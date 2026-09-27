@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
@@ -7,7 +6,6 @@ using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
 using Xunit;
@@ -47,11 +45,11 @@ public sealed class LocalBatchInspectionTests
             await File.WriteAllBytesAsync(Path.Combine(sourceRoot, "c.png"), [7, 8, 9]);
             await File.WriteAllTextAsync(Path.Combine(sourceRoot, "notes.txt"), "unsupported");
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             LocalBatchConfiguration configuration = new(sourceRoot, outputRoot, directory);
             RecordingHandler handler = new();
-            SqliteProcessingRepository processingRepository = new(database);
-            SqliteLocalBatchCatalogueRepository catalogueRepository = new(database);
+            PostgresProcessingRepository processingRepository = new(database);
+            PostgresLocalBatchCatalogueRepository catalogueRepository = new(database);
             LocalBatchCoordinator coordinator = new(
                 database,
                 catalogueRepository,
@@ -102,14 +100,14 @@ public sealed class LocalBatchInspectionTests
                 await encoder.EncodeAsync(CreateFrame(160, 160), stream, CancellationToken.None);
             }
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteLocalBatchRepository batchRepository = new(database);
+            PostgresLocalBatchRepository batchRepository = new(database);
             CatalogueSource sourceRecord = await batchRepository.GetOrCreateLocalFolderSourceAsync(
                 sourceRoot,
                 DateTimeOffset.UtcNow);
             LocalFolderAssetSource source = new(sourceRecord.Id, sourceRoot);
-            await new SqliteSourceCatalogueScanner(database).ScanAsync(
+            await new PostgresSourceCatalogueScanner(database).ScanAsync(
                 source,
                 sourceRecord,
                 new SourceScanOptions(),
@@ -120,7 +118,7 @@ public sealed class LocalBatchInspectionTests
             LocalBatchConfiguration configuration = new(sourceRoot, outputRoot, directory);
             using LocalInspectionJobHandler handler = new(
                 batchRepository,
-                new SqliteFaceCatalogueRepository(database),
+                new PostgresFaceCatalogueRepository(database),
                 configuration,
                 new OpenCvImageDecoder(),
                 encoder,
@@ -155,7 +153,7 @@ public sealed class LocalBatchInspectionTests
                 checkpointJson: checkpointWriter.LatestCheckpoint);
             await handler.ProcessAsync(resumed, checkpointWriter, CancellationToken.None);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(1, await CountAsync(connection, "face_occurrences"));
             Assert.Equal(1, await CountAsync(connection, "face_observations"));
             Assert.Equal(1, await CountAsync(connection, "face_crops"));
@@ -201,9 +199,9 @@ public sealed class LocalBatchInspectionTests
         return new ImageFrame(new ImageSize(width, height), PixelFormat.Bgr24, stride, data);
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
+    private static async Task<long> CountAsync(PostgresCompatibilityConnection connection, string table)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);

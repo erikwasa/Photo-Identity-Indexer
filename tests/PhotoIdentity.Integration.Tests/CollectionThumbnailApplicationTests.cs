@@ -3,11 +3,9 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using OpenCvSharp;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -42,9 +40,9 @@ public sealed class CollectionThumbnailApplicationTests
             string photoPath = Path.Combine(sourceRoot, "photo.png");
             await File.WriteAllBytesAsync(photoPath, image);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
 
             DateTimeOffset now = new(2026, 8, 2, 0, 0, 0, TimeSpan.Zero);
             CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync("Ada Lovelace", now);
@@ -54,8 +52,8 @@ public sealed class CollectionThumbnailApplicationTests
             FaceOccurrenceId faceId = FaceOccurrenceId.New();
             string contentHash = Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant();
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            using (SqliteCommand command = connection.CreateCommand())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
+            using (PostgresCompatibilityCommand command = connection.CreateCommand())
             {
                 command.CommandText = """
                     INSERT INTO sources (id, kind, root_locator, created_at_utc)
@@ -196,7 +194,7 @@ public sealed class CollectionThumbnailApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

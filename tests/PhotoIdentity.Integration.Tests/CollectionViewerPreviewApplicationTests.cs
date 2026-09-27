@@ -2,7 +2,6 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PhotoIdentity.Api;
@@ -10,7 +9,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -305,7 +303,7 @@ public sealed class CollectionViewerPreviewApplicationTests
         Directory.CreateDirectory(relativeDirectory);
         await File.WriteAllBytesAsync(Path.Combine(relativeDirectory, fileName), content);
 
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 8, 10, 20, 0, 0, TimeSpan.Zero);
         CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -319,7 +317,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             mediaType,
             10,
             8);
-        return (await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(
+        return (await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(
             source,
             asset,
             revision)).Id;
@@ -331,8 +329,8 @@ public sealed class CollectionViewerPreviewApplicationTests
         AssetRevisionId revisionId,
         byte[] content)
     {
-        SqliteCatalogueDatabase database = new(databasePath);
-        SqliteArchiveReviewProxyRepository repository = new(database);
+        PostgresTestCatalogueDatabase database = new(databasePath);
+        PostgresArchiveReviewProxyRepository repository = new(database);
         ReviewProxyProfile profile = new("test-preview", maximumLongEdge: 1600, jpegQuality: 78);
         DateTimeOffset now = new(2026, 8, 10, 20, 1, 0, TimeSpan.Zero);
         await repository.RegisterProfileAsync(profile, now);
@@ -360,9 +358,9 @@ public sealed class CollectionViewerPreviewApplicationTests
         string databasePath,
         AssetRevisionId revisionId)
     {
-        await using SqliteConnection connection = new($"Data Source={databasePath}");
+        await using PostgresCompatibilityConnection connection = new($"Data Source={databasePath}");
         await connection.OpenAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT availability.availability
             FROM archive_asset_availability AS availability
@@ -386,7 +384,7 @@ public sealed class CollectionViewerPreviewApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

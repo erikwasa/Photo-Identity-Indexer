@@ -1,7 +1,5 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using Xunit;
 
@@ -20,7 +18,7 @@ public sealed class LocalFolderCatalogueScannerTests
             string photoPath = Path.Combine(sourceDirectory, "photo.jpg");
             await File.WriteAllBytesAsync(photoPath, [1, 2, 3]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             SourceId sourceId = SourceId.New();
             LocalFolderAssetSource source = new(sourceId, sourceDirectory);
@@ -29,7 +27,7 @@ public sealed class LocalFolderCatalogueScannerTests
                 "local-folder",
                 sourceDirectory,
                 Utc(10));
-            SqliteSourceCatalogueScanner scanner = new(database);
+            PostgresSourceCatalogueScanner scanner = new(database);
 
             SourceCatalogueScanSummary first = await scanner.ScanAsync(
                 source,
@@ -79,7 +77,7 @@ public sealed class LocalFolderCatalogueScannerTests
             string photoPath = Path.Combine(sourceDirectory, "photo.png");
             await File.WriteAllBytesAsync(photoPath, [8, 9, 10]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             SourceId sourceId = SourceId.New();
             LocalFolderAssetSource source = new(sourceId, sourceDirectory);
@@ -88,7 +86,7 @@ public sealed class LocalFolderCatalogueScannerTests
                 "local-folder",
                 sourceDirectory,
                 Utc(10));
-            SqliteSourceCatalogueScanner scanner = new(database);
+            PostgresSourceCatalogueScanner scanner = new(database);
             await scanner.ScanAsync(source, catalogueSource, new SourceScanOptions(), Utc(10));
 
             CatalogueAsset asset = Assert.Single(await scanner.GetAssetsAsync(sourceId));
@@ -109,7 +107,7 @@ public sealed class LocalFolderCatalogueScannerTests
             Assert.Empty(await scanner.GetAssetsAsync(sourceId, includeDeleted: false));
             Assert.Single(await scanner.GetRevisionsAsync(asset.Id));
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(1, await CountAsync(connection, "person_labels"));
             Assert.Equal(1, await CountAsync(connection, "face_occurrences"));
         }
@@ -135,7 +133,7 @@ public sealed class LocalFolderCatalogueScannerTests
             await File.WriteAllBytesAsync(januaryPhoto, [1]);
             await File.WriteAllBytesAsync(februaryPhoto, [2]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             SourceId sourceId = SourceId.New();
             LocalFolderAssetSource source = new(sourceId, sourceDirectory);
@@ -144,7 +142,7 @@ public sealed class LocalFolderCatalogueScannerTests
                 "local-folder",
                 sourceDirectory,
                 Utc(10));
-            SqliteSourceCatalogueScanner scanner = new(database);
+            PostgresSourceCatalogueScanner scanner = new(database);
             await scanner.ScanAsync(source, catalogueSource, new SourceScanOptions(), Utc(10));
 
             File.Delete(januaryPhoto);
@@ -177,11 +175,11 @@ public sealed class LocalFolderCatalogueScannerTests
     }
 
     private static async Task SeedHumanLabelAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES ($face_id, $revision_id, 0, $now);
@@ -202,9 +200,9 @@ public sealed class LocalFolderCatalogueScannerTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
+    private static async Task<long> CountAsync(PostgresCompatibilityConnection connection, string table)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);

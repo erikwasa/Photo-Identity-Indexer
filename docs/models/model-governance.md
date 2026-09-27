@@ -88,7 +88,7 @@ Models produce observations and advisory suggestions. They do not own people or 
 
 ## Comparison and promotion
 
-Use the [multi-model comparison workflow](../operations/multi-model-comparison.md) to compare candidates under fixed source, detector, alignment, review and evaluation scope.
+The [historical multi-model comparison workflow](../operations/multi-model-comparison.md) documents the fixed source, detector, alignment, review and evaluation scope used for the accepted comparison. Its automation is retired; new comparison tooling must be separately scoped on PostgreSQL/provider-neutral contracts.
 
 A recommendation considers:
 

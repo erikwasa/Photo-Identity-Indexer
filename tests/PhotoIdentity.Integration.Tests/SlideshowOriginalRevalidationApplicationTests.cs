@@ -6,7 +6,6 @@ using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
@@ -73,7 +72,7 @@ public sealed class SlideshowOriginalRevalidationApplicationTests
         Directory.CreateDirectory(relativeDirectory);
         await File.WriteAllBytesAsync(Path.Combine(relativeDirectory, "photo.jpg"), content);
 
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 9, 12, 20, 30, 0, TimeSpan.Zero);
         CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -87,7 +86,7 @@ public sealed class SlideshowOriginalRevalidationApplicationTests
             "image/jpeg",
             100,
             100);
-        return (await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(
+        return (await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(
             source,
             asset,
             revision)).Id;

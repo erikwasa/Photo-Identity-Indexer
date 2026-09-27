@@ -1,6 +1,5 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PhotoIdentity.Testing.Postgres;
@@ -33,31 +32,6 @@ internal class WebApplicationFactory<TEntryPoint> :
     {
         builder.UseEnvironment("IntegrationTestPostgres");
         builder.ConfigureWebHost(webBuilder => webBuilder.UseStaticWebAssets());
-
-        // A number of mature endpoint fixtures override ConfigureWebHost without calling base and
-        // still provide only the historical PhotoIdentity:DatabasePath compatibility key. Host
-        // configuration is available before the minimal Program body runs, unlike generic app
-        // configuration callbacks, so translate that key here at bootstrap time. This preserves
-        // each fixture's isolated seeded PostgreSQL catalogue without restoring SQLite runtime use.
-        builder.ConfigureHostConfiguration(configuration =>
-        {
-            IConfiguration current = configuration.Build();
-            string? configuredConnectionString =
-                current["PhotoIdentity:Postgres:ConnectionString"];
-            if (!string.IsNullOrWhiteSpace(configuredConnectionString))
-            {
-                return;
-            }
-
-            string? compatibilityPath = current["PhotoIdentity:DatabasePath"];
-            string connectionString = !string.IsNullOrWhiteSpace(compatibilityPath)
-                ? PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(compatibilityPath)
-                : _databaseLease.ConnectionString;
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["PhotoIdentity:Postgres:ConnectionString"] = connectionString,
-            });
-        });
 
         if (DisableBackgroundWorkers)
         {
@@ -99,27 +73,27 @@ internal class WebApplicationFactory<TEntryPoint> :
 
 /// <summary>
 /// Shared host foundation for API integration tests.
-/// The historical database-path argument is retained only as a PostgreSQL compatibility key so
-/// existing fixtures can share seeded state with the API host while WI-0148 removes SQLite usage.
+/// A stable catalogue key lets existing fixtures share one isolated PostgreSQL database with the
+/// API host without repeating provider-specific setup in every test.
 /// </summary>
 internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
 {
-    private readonly string _databasePath;
+    private readonly string _catalogueKey;
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly bool _disableBackgroundWorkers;
-    private readonly bool _useCompatibilityDatabase;
+    private readonly bool _useSharedTestCatalogue;
 
     public PhotoIdentityApiTestFactory(
-        string databasePath,
+        string catalogueKey,
         Action<IWebHostBuilder>? configureWebHost = null,
         bool disableBackgroundWorkers = true,
-        bool useSqliteTestCompatibility = true)
+        bool useSharedTestCatalogue = true)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
-        _databasePath = databasePath;
+        ArgumentException.ThrowIfNullOrWhiteSpace(catalogueKey);
+        _catalogueKey = catalogueKey;
         _configureWebHost = configureWebHost;
         _disableBackgroundWorkers = disableBackgroundWorkers;
-        _useCompatibilityDatabase = useSqliteTestCompatibility;
+        _useSharedTestCatalogue = useSharedTestCatalogue;
     }
 
     protected override bool DisableBackgroundWorkers => _disableBackgroundWorkers;
@@ -128,12 +102,11 @@ internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity
     {
         base.ConfigureWebHost(builder);
 
-        if (_useCompatibilityDatabase)
+        if (_useSharedTestCatalogue)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
             builder.UseSetting(
                 "PhotoIdentity:Postgres:ConnectionString",
-                PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
+                PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_catalogueKey));
         }
 
         builder.UseSetting(WebHostDefaults.DetailedErrorsKey, "true");

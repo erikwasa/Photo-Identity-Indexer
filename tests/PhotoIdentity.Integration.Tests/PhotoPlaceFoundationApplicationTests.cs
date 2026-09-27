@@ -2,12 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -35,10 +33,10 @@ public sealed class PhotoPlaceFoundationApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             SeededRevision seeded = await CreateRevisionAsync(databasePath, directory);
-            SqliteCatalogueDatabase database = new(databasePath);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresTestCatalogueDatabase database = new(databasePath);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
             await tags.AddManualTagAsync(seeded.RevisionId, "Places/Sweden/Stockholm", "legacy:test");
-            await new SqlitePhotoPlaceRepository(database, TimeProvider.System).SetManualPlaceAsync(
+            await new PostgresPhotoPlaceRepository(database, TimeProvider.System).SetManualPlaceAsync(
                 seeded.RevisionId,
                 "Sweden/Stockholm",
                 "test");
@@ -134,9 +132,9 @@ public sealed class PhotoPlaceFoundationApplicationTests
                 await clear.Content.ReadFromJsonAsync<PhotoPlaceStateResponse>());
             Assert.Null(cleared.Place);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(3, await ReadCountAsync(
                 connection,
                 "SELECT COUNT(*) FROM photo_place_actions WHERE asset_revision_id = $revision_id;",
@@ -162,16 +160,16 @@ public sealed class PhotoPlaceFoundationApplicationTests
             string databasePath = Path.Combine(directory, "catalogue.db");
             SeededRevision coherent = await CreateRevisionAsync(databasePath, directory, "coherent.jpg");
             SeededRevision divergent = await CreateRevisionAsync(databasePath, directory, "divergent.jpg");
-            SqliteCatalogueDatabase database = new(databasePath);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresTestCatalogueDatabase database = new(databasePath);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
 
             await tags.AddManualTagAsync(coherent.RevisionId, "Places/Sweden", "legacy:test");
             await tags.AddManualTagAsync(coherent.RevisionId, "Places/Sweden/Stockholm", "legacy:test");
             await tags.AddManualTagAsync(divergent.RevisionId, "Places/Sweden/Stockholm", "legacy:test");
             await tags.AddManualTagAsync(divergent.RevisionId, "Places/USA/Stockholm", "legacy:test");
 
-            await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(database);
-            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
+            await PostgresPhotoPlaceSchemaCompatibility.EnsureAndMigrateAsync(database);
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
 
             CataloguePhotoPlaceState coherentState = await places.GetStateAsync(coherent.RevisionId);
             Assert.NotNull(coherentState.Place);
@@ -213,7 +211,7 @@ public sealed class PhotoPlaceFoundationApplicationTests
         string directory,
         string sourceKey = "photo.jpg")
     {
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         string sourceRoot = Path.Combine(
             directory,
@@ -234,17 +232,17 @@ public sealed class PhotoPlaceFoundationApplicationTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
         return new SeededRevision(saved.Id, sourceRoot);
     }
 
     private static async Task<long> ReadCountAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sql,
         string revisionId)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         command.Parameters.AddWithValue("$revision_id", revisionId);
         return Convert.ToInt64(await command.ExecuteScalarAsync());
@@ -281,7 +279,7 @@ public sealed class PhotoPlaceFoundationApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

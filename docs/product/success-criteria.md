@@ -20,7 +20,7 @@ The version-1 gate is satisfied when:
 - Full-resolution originals can be hydrated explicitly when needed, verified against the immutable revision and released again under configured storage limits.
 - Existing canonical people, identity assignments, rejections and append-only review history remain usable as permanent archive coverage grows.
 - Original photos remain read-only and are never modified by catalogue creation, review, tagging or metadata extraction.
-- The SQLite catalogue and its governed local artefacts can be backed up, restored and integrity-checked before permanent processing begins.
+- The PostgreSQL catalogue and its governed local artefacts can be backed up, restored and integrity-checked before permanent processing begins.
 - The operator documentation provides a clear path from a clean checkout to configuring, synchronising and advancing the permanent archive.
 
 The concrete version-1 readiness work is represented by the permanent-ingestion, bounded-storage and archive-format work in M12. Once those gates pass, the first real archive folders may be added to the permanent catalogue and processing can continue incrementally from there.
@@ -35,6 +35,6 @@ The following are valuable planned capabilities but are not required to declare 
 - favorite people, Unknown review state and web-based match regeneration;
 - simplified Review/Library navigation and packaged Windows startup;
 - EXIF/location smart collections and visible-content tagging; and
-- optional Azure scale-out or later production-model experiments.
+- later production-model experiments; any future remote compute requires a new accepted architecture decision.
 
 Trust remains more important than raw automation rate. Automatic identity assignment is an accepted future direction, but it must be explicit, configurable, auditable and correctable rather than silently changing historical decisions.

@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -17,7 +15,7 @@ public sealed class ReviewQueueNavigationApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededQueue seeded = await SeedQueueAsync(database);
 
@@ -79,7 +77,7 @@ public sealed class ReviewQueueNavigationApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededQueue seeded = await SeedQueueAsync(database);
 
@@ -98,7 +96,7 @@ public sealed class ReviewQueueNavigationApplicationTests
         }
     }
 
-    private static async Task<SeededQueue> SeedQueueAsync(SqliteCatalogueDatabase database)
+    private static async Task<SeededQueue> SeedQueueAsync(PostgresTestCatalogueDatabase database)
     {
         string sourceRoot = Path.Combine(Path.GetTempPath(), "private-queue", Guid.NewGuid().ToString("N"));
         string sourceId = Guid.NewGuid().ToString("D");
@@ -110,8 +108,8 @@ public sealed class ReviewQueueNavigationApplicationTests
         string oldestFaceId = Guid.NewGuid().ToString("D");
         string now = new DateTimeOffset(2026, 7, 30, 20, 0, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', $source_root, $now);

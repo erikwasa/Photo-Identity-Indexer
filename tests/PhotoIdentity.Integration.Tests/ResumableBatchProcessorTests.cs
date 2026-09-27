@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 using System.Text.Json;
 using Xunit;
@@ -12,22 +11,22 @@ public sealed class ResumableBatchProcessorTests
     [Fact]
     public async Task Interrupted_run_repeats_only_the_active_job_after_lease_expiry()
     {
-        string directory = SqliteProcessingRepositoryTests.CreateTemporaryDirectory();
+        string directory = PostgresProcessingRepositoryTests.CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions =
-                await SqliteProcessingRepositoryTests.SeedRevisionsAsync(database, 3);
+                await PostgresProcessingRepositoryTests.SeedRevisionsAsync(database, 3);
             DateTimeOffset now = new(2026, 7, 26, 11, 0, 0, TimeSpan.Zero);
-            CatalogueProcessingRun run = SqliteProcessingRepositoryTests.CreateRun(now);
+            CatalogueProcessingRun run = PostgresProcessingRepositoryTests.CreateRun(now);
             CatalogueProcessingJob[] jobs =
             [
                 CreateOrderedJob(1, run.Id, revisions[0].Id, now),
                 CreateOrderedJob(2, run.Id, revisions[1].Id, now),
                 CreateOrderedJob(3, run.Id, revisions[2].Id, now),
             ];
-            SqliteProcessingRepository repository = new(database);
+            PostgresProcessingRepository repository = new(database);
             await repository.CreateRunAsync(run, jobs);
 
             ManualTimeProvider time = new(now);
@@ -75,28 +74,28 @@ public sealed class ResumableBatchProcessorTests
         }
         finally
         {
-            SqliteProcessingRepositoryTests.DeleteTemporaryDirectory(directory);
+            PostgresProcessingRepositoryTests.DeleteTemporaryDirectory(directory);
         }
     }
 
     [Fact]
     public async Task Transient_failure_retries_but_permanent_failure_is_terminal()
     {
-        string directory = SqliteProcessingRepositoryTests.CreateTemporaryDirectory();
+        string directory = PostgresProcessingRepositoryTests.CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions =
-                await SqliteProcessingRepositoryTests.SeedRevisionsAsync(database, 2);
+                await PostgresProcessingRepositoryTests.SeedRevisionsAsync(database, 2);
             DateTimeOffset now = new(2026, 7, 26, 11, 10, 0, TimeSpan.Zero);
-            CatalogueProcessingRun run = SqliteProcessingRepositoryTests.CreateRun(now);
+            CatalogueProcessingRun run = PostgresProcessingRepositoryTests.CreateRun(now);
             CatalogueProcessingJob[] jobs =
             [
                 CreateOrderedJob(1, run.Id, revisions[0].Id, now),
                 CreateOrderedJob(2, run.Id, revisions[1].Id, now),
             ];
-            SqliteProcessingRepository repository = new(database);
+            PostgresProcessingRepository repository = new(database);
             await repository.CreateRunAsync(run, jobs);
 
             ManualTimeProvider time = new(now);
@@ -126,7 +125,7 @@ public sealed class ResumableBatchProcessorTests
         }
         finally
         {
-            SqliteProcessingRepositoryTests.DeleteTemporaryDirectory(directory);
+            PostgresProcessingRepositoryTests.DeleteTemporaryDirectory(directory);
         }
     }
 
@@ -134,19 +133,19 @@ public sealed class ResumableBatchProcessorTests
     public async Task Fifty_job_sample_produces_complete_status_summary()
     {
         const int sampleSize = 50;
-        string directory = SqliteProcessingRepositoryTests.CreateTemporaryDirectory();
+        string directory = PostgresProcessingRepositoryTests.CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions =
-                await SqliteProcessingRepositoryTests.SeedRevisionsAsync(database, sampleSize);
+                await PostgresProcessingRepositoryTests.SeedRevisionsAsync(database, sampleSize);
             DateTimeOffset now = new(2026, 7, 26, 11, 20, 0, TimeSpan.Zero);
-            CatalogueProcessingRun run = SqliteProcessingRepositoryTests.CreateRun(now);
+            CatalogueProcessingRun run = PostgresProcessingRepositoryTests.CreateRun(now);
             CatalogueProcessingJob[] jobs = revisions
-                .Select(revision => SqliteProcessingRepositoryTests.CreateJob(run.Id, revision.Id, now))
+                .Select(revision => PostgresProcessingRepositoryTests.CreateJob(run.Id, revision.Id, now))
                 .ToArray();
-            SqliteProcessingRepository repository = new(database);
+            PostgresProcessingRepository repository = new(database);
             await repository.CreateRunAsync(run, jobs);
 
             RecordingHandler handler = new();
@@ -168,7 +167,7 @@ public sealed class ResumableBatchProcessorTests
         }
         finally
         {
-            SqliteProcessingRepositoryTests.DeleteTemporaryDirectory(directory);
+            PostgresProcessingRepositoryTests.DeleteTemporaryDirectory(directory);
         }
     }
 

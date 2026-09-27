@@ -3,9 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -20,10 +18,10 @@ public sealed class BulkReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             FaceOccurrenceId[] faces = await SeedFacesAsync(database, 3);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             DateTimeOffset now = new(2026, 7, 27, 18, 0, 0, TimeSpan.Zero);
             CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync("Ada", now);
             await reviewRepository.RejectAsync(
@@ -51,7 +49,7 @@ public sealed class BulkReviewApplicationTests
             Assert.Equal(person.Id.ToString(), preview.Person?.Id);
             Assert.Equal(64, preview.PreviewToken.Length);
 
-            await using (SqliteConnection beforeCommit = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection beforeCommit = await database.OpenConnectionAsync())
             {
                 Assert.Equal(0, await ReadInt64Async(beforeCommit, "SELECT COUNT(*) FROM person_labels;"));
                 Assert.Equal(1, await ReadInt64Async(beforeCommit, "SELECT COUNT(*) FROM review_actions;"));
@@ -81,7 +79,7 @@ public sealed class BulkReviewApplicationTests
             Assert.Equal(2, result.AffectedCount);
             Assert.Equal(person.Id.ToString(), result.Person?.Id);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(2, await ReadInt64Async(connection, "SELECT COUNT(*) FROM person_labels WHERE label_kind = 'manual';"));
             Assert.Equal(2, await ReadInt64Async(connection, "SELECT COUNT(*) FROM review_actions WHERE action_kind = 'assign';"));
             Assert.Equal(1, await ReadInt64Async(connection, "SELECT COUNT(*) FROM review_actions WHERE action_kind = 'reject';"));
@@ -114,7 +112,7 @@ public sealed class BulkReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             FaceOccurrenceId[] faces = await SeedFacesAsync(database, 2);
 
@@ -131,7 +129,7 @@ public sealed class BulkReviewApplicationTests
                 await previewResponse.Content.ReadFromJsonAsync<BulkReviewPreviewResponse>());
             Assert.Equal(2, preview.AffectedCount);
 
-            SqliteReviewRepository repository = new(database);
+            PostgresReviewRepository repository = new(database);
             await repository.RejectAsync(
                 faces[0],
                 "other-reviewer",
@@ -152,7 +150,7 @@ public sealed class BulkReviewApplicationTests
             string conflict = await commitResponse.Content.ReadAsStringAsync();
             Assert.Contains("Preview", conflict, StringComparison.OrdinalIgnoreCase);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(1, await ReadInt64Async(connection, "SELECT COUNT(*) FROM review_actions;"));
             CatalogueReviewFace untouched = Assert.IsType<CatalogueReviewFace>(
                 await repository.GetFaceAsync(faces[1]));
@@ -165,7 +163,7 @@ public sealed class BulkReviewApplicationTests
     }
 
     private static async Task<FaceOccurrenceId[]> SeedFacesAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         int count)
     {
         string now = new DateTimeOffset(2026, 7, 27, 17, 50, 0, TimeSpan.Zero).ToString("O");
@@ -173,8 +171,8 @@ public sealed class BulkReviewApplicationTests
         string assetId = Guid.NewGuid().ToString("D");
         string revisionId = Guid.NewGuid().ToString("D");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using (SqliteCommand seed = connection.CreateCommand())
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using (PostgresCompatibilityCommand seed = connection.CreateCommand())
         {
             seed.CommandText = """
                 INSERT INTO sources (id, kind, root_locator, created_at_utc)
@@ -200,7 +198,7 @@ public sealed class BulkReviewApplicationTests
             .ToArray();
         for (int index = 0; index < faces.Length; index++)
         {
-            using SqliteCommand insert = connection.CreateCommand();
+            using PostgresCompatibilityCommand insert = connection.CreateCommand();
             insert.CommandText = """
                 INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                     VALUES ($face_id, $revision_id, $ordinal, $now);
@@ -215,9 +213,9 @@ public sealed class BulkReviewApplicationTests
         return faces;
     }
 
-    private static async Task<long> ReadInt64Async(SqliteConnection connection, string sql)
+    private static async Task<long> ReadInt64Async(PostgresCompatibilityConnection connection, string sql)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);
@@ -252,7 +250,7 @@ public sealed class BulkReviewApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

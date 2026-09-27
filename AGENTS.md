@@ -16,7 +16,7 @@
 - Core/domain code must not expose EF Core, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
 - Personal OneDrive is accessed through the Windows sync client, not Microsoft Graph.
 - Production model execution and archive processing run on maintainer-controlled local hardware; ADR-0010 supersedes the earlier disposable-Azure strategy.
-- PostgreSQL is the sole writable production catalogue. SQLite support is compatibility/migration/rollback tooling unless a future ADR changes that authority boundary.
+- PostgreSQL is the sole writable production catalogue. The SQLite implementation and executable compatibility paths are retired; preserved SQLite material is historical migration evidence only unless a future ADR changes that authority boundary.
 - Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.

@@ -13,11 +13,11 @@ public sealed class DetectorRolloutCommandTests
             ["rollout", "status", "--run", run], new StringWriter(), absent));
         Assert.Contains("PostgreSQL is the only supported rollout catalogue", absent.ToString());
 
-        StringWriter sqlite = new();
+        StringWriter unsupportedDatabaseOption = new();
         Assert.Equal(2, await Program.RunAsync(
             ["rollout", "status", "--run", run, "--database", "catalogue.db"],
-            new StringWriter(), sqlite));
-        Assert.Contains("Unknown option '--database'", sqlite.ToString());
+            new StringWriter(), unsupportedDatabaseOption));
+        Assert.Contains("Unknown option '--database'", unsupportedDatabaseOption.ToString());
 
         StringWriter missing = new();
         Assert.Equal(2, await Program.RunAsync(
@@ -125,7 +125,7 @@ public sealed class DetectorRolloutCommandTests
     }
 
     [Fact]
-    public async Task Help_identifies_rollout_as_separate_fixed_pipeline_path()
+    public async Task Help_lists_only_the_PostgreSQL_rollout_path()
     {
         StringWriter output = new();
         StringWriter error = new();
@@ -133,9 +133,9 @@ public sealed class DetectorRolloutCommandTests
         int exit = await Program.RunAsync(["help"], output, error);
 
         Assert.Equal(0, exit);
-        Assert.Contains("rollout start", output.ToString(), StringComparison.Ordinal);
-        Assert.Contains("fixed to the governed CenterFace 0.5", output.ToString(), StringComparison.Ordinal);
-        Assert.Contains("batch command is not a detector-migration mechanism", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("rollout start --postgres-connection-env NAME", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("rollout apply --postgres-connection-env NAME", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("--database", output.ToString(), StringComparison.Ordinal);
         Assert.Equal(string.Empty, error.ToString());
     }
 }

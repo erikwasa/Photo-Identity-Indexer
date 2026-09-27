@@ -3,9 +3,9 @@ using PhotoIdentity.Persistence.Postgres;
 namespace PhotoIdentity.Integration.Tests;
 
 /// <summary>
-/// Compatibility shims for mature fixtures that explicitly invoked SQLite schema guards.
-/// PostgreSQL catalogue initialization owns these schemas, so no repository-local migration step
-/// is required after PostgresTestCatalogueDatabase.InitializeAsync has completed.
+/// Compatibility shim for mature fixtures that explicitly invoked repository-local schema guards.
+/// PostgreSQL catalogue initialization owns these schemas, so no additional migration step is
+/// required after PostgresTestCatalogueDatabase.InitializeAsync has completed.
 /// </summary>
 internal static class PostgresLegacySchemaCompatibilityExtensions
 {

@@ -37,7 +37,7 @@ The packager:
 1. publishes `src/PhotoIdentity.Api` self-contained for `win-x64`;
 2. places application binaries under `app`;
 3. adds `PhotoIdentity.cmd`, `Start-PhotoIdentity.ps1`, `README.txt`, a safe launcher-configuration example and `package-manifest.json`;
-4. rejects an accidental real `PhotoIdentity.launcher.json` or SQLite database in the package; and
+4. rejects an accidental real `PhotoIdentity.launcher.json` or database file in the package; and
 5. creates the ZIP and prints compressed/uncompressed package size.
 
 The CI `package-verification` job runs the same package path on Windows and uploads the resulting ZIP as a short-lived workflow artifact.
@@ -66,7 +66,7 @@ By default, Photo Identity uses:
 %LOCALAPPDATA%\PhotoIdentity
 ```
 
-for local durable application state such as the default catalogue, archive analysis output and launcher logs. Private installations may configure other local non-OneDrive paths where the existing operating policy requires them.
+for local durable application state such as archive analysis output and launcher logs. PostgreSQL catalogue storage is owned by the separately managed local database service. Private installations may configure other local non-OneDrive paths where the existing operating policy requires them.
 
 Optional launcher configuration belongs at:
 
@@ -132,7 +132,7 @@ These are process-startup settings. Edit `launcher.json`, restart Photo Identity
 
 Do not place any of these inside the extracted package directory:
 
-- the canonical SQLite catalogue;
+- PostgreSQL data or logical catalogue backups;
 - archive-analysis output;
 - review proxies;
 - private photos or crops;
@@ -149,7 +149,7 @@ Use side-by-side replacement rather than overwriting a running application folde
 4. confirm the existing catalogue, settings and expected Review/Library state are present; and
 5. delete the old package folder only after the new package is verified.
 
-No catalogue migration or private-data copy is part of a normal package replacement because durable state is outside both package folders. Normal database schema migration remains the application's existing startup responsibility and must continue to follow the SQLite backup/restore policy for risky maintenance.
+No catalogue migration or private-data copy is part of a normal package replacement because durable state is outside both package folders. Normal database schema migration remains the application's existing startup responsibility; use the PostgreSQL backup and isolated restore-verification procedure before risky maintenance.
 
 ## Verification
 

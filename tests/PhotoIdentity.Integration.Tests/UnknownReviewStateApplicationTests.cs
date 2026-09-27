@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -23,7 +22,7 @@ public sealed class UnknownReviewStateApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 20, 0, 0, TimeSpan.Zero);
             FaceOccurrenceId faceId = await SeedFaceAsync(database, directory, [1f, 0f, 0f], 0, now);
@@ -109,21 +108,21 @@ public sealed class UnknownReviewStateApplicationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 20, 30, 0, TimeSpan.Zero);
             FaceOccurrenceId target = await SeedFaceAsync(database, directory, [1f, 0f, 0f], 0, now);
             FaceOccurrenceId firstExemplar = await SeedFaceAsync(database, directory, [1f, 0f, 0f], 1, now);
             FaceOccurrenceId secondExemplar = await SeedFaceAsync(database, directory, [0f, 1f, 0f], 2, now);
 
-            SqliteReviewRepository review = new(database);
+            PostgresReviewRepository review = new(database);
             CatalogueReviewPerson firstPerson = await review.CreatePersonAsync("First", now);
             CatalogueReviewPerson secondPerson = await review.CreatePersonAsync("Second", now.AddSeconds(1));
             await review.AssignAsync(firstExemplar, firstPerson.Id, "human:test", now.AddMinutes(1));
             await review.AssignAsync(secondExemplar, secondPerson.Id, "human:test", now.AddMinutes(2));
             await review.MarkUnknownAsync(target, "human:test", now.AddMinutes(3), "Real face, unknown identity.");
 
-            SqliteIdentityMatcher matcher = new(database);
+            PostgresIdentityMatcher matcher = new(database);
             IdentityMatchSummary normal = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
             Assert.Equal(new IdentityMatchSummary(0, 0, 0), normal);
             Assert.Empty(await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash));
@@ -144,7 +143,7 @@ public sealed class UnknownReviewStateApplicationTests
             Assert.Equal(CatalogueReviewStates.Unknown, stillUnknown.State);
             Assert.Null(stillUnknown.Person);
 
-            _ = await new SqliteIdentitySuggestionPolicyRepository(database).UpdateAsync(
+            _ = await new PostgresIdentitySuggestionPolicyRepository(database).UpdateAsync(
                 EmbeddingModelId,
                 EmbeddingModelHash,
                 autoAssignEnabled: true,
@@ -152,14 +151,14 @@ public sealed class UnknownReviewStateApplicationTests
                 highMarginThreshold: 0.2,
                 mediumScoreThreshold: 0.5,
                 actor: "human:test");
-            IdentityAutoAssignmentSummary autoSummary = await new SqliteIdentityAutoAssignmentService(database)
+            IdentityAutoAssignmentSummary autoSummary = await new PostgresIdentityAutoAssignmentCompatibilityService(database)
                 .ApplyAsync(EmbeddingModelId, EmbeddingModelHash);
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), autoSummary);
             Assert.Equal(
                 CatalogueReviewStates.Unknown,
                 Assert.IsType<CatalogueReviewFace>(await review.GetFaceAsync(target)).State);
 
-            CatalogueCollectionPhotoPage collection = await new SqliteCollectionQueryRepository(database)
+            CatalogueCollectionPhotoPage collection = await new PostgresCollectionQueryRepository(database)
                 .QueryPhotosAsync(
                     [firstPerson.Id],
                     CatalogueCollectionMatchModes.Any,
@@ -179,22 +178,22 @@ public sealed class UnknownReviewStateApplicationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 21, 0, 0, TimeSpan.Zero);
             FaceOccurrenceId hiddenExemplar = await SeedFaceAsync(database, directory, [1f, 0f, 0f], 0, now);
             FaceOccurrenceId target = await SeedFaceAsync(database, directory, [1f, 0f, 0f], 1, now);
 
-            SqliteReviewRepository review = new(database);
+            PostgresReviewRepository review = new(database);
             CatalogueReviewPerson person = await review.CreatePersonAsync("Hidden exemplar", now);
             await review.AssignAsync(hiddenExemplar, person.Id, "human:test", now.AddMinutes(1));
             await review.MarkUnknownAsync(hiddenExemplar, "human:test", now.AddMinutes(2));
 
-            IdentityMatchSummary summary = await new SqliteIdentityMatcher(database)
+            IdentityMatchSummary summary = await new PostgresIdentityMatcher(database)
                 .RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
 
             Assert.Equal(new IdentityMatchSummary(1, 0, 0), summary);
-            Assert.Empty(await new SqliteIdentityMatcher(database)
+            Assert.Empty(await new PostgresIdentityMatcher(database)
                 .GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash));
             Assert.Equal(
                 CatalogueReviewStates.Unknown,
@@ -207,7 +206,7 @@ public sealed class UnknownReviewStateApplicationTests
     }
 
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory,
         float[] vector,
         int index,
@@ -230,7 +229,7 @@ public sealed class UnknownReviewStateApplicationTests
             "image/jpeg",
             640,
             480);
-        CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
@@ -261,7 +260,7 @@ public sealed class UnknownReviewStateApplicationTests
                 new EmbeddingVector(vector),
                 now.AddMinutes(index)));
 
-        CatalogueFaceInspection persisted = await new SqliteFaceCatalogueRepository(database).SaveInspectionAsync(
+        CatalogueFaceInspection persisted = await new PostgresFaceCatalogueRepository(database).SaveInspectionAsync(
             inspection.Occurrence,
             inspection.Observation,
             inspection.Crop,
@@ -306,7 +305,7 @@ public sealed class UnknownReviewStateApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

@@ -3,7 +3,6 @@ using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -17,9 +16,9 @@ public sealed class PhotoMetadataBackfillServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             await CreateRevisionForFileAsync(repository, directory, "photo.jpg", [1, 2, 3, 4]);
             FakeFilesOnDemandPlatform platform = new(AssetAvailability.OnlineOnly);
             FakeMetadataReader reader = new();
@@ -44,9 +43,9 @@ public sealed class PhotoMetadataBackfillServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             AssetRevisionId revisionId = await CreateRevisionForFileAsync(
                 repository,
                 directory,
@@ -58,9 +57,9 @@ public sealed class PhotoMetadataBackfillServiceTests
 
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync();
             PhotoCaptureMetadata? persisted = await repository.GetPhotoMetadataAsync(revisionId);
-            CatalogueExtendedPhotoMetadata? extended = await new SqliteExtendedPhotoMetadataRepository(database)
+            CatalogueExtendedPhotoMetadata? extended = await new PostgresExtendedPhotoMetadataRepository(database)
                 .GetAsync(revisionId);
-            CataloguePhotoMetadataInspection? inspection = await new SqlitePhotoMetadataInspectionRepository(database)
+            CataloguePhotoMetadataInspection? inspection = await new PostgresPhotoMetadataInspectionRepository(database)
                 .GetAsync(revisionId);
 
             Assert.Equal(1, report.Persisted);
@@ -94,9 +93,9 @@ public sealed class PhotoMetadataBackfillServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             AssetRevisionId revisionId = await CreateRevisionForFileAsync(
                 repository,
                 directory,
@@ -111,8 +110,8 @@ public sealed class PhotoMetadataBackfillServiceTests
                     18.0),
                 DateTimeOffset.UtcNow);
 
-            Assert.Null(await new SqliteExtendedPhotoMetadataRepository(database).GetAsync(revisionId));
-            Assert.Null(await new SqlitePhotoMetadataInspectionRepository(database).GetAsync(revisionId));
+            Assert.Null(await new PostgresExtendedPhotoMetadataRepository(database).GetAsync(revisionId));
+            Assert.Null(await new PostgresPhotoMetadataInspectionRepository(database).GetAsync(revisionId));
 
             FakeMetadataReader reader = new(RichMetadata());
             PhotoMetadataBackfillService service = CreateService(
@@ -122,9 +121,9 @@ public sealed class PhotoMetadataBackfillServiceTests
                 reader);
 
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync();
-            CatalogueExtendedPhotoMetadata? extended = await new SqliteExtendedPhotoMetadataRepository(database)
+            CatalogueExtendedPhotoMetadata? extended = await new PostgresExtendedPhotoMetadataRepository(database)
                 .GetAsync(revisionId);
-            CataloguePhotoMetadataInspection? inspection = await new SqlitePhotoMetadataInspectionRepository(database)
+            CataloguePhotoMetadataInspection? inspection = await new PostgresPhotoMetadataInspectionRepository(database)
                 .GetAsync(revisionId);
 
             Assert.Equal(1, report.Persisted);
@@ -149,9 +148,9 @@ public sealed class PhotoMetadataBackfillServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             AssetRevisionId revisionId = await CreateRevisionForFileAsync(
                 repository,
                 directory,
@@ -174,7 +173,7 @@ public sealed class PhotoMetadataBackfillServiceTests
             Assert.Equal(0, platform.HydrationRequests);
             Assert.Equal(
                 PhotoMetadataExtractionContract.CurrentVersion,
-                (await new SqlitePhotoMetadataInspectionRepository(database).GetAsync(revisionId))?.ExtractionContractVersion);
+                (await new PostgresPhotoMetadataInspectionRepository(database).GetAsync(revisionId))?.ExtractionContractVersion);
         }
         finally
         {
@@ -188,9 +187,9 @@ public sealed class PhotoMetadataBackfillServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             AssetRevisionId revisionId = await CreateRevisionForFileAsync(
                 repository,
                 directory,
@@ -209,7 +208,7 @@ public sealed class PhotoMetadataBackfillServiceTests
             Assert.Equal(1, report.Candidates);
             Assert.Equal(0, report.Persisted);
             Assert.Equal(1, report.DeferredNonLocal);
-            Assert.Null(await new SqlitePhotoMetadataInspectionRepository(database).GetAsync(revisionId));
+            Assert.Null(await new PostgresPhotoMetadataInspectionRepository(database).GetAsync(revisionId));
             Assert.Equal(0, reader.ReadCount);
             Assert.Equal(0, platform.HydrationRequests);
         }
@@ -225,12 +224,12 @@ public sealed class PhotoMetadataBackfillServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             AssetRevisionId first = await CreateRevisionForFileAsync(repository, directory, "first.jpg", [1]);
             AssetRevisionId second = await CreateRevisionForFileAsync(repository, directory, "second.jpg", [2]);
-            SqlitePhotoMetadataBackfillRepository backfill = new(database);
+            PostgresPhotoMetadataBackfillRepository backfill = new(database);
 
             IReadOnlyList<PhotoMetadataBackfillCandidate> firstPage = await backfill.GetCandidatesAsync(1, 0);
             IReadOnlyList<PhotoMetadataBackfillCandidate> secondPage = await backfill.GetCandidatesAsync(1, 1);
@@ -267,25 +266,25 @@ public sealed class PhotoMetadataBackfillServiceTests
         ]);
 
     private static PhotoMetadataBackfillService CreateService(
-        SqliteCatalogueDatabase database,
-        SqliteAssetCatalogueRepository repository,
+        PostgresTestCatalogueDatabase database,
+        PostgresAssetCatalogueRepository repository,
         IOneDriveFilesOnDemandPlatform platform,
         IPhotoMetadataReader reader)
     {
         PhotoMetadataInspectionService inspection = new(
             repository,
-            new SqliteExtendedPhotoMetadataRepository(database),
-            new SqlitePhotoMetadataInspectionRepository(database),
+            new PostgresExtendedPhotoMetadataRepository(database),
+            new PostgresPhotoMetadataInspectionRepository(database),
             reader,
             TimeProvider.System);
         return new PhotoMetadataBackfillService(
-            new SqlitePhotoMetadataBackfillRepository(database),
+            new PostgresPhotoMetadataBackfillRepository(database),
             platform,
             inspection);
     }
 
     private static async Task<AssetRevisionId> CreateRevisionForFileAsync(
-        SqliteAssetCatalogueRepository repository,
+        PostgresAssetCatalogueRepository repository,
         string root,
         string sourceKey,
         byte[] content)

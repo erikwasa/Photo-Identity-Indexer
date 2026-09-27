@@ -1,9 +1,7 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity.Integration.Tests;
@@ -25,7 +23,7 @@ public sealed class SourceCopyPurgePartialAnalysisTests
 
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
             await database.InitializeAsync();
 
             SourceId sourceId = SourceId.New();
@@ -36,9 +34,9 @@ public sealed class SourceCopyPurgePartialAnalysisTests
             DateTimeOffset now = new(2026, 9, 26, 1, 0, 0, TimeSpan.Zero);
             const string sourceKey = "Private/partial-analysis.jpg";
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand seed = connection.CreateCommand();
+                using PostgresCompatibilityCommand seed = connection.CreateCommand();
                 seed.CommandText = """
                     CREATE TABLE IF NOT EXISTS archive_analysis_runs (
                         processing_run_id TEXT NOT NULL PRIMARY KEY,
@@ -114,11 +112,11 @@ public sealed class SourceCopyPurgePartialAnalysisTests
             Directory.CreateDirectory(partialDirectory);
             await File.WriteAllTextAsync(Path.Combine(partialDirectory, "partial.tmp"), "partial-analysis");
 
-            SqliteSourceCopyExclusionRepository exclusions = new(database);
+            PostgresSourceCopyExclusionRepository exclusions = new(database);
             await exclusions.ExcludeAsync(sourceId, sourceKey, now.AddMinutes(1));
             SourceCopyPurgeService service = new(
                 exclusions,
-                new SqliteSourceCopyPurgeRepository(database),
+                new PostgresSourceCopyPurgeRepository(database),
                 new SourceCopyPurgeRoots(fallbackAnalysisRoot, reviewRoot, detectorRoot),
                 new SourceCopyPurgeFileSystem(),
                 TimeProvider.System);
@@ -126,9 +124,9 @@ public sealed class SourceCopyPurgePartialAnalysisTests
             Assert.True(await service.PurgeAsync(sourceId, sourceKey));
             Assert.False(Directory.Exists(partialDirectory));
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand count = connection.CreateCommand();
+                using PostgresCompatibilityCommand count = connection.CreateCommand();
                 count.CommandText = "SELECT COUNT(*) FROM assets;";
                 Assert.Equal(0L, Convert.ToInt64(await count.ExecuteScalarAsync(), CultureInfo.InvariantCulture));
             }
@@ -139,7 +137,7 @@ public sealed class SourceCopyPurgePartialAnalysisTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            PostgresCompatibilityConnection.ClearAllPools();
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);

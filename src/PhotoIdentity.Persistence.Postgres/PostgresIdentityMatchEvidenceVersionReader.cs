@@ -6,8 +6,8 @@ using PhotoIdentity.Core.Review;
 namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
-/// Reads the same monotonic identity-affecting evidence counters as the accepted SQLite
-/// implementation. Embedding evidence is scoped to one exact model revision; review,
+/// Reads the monotonic identity-affecting evidence counters used by durable regeneration.
+/// Embedding evidence is scoped to one exact model revision; review,
 /// suggestion-decision and person-merge counters are catalogue-wide by design.
 /// </summary>
 public sealed class PostgresIdentityMatchEvidenceVersionReader :

@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -17,7 +15,7 @@ public sealed class ReviewSuggestionApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             string faceId = Guid.NewGuid().ToString();
@@ -69,7 +67,7 @@ public sealed class ReviewSuggestionApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             string faceId = Guid.NewGuid().ToString();
@@ -106,7 +104,7 @@ public sealed class ReviewSuggestionApplicationTests
             Assert.Equal("human:test", action.Actor);
             Assert.Equal("Identity confirmed.", action.Note);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -141,7 +139,7 @@ public sealed class ReviewSuggestionApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             string faceId = Guid.NewGuid().ToString();
@@ -181,7 +179,7 @@ public sealed class ReviewSuggestionApplicationTests
             Assert.Equal("unreviewed", details.Face.State);
             Assert.Empty(details.Actions);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -204,7 +202,7 @@ public sealed class ReviewSuggestionApplicationTests
     }
 
     private static async Task<long> SeedSuggestionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string faceId,
         string personId,
         string modelHash,
@@ -215,8 +213,8 @@ public sealed class ReviewSuggestionApplicationTests
         string assetId = Guid.NewGuid().ToString();
         string revisionId = Guid.NewGuid().ToString();
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using (SqliteCommand command = connection.CreateCommand())
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using (PostgresCompatibilityCommand command = connection.CreateCommand())
         {
             command.CommandText = """
                 INSERT INTO sources (id, kind, root_locator, created_at_utc)
@@ -301,7 +299,7 @@ public sealed class ReviewSuggestionApplicationTests
             await command.ExecuteNonQueryAsync();
         }
 
-        using SqliteCommand read = connection.CreateCommand();
+        using PostgresCompatibilityCommand read = connection.CreateCommand();
         read.CommandText = """
             SELECT id
             FROM identity_suggestions
@@ -318,11 +316,11 @@ public sealed class ReviewSuggestionApplicationTests
     }
 
     private static async Task<long> ReadInt64Async(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sql,
         params (string Name, object Value)[] parameters)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         foreach ((string name, object value) in parameters)
         {

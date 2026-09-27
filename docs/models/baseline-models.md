@@ -47,7 +47,7 @@ A baseline is identified by model ID, exact SHA-256 and preprocessing/alignment 
 
 See:
 
-- [Multi-model comparison workflow](../operations/multi-model-comparison.md)
+- [Historical multi-model comparison evidence](../operations/multi-model-comparison.md)
 - [Candidate models](candidate-models.md)
 - [Model manifests and governance](model-governance.md)
 - [Recognition and identity matching](../architecture/identity-matching.md)

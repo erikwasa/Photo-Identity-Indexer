@@ -2,9 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -30,7 +28,7 @@ public sealed class CollectionContentApplicationTests
             string outsidePath = Path.Combine(directory, "outside.png");
             await File.WriteAllBytesAsync(outsidePath, image);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 8, 1, 21, 0, 0, TimeSpan.Zero);
@@ -41,8 +39,8 @@ public sealed class CollectionContentApplicationTests
             AssetRevisionId escapeRevisionId = AssetRevisionId.New();
             string contentHash = Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant();
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            using (SqliteCommand command = connection.CreateCommand())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
+            using (PostgresCompatibilityCommand command = connection.CreateCommand())
             {
                 command.CommandText = """
                     INSERT INTO sources (id, kind, root_locator, created_at_utc)
@@ -184,7 +182,7 @@ public sealed class CollectionContentApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

@@ -2395,8 +2395,7 @@ public sealed class PostgresCatalogueDatabaseTests
                     refresh: true));
 
             // WI-0099 acceptance: exercise independent archive/background writers
-            // concurrently against PostgreSQL. These operations previously shared
-            // SQLite's single-writer ceiling and could participate in host-stopping
+            // concurrently against PostgreSQL without participating in host-stopping
             // lock contention.
             IArchiveAdvancementControlRepository concurrentAdvancement =
                 new PostgresArchiveAdvancementControlRepository(database);

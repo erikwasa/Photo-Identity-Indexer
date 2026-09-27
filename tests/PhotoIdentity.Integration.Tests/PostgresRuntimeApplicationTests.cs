@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -59,7 +58,7 @@ public sealed class PostgresRuntimeApplicationTests
                 {
                     builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", testBuilder.ConnectionString);
                 },
-                useSqliteTestCompatibility: false);
+                useSharedTestCatalogue: false);
             using HttpClient client = factory.CreateClient();
             using HttpResponseMessage response = await client.GetAsync("/health");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -88,7 +87,7 @@ public sealed class PostgresRuntimeApplicationTests
                 $"/api/review/provisional-clusters/review-groups/test-cluster/known-person-advisory?modelId=test-model&modelHash={TestModelHash}");
             Assert.Equal(HttpStatusCode.NotFound, advisory.StatusCode);
 
-            Assert.Null(factory.Services.GetService<SqliteCatalogueDatabase>());
+            Assert.Null(factory.Services.GetService<PostgresTestCatalogueDatabase>());
             Assert.IsType<PostgresCatalogueDatabase>(
                 factory.Services.GetRequiredService<PostgresCatalogueDatabase>());
             Assert.False(File.Exists(sqlitePath));

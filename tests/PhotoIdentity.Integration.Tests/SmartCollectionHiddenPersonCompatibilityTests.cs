@@ -1,8 +1,6 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -15,12 +13,12 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
-            SqlitePersonSmartCollectionVisibilityRepository visibility = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
+            PostgresPersonSmartCollectionVisibilityRepository visibility = new(database);
 
             PersonId alice = PersonId.New();
             CatalogueAssetRevision revision = await CreateRevisionAsync(catalogue, directory, "alice.jpg", 'a');
@@ -50,7 +48,7 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string root,
         string sourceKey,
         char hashCharacter)
@@ -75,16 +73,16 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
     }
 
     private static async Task AssignPersonAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         PersonId personId,
         string displayName)
     {
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
 
-        using (SqliteCommand person = connection.CreateCommand())
+        using (PostgresCompatibilityCommand person = connection.CreateCommand())
         {
             person.Transaction = transaction;
             person.CommandText = "INSERT INTO people (id, display_name, created_at_utc) VALUES ($id, $name, $now);";
@@ -94,7 +92,7 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
             await person.ExecuteNonQueryAsync();
         }
 
-        using (SqliteCommand face = connection.CreateCommand())
+        using (PostgresCompatibilityCommand face = connection.CreateCommand())
         {
             face.Transaction = transaction;
             face.CommandText = "INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc) VALUES ($id, $revision, 0, $now);";
@@ -105,7 +103,7 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
         }
 
         long labelId;
-        using (SqliteCommand label = connection.CreateCommand())
+        using (PostgresCompatibilityCommand label = connection.CreateCommand())
         {
             label.Transaction = transaction;
             label.CommandText = """
@@ -119,7 +117,7 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
             labelId = (long)(await label.ExecuteScalarAsync() ?? throw new InvalidOperationException());
         }
 
-        using (SqliteCommand action = connection.CreateCommand())
+        using (PostgresCompatibilityCommand action = connection.CreateCommand())
         {
             action.Transaction = transaction;
             action.CommandText = """
@@ -149,7 +147,7 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

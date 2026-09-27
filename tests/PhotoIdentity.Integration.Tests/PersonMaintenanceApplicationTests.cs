@@ -4,9 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -21,13 +19,13 @@ public sealed class PersonMaintenanceApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 7, 27, 16, 0, 0, TimeSpan.Zero);
 
             FaceOccurrenceId firstFace = await SeedFaceAsync(database, directory, 1, now);
             FaceOccurrenceId duplicateFace = await SeedFaceAsync(database, directory, 2, now);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson source = await reviewRepository.CreatePersonAsync("Ada Old", now);
             CatalogueReviewPerson target = await reviewRepository.CreatePersonAsync("Ada", now);
 
@@ -94,7 +92,7 @@ public sealed class PersonMaintenanceApplicationTests
             Assert.Equal("rename", history[1].Kind);
             Assert.True(history[1].Reversible);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(
                 target.Id.ToString(),
                 await ReadStringAsync(
@@ -147,7 +145,7 @@ public sealed class PersonMaintenanceApplicationTests
     }
 
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string sourceRoot,
         int index,
         DateTimeOffset now)
@@ -157,8 +155,8 @@ public sealed class PersonMaintenanceApplicationTests
         string revisionId = Guid.NewGuid().ToString("D");
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
             VALUES ($source_id, 'local-folder', $source_root, $now);
@@ -185,14 +183,14 @@ public sealed class PersonMaintenanceApplicationTests
     }
 
     private static async Task SeedDuplicateSuggestionsAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         FaceOccurrenceId faceId,
         PersonId sourcePersonId,
         PersonId targetPersonId,
         DateTimeOffset now)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO identity_suggestions (
                 face_occurrence_id, suggested_person_id, model_id, model_hash,
@@ -233,11 +231,11 @@ public sealed class PersonMaintenanceApplicationTests
     }
 
     private static async Task<long> ReadInt64Async(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sql,
         params (string Name, object Value)[] parameters)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         foreach ((string name, object value) in parameters)
         {
@@ -249,11 +247,11 @@ public sealed class PersonMaintenanceApplicationTests
     }
 
     private static async Task<string> ReadStringAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sql,
         params (string Name, object Value)[] parameters)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         foreach ((string name, object value) in parameters)
         {
@@ -294,7 +292,7 @@ public sealed class PersonMaintenanceApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

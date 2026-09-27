@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Review;
 using System.Net;
 using System.Net.Http.Json;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -17,10 +16,10 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 18, 16, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada", now);
             CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace", now.AddMinutes(1));
 
@@ -42,7 +41,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
             Assert.True(Assert.Single(maintenancePeople, person => person.Id == grace.Id.ToString()).HiddenFromSmartCollections);
 
             IReadOnlySet<PhotoIdentity.Core.Identifiers.PersonId> persisted =
-                await new SqlitePersonSmartCollectionVisibilityRepository(new SqliteCatalogueDatabase(databasePath))
+                await new PostgresPersonSmartCollectionVisibilityRepository(new PostgresTestCatalogueDatabase(databasePath))
                     .GetHiddenPersonIdsAsync();
             Assert.Contains(grace.Id, persisted);
             Assert.DoesNotContain(ada.Id, persisted);
@@ -56,7 +55,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
                 "/api/review/people/maintenance") ?? [];
             Assert.False(Assert.Single(maintenancePeople, person => person.Id == grace.Id.ToString()).HiddenFromSmartCollections);
 
-            persisted = await new SqlitePersonSmartCollectionVisibilityRepository(new SqliteCatalogueDatabase(databasePath))
+            persisted = await new PostgresPersonSmartCollectionVisibilityRepository(new PostgresTestCatalogueDatabase(databasePath))
                 .GetHiddenPersonIdsAsync();
             Assert.DoesNotContain(grace.Id, persisted);
         }
@@ -73,17 +72,17 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 18, 16, 30, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
 
             CatalogueReviewPerson hiddenSource = await reviewRepository.CreatePersonAsync("Hidden source", now);
             CatalogueReviewPerson visibleTarget = await reviewRepository.CreatePersonAsync("Visible target", now.AddMinutes(1));
             CatalogueReviewPerson visibleSource = await reviewRepository.CreatePersonAsync("Visible source", now.AddMinutes(2));
             CatalogueReviewPerson hiddenTarget = await reviewRepository.CreatePersonAsync("Hidden target", now.AddMinutes(3));
 
-            SqlitePersonSmartCollectionVisibilityRepository visibility = new(database);
+            PostgresPersonSmartCollectionVisibilityRepository visibility = new(database);
             await visibility.SetHiddenAsync(hiddenSource.Id, true, now.AddMinutes(4));
             await visibility.SetHiddenAsync(hiddenTarget.Id, true, now.AddMinutes(5));
 
@@ -117,7 +116,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            await new SqliteCatalogueDatabase(databasePath).InitializeAsync();
+            await new PostgresTestCatalogueDatabase(databasePath).InitializeAsync();
 
             await using PhotoIdentityApiTestFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();

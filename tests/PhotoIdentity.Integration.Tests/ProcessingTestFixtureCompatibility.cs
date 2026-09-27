@@ -10,7 +10,7 @@ namespace PhotoIdentity_Integration_Tests;
 /// higher-level batch and resumability tests can keep their fixture calls while running on the
 /// PostgreSQL test catalogue.
 /// </summary>
-internal static class SqliteProcessingRepositoryTests
+internal static class PostgresProcessingRepositoryTests
 {
     internal static CatalogueProcessingRun CreateRun(DateTimeOffset now) =>
         new(
@@ -32,7 +32,7 @@ internal static class SqliteProcessingRepositoryTests
             availableAtUtc);
 
     internal static async Task<IReadOnlyList<CatalogueAssetRevision>> SeedRevisionsAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         int count)
     {
         DateTimeOffset now = new(2026, 7, 26, 9, 55, 0, TimeSpan.Zero);
@@ -44,7 +44,7 @@ internal static class SqliteProcessingRepositoryTests
             Path.Combine(Path.GetTempPath(), sourceId.ToString()),
             now);
         CatalogueAsset asset = new(assetId, sourceId, "photo.jpg", now);
-        SqliteAssetCatalogueRepository repository = new(database);
+        PostgresAssetCatalogueRepository repository = new(database);
         List<CatalogueAssetRevision> revisions = [];
 
         for (int index = 0; index < count; index++)

@@ -1,11 +1,10 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
 
-public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
+public sealed class PostgresIdentitySuggestionPolicyRepositoryTests
 {
     private static readonly ModelId ModelA = new("sface-a");
     private static readonly Sha256Digest ModelHashA = new(new string('a', 64));
@@ -18,9 +17,9 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteIdentitySuggestionPolicyRepository repository = new(
+            PostgresIdentitySuggestionPolicyRepository repository = new(
                 database,
                 new FixedTimeProvider(new DateTimeOffset(2026, 8, 10, 12, 0, 0, TimeSpan.Zero)));
 
@@ -32,7 +31,7 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
             Assert.Equal(IdentitySuggestionPolicy.DefaultHighScoreThreshold, first.HighScoreThreshold);
             Assert.Equal(IdentitySuggestionPolicy.DefaultHighMarginThreshold, first.HighMarginThreshold);
             Assert.Equal(IdentitySuggestionPolicy.DefaultMediumScoreThreshold, first.MediumScoreThreshold);
-            Assert.Equal(SqliteIdentitySuggestionPolicyRepository.DefaultActor, first.UpdatedBy);
+            Assert.Equal(PostgresIdentitySuggestionPolicyRepository.DefaultActor, first.UpdatedBy);
             Assert.Equal(first, second);
         }
         finally
@@ -48,9 +47,9 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
         try
         {
             DateTimeOffset now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteIdentitySuggestionPolicyRepository repository = new(
+            PostgresIdentitySuggestionPolicyRepository repository = new(
                 database,
                 new FixedTimeProvider(now));
 
@@ -93,9 +92,9 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteIdentitySuggestionPolicyRepository repository = new(database);
+            PostgresIdentitySuggestionPolicyRepository repository = new(database);
 
             IdentitySuggestionPolicy updatedA = await repository.UpdateAsync(
                 ModelA,
@@ -130,9 +129,9 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteIdentitySuggestionPolicyRepository repository = new(database);
+            PostgresIdentitySuggestionPolicyRepository repository = new(database);
 
             ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(
                 () => repository.UpdateAsync(

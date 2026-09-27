@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -18,7 +17,7 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 18, 0, 0, TimeSpan.Zero);
 
@@ -26,13 +25,13 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
             FaceOccurrenceId secondExemplar = await SeedFaceAsync(database, [0f, 1f], 1, now);
             FaceOccurrenceId automaticTarget = await SeedFaceAsync(database, [0.8f, 0.6f], 2, now);
 
-            SqliteReviewRepository reviews = new(database);
+            PostgresReviewRepository reviews = new(database);
             CatalogueReviewPerson firstPerson = await reviews.CreatePersonAsync("First", now);
             await reviews.AssignAsync(firstExemplar, firstPerson.Id, "human:test", now.AddMinutes(1));
             CatalogueReviewPerson secondPerson = await reviews.CreatePersonAsync("Second", now.AddMinutes(2));
             await reviews.AssignAsync(secondExemplar, secondPerson.Id, "human:test", now.AddMinutes(3));
 
-            SqliteIdentitySuggestionPolicyRepository policies = new(database);
+            PostgresIdentitySuggestionPolicyRepository policies = new(database);
             IdentitySuggestionPolicy enabledPolicy = await policies.UpdateAsync(
                 EmbeddingModelId,
                 EmbeddingModelHash,
@@ -42,9 +41,9 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
                 mediumScoreThreshold: 0.50,
                 actor: "test:policy");
 
-            SqliteIdentityMatcher matcher = new(database);
+            PostgresIdentityMatcher matcher = new(database);
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
-            IdentityAutoAssignmentSummary automatic = await new SqliteIdentityAutoAssignmentService(database)
+            IdentityAutoAssignmentSummary automatic = await new PostgresIdentityAutoAssignmentCompatibilityService(database)
                 .ApplyAsync(EmbeddingModelId, EmbeddingModelHash);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), automatic);
@@ -52,7 +51,7 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
                 await reviews.GetActionsAsync(automaticTarget),
                 action => action.Kind == CatalogueReviewActionKinds.Assign);
             Assert.Equal(firstPerson.Id, automaticAction.PersonId);
-            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, automaticAction.Actor);
+            Assert.Equal(PostgresIdentityAutoAssignmentCompatibilityService.AutomaticActor, automaticAction.Actor);
             string automaticNote = Assert.IsType<string>(automaticAction.Note);
             Assert.Contains($"policy-version={enabledPolicy.Version}", automaticNote, StringComparison.Ordinal);
 
@@ -85,7 +84,7 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
             Assert.Contains(
                 history,
                 action => action.PersonId == firstPerson.Id
-                    && action.Actor == SqliteIdentityAutoAssignmentService.AutomaticActor);
+                    && action.Actor == PostgresIdentityAutoAssignmentCompatibilityService.AutomaticActor);
             Assert.Contains(
                 history,
                 action => action.PersonId == secondPerson.Id
@@ -107,7 +106,7 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
     }
 
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         float[] vector,
         int index,
         DateTimeOffset now)
@@ -130,7 +129,7 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
             "image/jpeg",
             640,
             480);
-        CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
@@ -161,7 +160,7 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
                 new EmbeddingVector(vector),
                 now.AddMinutes(index)));
 
-        CatalogueFaceInspection persisted = await new SqliteFaceCatalogueRepository(database).SaveInspectionAsync(
+        CatalogueFaceInspection persisted = await new PostgresFaceCatalogueRepository(database).SaveInspectionAsync(
             inspection.Occurrence,
             inspection.Observation,
             inspection.Crop,

@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -15,7 +14,7 @@ public sealed class ProcessingRunRepositoryContractTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 9, 2, 18, 30, 0, TimeSpan.Zero);
@@ -36,7 +35,7 @@ public sealed class ProcessingRunRepositoryContractTests
                 42,
                 now,
                 "image/jpeg");
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
             ProcessingRunId runId = ProcessingRunId.New();
@@ -54,7 +53,7 @@ public sealed class ProcessingRunRepositoryContractTests
                 availableAtUtc: now,
                 idempotencyKey: $"contract:{runId}:{persistedRevision.Id}");
 
-            IProcessingRunRepository repository = new SqliteProcessingRepository(database);
+            IProcessingRunRepository repository = new PostgresProcessingRepository(database);
 
             CatalogueProcessingBatch created = await repository.CreateRunAsync(run, [job]);
             CatalogueProcessingRun? loaded = await repository.GetRunAsync(runId);

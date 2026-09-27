@@ -9,19 +9,6 @@ allowed_statuses:
 - completed
 - cancelled
 work_items:
-- id: WI-0149
-  title: Remove the SQLite implementation and obsolete migration-era active references
-  milestone: M29
-  status: in_progress
-  owner: codex
-  document: ../work-items/WI-0149-remove-sqlite-implementation.md
-  started_at: 2026-09-27
-  last_updated_at: 2026-09-27
-  branch: codex/wi-0149-remove-sqlite-implementation
-  blockers:
-  - WI-0148
-  blocker_notes: []
-  evidence: []
 - id: WI-0150
   title: Define the video media architecture and explicitly activate deferred implementation
   milestone: M30
@@ -125,20 +112,3 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/442
-- id: WI-0166
-  title: Reduce included-folder synchronization time at archive scale
-  milestone: M33
-  status: in_review
-  owner: codex
-  document: ../work-items/WI-0166-included-folder-sync-performance.md
-  started_at: 2026-09-27
-  last_updated_at: 2026-09-27
-  branch: codex/wi-0166-sync-performance
-  blockers:
-  - WI-0079
-  - WI-0099
-  - WI-0101
-  blocker_notes: []
-  evidence:
-  - type: verification
-    value: 2026-09-27 Release build; Core 112/112; focused live PostgreSQL sync 9/9; PostgreSQL persistence 53/53 and runtime 6/6

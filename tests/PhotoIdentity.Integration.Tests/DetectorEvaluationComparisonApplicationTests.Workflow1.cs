@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -16,7 +15,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         DetectorEvaluationBoundingBoxResponse manualMiss)
     {
         string databasePath = Path.Combine(directory, "baseline.db");
-        var database = new SqliteCatalogueDatabase(databasePath);
+        var database = new PostgresTestCatalogueDatabase(databasePath);
         await database.InitializeAsync();
         SeededRun baseline = await SeedRunAsync(database, Path.Combine(directory, "baseline-source"), groupBytes, smallBytes, groupDetections, []);
 

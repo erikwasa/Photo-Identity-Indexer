@@ -10,7 +10,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Scores snapshotted regeneration targets per PostgreSQL transaction while preserving the
-/// accepted SQLite candidate, rejection, ranking and stale-derived-suggestion semantics.
+/// accepted candidate, rejection, ranking and stale-derived-suggestion semantics.
 /// Confirmed exemplar evidence can be prepared once per durable run, while rejected identities
 /// remain target-scoped so the growing rejected-pair corpus is never reloaded for every target.
 /// </summary>

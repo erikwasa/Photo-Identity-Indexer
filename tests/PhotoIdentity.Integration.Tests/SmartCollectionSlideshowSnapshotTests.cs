@@ -1,12 +1,10 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -19,12 +17,12 @@ public sealed class SmartCollectionSlideshowSnapshotTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             FixedTimeProvider timeProvider = new(new DateTimeOffset(2026, 8, 29, 8, 0, 0, TimeSpan.Zero));
-            SqliteSmartCollectionRepository definitions = new(database, timeProvider);
-            SqliteSmartCollectionQueryRepository snapshots = new(database, timeProvider);
-            SqliteAssetCatalogueRepository catalogue = new(database);
+            PostgresSmartCollectionRepository definitions = new(database, timeProvider);
+            PostgresSmartCollectionQueryRepository snapshots = new(database, timeProvider);
+            PostgresAssetCatalogueRepository catalogue = new(database);
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "All photos",
                 new SmartCollectionFilter());
@@ -107,12 +105,12 @@ public sealed class SmartCollectionSlideshowSnapshotTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             FixedTimeProvider timeProvider = new(new DateTimeOffset(2026, 8, 29, 8, 30, 0, TimeSpan.Zero));
-            SqliteSmartCollectionRepository definitions = new(database, timeProvider);
-            SqliteSmartCollectionQueryRepository snapshots = new(database, timeProvider);
-            SqliteAssetCatalogueRepository catalogue = new(database);
+            PostgresSmartCollectionRepository definitions = new(database, timeProvider);
+            PostgresSmartCollectionQueryRepository snapshots = new(database, timeProvider);
+            PostgresAssetCatalogueRepository catalogue = new(database);
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Chronology",
                 new SmartCollectionFilter());
@@ -188,7 +186,7 @@ public sealed class SmartCollectionSlideshowSnapshotTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             string privateRoot = Path.Combine(directory, "private-source-root");
             string privateFileName = "family/private-file-name.jpg";
@@ -200,7 +198,7 @@ public sealed class SmartCollectionSlideshowSnapshotTests
                     privateFileName,
                     new DateTimeOffset(2022, 4, 5, 12, 0, 0, TimeSpan.Zero))]))[0];
 
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Phone slideshow",
                 new SmartCollectionFilter());
@@ -240,16 +238,16 @@ public sealed class SmartCollectionSlideshowSnapshotTests
     }
 
     private static async Task<IReadOnlyList<AssetRevisionId>> SeedRevisionsAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         SourceId sourceId,
         string sourceRoot,
         IReadOnlyList<SeedRevisionRequest> revisions)
     {
         Directory.CreateDirectory(sourceRoot);
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
 
-        using (SqliteCommand source = connection.CreateCommand())
+        using (PostgresCompatibilityCommand source = connection.CreateCommand())
         {
             source.Transaction = transaction;
             source.CommandText = """
@@ -274,7 +272,7 @@ public sealed class SmartCollectionSlideshowSnapshotTests
             AssetRevisionId revisionId = seed.RevisionId ?? AssetRevisionId.New();
             ids.Add(revisionId);
 
-            using SqliteCommand command = connection.CreateCommand();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO assets (id, source_id, source_key, created_at_utc)
@@ -331,7 +329,7 @@ public sealed class SmartCollectionSlideshowSnapshotTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

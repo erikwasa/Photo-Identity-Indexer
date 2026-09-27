@@ -1,8 +1,6 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -17,7 +15,7 @@ public sealed class SuggestionUndoRegressionTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             string faceId = Guid.NewGuid().ToString();
@@ -65,7 +63,7 @@ public sealed class SuggestionUndoRegressionTests
                     $"/api/review/faces/{faceId}/suggestions") ?? [];
             Assert.Equal("pending", Assert.Single(suggestions).Status);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -86,7 +84,7 @@ public sealed class SuggestionUndoRegressionTests
     }
 
     private static async Task<long> SeedSuggestionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string faceId,
         string personId,
         string modelId,
@@ -98,8 +96,8 @@ public sealed class SuggestionUndoRegressionTests
         string assetId = Guid.NewGuid().ToString();
         string revisionId = Guid.NewGuid().ToString();
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using (SqliteCommand command = connection.CreateCommand())
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using (PostgresCompatibilityCommand command = connection.CreateCommand())
         {
             command.CommandText = """
                 INSERT INTO sources (id, kind, root_locator, created_at_utc)
@@ -153,7 +151,7 @@ public sealed class SuggestionUndoRegressionTests
             await command.ExecuteNonQueryAsync();
         }
 
-        using SqliteCommand read = connection.CreateCommand();
+        using PostgresCompatibilityCommand read = connection.CreateCommand();
         read.CommandText = """
             SELECT id
             FROM identity_suggestions
@@ -171,11 +169,11 @@ public sealed class SuggestionUndoRegressionTests
     }
 
     private static async Task<long> ReadInt64Async(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sql,
         params (string Name, object Value)[] parameters)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         foreach ((string name, object value) in parameters)
         {
@@ -215,7 +213,7 @@ public sealed class SuggestionUndoRegressionTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

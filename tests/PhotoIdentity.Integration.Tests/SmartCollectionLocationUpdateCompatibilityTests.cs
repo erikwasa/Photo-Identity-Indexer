@@ -1,7 +1,5 @@
 using System.Net.Http.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -15,7 +13,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             await using SmartCollectionApiFactory factory = new(databasePath);
@@ -91,7 +89,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

@@ -1,10 +1,8 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity.Integration.Tests;
@@ -72,7 +70,7 @@ public sealed class SourceCopyPurgeTests
         await using PurgeFixture fixture = await PurgeFixture.CreateAsync();
         await fixture.Exclusions.ExcludeAsync(fixture.SourceId, fixture.SourceKey, fixture.Now.AddMinutes(1));
 
-        ISourceCopyPurgeRepository inner = new SqliteSourceCopyPurgeRepository(fixture.Database);
+        ISourceCopyPurgeRepository inner = new PostgresSourceCopyPurgeRepository(fixture.Database);
         SourceCopyPurgeService failing = fixture.CreateService(
             new SourceCopyPurgeFileSystem(),
             new ThrowOncePurgeRepository(inner, ThrowStage.BeforeCatalogueDelete));
@@ -96,7 +94,7 @@ public sealed class SourceCopyPurgeTests
         await using PurgeFixture fixture = await PurgeFixture.CreateAsync();
         await fixture.Exclusions.ExcludeAsync(fixture.SourceId, fixture.SourceKey, fixture.Now.AddMinutes(1));
 
-        ISourceCopyPurgeRepository inner = new SqliteSourceCopyPurgeRepository(fixture.Database);
+        ISourceCopyPurgeRepository inner = new PostgresSourceCopyPurgeRepository(fixture.Database);
         SourceCopyPurgeService failing = fixture.CreateService(
             new SourceCopyPurgeFileSystem(),
             new ThrowOncePurgeRepository(inner, ThrowStage.BeforeManifestClear));
@@ -218,8 +216,8 @@ public sealed class SourceCopyPurgeTests
 
         private PurgeFixture(
             string root,
-            SqliteCatalogueDatabase database,
-            SqliteSourceCopyExclusionRepository exclusions,
+            PostgresTestCatalogueDatabase database,
+            PostgresSourceCopyExclusionRepository exclusions,
             SourceId sourceId,
             AssetRevisionId revisionId,
             string sourceKey,
@@ -242,8 +240,8 @@ public sealed class SourceCopyPurgeTests
             FaceCropPath = faceCropPath;
         }
 
-        public SqliteCatalogueDatabase Database { get; }
-        public SqliteSourceCopyExclusionRepository Exclusions { get; }
+        public PostgresTestCatalogueDatabase Database { get; }
+        public PostgresSourceCopyExclusionRepository Exclusions { get; }
         public SourceId SourceId { get; }
         public AssetRevisionId RevisionId { get; }
         public string SourceKey { get; }
@@ -263,13 +261,13 @@ public sealed class SourceCopyPurgeTests
             Directory.CreateDirectory(reviewRoot);
             Directory.CreateDirectory(detectorRoot);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteArchiveReviewProxyRepository reviewProxies = new(database);
+            PostgresArchiveReviewProxyRepository reviewProxies = new(database);
             await reviewProxies.RegisterProfileAsync(
                 new ReviewProxyProfile("purge-test", 1600, 85),
                 DateTimeOffset.UtcNow);
-            await new SqliteFaceReviewDerivativeRepository(database).EnsureSchemaAsync();
+            await new PostgresFaceReviewDerivativeRepository(database).EnsureSchemaAsync();
 
             SourceId sourceId = SourceId.New();
             AssetId assetId = AssetId.New();
@@ -284,9 +282,9 @@ public sealed class SourceCopyPurgeTests
             Guid runId = Guid.NewGuid();
             string faceCropRelative = $"runs/{runId:D}/assets/{revisionId}/faces/face-001/aligned.png";
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand seed = connection.CreateCommand();
+                using PostgresCompatibilityCommand seed = connection.CreateCommand();
                 seed.CommandText = """
                     INSERT INTO sources (id, kind, root_locator, created_at_utc)
                     VALUES ($source_id, 'local-folder', 'private-root', $now);
@@ -334,7 +332,7 @@ public sealed class SourceCopyPurgeTests
             await WriteAsync(faceReviewPath);
             await WriteAsync(faceCropPath);
 
-            SqliteSourceCopyExclusionRepository exclusions = new(database);
+            PostgresSourceCopyExclusionRepository exclusions = new(database);
             return new PurgeFixture(
                 root,
                 database,
@@ -353,15 +351,15 @@ public sealed class SourceCopyPurgeTests
             ISourceCopyPurgeFileSystem fileSystem,
             ISourceCopyPurgeRepository? purgeRepository = null) => new(
             Exclusions,
-            purgeRepository ?? new SqliteSourceCopyPurgeRepository(Database),
+            purgeRepository ?? new PostgresSourceCopyPurgeRepository(Database),
             Roots,
             fileSystem,
             TimeProvider.System);
 
         public SourceCopyPurgeService CreateRestartedService()
         {
-            SqliteSourceCopyExclusionRepository exclusions = new(Database);
-            SqliteSourceCopyPurgeRepository purges = new(Database);
+            PostgresSourceCopyExclusionRepository exclusions = new(Database);
+            PostgresSourceCopyPurgeRepository purges = new(Database);
             return new SourceCopyPurgeService(
                 exclusions,
                 purges,
@@ -372,15 +370,15 @@ public sealed class SourceCopyPurgeTests
 
         public async Task<long> CountAsync(string table)
         {
-            await using SqliteConnection connection = await Database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await Database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = $"SELECT COUNT(*) FROM {table};";
             return Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
         }
 
         public ValueTask DisposeAsync()
         {
-            SqliteConnection.ClearAllPools();
+            PostgresCompatibilityConnection.ClearAllPools();
             if (Directory.Exists(_root))
             {
                 Directory.Delete(_root, recursive: true);

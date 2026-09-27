@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenCvSharp;
@@ -10,7 +9,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Web.Contracts;
 using PhotoIdentity.Worker;
@@ -27,8 +25,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
         try
         {
             SeededFace seeded = await SeedAsync(directory);
-            SqliteCatalogueDatabase database = new(seeded.DatabasePath);
-            _ = await new ArchiveFaceReviewDerivativeWriter(new SqliteFaceReviewDerivativeRepository(database)).GenerateAsync(
+            PostgresTestCatalogueDatabase database = new(seeded.DatabasePath);
+            _ = await new ArchiveFaceReviewDerivativeWriter(new PostgresFaceReviewDerivativeRepository(database)).GenerateAsync(
                 seeded.RevisionId,
                 seeded.SourcePath,
                 seeded.SourceRoot,
@@ -96,8 +94,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
         try
         {
             SeededFace seeded = await SeedAsync(directory, includeRevisionDimensions: false);
-            SqliteCatalogueDatabase database = new(seeded.DatabasePath);
-            _ = await new ArchiveFaceReviewDerivativeWriter(new SqliteFaceReviewDerivativeRepository(database)).GenerateAsync(
+            PostgresTestCatalogueDatabase database = new(seeded.DatabasePath);
+            _ = await new ArchiveFaceReviewDerivativeWriter(new PostgresFaceReviewDerivativeRepository(database)).GenerateAsync(
                 seeded.RevisionId,
                 seeded.SourcePath,
                 seeded.SourceRoot,
@@ -148,8 +146,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
         try
         {
             SeededFace seeded = await SeedAsync(directory);
-            SqliteCatalogueDatabase database = new(seeded.DatabasePath);
-            _ = await new ArchiveFaceReviewDerivativeWriter(new SqliteFaceReviewDerivativeRepository(database)).GenerateAsync(
+            PostgresTestCatalogueDatabase database = new(seeded.DatabasePath);
+            _ = await new ArchiveFaceReviewDerivativeWriter(new PostgresFaceReviewDerivativeRepository(database)).GenerateAsync(
                 seeded.RevisionId,
                 seeded.SourcePath,
                 seeded.SourceRoot,
@@ -213,7 +211,7 @@ public sealed class ReviewFaceDetailImageApplicationTests
         }
         await File.WriteAllBytesAsync(sourcePath, originalBytes);
 
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 8, 15, 7, 30, 0, TimeSpan.Zero);
         CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -227,13 +225,13 @@ public sealed class ReviewFaceDetailImageApplicationTests
             "image/jpeg",
             includeRevisionDimensions ? 2400 : null,
             includeRevisionDimensions ? 1600 : null);
-        CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
-        await using (SqliteConnection connection = await database.OpenConnectionAsync())
+        await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
         {
-            using SqliteCommand command = connection.CreateCommand();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES ($face_id, $revision_id, 0, $created_at_utc);
@@ -263,7 +261,7 @@ public sealed class ReviewFaceDetailImageApplicationTests
         }
 
         ReviewProxyProfile profile = new(profileId, 1600, 90);
-        SqliteArchiveReviewProxyRepository proxyRepository = new(database);
+        PostgresArchiveReviewProxyRepository proxyRepository = new(database);
         await proxyRepository.RegisterProfileAsync(profile, now);
         byte[] proxyBytes;
         using (Mat proxy = new(new Size(1200, 800), MatType.CV_8UC3, new Scalar(45, 75, 95)))
@@ -349,7 +347,7 @@ public sealed class ReviewFaceDetailImageApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
             builder.UseSetting("PhotoIdentity:ReviewProxyRoot", _proxyRoot);
             builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", _profileId);
             builder.ConfigureServices(services =>

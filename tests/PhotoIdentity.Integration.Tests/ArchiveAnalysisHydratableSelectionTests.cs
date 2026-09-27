@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -15,7 +14,7 @@ public sealed class ArchiveAnalysisHydratableSelectionTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 0, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -23,12 +22,12 @@ public sealed class ArchiveAnalysisHydratableSelectionTests
             CatalogueAssetRevision local = await SaveRevisionAsync(database, source, "local.jpg", now);
             CatalogueAssetRevision online = await SaveRevisionAsync(database, source, "online.jpg", now.AddMinutes(1));
             CatalogueAssetRevision downloading = await SaveRevisionAsync(database, source, "downloading.jpg", now.AddMinutes(2));
-            SqliteArchiveAvailabilityRepository availability = new(database);
+            PostgresArchiveAvailabilityRepository availability = new(database);
             await availability.RecordAsync(local.AssetId, AssetAvailability.Local, now);
             await availability.RecordAsync(online.AssetId, AssetAvailability.OnlineOnly, now);
             await availability.RecordAsync(downloading.AssetId, AssetAvailability.Downloading, now);
 
-            SqliteArchiveAnalysisRepository repository = new(database);
+            PostgresArchiveAnalysisRepository repository = new(database);
             Sha256Digest profile = new(new string('a', 64));
 
             IReadOnlyList<AssetRevisionId> localOnly = await repository.GetPendingCurrentRevisionIdsAsync(
@@ -52,7 +51,7 @@ public sealed class ArchiveAnalysisHydratableSelectionTests
     }
 
     private static async Task<CatalogueAssetRevision> SaveRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         CatalogueSource source,
         string sourceKey,
         DateTimeOffset observedAtUtc)
@@ -68,7 +67,7 @@ public sealed class ArchiveAnalysisHydratableSelectionTests
             "image/jpeg",
             100,
             100);
-        return await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(source, asset, revision);
+        return await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(source, asset, revision);
     }
 
     private static string CreateTemporaryDirectory()

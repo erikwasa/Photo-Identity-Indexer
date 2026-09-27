@@ -73,7 +73,3 @@ models/**/*.pt
 models/**/*.pth
 models/**/*.tflite
 models/**/*.bin
-metadata-fideli-hospitals-clear.json
-metadata-fideli-sodersjukhuset-default.json
-metadata-place-rules-tier1.json
-metadata-rules.json

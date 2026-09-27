@@ -13,7 +13,7 @@ It includes:
 3. Explicit source availability and verification state for local and Files On-Demand content.
 4. Decode support for the image formats needed by the archive, including HEIC/HEIF and the RAW variants found during archive inventory.
 5. The governed CenterFace face-detection pipeline, SFace alignment and model-versioned embeddings.
-6. A local SQLite catalogue with stable source, asset, revision, face and person identity plus append-only review history.
+6. A local PostgreSQL catalogue with stable source, asset, revision, face and person identity plus append-only review history.
 7. A local browser application for face review, people maintenance, progress inspection and collection browsing.
 8. Identity suggestions with exact-model provenance and durable negative evidence.
 9. Bounded OneDrive hydration for analysis and explicit full-resolution viewing.
@@ -47,7 +47,7 @@ These are not required for the local product or for version 1:
 - neural-network fine-tuning; and
 - video processing in the current implementation. Video is a planned later direction under [M30](../delivery/milestones/M30-video-media-support.md), intentionally held until explicitly reactivated.
 
-Azure remains an optional compute path for bounded jobs. The canonical catalogue, review workflow and source-of-truth decisions remain local.
+Production model execution remains on maintainer-controlled local hardware. Any future remote-compute path requires a new accepted architecture decision and separately scoped work; the canonical catalogue, review workflow and source-of-truth decisions remain local.
 
 ## Future media direction
 

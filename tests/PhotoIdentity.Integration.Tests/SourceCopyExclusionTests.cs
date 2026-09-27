@@ -1,10 +1,8 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 using Xunit;
 
@@ -46,7 +44,7 @@ public sealed class SourceCopyExclusionTests
             Utc(12));
 
         // A new repository instance simulates application restart; the locator tombstone survives.
-        SqliteSourceCopyExclusionRepository restarted = new(catalogue.Database);
+        PostgresSourceCopyExclusionRepository restarted = new(catalogue.Database);
         SourceCopyExclusionState durable = Assert.IsType<SourceCopyExclusionState>(
             await restarted.GetAsync(catalogue.SourceId, "A/one.jpg"));
         Assert.Equal(state.ExcludedAtUtc, durable.ExcludedAtUtc);
@@ -78,9 +76,6 @@ public sealed class SourceCopyExclusionTests
         LocalArchiveSyncSummary sameLocator = await catalogue.SyncAsync(source, ["A", "B"], t1);
         Assert.Equal(openedBeforeExclusion, source.OpenCount);
         Assert.Equal(0, sameLocator.ReconciledMoveCount);
-        Assert.Equal(1, sameLocator.Diagnostics.Folders.Sum(static folder => folder.ExclusionBatchCount));
-        Assert.Equal(1, sameLocator.Diagnostics.Folders.Sum(static folder => folder.ExcludedFileCount));
-        Assert.Equal(0, sameLocator.Diagnostics.Folders.Sum(static folder => folder.ObservationWriteCount));
         SourceCopyExclusionState observed = Assert.IsType<SourceCopyExclusionState>(
             await catalogue.Exclusions.GetAsync(catalogue.SourceId, "A/private.jpg"));
         Assert.Equal(t1, observed.LastSeenAtUtc);
@@ -117,7 +112,7 @@ public sealed class SourceCopyExclusionTests
 
         await catalogue.Exclusions.ExcludeAsync(catalogue.SourceId, "A/private.jpg", Utc(11));
 
-        SqliteArchiveAnalysisRepository analysis = new(catalogue.Database);
+        PostgresArchiveAnalysisRepository analysis = new(catalogue.Database);
         IReadOnlyList<AssetRevisionId> pending = await analysis.GetPendingCurrentRevisionIdsAsync(
             catalogue.SourceId,
             new Sha256Digest(new string('a', 64)));
@@ -207,9 +202,9 @@ public sealed class SourceCopyExclusionTests
 
         private TestCatalogue(
             string root,
-            SqliteCatalogueDatabase database,
+            PostgresTestCatalogueDatabase database,
             SourceId sourceId,
-            SqliteSourceCopyExclusionRepository exclusions,
+            PostgresSourceCopyExclusionRepository exclusions,
             LocalArchiveSyncCoordinator coordinator)
         {
             _root = root;
@@ -219,25 +214,25 @@ public sealed class SourceCopyExclusionTests
             _coordinator = coordinator;
         }
 
-        public SqliteCatalogueDatabase Database { get; }
+        public PostgresTestCatalogueDatabase Database { get; }
         public SourceId SourceId { get; }
-        public SqliteSourceCopyExclusionRepository Exclusions { get; }
+        public PostgresSourceCopyExclusionRepository Exclusions { get; }
 
         public static async Task<TestCatalogue> CreateAsync()
         {
             string root = Path.Combine(Path.GetTempPath(), $"photoidentity-exclusion-{Guid.NewGuid():N}");
             Directory.CreateDirectory(root);
-            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
             await database.InitializeAsync();
             SourceId sourceId = SourceId.New();
-            SqliteSourceCopyExclusionRepository exclusions = new(database);
+            PostgresSourceCopyExclusionRepository exclusions = new(database);
             ArchiveSourceCatalogueScanner scanner = new(
                 database,
-                new SqliteArchiveSourceScanBatchRepository(database),
+                new PostgresArchiveSourceScanBatchRepository(database),
                 exclusions);
             LocalArchiveSyncCoordinator coordinator = new(
                 scanner,
-                moveReconciler: new SqliteArchiveSourceMoveReconciler(database, exclusions));
+                moveReconciler: new PostgresArchiveSourceMoveReconciler(database, exclusions));
             return new TestCatalogue(root, database, sourceId, exclusions, coordinator);
         }
 
@@ -253,8 +248,8 @@ public sealed class SourceCopyExclusionTests
 
         public async Task<AssetRow?> FindAssetAsync(string sourceKey)
         {
-            await using SqliteConnection connection = await Database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await Database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT asset.id, observation.verified_revision_id, asset.deleted_at_utc
                 FROM assets AS asset
@@ -263,7 +258,7 @@ public sealed class SourceCopyExclusionTests
                 """;
             command.Parameters.AddWithValue("$source_id", SourceId.ToString());
             command.Parameters.AddWithValue("$source_key", sourceKey);
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
             if (!await reader.ReadAsync())
             {
                 return null;

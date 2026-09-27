@@ -1,10 +1,8 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -13,7 +11,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed partial class DetectorEvaluationComparisonApplicationTests
 {
     private static async Task<SeededRun> SeedRunAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string sourceRoot,
         byte[] groupBytes,
         byte[] smallBytes,
@@ -27,7 +25,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
 
         SourceId sourceId = SourceId.New();
         CatalogueSource source = new(sourceId, "local-folder", sourceRoot, now);
-        SqliteAssetCatalogueRepository assetRepository = new(database);
+        PostgresAssetCatalogueRepository assetRepository = new(database);
         AssetId groupAssetId = AssetId.New();
         CatalogueAssetRevision groupRevision = await assetRepository.SaveRevisionAsync(
             source,
@@ -40,8 +38,8 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
             Revision(smallAssetId, smallBytes));
 
         ProcessingRunId runId = ProcessingRunId.New();
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using (SqliteCommand command = connection.CreateCommand())
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using (PostgresCompatibilityCommand command = connection.CreateCommand())
         {
             command.CommandText = """
                 INSERT INTO processing_runs (
@@ -88,7 +86,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
     }
 
     private static async Task InsertDetectionsAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         AssetRevisionId revisionId,
         IReadOnlyList<DetectionSeed> detections,
         DateTimeOffset observedAtUtc)
@@ -97,7 +95,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         {
             DetectionSeed detection = detections[ordinal];
             string faceId = FaceOccurrenceId.New().ToString();
-            using SqliteCommand command = connection.CreateCommand();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES ($face_id, $revision_id, $ordinal, $observed_at_utc);

@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using Xunit;
 
@@ -22,12 +21,12 @@ public sealed class ArchiveAnalysisRepositoryTests
             string photo = Path.Combine(month, "photo.jpg");
             await File.WriteAllBytesAsync(photo, [1, 2, 3]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteLocalBatchRepository assets = new(database);
+            PostgresLocalBatchRepository assets = new(database);
             CatalogueSource sourceRecord = await assets.GetOrCreateLocalFolderSourceAsync(archiveRoot, Utc(10));
             LocalFolderAssetSource source = new(sourceRecord.Id, archiveRoot);
-            SqliteSourceCatalogueScanner scanner = new(database);
+            PostgresSourceCatalogueScanner scanner = new(database);
             await scanner.ScanAsync(
                 source,
                 sourceRecord,
@@ -38,7 +37,7 @@ public sealed class ArchiveAnalysisRepositoryTests
                 await assets.GetCurrentRevisionIdsAsync(sourceRecord.Id));
             AnalysisProfileDefinition profile = CreateProfile();
             Sha256Digest profileHash = profile.ComputeHash();
-            SqliteArchiveAnalysisRepository analysis = new(database);
+            PostgresArchiveAnalysisRepository analysis = new(database);
 
             Assert.Equal(
                 [firstRevision],
@@ -61,7 +60,7 @@ public sealed class ArchiveAnalysisRepositoryTests
                 attemptCount: 0,
                 availableAtUtc: Utc(10),
                 idempotencyKey: $"archive-analysis-test:{runId}:{firstRevision}");
-            await new SqliteProcessingRepository(database).CreateRunAsync(run, [job]);
+            await new PostgresProcessingRepository(database).CreateRunAsync(run, [job]);
             await analysis.RegisterRunAsync(runId, profile, Utc(10));
 
             // Completion intentionally carries no face count: a successful zero-face image

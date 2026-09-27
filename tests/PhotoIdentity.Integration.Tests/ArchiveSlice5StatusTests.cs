@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using Xunit;
 
@@ -21,12 +20,12 @@ public sealed class ArchiveSlice5StatusTests
             Directory.CreateDirectory(month);
             await File.WriteAllBytesAsync(Path.Combine(month, "photo.jpg"), [1, 2, 3, 4]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteLocalBatchRepository assets = new(database);
+            PostgresLocalBatchRepository assets = new(database);
             CatalogueSource sourceRecord = await assets.GetOrCreateLocalFolderSourceAsync(archiveRoot, Utc(10));
             LocalFolderAssetSource source = new(sourceRecord.Id, archiveRoot);
-            await new SqliteSourceCatalogueScanner(database).ScanAsync(
+            await new PostgresSourceCatalogueScanner(database).ScanAsync(
                 source,
                 sourceRecord,
                 new SourceScanOptions("1970/01", true),
@@ -52,29 +51,29 @@ public sealed class ArchiveSlice5StatusTests
                 attemptCount: 0,
                 availableAtUtc: Utc(10),
                 idempotencyKey: $"slice5-status:{runId}:{revisionId}");
-            await new SqliteProcessingRepository(database).CreateRunAsync(run, [job]);
+            await new PostgresProcessingRepository(database).CreateRunAsync(run, [job]);
 
-            SqliteArchiveAnalysisRepository analysis = new(database);
+            PostgresArchiveAnalysisRepository analysis = new(database);
             await analysis.RegisterRunAsync(runId, profile, Utc(10));
             await analysis.RecordCompletionAsync(runId, revisionId, profileHash, Utc(11));
-            await new SqliteArchiveAvailabilityRepository(database).RecordAsync(
+            await new PostgresArchiveAvailabilityRepository(database).RecordAsync(
                 revision.AssetId,
                 AssetAvailability.OnlineOnly,
                 Utc(12));
 
-            CatalogueArchiveFolderStatus folderStatus = await new SqliteArchiveStatusRepository(database)
+            CatalogueArchiveFolderStatus folderStatus = await new PostgresArchiveStatusRepository(database)
                 .GetStatusAsync(sourceRecord.Id, "1970", profileHash);
             Assert.Equal(1, folderStatus.OnlineOnlyImages);
             Assert.Equal(1, folderStatus.AnalysedImages);
 
-            CatalogueArchiveItemPage legacyAnalyzed = await new SqliteArchiveStatusRepository(database)
+            CatalogueArchiveItemPage legacyAnalyzed = await new PostgresArchiveStatusRepository(database)
                 .GetItemsAsync(sourceRecord.Id, "1970", profileHash, "analysed", 0, 50);
             CatalogueArchiveItemStatus legacyItem = Assert.Single(legacyAnalyzed.Items);
             Assert.Equal(revisionId, legacyItem.RevisionId);
             Assert.Equal("online-only", legacyItem.Availability);
             Assert.Equal("analysed", legacyItem.AnalysisState);
 
-            CatalogueArchiveItemPage filtered = await new SqliteArchiveItemFilterRepository(database)
+            CatalogueArchiveItemPage filtered = await new PostgresArchiveItemFilterRepository(database)
                 .GetItemsAsync(
                     sourceRecord.Id,
                     "1970",
@@ -104,35 +103,35 @@ public sealed class ArchiveSlice5StatusTests
         {
             string archiveRoot = Path.Combine(directory, "Kamerabilder");
             Directory.CreateDirectory(archiveRoot);
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            CatalogueSource source = await new SqliteLocalBatchRepository(database)
+            CatalogueSource source = await new PostgresLocalBatchRepository(database)
                 .GetOrCreateLocalFolderSourceAsync(archiveRoot, Utc(10));
 
-            SqliteArchiveAdvancementRepository first = new(database);
+            PostgresArchiveAdvancementRepository first = new(database);
             await first.RequestRunAsync(source.Id, Utc(11));
 
-            ArchiveAdvancementState running = await new SqliteArchiveAdvancementRepository(database).GetAsync(source.Id)
+            ArchiveAdvancementState running = await new PostgresArchiveAdvancementRepository(database).GetAsync(source.Id)
                 ?? throw new InvalidOperationException("Advancement state was unavailable.");
             Assert.True(running.IsRequested);
             Assert.Equal("queued", running.RuntimeState);
             Assert.True(running.SyncRequired);
 
-            await new SqliteArchiveAdvancementRepository(database).UpdateRuntimeAsync(
+            await new PostgresArchiveAdvancementRepository(database).UpdateRuntimeAsync(
                 source.Id,
                 "waiting",
                 syncRequired: false,
                 "Waiting for OneDrive.",
                 Utc(12));
 
-            ArchiveAdvancementState waiting = await new SqliteArchiveAdvancementRepository(database).GetAsync(source.Id)
+            ArchiveAdvancementState waiting = await new PostgresArchiveAdvancementRepository(database).GetAsync(source.Id)
                 ?? throw new InvalidOperationException("Advancement state was unavailable after update.");
             Assert.True(waiting.IsRequested);
             Assert.Equal("waiting", waiting.RuntimeState);
             Assert.False(waiting.SyncRequired);
 
-            await new SqliteArchiveAdvancementRepository(database).PauseAsync(source.Id, Utc(13));
-            ArchiveAdvancementState paused = await new SqliteArchiveAdvancementRepository(database).GetAsync(source.Id)
+            await new PostgresArchiveAdvancementRepository(database).PauseAsync(source.Id, Utc(13));
+            ArchiveAdvancementState paused = await new PostgresArchiveAdvancementRepository(database).GetAsync(source.Id)
                 ?? throw new InvalidOperationException("Advancement state was unavailable after pause.");
             Assert.False(paused.IsRequested);
             Assert.Equal("paused", paused.RuntimeState);

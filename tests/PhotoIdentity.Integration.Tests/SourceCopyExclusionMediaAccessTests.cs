@@ -3,7 +3,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity.Integration.Tests;
@@ -21,7 +20,7 @@ public sealed class SourceCopyExclusionMediaAccessTests
             string proxyRoot = Path.Combine(directory, "proxies");
             Directory.CreateDirectory(proxyRoot);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 9, 25, 15, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -35,10 +34,10 @@ public sealed class SourceCopyExclusionMediaAccessTests
                 "image/jpeg",
                 100,
                 100);
-            CatalogueAssetRevision persisted = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persisted = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
-            SqliteArchiveReviewProxyRepository proxies = new(database);
+            PostgresArchiveReviewProxyRepository proxies = new(database);
             ReviewProxyProfile profile = new("wi-0089-test", 1600, 82);
             await proxies.RegisterProfileAsync(profile, now);
             string relativePath = "review/wi-0089-test/proxy.jpg";
@@ -56,7 +55,7 @@ public sealed class SourceCopyExclusionMediaAccessTests
                 now,
                 relativePath));
 
-            SqliteSourceCopyExclusionRepository exclusions = new(database);
+            PostgresSourceCopyExclusionRepository exclusions = new(database);
             CollectionReviewProxyFileResolver resolver = new(
                 proxies,
                 derivatives: null,

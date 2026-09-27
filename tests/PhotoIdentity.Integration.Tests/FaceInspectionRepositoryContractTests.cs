@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -9,12 +8,12 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class FaceInspectionRepositoryContractTests
 {
     [Fact]
-    public async Task Sqlite_adapter_preserves_atomic_face_inspection_write_through_contract()
+    public async Task Postgres_adapter_preserves_atomic_face_inspection_write_through_contract()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 9, 2, 20, 0, 0, TimeSpan.Zero);
@@ -35,7 +34,7 @@ public sealed class FaceInspectionRepositoryContractTests
                 42,
                 now,
                 "image/jpeg");
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
             FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
@@ -73,18 +72,18 @@ public sealed class FaceInspectionRepositoryContractTests
                 embeddingHash,
                 vector);
 
-            IFaceInspectionRepository repository = new SqliteFaceCatalogueRepository(database);
+            IFaceInspectionRepository repository = new PostgresFaceCatalogueRepository(database);
             await repository.SaveInspectionAsync(inspection);
 
-            SqliteFaceCatalogueRepository sqlite = new(database);
+            PostgresFaceCatalogueRepository persisted = new(database);
             CatalogueFaceOccurrence occurrence = Assert.Single(
-                await sqlite.GetOccurrencesAsync(persistedRevision.Id));
+                await persisted.GetOccurrencesAsync(persistedRevision.Id));
             CatalogueFaceObservation observation = Assert.IsType<CatalogueFaceObservation>(
-                await sqlite.GetObservationAsync(occurrence.Id, detectorModelId, detectorHash));
+                await persisted.GetObservationAsync(occurrence.Id, detectorModelId, detectorHash));
             CatalogueFaceCrop crop = Assert.IsType<CatalogueFaceCrop>(
-                await sqlite.FindCropAsync(occurrence.Id, protocol, cropHash));
+                await persisted.FindCropAsync(occurrence.Id, protocol, cropHash));
             CatalogueFaceEmbedding embedding = Assert.IsType<CatalogueFaceEmbedding>(
-                await sqlite.GetEmbeddingAsync(crop.Id, embeddingModelId, embeddingHash));
+                await persisted.GetEmbeddingAsync(crop.Id, embeddingModelId, embeddingHash));
 
             Assert.Equal(occurrenceId, occurrence.Id);
             Assert.Equal(inspection.Confidence, observation.Confidence);

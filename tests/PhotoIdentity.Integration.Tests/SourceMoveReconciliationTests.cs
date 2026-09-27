@@ -1,9 +1,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 using Xunit;
 
@@ -225,12 +223,12 @@ public sealed class SourceMoveReconciliationTests
     private sealed class TestCatalogue : IAsyncDisposable
     {
         private readonly string _root;
-        private readonly SqliteCatalogueDatabase _database;
+        private readonly PostgresTestCatalogueDatabase _database;
         private readonly LocalArchiveSyncCoordinator _coordinator;
 
         private TestCatalogue(
             string root,
-            SqliteCatalogueDatabase database,
+            PostgresTestCatalogueDatabase database,
             SourceId sourceId,
             LocalArchiveSyncCoordinator coordinator)
         {
@@ -246,15 +244,15 @@ public sealed class SourceMoveReconciliationTests
         {
             string root = Path.Combine(Path.GetTempPath(), $"photoidentity-move-{Guid.NewGuid():N}");
             Directory.CreateDirectory(root);
-            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
             await database.InitializeAsync();
             SourceId sourceId = SourceId.New();
             ArchiveSourceCatalogueScanner scanner = new(
                 database,
-                new SqliteArchiveSourceScanBatchRepository(database));
+                new PostgresArchiveSourceScanBatchRepository(database));
             LocalArchiveSyncCoordinator coordinator = new(
                 scanner,
-                moveReconciler: new SqliteArchiveSourceMoveReconciler(database));
+                moveReconciler: new PostgresArchiveSourceMoveReconciler(database));
             return new TestCatalogue(root, database, sourceId, coordinator);
         }
 
@@ -270,8 +268,8 @@ public sealed class SourceMoveReconciliationTests
 
         public async Task<AssetRow?> FindAssetAsync(string sourceKey)
         {
-            await using SqliteConnection connection = await _database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await _database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT asset.id, asset.source_key, observation.verified_revision_id, asset.deleted_at_utc
                 FROM assets AS asset
@@ -280,7 +278,7 @@ public sealed class SourceMoveReconciliationTests
                 """;
             command.Parameters.AddWithValue("$source_id", SourceId.ToString());
             command.Parameters.AddWithValue("$source_key", sourceKey);
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
             if (!await reader.ReadAsync())
             {
                 return null;
@@ -295,8 +293,8 @@ public sealed class SourceMoveReconciliationTests
 
         public async Task<int> CountAssetsAsync()
         {
-            await using SqliteConnection connection = await _database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await _database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM assets WHERE source_id = $source_id;";
             command.Parameters.AddWithValue("$source_id", SourceId.ToString());
             return Convert.ToInt32(await command.ExecuteScalarAsync());
@@ -304,8 +302,8 @@ public sealed class SourceMoveReconciliationTests
 
         public async Task AddFaceHistoryAsync(AssetRevisionId revisionId, DateTimeOffset createdAtUtc)
         {
-            await using SqliteConnection connection = await _database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await _database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES ($id, $revision_id, 0, $created_at_utc);
@@ -318,8 +316,8 @@ public sealed class SourceMoveReconciliationTests
 
         public async Task<int> CountFaceHistoryAsync(AssetRevisionId revisionId)
         {
-            await using SqliteConnection connection = await _database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await _database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM face_occurrences WHERE asset_revision_id = $revision_id;";
             command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
             return Convert.ToInt32(await command.ExecuteScalarAsync());

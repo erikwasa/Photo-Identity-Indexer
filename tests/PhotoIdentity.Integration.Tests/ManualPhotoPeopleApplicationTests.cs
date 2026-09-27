@@ -2,9 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -19,7 +17,7 @@ public sealed class ManualPhotoPeopleApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededCatalogue seeded = await SeedCatalogueAsync(database, directory);
 
@@ -46,8 +44,8 @@ public sealed class ManualPhotoPeopleApplicationTests
                 await removeResponse.Content.ReadFromJsonAsync<PhotoDetailsResponse>());
             Assert.Empty(removed.People);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand history = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand history = connection.CreateCommand();
             history.CommandText = """
                 SELECT action_kind, actor
                 FROM photo_person_actions
@@ -57,7 +55,7 @@ public sealed class ManualPhotoPeopleApplicationTests
                 """;
             history.Parameters.AddWithValue("$revision_id", seeded.FirstRevisionId);
             history.Parameters.AddWithValue("$person_id", seeded.AdaPersonId);
-            await using SqliteDataReader reader = await history.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await history.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("add", reader.GetString(0));
             Assert.Equal("local-maintainer", reader.GetString(1));
@@ -81,7 +79,7 @@ public sealed class ManualPhotoPeopleApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededCatalogue seeded = await SeedCatalogueAsync(database, directory);
             await SeedConfirmedFaceAsync(database, seeded.FirstRevisionId, seeded.AdaPersonId);
@@ -141,17 +139,17 @@ public sealed class ManualPhotoPeopleApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededCatalogue seeded = await SeedCatalogueAsync(database, directory);
 
-            SqlitePhotoPersonRepository manualRepository = new(database, TimeProvider.System);
+            PostgresPhotoPersonRepository manualRepository = new(database, TimeProvider.System);
             await manualRepository.AddManualPersonAsync(
                 AssetRevisionId.From(Guid.Parse(seeded.FirstRevisionId)),
                 PersonId.From(Guid.Parse(seeded.BobPersonId)),
                 "merge:test");
 
-            SqlitePersonMaintenanceRepository maintenance = new(database);
+            PostgresPersonMaintenanceRepository maintenance = new(database);
             await maintenance.MergeAsync(
                 PersonId.From(Guid.Parse(seeded.BobPersonId)),
                 PersonId.From(Guid.Parse(seeded.AdaPersonId)),
@@ -159,7 +157,7 @@ public sealed class ManualPhotoPeopleApplicationTests
                 actor: "merge:test",
                 createdAtUtc: DateTimeOffset.UtcNow);
 
-            SqlitePhotoDetailsRepository detailsRepository = new(database);
+            PostgresPhotoDetailsRepository detailsRepository = new(database);
             CataloguePhotoDetails details = Assert.IsType<CataloguePhotoDetails>(
                 await detailsRepository.GetAsync(AssetRevisionId.From(Guid.Parse(seeded.FirstRevisionId))));
             CataloguePhotoDetailsPerson person = Assert.Single(details.People);
@@ -167,9 +165,9 @@ public sealed class ManualPhotoPeopleApplicationTests
             Assert.True(person.ManualPresence);
             Assert.Equal(0, person.ConfirmedFaceCount);
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand history = connection.CreateCommand();
+                using PostgresCompatibilityCommand history = connection.CreateCommand();
                 history.CommandText = """
                     SELECT person_id, action_kind, actor
                     FROM photo_person_actions
@@ -177,7 +175,7 @@ public sealed class ManualPhotoPeopleApplicationTests
                     ORDER BY id;
                     """;
                 history.Parameters.AddWithValue("$revision_id", seeded.FirstRevisionId);
-                await using SqliteDataReader reader = await history.ExecuteReaderAsync();
+                await using NpgsqlDataReader reader = await history.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
                 Assert.Equal(seeded.BobPersonId, reader.GetGuid(0).ToString("D"));
                 Assert.Equal("add", reader.GetString(1));
@@ -231,9 +229,9 @@ public sealed class ManualPhotoPeopleApplicationTests
             await response.Content.ReadFromJsonAsync<SmartCollectionPageResponse>());
     }
 
-    private static async Task AssertFaceEvidenceCountsAsync(SqliteCatalogueDatabase database, int expected)
+    private static async Task AssertFaceEvidenceCountsAsync(PostgresTestCatalogueDatabase database, int expected)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
         foreach (string table in new[]
                  {
                      "face_occurrences",
@@ -244,14 +242,14 @@ public sealed class ManualPhotoPeopleApplicationTests
                      "identity_suggestions",
                  })
         {
-            using SqliteCommand command = connection.CreateCommand();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = $"SELECT COUNT(*) FROM {table};";
             Assert.Equal(expected, Convert.ToInt32(await command.ExecuteScalarAsync()));
         }
     }
 
     private static async Task<SeededCatalogue> SeedCatalogueAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory)
     {
         string sourceId = Guid.NewGuid().ToString("D");
@@ -264,8 +262,8 @@ public sealed class ManualPhotoPeopleApplicationTests
         string sourceRoot = Path.Combine(directory, "originals-do-not-exist");
         string now = new DateTimeOffset(2026, 8, 16, 21, 0, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', $source_root, $now);
@@ -302,15 +300,15 @@ public sealed class ManualPhotoPeopleApplicationTests
     }
 
     private static async Task SeedConfirmedFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string revisionId,
         string personId)
     {
         string faceId = Guid.NewGuid().ToString("D");
         string now = new DateTimeOffset(2026, 8, 16, 21, 5, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES ($face_id, $revision_id, 0, $now);
@@ -375,7 +373,7 @@ public sealed class ManualPhotoPeopleApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }
