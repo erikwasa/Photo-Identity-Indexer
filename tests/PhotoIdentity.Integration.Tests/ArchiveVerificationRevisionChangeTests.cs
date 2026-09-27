@@ -90,7 +90,7 @@ public sealed class ArchiveVerificationRevisionChangeTests
         }
         finally
         {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Npgsql.NpgsqlConnection.ClearAllPools();
             DeleteTemporaryDirectory(directory);
         }
     }
