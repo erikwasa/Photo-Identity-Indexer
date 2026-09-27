@@ -239,8 +239,8 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
             INSERT INTO identity_suggestions (
                 face_occurrence_id, suggested_person_id, model_id, model_hash,
                 score, status, created_at_utc)
-                VALUES ($face_id, $person_id, 'sface', $model_hash, $score, 'pending', $now);
-            SELECT last_insert_rowid();
+                VALUES ($face_id, $person_id, 'sface', $model_hash, $score, 'pending', $now)
+            RETURNING id;
             """;
         command.Parameters.AddWithValue("$face_id", faceId);
         command.Parameters.AddWithValue("$person_id", personId);
