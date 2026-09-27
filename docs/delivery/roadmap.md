@@ -37,6 +37,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M30 | Video media support | blocked |
 | M31 | Bulk archive metadata enrichment | in_progress |
 | M32 | Archive media compatibility and slideshow library polish | in_progress |
+| M33 | Archive synchronization performance | in_progress |
 
 Expected evolution:
 

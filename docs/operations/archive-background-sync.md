@@ -65,3 +65,19 @@ The historical failure that motivated this change had these characteristics:
 - retrying simply repeated the same request-lifetime failure.
 
 With background synchronization, a scan may legitimately run for longer than 100 seconds without being cancelled by the browser.
+
+## Synchronization throughput
+
+Background execution protects synchronization from browser lifetime, but it is not a throughput optimization. WI-0166 keeps the same durable worker boundary while removing PostgreSQL N+1 work from each included-folder scan.
+
+The scanner now sends one exclusion observation/check batch per non-empty included folder. Non-excluded observations are staged and persisted through fixed set-oriented asset, availability, revision and observation statements inside one serializable transaction. Metadata-stable verified originals remain hash-free; new, changed, reappearing, unverified and incomplete-baseline originals still use SHA-256 verification.
+
+Launcher/API logs use the prefix:
+
+```text
+[WI-0166 sync diagnostics]
+```
+
+The aggregate line includes total, source-enumeration, baseline, exclusion, hashing, persistence and missing-reconciliation timings plus counts for files, status checks, metadata reuse, excluded items, exclusion batches, hashed bytes, observation writes and persistence batches. These values are aggregate and do not expose source paths, filenames or hashes.
+
+When investigating a slow run, use the server-side `total_ms` rather than the browser polling duration. A normal non-empty included folder should report one exclusion batch and one persistence batch. A larger count indicates an orchestration regression back toward per-file work.

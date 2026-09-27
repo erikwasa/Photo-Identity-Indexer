@@ -78,6 +78,9 @@ public sealed class SourceCopyExclusionTests
         LocalArchiveSyncSummary sameLocator = await catalogue.SyncAsync(source, ["A", "B"], t1);
         Assert.Equal(openedBeforeExclusion, source.OpenCount);
         Assert.Equal(0, sameLocator.ReconciledMoveCount);
+        Assert.Equal(1, sameLocator.Diagnostics.Folders.Sum(static folder => folder.ExclusionBatchCount));
+        Assert.Equal(1, sameLocator.Diagnostics.Folders.Sum(static folder => folder.ExcludedFileCount));
+        Assert.Equal(0, sameLocator.Diagnostics.Folders.Sum(static folder => folder.ObservationWriteCount));
         SourceCopyExclusionState observed = Assert.IsType<SourceCopyExclusionState>(
             await catalogue.Exclusions.GetAsync(catalogue.SourceId, "A/private.jpg"));
         Assert.Equal(t1, observed.LastSeenAtUtc);

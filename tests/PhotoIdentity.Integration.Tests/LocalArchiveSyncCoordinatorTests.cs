@@ -55,6 +55,8 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(1, januaryDiagnostics.HashedFileCount);
             Assert.Equal(1, januaryDiagnostics.HashedBytes);
             Assert.Equal(1, januaryDiagnostics.ObservationWriteCount);
+            Assert.Equal(0, januaryDiagnostics.ExclusionBatchCount);
+            Assert.Equal(1, januaryDiagnostics.PersistenceBatchCount);
             Assert.True(januaryDiagnostics.AvailabilityCheckCount >= 2);
             Assert.Single(await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false));
 
@@ -73,6 +75,7 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(2, monthSync.Diagnostics.Folders.Sum(static folder => folder.HashedFileCount));
             Assert.Equal(2, monthSync.Diagnostics.Folders.Sum(static folder => folder.HashedBytes));
             Assert.Equal(3, monthSync.Diagnostics.Folders.Sum(static folder => folder.ObservationWriteCount));
+            Assert.Equal(2, monthSync.Diagnostics.Folders.Sum(static folder => folder.PersistenceBatchCount));
             Assert.Equal(3, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
 
             LocalArchiveSyncSummary yearSync = await coordinator.SyncAsync(
@@ -91,6 +94,7 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(1, yearDiagnostics.HashedFileCount);
             Assert.Equal(1, yearDiagnostics.HashedBytes);
             Assert.Equal(4, yearDiagnostics.ObservationWriteCount);
+            Assert.Equal(1, yearDiagnostics.PersistenceBatchCount);
             // Enumeration checks all four files; only the newly discovered local file is opened
             // for hashing, so the fast path deliberately avoids the three extra status checks
             // that the old unconditional-hash behavior performed.
