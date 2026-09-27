@@ -3,7 +3,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
 
@@ -173,14 +172,14 @@ public static class ArchiveItemFilterEndpoints
     private static async Task<IResult> GetExactDuplicatesAsync(
         IArchiveCoverageRepository coverageRepository,
         ISourceCopyExclusionRepository exclusions,
-        IServiceProvider services,
+        PostgresCatalogueDatabase postgres,
         CancellationToken cancellationToken)
     {
         try
         {
             ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
-            IExactDuplicateRepository repository = ResolveExactDuplicateRepository(services);
+            IExactDuplicateRepository repository = new PostgresExactDuplicateRepository(postgres);
             IReadOnlyList<ExactDuplicateGroup> groups = await repository.GetGroupsAsync(
                 configured.Source.SourceId,
                 cancellationToken);
@@ -460,21 +459,6 @@ public static class ArchiveItemFilterEndpoints
         state.PurgeState,
         state.PurgeErrorCode,
         state.PurgeUpdatedAtUtc);
-
-    private static IExactDuplicateRepository ResolveExactDuplicateRepository(IServiceProvider services)
-    {
-        if (services.GetService(typeof(PostgresCatalogueDatabase)) is PostgresCatalogueDatabase postgres)
-        {
-            return new PostgresExactDuplicateRepository(postgres);
-        }
-
-        if (services.GetService(typeof(SqliteCatalogueDatabase)) is SqliteCatalogueDatabase sqlite)
-        {
-            return new SqliteExactDuplicateRepository(sqlite);
-        }
-
-        throw new InvalidOperationException("No supported catalogue provider is configured.");
-    }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(
         ArchiveCoverageState configured,
