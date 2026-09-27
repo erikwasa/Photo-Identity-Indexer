@@ -23,9 +23,8 @@ internal class WebApplicationFactory<TEntryPoint> :
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Minimal-hosting applications read web-host settings while Program is being constructed,
-        // before ConfigureAppConfiguration callbacks on the generic host can repair legacy test
-        // configuration. Give every test host a valid PostgreSQL catalogue at that earliest point.
+        // Minimal-hosting applications read web-host settings while Program is being constructed.
+        // Give factories that use this base implementation a valid catalogue immediately.
         builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", _databaseLease.ConnectionString);
         builder.UseStaticWebAssets();
     }
@@ -33,7 +32,13 @@ internal class WebApplicationFactory<TEntryPoint> :
     protected override IHost CreateHost(IHostBuilder builder)
     {
         builder.UseEnvironment("IntegrationTestPostgres");
-        builder.ConfigureAppConfiguration((_, configuration) =>
+
+        // A number of mature endpoint fixtures override ConfigureWebHost without calling base and
+        // still provide only the historical PhotoIdentity:DatabasePath compatibility key. Host
+        // configuration is available before the minimal Program body runs, unlike generic app
+        // configuration callbacks, so translate that key here at bootstrap time. This preserves
+        // each fixture's isolated seeded PostgreSQL catalogue without restoring SQLite runtime use.
+        builder.ConfigureHostConfiguration(configuration =>
         {
             IConfiguration current = configuration.Build();
             string? configuredConnectionString =
