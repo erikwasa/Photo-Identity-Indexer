@@ -331,7 +331,7 @@ milestones:
   - WI-0165
 - id: M33
   title: Archive synchronization performance
-  status: in_progress
+  status: completed
   document: ../milestones/M33-archive-synchronization-performance.md
   work_items:
   - WI-0166
