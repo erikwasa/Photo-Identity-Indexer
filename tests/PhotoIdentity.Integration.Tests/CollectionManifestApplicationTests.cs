@@ -2,10 +2,8 @@ using PhotoIdentity.Core.Review;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -23,20 +21,20 @@ public sealed class CollectionManifestApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             string sourceRoot = Path.Combine(directory, "private-family-archive");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 8, 2, 0, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync("Ada Lovelace", now);
             SourceId sourceId = SourceId.New();
             List<FaceOccurrenceId> faceIds = [];
             List<AssetRevisionId> revisionIds = [];
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            using (SqliteTransaction transaction = connection.BeginTransaction())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
+            using (NpgsqlTransaction transaction = connection.BeginTransaction())
             {
-                using (SqliteCommand sourceCommand = connection.CreateCommand())
+                using (PostgresCompatibilityCommand sourceCommand = connection.CreateCommand())
                 {
                     sourceCommand.Transaction = transaction;
                     sourceCommand.CommandText = """
@@ -58,7 +56,7 @@ public sealed class CollectionManifestApplicationTests
                     faceIds.Add(faceId);
                     DateTimeOffset observedAt = now.AddMinutes(index + 1);
 
-                    using SqliteCommand command = connection.CreateCommand();
+                    using PostgresCompatibilityCommand command = connection.CreateCommand();
                     command.Transaction = transaction;
                     command.CommandText = """
                         INSERT INTO assets (

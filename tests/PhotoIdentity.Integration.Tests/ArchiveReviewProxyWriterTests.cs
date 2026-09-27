@@ -3,7 +3,6 @@ using OpenCvSharp;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 using Xunit;
 
@@ -24,7 +23,7 @@ public sealed class ArchiveReviewProxyWriterTests
             await WriteTestJpegAsync(sourcePath);
 
             DateTimeOffset now = new(2026, 8, 8, 21, 0, 0, TimeSpan.Zero);
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
             CatalogueAsset asset = new(AssetId.New(), source.Id, "photo.jpg", now);
@@ -37,11 +36,11 @@ public sealed class ArchiveReviewProxyWriterTests
                 "image/jpeg",
                 2000,
                 1000);
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
             ReviewProxyProfile profile = new("candidate-1600-q82", 1600, 82);
-            ArchiveReviewProxyWriter writer = new(new SqliteArchiveReviewProxyRepository(database));
+            ArchiveReviewProxyWriter writer = new(new PostgresArchiveReviewProxyRepository(database));
             ArchiveReviewProxyMetadata first = await writer.GenerateAsync(
                 persistedRevision.Id,
                 sourcePath,
@@ -74,7 +73,7 @@ public sealed class ArchiveReviewProxyWriterTests
             Assert.Equal(now.AddMinutes(1), replay.GeneratedAtUtc);
             Assert.Equal(
                 first,
-                await ((IArchiveReviewProxyRepository)new SqliteArchiveReviewProxyRepository(database)).GetAsync(
+                await ((IArchiveReviewProxyRepository)new PostgresArchiveReviewProxyRepository(database)).GetAsync(
                     persistedRevision.Id,
                     profile.Id));
 
@@ -106,7 +105,7 @@ public sealed class ArchiveReviewProxyWriterTests
             await WriteTestJpegAsync(sourcePath);
 
             DateTimeOffset now = new(2026, 8, 8, 21, 0, 0, TimeSpan.Zero);
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
             CatalogueAsset asset = new(AssetId.New(), source.Id, "photo.jpg", now);
@@ -119,11 +118,11 @@ public sealed class ArchiveReviewProxyWriterTests
                 "image/jpeg",
                 2000,
                 1000);
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
             ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() =>
-                new ArchiveReviewProxyWriter(new SqliteArchiveReviewProxyRepository(database)).GenerateAsync(
+                new ArchiveReviewProxyWriter(new PostgresArchiveReviewProxyRepository(database)).GenerateAsync(
                     persistedRevision.Id,
                     sourcePath,
                     sourceRoot,

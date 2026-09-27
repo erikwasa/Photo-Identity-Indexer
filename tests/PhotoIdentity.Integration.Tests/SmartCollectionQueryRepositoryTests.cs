@@ -1,8 +1,6 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -15,11 +13,11 @@ public sealed class SmartCollectionQueryRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
 
             PersonId alice = PersonId.New();
             PersonId bob = PersonId.New();
@@ -84,11 +82,11 @@ public sealed class SmartCollectionQueryRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
             PersonId alice = PersonId.New();
             PersonId bob = PersonId.New();
             CatalogueAssetRevision aliceTrip = await CreateRevisionAsync(catalogue, directory, "alice-trip.jpg", 'f');
@@ -122,11 +120,11 @@ public sealed class SmartCollectionQueryRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
             CatalogueAssetRevision tagged = await CreateRevisionAsync(catalogue, directory, "tagged.jpg", 'd');
             _ = await CreateRevisionAsync(catalogue, directory, "untagged.jpg", 'e');
             await tags.AddManualTagAsync(tagged.Id, "Archive/Sweden/Stockholm", "test");
@@ -144,7 +142,7 @@ public sealed class SmartCollectionQueryRepositoryTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string root,
         string sourceKey,
         char hashCharacter)
@@ -168,16 +166,16 @@ public sealed class SmartCollectionQueryRepositoryTests
     }
 
     private static async Task AssignPersonAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         PersonId personId,
         string displayName)
     {
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using NpgsqlTransaction transaction = connection.BeginTransaction();
 
-        using (SqliteCommand person = connection.CreateCommand())
+        using (PostgresCompatibilityCommand person = connection.CreateCommand())
         {
             person.Transaction = transaction;
             person.CommandText = """
@@ -192,7 +190,7 @@ public sealed class SmartCollectionQueryRepositoryTests
         }
 
         long ordinal;
-        using (SqliteCommand nextOrdinal = connection.CreateCommand())
+        using (PostgresCompatibilityCommand nextOrdinal = connection.CreateCommand())
         {
             nextOrdinal.Transaction = transaction;
             nextOrdinal.CommandText = "SELECT COALESCE(MAX(ordinal), -1) + 1 FROM face_occurrences WHERE asset_revision_id = $revision;";
@@ -200,7 +198,7 @@ public sealed class SmartCollectionQueryRepositoryTests
             ordinal = Convert.ToInt64(await nextOrdinal.ExecuteScalarAsync() ?? 0L);
         }
 
-        using (SqliteCommand face = connection.CreateCommand())
+        using (PostgresCompatibilityCommand face = connection.CreateCommand())
         {
             face.Transaction = transaction;
             face.CommandText = "INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc) VALUES ($id, $revision, $ordinal, $now);";
@@ -212,7 +210,7 @@ public sealed class SmartCollectionQueryRepositoryTests
         }
 
         long labelId;
-        using (SqliteCommand label = connection.CreateCommand())
+        using (PostgresCompatibilityCommand label = connection.CreateCommand())
         {
             label.Transaction = transaction;
             label.CommandText = """
@@ -226,7 +224,7 @@ public sealed class SmartCollectionQueryRepositoryTests
             labelId = Convert.ToInt64(await label.ExecuteScalarAsync() ?? throw new InvalidOperationException());
         }
 
-        using (SqliteCommand action = connection.CreateCommand())
+        using (PostgresCompatibilityCommand action = connection.CreateCommand())
         {
             action.Transaction = transaction;
             action.CommandText = """

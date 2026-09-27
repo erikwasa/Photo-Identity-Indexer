@@ -1,9 +1,7 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity.Integration.Tests;
@@ -17,7 +15,7 @@ public sealed class SourceCopyPurgeReviewHistoryTests
         Directory.CreateDirectory(root);
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
             await database.InitializeAsync();
 
             SourceId sourceId = SourceId.New();
@@ -28,9 +26,9 @@ public sealed class SourceCopyPurgeReviewHistoryTests
             DateTimeOffset now = new(2026, 9, 26, 1, 0, 0, TimeSpan.Zero);
             const string sourceKey = "Private/review-history.jpg";
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand seed = connection.CreateCommand();
+                using PostgresCompatibilityCommand seed = connection.CreateCommand();
                 seed.CommandText = """
                     INSERT INTO sources (id, kind, root_locator, created_at_utc)
                     VALUES ($source_id, 'local-folder', 'private-root', $now);
@@ -79,11 +77,11 @@ public sealed class SourceCopyPurgeReviewHistoryTests
                 await seed.ExecuteNonQueryAsync();
             }
 
-            SqliteSourceCopyExclusionRepository exclusions = new(database);
+            PostgresSourceCopyExclusionRepository exclusions = new(database);
             await exclusions.ExcludeAsync(sourceId, sourceKey, now.AddMinutes(1));
             SourceCopyPurgeService service = new(
                 exclusions,
-                new SqliteSourceCopyPurgeRepository(database),
+                new PostgresSourceCopyPurgeRepository(database),
                 new SourceCopyPurgeRoots(
                     Path.Combine(root, "analysis"),
                     Path.Combine(root, "review"),
@@ -93,7 +91,7 @@ public sealed class SourceCopyPurgeReviewHistoryTests
 
             Assert.True(await service.PurgeAsync(sourceId, sourceKey));
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
                 Assert.Equal(0L, await CountAsync(connection, "assets"));
                 Assert.Equal(0L, await CountAsync(connection, "face_occurrences"));
@@ -108,7 +106,7 @@ public sealed class SourceCopyPurgeReviewHistoryTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            PostgresCompatibilityConnection.ClearAllPools();
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
@@ -116,9 +114,9 @@ public sealed class SourceCopyPurgeReviewHistoryTests
         }
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
+    private static async Task<long> CountAsync(PostgresCompatibilityConnection connection, string table)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         return Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
     }

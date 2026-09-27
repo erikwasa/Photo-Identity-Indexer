@@ -4,10 +4,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -23,11 +21,11 @@ public sealed class CollectionQueryApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             string sourceRoot = Path.Combine(directory, "private-family-archive");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 8, 1, 17, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada Lovelace", now);
             CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace Hopper", now.AddSeconds(1));
 
@@ -144,11 +142,11 @@ public sealed class CollectionQueryApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             string sourceRoot = Path.Combine(directory, "private-family-archive");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 8, 1, 18, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada Lovelace", now);
             CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace Hopper", now.AddSeconds(1));
             CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -256,11 +254,11 @@ public sealed class CollectionQueryApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 8, 1, 19, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada Lovelace", now);
             CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace Hopper", now.AddSeconds(1));
             CatalogueSource source = new(SourceId.New(), "local-folder", Path.Combine(directory, "private"), now);
@@ -347,7 +345,7 @@ public sealed class CollectionQueryApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             await using CollectionApiFactory factory = new(databasePath);
@@ -398,7 +396,7 @@ public sealed class CollectionQueryApplicationTests
     }
 
     private static async Task<SeededPhoto> SeedPhotoAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         CatalogueSource source,
         string sourceKey,
         char hashCharacter,
@@ -416,16 +414,16 @@ public sealed class CollectionQueryApplicationTests
             "image/jpeg",
             1920,
             1080);
-        CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         List<FaceOccurrenceId> faces = [];
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
         for (int ordinal = 0; ordinal < confidences.Length; ordinal++)
         {
             FaceOccurrenceId faceId = FaceOccurrenceId.New();
             faces.Add(faceId);
-            using SqliteCommand command = connection.CreateCommand();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES ($face_id, $revision_id, $ordinal, $created_at_utc);
@@ -460,7 +458,7 @@ public sealed class CollectionQueryApplicationTests
     }
 
     private static async Task SeedSuggestionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         FaceOccurrenceId faceId,
         PersonId personId,
         string modelId,
@@ -469,8 +467,8 @@ public sealed class CollectionQueryApplicationTests
         double? scoreMargin,
         DateTimeOffset generatedAtUtc)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO identity_suggestions (
                 face_occurrence_id,

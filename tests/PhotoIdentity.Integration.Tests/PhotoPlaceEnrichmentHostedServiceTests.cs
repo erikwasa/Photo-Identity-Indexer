@@ -1,11 +1,9 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 using Xunit;
 
@@ -19,16 +17,16 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
             TimeProvider clock = TimeProvider.System;
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService enrichment = new(
                 new SuccessfulGeocoder(),
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
             GeoNamesAutomaticEnrichmentConfiguration automatic = new(
                 enabled: null,
                 minimumRequestIntervalMilliseconds: 1_000,
@@ -110,15 +108,15 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
 
             TimeProvider clock = TimeProvider.System;
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService enrichment = new(
                 new SuccessfulGeocoder(),
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
             GeoNamesAutomaticEnrichmentConfiguration automatic = new(
                 enabled: true,
                 minimumRequestIntervalMilliseconds: null,
@@ -156,17 +154,17 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
             TimeProvider clock = TimeProvider.System;
             CountingGeocoder provider = new();
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService enrichment = new(
                 provider,
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
             GeoNamesAutomaticEnrichmentConfiguration automatic = new(
                 enabled: false,
                 minimumRequestIntervalMilliseconds: null,
@@ -193,7 +191,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
             Assert.Null((await places.GetStateAsync(revisionId)).Place);
 
             IReadOnlyList<CataloguePlaceEnrichmentCandidate> pending =
-                await new SqlitePhotoPlaceEnrichmentRepository(database, clock).GetCandidatesAsync(
+                await new PostgresPhotoPlaceEnrichmentRepository(database, clock).GetCandidatesAsync(
                     provider.ProviderName,
                     provider.ContractKey,
                     limit: 10,
@@ -208,7 +206,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
     }
 
     private static async Task<AssetRevisionId> CreateRevisionWithGpsAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory)
     {
         DateTimeOffset now = new(2026, 8, 18, 0, 0, 0, TimeSpan.Zero);
@@ -227,11 +225,11 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO photo_capture_metadata (
                 asset_revision_id, taken_at_local, utc_offset_minutes,
@@ -256,7 +254,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

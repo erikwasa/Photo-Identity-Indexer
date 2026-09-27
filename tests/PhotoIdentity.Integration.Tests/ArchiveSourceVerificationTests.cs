@@ -1,7 +1,6 @@
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -15,12 +14,12 @@ public sealed class ArchiveSourceVerificationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset t0 = new(2026, 8, 9, 7, 0, 0, TimeSpan.Zero);
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, t0);
             MutableAssetSource source = new(catalogueSource.Id, "1970/01/a.jpg", [1, 2, 3], t0, AssetAvailability.Local);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
 
             ArchiveSourceCatalogueScanSummary initial = await scanner.ScanAsync(
                 source,
@@ -90,11 +89,11 @@ public sealed class ArchiveSourceVerificationTests
             DateTimeOffset t0 = new(2026, 8, 9, 7, 30, 0, TimeSpan.Zero);
             File.SetLastWriteTimeUtc(fullPath, t0.UtcDateTime);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, t0);
             MutableAssetSource source = new(catalogueSource.Id, relativePath, bytes, t0, AssetAvailability.OnlineOnly);
-            ArchiveSourceCatalogueScanSummary scan = await new SqliteArchiveSourceCatalogueScanner(database).ScanAsync(
+            ArchiveSourceCatalogueScanSummary scan = await new PostgresArchiveSourceCatalogueScanner(database).ScanAsync(
                 source,
                 catalogueSource,
                 new SourceScanOptions("2026/08", true),
@@ -103,18 +102,18 @@ public sealed class ArchiveSourceVerificationTests
             Assert.Equal(0, scan.NewRevisionCount);
             Assert.Equal(0, source.OpenCount);
 
-            SqliteArchiveSourceObservationRepository observations = new(database);
+            PostgresArchiveSourceObservationRepository observations = new(database);
             ArchiveSourceObservation pending = Assert.IsType<ArchiveSourceObservation>(
                 await observations.GetNextPendingAsync(catalogueSource.Id));
             FakeFilesOnDemandPlatform platform = new();
             platform.Set(fullPath, AssetAvailability.OnlineOnly);
-            SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
+            PostgresArchiveSourceHydrationRepository sourceHydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                new SqliteArchiveHydrationRepository(database),
+                new PostgresArchiveHydrationRepository(database),
                 sourceHydrations,
-                new SqliteArchiveCoverageRepository(database),
-                new SqliteArchiveStorageRepository(database),
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveCoverageRepository(database),
+                new PostgresArchiveStorageRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),
@@ -123,7 +122,7 @@ public sealed class ArchiveSourceVerificationTests
             ArchiveSourceVerificationService verification = new(
                 observations,
                 sourceHydrations,
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 capacity,
                 platform,
                 TimeProvider.System);
@@ -157,7 +156,7 @@ public sealed class ArchiveSourceVerificationTests
             Assert.Equal(ArchiveSourceVerificationState.Verified, final.VerificationState);
             Assert.Equal(verified.RevisionId, final.VerifiedRevisionId);
             Assert.False((await sourceHydrations.GetAsync(pending.AssetId))?.IsActive);
-            Assert.True((await new SqliteArchiveHydrationRepository(database)
+            Assert.True((await new PostgresArchiveHydrationRepository(database)
                 .GetAsync(verified.RevisionId!.Value))?.IsActive);
         }
         finally
@@ -178,7 +177,7 @@ public sealed class ArchiveSourceVerificationTests
             byte[] bytes = [1, 2, 3, 4];
             DateTimeOffset now = new(2026, 8, 28, 18, 45, 0, TimeSpan.Zero);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, now);
             MutableAssetSource source = new(
@@ -187,7 +186,7 @@ public sealed class ArchiveSourceVerificationTests
                 bytes,
                 now,
                 AssetAvailability.OnlineOnly);
-            _ = await new SqliteArchiveSourceCatalogueScanner(database).ScanAsync(
+            _ = await new PostgresArchiveSourceCatalogueScanner(database).ScanAsync(
                 source,
                 catalogueSource,
                 new SourceScanOptions("2026/08", true),
@@ -195,22 +194,22 @@ public sealed class ArchiveSourceVerificationTests
 
             FakeFilesOnDemandPlatform platform = new();
             platform.Set(fullPath, AssetAvailability.Unavailable);
-            SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
+            PostgresArchiveSourceHydrationRepository sourceHydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                new SqliteArchiveHydrationRepository(database),
+                new PostgresArchiveHydrationRepository(database),
                 sourceHydrations,
-                new SqliteArchiveCoverageRepository(database),
-                new SqliteArchiveStorageRepository(database),
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveCoverageRepository(database),
+                new PostgresArchiveStorageRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),
                 new ReviewProxyServingConfiguration(null, null),
                 TimeProvider.System);
             ArchiveSourceVerificationService verification = new(
-                new SqliteArchiveSourceObservationRepository(database),
+                new PostgresArchiveSourceObservationRepository(database),
                 sourceHydrations,
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 capacity,
                 platform,
                 TimeProvider.System);
@@ -233,7 +232,7 @@ public sealed class ArchiveSourceVerificationTests
         try
         {
             DateTimeOffset now = new(2026, 8, 9, 8, 0, 0, TimeSpan.Zero);
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, now);
             MutableAssetSource source = new(
@@ -242,22 +241,22 @@ public sealed class ArchiveSourceVerificationTests
                 Enumerable.Repeat((byte)1, 600).ToArray(),
                 now,
                 AssetAvailability.OnlineOnly);
-            _ = await new SqliteArchiveSourceCatalogueScanner(database).ScanAsync(
+            _ = await new PostgresArchiveSourceCatalogueScanner(database).ScanAsync(
                 source,
                 catalogueSource,
                 new SourceScanOptions(null, true),
                 now);
-            IArchiveSourceObservationRepository observations = new SqliteArchiveSourceObservationRepository(database);
+            IArchiveSourceObservationRepository observations = new PostgresArchiveSourceObservationRepository(database);
             ArchiveSourceObservationSnapshot pending = Assert.IsType<ArchiveSourceObservationSnapshot>(
                 await observations.GetNextPendingAsync(catalogueSource.Id));
 
             FakeFilesOnDemandPlatform platform = new();
             ArchiveHydrationCapacityService capacity = new(
-                new SqliteArchiveHydrationRepository(database),
-                new SqliteArchiveSourceHydrationRepository(database),
-                new SqliteArchiveCoverageRepository(database),
-                new SqliteArchiveStorageRepository(database),
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveHydrationRepository(database),
+                new PostgresArchiveSourceHydrationRepository(database),
+                new PostgresArchiveCoverageRepository(database),
+                new PostgresArchiveStorageRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 500, 1),

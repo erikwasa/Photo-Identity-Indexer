@@ -1,8 +1,6 @@
 using System.Net.Http.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -17,7 +15,7 @@ public sealed class PhotoDetailsMetadataApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             AssetRevisionId revisionId = await SeedRevisionAsync(database, directory);
 
@@ -32,8 +30,8 @@ public sealed class PhotoDetailsMetadataApplicationTests
                 iso: "ISO 200",
                 gpsAltitude: "42 metres",
                 rawTags: [new PhotoMetadataTag("Exif IFD0", "Make", "Example Camera Co.")]);
-            await new SqliteExtendedPhotoMetadataRepository(database).SaveAsync(revisionId, metadata);
-            await new SqliteAssetCatalogueRepository(database).SavePhotoMetadataAsync(
+            await new PostgresExtendedPhotoMetadataRepository(database).SaveAsync(revisionId, metadata);
+            await new PostgresAssetCatalogueRepository(database).SavePhotoMetadataAsync(
                 revisionId,
                 metadata,
                 new DateTimeOffset(2026, 8, 19, 18, 0, 0, TimeSpan.Zero));
@@ -77,7 +75,7 @@ public sealed class PhotoDetailsMetadataApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             AssetRevisionId revisionId = await SeedRevisionAsync(database, directory);
 
@@ -89,9 +87,9 @@ public sealed class PhotoDetailsMetadataApplicationTests
                     $"/api/collections/photos/{revisionId}/details"));
             Assert.Null(before.Metadata);
 
-            await new SqliteExtendedPhotoMetadataRepository(database)
+            await new PostgresExtendedPhotoMetadataRepository(database)
                 .SaveAsync(revisionId, new PhotoCaptureMetadata());
-            await new SqliteAssetCatalogueRepository(database).SavePhotoMetadataAsync(
+            await new PostgresAssetCatalogueRepository(database).SavePhotoMetadataAsync(
                 revisionId,
                 new PhotoCaptureMetadata(),
                 DateTimeOffset.UtcNow);
@@ -111,7 +109,7 @@ public sealed class PhotoDetailsMetadataApplicationTests
     }
 
     private static async Task<AssetRevisionId> SeedRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string root)
     {
         string sourceRoot = Path.Combine(root, "source");
@@ -121,8 +119,8 @@ public sealed class PhotoDetailsMetadataApplicationTests
         string assetId = Guid.NewGuid().ToString("D");
         string now = new DateTimeOffset(2026, 8, 19, 18, 0, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', $source_root, $now);

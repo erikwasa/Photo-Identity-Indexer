@@ -6,7 +6,6 @@ using OpenCvSharp;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -26,7 +25,7 @@ public sealed class CollectionProxyContentApplicationTests
             Directory.CreateDirectory(proxyRoot);
 
             DateTimeOffset now = new(2026, 8, 9, 0, 15, 0, TimeSpan.Zero);
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -40,7 +39,7 @@ public sealed class CollectionProxyContentApplicationTests
                 "image/jpeg",
                 2400,
                 1600);
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
             ReviewProxyProfile profile = new("jpeg-1600-q78", 1600, 78);
@@ -53,7 +52,7 @@ public sealed class CollectionProxyContentApplicationTests
             Directory.CreateDirectory(Path.GetDirectoryName(proxyPath)!);
             await File.WriteAllBytesAsync(proxyPath, proxyBytes);
 
-            SqliteArchiveReviewProxyRepository proxyRepository = new(database);
+            PostgresArchiveReviewProxyRepository proxyRepository = new(database);
             await proxyRepository.RegisterProfileAsync(profile, now);
             await proxyRepository.RecordCompletionAsync(new ArchiveReviewProxyRecord(
                 persistedRevision.Id,
@@ -149,7 +148,7 @@ public sealed class CollectionProxyContentApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
             builder.UseSetting("PhotoIdentity:ReviewProxyRoot", _proxyRoot);
             builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", _profileId);
         }

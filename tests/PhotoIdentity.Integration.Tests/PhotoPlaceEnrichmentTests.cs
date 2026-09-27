@@ -1,10 +1,8 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -18,7 +16,7 @@ public sealed class PhotoPlaceEnrichmentTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision first = await CreateRevisionAsync(database, directory, "first.jpg", 'a');
             SeededRevision second = await CreateRevisionAsync(database, directory, "second.jpg", 'b');
@@ -41,7 +39,7 @@ public sealed class PhotoPlaceEnrichmentTests
             Assert.Equal(2, report.Assigned);
             Assert.Equal(1, provider.CallCount);
 
-            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
             CataloguePhotoPlaceState firstState = await places.GetStateAsync(first.RevisionId);
             CataloguePhotoPlaceState secondState = await places.GetStateAsync(second.RevisionId);
             Assert.Equal("Sweden/Stockholm County/Norrtälje", firstState.Place?.Value);
@@ -68,7 +66,7 @@ public sealed class PhotoPlaceEnrichmentTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision seeded = await CreateRevisionAsync(database, directory, "zero-zero.jpg", 'c');
             await SaveGpsAsync(database, seeded.RevisionId, 0, 0);
@@ -95,12 +93,12 @@ public sealed class PhotoPlaceEnrichmentTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision seeded = await CreateRevisionAsync(database, directory, "manual.jpg", 'c');
             await SaveGpsAsync(database, seeded.RevisionId, 57.6348, 18.2948);
 
-            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
             await places.SetManualPlaceAsync(seeded.RevisionId, "Sweden/Gotland/Visby", "test-maintainer");
             await places.ClearManualPlaceAsync(seeded.RevisionId, "test-maintainer");
 
@@ -137,7 +135,7 @@ public sealed class PhotoPlaceEnrichmentTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision seeded = await CreateRevisionAsync(database, directory, "retry.jpg", 'd');
             await SaveGpsAsync(database, seeded.RevisionId, 59.758, 18.705);
@@ -164,13 +162,13 @@ public sealed class PhotoPlaceEnrichmentTests
             Assert.Equal(1, second.Assigned);
             Assert.Equal(2, provider.CallCount);
 
-            CataloguePhotoPlaceState state = await new SqlitePhotoPlaceRepository(database, TimeProvider.System)
+            CataloguePhotoPlaceState state = await new PostgresPhotoPlaceRepository(database, TimeProvider.System)
                 .GetStateAsync(seeded.RevisionId);
             Assert.Equal("Sweden/Stockholm County/Norrtälje", state.Place?.Value);
             Assert.Equal("automatic", state.Place?.SourceKind);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT status, attempt_count
                 FROM photo_place_enrichment_attempts
@@ -178,7 +176,7 @@ public sealed class PhotoPlaceEnrichmentTests
                   AND provider = 'geonames';
                 """;
             command.Parameters.AddWithValue("$revision_id", seeded.RevisionId.ToString());
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("succeeded", reader.GetString(0));
             Assert.Equal(2, reader.GetInt32(1));
@@ -197,7 +195,7 @@ public sealed class PhotoPlaceEnrichmentTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision unresolved = await CreateRevisionAsync(database, directory, "legacy-no-result.jpg", 'f');
             SeededRevision resolved = await CreateRevisionAsync(database, directory, "legacy-success.jpg", 'b');
@@ -206,7 +204,7 @@ public sealed class PhotoPlaceEnrichmentTests
 
             TimeProvider clock = TimeProvider.System;
             IPhotoPlaceEnrichmentStateRepository enrichment =
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock);
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock);
             await enrichment.MarkSkippedAsync(
                 "geonames",
                 "legacy-populated-place-v1",
@@ -229,11 +227,11 @@ public sealed class PhotoPlaceEnrichmentTests
                         "SE")),
                 ],
                 "geonames-place-v3");
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService service = new(
                 provider,
                 enrichment,
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
 
             PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 10);
 
@@ -262,7 +260,7 @@ public sealed class PhotoPlaceEnrichmentTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision seeded = await CreateRevisionAsync(database, directory, "refresh.jpg", 'e');
             await SaveGpsAsync(database, seeded.RevisionId, 59.758, 18.705);
@@ -282,14 +280,14 @@ public sealed class PhotoPlaceEnrichmentTests
             Assert.Equal(1, (await service.ExecuteBatchAsync(limit: 10)).Assigned);
             Assert.Equal(1, (await service.ExecuteBatchAsync(limit: 10, refresh: true)).Assigned);
 
-            CataloguePhotoPlaceState state = await new SqlitePhotoPlaceRepository(database, TimeProvider.System)
+            CataloguePhotoPlaceState state = await new PostgresPhotoPlaceRepository(database, TimeProvider.System)
                 .GetStateAsync(seeded.RevisionId);
             Assert.Equal("Sweden/Stockholm County/Norrtälje", state.Place?.Value);
             Assert.Equal("automatic", state.Place?.SourceKind);
             Assert.Equal(2, provider.CallCount);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT COUNT(*)
                 FROM photo_place_actions
@@ -306,19 +304,19 @@ public sealed class PhotoPlaceEnrichmentTests
     }
 
     private static PhotoPlaceEnrichmentService CreateService(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         IReverseGeocoder provider)
     {
         TimeProvider clock = TimeProvider.System;
-        SqlitePhotoPlaceRepository places = new(database, clock);
+        PostgresPhotoPlaceRepository places = new(database, clock);
         return new PhotoPlaceEnrichmentService(
             provider,
-            new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-            new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+            new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+            new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
     }
 
     private static async Task<SeededRevision> CreateRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory,
         string sourceKey,
         char hashCharacter)
@@ -336,18 +334,18 @@ public sealed class PhotoPlaceEnrichmentTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
         return new SeededRevision(saved.Id, sourceRoot);
     }
 
     private static async Task SaveGpsAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         double latitude,
         double longitude)
     {
-        await new SqliteAssetCatalogueRepository(database).SavePhotoMetadataAsync(
+        await new PostgresAssetCatalogueRepository(database).SavePhotoMetadataAsync(
             revisionId,
             new PhotoIdentity.Core.Sources.PhotoCaptureMetadata(
                 latitude: latitude,

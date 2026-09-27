@@ -1,11 +1,9 @@
 using System.Security.Cryptography;
-using Microsoft.Data.Sqlite;
 using OpenCvSharp;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Worker;
 using Xunit;
@@ -36,7 +34,7 @@ public sealed class FaceReviewDerivativeBackfillServiceTests
             }
             await File.WriteAllBytesAsync(sourcePath, originalBytes);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 28, 12, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -50,13 +48,13 @@ public sealed class FaceReviewDerivativeBackfillServiceTests
                 "image/jpeg",
                 1200,
                 800);
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
             FaceOccurrenceId faceId = FaceOccurrenceId.New();
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand command = connection.CreateCommand();
+                using PostgresCompatibilityCommand command = connection.CreateCommand();
                 command.CommandText = """
                     INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                     VALUES ($face_id, $revision_id, 0, $created_at_utc);
@@ -86,30 +84,30 @@ public sealed class FaceReviewDerivativeBackfillServiceTests
             }
 
             FakeFilesOnDemandPlatform platform = new();
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
                 hydrations,
-                new SqliteArchiveSourceHydrationRepository(database),
-                new SqliteArchiveCoverageRepository(database),
-                new SqliteArchiveStorageRepository(database),
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveSourceHydrationRepository(database),
+                new PostgresArchiveCoverageRepository(database),
+                new PostgresArchiveStorageRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(),
                 new ArchiveHydrationPolicyConfiguration(null, null, null),
                 new ReviewProxyServingConfiguration(derivativeRoot, "test-proxy"),
                 TimeProvider.System);
             CollectionOriginalAccessService originals = new(
-                new SqliteLocalBatchRepository(database),
+                new PostgresLocalBatchRepository(database),
                 hydrations,
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 capacity,
                 TimeProvider.System);
 
             FaceReviewDerivativeBackfillService service = new(
-                new SqliteFaceReviewDerivativeRepository(database),
-                new SqliteFaceReviewDerivativeBackfillRepository(database),
-                new SqliteLocalBatchRepository(database),
+                new PostgresFaceReviewDerivativeRepository(database),
+                new PostgresFaceReviewDerivativeBackfillRepository(database),
+                new PostgresLocalBatchRepository(database),
                 originals,
                 new ReviewProxyGenerationConfiguration(
                     derivativeRoot,
@@ -120,7 +118,7 @@ public sealed class FaceReviewDerivativeBackfillServiceTests
 
             await service.GenerateReadyRevisionAsync(persistedRevision.Id);
 
-            SqliteFaceReviewDerivativeRepository derivatives = new(database);
+            PostgresFaceReviewDerivativeRepository derivatives = new(database);
             Assert.True(await derivatives.IsRevisionCompleteAsync(
                 persistedRevision.Id,
                 ArchiveFaceReviewDerivativeWriter.ProfileId));

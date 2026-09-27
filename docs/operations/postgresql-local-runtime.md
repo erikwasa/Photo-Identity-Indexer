@@ -111,7 +111,7 @@ This removes the named PostgreSQL data volume.
 
 ## Current authority boundary
 
-WI-0102 completed the real SQLite-to-PostgreSQL migration and controlled authority transfer. The maintainer runtime now requires PostgreSQL. Remaining SQLite migration/import and test compatibility code is transitional M29 cleanup surface, not a supported runtime or rollback authority.
+WI-0102 completed the real SQLite-to-PostgreSQL migration and controlled authority transfer. The maintainer runtime now requires PostgreSQL; WI-0149 removed the remaining executable SQLite migration/import and active test compatibility surface.
 
 Longer-term PostgreSQL backup/recovery, stabilization and sustained real-archive catch-up are owned by WI-0106.
 

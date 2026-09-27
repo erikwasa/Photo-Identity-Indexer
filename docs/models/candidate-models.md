@@ -65,9 +65,7 @@ Expected success signals:
 
 ## Processing and coexistence
 
-Use the [multi-model comparison workflow](../operations/multi-model-comparison.md) rather than manually creating a separate candidate catalogue.
-
-The workflow processes the same source and canonical database with the fixed YuNet detector and candidate embedder. Existing detector-derived face occurrence and crop identities are reused where their natural keys match. Candidate embeddings are inserted under the INT8 model ID and exact hash.
+The [historical multi-model comparison workflow](../operations/multi-model-comparison.md) records the accepted FP32/INT8 evidence, but its automation and catalogue-opening commands are retired. New comparison work must be explicitly scoped against PostgreSQL/provider-neutral contracts and must not create a separate candidate catalogue.
 
 Baseline and candidate embeddings and suggestions therefore coexist. Installing, running or removing the candidate does not alter persisted baseline embeddings, people, assignments, rejections or append-only review history.
 

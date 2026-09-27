@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -14,7 +13,7 @@ public sealed class ArchiveReviewProxyRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 8, 20, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -28,10 +27,10 @@ public sealed class ArchiveReviewProxyRepositoryTests
                 "image/jpeg",
                 4000,
                 3000);
-            CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+            CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
-            SqliteArchiveReviewProxyRepository repository = new(database);
+            PostgresArchiveReviewProxyRepository repository = new(database);
             ReviewProxyProfile profile = new("candidate-1600-q82", 1600, 82);
             await repository.RegisterProfileAsync(profile, now);
 

@@ -113,7 +113,7 @@ public sealed class SimilarFaceApplicationTests
             }
             catch (IOException)
             {
-                // SQLite can briefly retain a file handle after the test host stops on Windows.
+                // The test host can briefly retain a file handle after it stops on Windows.
             }
             catch (UnauthorizedAccessException)
             {

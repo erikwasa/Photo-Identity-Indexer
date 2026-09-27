@@ -1,12 +1,10 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
 
-public sealed class SqliteAssetCatalogueRepositoryTests
+public sealed class PostgresAssetCatalogueRepositoryTests
 {
     [Fact]
     public async Task Save_revision_round_trips_typed_catalogue_records()
@@ -14,9 +12,9 @@ public sealed class SqliteAssetCatalogueRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             (CatalogueSource source, CatalogueAsset asset, CatalogueAssetRevision revision) = CreateRecords();
 
             CatalogueAssetRevision persisted = await repository.SaveRevisionAsync(source, asset, revision);
@@ -41,9 +39,9 @@ public sealed class SqliteAssetCatalogueRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             (CatalogueSource source, CatalogueAsset asset, CatalogueAssetRevision first) = CreateRecords();
             CatalogueAssetRevision duplicate = new(
                 AssetRevisionId.New(),
@@ -62,7 +60,7 @@ public sealed class SqliteAssetCatalogueRepositoryTests
             Assert.Equal(first, duplicateResult);
             Assert.Null(await repository.GetRevisionAsync(duplicate.Id));
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(1, await CountAsync(connection, "asset_revisions"));
         }
         finally
@@ -77,9 +75,9 @@ public sealed class SqliteAssetCatalogueRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             (CatalogueSource source, CatalogueAsset asset, CatalogueAssetRevision first) = CreateRecords();
             await repository.SaveRevisionAsync(source, asset, first);
 
@@ -114,7 +112,7 @@ public sealed class SqliteAssetCatalogueRepositoryTests
             Assert.Equal(first, await repository.GetRevisionAsync(first.Id));
             Assert.Equal(second, await repository.GetLatestRevisionAsync(asset.Id));
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(2, await CountAsync(connection, "asset_revisions"));
         }
         finally
@@ -129,9 +127,9 @@ public sealed class SqliteAssetCatalogueRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             (CatalogueSource source, CatalogueAsset asset, CatalogueAssetRevision revision) = CreateRecords();
             CatalogueAsset mismatchedAsset = new(
                 asset.Id,
@@ -142,7 +140,7 @@ public sealed class SqliteAssetCatalogueRepositoryTests
             await Assert.ThrowsAsync<ArgumentException>(
                 () => repository.SaveRevisionAsync(source, mismatchedAsset, revision));
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(0, await CountAsync(connection, "sources"));
             Assert.Equal(0, await CountAsync(connection, "assets"));
             Assert.Equal(0, await CountAsync(connection, "asset_revisions"));
@@ -177,9 +175,9 @@ public sealed class SqliteAssetCatalogueRepositoryTests
         return (source, asset, revision);
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
+    private static async Task<long> CountAsync(PostgresCompatibilityConnection connection, string table)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);

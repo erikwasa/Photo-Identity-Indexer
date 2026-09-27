@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -9,12 +8,12 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class AssetRevisionLookupRepositoryTests
 {
     [Fact]
-    public async Task Sqlite_adapter_preserves_revision_and_source_location_through_neutral_lookup()
+    public async Task Postgres_adapter_preserves_revision_and_source_location_through_neutral_lookup()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
 
             DateTimeOffset now = new(2026, 9, 2, 18, 0, 0, TimeSpan.Zero);
@@ -37,10 +36,10 @@ public sealed class AssetRevisionLookupRepositoryTests
                 "image/jpeg",
                 1200,
                 800);
-            await new SqliteAssetCatalogueRepository(database)
+            await new PostgresAssetCatalogueRepository(database)
                 .SaveRevisionAsync(source, asset, revision);
 
-            IAssetRevisionLookupRepository repository = new SqliteLocalBatchRepository(database);
+            IAssetRevisionLookupRepository repository = new PostgresLocalBatchRepository(database);
 
             AssetRevisionLookup? byId = await repository.GetRevisionAsync(revision.Id);
             AssetRevisionLookup? bySourceIdentity = await repository.FindRevisionAsync(
@@ -67,14 +66,14 @@ public sealed class AssetRevisionLookupRepositoryTests
     }
 
     [Fact]
-    public async Task Sqlite_adapter_returns_null_when_revision_lookup_does_not_exist()
+    public async Task Postgres_adapter_returns_null_when_revision_lookup_does_not_exist()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            IAssetRevisionLookupRepository repository = new SqliteLocalBatchRepository(database);
+            IAssetRevisionLookupRepository repository = new PostgresLocalBatchRepository(database);
 
             Assert.Null(await repository.GetRevisionAsync(AssetRevisionId.New()));
             Assert.Null(await repository.FindRevisionAsync(

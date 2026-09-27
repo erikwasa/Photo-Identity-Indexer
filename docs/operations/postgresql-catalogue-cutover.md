@@ -1,6 +1,6 @@
 # PostgreSQL catalogue migration and cutover
 
-WI-0102 moved one existing authoritative SQLite catalogue to PostgreSQL. This document preserves the accepted offline migration evidence. Since WI-0147, PostgreSQL is unconditional at runtime; the former SQLite runtime rollback procedure is historical and must not be used with current builds.
+WI-0102 moved one existing authoritative SQLite catalogue to PostgreSQL. This document preserves the accepted offline migration evidence. Since WI-0147, PostgreSQL is unconditional at runtime; the migration commands, rehearsal scripts and former SQLite runtime rollback procedure described below are historical and are not shipped or supported by current builds.
 
 ## Safety rules
 
@@ -10,9 +10,9 @@ WI-0102 moved one existing authoritative SQLite catalogue to PostgreSQL. This do
 - Never copy post-cutover PostgreSQL state back into that preserved backup. A rollback intentionally returns to the pre-cutover state.
 - Keep PostgreSQL credentials outside source control and command output. Migration/rehearsal code reads them only from private environment/configuration state.
 
-## 1. Automated real-catalogue rehearsal
+## 1. Historical automated real-catalogue rehearsal
 
-The supported rehearsal path is `rehearse-postgres-migration.ps1`. Exit Photo Identity completely first. The script requires the explicit `-ApplicationStopped` acknowledgement and also rejects a detected `PhotoIdentity.Api`/known `dotnet PhotoIdentity.Api` process.
+The accepted rehearsal used `rehearse-postgres-migration.ps1`. WI-0149 removed that script and its retired catalogue commands after cutover acceptance. The commands in this section are retained only as evidence of what was run and must not be used as current operator instructions.
 
 From the repository root:
 
@@ -49,9 +49,9 @@ The script prints both rehearsal database names, the backup path/hash and both r
 
 If one target fails before a successful import, that incomplete target is removed. A successfully imported target is retained for diagnosis/review. The preserved SQLite backup is never considered accepted unless its validation succeeds and its SHA-256 remains unchanged through the complete two-target rehearsal.
 
-## 2. Stopped SQLite backup contract
+## 2. Historical stopped SQLite backup contract
 
-The underlying backup command can also be used independently:
+The retired backup command was also used independently:
 
 ~~~powershell
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -66,11 +66,11 @@ dotnet run --project .\src\PhotoIdentity.Cli --configuration Release -- `
 
 `--application-stopped` is deliberately mandatory. The command opens the source read-only, requires the current SQLite schema, runs `PRAGMA foreign_key_check`, creates the destination through SQLite's backup API, then reopens the result read-only and runs `PRAGMA integrity_check` plus foreign-key validation. Existing backup paths are never overwritten.
 
-This is the supported replacement for copying only the `.db` file. It creates a logical SQLite snapshot and therefore does not depend on whether the source previously used rollback-journal or WAL mode.
+This was the accepted migration-time replacement for copying only the `.db` file. Current recovery uses PostgreSQL logical backup and isolated restore verification.
 
-## 3. PostgreSQL import contract
+## 3. Historical PostgreSQL import contract
 
-The underlying migration command is:
+The retired migration command was:
 
 ~~~powershell
 $env:PHOTOIDENTITY_MIGRATION_CONNECTION = "<private connection string to a fresh database>"
@@ -128,11 +128,11 @@ Before accepting the migrated state, verify representative examples of:
 
 The migration reports prove structural completeness and counts; this representative pass proves user-visible meaning. Keep ordinary editing to a minimum during rehearsal because these databases are disposable and are not yet the accepted authority.
 
-When review is finished, stop the rehearsal Photo Identity process before restarting the normal SQLite-authoritative application.
+During the accepted rehearsal, the review process was stopped before the then-current SQLite-authoritative application was restarted. Current builds have no SQLite runtime mode.
 
 ## 6. Persisted Windows launcher cutover
 
-The supported launcher persists the **provider selection** in `launcher.json` but deliberately keeps the PostgreSQL connection string out of that file. The private JSON contains only the name of an environment variable holding the secret. Both repository/package launcher examples show this safe indirection while retaining SQLite as the default provider until cutover.
+At cutover, the launcher persisted the **provider selection** in `launcher.json` while keeping the PostgreSQL connection string out of that file. Current launchers are unconditionally PostgreSQL and retain only the safe environment-variable indirection for the connection string.
 
 First put the accepted target connection string in a Windows environment variable. If the final migration already placed it in a process variable, persist that value without retyping it:
 

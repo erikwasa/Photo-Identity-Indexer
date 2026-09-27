@@ -14,12 +14,12 @@ public sealed class ArchiveSourceRevisionSelectionTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset t0 = new(2026, 8, 9, 8, 30, 0, TimeSpan.Zero);
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, t0);
             MutableLocalSource source = new(catalogueSource.Id, "photo.jpg", [1, 2, 3], t0);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
 
             ArchiveSourceCatalogueScanSummary first = await scanner.ScanAsync(
                 source,
@@ -53,7 +53,7 @@ public sealed class ArchiveSourceRevisionSelectionTests
             Assert.Equal(revisionA, afterRevert.VerifiedRevisionId);
 
             Sha256Digest profileHash = new(new string('a', 64));
-            IReadOnlyList<AssetRevisionId> pending = await new SqliteArchiveAnalysisRepository(database)
+            IReadOnlyList<AssetRevisionId> pending = await new PostgresArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash);
             Assert.Single(pending);
             Assert.Equal(revisionA, pending[0]);
@@ -70,12 +70,12 @@ public sealed class ArchiveSourceRevisionSelectionTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset t0 = new(2026, 8, 9, 8, 45, 0, TimeSpan.Zero);
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, t0);
             MutableLocalSource source = new(catalogueSource.Id, "1970/01/photo.jpg", [1, 2, 3], t0);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
             _ = await scanner.ScanAsync(
                 source,
                 catalogueSource,
@@ -93,7 +93,7 @@ public sealed class ArchiveSourceRevisionSelectionTests
             Assert.Equal(1, source.OpenCount);
 
             Sha256Digest profileHash = new(new string('b', 64));
-            SqliteArchiveStatusRepository statusRepository = new(database);
+            PostgresArchiveStatusRepository statusRepository = new(database);
             CatalogueArchiveFolderStatus status = await statusRepository.GetStatusAsync(
                 catalogueSource.Id,
                 "1970",
@@ -121,7 +121,7 @@ public sealed class ArchiveSourceRevisionSelectionTests
     }
 
     private static async Task<ArchiveSourceObservation> FindObservationAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         SourceId sourceId)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync();
@@ -132,7 +132,7 @@ public sealed class ArchiveSourceRevisionSelectionTests
         AssetId assetId = value is Guid id
             ? AssetId.From(id)
             : throw new InvalidOperationException("Test asset was unavailable.");
-        return await new SqliteArchiveSourceObservationRepository(database).GetAsync(assetId)
+        return await new PostgresArchiveSourceObservationRepository(database).GetAsync(assetId)
             ?? throw new InvalidOperationException("Source observation was unavailable.");
     }
 

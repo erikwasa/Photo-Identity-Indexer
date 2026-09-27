@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -17,7 +16,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         DetectorEvaluationBoundingBoxResponse manualMiss)
     {
         string databasePath = Path.Combine(directory, "candidate.db");
-        var database = new SqliteCatalogueDatabase(databasePath);
+        var database = new PostgresTestCatalogueDatabase(databasePath);
         await database.InitializeAsync();
         DetectionSeed[] candidateGroupDetections =
         [

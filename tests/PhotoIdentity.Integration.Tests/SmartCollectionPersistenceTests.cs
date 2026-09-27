@@ -2,12 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -20,9 +18,9 @@ public sealed class SmartCollectionPersistenceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteSmartCollectionRepository repository = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository repository = new(database, TimeProvider.System);
             PersonId firstPerson = PersonId.New();
             PersonId secondPerson = PersonId.New();
 
@@ -73,7 +71,7 @@ public sealed class SmartCollectionPersistenceTests
             Assert.False(await repository.DeleteAsync(created.Id));
             Assert.Null(await repository.GetAsync(created.Id));
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(0, await ReadCountAsync(connection, "SELECT COUNT(*) FROM smart_collections;"));
         }
         finally
@@ -88,12 +86,12 @@ public sealed class SmartCollectionPersistenceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
 
             CatalogueAssetRevision first = await CreateRevisionAsync(catalogue, directory, "first.jpg", 'a');
             await tags.AddManualTagAsync(first.Id, "Trips/Italy", "test");
@@ -116,7 +114,7 @@ public sealed class SmartCollectionPersistenceTests
             Assert.Contains(secondEvaluation.Items, item => item.RevisionId == first.Id);
             Assert.Contains(secondEvaluation.Items, item => item.RevisionId == second.Id);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(
                 0,
                 await ReadCountAsync(
@@ -136,7 +134,7 @@ public sealed class SmartCollectionPersistenceTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             await using SmartCollectionApiFactory factory = new(databasePath);
@@ -213,7 +211,7 @@ public sealed class SmartCollectionPersistenceTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string root,
         string sourceKey,
         char hashCharacter)
@@ -237,9 +235,9 @@ public sealed class SmartCollectionPersistenceTests
                 100));
     }
 
-    private static async Task<long> ReadCountAsync(SqliteConnection connection, string sql)
+    private static async Task<long> ReadCountAsync(PostgresCompatibilityConnection connection, string sql)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         return (long)(await command.ExecuteScalarAsync() ?? 0L);
     }
@@ -256,7 +254,7 @@ public sealed class SmartCollectionPersistenceTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
@@ -274,7 +272,7 @@ public sealed class SmartCollectionPersistenceTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

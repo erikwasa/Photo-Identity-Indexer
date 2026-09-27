@@ -1,7 +1,5 @@
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity_Integration_Tests;
 
@@ -25,11 +23,11 @@ public sealed class ReviewCropFileResolverTests
             Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
             await File.WriteAllBytesAsync(physicalPath, [1, 2, 3]);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand command = connection.CreateCommand();
+                using PostgresCompatibilityCommand command = connection.CreateCommand();
                 command.CommandText = """
                     INSERT INTO processing_runs (
                         id, status, configuration_json, started_at_utc, completed_at_utc)
@@ -43,14 +41,14 @@ public sealed class ReviewCropFileResolverTests
                 await command.ExecuteNonQueryAsync();
             }
 
-            ReviewCropFileResolver resolver = new(new SqliteProcessingRepository(database));
+            ReviewCropFileResolver resolver = new(new PostgresProcessingRepository(database));
             string? resolved = await resolver.ResolveAsync(relativePath);
 
             Assert.Equal(Path.GetFullPath(physicalPath), resolved);
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            PostgresCompatibilityConnection.ClearAllPools();
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);

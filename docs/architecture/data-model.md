@@ -1,8 +1,8 @@
 # Canonical data model
 
-The SQLite catalogue is sensitive application data and the canonical local record of source identity, immutable photo revisions, people, assignment/review history and resumable processing state. Model-produced results are retained under exact provenance but remain derived and replaceable unless an explicit governed policy promotes a decision into canonical history.
+The PostgreSQL catalogue is sensitive application data and the canonical local record of source identity, immutable photo revisions, people, assignment/review history and resumable processing state. Model-produced results are retained under exact provenance but remain derived and replaceable unless an explicit governed policy promotes a decision into canonical history.
 
-This document describes logical ownership and invariants. Physical tables and migrations remain implementation details of `PhotoIdentity.Persistence.Sqlite`.
+This document describes logical ownership and invariants. Physical tables and migrations remain implementation details of `PhotoIdentity.Persistence.Postgres`.
 
 ## Sources, assets and revisions
 
@@ -165,4 +165,4 @@ Every derived result must be traceable to the immutable source revision, exact m
 
 Every automatic canonical assignment must additionally retain the exact model revision, score and rank-gap evidence plus the policy version and thresholds that promoted it from derived suggestion evidence into canonical history.
 
-See the [Glossary](../glossary.md), [Recognition and identity matching](identity-matching.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [ADR-0007](../decisions/ADR-0007-permanent-archive-bounded-storage.md) and [SQLite persistence operations](../operations/sqlite-persistence.md).
+See the [Glossary](../glossary.md), [Recognition and identity matching](identity-matching.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [ADR-0007](../decisions/ADR-0007-permanent-archive-bounded-storage.md) and [PostgreSQL production operations](../operations/postgresql-operations.md).

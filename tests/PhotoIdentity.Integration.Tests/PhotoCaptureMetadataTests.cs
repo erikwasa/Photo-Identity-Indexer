@@ -1,8 +1,6 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using Xunit;
 
@@ -53,9 +51,9 @@ public sealed class PhotoCaptureMetadataTests
         Directory.CreateDirectory(root);
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository repository = new(database);
+            PostgresAssetCatalogueRepository repository = new(database);
             DateTimeOffset observed = new(2026, 8, 14, 0, 0, 0, TimeSpan.Zero);
             SourceId sourceId = SourceId.New();
             AssetId assetId = AssetId.New();

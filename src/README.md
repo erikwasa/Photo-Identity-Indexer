@@ -11,7 +11,7 @@ Executable composition roots:
 
 Infrastructure adapters:
 
-- `PhotoIdentity.Persistence.Sqlite`
+- `PhotoIdentity.Persistence.Postgres`
 - `PhotoIdentity.Source.Local`
 - `PhotoIdentity.Source.OneDriveSync`
 - `PhotoIdentity.Imaging.OpenCv`

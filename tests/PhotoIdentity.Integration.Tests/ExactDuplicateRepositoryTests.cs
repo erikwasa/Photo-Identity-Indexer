@@ -1,9 +1,7 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity.Integration.Tests;
@@ -19,13 +17,13 @@ public sealed class ExactDuplicateRepositoryTests
 
         try
         {
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             SourceId sourceId = SourceId.New();
             DateTimeOffset observed = new(2026, 9, 25, 18, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(sourceId, "local-folder", directory, observed);
-            SqliteArchiveSourceObservationRepository observations = new(database);
+            PostgresArchiveSourceObservationRepository observations = new(database);
             Sha256Digest duplicateHash = new(new string('a', 64));
             Sha256Digest otherHash = new(new string('b', 64));
             Sha256Digest changedHash = new(new string('c', 64));
@@ -58,7 +56,7 @@ public sealed class ExactDuplicateRepositoryTests
             AssetRevisionId firstRevisionId = first.RevisionId
                 ?? throw new InvalidOperationException("Verified observation did not create a revision.");
             FaceOccurrenceId reviewedFaceId = await SeedFaceAsync(database, firstRevisionId, observed);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson reviewedPerson = await reviewRepository.CreatePersonAsync("Ada", observed);
             await reviewRepository.AssignAsync(
                 reviewedFaceId,
@@ -71,7 +69,7 @@ public sealed class ExactDuplicateRepositoryTests
             int labelsBeforeRead = await CountAsync(database, "person_labels");
             int reviewActionsBeforeRead = await CountAsync(database, "review_actions");
 
-            SqliteExactDuplicateRepository repository = new(database);
+            PostgresExactDuplicateRepository repository = new(database);
             IReadOnlyList<ExactDuplicateGroup> groups = await repository.GetGroupsAsync(sourceId);
 
             ExactDuplicateGroup group = Assert.Single(groups);
@@ -140,22 +138,22 @@ public sealed class ExactDuplicateRepositoryTests
             lastWrite,
             availability);
 
-    private static async Task<int> CountAsync(SqliteCatalogueDatabase database, string table)
+    private static async Task<int> CountAsync(PostgresTestCatalogueDatabase database, string table)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         return Convert.ToInt32(await command.ExecuteScalarAsync());
     }
 
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         DateTimeOffset createdAt)
     {
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
             VALUES ($face_id, $revision_id, 0, $created_at_utc);
@@ -168,12 +166,12 @@ public sealed class ExactDuplicateRepositoryTests
     }
 
     private static async Task MarkMissingAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetId assetId,
         DateTimeOffset deletedAt)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             UPDATE assets
             SET deleted_at_utc = $deleted_at_utc
@@ -184,10 +182,10 @@ public sealed class ExactDuplicateRepositoryTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task AssertContentHashIndexIsNonUniqueAsync(SqliteCatalogueDatabase database)
+    private static async Task AssertContentHashIndexIsNonUniqueAsync(PostgresTestCatalogueDatabase database)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT indexdef
             FROM pg_indexes

@@ -13,7 +13,6 @@ using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Worker;
@@ -39,7 +38,6 @@ public partial class Program
             "PhotoIdentity");
         string defaultDetectorEvaluationRoot = Path.Combine(defaultApplicationRoot, "detector-evaluations");
         string defaultArchiveAnalysisRoot = Path.Combine(defaultApplicationRoot, "archive-analysis");
-        bool useSqliteTestCompatibility = builder.Environment.IsEnvironment("IntegrationTest");
         string detectorEvaluationRoot =
             builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
         string archiveAnalysisRoot =
@@ -106,26 +104,13 @@ public partial class Program
                     GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds)
                 : GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds);
 
-        PostgresCatalogueDatabase? postgresCatalogueDatabase = null;
-        if (useSqliteTestCompatibility)
-        {
-            string databasePath = builder.Configuration["PhotoIdentity:DatabasePath"]
-                ?? throw new InvalidOperationException(
-                    "SQLite integration-test compatibility requires PhotoIdentity:DatabasePath.");
-            CataloguePersistenceComposition.AddSqliteTestCompatibility(
-                builder.Services,
-                databasePath);
-        }
-        else
-        {
-            postgresCatalogueDatabase = CataloguePersistenceComposition.AddPostgres(
-                builder.Services,
-                CataloguePersistenceComposition.GetRequiredPostgresConnectionString(builder.Configuration));
-            builder.Services.AddSingleton<ISimilarFaceRepository, PostgresSimilarFaceRepository>();
-            builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
-            builder.Services.AddSingleton<IPhotoSearchRepository>(
-                services => services.GetRequiredService<PostgresPhotoSearchRepository>());
-        }
+        PostgresCatalogueDatabase postgresCatalogueDatabase = CataloguePersistenceComposition.AddPostgres(
+            builder.Services,
+            CataloguePersistenceComposition.GetRequiredPostgresConnectionString(builder.Configuration));
+        builder.Services.AddSingleton<ISimilarFaceRepository, PostgresSimilarFaceRepository>();
+        builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
+        builder.Services.AddSingleton<IPhotoSearchRepository>(
+            services => services.GetRequiredService<PostgresPhotoSearchRepository>());
 
         builder.Services.AddSingleton<ArchiveThroughputMetrics>();
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
@@ -197,12 +182,9 @@ public partial class Program
             client => client.Timeout = TimeSpan.FromSeconds(captionConfiguration.TimeoutSeconds));
         builder.Services.AddSingleton<LocalPhotoCaptionGenerator>();
         builder.Services.AddHostedService<PhotoCaptionEnrichmentHostedService>();
-        if (!useSqliteTestCompatibility)
-        {
-            builder.Services.AddSingleton<PhotoSemanticSearchModel>();
-            builder.Services.AddSingleton<PhotoSearchService>();
-            builder.Services.AddHostedService<PhotoSemanticEmbeddingHostedService>();
-        }
+        builder.Services.AddSingleton<PhotoSemanticSearchModel>();
+        builder.Services.AddSingleton<PhotoSearchService>();
+        builder.Services.AddHostedService<PhotoSemanticEmbeddingHostedService>();
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
         builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
         builder.Services.AddHostedService<PhotoPlaceEnrichmentHostedService>();
@@ -221,35 +203,19 @@ public partial class Program
         WebApplication app = builder.Build();
 
         PostgresCatalogueHealth postgresHealth = PostgresCatalogueHealth.NotConfigured;
-        int? catalogueSchemaVersion;
-        if (useSqliteTestCompatibility)
+        PostgresInitializationResult postgresInitialization = await postgresCatalogueDatabase.TryInitializeAsync();
+        postgresHealth = postgresInitialization.Health;
+        if (postgresInitialization.Error is not null)
         {
-            SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
-            await catalogueDatabase.InitializeAsync();
-            await SqliteExtendedPhotoMetadataSchema.EnsureAsync(catalogueDatabase);
-            await SqlitePhotoMetadataInspectionSchema.EnsureAsync(catalogueDatabase);
-            await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
-            await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
-            catalogueSchemaVersion = SqliteCatalogueDatabase.CurrentSchemaVersion;
+            throw new InvalidOperationException(
+                $"PostgreSQL catalogue initialization failed with status '{postgresHealth.Status}'.",
+                postgresInitialization.Error);
         }
-        else
-        {
-            PostgresCatalogueDatabase database = postgresCatalogueDatabase
-                ?? throw new InvalidOperationException("PostgreSQL catalogue composition was not initialized.");
-            PostgresInitializationResult postgresInitialization = await database.TryInitializeAsync();
-            postgresHealth = postgresInitialization.Health;
-            if (postgresInitialization.Error is not null)
-            {
-                throw new InvalidOperationException(
-                    $"PostgreSQL catalogue initialization failed with status '{postgresHealth.Status}'.",
-                    postgresInitialization.Error);
-            }
 
-            catalogueSchemaVersion = postgresHealth.SchemaVersion;
-            app.Logger.LogInformation(
-                "PostgreSQL is the runtime catalogue at schema version {SchemaVersion}.",
-                catalogueSchemaVersion);
-        }
+        int? catalogueSchemaVersion = postgresHealth.SchemaVersion;
+        app.Logger.LogInformation(
+            "PostgreSQL is the runtime catalogue at schema version {SchemaVersion}.",
+            catalogueSchemaVersion);
 
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
@@ -311,7 +277,7 @@ public partial class Program
         {
             status = "ok",
             schemaVersion = catalogueSchemaVersion,
-            catalogueProvider = useSqliteTestCompatibility ? "sqlite-test-compatibility" : "postgresql",
+            catalogueProvider = "postgresql",
             postgres = postgresHealth,
         }));
         app.MapReviewEndpoints();
@@ -327,11 +293,8 @@ public partial class Program
         app.MapCollectionEndpoints();
         app.MapPhotoDetailsEndpoints();
         app.MapSmartCollectionEndpoints();
-        if (!useSqliteTestCompatibility)
-        {
-            app.MapPhotoListCollectionEndpoints();
-            app.MapPhotoSearchEndpoints();
-        }
+        app.MapPhotoListCollectionEndpoints();
+        app.MapPhotoSearchEndpoints();
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
         app.MapSlideshowExposureEndpoints();

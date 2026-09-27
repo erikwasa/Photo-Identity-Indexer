@@ -1,5 +1,4 @@
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
 using Xunit;
@@ -25,9 +24,9 @@ public sealed class LocalArchiveSyncCoordinatorTests
             await File.WriteAllBytesAsync(Path.Combine(february, "b.jpg"), [2]);
             await File.WriteAllBytesAsync(Path.Combine(march, "c.jpg"), [3]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteLocalBatchRepository repository = new(database);
+            PostgresLocalBatchRepository repository = new(database);
             var catalogueSource = await repository.GetOrCreateLocalFolderSourceAsync(archiveRoot, Utc(10));
             ArchiveCatalogueSource archiveCatalogueSource = new(
                 catalogueSource.Id,
@@ -37,9 +36,9 @@ public sealed class LocalArchiveSyncCoordinatorTests
             LocalFolderAssetSource source = new(catalogueSource.Id, archiveRoot);
             ArchiveSourceCatalogueScanner archiveScanner = new(
                 database,
-                new SqliteArchiveSourceScanBatchRepository(database));
+                new PostgresArchiveSourceScanBatchRepository(database));
             LocalArchiveSyncCoordinator coordinator = new(archiveScanner);
-            SqliteSourceCatalogueScanner scanner = new(database);
+            PostgresSourceCatalogueScanner scanner = new(database);
 
             LocalArchiveSyncSummary januarySync = await coordinator.SyncAsync(
                 source,

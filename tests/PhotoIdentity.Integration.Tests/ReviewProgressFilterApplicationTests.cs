@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -16,7 +14,7 @@ public sealed class ReviewProgressFilterApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededProgress seeded = await SeedProgressAsync(database);
 
@@ -76,7 +74,7 @@ public sealed class ReviewProgressFilterApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             await SeedProgressAsync(database);
 
@@ -95,7 +93,7 @@ public sealed class ReviewProgressFilterApplicationTests
         }
     }
 
-    private static async Task<SeededProgress> SeedProgressAsync(SqliteCatalogueDatabase database)
+    private static async Task<SeededProgress> SeedProgressAsync(PostgresTestCatalogueDatabase database)
     {
         string sourceRoot = Path.Combine(Path.GetTempPath(), "private-progress", Guid.NewGuid().ToString("N"));
         string sourceId = Guid.NewGuid().ToString("D");
@@ -114,8 +112,8 @@ public sealed class ReviewProgressFilterApplicationTests
         string secondModelHash = new('b', 64);
         string now = new DateTimeOffset(2026, 7, 27, 18, 30, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', $source_root, $now);

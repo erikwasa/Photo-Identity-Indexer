@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using OpenCvSharp;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
@@ -10,7 +9,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -27,11 +25,11 @@ public sealed class CreativeVisualRedundancyApplicationTests
             string proxyRoot = Path.Combine(directory, "derivatives");
             Directory.CreateDirectory(proxyRoot);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
 
             CatalogueAssetRevision first = await CreateRevisionAsync(catalogue, directory, "first.jpg", 'a');
             CatalogueAssetRevision second = await CreateRevisionAsync(catalogue, directory, "second.jpg", 'b');
@@ -48,7 +46,7 @@ public sealed class CreativeVisualRedundancyApplicationTests
             await SetTakenAtAsync(database, third.Id, start.AddSeconds(10));
 
             ReviewProxyProfile profile = new("creative-burst-test", 1600, 82);
-            SqliteArchiveReviewProxyRepository proxies = new(database);
+            PostgresArchiveReviewProxyRepository proxies = new(database);
             DateTimeOffset generatedAt = new(2026, 9, 18, 10, 30, 0, TimeSpan.Zero);
             await proxies.RegisterProfileAsync(profile, generatedAt);
             await SaveProxyAsync(
@@ -142,7 +140,7 @@ public sealed class CreativeVisualRedundancyApplicationTests
     }
 
     private static async Task SaveProxyAsync(
-        SqliteArchiveReviewProxyRepository repository,
+        PostgresArchiveReviewProxyRepository repository,
         string proxyRoot,
         ReviewProxyProfile profile,
         AssetRevisionId revisionId,
@@ -189,12 +187,12 @@ public sealed class CreativeVisualRedundancyApplicationTests
     }
 
     private static async Task SetTakenAtAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         DateTime takenAtLocal)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO photo_capture_metadata (
                 asset_revision_id,
@@ -215,7 +213,7 @@ public sealed class CreativeVisualRedundancyApplicationTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string root,
         string sourceKey,
         char hashCharacter)
@@ -251,7 +249,7 @@ public sealed class CreativeVisualRedundancyApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
@@ -276,7 +274,7 @@ public sealed class CreativeVisualRedundancyApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
             builder.UseSetting("PhotoIdentity:ReviewProxyRoot", _proxyRoot);
             builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", _profileId);
         }

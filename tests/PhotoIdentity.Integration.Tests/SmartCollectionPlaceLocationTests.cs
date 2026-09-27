@@ -2,13 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -21,11 +19,11 @@ public sealed class SmartCollectionPlaceLocationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
 
             CatalogueAssetRevision stockholm = await CreateRevisionAsync(catalogue, directory, "stockholm.jpg", 'a');
             CatalogueAssetRevision norrtalje = await CreateRevisionAsync(catalogue, directory, "norrtalje.jpg", 'b');
@@ -77,13 +75,13 @@ public sealed class SmartCollectionPlaceLocationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqlitePhotoPersonRepository people = new(database, TimeProvider.System);
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresPhotoPersonRepository people = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database);
 
             PersonId ada = PersonId.New();
             CatalogueAssetRevision matching = await CreateRevisionAsync(catalogue, directory, "matching.jpg", 'd');
@@ -137,7 +135,7 @@ public sealed class SmartCollectionPlaceLocationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             await using SmartLocationApiFactory factory = new(databasePath);
@@ -195,7 +193,7 @@ public sealed class SmartCollectionPlaceLocationTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string root,
         string sourceKey,
         char hashCharacter)
@@ -221,12 +219,12 @@ public sealed class SmartCollectionPlaceLocationTests
     }
 
     private static async Task SeedPersonAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         PersonId personId,
         string displayName)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO people (id, display_name, created_at_utc, merged_into_person_id)
             VALUES ($id, $name, $now, NULL);
@@ -237,9 +235,9 @@ public sealed class SmartCollectionPlaceLocationTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<long> ScalarLongAsync(SqliteConnection connection, string sql)
+    private static async Task<long> ScalarLongAsync(PostgresCompatibilityConnection connection, string sql)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
@@ -256,7 +254,7 @@ public sealed class SmartCollectionPlaceLocationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

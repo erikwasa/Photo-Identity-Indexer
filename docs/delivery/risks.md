@@ -16,9 +16,8 @@
 | Children and long time spans shift appearance | Keep age-diverse exemplars and consider temporal/quality-aware prototypes only after archive-scale evidence shows a need |
 | Model scores are compared across incompatible revisions | Version embeddings, suggestions and thresholds by exact model ID/hash and never silently mix score scales |
 | A detector change changes the face population | Treat detector rollout as a governed migration, preserve face/review history where reconciled and rerun embedding evaluation on the changed population before reaffirming production-model conclusions |
-| The SQLite catalogue is corrupted or copied inconsistently | Keep it on local disk, use short transactions and quiesced backup/restore with integrity and foreign-key checks |
+| The PostgreSQL catalogue is corrupted or restored inconsistently | Use the supported logical backup and isolated restore-verification procedure, retain private backups outside replaceable packages and verify catalogue markers before accepting recovery |
 | Browser access exposes private identity data on the LAN | Bind to localhost by default; use only a trusted private network when another device must connect and keep firewall scope narrow |
 | Review proxies become mistaken for authoritative source images | Keep proxy profile/version metadata explicit and use authoritative original bytes for analysis and explicit full-resolution viewing |
 | Semantic tagging produces misleading or unstable labels | Treat model-generated tags as derived model-scoped evidence, retain confidence/provenance and evaluate usefulness before selecting a production tagging model |
-| Azure examples become an accidental product dependency | Keep Azure optional, use portable bounded bundles only and keep canonical data/OneDrive credentials on the local control plane |
-| Temporary Azure compute or transfer credentials are lost/leaked | Use small resumable jobs, narrow short-lived credentials, never log secrets and delete/deallocate temporary resources promptly |
+| Historical remote-compute examples are mistaken for a supported production path | Keep production model execution on maintainer-controlled local hardware and require a new accepted ADR plus explicitly scoped work before introducing any remote-compute path |

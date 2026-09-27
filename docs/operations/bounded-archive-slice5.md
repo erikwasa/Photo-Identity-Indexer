@@ -33,7 +33,7 @@ The operator may still run `Sync included folders` independently when discovery-
 
 ### Durable advancement
 
-Archive advancement is server-owned rather than browser-click-owned. Starting advancement records durable intent in SQLite so an interrupted application can resume the same operation after restart. The worker automatically rechecks OneDrive while managed content is downloading or releasing and continues until:
+Archive advancement is server-owned rather than browser-click-owned. Starting advancement records durable intent in PostgreSQL so an interrupted application can resume the same operation after restart. The worker automatically rechecks OneDrive while managed content is downloading or releasing and continues until:
 
 - all intended archive work is complete;
 - the operator pauses the run; or

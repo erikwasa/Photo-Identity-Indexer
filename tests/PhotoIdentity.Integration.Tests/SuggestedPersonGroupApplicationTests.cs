@@ -2,8 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -18,7 +16,7 @@ public sealed class SuggestedPersonGroupApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededGroups seed = await SeedAsync(database);
 
@@ -74,7 +72,7 @@ public sealed class SuggestedPersonGroupApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededGroups seed = await SeedAsync(database);
 
@@ -100,7 +98,7 @@ public sealed class SuggestedPersonGroupApplicationTests
         }
     }
 
-    private static async Task<SeededGroups> SeedAsync(SqliteCatalogueDatabase database)
+    private static async Task<SeededGroups> SeedAsync(PostgresTestCatalogueDatabase database)
     {
         string sourceId = Guid.NewGuid().ToString("D");
         string assetId = Guid.NewGuid().ToString("D");
@@ -119,8 +117,8 @@ public sealed class SuggestedPersonGroupApplicationTests
         string revisionHash = new('c', 64);
         string now = new DateTimeOffset(2026, 9, 13, 15, 0, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', 'C:/private/photos', $now);
@@ -195,7 +193,7 @@ public sealed class SuggestedPersonGroupApplicationTests
         command.Parameters.AddWithValue("$now", now);
         await command.ExecuteNonQueryAsync();
 
-        using SqliteCommand readSuggestion = connection.CreateCommand();
+        using PostgresCompatibilityCommand readSuggestion = connection.CreateCommand();
         readSuggestion.CommandText =
             "SELECT id FROM identity_suggestions WHERE face_occurrence_id = $face_id AND status = 'pending';";
         readSuggestion.Parameters.AddWithValue("$face_id", bobLowFaceId);
@@ -247,7 +245,7 @@ public sealed class SuggestedPersonGroupApplicationTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
-            builder.UseSetting("PhotoIdentity:DatabasePath", databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(databasePath));
         }
     }
 }

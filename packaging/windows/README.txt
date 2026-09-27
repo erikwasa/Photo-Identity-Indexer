@@ -78,7 +78,7 @@ A PostgreSQL cutover preflight must report:
   catalogueProvider: postgresql
   postgresConnectionEnvironmentVariable: PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
 
-The connection string itself must not appear. After the final switch, `/health` must report catalogueProvider `postgresql`. For rollback, stop PostgreSQL-authoritative Photo Identity before restoring the SQLite provider/configuration and a working copy made from the preserved pre-cutover backup.
+The connection string itself must not appear. `/health` must report catalogueProvider `postgresql`. Recovery uses the supported PostgreSQL backup and isolated restore-verification procedure; the retired SQLite provider cannot be selected by current packages.
 
 TRUSTED-LAN PHONE ACCESS
 ------------------------

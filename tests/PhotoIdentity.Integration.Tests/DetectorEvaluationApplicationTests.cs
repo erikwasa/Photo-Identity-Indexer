@@ -2,10 +2,8 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
@@ -22,7 +20,7 @@ public sealed class DetectorEvaluationApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             string sessionRoot = Path.Combine(directory, "private-sessions");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             SeededEvaluation seeded = await SeedEvaluationAsync(database, directory);
@@ -90,7 +88,7 @@ public sealed class DetectorEvaluationApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             string sessionRoot = Path.Combine(directory, "private-sessions");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededEvaluation seeded = await SeedEvaluationAsync(database, directory);
 
@@ -218,7 +216,7 @@ public sealed class DetectorEvaluationApplicationTests
     }
 
     private static async Task<SeededEvaluation> SeedEvaluationAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory)
     {
         DateTimeOffset now = new(2026, 8, 3, 0, 30, 0, TimeSpan.Zero);
@@ -232,7 +230,7 @@ public sealed class DetectorEvaluationApplicationTests
 
         SourceId sourceId = SourceId.New();
         CatalogueSource source = new(sourceId, "local-folder", sourceRoot, now);
-        SqliteAssetCatalogueRepository assetRepository = new(database);
+        PostgresAssetCatalogueRepository assetRepository = new(database);
 
         AssetId detectedAssetId = AssetId.New();
         CatalogueAssetRevision detectedRevision = await assetRepository.SaveRevisionAsync(
@@ -248,8 +246,8 @@ public sealed class DetectorEvaluationApplicationTests
 
         ProcessingRunId runId = ProcessingRunId.New();
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO processing_runs (
                 id,

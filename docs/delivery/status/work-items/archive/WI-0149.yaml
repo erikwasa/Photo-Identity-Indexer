@@ -1,0 +1,18 @@
+id: WI-0149
+title: Remove the SQLite implementation and obsolete migration-era active references
+milestone: M29
+status: completed
+owner: codex
+document: ../work-items/WI-0149-remove-sqlite-implementation.md
+started_at: 2026-09-27
+completed_at: 2026-09-27
+verified_at: 2026-09-27
+verified_by: codex
+last_updated_at: 2026-09-27
+branch: codex/wi-0149-remove-sqlite-implementation
+blockers:
+- WI-0148
+blocker_notes: []
+evidence:
+- type: verification
+  value: '2026-09-27 agent verification: Release build passed with zero warnings/errors; full solution test suite passed 839/839 including 574 host-heavy PostgreSQL integration tests; live PostgreSQL acceptance passed 53 persistence and 6 runtime/composition tests against an isolated disposable service; self-contained win-x64 package verification passed with catalogueProvider=postgresql; package/source audit found no SQLite project, package dependency, assembly or selectable runtime path; PhotoIdentity.Docs validate and generate --check passed.'

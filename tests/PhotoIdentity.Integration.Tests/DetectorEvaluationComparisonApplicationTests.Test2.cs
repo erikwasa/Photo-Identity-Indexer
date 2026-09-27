@@ -2,10 +2,8 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -21,7 +19,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         {
             string sessionRoot = Path.Combine(directory, "private-sessions");
             string baselineDatabasePath = Path.Combine(directory, "baseline.db");
-            SqliteCatalogueDatabase baselineDatabase = new(baselineDatabasePath);
+            PostgresTestCatalogueDatabase baselineDatabase = new(baselineDatabasePath);
             await baselineDatabase.InitializeAsync();
             SeededRun baseline = await SeedRunAsync(
                 baselineDatabase,
@@ -69,7 +67,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
             }
 
             string candidateDatabasePath = Path.Combine(directory, "candidate.db");
-            SqliteCatalogueDatabase candidateDatabase = new(candidateDatabasePath);
+            PostgresTestCatalogueDatabase candidateDatabase = new(candidateDatabasePath);
             await candidateDatabase.InitializeAsync();
             SeededRun candidate = await SeedRunAsync(
                 candidateDatabase,

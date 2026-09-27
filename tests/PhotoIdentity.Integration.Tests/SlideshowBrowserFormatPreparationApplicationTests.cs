@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PhotoIdentity.Api;
@@ -9,7 +8,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
@@ -118,7 +116,7 @@ public sealed class SlideshowBrowserFormatPreparationApplicationTests
         Directory.CreateDirectory(relativeDirectory);
         await File.WriteAllBytesAsync(Path.Combine(relativeDirectory, fileName), content);
 
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 9, 13, 0, 0, 0, TimeSpan.Zero);
         CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -132,7 +130,7 @@ public sealed class SlideshowBrowserFormatPreparationApplicationTests
             mediaType,
             10,
             8);
-        return (await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(
+        return (await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(
             source,
             asset,
             revision)).Id;
@@ -144,8 +142,8 @@ public sealed class SlideshowBrowserFormatPreparationApplicationTests
         AssetRevisionId revisionId,
         byte[] content)
     {
-        SqliteCatalogueDatabase database = new(databasePath);
-        SqliteArchiveReviewProxyRepository repository = new(database);
+        PostgresTestCatalogueDatabase database = new(databasePath);
+        PostgresArchiveReviewProxyRepository repository = new(database);
         ReviewProxyProfile profile = new("test-preview", maximumLongEdge: 1600, jpegQuality: 78);
         DateTimeOffset now = new(2026, 9, 13, 0, 1, 0, TimeSpan.Zero);
         await repository.RegisterProfileAsync(profile, now);
@@ -209,7 +207,7 @@ public sealed class SlideshowBrowserFormatPreparationApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

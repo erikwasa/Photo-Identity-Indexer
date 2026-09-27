@@ -8,7 +8,6 @@ The implementation is a modular monolith with explicit project boundaries. Execu
 |---|---|
 | `PhotoIdentity.Core` | Stable identifiers, model-provenance types and application/domain contracts |
 | `PhotoIdentity.Persistence.Postgres` | Canonical catalogue, review history, processing state and collection queries |
-| `PhotoIdentity.Persistence.Sqlite` | Temporary migration and integration-test compatibility pending removal under M29 |
 | `PhotoIdentity.Source.Local` | Local filesystem discovery and source access |
 | `PhotoIdentity.Source.OneDriveSync` | OneDrive-synchronised-folder availability and staging through the Windows filesystem |
 | `PhotoIdentity.Imaging.OpenCv` | Image decoding, crop/alignment support and bounded thumbnail rendering |
@@ -39,12 +38,12 @@ Infrastructure adapters can depend on core contracts. `PhotoIdentity.Core` must 
 
 ## Mandatory rules
 
-- Core and shared contracts expose no SQLite, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
+- Core and shared contracts expose no provider-specific persistence, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
 - Personal OneDrive access is a local filesystem concern through the Windows synchronisation client.
 - Persistence does not depend on OpenCV or ONNX Runtime.
 - Recognition adapters do not know whether orchestration is local or Azure-hosted.
 - Model-specific preprocessing stays beside the corresponding recognition adapter and manifest.
-- Bundle contracts do not depend on SQLite and do not contain people or human review history.
+- Bundle contracts do not depend on catalogue persistence and do not contain people or human review history.
 - The worker never accesses the canonical catalogue or OneDrive credentials directly.
 - The API does not perform long-running batch inference inside HTTP requests.
 - Python tools exchange documented neutral files rather than importing canonical database internals.
@@ -73,7 +72,7 @@ The Web project owns shared HTTP response contracts used by the hosted client, b
 
 Each executable selects and wires the adapters it needs:
 
-- the CLI composes PostgreSQL-backed active operations plus explicit migration/compatibility commands, imaging, recognition, evaluation and bundle operations;
+- the CLI composes PostgreSQL-backed catalogue operations plus provider-neutral imaging, recognition, evaluation and bundle-processing operations;
 - the worker composes bundle input/output, imaging and recognition without catalogue identity state;
 - the API composes PostgreSQL-backed review/collection services, local file resolution and hosted Web assets; and
 - the Web client consumes API contracts only.

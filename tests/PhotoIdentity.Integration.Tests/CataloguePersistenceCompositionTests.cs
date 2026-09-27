@@ -11,7 +11,6 @@ using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -27,7 +26,7 @@ public sealed class CataloguePersistenceCompositionTests
             services,
             "Host=localhost;Database=photo_identity_composition_test");
 
-        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(SqliteCatalogueDatabase));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(PostgresTestCatalogueDatabase));
 
         Type[] authoritativeContracts = services
             .Select(descriptor => descriptor.ServiceType)
@@ -41,7 +40,7 @@ public sealed class CataloguePersistenceCompositionTests
         {
             object resolved = provider.GetRequiredService(contract);
             Assert.NotEqual(
-                typeof(SqliteCatalogueDatabase).Assembly,
+                typeof(PostgresTestCatalogueDatabase).Assembly,
                 resolved.GetType().Assembly);
         }
 

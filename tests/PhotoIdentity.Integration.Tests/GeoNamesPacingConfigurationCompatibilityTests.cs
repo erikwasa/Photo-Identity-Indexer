@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using Xunit;
 
@@ -61,7 +60,7 @@ public sealed class GeoNamesPacingConfigurationCompatibilityTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            PostgresCompatibilityConnection.ClearAllPools();
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);

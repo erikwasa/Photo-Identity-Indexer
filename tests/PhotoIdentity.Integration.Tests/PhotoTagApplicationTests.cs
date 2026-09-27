@@ -2,12 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 using WebPhotoTagDefinitionResponse = PhotoIdentity.Web.Contracts.PhotoTagDefinitionResponse;
 using WebPhotoTagMutationRequest = PhotoIdentity.Web.Contracts.PhotoTagMutationRequest;
 using WebPhotoTagResponse = PhotoIdentity.Web.Contracts.PhotoTagResponse;
@@ -76,9 +74,9 @@ public sealed class PhotoTagApplicationTests
             Assert.Equal("Beach", leaf.ParentValue);
             Assert.Null(leaf.Color);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
                 Assert.Equal(2, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tags;"));
                 Assert.Equal(1, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tag_actions;"));
@@ -94,7 +92,7 @@ public sealed class PhotoTagApplicationTests
             WebPhotoTagResponse[] afterReAdd = await PostTagAsync(client, revisionId, "Beach/Day");
             Assert.Single(afterReAdd);
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
                 Assert.Equal(2, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tags;"));
                 Assert.Equal(3, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tag_actions;"));
@@ -157,15 +155,15 @@ public sealed class PhotoTagApplicationTests
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
             AssetRevisionId revisionId = await CreateRevisionAsync(databasePath, directory);
-            SqliteCatalogueDatabase database = new(databasePath);
-            SqlitePhotoTagRepository repository = new(database, TimeProvider.System);
+            PostgresTestCatalogueDatabase database = new(databasePath);
+            PostgresPhotoTagRepository repository = new(database, TimeProvider.System);
 
             await repository.AddManualTagAsync(revisionId, "volleyball", "test-maintainer");
             await repository.RemoveManualTagAsync(revisionId, "Volleyball", "test-maintainer");
 
             Assert.Empty(await repository.GetManualTagsAsync(revisionId));
 
-            await using SqliteConnection verify = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection verify = await database.OpenConnectionAsync();
             Assert.Equal(1, await ReadCountAsync(verify, "SELECT COUNT(*) FROM photo_tags;"));
             Assert.Equal(2, await ReadCountAsync(verify, "SELECT COUNT(*) FROM photo_tag_actions;"));
         }
@@ -189,7 +187,7 @@ public sealed class PhotoTagApplicationTests
 
     private static async Task<AssetRevisionId> CreateRevisionAsync(string databasePath, string sourceRoot)
     {
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 8, 13, 0, 0, 0, TimeSpan.Zero);
         CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
@@ -203,12 +201,12 @@ public sealed class PhotoTagApplicationTests
             "image/jpeg",
             100,
             100);
-        return (await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(source, asset, revision)).Id;
+        return (await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(source, asset, revision)).Id;
     }
 
-    private static async Task<long> ReadCountAsync(SqliteConnection connection, string sql)
+    private static async Task<long> ReadCountAsync(PostgresCompatibilityConnection connection, string sql)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         return (long)(await command.ExecuteScalarAsync() ?? 0L);
     }
@@ -242,7 +240,7 @@ public sealed class PhotoTagApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

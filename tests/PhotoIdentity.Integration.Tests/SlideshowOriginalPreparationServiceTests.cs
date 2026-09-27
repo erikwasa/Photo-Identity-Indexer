@@ -3,7 +3,6 @@ using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -17,7 +16,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             FakeFilesOnDemandPlatform platform = new();
             TestServices services = CreateServices(
@@ -50,7 +49,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 29, 20, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -118,7 +117,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 31, 8, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -177,7 +176,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 31, 8, 30, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -249,7 +248,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 29, 20, 30, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -296,7 +295,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 29, 21, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -399,20 +398,20 @@ public sealed class SlideshowOriginalPreparationServiceTests
     }
 
     private static TestServices CreateServices(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         FakeFilesOnDemandPlatform platform,
         ArchiveHydrationPolicyConfiguration policy,
         TimeProvider? timeProvider = null)
     {
         TimeProvider time = timeProvider ?? TimeProvider.System;
-        SqliteArchiveHydrationRepository hydrations = new(database);
+        PostgresArchiveHydrationRepository hydrations = new(database);
         SlideshowOriginalLeaseRegistry leases = new(time);
         ArchiveHydrationCapacityService capacity = new(
             hydrations,
-            new SqliteArchiveSourceHydrationRepository(database),
-            new SqliteArchiveCoverageRepository(database),
-            new SqliteArchiveStorageRepository(database),
-            new SqliteArchiveAvailabilityRepository(database),
+            new PostgresArchiveSourceHydrationRepository(database),
+            new PostgresArchiveCoverageRepository(database),
+            new PostgresArchiveStorageRepository(database),
+            new PostgresArchiveAvailabilityRepository(database),
             platform,
             new FixedStorageProbe(100_000),
             policy,
@@ -420,14 +419,14 @@ public sealed class SlideshowOriginalPreparationServiceTests
             time,
             leases);
         CollectionOriginalAccessService originals = new(
-            new SqliteLocalBatchRepository(database),
+            new PostgresLocalBatchRepository(database),
             hydrations,
-            new SqliteArchiveAvailabilityRepository(database),
+            new PostgresArchiveAvailabilityRepository(database),
             platform,
             capacity,
             time);
         SlideshowOriginalPreparationService preparation = new(
-            new SqliteLocalBatchRepository(database),
+            new PostgresLocalBatchRepository(database),
             originals,
             capacity,
             policy,
@@ -441,7 +440,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
     }
 
     private static async Task<CatalogueProcessingAssetRevision> SaveRevisionAndFileAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         CatalogueSource source,
         string sourceKey,
         byte[] content,
@@ -457,11 +456,11 @@ public sealed class SlideshowOriginalPreparationServiceTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         CatalogueProcessingAssetRevision resolved =
-            await new SqliteLocalBatchRepository(database).GetAssetRevisionAsync(saved.Id)
+            await new PostgresLocalBatchRepository(database).GetAssetRevisionAsync(saved.Id)
             ?? throw new InvalidOperationException("Saved revision was unavailable.");
 
         string path = ResolvePath(resolved);
@@ -509,7 +508,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
 
     private sealed record TestServices(
         SlideshowOriginalPreparationService Preparation,
-        SqliteArchiveHydrationRepository Hydrations,
+        PostgresArchiveHydrationRepository Hydrations,
         SlideshowOriginalLeaseRegistry Leases);
 
     private sealed class FixedStorageProbe(long availableBytes) : IArchiveStorageProbe

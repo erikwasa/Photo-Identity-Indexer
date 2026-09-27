@@ -2,11 +2,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -37,7 +35,7 @@ public sealed class DetectorRolloutApplicationTests
                 item.Options.Select(value => value.FaceOccurrenceId).OrderBy(value => value));
             Assert.Null(item.LatestResolution);
 
-            await using (SqliteConnection before = await state.Database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection before = await state.Database.OpenConnectionAsync())
             {
                 Assert.Equal(2L, await CountAsync(before, "face_occurrences"));
                 Assert.Equal(2L, await CountAsync(before, "face_observations"));
@@ -65,7 +63,7 @@ public sealed class DetectorRolloutApplicationTests
             Assert.Equal(1, summary.ReadyToApplyCount);
             Assert.False(summary.RolloutComplete);
 
-            await using SqliteConnection after = await state.Database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection after = await state.Database.OpenConnectionAsync();
             Assert.Equal(2L, await CountAsync(after, "face_occurrences"));
             Assert.Equal(2L, await CountAsync(after, "face_observations"));
             Assert.Equal(0L, await CountAsync(after, "face_crops"));
@@ -107,7 +105,7 @@ public sealed class DetectorRolloutApplicationTests
 
     private static async Task<TestState> SeedAmbiguousStateAsync(string databasePath)
     {
-        SqliteCatalogueDatabase database = new(databasePath);
+        PostgresTestCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 8, 7, 20, 45, 0, TimeSpan.Zero);
         string sourceId = Guid.NewGuid().ToString();
@@ -119,9 +117,9 @@ public sealed class DetectorRolloutApplicationTests
         NormalizedBoundingBox candidateBox = Box(0.20, 0.20);
         NormalizedFaceLandmarks candidateLandmarks = Landmarks(0.20, 0.20);
 
-        await using (SqliteConnection connection = await database.OpenConnectionAsync())
+        await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
         {
-            using SqliteTransaction transaction = connection.BeginTransaction();
+            using NpgsqlTransaction transaction = connection.BeginTransaction();
             await ExecuteAsync(connection, transaction,
                 "INSERT INTO sources (id, kind, root_locator, created_at_utc) VALUES ($id, 'local-folder', $root, $now);",
                 ("$id", sourceId),
@@ -161,7 +159,7 @@ public sealed class DetectorRolloutApplicationTests
             transaction.Commit();
         }
 
-        SqliteDetectorRolloutRepository rollout = new(database);
+        PostgresDetectorRolloutRepository rollout = new(database);
         CatalogueDetectorPipelineRegistration registration = await rollout.RegisterPipelineAsync(runId, Pipeline(), now);
         ExistingFaceDetectionAnchor[] existing =
         [
@@ -178,7 +176,7 @@ public sealed class DetectorRolloutApplicationTests
             [candidate],
             plan,
             now);
-        await new SqliteDetectorRolloutReviewRepository(database).SaveInspectionAsync(
+        await new PostgresDetectorRolloutReviewRepository(database).SaveInspectionAsync(
             runId,
             revisionId,
             candidateIndex,
@@ -187,8 +185,8 @@ public sealed class DetectorRolloutApplicationTests
     }
 
     private static async Task InsertExistingAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        PostgresCompatibilityConnection connection,
+        NpgsqlTransaction transaction,
         FaceOccurrenceId occurrenceId,
         AssetRevisionId revisionId,
         int ordinal,
@@ -270,12 +268,12 @@ public sealed class DetectorRolloutApplicationTests
             now);
 
     private static async Task ExecuteAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        PostgresCompatibilityConnection connection,
+        NpgsqlTransaction transaction,
         string sql,
         params (string Name, object Value)[] parameters)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = sql;
         foreach ((string name, object value) in parameters)
@@ -285,9 +283,9 @@ public sealed class DetectorRolloutApplicationTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
+    private static async Task<long> CountAsync(PostgresCompatibilityConnection connection, string table)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
@@ -319,7 +317,7 @@ public sealed class DetectorRolloutApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
@@ -337,12 +335,12 @@ public sealed class DetectorRolloutApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 
     private sealed record TestState(
-        SqliteCatalogueDatabase Database,
+        PostgresTestCatalogueDatabase Database,
         ProcessingRunId RunId,
         AssetRevisionId RevisionId,
         IReadOnlyList<FaceOccurrenceId> ExistingFaceIds,

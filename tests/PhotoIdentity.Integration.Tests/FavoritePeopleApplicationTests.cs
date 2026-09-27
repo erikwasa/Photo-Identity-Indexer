@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -23,10 +22,10 @@ public sealed class FavoritePeopleApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 19, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson zelda = await reviewRepository.CreatePersonAsync("Zelda", now);
             CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada", now.AddMinutes(1));
             CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace", now.AddMinutes(2));
@@ -65,8 +64,8 @@ public sealed class FavoritePeopleApplicationTests
             Assert.True(assignmentPeople[0].IsFavorite);
             Assert.Equal(grace.Id.ToString(), assignmentPeople[0].Id);
 
-            SqliteCatalogueDatabase reopenedDatabase = new(databasePath);
-            IReadOnlySet<PersonId> persistedFavorites = await new SqliteFavoritePeopleRepository(reopenedDatabase)
+            PostgresTestCatalogueDatabase reopenedDatabase = new(databasePath);
+            IReadOnlySet<PersonId> persistedFavorites = await new PostgresFavoritePeopleRepository(reopenedDatabase)
                 .GetFavoritePersonIdsAsync();
             Assert.Contains(grace.Id, persistedFavorites);
             Assert.Contains(bob.Id, persistedFavorites);
@@ -95,10 +94,10 @@ public sealed class FavoritePeopleApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 20, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
 
             CatalogueReviewPerson favoriteSource = await reviewRepository.CreatePersonAsync("Favorite source", now);
             CatalogueReviewPerson plainTarget = await reviewRepository.CreatePersonAsync("Plain target", now.AddMinutes(1));
@@ -122,7 +121,7 @@ public sealed class FavoritePeopleApplicationTests
                 ["Favorite target", "Plain target"],
                 active.Select(person => person.DisplayName));
 
-            IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(new SqliteCatalogueDatabase(databasePath))
+            IReadOnlySet<PersonId> favorites = await new PostgresFavoritePeopleRepository(new PostgresTestCatalogueDatabase(databasePath))
                 .GetFavoritePersonIdsAsync();
             Assert.Contains(plainTarget.Id, favorites);
             Assert.Contains(favoriteTarget.Id, favorites);
@@ -142,22 +141,22 @@ public sealed class FavoritePeopleApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 21, 0, 0, TimeSpan.Zero);
             FaceOccurrenceId target = await SeedFaceAsync(database, [1f, 0f, 0f], 0, now);
             FaceOccurrenceId exemplar = await SeedFaceAsync(database, [0.8f, 0.6f, 0f], 1, now);
 
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync("Favorite candidate", now);
             await reviewRepository.AssignAsync(exemplar, person.Id, "human:test", now.AddMinutes(1));
 
-            SqliteIdentityMatcher matcher = new(database, new FixedTimeProvider(now.AddMinutes(2)));
+            PostgresIdentityMatcher matcher = new(database, new FixedTimeProvider(now.AddMinutes(2)));
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
             CatalogueRankedIdentitySuggestion before = Assert.Single(
                 await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash));
 
-            await new SqliteFavoritePeopleRepository(database).SetFavoriteAsync(
+            await new PostgresFavoritePeopleRepository(database).SetFavoriteAsync(
                 person.Id,
                 true,
                 now.AddMinutes(3));
@@ -195,7 +194,7 @@ public sealed class FavoritePeopleApplicationTests
     }
 
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         float[] vector,
         int index,
         DateTimeOffset now)
@@ -217,7 +216,7 @@ public sealed class FavoritePeopleApplicationTests
             "image/jpeg",
             640,
             480);
-        CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
@@ -248,7 +247,7 @@ public sealed class FavoritePeopleApplicationTests
                 new EmbeddingVector(vector),
                 now.AddMinutes(index)));
 
-        CatalogueFaceInspection persisted = await new SqliteFaceCatalogueRepository(database).SaveInspectionAsync(
+        CatalogueFaceInspection persisted = await new PostgresFaceCatalogueRepository(database).SaveInspectionAsync(
             inspection.Occurrence,
             inspection.Observation,
             inspection.Crop,
@@ -305,7 +304,7 @@ public sealed class FavoritePeopleApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

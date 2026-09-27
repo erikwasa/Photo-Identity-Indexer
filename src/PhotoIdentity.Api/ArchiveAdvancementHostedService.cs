@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
 
@@ -50,7 +49,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         ArchiveOperatorConfiguration operatorConfiguration,
         ReviewProxyGenerationConfiguration proxyConfiguration,
         ISourceCopyExclusionRepository exclusions,
-        IServiceProvider services,
+        PostgresCatalogueDatabase postgres,
         IConfiguration configuration,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics,
@@ -75,11 +74,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _logger = logger;
 
-        ISourceCopyPurgeRepository purgeRepository =
-            services.GetService<PostgresCatalogueDatabase>() is PostgresCatalogueDatabase postgres
-                ? new PostgresSourceCopyPurgeRepository(postgres)
-                : new SqliteSourceCopyPurgeRepository(
-                    services.GetRequiredService<SqliteCatalogueDatabase>());
+        ISourceCopyPurgeRepository purgeRepository = new PostgresSourceCopyPurgeRepository(postgres);
         string defaultApplicationRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "PhotoIdentity");

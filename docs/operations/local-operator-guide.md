@@ -1,24 +1,23 @@
 # Local operator guide
 
-This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained pilot/evaluation tooling.
+This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained historical migration/evaluation evidence.
 
 ## Current catalogue authority
 
-As of 2026-09-11, the maintainer production application uses PostgreSQL as its single authoritative catalogue after WI-0102 completed stopped-source migration, representative verification, production cutover and rollback acceptance. `/health` must report `catalogueProvider: postgresql` for the accepted production runtime. Keep the final pre-cutover SQLite backup unchanged as a rollback/migration artifact; do not run it concurrently as another writable authority.
+PostgreSQL is the single supported and authoritative catalogue. WI-0102 completed the maintainer production migration/cutover and rollback acceptance, WI-0147 made PostgreSQL unconditional at runtime, and WI-0149 removed the former SQLite implementation and executable compatibility paths. `/health` must report `catalogueProvider: postgresql`.
 
-Some SQLite-oriented CLI and local-path examples below predate the PostgreSQL cutover and remain useful only for explicit compatibility, migration or rollback work. They are not instructions to switch the accepted production catalogue back to SQLite. See [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) for the accepted authority boundary and [PostgreSQL local runtime](postgresql-local-runtime.md) for the current service/runtime setup. WI-0106 owns the full PostgreSQL day-to-day backup/recovery and sustained archive-catch-up operationalization.
+The final stopped-source SQLite backup from WI-0102 may be preserved unchanged as historical migration/rollback evidence, but current Photo Identity binaries do not open it. Do not configure a catalogue provider or SQLite database path. Historical rollback instructions remain in [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) only as evidence of the accepted migration boundary.
 
-Check the short [`BUILD_CONTEXT.md`](../../BUILD_CONTEXT.md) handoff and the canonical [work-item registry](../delivery/status/work-items.yaml) before treating a planned feature as available. Formal lifecycle status and completion evidence live in the registry; the build context identifies the current development or verification boundary.
+Check the short [`BUILD_CONTEXT.md`](../../BUILD_CONTEXT.md) handoff and the canonical [work-item registry](../delivery/status/work-items.yaml) before treating a planned feature as available.
 
 ## Trust and privacy boundary
 
-- Keep personal photos, catalogues, crops, embeddings, proxies and private reports outside the repository.
-- Keep PostgreSQL data and any preserved SQLite rollback/compatibility catalogue on local storage, not a network share or synchronised cloud folder.
+- Keep personal photos, PostgreSQL data, crops, embeddings, proxies and private reports outside the repository.
+- Keep PostgreSQL data and backups on local/private storage, not a synchronised cloud folder.
 - Treat the Windows computer as the trusted control plane.
 - Original photos are read-only inputs.
 - The browser application is unauthenticated. Prefer localhost; use another device only on a trusted private network with narrow firewall scope.
 - Personal OneDrive is accessed through the Windows sync client, not Microsoft Graph.
-- Azure is optional and never receives OneDrive credentials or the canonical review database.
 
 ## 1. Build and verify the application
 
@@ -32,25 +31,22 @@ From the repository root:
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
 
-The permanent archive analysis profile is governed separately from the legacy generic `batch` defaults. Permanent archive analysis uses:
+PostgreSQL-specific live acceptance is available through:
 
-- detector `centerface-2019-fp32`;
-- confidence `0.5`;
-- detector pipeline `single-pass`;
-- embedder `sface-2021dec-fp32`; and
-- SFace five-point alignment with the governed archive configuration.
+```powershell
+./verify-postgres.ps1
+```
 
-Do not infer the production archive detector from the generic `batch start` default, which remains a legacy/general-purpose interface.
+The permanent archive analysis profile is governed separately from generic evaluation defaults. Use the currently accepted values recorded by the bounded archive/detector work items rather than inventing production settings.
 
 ## 2. Choose permanent local paths
 
-Use local non-OneDrive paths for governed application artefacts such as model/analysis output, review proxies and backups. PostgreSQL catalogue storage is owned by the configured local PostgreSQL service. The `$db` path in the compatibility example below applies only when intentionally running the SQLite provider for migration/rollback work.
+Use local non-OneDrive paths for governed application artefacts such as model/analysis output, review proxies and backups. PostgreSQL catalogue storage is owned by the configured local PostgreSQL service.
 
-Example compatibility layout:
+Example layout:
 
 ```powershell
 $root = "C:\PhotoIdentity"
-$db = Join-Path $root "catalogue.db"
 $analysis = Join-Path $root "analysis"
 $proxies = Join-Path $root "review-proxies"
 $publish = Join-Path $root "app"
@@ -59,16 +55,15 @@ $backups = Join-Path $root "backups"
 New-Item -ItemType Directory -Force -Path $root,$analysis,$proxies,$backups | Out-Null
 ```
 
-The actual Personal OneDrive archive root is private configuration and must not be committed to Git.
+The actual Personal OneDrive archive root and PostgreSQL connection string are private configuration and must not be committed to Git.
 
-## 3. Configure bounded archive storage
+## 3. Configure PostgreSQL and bounded archive storage
 
-The API host requires the PostgreSQL connection string and reads archive settings before normal operation. At minimum, permanent archive operation needs PostgreSQL, analysis output and selected review-proxy configuration. Managed hydration remains disabled until explicit limits are supplied.
+The API host requires `PhotoIdentity:Postgres:ConnectionString`. For normal packaged use, the launcher stores only the **name** of the environment variable containing that connection string; the secret itself must not be stored in launcher JSON.
 
-The following environment-variable form shows the archive/storage settings. `PhotoIdentity__DatabasePath` is an SQLite compatibility setting and is ignored as authoritative storage when the selected provider is PostgreSQL:
+Archive operation also uses the accepted analysis/proxy/hydration settings. Environment-variable examples include:
 
 ```powershell
-$env:PhotoIdentity__DatabasePath = $db
 $env:PhotoIdentity__ArchiveAnalysisOutputRoot = $analysis
 $env:PhotoIdentity__ReviewProxyRoot = $proxies
 $env:PhotoIdentity__ReviewProxyProfileId = "<accepted-profile-id>"
@@ -79,15 +74,13 @@ $env:PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes = "<accepted-
 $env:PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations = "<accepted-concurrency>"
 ```
 
-Do not invent production values. Use the values accepted through [bounded archive acceptance](bounded-archive-acceptance.md). See [review-proxy serving and bounded originals](review-proxy-serving.md) for exact semantics.
+Do not invent production values. Use values accepted through [bounded archive acceptance](bounded-archive-acceptance.md). See [review-proxy serving and bounded originals](review-proxy-serving.md) for exact semantics.
 
-For routine packaged use, store the same accepted values in `%LOCALAPPDATA%\PhotoIdentity\launcher.json` instead of setting them manually before every start. The launcher persists only the **name** of the environment variable holding the PostgreSQL connection string; the secret itself must not be stored in launcher JSON. PostgreSQL is unconditional, so neither a catalogue-provider switch nor a SQLite database path is accepted. For the packaged application, normally leave `publishPath` unset: the package entry point selects the code directory, while private configuration remains durable outside the replaceable package. The real launcher configuration must remain private.
+PostgreSQL is unconditional: `PhotoIdentity__CatalogueProvider` and `PhotoIdentity__DatabasePath` are obsolete settings and are rejected by the packaged launcher.
 
 ## 4. Install and run the Windows application
 
-Normal M18 operation uses the self-contained `win-x64` operator package. A separately installed .NET runtime and manual `dotnet publish` are not required for routine use.
-
-To build the package from a repository checkout:
+Normal operation uses the self-contained `win-x64` operator package. Build it with:
 
 ```powershell
 ./Package-PhotoIdentity.ps1 -Configuration Release
@@ -99,22 +92,22 @@ The default ZIP is:
 .artifacts\packages\PhotoIdentity-win-x64.zip
 ```
 
-Extract the complete ZIP to a local code-only folder such as `C:\Apps\PhotoIdentity-<version>`, then start Photo Identity by double-clicking:
+Extract the complete ZIP to a local code-only folder such as `C:\Apps\PhotoIdentity-<version>`, then start:
 
 ```text
 PhotoIdentity.cmd
 ```
 
-The packaged entry point delegates to the WI-0051 launcher and therefore:
+The launcher:
 
 - accepts only a loopback HTTP URL such as `http://127.0.0.1:5080`;
 - opens the browser only after `/health` reports the application ready;
 - reuses an already healthy Photo Identity instance instead of starting a duplicate;
-- refuses to start when the configured port is occupied by something that is not the Photo Identity health endpoint;
-- loads only the documented `PhotoIdentity__...` bootstrap settings from the private JSON file; and
+- refuses to start when the configured port is occupied by another process;
+- resolves the private PostgreSQL connection string from the configured environment-variable name; and
 - writes startup stdout/stderr logs under `%LOCALAPPDATA%\PhotoIdentity\launcher-logs` when troubleshooting is needed.
 
-The package directory contains replaceable application code only. Keep catalogue data, analysis output, proxies, launcher configuration and backups outside it. Upgrade by extracting a new package beside the old one, stopping the old `PhotoIdentity.Api.exe`, starting `PhotoIdentity.cmd` from the new folder, verifying the existing catalogue/settings, and only then deleting the old package folder. See [Windows operator package](windows-package.md) for the complete package, deployment trade-off and verification procedure.
+The package directory contains replaceable application code only. Keep PostgreSQL data, analysis output, proxies, launcher configuration and backups outside it. See [Windows operator package](windows-package.md) for the complete package/update procedure.
 
 Manual framework-dependent publishing remains available for development and diagnostics:
 
@@ -127,46 +120,17 @@ dotnet publish `
   --output $publish
 ```
 
-The repository `Start-PhotoIdentity.cmd` launcher can start that prepared publish when its private launcher configuration supplies the matching `publishPath`. Direct command-line startup also remains available for diagnostics:
+## 5. Configure and synchronize permanent archive coverage
 
-```powershell
-Push-Location $publish
-dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
-```
+Use the **Archive** page for production archive coverage and synchronization. The application operates through PostgreSQL only; the former `archive --database ...` SQLite CLI paths were retired under WI-0149.
 
-Open `http://localhost:5080` on Windows when starting manually.
+Expanding coverage keeps one permanent archive source identity. A broader included parent can subsume previously listed children without creating another source authority.
 
-## 5. Configure permanent archive coverage
-
-Use the **Archive** page for normal production operation. It operates through the selected PostgreSQL catalogue provider after WI-0102.
-
-The following CLI examples use the explicit SQLite `--database` compatibility boundary and should not be used to mutate the accepted PostgreSQL production authority. They are retained for rollback/migration diagnostics:
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  archive include `
-  --database $db `
-  --root "<private-archive-root>" `
-  --folder "<relative-folder>"
-```
-
-Later inclusions use the same permanent root and another relative folder. A broader parent may be added later; normalized parent coverage subsumes previously listed children rather than creating another source identity.
-
-SQLite compatibility synchronization examples are:
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  archive sync --database $db
-
-dotnet run --project src/PhotoIdentity.Cli -- `
-  archive status --database $db
-```
-
-Production synchronization should be driven through the normal PostgreSQL-selected application/Archive workflow. Synchronization revisits all included coverage for new, changed, missing and newly available files. It must not repeat unchanged exact-profile work.
+Synchronization revisits included coverage for new, changed, missing and newly available files while avoiding repeated unchanged exact-profile work. Browser-triggered long-running synchronization is server-owned and durable; see [Archive background synchronization](archive-background-sync.md).
 
 ## 6. Advance the archive
 
-Use **Advance archive** in the Archive page for the bounded permanent workflow. It coordinates source verification, managed OneDrive hydration, governed analysis, durable proxy generation and release/retry behavior through the selected PostgreSQL provider.
+Use **Advance archive** in the Archive page for the bounded permanent workflow. It coordinates source verification, managed OneDrive hydration, governed analysis, durable proxy generation and release/retry behavior through PostgreSQL.
 
 Important distinctions:
 
@@ -177,73 +141,28 @@ Important distinctions:
 - Ordinary collection browsing uses proxies and must not hydrate originals.
 - Explicit original viewing uses the separate hydrate/status/view/release lifecycle.
 
-The CLI `archive analyze` command exists for the archive analysis coordinator, but it is not a substitute for the complete bounded online-only advancement path when source verification or managed hydration is required.
+## 7. Review, collections and metadata
 
-## 7. Media-format completeness
+Use the browser application for canonical review/identity decisions, people maintenance, Smart/Creative Collections, metadata/Places, archive review and slideshows. The browser/runtime shares one PostgreSQL catalogue; there is no provider-specific alternative path.
 
-HEIC/HEIF is being added under WI-0053; RAW support is activated only for formats actually found in the real archive. The SQLite CLI inventory example below is a compatibility diagnostic, not the normal PostgreSQL authority path:
+Normal thumbnails/previews are served from durable review proxies when configured. Request authoritative full-resolution content only through the explicit original lifecycle so immutable revision checks and managed hydration/release accounting remain enforced.
+
+## 8. CLI engineering/evaluation operations
+
+The CLI remains available for supported PostgreSQL-backed and provider-neutral engineering tasks. Current help is authoritative:
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  archive inventory --database $db
+dotnet run --project src/PhotoIdentity.Cli -- --help
 ```
 
-The inventory walks only configured archive coverage, does not open image content, and prints extension counts plus media family/current support state. It does not print source paths or filenames. Because it only enumerates directory entries, it can reveal online-only HEIC or future RAW extensions without requesting OneDrive hydration.
+Catalogue commands that require a database use a PostgreSQL connection string from an explicitly named environment variable. `bundle process` remains database-free. Migration-era SQLite backup/migrate/archive/batch/match/evaluation-export and bundle import/export commands are no longer supported.
 
-Expected examples include:
+## 9. Back up and restore
 
-```text
-extension: .heic count=<n> family=heif supported=true
-extension: .dng count=<n> family=raw supported=false
-```
+Use [PostgreSQL production operations](postgresql-operations.md) for routine logical backup, isolated restore verification, restart and upgrade procedures. The old SQLite backup is not a current recovery target for the application after WI-0149.
 
-A RAW line with `supported=false` is a deliberate trigger for format-specific WI-0053 work, not permission to omit the file. When the current archive reports no RAW family, retain that aggregate result and defer RAW decoding until a real variant appears.
+The accepted historical migration/rollback rehearsal remains documented in [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md). [Historical SQLite persistence operations](sqlite-persistence.md) is retained only so older delivery evidence remains understandable and link-valid.
 
-Do not treat a scan with silently omitted media as full archive coverage.
+## Readiness and specialized references
 
-## 8. Review faces and maintain people
-
-The current runtime supports canonical manual assignment, rejection, undo, person creation/maintenance and exact-model identity suggestions through PostgreSQL.
-
-Use the browser application to review new faces and maintain people. Rejected face-person pairs remain durable negative evidence.
-
-The accepted future direction under ADR-0006/WI-0043 adds configurable confidence groups and optional canonical High-confidence automatic assignment. **That policy must not be documented as operationally available until WI-0043 is implemented.**
-
-Unknown-as-a-review-state is similarly planned under WI-0047; until then, do not create a synthetic person named `Unknown` as a workaround.
-
-## 9. Regenerate current identity suggestions
-
-The production browser/runtime uses the selected PostgreSQL catalogue. Legacy CLI examples that use `--database $db` target SQLite explicitly; for PostgreSQL CLI regeneration, use the supported PostgreSQL provider-selection/environment-variable path documented by the command/work-item in effect for the current build.
-
-Current regeneration is advisory and does not itself create automatic canonical assignments. WI-0103 owns making regeneration scalable and bounded while preserving accepted scoring semantics.
-
-## 10. Browse collections and originals
-
-Use `/collections` for people-based collection queries. Normal thumbnails/previews are served from durable review proxies when configured.
-
-Request authoritative full-resolution content only through the explicit original lifecycle. The API verifies the expected immutable revision before serving it and tracks only Photo-Identity-owned hydration for later release.
-
-See [review-proxy serving and bounded originals](review-proxy-serving.md) for the detailed API semantics.
-
-## 11. Back up and restore
-
-The accepted PostgreSQL catalogue and governed local artefacts are sensitive permanent data. WI-0106 owns the full routine PostgreSQL backup/recovery policy and operational stabilization.
-
-For the immediate WI-0102 rollback boundary, keep the final stopped-source SQLite backup unchanged/read-only. A rollback must stop PostgreSQL-authoritative Photo Identity, create a separate writable working copy from that preserved backup, select the SQLite provider for that working copy, and never copy post-cutover PostgreSQL changes back into the preserved backup. The rollback procedure was maintainer-verified on 2026-09-11 before PostgreSQL authority was restored.
-
-Follow [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) for that immediate rollback boundary. [SQLite persistence operations](sqlite-persistence.md) remains applicable only when intentionally operating an SQLite catalogue.
-
-## Version-1 readiness check
-
-Do not call the permanent archive ready merely because a small pilot works. The version-1 start gate requires:
-
-- accepted bounded-storage/proxy behavior (WI-0042);
-- completed permanent incremental ingestion behavior (WI-0041);
-- completed HEIC/HEIF and real-archive RAW support (WI-0053); and
-- the product [success criteria](../product/success-criteria.md) to be satisfied on the real Windows/OneDrive environment.
-
-Once those gates pass, keep expanding real archive coverage incrementally in the accepted PostgreSQL catalogue rather than creating a replacement authority.
-
-## Specialized references
-
-Use the [operations index](index.md) to distinguish current runbooks from retained experiment evidence.
+Do not call a planned feature available merely because an old pilot/runbook describes it. Formal lifecycle status lives in the work-item registry. Use the [operations index](index.md) to distinguish current runbooks from retained experiment/migration evidence.
