@@ -74,3 +74,11 @@ Three private representatives covering the smallest, median and largest observed
 All three samples exposed orientation, camera make/model and valid GPS metadata. They did not contain a capture date, and extraction correctly left it absent rather than inventing one. SHA-256 before/after checks confirmed every source remained unchanged. The generated proxies were kept in ignored private verification storage and no source filename, path, pixel data, GPS value or device identity is retained in Git.
 
 An isolated normal archive include/sync ingested a copied representative as one `image/dng` revision. The exact governed CenterFace 0.5 single-pass/SFace FP32 profile completed successfully. Repeating sync reported zero new revisions and one unchanged source; repeating analysis reported the exact profile already complete and scheduled zero work. Privacy-safe inventory reported `family=raw supported=true`. Automated coverage adds a synthetic distributable DNG container for orientation/BGR decoding, signature and corrupt-media behavior, source eligibility, inventory classification and protection of other RAW extensions.
+
+## Maintainer verification
+
+On 2026-09-27 the maintainer verified WI-0164 against the real maintained archive after the browser-triggered archive synchronization path had been moved to durable background work. A normal **Archive → Sync included folders** discovered the existing DNG files under configured coverage without renaming, copying or manually re-importing them.
+
+The subsequent archive advancement initially exposed two independent operational conditions rather than a DNG-format failure: a pre-existing managed JPEG release request from 2026-08-26 remained unreconciled, and the configured 100,000,000,000-byte minimum free-space reserve exceeded the approximately 90.9 GB then available on the archive volume, preventing further managed hydration for source verification. After sufficient storage-policy headroom was restored, the discovered DNG files advanced through source verification and governed analysis normally.
+
+The maintainer then confirmed that WI-0164 works as expected. This real-archive pass completes the human acceptance requirement on top of the automated/private-sample decoder, metadata, proxy, immutability and retry-idempotence evidence recorded above.
