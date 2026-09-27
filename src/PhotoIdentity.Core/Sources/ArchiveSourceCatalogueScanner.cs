@@ -234,6 +234,7 @@ public sealed class ArchiveSourceCatalogueScanner
         int deleted = await _persistence.MarkMissingAssetsAsync(
             catalogueSource.SourceId,
             options.RelativeRoot,
+            writes.Select(static write => write.SourceAsset.Reference.ItemKey).ToArray(),
             scannedAt,
             cancellationToken);
         missingStopwatch.Stop();
