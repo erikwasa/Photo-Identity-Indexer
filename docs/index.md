@@ -11,7 +11,7 @@
 - [Architecture overview](architecture/overview.md)
 - [Glossary](glossary.md)
 
-The local operator guide is the authoritative normal operating path. Specialized operations documents are classified in the operations index so completed experiment runbooks are not mistaken for current product instructions.
+The local operator guide is the authoritative normal operating path. Specialized operations documents are classified in the operations index so completed experiment and migration records are not mistaken for current product instructions.
 
 Formal delivery lifecycle status is kept in the canonical YAML registries. They are machine/audit records rather than the normal human current-status view; use `BUILD_CONTEXT.md` for the immediate continuation point.
 
@@ -23,7 +23,7 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
 - [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
-- [SQLite persistence compatibility/history](operations/sqlite-persistence.md)
+- [Historical SQLite persistence record — retired](operations/sqlite-persistence.md)
 
 ## Architecture
 
