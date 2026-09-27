@@ -28,10 +28,16 @@ Background execution remains important for reliability, but it is not treated as
 
 ## Exit criteria
 
-- [ ] Current archive-scale phase timings identify the dominant synchronization cost.
-- [ ] A maintainer-reviewed performance expectation is explicit.
-- [ ] Before/after evidence shows a material reduction in no-change and small-change synchronization time on the same coverage.
-- [ ] Correctness regressions cover changed, unchanged, reappearing, online-only, missing and moved assets plus parent-folder expansion.
-- [ ] Durable background behavior and conflict exclusion remain intact.
-- [ ] A non-private automated guard makes the corrected scaling behavior visible in normal development/CI.
-- [ ] Maintainer verification accepts synchronization latency on the maintained archive.
+- [x] Current archive-scale phase timings identify the dominant synchronization cost.
+- [x] A maintainer-reviewed performance expectation is explicit.
+- [x] Before/after evidence shows a material reduction in no-change and small-change synchronization time on the same coverage.
+- [x] Correctness regressions cover changed, unchanged, reappearing, online-only, missing and moved assets plus parent-folder expansion.
+- [x] Durable background behavior and conflict exclusion remain intact.
+- [x] A non-private automated guard makes the corrected scaling behavior visible in normal development/CI.
+- [x] Maintainer verification accepts synchronization latency on the maintained archive.
+
+## Completion evidence — 2026-09-27
+
+The maintainer accepted a target of at least 75% lower no-change wall clock and no more than 30 seconds for a stable maintained-archive synchronization. On the same PostgreSQL catalogue and coverage, `main` commit `6e3d52753231ed849a8321cdb80d506909f6fb50` completed the controlled no-change run in `192.264856 s`; corrected commit `92bab66ac741fb4baf5fa9c2ab830efa8cfcc559` completed the stable repeat in `7.421021 s`, a `96.14%` reduction. The corrected repeat hashed zero files and used one exclusion plus one persistence batch for each of 17 included folders.
+
+A bounded one-photo change completed in `7.351566 s`, created exactly one revision and hashed exactly one `2,144,504`-byte file. The maintainer also confirmed that navigating away from Archive and returning did not interrupt the durable background synchronization. GitHub Actions build run `#2450` passed for the verified implementation commit.
