@@ -139,7 +139,7 @@ Pop-Location
 
 The maintainer completed this acceptance successfully on 2026-09-12 from a stopped production source. The custom-format dump was hash-recorded, restored into an isolated database, and passed schema/table/count/constraint comparison before that isolated database was explicitly removed.
 
-Keep the verified backup and its reports through the M24 operational stabilization window. Do not retire the preserved pre-cutover SQLite rollback snapshot until WI-0106 acceptance explicitly records that decision.
+M24/WI-0106 stabilization is complete. The pre-cutover SQLite snapshot may remain as protected historical migration evidence, but it is not a current recovery target; current recovery always uses a verified PostgreSQL logical backup.
 
 ## PostgreSQL 18 service upgrades
 

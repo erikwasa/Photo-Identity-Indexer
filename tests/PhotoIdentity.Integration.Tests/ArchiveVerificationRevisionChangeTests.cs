@@ -3,7 +3,6 @@ using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -25,10 +24,10 @@ public sealed class ArchiveVerificationRevisionChangeTests
             await File.WriteAllBytesAsync(path, changedBytes);
             File.SetLastWriteTimeUtc(path, changedObserved.UtcDateTime);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, firstObserved);
-            SqliteArchiveSourceObservationRepository observations = new(database);
+            PostgresArchiveSourceObservationRepository observations = new(database);
 
             SourceAsset first = new(
                 new SourceAssetReference(source.Id, "photo.jpg"),
@@ -59,13 +58,13 @@ public sealed class ArchiveVerificationRevisionChangeTests
             Assert.Equal(ArchiveSourceVerificationState.NeedsSourceVerification, changedWrite.VerificationState);
 
             LocalFilesOnDemandPlatform platform = new();
-            SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
+            PostgresArchiveSourceHydrationRepository sourceHydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                new SqliteArchiveHydrationRepository(database),
+                new PostgresArchiveHydrationRepository(database),
                 sourceHydrations,
-                new SqliteArchiveCoverageRepository(database),
-                new SqliteArchiveStorageRepository(database),
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveCoverageRepository(database),
+                new PostgresArchiveStorageRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),
@@ -74,7 +73,7 @@ public sealed class ArchiveVerificationRevisionChangeTests
             ArchiveSourceVerificationService verification = new(
                 observations,
                 sourceHydrations,
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 capacity,
                 platform,
                 TimeProvider.System);

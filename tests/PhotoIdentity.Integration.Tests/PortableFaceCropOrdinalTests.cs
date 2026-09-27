@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using PhotoIdentity.Cli;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
@@ -52,28 +51,6 @@ public sealed class PortableFaceCropOrdinalTests
         {
             DeleteTemporaryDirectory(directory);
         }
-    }
-
-    [Fact]
-    public async Task Bundle_cli_rejects_duplicate_numbered_crop_arguments_before_database_access()
-    {
-        StringWriter output = new();
-        StringWriter error = new();
-        int exitCode = await Program.RunAsync(
-            [
-                "bundle", "export",
-                "--database", "unused.db",
-                "--revision", Guid.NewGuid().ToString(),
-                "--job", "unused.photoid-job",
-                "--profile", "face-crops",
-                "--crop", "3=first.png",
-                "--crop", "3=second.png",
-            ],
-            output,
-            error);
-
-        Assert.Equal(2, exitCode);
-        Assert.Contains("Face number 3", error.ToString(), StringComparison.Ordinal);
     }
 
     private static async Task WritePngAsync(string path, ImageFrame frame)

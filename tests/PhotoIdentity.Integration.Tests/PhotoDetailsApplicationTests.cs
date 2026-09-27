@@ -2,8 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -18,7 +16,7 @@ public sealed class PhotoDetailsApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededPhoto seeded = await SeedPhotoAsync(database, directory);
 
@@ -59,7 +57,7 @@ public sealed class PhotoDetailsApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             await using PhotoDetailsApiFactory factory = new(databasePath);
@@ -80,7 +78,7 @@ public sealed class PhotoDetailsApplicationTests
     }
 
     private static async Task<SeededPhoto> SeedPhotoAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory)
     {
         string sourceRoot = Path.Combine(directory, "do-not-open", "private-source");
@@ -94,8 +92,8 @@ public sealed class PhotoDetailsApplicationTests
         string suggestedFaceId = Guid.NewGuid().ToString("D");
         string now = new DateTimeOffset(2026, 8, 16, 20, 30, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', $source_root, $now);

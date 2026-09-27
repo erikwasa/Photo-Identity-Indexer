@@ -2,13 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -22,11 +20,11 @@ public sealed class CreativeCollectionPreviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresAssetCatalogueRepository catalogue = new(database);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
 
             CatalogueAssetRevision anchor = await CreateRevisionAsync(catalogue, directory, "anchor.jpg", 'a');
             CatalogueAssetRevision context = await CreateRevisionAsync(catalogue, directory, "context.jpg", 'b');
@@ -40,7 +38,7 @@ public sealed class CreativeCollectionPreviewApplicationTests
                 "Creative anchor",
                 new SmartCollectionFilter(tags: ["Creative/Anchor"]));
 
-            SqliteSmartCollectionQueryRepository query = new(database);
+            PostgresSmartCollectionQueryRepository query = new(database);
             SmartCollectionPhotoPage exactBefore = await query.QueryAsync(saved.Filter);
             Assert.Equal(anchor.Id, Assert.Single(exactBefore.Items).RevisionId);
 
@@ -100,9 +98,9 @@ public sealed class CreativeCollectionPreviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "No matches",
                 new SmartCollectionFilter(tags: ["does/not/exist"]));
@@ -135,9 +133,9 @@ public sealed class CreativeCollectionPreviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Any collection",
                 new SmartCollectionFilter());
@@ -161,12 +159,12 @@ public sealed class CreativeCollectionPreviewApplicationTests
     }
 
     private static async Task SetTakenAtAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         DateTime takenAtLocal)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO photo_capture_metadata (
                 asset_revision_id,
@@ -187,7 +185,7 @@ public sealed class CreativeCollectionPreviewApplicationTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string root,
         string sourceKey,
         char hashCharacter)
@@ -223,7 +221,7 @@ public sealed class CreativeCollectionPreviewApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
@@ -241,7 +239,7 @@ public sealed class CreativeCollectionPreviewApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

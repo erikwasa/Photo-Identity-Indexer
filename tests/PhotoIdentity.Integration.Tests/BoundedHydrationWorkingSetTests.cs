@@ -3,7 +3,6 @@ using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -18,7 +17,7 @@ public sealed class BoundedHydrationWorkingSetTests
         Directory.CreateDirectory(directory);
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 0, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -29,14 +28,14 @@ public sealed class BoundedHydrationWorkingSetTests
             }
 
             const long managedBudget = 500;
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             ImmediateFilesOnDemandPlatform platform = new();
             ArchiveHydrationCapacityService capacity = new(
                 hydrations,
-                new SqliteArchiveSourceHydrationRepository(database),
-                new SqliteArchiveCoverageRepository(database),
-                new SqliteArchiveStorageRepository(database),
-                new SqliteArchiveAvailabilityRepository(database),
+                new PostgresArchiveSourceHydrationRepository(database),
+                new PostgresArchiveCoverageRepository(database),
+                new PostgresArchiveStorageRepository(database),
+                new PostgresArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, managedBudget, 1),
@@ -82,7 +81,7 @@ public sealed class BoundedHydrationWorkingSetTests
     }
 
     private static async Task<CatalogueProcessingAssetRevision> SaveRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         CatalogueSource source,
         string sourceKey,
         int sizeBytes,
@@ -99,8 +98,8 @@ public sealed class BoundedHydrationWorkingSetTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(source, asset, revision);
-        return await new SqliteLocalBatchRepository(database).GetAssetRevisionAsync(saved.Id)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(source, asset, revision);
+        return await new PostgresLocalBatchRepository(database).GetAssetRevisionAsync(saved.Id)
             ?? throw new InvalidOperationException("Saved revision was unavailable.");
     }
 

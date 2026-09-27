@@ -8,40 +8,9 @@ The model lab uses a versioned JSON manifest with three explicit identity-evalua
 
 Do not reuse a face or source revision across splits. Personal images, crops, embeddings, identity identifiers, real manifests and reports remain local and must not be committed. The checked-in example is synthetic.
 
-## Export from a reviewed catalogue
+## Evaluation manifests
 
-Use `evaluate export` to create the manifest directly from active human assignments in a local SQLite catalogue. Select exact detector and embedder revisions and exactly one scope: a processing run or one or more immutable asset revisions.
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate export `
-  --database C:\PhotoIdentity\catalogue.db `
-  --output C:\PhotoIdentity\private-evaluation\baseline.json `
-  --dataset-id private-baseline-v1 `
-  --pipeline-version local-pipeline-v1 `
-  --detector-id yunet `
-  --detector-hash DETECTOR_SHA256 `
-  --embedder-id sface `
-  --embedder-hash EMBEDDER_SHA256 `
-  --seed private-baseline-split-v1 `
-  --run PROCESSING_RUN_ID
-```
-
-For an explicit photo-revision scope, replace `--run` with one or more `--revision ASSET_REVISION_ID` options.
-
-The defaults require one gallery, validation and test photo per known person plus one unknown photo in each held-out split. Increase these with `--gallery-per-person`, `--validation-known-per-person`, `--test-known-per-person`, `--validation-unknown` and `--test-unknown`. Repeated `--threshold` options replace the default cosine sweep.
-
-The exporter:
-
-- includes only active human assignments with the exact requested detector and embedder outputs;
-- uses assigned people absent from the gallery as human-confirmed unknown examples;
-- assigns each immutable source revision wholly to gallery, validation or test;
-- uses SHA-256 ordering from the recorded seed rather than runtime random shuffling;
-- records model hashes, pipeline version, source revision IDs and hashes, split settings and a canonical catalogue-input digest;
-- never serializes source roots or crop storage paths; and
-- fails clearly when the reviewed catalogue cannot support the requested known and unknown split sizes.
-
-If processing-job timing is unavailable for an explicitly selected revision, affected samples receive a deterministic 1 ms fallback and the manifest records the fallback count. Do not use fallback-based throughput as a performance measurement.
+The former catalogue-backed `evaluate export` command was retired with the SQLite migration surface under WI-0149. Existing private manifests remain valid inputs to the provider-neutral evaluator. Any new catalogue export must be introduced as a separately scoped PostgreSQL-backed workflow with the same privacy, exact-model provenance and deterministic split guarantees; do not restore the retired command or create a second catalogue.
 
 ## Evaluate a manifest
 

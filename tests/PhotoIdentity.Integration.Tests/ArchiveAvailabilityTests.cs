@@ -2,7 +2,6 @@ using System.Runtime.CompilerServices;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -17,12 +16,12 @@ public sealed class ArchiveAvailabilityTests
         {
             string root = Path.Combine(directory, "Kamerabilder");
             Directory.CreateDirectory(root);
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
-            CatalogueSource catalogueSource = await new SqliteLocalBatchRepository(database)
+            CatalogueSource catalogueSource = await new PostgresLocalBatchRepository(database)
                 .GetOrCreateLocalFolderSourceAsync(root, Utc(10));
             MutableArchiveSource source = new(catalogueSource.Id, "1970/01/photo.jpg", [1, 2, 3]);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
             Sha256Digest profileHash = new(new string('a', 64));
 
             ArchiveSourceCatalogueScanSummary local = await scanner.ScanAsync(
@@ -35,7 +34,7 @@ public sealed class ArchiveAvailabilityTests
             Assert.Equal(1, local.Diagnostics.HashedFileCount);
             Assert.Equal(0, local.Diagnostics.MetadataReuseCount);
             Assert.Equal(1, source.OpenContentCalls);
-            Assert.Single(await new SqliteArchiveAnalysisRepository(database)
+            Assert.Single(await new PostgresArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash));
 
             source.Availability = AssetAvailability.OnlineOnly;
@@ -48,10 +47,10 @@ public sealed class ArchiveAvailabilityTests
             Assert.Equal(0, onlineOnly.NewRevisionCount);
             Assert.Equal(0, onlineOnly.Diagnostics.HashedFileCount);
             Assert.Equal(1, source.OpenContentCalls);
-            Assert.Empty(await new SqliteArchiveAnalysisRepository(database)
+            Assert.Empty(await new PostgresArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash));
 
-            SqliteArchiveStatusRepository statusRepository = new(database);
+            PostgresArchiveStatusRepository statusRepository = new(database);
             CatalogueArchiveFolderStatus status = await statusRepository.GetStatusAsync(
                 catalogueSource.Id,
                 "1970",
@@ -74,7 +73,7 @@ public sealed class ArchiveAvailabilityTests
             Assert.Equal("online-only", item.Availability);
             Assert.Equal("unavailable", item.AnalysisState);
 
-            CatalogueArchiveItemPage orthogonalPending = await new SqliteArchiveItemFilterRepository(database)
+            CatalogueArchiveItemPage orthogonalPending = await new PostgresArchiveItemFilterRepository(database)
                 .GetItemsAsync(
                     catalogueSource.Id,
                     "1970",
@@ -104,7 +103,7 @@ public sealed class ArchiveAvailabilityTests
             // The asset remained continuously present and its verified size/mtime/media baseline
             // is unchanged, so returning from online-only to local does not require a content read.
             Assert.Equal(1, source.OpenContentCalls);
-            Assert.Single(await new SqliteArchiveAnalysisRepository(database)
+            Assert.Single(await new PostgresArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash));
         }
         finally

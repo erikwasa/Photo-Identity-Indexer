@@ -3,7 +3,6 @@ using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using Xunit;
 
@@ -17,7 +16,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueProcessingAssetRevision revision = CreateDetachedRevision(directory, 400);
             FakeFilesOnDemandPlatform platform = new();
@@ -48,7 +47,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueProcessingAssetRevision revision = CreateDetachedRevision(directory, 600);
             ArchiveHydrationCapacityService service = CreateService(
@@ -79,13 +78,13 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 0, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
             CatalogueProcessingAssetRevision active = await SaveRevisionAsync(database, source, "active.jpg", 300, now);
             CatalogueProcessingAssetRevision requested = await SaveRevisionAsync(database, source, "requested.jpg", 300, now.AddMinutes(1));
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             await hydrations.ClaimAsync(active.RevisionId, now);
 
             FakeFilesOnDemandPlatform platform = new();
@@ -118,7 +117,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset t0 = new(2026, 8, 9, 0, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, t0);
@@ -126,7 +125,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
             CatalogueProcessingAssetRevision recent = await SaveRevisionAsync(database, source, "recent.jpg", 400, t0.AddMinutes(1));
             CatalogueProcessingAssetRevision requested = await SaveRevisionAsync(database, source, "requested.jpg", 400, t0.AddMinutes(2));
 
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             await hydrations.ClaimAsync(oldest.RevisionId, t0);
             await hydrations.ClaimAsync(recent.RevisionId, t0.AddMinutes(1));
             await hydrations.TouchAsync(recent.RevisionId, t0.AddHours(1));
@@ -169,7 +168,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 29, 18, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -180,7 +179,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
             CatalogueProcessingAssetRevision second = await SaveRevisionAsync(
                 database, source, "second-online.jpg", 300, now.AddMinutes(2));
 
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             await hydrations.ClaimAsync(oldManaged.RevisionId, now);
 
             FakeFilesOnDemandPlatform platform = new();
@@ -231,7 +230,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 29, 18, 30, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -242,7 +241,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
             CatalogueProcessingAssetRevision requested = await SaveRevisionAsync(
                 database, source, "requested-online.jpg", 400, now.AddMinutes(2));
 
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             await hydrations.ClaimAsync(protectedOldest.RevisionId, now);
             await hydrations.ClaimAsync(releasableRecent.RevisionId, now.AddMinutes(1));
 
@@ -297,7 +296,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 29, 19, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -306,7 +305,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
             CatalogueProcessingAssetRevision requested = await SaveRevisionAsync(
                 database, source, "large-online.jpg", 600, now.AddMinutes(1));
 
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             await hydrations.ClaimAsync(protectedManaged.RevisionId, now);
 
             FakeFilesOnDemandPlatform platform = new();
@@ -353,7 +352,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 28, 16, 30, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
@@ -364,7 +363,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
                 400,
                 now);
 
-            SqliteArchiveHydrationRepository hydrations = new(database);
+            PostgresArchiveHydrationRepository hydrations = new(database);
             await hydrations.ClaimAsync(revision.RevisionId, now);
             await hydrations.MarkReleaseRequestedAsync(revision.RevisionId, now.AddSeconds(1));
 
@@ -382,7 +381,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
             ArchiveManagedHydrationRecord? ownership = await hydrations.GetAsync(revision.RevisionId);
             Assert.False(ownership?.IsActive);
 
-            CatalogueArchiveFolderStatus status = await new SqliteArchiveStatusRepository(database)
+            CatalogueArchiveFolderStatus status = await new PostgresArchiveStatusRepository(database)
                 .GetStatusAsync(source.Id, string.Empty, profileHash: null);
             Assert.Equal(1, status.CurrentImages);
             Assert.Equal(0, status.LocalImages);
@@ -395,17 +394,17 @@ public sealed class ArchiveHydrationCapacityServiceTests
     }
 
     private static ArchiveHydrationCapacityService CreateService(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         FakeFilesOnDemandPlatform platform,
         IArchiveStorageProbe probe,
         ArchiveHydrationPolicyConfiguration configuration,
         SlideshowOriginalLeaseRegistry? slideshowLeases = null) =>
         new(
-            new SqliteArchiveHydrationRepository(database),
-            new SqliteArchiveSourceHydrationRepository(database),
-            new SqliteArchiveCoverageRepository(database),
-            new SqliteArchiveStorageRepository(database),
-            new SqliteArchiveAvailabilityRepository(database),
+            new PostgresArchiveHydrationRepository(database),
+            new PostgresArchiveSourceHydrationRepository(database),
+            new PostgresArchiveCoverageRepository(database),
+            new PostgresArchiveStorageRepository(database),
+            new PostgresArchiveAvailabilityRepository(database),
             platform,
             probe,
             configuration,
@@ -426,7 +425,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
             "image/jpeg");
 
     private static async Task<CatalogueProcessingAssetRevision> SaveRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         CatalogueSource source,
         string sourceKey,
         int sizeBytes,
@@ -443,9 +442,9 @@ public sealed class ArchiveHydrationCapacityServiceTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
-        return await new SqliteLocalBatchRepository(database).GetAssetRevisionAsync(saved.Id)
+        return await new PostgresLocalBatchRepository(database).GetAssetRevisionAsync(saved.Id)
             ?? throw new InvalidOperationException("Saved revision was unavailable.");
     }
 

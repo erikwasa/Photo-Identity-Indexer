@@ -289,7 +289,7 @@ public sealed class ArchiveApplicationTests
             }
 
             // The real Archive UI polls every two seconds. Keep integration polling frequent enough
-            // for a fast test while avoiding a 50 ms SQLite read loop that can starve the background
+            // for a fast test while avoiding a tight polling loop that can starve the background
             // writer under sharded CI load.
             await Task.Delay(250);
         }
@@ -353,7 +353,7 @@ public sealed class ArchiveApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
             builder.UseSetting("PhotoIdentity:RepositoryRoot", _repositoryRoot);
             builder.UseSetting("PhotoIdentity:ArchiveAnalysisOutputRoot", _analysisOutputRoot);
         }

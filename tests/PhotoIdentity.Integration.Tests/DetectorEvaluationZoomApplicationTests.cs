@@ -72,7 +72,7 @@ public sealed class DetectorEvaluationZoomApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
             builder.UseSetting("PhotoIdentity:DetectorEvaluationRoot", _sessionRoot);
         }
     }

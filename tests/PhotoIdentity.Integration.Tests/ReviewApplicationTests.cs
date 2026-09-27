@@ -5,12 +5,10 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using OpenCvSharp;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -25,10 +23,10 @@ public sealed class ReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededReviewFace seeded = await SeedReviewFaceAsync(database, directory);
-            SqliteReviewRepository repository = new(database);
+            PostgresReviewRepository repository = new(database);
             DateTimeOffset now = new(2026, 7, 26, 8, 0, 0, TimeSpan.Zero);
             CatalogueReviewPerson person = await repository.CreatePersonAsync("Ada Lovelace", now);
 
@@ -39,9 +37,9 @@ public sealed class ReviewApplicationTests
 
             await repository.RejectAsync(seeded.Id, "human:test", now.AddMinutes(2), "Temporary correction.");
 
-            SqliteCatalogueDatabase restartedDatabase = new(databasePath);
+            PostgresTestCatalogueDatabase restartedDatabase = new(databasePath);
             await restartedDatabase.InitializeAsync();
-            SqliteReviewRepository restartedRepository = new(restartedDatabase);
+            PostgresReviewRepository restartedRepository = new(restartedDatabase);
             CatalogueReviewFace rejected = Assert.IsType<CatalogueReviewFace>(
                 await restartedRepository.GetFaceAsync(seeded.Id));
             Assert.Equal(CatalogueReviewStates.Rejected, rejected.State);
@@ -73,7 +71,7 @@ public sealed class ReviewApplicationTests
             Assert.Equal(2, actions.Count(action => action.ReversedAtUtc is not null));
             Assert.Equal(2, actions.Count(action => action.Kind == CatalogueReviewActionKinds.Undo));
 
-            SqliteIdentityCatalogueRepository identityRepository = new(restartedDatabase);
+            PostgresIdentityCatalogueRepository identityRepository = new(restartedDatabase);
             CatalogueHumanLabel label = Assert.Single(await identityRepository.GetHumanLabelsAsync(seeded.Id));
             Assert.Equal(person.Id, label.PersonId);
             Assert.Equal("Confirmed manually.", label.Note);
@@ -91,7 +89,7 @@ public sealed class ReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededReviewFace seeded = await SeedReviewFaceAsync(database, directory);
 
@@ -161,7 +159,7 @@ public sealed class ReviewApplicationTests
             string proxyRoot = Path.Combine(directory, "review-proxies");
             Directory.CreateDirectory(proxyRoot);
 
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededReviewFace seeded = await SeedReviewFaceAsync(database, directory);
             const string profileId = "review-test-1600-q90";
@@ -213,7 +211,7 @@ public sealed class ReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededReviewFace seeded = await SeedReviewFaceAsync(
                 database,
@@ -236,7 +234,7 @@ public sealed class ReviewApplicationTests
     }
 
     private static async Task<SeededReviewFace> SeedReviewFaceAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory,
         bool useBatchRelativeCropPath = false)
     {
@@ -258,7 +256,7 @@ public sealed class ReviewApplicationTests
             "image/jpeg",
             1200,
             800);
-        CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision persistedRevision = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
         FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
@@ -283,8 +281,8 @@ public sealed class ReviewApplicationTests
                 storedCropPath.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(cropPath)!);
 
-            await using SqliteConnection runConnection = await database.OpenConnectionAsync();
-            using SqliteCommand runCommand = runConnection.CreateCommand();
+            await using PostgresCompatibilityConnection runConnection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand runCommand = runConnection.CreateCommand();
             runCommand.CommandText = """
                 INSERT INTO processing_runs (
                     id,
@@ -341,8 +339,8 @@ public sealed class ReviewApplicationTests
         await File.WriteAllBytesAsync(cropPath, cropBytes);
         string cropHash = Convert.ToHexString(SHA256.HashData(cropBytes)).ToLowerInvariant();
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
             VALUES ($face_id, $revision_id, 0, $created_at_utc);
@@ -401,14 +399,14 @@ public sealed class ReviewApplicationTests
     }
 
     private static async Task SeedReviewProxyAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId,
         string proxyRoot,
         string profileId)
     {
         DateTimeOffset now = new(2026, 7, 26, 7, 55, 0, TimeSpan.Zero);
         ReviewProxyProfile profile = new(profileId, 1600, 90);
-        SqliteArchiveReviewProxyRepository repository = new(database);
+        PostgresArchiveReviewProxyRepository repository = new(database);
         await repository.RegisterProfileAsync(profile, now);
 
         byte[] proxyBytes;

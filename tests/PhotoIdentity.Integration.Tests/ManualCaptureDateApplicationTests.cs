@@ -43,7 +43,7 @@ public sealed class ManualCaptureDateApplicationTests
             "PhotoIdentity.Integration.Tests",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        string sqlitePath = Path.Combine(directory, "unused.db");
+        string catalogueKey = Path.Combine(directory, "catalogue-key");
 
         try
         {
@@ -72,9 +72,9 @@ public sealed class ManualCaptureDateApplicationTests
             };
 
             await using (PhotoIdentityApiTestFactory factory = new(
-                sqlitePath,
+                catalogueKey,
                 configure,
-                useSqliteTestCompatibility: false))
+                useSharedTestCatalogue: false))
             {
                 using HttpClient client = factory.CreateClient();
                 string url = $"/api/collections/photos/{revisionId}/capture-date";
@@ -133,7 +133,7 @@ public sealed class ManualCaptureDateApplicationTests
             }
 
             // A new API host proves the manual edit is durable across application restart.
-            await using (PhotoIdentityApiTestFactory restarted = new(sqlitePath, configure))
+            await using (PhotoIdentityApiTestFactory restarted = new(catalogueKey, configure))
             {
                 using HttpClient client = restarted.CreateClient();
                 string url = $"/api/collections/photos/{revisionId}/capture-date";

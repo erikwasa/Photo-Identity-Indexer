@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -16,7 +14,7 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededReviewFilter seeded = await SeedAsync(database);
 
@@ -119,7 +117,7 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
             await client.GetFromJsonAsync<ReviewFacePageResponse>(
                 $"/api/review/suggestion-faces?{query}&limit=20"));
 
-    private static async Task<SeededReviewFilter> SeedAsync(SqliteCatalogueDatabase database)
+    private static async Task<SeededReviewFilter> SeedAsync(PostgresTestCatalogueDatabase database)
     {
         string sourceId = Guid.NewGuid().ToString("D");
         string sourceRoot = Path.Combine(Path.GetTempPath(), "private-suggested-person-filter", Guid.NewGuid().ToString("N"));
@@ -129,7 +127,7 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
         string modelHash = new('a', 64);
         DateTimeOffset now = new(2026, 8, 19, 20, 0, 0, TimeSpan.Zero);
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
         await ExecuteAsync(
             connection,
             """
@@ -185,7 +183,7 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
     }
 
     private static async Task<SeededFace> SeedFaceAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sourceId,
         string runId,
         string name,
@@ -227,14 +225,14 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
     }
 
     private static async Task<long> SeedSuggestionAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string faceId,
         string personId,
         string modelHash,
         double score,
         DateTimeOffset createdAt)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO identity_suggestions (
                 face_occurrence_id, suggested_person_id, model_id, model_hash,
@@ -252,7 +250,7 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
     }
 
     private static Task SeedRankingAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string faceId,
         string modelHash,
         int rank,
@@ -275,11 +273,11 @@ public sealed class SuggestedPersonReviewFilterApplicationTests
             ("$now", generatedAt.ToString("O")));
 
     private static async Task ExecuteAsync(
-        SqliteConnection connection,
+        PostgresCompatibilityConnection connection,
         string sql,
         params (string Name, object? Value)[] parameters)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         foreach ((string name, object? value) in parameters)
         {

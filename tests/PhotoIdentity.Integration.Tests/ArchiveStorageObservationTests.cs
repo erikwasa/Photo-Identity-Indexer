@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -17,13 +16,13 @@ public sealed class ArchiveStorageObservationTests
         Directory.CreateDirectory(directory);
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 9, 15, 0, TimeSpan.Zero);
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, now);
             OnlineOnlySource source = new(catalogueSource.Id, "online.jpg", 600, now);
 
-            ArchiveSourceCatalogueScanSummary scan = await new SqliteArchiveSourceCatalogueScanner(database).ScanAsync(
+            ArchiveSourceCatalogueScanSummary scan = await new PostgresArchiveSourceCatalogueScanner(database).ScanAsync(
                 source,
                 catalogueSource,
                 new SourceScanOptions(null, true),
@@ -32,7 +31,7 @@ public sealed class ArchiveStorageObservationTests
             Assert.Equal(0, scan.NewRevisionCount);
             Assert.Equal(0, source.OpenCount);
 
-            long logicalBytes = await new SqliteArchiveStorageRepository(database)
+            long logicalBytes = await new PostgresArchiveStorageRepository(database)
                 .GetCurrentLogicalSourceBytesAsync(catalogueSource.Id);
             Assert.Equal(600, logicalBytes);
         }
@@ -51,12 +50,12 @@ public sealed class ArchiveStorageObservationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset firstObserved = new(2026, 8, 26, 10, 0, 0, TimeSpan.Zero);
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, firstObserved);
             MutableSource source = new(catalogueSource.Id, "photo.jpg", [1, 2, 3], firstObserved);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
 
             ArchiveSourceCatalogueScanSummary first = await scanner.ScanAsync(
                 source,
@@ -103,12 +102,12 @@ public sealed class ArchiveStorageObservationTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset firstObserved = new(2026, 8, 26, 11, 0, 0, TimeSpan.Zero);
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, firstObserved);
             MutableSource source = new(catalogueSource.Id, "photo.jpg", [1, 2, 3], firstObserved);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
 
             ArchiveSourceCatalogueScanSummary first = await scanner.ScanAsync(
                 source,

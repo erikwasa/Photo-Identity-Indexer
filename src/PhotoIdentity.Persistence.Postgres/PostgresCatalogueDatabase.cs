@@ -4,8 +4,8 @@ using PhotoIdentity.Core.Catalogue;
 namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
-/// Owns the PostgreSQL connection pool and versioned migration bootstrap while
-/// PostgreSQL is introduced alongside the still-authoritative SQLite catalogue.
+/// Owns the PostgreSQL connection pool and versioned migration bootstrap for the
+/// authoritative production catalogue.
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {

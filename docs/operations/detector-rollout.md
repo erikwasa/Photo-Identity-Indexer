@@ -28,7 +28,7 @@ The maintainer accepted the documented CenterFace model-weight/training-data unc
 
 PR #93 added versioned pipeline identity and conservative geometry/landmark reconciliation.
 
-PR #94 added the SQLite rollout-persistence boundary so an existing occurrence can be reused only when the persisted plan explicitly identifies it; new candidates receive new occurrence IDs; unmatched old occurrences are retained; and ambiguous candidates cannot be applied before human resolution.
+PR #94 originally added the rollout-persistence boundary while SQLite was authoritative. The invariant remains: an existing occurrence can be reused only when the persisted plan explicitly identifies it; new candidates receive new occurrence IDs; unmatched old occurrences are retained; and ambiguous candidates cannot be applied before human resolution.
 
 PR #95 added durable candidate crop/embedding payload plus append-only human ambiguity decisions. Those decisions resolve face-occurrence identity only and never assign or change a person.
 
@@ -52,7 +52,7 @@ dotnet run --project src/PhotoIdentity.Cli -- rollout status --postgres-connecti
 dotnet run --project src/PhotoIdentity.Cli -- rollout apply --postgres-connection-env PHOTOIDENTITY_ROLLOUT_CONNECTION --run RUN_ID
 ```
 
-This explicit provider path supports M24 verification; production API authority remains SQLite until WI-0102 controlled cutover. Use the provider containing the run and its immutable revisions. Provider selection does not import an existing catalogue.
+PostgreSQL is now the unconditional production authority. Use the canonical catalogue containing the run and its immutable revisions; the rollout command does not import another catalogue.
 
 ## Why ordinal migration is unsafe
 

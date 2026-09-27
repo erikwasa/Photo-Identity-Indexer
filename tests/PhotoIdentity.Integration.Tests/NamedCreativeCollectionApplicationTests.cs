@@ -3,12 +3,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -22,9 +20,9 @@ public sealed class NamedCreativeCollectionApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             SmartCollectionDefinition anchor = await definitions.CreateAsync(
                 "Family trips",
                 new SmartCollectionFilter());
@@ -36,9 +34,9 @@ public sealed class NamedCreativeCollectionApplicationTests
                     noveltyEnabled: true);
             DateTimeOffset created = new(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand insert = connection.CreateCommand();
+                using PostgresCompatibilityCommand insert = connection.CreateCommand();
                 insert.CommandText = """
                     INSERT INTO creative_collection_recipes (
                         anchor_collection_id,
@@ -74,7 +72,7 @@ public sealed class NamedCreativeCollectionApplicationTests
                 await insert.ExecuteNonQueryAsync();
             }
 
-            SqliteCreativeCollectionRecipeRepository repository = new(database, TimeProvider.System);
+            PostgresCreativeCollectionRecipeRepository repository = new(database, TimeProvider.System);
             CreativeCollectionRecipe migrated = Assert.Single(await repository.ListForAnchorAsync(anchor.Id));
             Assert.Equal(anchor.Id.Value, migrated.Id.Value);
             Assert.Equal("Family trips Creative", migrated.Name);
@@ -123,10 +121,10 @@ public sealed class NamedCreativeCollectionApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
-            SqliteAssetCatalogueRepository catalogue = new(database);
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresAssetCatalogueRepository catalogue = new(database);
 
             SmartCollectionDefinition anchor = await definitions.CreateAsync(
                 "All family photos",
@@ -226,7 +224,7 @@ public sealed class NamedCreativeCollectionApplicationTests
     }
 
     private static async Task<CatalogueAssetRevision> CreateRevisionAsync(
-        SqliteAssetCatalogueRepository catalogue,
+        PostgresAssetCatalogueRepository catalogue,
         string directory)
     {
         DateTimeOffset now = new(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -259,7 +257,7 @@ public sealed class NamedCreativeCollectionApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
@@ -277,7 +275,7 @@ public sealed class NamedCreativeCollectionApplicationTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
     }
 }

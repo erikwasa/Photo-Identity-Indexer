@@ -1,11 +1,9 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -19,18 +17,18 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
             const string privateUsername = "private-maintainer-account";
             IReverseGeocoder provider = new AuthorizationFailureGeocoder(privateUsername);
             TimeProvider clock = TimeProvider.System;
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService service = new(
                 provider,
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
 
             PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 5);
 
@@ -48,8 +46,8 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Equal("10", issue.ProviderCode);
             Assert.DoesNotContain(privateUsername, issue.Message, StringComparison.OrdinalIgnoreCase);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT status, last_error_code, last_error_message
                 FROM photo_place_enrichment_attempts
@@ -57,7 +55,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                   AND provider = 'geonames';
                 """;
             command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("failed", reader.GetString(0));
             Assert.Equal("10", reader.GetString(1));
@@ -76,17 +74,17 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
             IReverseGeocoder provider = new NoResultGeocoder();
             TimeProvider clock = TimeProvider.System;
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService service = new(
                 provider,
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
 
             PhotoPlaceEnrichmentReport first = await service.ExecuteBatchAsync(limit: 5);
 
@@ -102,9 +100,9 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Contains("no nearby populated place", issue.Message, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("raw-provider-message", issue.Message, StringComparison.OrdinalIgnoreCase);
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand command = connection.CreateCommand();
+                using PostgresCompatibilityCommand command = connection.CreateCommand();
                 command.CommandText = """
                     SELECT status, last_error_code, completed_at_utc
                     FROM photo_place_enrichment_attempts
@@ -112,7 +110,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                       AND provider = 'geonames';
                     """;
                 command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-                await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+                await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
                 Assert.Equal("skipped", reader.GetString(0));
                 Assert.Equal("15", reader.GetString(1));
@@ -136,17 +134,17 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
             IReverseGeocoder provider = new NoResultGeocoder("geography-no-result");
             TimeProvider clock = TimeProvider.System;
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService service = new(
                 provider,
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
 
             PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 5);
 
@@ -157,8 +155,8 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Contains("administrative subdivision or country", issue.Message, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("raw-provider-message", issue.Message, StringComparison.OrdinalIgnoreCase);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT status, last_error_code
                 FROM photo_place_enrichment_attempts
@@ -166,7 +164,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                   AND provider = 'geonames';
                 """;
             command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("skipped", reader.GetString(0));
             Assert.Equal("geography-no-result", reader.GetString(1));
@@ -184,16 +182,16 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
             TimeProvider clock = TimeProvider.System;
-            SqlitePhotoPlaceRepository places = new(database, clock);
+            PostgresPhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService service = new(
                 new LongHierarchyGeocoder(),
-                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
-                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+                new PostgresPhotoPlaceEnrichmentRepository(database, clock),
+                new PostgresAutomaticPhotoPlaceRepository(database, places, clock));
 
             string ordinaryTooLong = "Family/" + new string('x', PhotoTagPath.MaximumValueLength - "Family/".Length + 1);
             Assert.Throws<ArgumentException>(() => PhotoTagPath.Parse(ordinaryTooLong));
@@ -214,8 +212,8 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Equal(LongHierarchyGeocoder.Place, state.Place.Value);
             Assert.Equal("automatic", state.Place.SourceKind);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand command = connection.CreateCommand();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+            using PostgresCompatibilityCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT
                     (SELECT length(display_name)
@@ -231,7 +229,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                 """;
             command.Parameters.AddWithValue("$normalized_place", LongHierarchyGeocoder.CanonicalPlace.ToLowerInvariant());
             command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.True(reader.GetInt64(0) > PhotoTagPath.MaximumValueLength);
             Assert.True(reader.GetInt64(1) > PhotoTagPath.MaximumValueLength);
@@ -244,7 +242,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
     }
 
     private static async Task<AssetRevisionId> CreateRevisionWithGpsAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory)
     {
         DateTimeOffset now = new(2026, 8, 17, 20, 0, 0, TimeSpan.Zero);
@@ -263,11 +261,11 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             "image/jpeg",
             100,
             100);
-        CatalogueAssetRevision saved = await new SqliteAssetCatalogueRepository(database)
+        CatalogueAssetRevision saved = await new PostgresAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO photo_capture_metadata (
                 asset_revision_id, taken_at_local, utc_offset_minutes,
@@ -292,7 +290,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

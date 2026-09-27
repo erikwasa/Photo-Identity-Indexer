@@ -17,12 +17,12 @@ public sealed class ArchiveHydrationIdentityTransferTests
         Directory.CreateDirectory(directory);
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 9, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
             MutableLocalSource scannerSource = new(source.Id, "photo.jpg", [1, 2, 3], now);
-            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            PostgresArchiveSourceCatalogueScanner scanner = new(database);
             _ = await scanner.ScanAsync(
                 scannerSource,
                 source,
@@ -31,7 +31,7 @@ public sealed class ArchiveHydrationIdentityTransferTests
 
             ArchiveSourceObservation initial = await FindObservationAsync(database, source.Id);
             AssetRevisionId staleRevisionId = Assert.IsType<AssetRevisionId>(initial.VerifiedRevisionId);
-            SqliteArchiveHydrationRepository revisionHydrations = new(database);
+            PostgresArchiveHydrationRepository revisionHydrations = new(database);
             await revisionHydrations.ClaimAsync(staleRevisionId, now.AddMinutes(1));
             await revisionHydrations.TouchAsync(staleRevisionId, now.AddMinutes(2));
 
@@ -47,7 +47,7 @@ public sealed class ArchiveHydrationIdentityTransferTests
             ArchiveSourceObservation newer = await FindObservationAsync(database, source.Id);
             Assert.NotEqual(staleRevisionId, newer.VerifiedRevisionId);
 
-            await new SqliteArchiveSourceVerificationStateRepository(database).MarkNeedsVerificationAsync(
+            await new PostgresArchiveSourceVerificationStateRepository(database).MarkNeedsVerificationAsync(
                 initial.AssetId,
                 now.AddMinutes(4));
 
@@ -56,12 +56,12 @@ public sealed class ArchiveHydrationIdentityTransferTests
             Assert.False(revisionLease.IsActive);
 
             ArchiveManagedSourceHydrationRecord sourceLease = Assert.IsType<ArchiveManagedSourceHydrationRecord>(
-                await new SqliteArchiveSourceHydrationRepository(database).GetAsync(initial.AssetId));
+                await new PostgresArchiveSourceHydrationRepository(database).GetAsync(initial.AssetId));
             Assert.True(sourceLease.IsActive);
             Assert.False(sourceLease.IsReleaseRequested);
 
             ArchiveSourceObservation pending = Assert.IsType<ArchiveSourceObservation>(
-                await new SqliteArchiveSourceObservationRepository(database).GetNextPendingAsync(source.Id));
+                await new PostgresArchiveSourceObservationRepository(database).GetNextPendingAsync(source.Id));
             Assert.Equal(initial.AssetId, pending.AssetId);
             Assert.Equal(ArchiveSourceVerificationState.NeedsSourceVerification, pending.VerificationState);
         }
@@ -75,7 +75,7 @@ public sealed class ArchiveHydrationIdentityTransferTests
     }
 
     private static async Task<ArchiveSourceObservation> FindObservationAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         SourceId sourceId)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync();
@@ -86,7 +86,7 @@ public sealed class ArchiveHydrationIdentityTransferTests
         AssetId assetId = value is Guid id
             ? AssetId.From(id)
             : throw new InvalidOperationException("Test asset was unavailable.");
-        return await new SqliteArchiveSourceObservationRepository(database).GetAsync(assetId)
+        return await new PostgresArchiveSourceObservationRepository(database).GetAsync(assetId)
             ?? throw new InvalidOperationException("Source observation was unavailable.");
     }
 

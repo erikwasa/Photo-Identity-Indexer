@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using Xunit;
 
@@ -10,7 +9,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class LocalBatchCatalogueRepositoryContractTests
 {
     [Fact]
-    public async Task Sqlite_adapter_preserves_source_scan_and_current_revision_selection_through_contract()
+    public async Task Postgres_adapter_preserves_source_scan_and_current_revision_selection_through_contract()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -20,9 +19,9 @@ public sealed class LocalBatchCatalogueRepositoryContractTests
             string photoPath = Path.Combine(sourceRoot, "photo.jpg");
             await File.WriteAllBytesAsync(photoPath, [1, 2, 3]);
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             ICatalogueStoreInitializer store = database;
-            ILocalBatchCatalogueRepository repository = new SqliteLocalBatchCatalogueRepository(database);
+            ILocalBatchCatalogueRepository repository = new PostgresLocalBatchCatalogueRepository(database);
             DateTimeOffset firstScanAt = new(2026, 9, 2, 19, 0, 0, TimeSpan.Zero);
 
             await store.InitializeAsync();

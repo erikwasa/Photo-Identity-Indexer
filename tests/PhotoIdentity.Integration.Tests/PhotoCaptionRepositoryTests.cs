@@ -1,10 +1,8 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -21,11 +19,11 @@ public sealed class PhotoCaptionRepositoryTests
 
         try
         {
-            SqliteCatalogueDatabase database =
+            PostgresTestCatalogueDatabase database =
                 new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
 
-            SqlitePhotoCaptionRepository repository = new(database);
+            PostgresPhotoCaptionRepository repository = new(database);
             PhotoCaptionEnrichmentSettings defaults =
                 await repository.GetSettingsAsync();
 
@@ -93,7 +91,7 @@ public sealed class PhotoCaptionRepositoryTests
 
         try
         {
-            SqliteCatalogueDatabase database =
+            PostgresTestCatalogueDatabase database =
                 new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
 
@@ -101,7 +99,7 @@ public sealed class PhotoCaptionRepositoryTests
             await SeedRevisionAsync(database, revisionId);
             await SeedReviewProxyAsync(database, revisionId);
 
-            SqlitePhotoCaptionRepository repository = new(database);
+            PostgresPhotoCaptionRepository repository = new(database);
             string modelDigest = new('a', 64);
             const string promptVersion = "prompt-sv-v1";
 
@@ -187,16 +185,16 @@ public sealed class PhotoCaptionRepositoryTests
     private const string ReviewProxyProfileId = "jpeg-1600-q78";
 
     private static async Task SeedRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId)
     {
         string sourceId = Guid.NewGuid().ToString("D");
         string assetId = Guid.NewGuid().ToString("D");
         string now = DateTimeOffset.UtcNow.ToString("O");
 
-        await using SqliteConnection connection =
+        await using PostgresCompatibilityConnection connection =
             await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (
                 id, kind, root_locator, created_at_utc)
@@ -225,11 +223,11 @@ public sealed class PhotoCaptionRepositoryTests
     }
 
     private static async Task SeedReviewProxyAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         AssetRevisionId revisionId)
     {
         DateTimeOffset now = new(2026, 9, 20, 20, 55, 0, TimeSpan.Zero);
-        SqliteArchiveReviewProxyRepository repository = new(database);
+        PostgresArchiveReviewProxyRepository repository = new(database);
         ReviewProxyProfile profile = new(ReviewProxyProfileId, 1600, 78);
         await repository.RegisterProfileAsync(profile, now);
         await repository.RecordCompletionAsync(

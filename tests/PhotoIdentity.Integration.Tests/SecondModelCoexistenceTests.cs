@@ -1,5 +1,4 @@
 using PhotoIdentity.Core.Review;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
@@ -7,7 +6,6 @@ using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
 using Xunit;
@@ -37,7 +35,7 @@ public sealed class SecondModelCoexistenceTests
                 await encoder.EncodeAsync(CreateFrame(160, 160), stream, CancellationToken.None);
             }
 
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CatalogueRevisionAsync(database, sourceRoot);
             LocalBatchConfiguration baselineConfiguration = new(
@@ -54,11 +52,11 @@ public sealed class SecondModelCoexistenceTests
                 new FakeEmbedder(BaselineModelId, BaselineModelHash, vectorOffset: 0),
                 revisionId);
 
-            SqliteFaceCatalogueRepository faceRepository = new(database);
+            PostgresFaceCatalogueRepository faceRepository = new(database);
             CatalogueFaceOccurrence occurrence = Assert.Single(
                 await faceRepository.GetOccurrencesAsync(revisionId));
             DateTimeOffset reviewedAt = new(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
-            SqliteReviewRepository reviewRepository = new(database);
+            PostgresReviewRepository reviewRepository = new(database);
             CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync(
                 "Confirmed person",
                 reviewedAt);
@@ -102,7 +100,7 @@ public sealed class SecondModelCoexistenceTests
                 new FakeEmbedder(CandidateModelId, CandidateModelHash, vectorOffset: 7),
                 revisionId);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(1, await CountAsync(connection, "face_occurrences"));
             Assert.Equal(1, await CountAsync(connection, "face_observations"));
             Assert.Equal(1, await CountAsync(connection, "face_crops"));
@@ -120,7 +118,7 @@ public sealed class SecondModelCoexistenceTests
                 persistedModels);
 
             IReadOnlyList<CatalogueHumanLabel> labels =
-                await new SqliteIdentityCatalogueRepository(database)
+                await new PostgresIdentityCatalogueRepository(database)
                     .GetHumanLabelsAsync(occurrence.Id);
             CatalogueHumanLabel label = Assert.Single(labels);
             Assert.Equal(person.Id, label.PersonId);
@@ -143,15 +141,15 @@ public sealed class SecondModelCoexistenceTests
     }
 
     private static async Task<AssetRevisionId> CatalogueRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string sourceRoot)
     {
-        SqliteLocalBatchRepository batchRepository = new(database);
+        PostgresLocalBatchRepository batchRepository = new(database);
         CatalogueSource sourceRecord = await batchRepository.GetOrCreateLocalFolderSourceAsync(
             sourceRoot,
             DateTimeOffset.UtcNow);
         LocalFolderAssetSource source = new(sourceRecord.Id, sourceRoot);
-        await new SqliteSourceCatalogueScanner(database).ScanAsync(
+        await new PostgresSourceCatalogueScanner(database).ScanAsync(
             source,
             sourceRecord,
             new SourceScanOptions(),
@@ -160,15 +158,15 @@ public sealed class SecondModelCoexistenceTests
     }
 
     private static async Task ProcessAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         LocalBatchConfiguration configuration,
         OpenCvPngEncoder encoder,
         IFaceEmbedder embedder,
         AssetRevisionId revisionId)
     {
         using LocalInspectionJobHandler handler = new(
-            new SqliteLocalBatchRepository(database),
-            new SqliteFaceCatalogueRepository(database),
+            new PostgresLocalBatchRepository(database),
+            new PostgresFaceCatalogueRepository(database),
             configuration,
             new OpenCvImageDecoder(),
             encoder,
@@ -206,25 +204,25 @@ public sealed class SecondModelCoexistenceTests
         return new ImageFrame(new ImageSize(width, height), PixelFormat.Bgr24, stride, data);
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
+    private static async Task<long> CountAsync(PostgresCompatibilityConnection connection, string table)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table};";
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static async Task<IReadOnlyList<(string ModelId, string ModelHash)>> ReadEmbeddingModelsAsync(
-        SqliteConnection connection)
+        PostgresCompatibilityConnection connection)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT model_id, model_hash
             FROM embeddings
             ORDER BY model_id, model_hash;
             """;
         List<(string ModelId, string ModelHash)> results = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
             results.Add((reader.GetString(0), reader.GetString(1)));
@@ -233,9 +231,9 @@ public sealed class SecondModelCoexistenceTests
         return results;
     }
 
-    private static async Task<FaceCropId> ReadOnlyCropIdAsync(SqliteConnection connection)
+    private static async Task<FaceCropId> ReadOnlyCropIdAsync(PostgresCompatibilityConnection connection)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = "SELECT id FROM face_crops;";
         object? value = await command.ExecuteScalarAsync();
         return FaceCropId.From(Assert.IsType<Guid>(value));

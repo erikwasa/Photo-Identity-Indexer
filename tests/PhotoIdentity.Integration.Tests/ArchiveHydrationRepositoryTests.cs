@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -13,11 +12,11 @@ public sealed class ArchiveHydrationRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset started = new(2026, 8, 9, 0, 0, 0, TimeSpan.Zero);
             AssetRevisionId revisionId = await CreateRevisionAsync(database, directory, started);
-            SqliteArchiveHydrationRepository repository = new(database);
+            PostgresArchiveHydrationRepository repository = new(database);
 
             ArchiveManagedHydrationRecord claimed = await repository.ClaimAsync(revisionId, started);
             Assert.True(claimed.IsActive);
@@ -61,11 +60,11 @@ public sealed class ArchiveHydrationRepositoryTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 0, 10, 0, TimeSpan.Zero);
             AssetRevisionId revisionId = await CreateRevisionAsync(database, directory, now);
-            SqliteArchiveHydrationRepository repository = new(database);
+            PostgresArchiveHydrationRepository repository = new(database);
 
             InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.MarkReleaseRequestedAsync(revisionId, now));
@@ -78,7 +77,7 @@ public sealed class ArchiveHydrationRepositoryTests
     }
 
     private static async Task<AssetRevisionId> CreateRevisionAsync(
-        SqliteCatalogueDatabase database,
+        PostgresTestCatalogueDatabase database,
         string directory,
         DateTimeOffset now)
     {
@@ -93,7 +92,7 @@ public sealed class ArchiveHydrationRepositoryTests
             "image/jpeg",
             10,
             10);
-        return (await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(
+        return (await new PostgresAssetCatalogueRepository(database).SaveRevisionAsync(
             source,
             asset,
             revision)).Id;

@@ -3,9 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -20,7 +18,7 @@ public sealed class BulkSuggestionReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededSuggestions seeded = await SeedSuggestionsAsync(database);
 
@@ -79,7 +77,7 @@ public sealed class BulkSuggestionReviewApplicationTests
             Assert.Equal(2, result.AffectedCount);
             Assert.Equal(seeded.AdaPersonId, result.Person.Id);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(2, await ReadInt64Async(
                 connection,
                 "SELECT COUNT(*) FROM person_labels WHERE label_kind = 'manual';"));
@@ -132,7 +130,7 @@ public sealed class BulkSuggestionReviewApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededSuggestions seeded = await SeedSuggestionsAsync(database);
             long[] suggestionIds = [seeded.FirstAdaSuggestionId, seeded.SecondAdaSuggestionId];
@@ -146,7 +144,7 @@ public sealed class BulkSuggestionReviewApplicationTests
             BulkSuggestionPreviewResponse preview = Assert.IsType<BulkSuggestionPreviewResponse>(
                 await previewResponse.Content.ReadFromJsonAsync<BulkSuggestionPreviewResponse>());
 
-            SqliteReviewSuggestionRepository suggestionRepository = new(database);
+            PostgresReviewSuggestionRepository suggestionRepository = new(database);
             await suggestionRepository.AcceptAsync(
                 FaceOccurrenceId.From(Guid.Parse(seeded.FirstAdaFaceId)),
                 seeded.FirstAdaSuggestionId,
@@ -167,7 +165,7 @@ public sealed class BulkSuggestionReviewApplicationTests
             string conflict = await commitResponse.Content.ReadAsStringAsync();
             Assert.Contains("preview", conflict, StringComparison.OrdinalIgnoreCase);
 
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
             Assert.Equal(1, await ReadInt64Async(
                 connection,
                 "SELECT COUNT(*) FROM review_actions WHERE action_kind = 'assign';"));
@@ -184,7 +182,7 @@ public sealed class BulkSuggestionReviewApplicationTests
         }
     }
 
-    private static async Task<SeededSuggestions> SeedSuggestionsAsync(SqliteCatalogueDatabase database)
+    private static async Task<SeededSuggestions> SeedSuggestionsAsync(PostgresTestCatalogueDatabase database)
     {
         string sourceRoot = Path.Combine(
             Path.GetTempPath(),
@@ -205,8 +203,8 @@ public sealed class BulkSuggestionReviewApplicationTests
         string modelHash = new('a', 64);
         string now = new DateTimeOffset(2026, 7, 31, 0, 0, 0, TimeSpan.Zero).ToString("O");
 
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
                 VALUES ($source_id, 'local-folder', $source_root, $now);
@@ -269,17 +267,17 @@ public sealed class BulkSuggestionReviewApplicationTests
             bobSuggestionId);
     }
 
-    private static async Task<long> ReadInt64Async(SqliteConnection connection, string sql)
+    private static async Task<long> ReadInt64Async(PostgresCompatibilityConnection connection, string sql)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 
-    private static async Task<string> ReadStringAsync(SqliteConnection connection, string sql)
+    private static async Task<string> ReadStringAsync(PostgresCompatibilityConnection connection, string sql)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = sql;
         object? value = await command.ExecuteScalarAsync();
         return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";

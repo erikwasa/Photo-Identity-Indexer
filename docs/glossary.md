@@ -24,7 +24,7 @@ Data whose loss cannot be repaired safely by rerunning a model. In this system i
 
 ## Catalogue
 
-The local SQLite database plus the referenced governed artefact state used by Photo Identity Indexer. It records sources, assets, immutable revisions, faces, people, assignment/review history, exact-model derived data and processing state. It is sensitive application data, not a disposable cache.
+The local PostgreSQL database plus the referenced governed artefact state used by Photo Identity Indexer. It records sources, assets, immutable revisions, faces, people, assignment/review history, exact-model derived data and processing state. It is sensitive application data, not a disposable cache.
 
 ## Collection
 

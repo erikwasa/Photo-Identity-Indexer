@@ -2,11 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -21,9 +19,9 @@ public sealed class PersonFeaturedFaceApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteReviewRepository review = new(database);
+            PostgresReviewRepository review = new(database);
             DateTimeOffset now = new(2026, 8, 18, 19, 30, 0, TimeSpan.Zero);
             CatalogueReviewPerson alice = await review.CreatePersonAsync("Alice", now);
             FaceOccurrenceId first = await CreateAssignedFaceAsync(
@@ -63,7 +61,7 @@ public sealed class PersonFeaturedFaceApplicationTests
             Assert.DoesNotContain(directory, listedExplicit.RepresentativeImageUrl, StringComparison.OrdinalIgnoreCase);
 
             CataloguePersonRepresentativeFace? reopened =
-                await new SqlitePersonFeaturedFaceRepository(new SqliteCatalogueDatabase(databasePath))
+                await new PostgresPersonFeaturedFaceRepository(new PostgresTestCatalogueDatabase(databasePath))
                     .ResolveAsync(alice.Id);
             Assert.NotNull(reopened);
             Assert.Equal(second, reopened.FaceId);
@@ -92,10 +90,10 @@ public sealed class PersonFeaturedFaceApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteReviewRepository review = new(database);
-            SqlitePersonFeaturedFaceRepository featured = new(database);
+            PostgresReviewRepository review = new(database);
+            PostgresPersonFeaturedFaceRepository featured = new(database);
             DateTimeOffset now = new(2026, 8, 18, 20, 0, 0, TimeSpan.Zero);
             CatalogueReviewPerson alice = await review.CreatePersonAsync("Alice", now);
             CatalogueReviewPerson bob = await review.CreatePersonAsync("Bob", now.AddSeconds(1));
@@ -175,15 +173,15 @@ public sealed class PersonFeaturedFaceApplicationTests
     }
 
     private static async Task<FaceOccurrenceId> CreateAssignedFaceAsync(
-        SqliteCatalogueDatabase database,
-        SqliteReviewRepository review,
+        PostgresTestCatalogueDatabase database,
+        PostgresReviewRepository review,
         string root,
         PersonId personId,
         string sourceKey,
         char hashCharacter,
         DateTimeOffset createdAtUtc)
     {
-        SqliteAssetCatalogueRepository catalogue = new(database);
+        PostgresAssetCatalogueRepository catalogue = new(database);
         SourceId sourceId = SourceId.New();
         AssetId assetId = AssetId.New();
         string sourceRoot = Path.Combine(root, assetId.ToString());
@@ -202,8 +200,8 @@ public sealed class PersonFeaturedFaceApplicationTests
                 100));
 
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
+        await using PostgresCompatibilityConnection connection = await database.OpenConnectionAsync();
+        using PostgresCompatibilityCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
             VALUES ($id, $revision_id, 0, $created_at_utc);
@@ -229,7 +227,7 @@ public sealed class PersonFeaturedFaceApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
-        SqliteConnection.ClearAllPools();
+        PostgresCompatibilityConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);

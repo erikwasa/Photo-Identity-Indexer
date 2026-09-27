@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -22,7 +20,7 @@ public sealed class StructuredSmartCollectionDateApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
+            PostgresTestCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             await using PhotoIdentityApiTestFactory factory = new(databasePath);
@@ -43,9 +41,9 @@ public sealed class StructuredSmartCollectionDateApplicationTests
             Assert.Equal("2020-01-01", structured.Filter.Taken!.From);
             Assert.Equal("2021-12-31", structured.Filter.Taken.To);
 
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            await using (PostgresCompatibilityConnection connection = await database.OpenConnectionAsync())
             {
-                using SqliteCommand persisted = connection.CreateCommand();
+                using PostgresCompatibilityCommand persisted = connection.CreateCommand();
                 persisted.CommandText = """
                     SELECT filter_schema_version, filter_json
                     FROM smart_collections
@@ -53,7 +51,7 @@ public sealed class StructuredSmartCollectionDateApplicationTests
                     """;
                 persisted.Parameters.AddWithValue("$id", structured.Id);
 
-                await using SqliteDataReader reader = await persisted.ExecuteReaderAsync();
+                await using NpgsqlDataReader reader = await persisted.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
                 Assert.Equal(3, reader.GetInt32(0));
                 string json = reader.GetString(1);
@@ -105,7 +103,7 @@ public sealed class StructuredSmartCollectionDateApplicationTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            PostgresCompatibilityConnection.ClearAllPools();
             if (Directory.Exists(directory))
             {
                 Directory.Delete(directory, recursive: true);
