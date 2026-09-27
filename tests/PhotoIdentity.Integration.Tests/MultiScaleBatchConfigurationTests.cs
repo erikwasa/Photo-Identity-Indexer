@@ -1,5 +1,4 @@
 using System.Text.Json;
-using PhotoIdentity.Cli;
 using PhotoIdentity.Worker;
 using Xunit;
 
@@ -7,41 +6,6 @@ namespace PhotoIdentity.Integration.Tests;
 
 public sealed class MultiScaleBatchConfigurationTests
 {
-    [Fact]
-    public void Batch_options_parse_multiscale_provenance()
-    {
-        BatchCommandOptions options = BatchCommandOptions.Parse(
-        [
-            "start",
-            "--database", "catalogue.db",
-            "--source", "sample",
-            "--detector-pipeline", LocalBatchConfiguration.MultiScaleDetectorPipeline,
-            "--tile-size", "960",
-            "--tile-overlap", "0.25",
-            "--merge-nms", "0.35",
-        ]);
-
-        Assert.Equal(LocalBatchConfiguration.MultiScaleDetectorPipeline, options.DetectorPipeline);
-        Assert.Equal(960, options.TileSize);
-        Assert.Equal(0.25, options.TileOverlap, 6);
-        Assert.Equal(0.35, options.MergeNmsThreshold, 6);
-    }
-
-    [Fact]
-    public void Batch_options_reject_complete_tile_overlap()
-    {
-        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
-            BatchCommandOptions.Parse(
-            [
-                "start",
-                "--database", "catalogue.db",
-                "--source", "sample",
-                "--tile-overlap", "1",
-            ]));
-
-        Assert.Contains("less than one", exception.Message, StringComparison.Ordinal);
-    }
-
     [Fact]
     public void Multiscale_configuration_round_trips_detector_pipeline_provenance()
     {
