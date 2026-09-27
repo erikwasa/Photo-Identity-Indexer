@@ -68,7 +68,7 @@ The application is unauthenticated and is intended only for localhost or a trust
 - **`PhotoIdentity.Docs`** validates canonical delivery registries and generated status documents.
 - **`PhotoIdentity.Models`** supports pinned model installation and verification workflows.
 - **`PhotoIdentity.ReviewVerification`** exercises the published local review application with disposable PostgreSQL fixtures and privacy-boundary assertions.
-- **`Invoke-MultiModelComparison.ps1`** coordinates fixed-scope, resumable exact-model comparisons and private evidence generation.
+- **`Invoke-MultiModelComparison.ps1`** is retained only as a self-testable historical tombstone for completed pre-WI-0149 comparison evidence; normal execution is retired.
 - **`tools/model-lab`** remains an optional isolated Python workspace for conversion or analysis when Python is materially better. It exchanges documented neutral files and does not own canonical data.
 
 ## Shared operational rule
