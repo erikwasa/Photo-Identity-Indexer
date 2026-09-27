@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -37,12 +36,9 @@ public static class SuggestionGalleryEndpoints
         {
             IIdentitySuggestionPolicyRepository policyRepository = services
                 .GetRequiredService<IIdentitySuggestionPolicyRepository>();
+            PostgresCatalogueDatabase postgres = services.GetRequiredService<PostgresCatalogueDatabase>();
             ISuggestedPersonGroupRepository repository =
-                services.GetService<PostgresCatalogueDatabase>() is PostgresCatalogueDatabase postgres
-                    ? new PostgresSuggestedPersonGroupRepository(postgres, policyRepository)
-                    : new SqliteSuggestedPersonGroupRepository(
-                        services.GetRequiredService<SqliteCatalogueDatabase>(),
-                        policyRepository);
+                new PostgresSuggestedPersonGroupRepository(postgres, policyRepository);
 
             ReviewSuggestedPersonGroupPage page = await repository.GetGroupsAsync(
                 parsedModelId,
