@@ -21,6 +21,15 @@ internal class WebApplicationFactory<TEntryPoint> :
 
     protected virtual bool DisableBackgroundWorkers => true;
 
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        // Minimal-hosting applications read web-host settings while Program is being constructed,
+        // before ConfigureAppConfiguration callbacks on the generic host can repair legacy test
+        // configuration. Give every test host a valid PostgreSQL catalogue at that earliest point.
+        builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", _databaseLease.ConnectionString);
+        builder.UseStaticWebAssets();
+    }
+
     protected override IHost CreateHost(IHostBuilder builder)
     {
         builder.UseEnvironment("IntegrationTestPostgres");
@@ -43,7 +52,6 @@ internal class WebApplicationFactory<TEntryPoint> :
                 ["PhotoIdentity:Postgres:ConnectionString"] = connectionString,
             });
         });
-        builder.ConfigureWebHost(webHost => webHost.UseStaticWebAssets());
 
         if (DisableBackgroundWorkers)
         {
@@ -112,9 +120,14 @@ internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        base.ConfigureWebHost(builder);
+
         if (_useCompatibilityDatabase)
         {
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting(
+                "PhotoIdentity:Postgres:ConnectionString",
+                PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
         }
 
         builder.UseSetting(WebHostDefaults.DetailedErrorsKey, "true");
