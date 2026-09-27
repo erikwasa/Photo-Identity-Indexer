@@ -10,7 +10,7 @@ Personal OneDrive or local folder
         ▼
 Trusted Windows application/control environment
         ├── PhotoIdentity.Cli
-        │     local diagnostics, evaluation and compatibility/admin tools
+        │     PostgreSQL-backed operations, diagnostics and evaluation tools
         ├── PhotoIdentity.Api + PhotoIdentity.Web
         │     archive advancement, review, people, collections and slideshow
         ├── PostgreSQL authoritative catalogue
@@ -24,7 +24,7 @@ Production processing is local. [ADR-0010](../decisions/ADR-0010-local-productio
 
 ## Runtime applications
 
-- **`PhotoIdentity.Cli`** provides local diagnostics, evaluation, migration/compatibility, portable-bundle and administrative workflows.
+- **`PhotoIdentity.Cli`** provides PostgreSQL-backed operations, local diagnostics/evaluation, media inspection and database-free portable-bundle processing.
 - **`PhotoIdentity.Worker`** contains headless processing components used by governed analysis and portable processing contracts.
 - **`PhotoIdentity.Api`** hosts archive advancement, review, people, audit, progress, photo delivery, collection and slideshow endpoints.
 - **`PhotoIdentity.Web`** is the responsive Blazor application used from Windows and supported devices on a trusted private network.
@@ -41,7 +41,7 @@ Canonical local data includes:
 - processing-run and job state needed for safe resume; and
 - governed provenance and operational state.
 
-PostgreSQL is the sole writable production catalogue. SQLite support is retained only where explicitly required for migration, rollback or compatibility and is not a second production authority.
+PostgreSQL is the sole supported catalogue. The former SQLite implementation and executable compatibility paths were retired under M29 after the accepted PostgreSQL migration/cutover; historical migration and rollback evidence remains in delivery and operations records only.
 
 Derived, replaceable data includes:
 
@@ -75,13 +75,13 @@ See [Recognition and identity matching](identity-matching.md).
 
 ## Collection and slideshow boundary
 
-Collection queries and slideshow snapshots operate from the local production catalogue and derived media. Browser-facing contracts use opaque identifiers and HTTP resource URLs rather than exposing source roots or private local paths.
+Collection queries and slideshow snapshots operate from the local PostgreSQL catalogue and derived media. Browser-facing contracts use opaque identifiers and HTTP resource URLs rather than exposing source roots or private local paths.
 
 Originals are hydrated only through explicit governed access/preparation paths; normal browsing remains derivative/proxy-backed where possible.
 
 ## Portable compute boundary
 
-Portable job bundles contain explicitly selected neutral inputs, exact model manifests and checksums. Result bundles contain derived processing results and checkpoints. Import validates provenance, revision identity and checksums before changing local derived state.
+Portable job bundles contain explicitly selected neutral inputs, exact model manifests and checksums. Result bundles contain derived processing results and checkpoints. The retained worker path processes bundles without catalogue access.
 
 The portable worker contract has no access to OneDrive credentials, people, assignments, rejections or the authoritative catalogue. It is retained for isolation/offline transfer, not as a currently planned cloud deployment path. See [Portable processing bundles](portable-bundles.md).
 
