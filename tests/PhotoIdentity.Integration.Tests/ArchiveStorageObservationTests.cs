@@ -92,7 +92,7 @@ public sealed class ArchiveStorageObservationTests
         }
         finally
         {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Npgsql.NpgsqlConnection.ClearAllPools();
             DeleteTemporaryDirectory(directory);
         }
     }
@@ -140,7 +140,7 @@ public sealed class ArchiveStorageObservationTests
         }
         finally
         {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Npgsql.NpgsqlConnection.ClearAllPools();
             DeleteTemporaryDirectory(directory);
         }
     }
