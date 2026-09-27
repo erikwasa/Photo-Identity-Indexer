@@ -12,7 +12,7 @@ Requirements:
 - Short-lived SAS credentials, when used, must be narrowly scoped and never logged.
 - Protect SSH keys locally.
 - Delete temporary Azure inputs after verified result import.
-- Keep the canonical SQLite database local and backed up.
+- Keep the canonical PostgreSQL database local/private and covered by the documented backup/restore procedure.
 - Use internal IDs rather than person names in logs where practical.
 - Do not publicly expose the review API during early versions.
 - Never modify original photos.
