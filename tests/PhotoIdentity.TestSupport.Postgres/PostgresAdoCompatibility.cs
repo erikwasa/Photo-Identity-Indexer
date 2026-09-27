@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Npgsql;
 using NpgsqlTypes;
@@ -107,6 +108,21 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
     private static readonly Regex LegacyNamedParameter = new(
         @"\$(?<name>[A-Za-z_][A-Za-z0-9_]*)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly HashSet<string> LegacyJsonParameterNames = new(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        "box",
+        "bounding_box",
+        "bounding_box_json",
+        "configuration",
+        "configuration_json",
+        "json",
+        "landmarks",
+        "landmarks_json",
+        "metadata_json",
+        "raw_metadata_json",
+    };
 
     private readonly NpgsqlCommand _inner;
     private string _commandText = string.Empty;
@@ -230,9 +246,10 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
 
     private static void NormalizeLegacyScalar(NpgsqlParameter parameter)
     {
-        // SQLite fixtures historically represented UUID and UTC timestamp columns as TEXT.
-        // Restrict normalization to values with unambiguous canonical shapes so ordinary text
-        // remains text while the mature seed helpers can execute against typed PostgreSQL columns.
+        // SQLite fixtures historically represented UUID, UTC timestamps, and JSON columns as
+        // TEXT. Restrict normalization to canonical UUID/time shapes or explicit JSON parameter
+        // names so ordinary text remains text while mature seed helpers can execute against typed
+        // PostgreSQL columns.
         if (parameter.Value is not string text)
         {
             return;
@@ -255,6 +272,32 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
         {
             parameter.Value = timestamp;
             parameter.NpgsqlDbType = NpgsqlDbType.TimestampTz;
+            return;
+        }
+
+        if (IsLegacyJsonParameter(parameter.ParameterName, text))
+        {
+            parameter.NpgsqlDbType = NpgsqlDbType.Jsonb;
+        }
+    }
+
+    private static bool IsLegacyJsonParameter(string parameterName, string value)
+    {
+        string normalizedName = parameterName.TrimStart('@', '$');
+        if (!LegacyJsonParameterNames.Contains(normalizedName) &&
+            !normalizedName.EndsWith("_json", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument _ = JsonDocument.Parse(value);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 }
