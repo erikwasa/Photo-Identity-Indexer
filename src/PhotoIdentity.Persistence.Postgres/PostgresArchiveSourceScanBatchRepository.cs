@@ -520,6 +520,55 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
         return updated;
     }
 
+    public async Task<int> MarkMissingAssetsAsync(
+        SourceId sourceId,
+        string? relativeRoot,
+        IReadOnlyCollection<string> observedSourceKeys,
+        DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(observedSourceKeys);
+
+        string scope = ArchiveCoverage.NormalizeRelativeFolder(relativeRoot ?? string.Empty);
+        string[] observedKeys = observedSourceKeys
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = scope.Length == 0
+            ? """
+              UPDATE assets
+              SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
+              WHERE source_id = @source_id
+                AND NOT (source_key = ANY(@observed_source_keys))
+                AND deleted_at_utc IS NULL;
+              """
+            : """
+              UPDATE assets
+              SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
+              WHERE source_id = @source_id
+                AND substr(source_key, 1, length(@scope_prefix)) = @scope_prefix
+                AND NOT (source_key = ANY(@observed_source_keys))
+                AND deleted_at_utc IS NULL;
+              """;
+        command.Parameters.AddWithValue("@source_id", Guid.Parse(sourceId.ToString()));
+        command.Parameters.AddWithValue("@scanned_at_utc", Format(scannedAtUtc));
+        command.Parameters.AddWithValue(
+            "@observed_source_keys",
+            NpgsqlDbType.Array | NpgsqlDbType.Text,
+            observedKeys);
+        if (scope.Length > 0)
+        {
+            command.Parameters.AddWithValue("@scope_prefix", scope + "/");
+        }
+
+        int updated = await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return updated;
+    }
+
     private static DateTimeOffset Format(DateTimeOffset value) => value.ToUniversalTime();
 
 
