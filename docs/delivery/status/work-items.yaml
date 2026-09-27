@@ -9,27 +9,15 @@ allowed_statuses:
 - completed
 - cancelled
 work_items:
-- id: WI-0148
-  title: Retire SQLite-dependent tests and compatibility tools that no longer protect supported behavior
-  milestone: M29
-  status: in_review
-  owner: codex
-  document: ../work-items/WI-0148-retire-sqlite-test-tool-dependencies.md
-  started_at: 2026-09-27
-  last_updated_at: 2026-09-27
-  branch: codex/wi-0148-finish
-  blockers:
-  - WI-0147
-  blocker_notes: []
-  evidence:
-  - type: verification
-    value: '2026-09-27 agent verification: Release build succeeded with zero warnings/errors; CI integration shard 1 passed 273/273 in 3m35s and shard 2 passed 304/304 in 3m56s against disposable PostgreSQL databases, with exact required-test coverage and no quarantine; PhotoIdentity.Docs validate and generate --check passed. The initial unsandboxed build attempt was blocked only by workspace access to the user NuGet.Config and passed unchanged when granted access.'
 - id: WI-0149
   title: Remove the SQLite implementation and obsolete migration-era active references
   milestone: M29
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: codex
   document: ../work-items/WI-0149-remove-sqlite-implementation.md
+  started_at: 2026-09-27
+  last_updated_at: 2026-09-27
+  branch: codex/wi-0149-remove-sqlite-implementation
   blockers:
   - WI-0148
   blocker_notes: []
