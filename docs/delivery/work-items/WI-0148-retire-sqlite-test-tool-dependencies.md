@@ -33,10 +33,10 @@ Test projects and migration-era utilities can otherwise keep a second persistenc
 
 ## Acceptance criteria
 
-- [ ] Supported behavior no longer depends on SQLite adapters except explicitly documented temporary migration exceptions.
-- [ ] Removed tests have equivalent current coverage or documented obsolescence.
-- [ ] Active tooling no longer offers SQLite as a normal catalogue.
-- [ ] Remaining SQLite references are enumerated for WI-0149.
+- [x] Supported behavior no longer depends on SQLite adapters except explicitly documented temporary migration exceptions.
+- [x] Removed tests have equivalent current coverage or documented obsolescence.
+- [x] Active tooling no longer offers SQLite as a normal catalogue.
+- [x] Remaining SQLite references are enumerated for WI-0149.
 
 ## Verification requirements
 
@@ -50,3 +50,4 @@ Relevant suites and documentation validation/generation.
 - WI-0149 inventory: remove `PhotoIdentity.Persistence.Sqlite` from `PhotoIdentity.slnx` and `Microsoft.Data.Sqlite` from package management; remove the remaining direct SQLite references and compatibility composition in `PhotoIdentity.Api` and `PhotoIdentity.Cli`; retire or replace SQLite migration/backup, archive, batch, bundle, evaluation-export and match commands; delete excluded legacy test sources and the PostgreSQL test aliases whose names still say `Sqlite`; update remaining active SQLite-era architecture/operator documents. The ReviewVerification tool, bundle tests, persistence tests and compiled integration tests no longer reference the SQLite project.
 - CI impact: the required integration surface is 577 tests across two balanced shards. A sequential local PostgreSQL run completed shard 1 (273 tests) in 3m35s and shard 2 (304 tests) in 3m56s; CI retains two-way sharding and provisions PostgreSQL explicitly.
 - Commands run: `./build.ps1` (Release, zero warnings/errors); `./test.ps1` (established the new PostgreSQL prerequisite); both CI integration shards against local PostgreSQL (577/577 passed); targeted regression runs; `PhotoIdentity.Docs validate`; `PhotoIdentity.Docs generate --check`.
+- Maintainer verification: on 2026-09-27 the PostgreSQL review-verification path passed after the active review-verification tooling was moved off SQLite.
