@@ -15,26 +15,25 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 ## Historical catalogue migration evidence
 
 - [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) — accepted SQLite-to-PostgreSQL authority-transfer and rollback evidence from WI-0102. It is historical migration evidence, not a supported current catalogue-selection or daily-backup path.
+- [Historical SQLite persistence record](sqlite-persistence.md) — retired persistence policy retained so completed delivery records remain understandable and link-valid.
 
-The former SQLite persistence runbook was retired with WI-0149 when the SQLite implementation and executable compatibility paths were removed. PostgreSQL production operations own the current backup/restore procedure.
+PostgreSQL production operations own the current backup/restore procedure.
 
 ## Conditional maintenance and engineering procedures
 
 - [Testing and CI strategy](testing-and-ci-strategy.md) — engineering policy for test-layer choice, integration-host isolation, flaky-test handling, PR gates and timing evidence.
 - [Review-proxy measurement](review-proxy-measurement.md) — calibration/measurement procedure for selecting or re-evaluating a proxy profile; not a routine daily task.
 - [Detector pipeline rollout](detector-rollout.md) — maintenance-only migration procedure for an existing catalogue created with a different detector. New permanent-archive analysis already uses the governed CenterFace profile and does not require a rollout first.
-- [Local evaluation workflow](local-evaluation.md) — specialized reproducible model-evaluation tooling. Its original examples use the historical YuNet pilot corpus; do not treat those detector settings as the permanent archive profile.
-- [Multi-model comparison workflow](multi-model-comparison.md) — specialized embedding comparison workflow. The completed FP32/INT8 evidence used the earlier detector population; a future production-model reaffirmation must account for the selected CenterFace population.
 - [Whole-image embedding evaluation](whole-image-embedding-evaluation.md) — bounded WI-0127 exact-vector experiment for semantic retrieval, similar-photo retrieval and Creative Collection diversity; not a production vector-store procedure.
 - [Local caption and narration evaluation](local-caption-narration-evaluation.md) — WI-0128 experiment evidence plus the retained loopback-only archive caption-enrichment policy; generated captions are revision-bound derived photo evidence and consumers do not trigger generation.
 
-## Retained M16 detector evidence
+## Retained model-evaluation evidence
 
-These files are historical governed experiment procedures. Keep them for reproducibility, but do not follow them as the current detector-selection sequence:
-
+- [Historical local reviewed-catalogue evaluation workflow](local-evaluation.md) — pre-WI-0149 procedure retained for reproducibility principles; its SQLite/batch/match/export commands are retired.
+- [Historical multi-model comparison workflow](multi-model-comparison.md) — accepted FP32/INT8 comparison evidence; the former automation is retired and its script path is only a historical tombstone.
 - [Detector recall pilot](detector-recall-pilot.md)
 - [Detector comparison runs](detector-comparison-runs.md)
 - [Multi-scale detector runs](multiscale-detector-runs.md)
 - [CenterFace detector runs](centerface-detector-runs.md)
 
-M16 is complete. CenterFace `centerface-2019-fp32`, confidence `0.5`, `single-pass`, is the selected permanent archive detector pipeline. YuNet threshold and multi-scale experiments are closed historical evidence.
+M16 is complete. CenterFace `centerface-2019-fp32`, confidence `0.5`, `single-pass`, is the selected permanent archive detector pipeline. Historical YuNet threshold, multi-scale and embedding-comparison experiments are retained as evidence rather than current operator procedures.
