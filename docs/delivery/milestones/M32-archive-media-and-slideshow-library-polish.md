@@ -29,8 +29,8 @@ This milestone is intentionally narrow follow-up work. It does not reopen generi
 
 ## Exit criteria
 
-- [ ] Existing and newly discovered DNG files can enter the normal archive pipeline and be viewed/processed through supported derivatives.
-- [ ] Representative private DNG samples have accepted orientation, colour, metadata, runtime and memory evidence.
+- [x] Existing and newly discovered DNG files can enter the normal archive pipeline and be viewed/processed through supported derivatives.
+- [x] Representative private DNG samples have accepted orientation, colour, metadata, runtime and memory evidence.
 - [ ] Slideshow cards show preparation state only when it is valid for the current revision set.
 - [ ] Manual and Smart slideshow counts are truthful, and Creative Collection quantity wording distinguishes target/maximum from exact membership when necessary.
 - [ ] Slideshow-library card rendering remains responsive and does not require full snapshots solely for decorative status/count information.
