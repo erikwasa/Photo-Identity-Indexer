@@ -12,4 +12,12 @@ public interface IArchiveSourceScanPersistence
         DateTimeOffset scannedAtUtc, CancellationToken cancellationToken = default);
     Task<int> MarkMissingAssetsAsync(SourceId sourceId, string? relativeRoot,
         DateTimeOffset scannedAtUtc, CancellationToken cancellationToken = default);
+
+    Task<int> MarkMissingAssetsAsync(
+        SourceId sourceId,
+        string? relativeRoot,
+        IReadOnlyCollection<string> observedSourceKeys,
+        DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        MarkMissingAssetsAsync(sourceId, relativeRoot, scannedAtUtc, cancellationToken);
 }

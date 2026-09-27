@@ -144,6 +144,49 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
+    public async Task<IReadOnlySet<string>> RecordObservedAndGetExcludedAsync(
+        SourceId sourceId,
+        IReadOnlyCollection<string> sourceKeys,
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sourceKeys);
+        if (sourceKeys.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        await EnsureSchemaAsync(cancellationToken);
+        string[] keys = sourceKeys
+            .Select(SourceCopyLocator.NormalizeSourceKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE source_copy_exclusions
+            SET last_seen_at_utc = @observed_at_utc
+            WHERE source_id = @source_id
+              AND source_key = ANY(@source_keys)
+            RETURNING source_key;
+            """;
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
+        command.Parameters.AddWithValue(
+            "source_keys",
+            NpgsqlDbType.Array | NpgsqlDbType.Text,
+            keys);
+        command.Parameters.AddWithValue("observed_at_utc", observedAtUtc.ToUniversalTime());
+
+        HashSet<string> excluded = new(StringComparer.Ordinal);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            excluded.Add(reader.GetString(0));
+        }
+
+        return excluded;
+    }
+
     public async Task SetPurgeStateAsync(
         SourceId sourceId,
         string sourceKey,

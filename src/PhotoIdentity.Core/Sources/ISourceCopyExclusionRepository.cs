@@ -68,6 +68,34 @@ public interface ISourceCopyExclusionRepository
         DateTimeOffset observedAtUtc,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Records source presence for every excluded locator in one scan batch and returns the
+    /// excluded keys. Implementations should override this with a set-oriented operation; the
+    /// default preserves compatibility for non-production adapters.
+    /// </summary>
+    async Task<IReadOnlySet<string>> RecordObservedAndGetExcludedAsync(
+        SourceId sourceId,
+        IReadOnlyCollection<string> sourceKeys,
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sourceKeys);
+        HashSet<string> excluded = new(StringComparer.Ordinal);
+        foreach (string sourceKey in sourceKeys)
+        {
+            if (await RecordObservedIfExcludedAsync(
+                    sourceId,
+                    sourceKey,
+                    observedAtUtc,
+                    cancellationToken))
+            {
+                excluded.Add(sourceKey);
+            }
+        }
+
+        return excluded;
+    }
+
     Task SetPurgeStateAsync(
         SourceId sourceId,
         string sourceKey,

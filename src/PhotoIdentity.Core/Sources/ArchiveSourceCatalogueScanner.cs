@@ -9,10 +9,14 @@ namespace PhotoIdentity.Core.Sources;
 public sealed record ArchiveSourceCatalogueScanDiagnostics(
     int MetadataReuseCount,
     TimeSpan BaselineReadElapsed,
+    int ExcludedFileCount,
+    int ExclusionBatchCount,
+    TimeSpan ExclusionElapsed,
     int HashedFileCount,
     long HashedBytes,
     TimeSpan HashingElapsed,
     int ObservationWriteCount,
+    int PersistenceBatchCount,
     TimeSpan ObservationPersistenceElapsed,
     TimeSpan MissingReconciliationElapsed,
     TimeSpan TotalElapsed);
@@ -95,6 +99,7 @@ public sealed class ArchiveSourceCatalogueScanner
         int hashedFiles = 0;
         long hashedBytes = 0;
         TimeSpan hashingElapsed = TimeSpan.Zero;
+        List<SourceAsset> sourceAssets = [];
         List<ArchiveSourceScanWrite> writes = [];
 
         await foreach (SourceAsset sourceAsset in source.EnumerateAsync(options, cancellationToken))
@@ -131,12 +136,29 @@ public sealed class ArchiveSourceCatalogueScanner
                         "Unsupported archive availability state.");
             }
 
-            if (_exclusions is not null &&
-                await _exclusions.RecordObservedIfExcludedAsync(
-                    catalogueSource.SourceId,
-                    sourceAsset.Reference.ItemKey,
-                    scannedAt,
-                    cancellationToken))
+            sourceAssets.Add(sourceAsset);
+        }
+
+        Stopwatch exclusionStopwatch = Stopwatch.StartNew();
+        IReadOnlySet<string> excludedKeys = new HashSet<string>(StringComparer.Ordinal);
+        int exclusionBatchCount = 0;
+        if (_exclusions is not null && sourceAssets.Count > 0)
+        {
+            excludedKeys = await _exclusions.RecordObservedAndGetExcludedAsync(
+                catalogueSource.SourceId,
+                sourceAssets
+                    .Select(static asset => asset.Reference.ItemKey)
+                    .ToArray(),
+                scannedAt,
+                cancellationToken);
+            exclusionBatchCount = 1;
+        }
+        exclusionStopwatch.Stop();
+
+        foreach (SourceAsset sourceAsset in sourceAssets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (excludedKeys.Contains(sourceAsset.Reference.ItemKey))
             {
                 continue;
             }
@@ -212,6 +234,7 @@ public sealed class ArchiveSourceCatalogueScanner
         int deleted = await _persistence.MarkMissingAssetsAsync(
             catalogueSource.SourceId,
             options.RelativeRoot,
+            writes.Select(static write => write.SourceAsset.Reference.ItemKey).ToArray(),
             scannedAt,
             cancellationToken);
         missingStopwatch.Stop();
@@ -220,10 +243,14 @@ public sealed class ArchiveSourceCatalogueScanner
         ArchiveSourceCatalogueScanDiagnostics diagnostics = new(
             metadataReuse,
             baselineStopwatch.Elapsed,
+            excludedKeys.Count,
+            exclusionBatchCount,
+            exclusionStopwatch.Elapsed,
             hashedFiles,
             hashedBytes,
             hashingElapsed,
             writes.Count,
+            writes.Count == 0 ? 0 : 1,
             persistenceStopwatch.Elapsed,
             missingStopwatch.Elapsed,
             totalStopwatch.Elapsed);

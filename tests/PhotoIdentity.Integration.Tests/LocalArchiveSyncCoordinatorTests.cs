@@ -54,6 +54,8 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(1, januaryDiagnostics.HashedFileCount);
             Assert.Equal(1, januaryDiagnostics.HashedBytes);
             Assert.Equal(1, januaryDiagnostics.ObservationWriteCount);
+            Assert.Equal(0, januaryDiagnostics.ExclusionBatchCount);
+            Assert.Equal(1, januaryDiagnostics.PersistenceBatchCount);
             Assert.True(januaryDiagnostics.AvailabilityCheckCount >= 2);
             Assert.Single(await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false));
 
@@ -72,6 +74,7 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(2, monthSync.Diagnostics.Folders.Sum(static folder => folder.HashedFileCount));
             Assert.Equal(2, monthSync.Diagnostics.Folders.Sum(static folder => folder.HashedBytes));
             Assert.Equal(3, monthSync.Diagnostics.Folders.Sum(static folder => folder.ObservationWriteCount));
+            Assert.Equal(2, monthSync.Diagnostics.Folders.Sum(static folder => folder.PersistenceBatchCount));
             Assert.Equal(3, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
 
             LocalArchiveSyncSummary yearSync = await coordinator.SyncAsync(
@@ -90,11 +93,68 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(1, yearDiagnostics.HashedFileCount);
             Assert.Equal(1, yearDiagnostics.HashedBytes);
             Assert.Equal(4, yearDiagnostics.ObservationWriteCount);
+            Assert.Equal(1, yearDiagnostics.PersistenceBatchCount);
             // Enumeration checks all four files; only the newly discovered local file is opened
             // for hashing, so the fast path deliberately avoids the three extra status checks
             // that the old unconditional-hash behavior performed.
             Assert.True(yearDiagnostics.AvailabilityCheckCount >= 5);
             Assert.Equal(4, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Same_timestamp_repeat_marks_removed_file_missing()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string archiveRoot = Path.Combine(directory, "Kamerabilder");
+            string january = Path.Combine(archiveRoot, "1970", "01");
+            Directory.CreateDirectory(january);
+            string firstPath = Path.Combine(january, "one.jpg");
+            await File.WriteAllBytesAsync(firstPath, [1, 2, 3]);
+            await File.WriteAllBytesAsync(Path.Combine(january, "two.jpg"), [4, 5, 6]);
+
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            PostgresLocalBatchRepository repository = new(database);
+            var catalogueSource = await repository.GetOrCreateLocalFolderSourceAsync(archiveRoot, Utc(10));
+            ArchiveCatalogueSource archiveCatalogueSource = new(
+                catalogueSource.Id,
+                catalogueSource.Kind,
+                catalogueSource.RootLocator,
+                catalogueSource.CreatedAtUtc);
+            LocalFolderAssetSource source = new(catalogueSource.Id, archiveRoot);
+            ArchiveSourceCatalogueScanner archiveScanner = new(
+                database,
+                new PostgresArchiveSourceScanBatchRepository(database));
+            LocalArchiveSyncCoordinator coordinator = new(archiveScanner);
+            PostgresSourceCatalogueScanner scanner = new(database);
+
+            LocalArchiveSyncSummary firstSync = await coordinator.SyncAsync(
+                source,
+                archiveCatalogueSource,
+                ["1970"],
+                Utc(10));
+            Assert.Equal(2, firstSync.SupportedFileCount);
+            Assert.Equal(2, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
+
+            File.Delete(firstPath);
+
+            LocalArchiveSyncSummary secondSync = await coordinator.SyncAsync(
+                source,
+                archiveCatalogueSource,
+                ["1970"],
+                Utc(10));
+
+            Assert.Equal(1, secondSync.SupportedFileCount);
+            Assert.Equal(1, secondSync.MarkedDeletedCount);
+            Assert.Single(await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false));
+            Assert.Equal(2, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: true)).Count);
         }
         finally
         {

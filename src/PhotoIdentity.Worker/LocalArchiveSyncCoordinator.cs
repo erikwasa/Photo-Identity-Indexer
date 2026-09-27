@@ -14,10 +14,14 @@ public sealed record LocalArchiveFolderSyncDiagnostics(
     TimeSpan SourceScanElapsed,
     int MetadataReuseCount,
     TimeSpan BaselineReadElapsed,
+    int ExcludedFileCount,
+    int ExclusionBatchCount,
+    TimeSpan ExclusionElapsed,
     int HashedFileCount,
     long HashedBytes,
     TimeSpan HashingElapsed,
     int ObservationWriteCount,
+    int PersistenceBatchCount,
     TimeSpan ObservationPersistenceElapsed,
     TimeSpan MissingReconciliationElapsed,
     TimeSpan TotalElapsed);
@@ -142,10 +146,14 @@ public sealed class LocalArchiveSyncCoordinator
                     sourceDiagnostics?.SourceScanElapsed ?? TimeSpan.Zero,
                     scanDiagnostics.MetadataReuseCount,
                     scanDiagnostics.BaselineReadElapsed,
+                    scanDiagnostics.ExcludedFileCount,
+                    scanDiagnostics.ExclusionBatchCount,
+                    scanDiagnostics.ExclusionElapsed,
                     scanDiagnostics.HashedFileCount,
                     scanDiagnostics.HashedBytes,
                     scanDiagnostics.HashingElapsed,
                     scanDiagnostics.ObservationWriteCount,
+                    scanDiagnostics.PersistenceBatchCount,
                     scanDiagnostics.ObservationPersistenceElapsed,
                     scanDiagnostics.MissingReconciliationElapsed,
                     scanDiagnostics.TotalElapsed);
@@ -218,7 +226,7 @@ public sealed class LocalArchiveSyncCoordinator
     private static void WriteFolderDiagnostics(LocalArchiveFolderSyncDiagnostics diagnostics)
     {
         Console.WriteLine(
-            "[WI-0079 sync diagnostics] folder_index={0} total_ms={1:F1} source_scan_ms={2:F1} directories={3} files={4} status_checks={5} metadata_reused={6} baseline_ms={7:F1} hashed_files={8} hashed_bytes={9} hash_ms={10:F1} observation_writes={11} persistence_ms={12:F1} missing_reconcile_ms={13:F1}",
+            "[WI-0166 sync diagnostics] folder_index={0} total_ms={1:F1} source_scan_ms={2:F1} directories={3} files={4} status_checks={5} metadata_reused={6} baseline_ms={7:F1} excluded_files={8} exclusion_batches={9} exclusion_ms={10:F1} hashed_files={11} hashed_bytes={12} hash_ms={13:F1} observation_writes={14} persistence_batches={15} persistence_ms={16:F1} missing_reconcile_ms={17:F1}",
             diagnostics.FolderIndex,
             diagnostics.TotalElapsed.TotalMilliseconds,
             diagnostics.SourceScanElapsed.TotalMilliseconds,
@@ -227,10 +235,14 @@ public sealed class LocalArchiveSyncCoordinator
             diagnostics.AvailabilityCheckCount,
             diagnostics.MetadataReuseCount,
             diagnostics.BaselineReadElapsed.TotalMilliseconds,
+            diagnostics.ExcludedFileCount,
+            diagnostics.ExclusionBatchCount,
+            diagnostics.ExclusionElapsed.TotalMilliseconds,
             diagnostics.HashedFileCount,
             diagnostics.HashedBytes,
             diagnostics.HashingElapsed.TotalMilliseconds,
             diagnostics.ObservationWriteCount,
+            diagnostics.PersistenceBatchCount,
             diagnostics.ObservationPersistenceElapsed.TotalMilliseconds,
             diagnostics.MissingReconciliationElapsed.TotalMilliseconds);
     }
@@ -238,7 +250,7 @@ public sealed class LocalArchiveSyncCoordinator
     private static void WriteTotalDiagnostics(LocalArchiveSyncDiagnostics diagnostics)
     {
         Console.WriteLine(
-            "[WI-0079 sync diagnostics] cancelled=false included_folders={0} total_ms={1:F1} directories={2} files={3} status_checks={4} metadata_reused={5} baseline_ms={6:F1} hashed_files={7} hashed_bytes={8} source_scan_ms={9:F1} hash_ms={10:F1} observation_writes={11} persistence_ms={12:F1} missing_reconcile_ms={13:F1}",
+            "[WI-0166 sync diagnostics] cancelled=false included_folders={0} total_ms={1:F1} directories={2} files={3} status_checks={4} metadata_reused={5} baseline_ms={6:F1} excluded_files={7} exclusion_batches={8} exclusion_ms={9:F1} hashed_files={10} hashed_bytes={11} source_scan_ms={12:F1} hash_ms={13:F1} observation_writes={14} persistence_batches={15} persistence_ms={16:F1} missing_reconcile_ms={17:F1}",
             diagnostics.Folders.Count,
             diagnostics.TotalElapsed.TotalMilliseconds,
             diagnostics.Folders.Sum(static folder => folder.EnumeratedDirectoryCount),
@@ -246,11 +258,15 @@ public sealed class LocalArchiveSyncCoordinator
             diagnostics.Folders.Sum(static folder => folder.AvailabilityCheckCount),
             diagnostics.Folders.Sum(static folder => folder.MetadataReuseCount),
             diagnostics.Folders.Sum(static folder => folder.BaselineReadElapsed.TotalMilliseconds),
+            diagnostics.Folders.Sum(static folder => folder.ExcludedFileCount),
+            diagnostics.Folders.Sum(static folder => folder.ExclusionBatchCount),
+            diagnostics.Folders.Sum(static folder => folder.ExclusionElapsed.TotalMilliseconds),
             diagnostics.Folders.Sum(static folder => folder.HashedFileCount),
             diagnostics.Folders.Sum(static folder => folder.HashedBytes),
             diagnostics.Folders.Sum(static folder => folder.SourceScanElapsed.TotalMilliseconds),
             diagnostics.Folders.Sum(static folder => folder.HashingElapsed.TotalMilliseconds),
             diagnostics.Folders.Sum(static folder => folder.ObservationWriteCount),
+            diagnostics.Folders.Sum(static folder => folder.PersistenceBatchCount),
             diagnostics.Folders.Sum(static folder => folder.ObservationPersistenceElapsed.TotalMilliseconds),
             diagnostics.Folders.Sum(static folder => folder.MissingReconciliationElapsed.TotalMilliseconds));
     }
