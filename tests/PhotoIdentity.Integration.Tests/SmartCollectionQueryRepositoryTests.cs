@@ -197,7 +197,7 @@ public sealed class SmartCollectionQueryRepositoryTests
             nextOrdinal.Transaction = transaction;
             nextOrdinal.CommandText = "SELECT COALESCE(MAX(ordinal), -1) + 1 FROM face_occurrences WHERE asset_revision_id = $revision;";
             nextOrdinal.Parameters.AddWithValue("$revision", revisionId.ToString());
-            ordinal = (long)(await nextOrdinal.ExecuteScalarAsync() ?? 0L);
+            ordinal = Convert.ToInt64(await nextOrdinal.ExecuteScalarAsync() ?? 0L);
         }
 
         using (SqliteCommand face = connection.CreateCommand())
@@ -223,7 +223,7 @@ public sealed class SmartCollectionQueryRepositoryTests
             label.Parameters.AddWithValue("$person", personId.ToString());
             label.Parameters.AddWithValue("$face", faceId.ToString());
             label.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-            labelId = (long)(await label.ExecuteScalarAsync() ?? throw new InvalidOperationException());
+            labelId = Convert.ToInt64(await label.ExecuteScalarAsync() ?? throw new InvalidOperationException());
         }
 
         using (SqliteCommand action = connection.CreateCommand())
