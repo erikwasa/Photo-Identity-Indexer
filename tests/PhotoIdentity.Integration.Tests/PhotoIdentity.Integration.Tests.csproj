@@ -2,7 +2,7 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <!-- WI-0148: integration tests must not regain retired provider assemblies through app-project transitivity. -->
+    <!-- Integration tests must not regain retired provider assemblies through app-project transitivity. -->
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
   </PropertyGroup>
   <ItemGroup>
@@ -31,38 +31,5 @@
     <ProjectReference Include="../../src/PhotoIdentity.Transfer.Bundles/PhotoIdentity.Transfer.Bundles.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Web/PhotoIdentity.Web.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Worker/PhotoIdentity.Worker.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- WI-0148 retires provider-specific coverage that is superseded by PostgreSQL persistence tests. -->
-    <Compile Remove="SqliteCatalogueDatabaseTests.cs" />
-    <Compile Remove="SqliteProcessingMigrationTests.cs" />
-    <Compile Remove="SqliteIdentityMatcherMigrationTests.cs" />
-    <Compile Remove="SqliteDetectorRolloutRepositoryTests.cs" />
-    <Compile Remove="SqliteDetectorRolloutReviewRepositoryTests.cs" />
-    <Compile Remove="SqliteDetectorRolloutApplicationRepositoryTests.cs" />
-    <Compile Remove="SqliteIdentityCatalogueRepositoryTests.cs" />
-    <Compile Remove="SqliteIdentityMatcherTests.cs" />
-    <Compile Remove="SqliteIdentityAutoAssignmentServiceTests.cs" />
-    <Compile Remove="IdentityMatchRegenerationTests.cs" />
-    <Compile Remove="SqliteProcessingRepositoryTests.cs" />
-    <!-- Face inspection current behavior is covered by PostgresFaceInspectionRepositoryTests; the old suite also asserted SQLite exception codes and an inconsistent graph shape that FaceInspectionWrite no longer permits. -->
-    <Compile Remove="SqliteFaceCatalogueRepositoryTests.cs" />
-    <!-- Version-14-to-15 PRAGMA/schema_migrations upgrade coverage is specific to the retired SQLite catalogue. PostgreSQL initialization owns its current schema directly. -->
-    <Compile Remove="CatalogueSchemaV15Tests.cs" />
-    <!-- The retired file-database match command was a SQLite-only normal-operation surface. -->
-    <Compile Remove="MatchCommandTests.cs" />
-    <!-- The stopped-source .db/PRAGMA backup path is migration-era SQLite tooling, not supported PostgreSQL behavior. -->
-    <Compile Remove="CatalogueBackupCommandTests.cs" />
-    <!-- The source-side identity regeneration migration rehearsal requires the retained SQLite importer and is tracked as a WI-0149 migration exception, not active runtime coverage. -->
-    <Compile Remove="PostgresRuntimeApplicationTests.IdentityRegenerationMigration.cs" />
-    <!-- Catalogue evaluation export is still implemented only by the retained SQLite migration/compatibility adapter; WI-0149 owns its final disposition. -->
-    <Compile Remove="CatalogueEvaluationExportCommandTests.cs" />
-    <!-- The accepted stopped-source catalogue migration is preserved as WI-0102 operational evidence; executable SQLite-source migration coverage remains a WI-0149 compatibility concern. -->
-    <Compile Remove="CatalogueMigrationCommandTests.cs" />
-    <Compile Remove="PostgresRuntimeApplicationTestsMigration.cs" />
-    <!-- These commands still compose the retained SQLite compatibility adapter and are not supported PostgreSQL runtime paths; WI-0149 owns their removal or replacement. -->
-    <Compile Remove="ArchiveCommandTests.cs" />
-    <Compile Remove="BatchCommandTests.cs" />
-    <Compile Remove="PortableBundleCommandTests.cs" />
   </ItemGroup>
 </Project>
