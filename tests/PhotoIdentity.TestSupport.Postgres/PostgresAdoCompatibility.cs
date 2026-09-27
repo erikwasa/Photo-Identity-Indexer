@@ -109,6 +109,10 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
         @"\$(?<name>[A-Za-z_][A-Za-z0-9_]*)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    private static readonly Regex LegacyCompletedProcessingJobInsert = new(
+        @"INSERT\s+INTO\s+processing_jobs\b(?<body>.*?);",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
     private static readonly HashSet<string> LegacyJsonParameterNames = new(
         StringComparer.OrdinalIgnoreCase)
     {
@@ -229,9 +233,16 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
 
     private void PrepareForExecution()
     {
-        _inner.CommandText = LegacyNamedParameter.Replace(
+        string normalizedSql = LegacyNamedParameter.Replace(
             _commandText,
             match => $"@{match.Groups["name"].Value}");
+
+        // Older SQLite seed fixtures used "completed" for processing jobs. The current domain has
+        // distinct run/job terminal values: runs are completed, jobs are succeeded. Normalize only
+        // processing_jobs INSERT statements so processing_runs semantics remain untouched.
+        _inner.CommandText = LegacyCompletedProcessingJobInsert.Replace(
+            normalizedSql,
+            match => match.Value.Replace("'completed'", "'succeeded'", StringComparison.OrdinalIgnoreCase));
 
         foreach (NpgsqlParameter parameter in _inner.Parameters)
         {
