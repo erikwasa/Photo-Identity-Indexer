@@ -14,6 +14,18 @@ public sealed class PostgresCompatibilityConnection : IDisposable, IAsyncDisposa
 {
     private readonly NpgsqlConnection _inner;
 
+    /// <summary>
+    /// Transitional source-compatible constructor for mature fixtures that still create a
+    /// connection from a historical <c>Data Source=...</c> SQLite-style compatibility key.
+    /// The key is mapped to the same isolated PostgreSQL catalogue used by
+    /// <see cref="PostgresTestCatalogueDatabase"/>; no SQLite provider is opened.
+    /// </summary>
+    public PostgresCompatibilityConnection(string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        _inner = new NpgsqlConnection(ResolveCompatibilityConnectionString(connectionString));
+    }
+
     internal PostgresCompatibilityConnection(NpgsqlConnection inner)
     {
         ArgumentNullException.ThrowIfNull(inner);
@@ -58,6 +70,32 @@ public sealed class PostgresCompatibilityConnection : IDisposable, IAsyncDisposa
     {
         ArgumentNullException.ThrowIfNull(connection);
         return connection._inner;
+    }
+
+    private static string ResolveCompatibilityConnectionString(string connectionString)
+    {
+        const string dataSourcePrefix = "Data Source=";
+        if (!connectionString.StartsWith(dataSourcePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return connectionString;
+        }
+
+        string compatibilityPath = connectionString[dataSourcePrefix.Length..];
+        int optionSeparator = compatibilityPath.IndexOf(';');
+        if (optionSeparator >= 0)
+        {
+            compatibilityPath = compatibilityPath[..optionSeparator];
+        }
+
+        compatibilityPath = compatibilityPath.Trim();
+        if (compatibilityPath.Length == 0)
+        {
+            throw new ArgumentException(
+                "The historical Data Source compatibility key must include a path.",
+                nameof(connectionString));
+        }
+
+        return PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(compatibilityPath);
     }
 }
 
