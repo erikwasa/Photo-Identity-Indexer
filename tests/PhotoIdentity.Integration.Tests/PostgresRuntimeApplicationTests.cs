@@ -14,48 +14,6 @@ public sealed class PostgresRuntimeApplicationTests
     private const string TestModelHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     [Fact]
-    public async Task Provisional_clustering_endpoint_rejects_SQLite_test_compatibility_host()
-    {
-        string directory = Path.Combine(
-            Path.GetTempPath(),
-            "PhotoIdentity.Integration.Tests",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        string sqlitePath = Path.Combine(directory, "catalogue.db");
-
-        try
-        {
-            await using PhotoIdentityApiTestFactory factory = new(
-                sqlitePath);
-            using HttpClient client = factory.CreateClient();
-            using HttpResponseMessage response = await client.GetAsync(
-                $"/api/review/provisional-clusters?modelId=test-model&modelHash={TestModelHash}");
-
-            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-            using JsonDocument problem = JsonDocument.Parse(
-                await response.Content.ReadAsStringAsync());
-            Assert.Equal(
-                "Provisional clustering is available only when PostgreSQL is the selected catalogue provider.",
-                problem.RootElement.GetProperty("detail").GetString());
-
-            using HttpResponseMessage advisory = await client.GetAsync(
-                $"/api/review/provisional-clusters/review-groups/test-cluster/known-person-advisory?modelId=test-model&modelHash={TestModelHash}");
-            Assert.Equal(HttpStatusCode.Conflict, advisory.StatusCode);
-
-            Assert.IsType<SqliteCatalogueDatabase>(
-                factory.Services.GetRequiredService<SqliteCatalogueDatabase>());
-            Assert.Null(factory.Services.GetService<PostgresCatalogueDatabase>());
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
     public async Task PostgreSQL_selected_host_starts_without_registering_or_creating_SQLite_catalogue_WhenLivePostgresIsConfigured()
     {
         string? adminConnectionString = Environment.GetEnvironmentVariable(

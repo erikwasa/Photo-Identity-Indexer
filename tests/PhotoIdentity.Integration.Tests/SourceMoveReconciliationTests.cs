@@ -287,10 +287,10 @@ public sealed class SourceMoveReconciliationTests
             }
 
             return new AssetRow(
-                AssetId.From(Guid.Parse(reader.GetString(0))),
+                AssetId.From(reader.GetGuid(0)),
                 reader.GetString(1),
-                reader.IsDBNull(2) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(2))),
-                reader.IsDBNull(3) ? null : Parse(reader.GetString(3)));
+                reader.IsDBNull(2) ? null : AssetRevisionId.From(reader.GetGuid(2)),
+                reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3));
         }
 
         public async Task<int> CountAssetsAsync()
@@ -334,7 +334,5 @@ public sealed class SourceMoveReconciliationTests
         private static string Format(DateTimeOffset value) =>
             value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 
-        private static DateTimeOffset Parse(string value) =>
-            DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime();
     }
 }

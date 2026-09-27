@@ -270,6 +270,13 @@ public sealed class PostgresPersonMaintenanceRepository :
             targetPersonId,
             createdAt,
             cancellationToken);
+        await ConsolidateManualPhotoPeopleAsync(
+            connection,
+            transaction,
+            sourcePersonId,
+            targetPersonId,
+            createdAt,
+            cancellationToken);
 
         await using (NpgsqlCommand merge =
                      connection.CreateCommand())
@@ -324,6 +331,64 @@ public sealed class PostgresPersonMaintenanceRepository :
             normalizedNote,
             createdAt,
             Reversible: false);
+    }
+
+    private static async Task ConsolidateManualPhotoPeopleAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        PersonId sourcePersonId,
+        PersonId targetPersonId,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            WITH source_latest AS (
+                SELECT DISTINCT ON (asset_revision_id)
+                    asset_revision_id,
+                    action_kind
+                FROM photo_person_actions
+                WHERE person_id = @source_person_id
+                ORDER BY asset_revision_id, id DESC
+            ),
+            target_latest AS (
+                SELECT DISTINCT ON (asset_revision_id)
+                    asset_revision_id,
+                    action_kind
+                FROM photo_person_actions
+                WHERE person_id = @target_person_id
+                ORDER BY asset_revision_id, id DESC
+            )
+            INSERT INTO photo_person_actions (
+                asset_revision_id,
+                person_id,
+                action_kind,
+                actor,
+                created_at_utc)
+            SELECT
+                source.asset_revision_id,
+                @target_person_id,
+                'add',
+                'person-merge',
+                @created_at_utc
+            FROM source_latest AS source
+            LEFT JOIN target_latest AS target
+                ON target.asset_revision_id = source.asset_revision_id
+            WHERE source.action_kind = 'add'
+              AND target.action_kind IS DISTINCT FROM 'add';
+            """;
+        command.Parameters.AddWithValue(
+            "source_person_id",
+            Guid.Parse(sourcePersonId.ToString()));
+        command.Parameters.AddWithValue(
+            "target_person_id",
+            Guid.Parse(targetPersonId.ToString()));
+        command.Parameters.AddWithValue(
+            "created_at_utc",
+            createdAtUtc.ToUniversalTime());
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<Dictionary<PersonId, string>>

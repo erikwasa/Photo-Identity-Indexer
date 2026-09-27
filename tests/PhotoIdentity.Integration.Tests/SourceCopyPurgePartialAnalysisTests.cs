@@ -57,18 +57,44 @@ public sealed class SourceCopyPurgePartialAnalysisTests
                     INSERT INTO processing_runs (
                         id, status, configuration_json, started_at_utc, completed_at_utc, error)
                     VALUES ($run_id, 'running', $configuration_json, $now, NULL, NULL);
+                    INSERT INTO archive_analysis_profiles (
+                        profile_hash,
+                        detector_pipeline_hash,
+                        detector_model_id,
+                        detector_model_hash,
+                        embedder_model_id,
+                        embedder_model_hash,
+                        alignment_protocol,
+                        canonical_definition,
+                        recorded_at_utc)
+                    VALUES (
+                        $profile_hash,
+                        $profile_hash,
+                        'test-detector',
+                        $profile_hash,
+                        'test-embedder',
+                        $profile_hash,
+                        'test-alignment',
+                        'test-profile',
+                        $now);
                     INSERT INTO archive_analysis_runs (processing_run_id, profile_hash, registered_at_utc)
                     VALUES ($run_id, $profile_hash, $now);
                     INSERT INTO processing_jobs (
                         id, processing_run_id, asset_revision_id, status,
-                        attempt_count, available_at_utc, started_at_utc, completed_at_utc, error)
-                    VALUES ($job_id, $run_id, $revision_id, 'running', 1, $now, $now, NULL, NULL);
+                        attempt_count, available_at_utc, started_at_utc, completed_at_utc, error,
+                        idempotency_key, lease_token, leased_until_utc)
+                    VALUES (
+                        $job_id, $run_id, $revision_id, 'running', 1, $now, $now, NULL, NULL,
+                        $idempotency_key, $lease_token, $leased_until_utc);
                     """;
                 seed.Parameters.AddWithValue("$source_id", sourceId.ToString());
                 seed.Parameters.AddWithValue("$asset_id", assetId.ToString());
                 seed.Parameters.AddWithValue("$revision_id", revisionId.ToString());
                 seed.Parameters.AddWithValue("$run_id", runId.ToString());
                 seed.Parameters.AddWithValue("$job_id", jobId.ToString());
+                seed.Parameters.AddWithValue("$idempotency_key", $"purge-partial:{jobId:D}");
+                seed.Parameters.AddWithValue("$lease_token", Guid.NewGuid().ToString("D"));
+                seed.Parameters.AddWithValue("$leased_until_utc", Format(now.AddMinutes(5)));
                 seed.Parameters.AddWithValue("$source_key", sourceKey);
                 seed.Parameters.AddWithValue("$hash", new string('a', 64));
                 seed.Parameters.AddWithValue("$profile_hash", new string('b', 64));

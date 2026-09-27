@@ -2,6 +2,7 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
+using System.Text.Json;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -46,7 +47,11 @@ public sealed class ResumableBatchProcessorTests
             Assert.Equal(ProcessingJobStatus.Succeeded, afterInterruption.Single(job => job.Id == jobs[0].Id).Status);
             CatalogueProcessingJob active = afterInterruption.Single(job => job.Id == jobs[1].Id);
             Assert.Equal(ProcessingJobStatus.Running, active.Status);
-            Assert.Equal("""{"stage":"halfway"}""", active.CheckpointJson);
+            Assert.NotNull(active.CheckpointJson);
+            using (JsonDocument checkpoint = JsonDocument.Parse(active.CheckpointJson))
+            {
+                Assert.Equal("halfway", checkpoint.RootElement.GetProperty("stage").GetString());
+            }
             Assert.Equal(ProcessingJobStatus.Queued, afterInterruption.Single(job => job.Id == jobs[2].Id).Status);
 
             time.Advance(TimeSpan.FromMinutes(2));

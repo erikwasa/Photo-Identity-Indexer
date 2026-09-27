@@ -53,5 +53,16 @@
     <Compile Remove="MatchCommandTests.cs" />
     <!-- The stopped-source .db/PRAGMA backup path is migration-era SQLite tooling, not supported PostgreSQL behavior. -->
     <Compile Remove="CatalogueBackupCommandTests.cs" />
+    <!-- The source-side identity regeneration migration rehearsal requires the retained SQLite importer and is tracked as a WI-0149 migration exception, not active runtime coverage. -->
+    <Compile Remove="PostgresRuntimeApplicationTests.IdentityRegenerationMigration.cs" />
+    <!-- Catalogue evaluation export is still implemented only by the retained SQLite migration/compatibility adapter; WI-0149 owns its final disposition. -->
+    <Compile Remove="CatalogueEvaluationExportCommandTests.cs" />
+    <!-- The accepted stopped-source catalogue migration is preserved as WI-0102 operational evidence; executable SQLite-source migration coverage remains a WI-0149 compatibility concern. -->
+    <Compile Remove="CatalogueMigrationCommandTests.cs" />
+    <Compile Remove="PostgresRuntimeApplicationTestsMigration.cs" />
+    <!-- These commands still compose the retained SQLite compatibility adapter and are not supported PostgreSQL runtime paths; WI-0149 owns their removal or replacement. -->
+    <Compile Remove="ArchiveCommandTests.cs" />
+    <Compile Remove="BatchCommandTests.cs" />
+    <Compile Remove="PortableBundleCommandTests.cs" />
   </ItemGroup>
 </Project>

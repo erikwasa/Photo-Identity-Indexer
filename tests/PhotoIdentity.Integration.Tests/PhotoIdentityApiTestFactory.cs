@@ -32,6 +32,7 @@ internal class WebApplicationFactory<TEntryPoint> :
     protected override IHost CreateHost(IHostBuilder builder)
     {
         builder.UseEnvironment("IntegrationTestPostgres");
+        builder.ConfigureWebHost(webBuilder => webBuilder.UseStaticWebAssets());
 
         // A number of mature endpoint fixtures override ConfigureWebHost without calling base and
         // still provide only the historical PhotoIdentity:DatabasePath compatibility key. Host

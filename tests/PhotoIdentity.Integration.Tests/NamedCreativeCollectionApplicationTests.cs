@@ -59,7 +59,7 @@ public sealed class NamedCreativeCollectionApplicationTests
                         $context,
                         $selection,
                         $ordering,
-                        1,
+                        TRUE,
                         $created,
                         $created);
                     """;

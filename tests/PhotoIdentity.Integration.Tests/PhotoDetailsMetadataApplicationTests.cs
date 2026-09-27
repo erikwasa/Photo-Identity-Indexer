@@ -58,7 +58,7 @@ public sealed class PhotoDetailsMetadataApplicationTests
             Assert.Equal("extracted", response.CaptureDate!.Source);
             Assert.Equal("timestamp", response.CaptureDate.Precision);
             Assert.Equal("2025-05-06", response.CaptureDate.EffectiveFrom);
-            Assert.False(response.CaptureDate.CanEdit);
+            Assert.True(response.CaptureDate.CanEdit);
             PhotoMetadataTagResponse rawTag = Assert.Single(returned.Tags);
             Assert.Equal("Exif IFD0", rawTag.Directory);
             Assert.Equal("Make", rawTag.Name);

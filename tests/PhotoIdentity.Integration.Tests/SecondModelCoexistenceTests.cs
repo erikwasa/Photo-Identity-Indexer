@@ -238,7 +238,7 @@ public sealed class SecondModelCoexistenceTests
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = "SELECT id FROM face_crops;";
         object? value = await command.ExecuteScalarAsync();
-        return FaceCropId.From(Guid.Parse(Assert.IsType<string>(value)));
+        return FaceCropId.From(Assert.IsType<Guid>(value));
     }
 
     private static string CreateTemporaryDirectory()

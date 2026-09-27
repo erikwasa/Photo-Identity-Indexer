@@ -129,10 +129,10 @@ public sealed class SmartCollectionQueryRepositoryTests
             SqliteSmartCollectionQueryRepository query = new(database);
             CatalogueAssetRevision tagged = await CreateRevisionAsync(catalogue, directory, "tagged.jpg", 'd');
             _ = await CreateRevisionAsync(catalogue, directory, "untagged.jpg", 'e');
-            await tags.AddManualTagAsync(tagged.Id, "Places/Sweden/Stockholm", "test");
+            await tags.AddManualTagAsync(tagged.Id, "Archive/Sweden/Stockholm", "test");
 
             SmartCollectionPhotoPage result = await query.QueryAsync(
-                new SmartCollectionFilter(tags: ["places/sweden/stockholm"]));
+                new SmartCollectionFilter(tags: ["archive/sweden/stockholm"]));
 
             Assert.Equal(tagged.Id, Assert.Single(result.Items).RevisionId);
             Assert.Equal(1, result.Total);

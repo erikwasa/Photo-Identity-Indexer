@@ -286,6 +286,22 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
             return;
         }
 
+        if (string.Equals(
+                parameter.ParameterName.TrimStart('@', '$'),
+                "taken_at_local",
+                StringComparison.OrdinalIgnoreCase) &&
+            DateTime.TryParseExact(
+                text,
+                "yyyy-MM-dd'T'HH:mm:ss.fffffff",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateTime localTimestamp))
+        {
+            parameter.Value = DateTime.SpecifyKind(localTimestamp, DateTimeKind.Unspecified);
+            parameter.NpgsqlDbType = NpgsqlDbType.Timestamp;
+            return;
+        }
+
         if (IsLegacyJsonParameter(parameter.ParameterName, text))
         {
             parameter.NpgsqlDbType = NpgsqlDbType.Jsonb;

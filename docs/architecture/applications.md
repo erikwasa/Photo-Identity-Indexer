@@ -31,7 +31,7 @@ It:
 - records timings, errors and checkpoints; and
 - writes a checksummed result bundle.
 
-The worker can run locally or on temporary Azure compute. It does not connect to OneDrive, open the canonical SQLite catalogue, or receive people and human review history.
+The worker runs on maintainer-controlled local hardware. It does not connect to OneDrive, open the canonical PostgreSQL catalogue, or receive people and human review history.
 
 ## `PhotoIdentity.Api`
 

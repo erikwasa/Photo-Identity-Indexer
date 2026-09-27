@@ -28,7 +28,7 @@ public sealed class PhotoPlaceFoundationApplicationTests
     }
 
     [Fact]
-    public async Task Generic_tag_api_reserves_places_and_hides_legacy_place_assignments()
+    public async Task Generic_tag_api_reserves_places_and_keeps_place_assignments_separate()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -38,6 +38,10 @@ public sealed class PhotoPlaceFoundationApplicationTests
             SqliteCatalogueDatabase database = new(databasePath);
             SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
             await tags.AddManualTagAsync(seeded.RevisionId, "Places/Sweden/Stockholm", "legacy:test");
+            await new SqlitePhotoPlaceRepository(database, TimeProvider.System).SetManualPlaceAsync(
+                seeded.RevisionId,
+                "Sweden/Stockholm",
+                "test");
 
             await using PlaceApiFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
@@ -72,7 +76,7 @@ public sealed class PhotoPlaceFoundationApplicationTests
                     $"/api/collections/photos/{seeded.RevisionId}/place"));
             Assert.NotNull(placeState.Place);
             Assert.Equal("Sweden/Stockholm", placeState.Place.Value);
-            Assert.Equal("migration", placeState.Place.Source);
+            Assert.Equal("manual", placeState.Place.Source);
             Assert.False(Directory.Exists(seeded.SourceRoot));
         }
         finally

@@ -24,7 +24,7 @@ The solution-level fast pass must exclude both integration namespaces currently 
 
 ### API integration tests
 
-Use `PhotoIdentity.Integration.Tests` for cross-layer application contracts that genuinely require the ASP.NET host, SQLite wiring, HTTP serialization, static-web-host wiring or interactions among multiple application modules.
+Use `PhotoIdentity.Integration.Tests` for cross-layer application contracts that genuinely require the ASP.NET host, PostgreSQL wiring, HTTP serialization, static-web-host wiring or interactions among multiple application modules. PostgreSQL-backed fixtures use isolated disposable databases and require `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING`; the integration-shard CI script provisions the Windows runner service and supplies that process-local setting.
 
 Generic API tests should use `PhotoIdentityApiTestFactory`. The shared factory disables unrelated production background workers by default so a request test is not competing with archive advancement, identity-regeneration or place-enrichment loops. Tests that specifically verify a hosted worker should exercise its cycle directly where possible or explicitly opt into the production worker.
 
