@@ -1,14 +1,14 @@
-# Local evaluation workflow
+# Local evaluation workflow — historical reviewed-catalogue procedure
 
-This specialized runbook evaluates one exact detector/embedder revision from an already reviewed local catalogue. Use the [local operator guide](local-operator-guide.md) for setup, processing, browser review, suggestion regeneration, collections, backup and cleanup.
+> **Historical procedure.** This page records the reviewed-catalogue evaluation workflow used before WI-0149 retired the SQLite-opening `batch`, `match regenerate` and `evaluate export` CLI paths. Do not copy these commands into current operation.
 
-For a same-corpus comparison between model revisions, use the [multi-model comparison workflow](multi-model-comparison.md).
+The retained evidence is useful for understanding how earlier model comparisons fixed immutable source scope, exact detector/embedder revisions, deterministic split identity and held-out reporting. The original procedure operated against the then-canonical SQLite catalogue and produced private deterministic manifests/reports outside Git.
 
-## Evaluation boundary
+## Historical evaluation boundary
 
-An accepted evaluation identifies and fixes:
+An accepted run fixed:
 
-- the canonical SQLite catalogue;
+- the canonical catalogue snapshot used at that time;
 - immutable source and asset revisions;
 - detector model ID and SHA-256;
 - embedder model ID and SHA-256;
@@ -17,146 +17,39 @@ An accepted evaluation identifies and fixes:
 - split seed and split counts; and
 - the processing run that produced the selected embeddings.
 
-Human-confirmed assignments are canonical. Suggestions and evaluation outputs are derived, model-versioned evidence.
+Human-confirmed assignments were canonical. Suggestions and evaluation outputs were derived, model-versioned evidence. Validation selected thresholds; the held-out test split reported final results without selecting replacement thresholds.
 
-## 1. Define private paths and exact revisions
+## Current supported evaluation surface
 
-Run from the repository root:
-
-```powershell
-$root = "C:\PhotoIdentityPilot"
-$db = Join-Path $root "catalogue.db"
-$evaluation = Join-Path $root "model-lab"
-$runId = "REPLACE_WITH_RUN_ID"
-
-New-Item -ItemType Directory -Force -Path $evaluation | Out-Null
-
-$detector = Get-Content `
-  .\models\manifests\yunet-2023mar-fp32.json -Raw | ConvertFrom-Json
-$embedder = Get-Content `
-  .\models\manifests\sface-2021dec-fp32.json -Raw | ConvertFrom-Json
-```
-
-Confirm the saved batch run before export:
+WI-0149 removed the migration-era catalogue export/regeneration commands rather than porting them to PostgreSQL because they were no longer part of supported application operation. Current CLI help is authoritative:
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch status --database $db --run $runId
+dotnet run --project src/PhotoIdentity.Cli -- --help
 ```
 
-Expected success signals:
+The provider-neutral `evaluate --dataset ...` command remains available for an already prepared neutral evaluation dataset. New catalogue-backed evaluation features should be added against PostgreSQL/provider-neutral contracts rather than reviving the retired SQLite command surface.
 
-- the run reports the intended detector and embedder IDs;
-- the intended immutable revisions are complete or have recorded unsupported/unavailable outcomes; and
-- the selected model files match their pinned manifests.
+Current bounded semantic/image/caption evaluation commands that explicitly accept `--postgres-connection-env` are separate PostgreSQL-backed engineering workflows and document their own input/output boundaries.
 
-## 2. Regenerate suggestions for the exact embedder
+## Historical evidence principles retained
 
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  match regenerate `
-  --database $db `
-  --embedder-id $embedder.modelId `
-  --embedder-hash $embedder.sha256
-```
+For any future same-corpus model comparison, preserve the principles that made the old procedure reproducible:
 
-Expected success signals:
+- fix exact model IDs and hashes;
+- fix immutable revision scope;
+- use deterministic ordering/split identity;
+- select thresholds from validation data only;
+- report held-out results separately;
+- compare repeated output hashes when deterministic bytes are expected; and
+- keep private catalogues, images, crops, embeddings, names and per-person reports outside Git.
 
-- the exact model ID and hash are echoed;
-- target and suggestion counts are reported;
-- confirmed assignments and append-only review history remain unchanged; and
-- rejected face-person pairs remain excluded.
-
-Regeneration prepares exact-model advisory evidence; it does not create canonical labels.
-
-## 3. Export a deterministic reviewed-catalogue split
-
-Define output and fixed provenance:
-
-```powershell
-$manifest = Join-Path $evaluation "baseline.json"
-$report = Join-Path $evaluation "baseline-report.json"
-$datasetId = "private-baseline-v1"
-$pipelineVersion = "local-pipeline-v1"
-$splitSeed = "private-baseline-split-v1"
-```
-
-Export:
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate export `
-  --database $db `
-  --output $manifest `
-  --dataset-id $datasetId `
-  --pipeline-version $pipelineVersion `
-  --detector-id $detector.modelId `
-  --detector-hash $detector.sha256 `
-  --embedder-id $embedder.modelId `
-  --embedder-hash $embedder.sha256 `
-  --seed $splitSeed `
-  --run $runId
-```
-
-Expected success signals:
-
-- export reports the exact detector and embedder revisions;
-- the source and processing-run scope is explicit;
-- gallery, validation and held-out test splits are created under the fixed seed; and
-- no private path or report is written under the repository.
-
-## 4. Evaluate without changing the split
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate `
-  --dataset $manifest `
-  --output $report
-```
-
-Validation selects thresholds. The held-out test split reports final results and must not select a replacement threshold.
-
-Expected success signals:
-
-- the report preserves dataset and exact-model provenance;
-- validation and held-out results are separated;
-- unknown-rejection and identification results are present; and
-- the command completes without changing the canonical catalogue.
-
-## 5. Prove deterministic bytes
-
-Repeat export and evaluation with unchanged inputs, then compare hashes:
-
-```powershell
-Get-FileHash $manifest -Algorithm SHA256
-Get-FileHash $report -Algorithm SHA256
-```
-
-The repeated manifest and report hashes must match their previous values. A mismatch means the input scope, provenance, ordering or implementation changed and must be investigated before comparing results.
-
-## 6. Interpret and retain evidence
-
-Record private evidence outside Git:
-
-- exact detector and embedder IDs and hashes;
-- immutable revision and evaluated-face counts;
-- split identity and selected thresholds;
-- held-out identification and unknown-rejection metrics;
-- confusion and representative error review;
-- processing/evaluation throughput when measured; and
-- defects, uncertainty and recommendation.
-
-Do not commit the catalogue, images, crops, embeddings, names, real manifests, reports or per-person results.
-
-## Multi-model evaluation
-
-Do not duplicate this procedure manually for a candidate model. The [multi-model comparison workflow](multi-model-comparison.md) automates fixed-scope processing, exact-model suggestion regeneration, deterministic export/evaluation, split equality checks, resumability and private summary generation.
+The earlier FP32/INT8 and detector experiments remain governed evidence under their completed work items/runbooks. They are not instructions to restore the retired catalogue provider or CLI commands.
 
 ## Related references
 
 - [Local operator guide](local-operator-guide.md)
-- [Multi-model comparison workflow](multi-model-comparison.md)
+- [Operations documentation map](index.md)
 - [Evaluation method](../models/evaluation-method.md)
 - [Model manifests and governance](../models/model-governance.md)
 - [Recognition and identity matching](../architecture/identity-matching.md)
-- [Glossary](../glossary.md)
+- [Historical SQLite persistence record](sqlite-persistence.md)
