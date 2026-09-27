@@ -6,7 +6,7 @@ owner: codex
 document: ../work-items/WI-0166-included-folder-sync-performance.md
 started_at: 2026-09-27
 last_updated_at: 2026-09-27
-branch: codex/wi-0166-sync-performance
+branch: wi-166
 blockers:
 - WI-0079
 - WI-0099
