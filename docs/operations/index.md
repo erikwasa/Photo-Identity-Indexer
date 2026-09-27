@@ -1,6 +1,6 @@
 # Operations documentation
 
-Use this page to decide which runbook is current. Some files under `docs/operations` are intentionally retained as reproducible evidence for completed detector/model experiments; they are not normal operator instructions.
+Use this page to decide which runbook is current. Some files under `docs/operations` are intentionally retained as reproducible evidence for completed detector/model experiments or catalogue migration; they are not normal operator instructions.
 
 ## Current operator path
 
@@ -9,10 +9,14 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 - [Windows operator package](windows-package.md) — self-contained `win-x64` package build, installation, durable-data boundary and side-by-side upgrade procedure.
 - [PostgreSQL production operations](postgresql-operations.md) — current production startup/restart, logical backup, isolated restore verification, upgrade boundary and WI-0106 catch-up acceptance path.
 - [PostgreSQL local runtime](postgresql-local-runtime.md) — Podman/WSL PostgreSQL service setup, localhost diagnostics and verification details.
-- [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) — accepted SQLite-to-PostgreSQL authority-transfer and rollback boundary; not the normal daily backup procedure.
-- [SQLite persistence operations](sqlite-persistence.md) — retained compatibility/migration/rollback guidance now that PostgreSQL is production authority.
 - [Review-proxy serving and bounded originals](review-proxy-serving.md) — current archive storage/original-serving semantics.
 - [Bounded archive acceptance](bounded-archive-acceptance.md) — retained permanent-archive acceptance record/runbook.
+
+## Historical catalogue migration evidence
+
+- [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) — accepted SQLite-to-PostgreSQL authority-transfer and rollback evidence from WI-0102. It is historical migration evidence, not a supported current catalogue-selection or daily-backup path.
+
+The former SQLite persistence runbook was retired with WI-0149 when the SQLite implementation and executable compatibility paths were removed. PostgreSQL production operations own the current backup/restore procedure.
 
 ## Conditional maintenance and engineering procedures
 
