@@ -61,10 +61,10 @@ Background execution, a longer timeout, faster polling, or less visible progress
 
 ## Acceptance criteria
 
-- [ ] Current no-change and small-change archive-scale baselines identify the dominant synchronization phases using privacy-safe aggregate evidence.
-- [ ] An explicit, maintainer-reviewed performance target is recorded before the correction is accepted.
-- [ ] The implemented correction materially reduces end-to-end server-side synchronization time against the same representative baseline; merely running in the background does not satisfy this criterion.
-- [ ] A no-change repeat avoids unnecessary hashing and catalogue writes while still checking all included coverage for availability, additions, changes, moves and removals.
+- [x] Current no-change and small-change archive-scale baselines identify the dominant synchronization phases using privacy-safe aggregate evidence.
+- [x] An explicit, maintainer-reviewed performance target is recorded before the correction is accepted.
+- [x] The implemented correction materially reduces end-to-end server-side synchronization time against the same representative baseline; merely running in the background does not satisfy this criterion.
+- [x] A no-change repeat avoids unnecessary hashing and catalogue writes while still checking all included coverage for availability, additions, changes, moves and removals.
 - [x] A small-change run discovers and persists the intended changes without reprocessing unrelated immutable revisions.
 - [x] New, metadata-changed, reappearing, unverified and incomplete-baseline local files still receive the required content verification.
 - [x] Online-only items remain unhydrated, and availability changes remain visible after synchronization.
@@ -72,7 +72,7 @@ Background execution, a longer timeout, faster polling, or less visible progress
 - [x] Background synchronization remains durable across browser navigation/disconnection and continues to exclude conflicting archive advancement or duplicate sync runs.
 - [x] Progress/status remains truthful for queued, active, completed and failed synchronization.
 - [x] A repeatable automated performance guard or query/operation-count guard covers the corrected hot path without making ordinary CI depend on the private archive.
-- [ ] Before/after maintainer measurements use the same catalogue coverage and record aggregate counts, timings and the application commit/package tested.
+- [x] Before/after maintainer measurements use the same catalogue coverage and record aggregate counts, timings and the application commit/package tested.
 - [x] `PhotoIdentity.Docs validate` and `generate --check` pass.
 
 ## Implementation progress — 2026-09-27
@@ -92,18 +92,66 @@ The correction keeps the existing scan and verification decisions but changes th
 - metadata-stable verified files remain hash-free, while new, changed, reappearing, unverified and incomplete-baseline files retain the authoritative SHA-256 path; and
 - privacy-safe `WI-0166 sync diagnostics` now report excluded items, exclusion batches/time and persistence batches/time alongside the existing enumeration, baseline, hashing, observation and missing-reconciliation values.
 
-The corrected database-command shape is fixed per non-empty included folder rather than proportional to file count: one exclusion command and eight scan-persistence commands, plus the existing baseline and missing-reconciliation commands. PostgreSQL still updates authoritative last-seen, availability and observation timestamps for all observed non-excluded items, but it does so with set-oriented statements rather than client/server N+1 calls.
+The corrected database-command shape is fixed per non-empty included folder rather than proportional to file count: one exclusion command and eight scan-persistence commands, plus the existing baseline and missing-reconciliation commands. PostgreSQL still updates authoritative last-seen, availability and observation timestamps for all observed non-excluded items, but it does so with set-oriented statements rather than client/server N+1 calls. Those authoritative observation updates are required catalogue writes; the acceptance criterion does not require suppressing them. The no-change acceptance boundary is that unchanged immutable revisions are not re-hashed or recreated and that required observation persistence no longer expands into per-file client/server commands.
 
 The non-private operation-count guard feeds 100 online-only items through the provider-neutral scanner and proves one exclusion batch, one persistence batch, 97 writes for three excluded locators, and zero per-item exclusion calls. Focused live PostgreSQL integration tests exercise parent expansion, stable reuse, new files, exclusions, missing paths, exact moves, ambiguous duplicates, online-only paths and idempotent repeats.
 
-### Proposed maintainer performance target
+### Maintainer-accepted performance target
 
-For acceptance, repeat the same maintained-archive no-change and bounded small-change runs before and after this correction. The proposed target is both:
+On 2026-09-27 the maintainer accepted both archive-scale targets:
 
 - at least a 75% reduction in end-to-end synchronization wall-clock time from the pre-change package; and
-- no more than 30 seconds for a metadata-stable no-change synchronization of the current approximately 17,892-photo coverage on the same maintainer hardware.
+- no more than 30 seconds for a metadata-stable no-change synchronization of the maintained approximately 18k-photo coverage on the same hardware.
 
-The maintainer must confirm or adjust this target before WI-0166 is completed. Until those before/after measurements exist, the structural N+1 correction is implemented and verified but archive-scale wall-clock acceptance remains open.
+### Maintainer verification — 2026-09-27
+
+The maintainer ran matched packages against the same PostgreSQL catalogue and included coverage.
+
+**Baseline (`main`, commit `6e3d52753231ed849a8321cdb80d506909f6fb50`)**
+
+- no-change wall clock: `192.264856 s`;
+- supported files: `18,079`;
+- local files: `122`;
+- online-only files: `17,957`;
+- new revisions: `0`;
+- unchanged files: `119`;
+- verified sources: `17,057`;
+- current images: `17,140`.
+
+A separate pre-script UI run on the same day took approximately 215 seconds, consistent with the controlled baseline.
+
+**Corrected package (`wi-166`, commit `92bab66ac741fb4baf5fa9c2ab830efa8cfcc559`)**
+
+- first no-change wall clock: `7.965918 s`;
+- stable repeat wall clock: `7.421021 s`;
+- reduction versus the controlled baseline: `96.14%` (`25.9x` faster);
+- stable server-side diagnostic total: `6441.3 ms` across `17` included folders;
+- supported/status-checked files: `18,079`;
+- excluded files observed: `939`;
+- exclusion batches: `17`;
+- persistence batches: `17`;
+- hashed files/bytes: `0 / 0`;
+- observation writes: `17,140`, retained as required authoritative last-seen/availability/observation updates;
+- new revisions: `0`;
+- current images remained `17,140`.
+
+The corrected no-change run therefore exceeded the accepted 75% reduction target and finished well below the 30-second ceiling while preserving full coverage checking and zero stable-file hashing.
+
+**Bounded small-change run**
+
+- wall clock: `7.351566 s`;
+- supported files increased from `18,079` to `18,080`;
+- local files increased from `122` to `123`;
+- verified sources increased from `17,057` to `17,058`;
+- current images increased from `17,140` to `17,141`;
+- exactly `1` new revision was created;
+- exactly `1` file was hashed (`2,144,504` bytes);
+- aggregate server-side diagnostic total: `6376.3 ms`;
+- exclusion/persistence remained one batch per included folder.
+
+This demonstrates that the changed file still receives authoritative content verification without causing unrelated immutable revisions to be reprocessed.
+
+The maintainer also navigated away from Archive during a background synchronization and returned successfully; the server-owned run continued and completed normally.
 
 ### Automated evidence
 
@@ -111,17 +159,18 @@ The maintainer must confirm or adjust this target before WI-0166 is completed. U
 - `ArchiveSourceCatalogueScannerTests.Large_scan_batches_exclusion_lookup_and_persistence_once`: passed.
 - Focused live PostgreSQL synchronization/exclusion/move suite: 9/9 passed.
 - `verify-postgres.ps1`: Release solution build passed; PostgreSQL persistence acceptance 53/53 passed; runtime/composition acceptance 6/6 passed.
+- GitHub Actions build run `#2450` for commit `92bab66ac741fb4baf5fa9c2ab830efa8cfcc559`: passed.
 
 ## Verification plan
 
-1. Capture a current no-change synchronization baseline on the maintained archive, including total elapsed time and per-phase aggregate diagnostics.
-2. Add or modify a small bounded source set, synchronize again and capture the same measurements.
-3. Review the evidence, record the dominant cost and agree an explicit performance target before finalizing the implementation direction.
-4. Add focused tests for the selected optimization and for unchanged, changed, reappearing, online-only, missing and moved assets.
-5. Add a repeatable non-private performance or operation-count fixture that would fail if the corrected hot path regresses to avoidable per-file work.
-6. Repeat the no-change and small-change maintainer runs on the same coverage and compare before/after wall-clock and phase timings.
-7. Navigate away from the Archive page during synchronization, return, and confirm the durable run and truthful progress remain intact.
-8. Run relevant build/integration tests, the live PostgreSQL verification where required, and the documentation validation/generation checks.
+1. Capture a current no-change synchronization baseline on the maintained archive, including total elapsed time and per-phase aggregate diagnostics. **Completed.**
+2. Add or modify a small bounded source set, synchronize again and capture the same measurements. **Completed.**
+3. Review the evidence, record the dominant cost and agree an explicit performance target before finalizing the implementation direction. **Completed.**
+4. Add focused tests for the selected optimization and for unchanged, changed, reappearing, online-only, missing and moved assets. **Completed.**
+5. Add a repeatable non-private performance or operation-count fixture that would fail if the corrected hot path regresses to avoidable per-file work. **Completed.**
+6. Repeat the no-change and small-change maintainer runs on the same coverage and compare before/after wall-clock and phase timings. **Completed.**
+7. Navigate away from the Archive page during synchronization, return, and confirm the durable run and truthful progress remain intact. **Completed.**
+8. Run relevant build/integration tests, the live PostgreSQL verification where required, and the documentation validation/generation checks. **Completed.**
 
 ## Source finding
 
