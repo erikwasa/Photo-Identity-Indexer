@@ -107,6 +107,10 @@ PR #459 addresses maintainer feedback from using the completed Search surface wi
 - The user-facing **How search works** section now explains Visual, Captions and combined search directly; benchmark/evaluation metrics remain in this work-item documentation rather than in the product help text.
 - `PhotoSearchSessionStateTests` protect cumulative selection ordering, case-insensitive deselection and clearing of the working collection.
 
+After PR #459 was merged, maintainer verification found that requests above 500 still failed with an out-of-range `limit` error. The API/search service and caption repository accepted up to 1,000, but the shared `PhotoSearchRanker` still enforced its older 500-result bound. The follow-up correction aligns the ranker with the 1,000-result product limit and adds a regression test at exactly 1,000 results.
+
+The maintainer also changed the active caption-enrichment language to **English**. English is now the normal operator convention for new captions so Visual, Captions and combined searches can use the same query language. Existing Swedish caption evidence remains valid and searchable; changing the active generation language does not rewrite historical caption rows. The earlier bilingual evaluation and Swedish-caption acceptance evidence remain historical measurement rather than current operator guidance.
+
 This is a post-completion usability correction. It does not reopen the WI-0162 acceptance decision, change semantic/caption ranking, or change the immutable membership semantics of an already saved slideshow collection.
 
 ## Design notes
