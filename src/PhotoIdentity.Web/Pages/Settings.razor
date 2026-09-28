@@ -2,21 +2,55 @@
 
 <PageTitle>Settings · Photo Identity</PageTitle>
 
-<section class="hero">
+<section class="hero settings-hero">
     <div>
         <p class="eyebrow">Operator settings</p>
         <h1>Settings</h1>
-        <p>Manage permanent archive coverage, inspect bounded archive storage policy, configure background photo enrichment, and configure the confidence policy used for future identity matching runs.</p>
+        <p>Manage archive, enrichment, and identity-matching configuration.</p>
     </div>
     <button class="button secondary" @onclick="Refresh">Refresh</button>
 </section>
 
-<ArchiveCoverageSettings RefreshVersion="@RefreshVersion" />
-<ArchiveStorageSettings RefreshVersion="@RefreshVersion" />
-<GeoNamesPlaceEnrichmentSettings />
-<PhotoCaptionEnrichmentSettings />
-<IdentityMatchingSettings RefreshVersion="@RefreshVersion" />
-<MultiEvidenceAutoAssignmentSettings RefreshVersion="@RefreshVersion" />
+<div class="settings-groups">
+    <details class="settings-group" open>
+        <summary>
+            <span>
+                <strong>Archive &amp; storage</strong>
+                <small>Coverage and bounded local hydration</small>
+            </span>
+        </summary>
+        <div class="settings-group-content">
+            <ArchiveCoverageSettings RefreshVersion="@RefreshVersion" />
+            <ArchiveStorageSettings RefreshVersion="@RefreshVersion" />
+        </div>
+    </details>
+
+    <details class="settings-group">
+        <summary>
+            <span>
+                <strong>Metadata enrichment</strong>
+                <small>Places and generated photo captions</small>
+            </span>
+        </summary>
+        <div class="settings-group-content">
+            <GeoNamesPlaceEnrichmentSettings />
+            <PhotoCaptionEnrichmentSettings />
+        </div>
+    </details>
+
+    <details class="settings-group">
+        <summary>
+            <span>
+                <strong>Identity matching</strong>
+                <small>Suggestion confidence and automatic assignment</small>
+            </span>
+        </summary>
+        <div class="settings-group-content">
+            <IdentityMatchingSettings RefreshVersion="@RefreshVersion" />
+            <MultiEvidenceAutoAssignmentSettings RefreshVersion="@RefreshVersion" />
+        </div>
+    </details>
+</div>
 
 @code {
     private int RefreshVersion { get; set; }

@@ -8,7 +8,7 @@
         </div>
         @if (ArchiveStorage is not null)
         {
-            <span class="model-summary">Managed hydration: @(ArchiveStorage.PolicyConfigured ? "enabled" : "disabled")</span>
+            <span class="model-summary">Currently active: @(ArchiveStorage.PolicyConfigured ? "enabled" : "disabled")</span>
         }
     </div>
 
@@ -19,10 +19,6 @@
             <p>Loading archive storage status…</p>
         </div>
     }
-    else if (!string.IsNullOrWhiteSpace(Error))
-    {
-        <div class="notice error" role="alert">Archive storage status could not be loaded: @Error</div>
-    }
     else if (ArchiveStorage is null)
     {
         <div class="empty-state compact">
@@ -31,62 +27,98 @@
     }
     else
     {
-        <div class="review-filter-grid">
-            <div>
-                <span class="field-label">Minimum free-space reserve</span>
-                <strong>@FormatByteSetting(ArchiveStorage.MinimumFreeSpaceReserveBytes)</strong>
-                <p><code>PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes</code></p>
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="notice error" role="alert">@Error</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <div class="notice success" role="status">@Message</div>
+        }
+
+        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="review-filter-grid">
+                <div>
+                    <label class="field-label" for="archive-minimum-free-gb">Minimum free-space reserve (GB)</label>
+                    <input id="archive-minimum-free-gb"
+                           type="number"
+                           min="0"
+                           step="0.1"
+                           inputmode="decimal"
+                           @bind="MinimumFreeSpaceReserveGb"
+                           disabled="@Saving" />
+                    <p>Keep at least this much space free on the archive volume.</p>
+                </div>
+                <div>
+                    <label class="field-label" for="archive-managed-max-gb">Maximum managed hydration (GB)</label>
+                    <input id="archive-managed-max-gb"
+                           type="number"
+                           min="0.1"
+                           step="0.1"
+                           inputmode="decimal"
+                           @bind="MaximumManagedHydrationGb"
+                           disabled="@Saving" />
+                    <p>Maximum local space Photo Identity may reserve for managed originals.</p>
+                </div>
+                <div>
+                    <label class="field-label" for="archive-max-concurrent">Maximum concurrent operations</label>
+                    <input id="archive-max-concurrent"
+                           type="number"
+                           min="1"
+                           step="1"
+                           inputmode="numeric"
+                           @bind="MaximumConcurrentOperations"
+                           disabled="@Saving" />
+                    <p>Bounds concurrent managed hydration and large-read work.</p>
+                </div>
             </div>
-            <div>
-                <span class="field-label">Maximum Photo Identity-managed hydration</span>
-                <strong>@FormatByteSetting(ArchiveStorage.MaximumManagedHydrationBytes)</strong>
-                <p><code>PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes</code></p>
+
+            <div class="card-actions">
+                <button type="submit" class="button primary" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save storage policy")
+                </button>
             </div>
-            <div>
-                <span class="field-label">Maximum concurrent operations</span>
-                <strong>@FormatCountSetting(ArchiveStorage.MaximumConcurrentOperations)</strong>
-                <p><code>PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations</code></p>
-            </div>
-        </div>
+            <p class="field-help">Capacity values are entered in GB. Saved limits are persisted to the packaged launcher configuration and take effect after Photo Identity is restarted.</p>
+        </form>
 
         <h3>Current storage use</h3>
         <div class="review-filter-grid">
             <div>
                 <span class="field-label">Disk free now</span>
-                <strong>@FormatByteSetting(ArchiveStorage.AvailableFreeBytes)</strong>
+                <strong>@FormatGigabytes(ArchiveStorage.AvailableFreeBytes)</strong>
                 <p>Current available free space on the volume containing the configured archive.</p>
             </div>
             <div>
                 <span class="field-label">Photo Identity-managed hydration used</span>
-                <strong>@FormatByteSetting(ArchiveStorage.ManagedReservedBytes)</strong>
+                <strong>@FormatGigabytes(ArchiveStorage.ManagedReservedBytes)</strong>
                 <p>@ArchiveStorage.ActiveManagedOriginals managed item(s) · @ArchiveStorage.HydrationsInProgress hydration(s) currently downloading.</p>
             </div>
             <div>
                 <span class="field-label">Managed budget remaining</span>
-                <strong>@FormatByteSetting(RemainingManagedBudget(ArchiveStorage))</strong>
-                <p>Maximum managed hydration minus bytes still reserved by Photo Identity.</p>
+                <strong>@FormatGigabytes(RemainingManagedBudget(ArchiveStorage))</strong>
+                <p>Currently active managed-hydration limit minus space still reserved by Photo Identity.</p>
             </div>
             <div>
                 <span class="field-label">Managed local / downloading / releasing</span>
-                <strong>@FormatByteSetting(ArchiveStorage.ManagedHydratedBytes)</strong>
-                <p>@FormatByteSetting(ArchiveStorage.ManagedDownloadingBytes) downloading · @FormatByteSetting(ArchiveStorage.ManagedReleasingBytes) releasing.</p>
+                <strong>@FormatGigabytes(ArchiveStorage.ManagedHydratedBytes)</strong>
+                <p>@FormatGigabytes(ArchiveStorage.ManagedDownloadingBytes) downloading · @FormatGigabytes(ArchiveStorage.ManagedReleasingBytes) releasing.</p>
             </div>
             <div>
                 <span class="field-label">Durable review proxies</span>
-                <strong>@FormatByteSetting(ArchiveStorage.ReviewProxyBytes)</strong>
+                <strong>@FormatGigabytes(ArchiveStorage.ReviewProxyBytes)</strong>
                 <p>Selected profile: @(string.IsNullOrWhiteSpace(ArchiveStorage.ReviewProxyProfileId) ? "not configured" : ArchiveStorage.ReviewProxyProfileId)</p>
             </div>
             <div>
                 <span class="field-label">Logical archive source size</span>
-                <strong>@FormatByteSetting(ArchiveStorage.LogicalSourceBytes)</strong>
-                <p>Aggregate logical bytes in current archive coverage; this is not the amount that must remain local.</p>
+                <strong>@FormatGigabytes(ArchiveStorage.LogicalSourceBytes)</strong>
+                <p>Aggregate logical size in current archive coverage; this is not the amount that must remain local.</p>
             </div>
         </div>
 
         @if (ArchiveStorage.PolicyConfigured)
         {
             <div class="notice success">
-                Managed archive hydration is enabled with all three required limits configured.
+                The currently active managed archive hydration policy is fully configured.
             </div>
         }
         else
@@ -95,22 +127,24 @@
                 @(ArchiveStorage.PolicyMessage ?? "Managed archive hydration is disabled because the complete bounded-storage policy is not configured.")
             </div>
         }
-
-        <p class="field-help">
-            These are startup configuration values and are read-only while Photo Identity is running. For the packaged Windows application, edit
-            <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code> and restart Photo Identity for changes to take effect. Refresh this page to update current disk and managed-storage observations.
-        </p>
     }
 </section>
 
 @code {
+    private const decimal BytesPerGigabyte = 1_073_741_824m;
+
     [Parameter]
     public int RefreshVersion { get; set; }
 
     private ArchiveStorageStatusResponse? ArchiveStorage { get; set; }
     private bool Loading { get; set; } = true;
+    private bool Saving { get; set; }
     private string? Error { get; set; }
+    private string? Message { get; set; }
     private int LoadedRefreshVersion { get; set; } = -1;
+    private decimal MinimumFreeSpaceReserveGb { get; set; }
+    private decimal MaximumManagedHydrationGb { get; set; }
+    private int MaximumConcurrentOperations { get; set; } = 1;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -120,6 +154,7 @@
         }
 
         LoadedRefreshVersion = RefreshVersion;
+        Message = null;
         await LoadAsync();
     }
 
@@ -134,7 +169,80 @@
             if (ArchiveStorage is null)
             {
                 Error = "The archive storage response was empty.";
+                return;
             }
+
+            MinimumFreeSpaceReserveGb = ToGigabytes(ArchiveStorage.MinimumFreeSpaceReserveBytes) ?? 0m;
+            MaximumManagedHydrationGb = ToGigabytes(ArchiveStorage.MaximumManagedHydrationBytes) ?? 0m;
+            MaximumConcurrentOperations = ArchiveStorage.MaximumConcurrentOperations ?? 1;
+        }
+        catch (Exception exception)
+        {
+            Error = $"Archive storage status could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        Error = null;
+        Message = null;
+        if (MinimumFreeSpaceReserveGb < 0m)
+        {
+            Error = "Minimum free-space reserve must be zero or greater.";
+            return;
+        }
+        if (MaximumManagedHydrationGb <= 0m)
+        {
+            Error = "Maximum managed hydration must be greater than zero GB.";
+            return;
+        }
+        if (MaximumConcurrentOperations <= 0)
+        {
+            Error = "Maximum concurrent operations must be greater than zero.";
+            return;
+        }
+
+        Saving = true;
+        try
+        {
+            ArchiveStoragePolicyUpdateRequest request = new(
+                MinimumFreeSpaceReserveGb,
+                MaximumManagedHydrationGb,
+                MaximumConcurrentOperations);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync("api/archive/storage/policy", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                ArchiveErrorResponse? error = null;
+                try
+                {
+                    error = await response.Content.ReadFromJsonAsync<ArchiveErrorResponse>();
+                }
+                catch
+                {
+                }
+
+                Error = !string.IsNullOrWhiteSpace(error?.Error)
+                    ? error.Error
+                    : $"Storage policy could not be saved. HTTP {(int)response.StatusCode}.";
+                return;
+            }
+
+            ArchiveStoragePolicyUpdateResponse? saved =
+                await response.Content.ReadFromJsonAsync<ArchiveStoragePolicyUpdateResponse>();
+            if (saved is null)
+            {
+                Error = "The saved storage policy response was empty.";
+                return;
+            }
+
+            MinimumFreeSpaceReserveGb = saved.MinimumFreeSpaceReserveGb;
+            MaximumManagedHydrationGb = saved.MaximumManagedHydrationGb;
+            MaximumConcurrentOperations = saved.MaximumConcurrentOperations;
+            Message = saved.Message;
         }
         catch (Exception exception)
         {
@@ -142,7 +250,7 @@
         }
         finally
         {
-            Loading = false;
+            Saving = false;
         }
     }
 
@@ -151,26 +259,12 @@
             ? Math.Max(0L, maximum - storage.ManagedReservedBytes)
             : null;
 
-    private static string FormatByteSetting(long? value)
+    private static decimal? ToGigabytes(long? value) =>
+        value is null ? null : decimal.Round(value.Value / BytesPerGigabyte, 2, MidpointRounding.AwayFromZero);
+
+    private static string FormatGigabytes(long? value)
     {
-        if (value is null)
-        {
-            return "Not available";
-        }
-
-        string[] units = ["bytes", "KiB", "MiB", "GiB", "TiB"];
-        double scaled = value.Value;
-        int unit = 0;
-        while (Math.Abs(scaled) >= 1024d && unit < units.Length - 1)
-        {
-            scaled /= 1024d;
-            unit++;
-        }
-
-        string human = unit == 0 ? $"{value.Value} bytes" : $"{scaled:0.##} {units[unit]}";
-        return $"{human} ({value.Value} bytes exact)";
+        decimal? gigabytes = ToGigabytes(value);
+        return gigabytes is null ? "Not available" : $"{gigabytes.Value:0.##} GB";
     }
-
-    private static string FormatCountSetting(int? value) =>
-        value is null ? "Not configured" : $"{value.Value} operation{(value.Value == 1 ? "" : "s")}";
 }

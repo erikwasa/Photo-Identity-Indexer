@@ -1,0 +1,109 @@
+.settings-hero {
+    margin-bottom: 0.8rem;
+}
+
+.settings-hero h1 {
+    margin-bottom: 0.25rem;
+}
+
+.settings-groups {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.settings-group {
+    border: 1px solid rgba(31, 51, 42, 0.14);
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.78);
+    overflow: clip;
+}
+
+.settings-group > summary {
+    min-height: 3.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.settings-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-group > summary::after {
+    content: "▾";
+    flex: 0 0 auto;
+    font-weight: 800;
+}
+
+.settings-group[open] > summary::after {
+    content: "▴";
+}
+
+.settings-group > summary:hover,
+.settings-group > summary:focus-visible {
+    background: rgba(42, 91, 68, 0.06);
+}
+
+.settings-group > summary span {
+    min-width: 0;
+    display: grid;
+    gap: 0.1rem;
+}
+
+.settings-group > summary strong {
+    font-size: 1rem;
+}
+
+.settings-group > summary small {
+    color: #607068;
+    font-size: 0.84rem;
+    font-weight: 500;
+}
+
+.settings-group-content {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0 0.7rem 0.7rem;
+}
+
+.settings-group-content ::deep .review-filter-panel {
+    margin: 0;
+    padding: 0.85rem;
+}
+
+.settings-group-content ::deep .section-heading {
+    margin-bottom: 0.55rem;
+}
+
+.settings-group-content ::deep .review-filter-grid {
+    gap: 0.65rem;
+}
+
+.settings-group-content ::deep input:not([type="checkbox"]),
+.settings-group-content ::deep select {
+    min-height: 2.35rem;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+.settings-group-content ::deep .card-actions {
+    margin-top: 0.65rem;
+}
+
+@media (max-width: 680px) {
+    .settings-group > summary {
+        padding: 0.6rem 0.7rem;
+    }
+
+    .settings-group-content {
+        padding: 0 0.45rem 0.45rem;
+    }
+
+    .settings-group-content ::deep .review-filter-panel {
+        padding: 0.7rem;
+    }
+}
