@@ -7,6 +7,8 @@ START
 2. Double-click PhotoIdentity.cmd.
 3. The launcher starts the packaged local server, waits for /health, and opens the browser.
 
+If PostgreSQL is reachable but is still completing startup/recovery and returns SQLSTATE 57P03, PhotoIdentity.cmd retries startup for roughly the normal launcher health window instead of failing on the first connection attempt. Authentication, migration, configuration, and unrelated startup failures still stop immediately.
+
 The package is self-contained and does not require a separately installed .NET runtime. The governed CenterFace and SFace ONNX files required for normal archive advancement are installed into app\models\files during packaging and travel with replaceable application code; a separate source checkout is not required at runtime.
 
 DURABLE DATA AND CONFIGURATION
