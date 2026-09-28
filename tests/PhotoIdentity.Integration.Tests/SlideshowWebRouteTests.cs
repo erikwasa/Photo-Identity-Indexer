@@ -37,6 +37,13 @@ public sealed class SlideshowWebRouteTests
     }
 
     [Fact]
+    public void App_surface_navigation_targets_stay_inside_the_installed_pwa_scope()
+    {
+        Assert.Equal("/", AppSurfaceNavigation.FullAppPath);
+        Assert.Equal("/slideshows", AppSurfaceNavigation.SlideshowsPath);
+    }
+
+    [Fact]
     public void Slideshow_library_collection_contract_exposes_only_identity_and_name()
     {
         string[] properties = typeof(SlideshowLibraryCollectionResponse)
