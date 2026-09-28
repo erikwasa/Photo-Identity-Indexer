@@ -93,6 +93,24 @@ public sealed class PhotoSearchRankerTests
         Assert.Equal(first, one[0].RevisionId);
     }
 
+    [Fact]
+    public void Ranker_accepts_the_product_maximum_of_one_thousand_results()
+    {
+        PhotoSearchSemanticHit[] semantic = Enumerable.Range(1, 1000)
+            .Select(index => new PhotoSearchSemanticHit(
+                Revision($"00000000-0000-0000-0000-{index:D12}"),
+                1d - (index / 2000d)))
+            .ToArray();
+
+        IReadOnlyList<PhotoSearchRankedHit> result = PhotoSearchRanker.Fuse(
+            semantic,
+            [],
+            PhotoSearchModes.Semantic,
+            limit: 1000);
+
+        Assert.Equal(1000, result.Count);
+    }
+
     private static AssetRevisionId Revision(string value) =>
         AssetRevisionId.From(Guid.Parse(value));
 }
