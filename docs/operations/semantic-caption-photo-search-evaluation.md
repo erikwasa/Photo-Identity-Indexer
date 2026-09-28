@@ -29,7 +29,9 @@ The product decision is therefore:
 - Swedish CLIP input is not a supported quality target for WI-0162.
 - No translation layer or multilingual replacement model is added.
 - Existing image embeddings remain valid; this decision does not require re-indexing the archive.
-- Caption-only search can still use the language in which captions were generated.
+- Caption-only search can search stored caption text in whatever language that evidence was generated.
+
+The maintainer's current operating convention, adopted on 2026-09-28, is to generate new captions in **English**. This keeps routine Visual, Captions and combined searches in one language. Older Swedish caption evidence remains valid and searchable; switching the active caption-enrichment language does not rewrite historical caption rows.
 
 This is an evidence-based scope decision, not a statement that Swedish text cannot technically be submitted to the encoder.
 
@@ -72,6 +74,12 @@ GET /api/photo-search/status
 For formal WI-0162 review, wait until the representative indexed set is materially larger than WI-0127's 185 photos. The evaluator refuses a smaller sample by default.
 
 Raw vector storage is reported directly. A 512-dimensional float32 vector is 2,048 raw bytes before PostgreSQL row/index overhead, matching the WI-0127 representation.
+
+## Result-count bounds
+
+The Search UI exposes result counts up to **1,000**. The API service, caption repository and shared result ranker must all accept the same 1,000-result maximum.
+
+PR #459 raised the UI/API-facing limit from 200 to 1,000, but maintainer verification on 2026-09-28 found that 800/1,000-result requests still failed because `PhotoSearchRanker` retained its older 500-result validation bound. The follow-up correction aligns that final guard with the 1,000-result product limit and adds a core regression test at the maximum.
 
 ## Query-suite purpose
 
@@ -167,7 +175,7 @@ Average semantic server latency remained practical at this scale:
 
 The same evaluation showed caption retrieval contributing very little to this particular query suite: only three caption-only rows were returned, all Swedish, so combined aggregate quality matched semantic-only quality. Do not interpret the existence of 517 stored captions as evidence that current caption retrieval materially improves arbitrary natural-language searches; that behavior should be assessed separately when caption retrieval changes.
 
-Based on the measured quality and maintainer preference, WI-0162 adopts **English-only supported Visual/CLIP queries** rather than adding translation or a multilingual semantic model.
+Based on the measured quality and maintainer preference, WI-0162 adopts **English-only supported Visual/CLIP queries** rather than adding translation or a multilingual semantic model. The later switch to English caption generation is an operating convention for unified search; it does not alter the historical bilingual evaluation results above.
 
 ## Product verification
 
@@ -176,11 +184,12 @@ After the measurement is satisfactory, verify the normal UI on desktop and phone
 1. Open **Search** from the primary navigation.
 2. Run an English query in Visual + captions mode and inspect the Visual/Caption provenance badges.
 3. Switch to Visual only and verify photos without generated captions can still appear.
-4. Switch to Captions only and verify blocked/missing captions do not appear as caption evidence; use the language in which the available captions were generated.
+4. Switch to Captions only and verify blocked/missing captions do not appear as caption evidence. For the current maintainer configuration, use English because new captions are generated in English; older Swedish evidence can still be found with Swedish terms where needed.
 5. Select a useful ordered result subset, give it a name and save it.
 6. Save a second search as a different named collection.
 7. Open `/slideshows` and launch both normal explicit slideshow collections.
 8. Restart the application and confirm both collections still contain the same ordered revision membership.
 9. Change a search query or allow new caption/embedding evidence to appear; verify the already-saved collections do not silently change.
+10. Request 800 and 1,000 results on a query/catalogue that can return that many and confirm no `limit` range error is returned.
 
 The save boundary is the existing WI-0145 explicit photo-list model. A save captures immutable revision membership at that moment; it does not store a live search definition.
