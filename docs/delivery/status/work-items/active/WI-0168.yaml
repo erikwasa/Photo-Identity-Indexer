@@ -1,0 +1,10 @@
+id: WI-0168
+title: Add bidirectional navigation between Slideshows and the full PWA
+milestone: M32
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0168-pwa-slideshow-navigation.md
+blockers:
+- WI-0108
+blocker_notes: []
+evidence: []

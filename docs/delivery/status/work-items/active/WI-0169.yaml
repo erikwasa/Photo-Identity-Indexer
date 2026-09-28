@@ -1,0 +1,12 @@
+id: WI-0169
+title: Bound Creative Collection materialization for large Broad selections
+milestone: M32
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0169-creative-collection-scale.md
+blockers:
+- WI-0120
+- WI-0121
+- WI-0123
+blocker_notes: []
+evidence: []

@@ -5,7 +5,7 @@ status: in_review
 owner: ai-agent
 document: ../work-items/WI-0165-slideshow-library-status-counts.md
 started_at: 2026-09-26
-last_updated_at: 2026-09-26
+last_updated_at: 2026-09-29
 branch: agent/wi-0165-slideshow-library-status-counts
 blockers:
 - WI-0108

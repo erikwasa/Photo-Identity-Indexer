@@ -1,0 +1,11 @@
+id: WI-0167
+title: Fail best-quality slideshow preparation when OneDrive is unavailable
+milestone: M32
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0167-onedrive-slideshow-availability.md
+blockers:
+- WI-0093
+- WI-0096
+blocker_notes: []
+evidence: []
