@@ -171,7 +171,8 @@ If the thumbnail/context probe materially improves runtime, repeat a small quali
 The positive WI-0128 result is retained as optional **photo enrichment**. Production generation is independent of slideshows and Smart Collections:
 
 - **Settings → Automatic photo captions** is a durable server-side setting and defaults to off.
-- Caption generation language can be **Svenska** or **English**; Swedish is the default.
+- Caption generation language can be **Svenska** or **English**. The persisted product default for a previously unconfigured catalogue remains Swedish, but the maintainer's current operating convention is **English** so caption and Visual/CLIP searches can use the same language.
+- Changing the active generation language does not rewrite older evidence. Swedish and English caption rows may coexist for the same immutable revision, and search can continue to find older Swedish text when queried in Swedish.
 - When enabled, one background worker gradually selects current photo revisions that already have the configured durable review proxy and lack caption evidence for the active generation policy.
 - Only the configured durable review proxy is opened. Photo Identity derives a temporary 480x320 JPEG in memory before model inference.
 - The Ollama endpoint remains loopback-only.
