@@ -22,7 +22,7 @@
         {
             <div class="notice photo-place-conflict" role="status">
                 <strong>Legacy location needs review.</strong>
-                <p>More than one unrelated location path was active. Choose Edit location and save the correct place to resolve this conflict.</p>
+                <p>More than one unrelated location path was active. Enter or choose the correct place below and save it to resolve this conflict.</p>
                 <ul>
                     @foreach (string candidate in conflict.CandidateValues)
                     {
@@ -32,71 +32,55 @@
             </div>
         }
 
-        @if (!Editing)
+        @if (State?.Place is PhotoPlaceResponse current)
         {
-            <div class="photo-place-read">
-                <div>
-                    @if (State?.Place is PhotoPlaceResponse current)
-                    {
-                        <p class="photo-place-current" title="@current.Value">@PhotoIdentity.Web.PhotoPlaceDisplayLabel.Format(current)</p>
-                    }
-                    else
-                    {
-                        <p class="photo-place-empty">No location assigned</p>
-                    }
-                </div>
-                <button type="button"
-                        class="button secondary"
-                        disabled="@Busy"
-                        @onclick="BeginEditing">
-                    Edit location
-                </button>
-            </div>
+            <p class="photo-place-current" title="@current.Value">@PhotoIdentity.Web.PhotoPlaceDisplayLabel.Format(current)</p>
         }
         else
         {
+            <p class="photo-place-empty">No location assigned</p>
+        }
+
+        <label class="photo-place-path-field" for="photo-place-path-input">
+            <span class="field-label">Location</span>
+            <input id="photo-place-path-input"
+                   type="text"
+                   maxlength="500"
+                   autocomplete="off"
+                   placeholder="Sweden/Stockholm region/Norrtälje"
+                   disabled="@Busy"
+                   onfocus="this.select()"
+                   @bind="SelectedValue"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyDownAsync" />
+        </label>
+        <small class="photo-place-help">Click the field, type the full hierarchy, then press Enter. Escape restores the current saved location.</small>
+
+        <details class="photo-place-existing-picker">
+            <summary>Choose an existing place</summary>
             <PlacePicker @key="State?.Place?.Id"
-                         Label="Choose existing place"
+                         Label="Existing place"
                          EmptyLabel="No existing place selected"
                          Value="@SelectedValue"
                          ValueChanged="SetSelectedValue"
                          Disabled="@Busy" />
+            <small class="photo-place-help">Choosing an existing place fills the location field; press Enter or Save to apply it.</small>
+        </details>
 
-            <label class="photo-place-path-field">
-                <span class="field-label">Place path</span>
-                <input type="text"
-                       maxlength="500"
-                       autocomplete="off"
-                       placeholder="Sweden/Stockholm region/Norrtälje"
-                       disabled="@Busy"
-                       @bind="SelectedValue"
-                       @bind:event="oninput" />
-            </label>
-            <small class="photo-place-help">Enter the full hierarchy starting with the country. A new path becomes reusable place vocabulary when you save it.</small>
-
-            <div class="photo-place-actions">
-                <button type="button"
-                        class="button primary"
-                        disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedValue))"
-                        @onclick="SaveAsync">
-                    @(Busy ? "Saving…" : State?.Place is null ? "Set place" : "Replace place")
-                </button>
-                <button type="button"
-                        class="button secondary"
-                        disabled="@(Busy || (State?.Place is null && State?.MigrationConflict is null))"
-                        @onclick="ClearAsync">
-                    Clear place
-                </button>
-                <button type="button"
-                        class="button secondary"
-                        disabled="@Busy"
-                        @onclick="CancelEditing">
-                    Cancel
-                </button>
-            </div>
-
-            <p class="photo-place-help">Place edits affect catalogue metadata for this photo revision only. They do not download or modify the original image.</p>
-        }
+        <div class="photo-place-actions">
+            <button type="button"
+                    class="button primary"
+                    disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedValue))"
+                    @onclick="SaveAsync">
+                @(Busy ? "Saving…" : "Save")
+            </button>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@(Busy || (State?.Place is null && State?.MigrationConflict is null))"
+                    @onclick="ClearAsync">
+                Clear
+            </button>
+        </div>
     }
 
     @if (!string.IsNullOrWhiteSpace(Error))
@@ -113,7 +97,6 @@
     private string? SelectedValue { get; set; }
     private bool Loading { get; set; }
     private bool Busy { get; set; }
-    private bool Editing { get; set; }
     private string? Error { get; set; }
 
     private string PlaceUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/place";
@@ -121,7 +104,6 @@
     protected override async Task OnParametersSetAsync()
     {
         Loading = true;
-        Editing = false;
         Error = null;
         try
         {
@@ -140,24 +122,24 @@
         }
     }
 
-    private void BeginEditing()
-    {
-        SelectedValue = State?.Place?.Value;
-        Error = null;
-        Editing = true;
-    }
-
-    private void CancelEditing()
-    {
-        SelectedValue = State?.Place?.Value;
-        Error = null;
-        Editing = false;
-    }
-
     private Task SetSelectedValue(string? value)
     {
         SelectedValue = value;
+        Error = null;
         return Task.CompletedTask;
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SaveAsync();
+        }
+        else if (args.Key == "Escape")
+        {
+            SelectedValue = State?.Place?.Value;
+            Error = null;
+        }
     }
 
     private async Task SaveAsync()
@@ -182,7 +164,6 @@
             State = await response.Content.ReadFromJsonAsync<PhotoPlaceStateResponse>()
                 ?? throw new InvalidOperationException("The place response was empty.");
             SelectedValue = State.Place?.Value;
-            Editing = false;
         }
         catch (Exception exception)
         {
@@ -214,7 +195,6 @@
             State = await response.Content.ReadFromJsonAsync<PhotoPlaceStateResponse>()
                 ?? throw new InvalidOperationException("The place response was empty.");
             SelectedValue = null;
-            Editing = false;
         }
         catch (Exception exception)
         {
