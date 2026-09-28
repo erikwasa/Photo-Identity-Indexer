@@ -4,26 +4,28 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**WI-0163 Add safe bulk capture-date and Place enrichment is in progress under M31 Bulk archive metadata enrichment. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
+**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0167 OneDrive-unavailable slideshow recovery is in review under M32 on PR #467. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
 
-The maintainer measured 17,892 current photos: 234 have no effective capture date, 12,603 have no named Place or valid non-zero GPS, and 12,371 of the location-less photos already have an effective date. Directory `1970` is a miscellaneous catch-all and must never be interpreted as a real capture year merely from its path.
+WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`; continue its production-catalogue dry-run/apply verification from the canonical work-item shard.
 
-WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`. Its first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default.
+WI-0167 adds a bounded Windows OneDrive-client absence signal only when hydration is needed. Already-local originals do not depend on OneDrive process availability. A cloud-only best-quality preparation now enters an actionable `onedrive-unavailable` recovery state instead of remaining indefinitely at `0 / N`; Retry preserves the immutable slideshow session and can reassert Photo-Identity-owned in-flight hydration after OneDrive starts. Active/unknown but slow downloads retain the existing no-progress recovery.
 
-M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M26, M28, M29 and M33 are completed. M29 removed the retired SQLite implementation, executable compatibility paths and obsolete migration-era active references; PostgreSQL is now the only compiled and packaged catalogue implementation. M33 reduced maintained-archive no-change synchronization from 192.264856 seconds on the matched main baseline to 7.421021 seconds on the accepted corrected build, with zero stable-file hashing and fixed per-folder PostgreSQL batching. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M23 Source-copy lifecycle and privacy exclusion is completed. M26, M28, M29 and M33 are completed. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Continue WI-0163 from its canonical work-item/status shard. WI-0166 requires no further maintainer verification; PR #456 contains the completed implementation and recorded acceptance evidence.
+Run PR #467 CI, then verify WI-0167 on the maintained Windows archive PC/phone: online-only with OneDrive stopped, start OneDrive and Retry, already-local with OneDrive stopped, and a slow active hydration. Keep WI-0167 in review until that acceptance is recorded. Continue WI-0163 from its canonical shard when returning to metadata-enrichment verification.
 
 ## Relevant files
 
-- docs/delivery/milestones/M31-bulk-metadata-enrichment.md
+- docs/delivery/work-items/WI-0167-onedrive-slideshow-availability.md
+- docs/delivery/status/work-items/active/WI-0167.yaml
+- src/PhotoIdentity.Source.OneDriveSync/OneDriveFilesOnDemandPlatform.cs
+- src/PhotoIdentity.Api/CollectionOriginalAccessService.cs
+- src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowOneDriveAvailabilityTests.cs
 - docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
 - docs/delivery/status/work-items/active/WI-0163.yaml
-- docs/delivery/milestones/M33-archive-synchronization-performance.md
-- docs/delivery/work-items/WI-0166-included-folder-sync-performance.md
-- docs/delivery/status/work-items/archive/WI-0166.yaml
 
 ## Repository validation
 
