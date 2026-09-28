@@ -112,6 +112,27 @@ public interface ISourceCopyExclusionRepository
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns the excluded subset of a revision batch. Production providers should override this
+    /// with a set-oriented query; the default keeps non-production adapters source-compatible.
+    /// </summary>
+    async Task<IReadOnlySet<AssetRevisionId>> GetExcludedRevisionIdsAsync(
+        IReadOnlyCollection<AssetRevisionId> revisionIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(revisionIds);
+        HashSet<AssetRevisionId> excluded = [];
+        foreach (AssetRevisionId revisionId in revisionIds.Distinct())
+        {
+            if (await IsRevisionExcludedAsync(revisionId, cancellationToken))
+            {
+                excluded.Add(revisionId);
+            }
+        }
+
+        return excluded;
+    }
+
     Task<bool> IsFaceOccurrenceExcludedAsync(
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken = default);
