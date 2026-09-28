@@ -4,7 +4,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-if (-not $IsWindows) {
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     Write-Host "SKIP: packaged launcher retry smoke check requires Windows cmd.exe."
     exit 0
 }
