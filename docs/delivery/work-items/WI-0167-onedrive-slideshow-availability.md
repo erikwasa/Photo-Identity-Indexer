@@ -31,6 +31,16 @@ On a trusted-LAN phone, starting a slideshow with **Prepare originals** enabled 
 - Do not use Microsoft Graph; personal OneDrive remains accessed through the Windows sync client.
 - Keep errors path-free and suitable for a remote phone UI.
 
+## Implementation
+
+The Windows Files On-Demand adapter now exposes a bounded sync-client availability signal. A confirmed absence of the `OneDrive` desktop process is `Unavailable`; process-enumeration failures are `Unknown` and preserve the existing behavior, while process presence is only `Available` and is not treated as proof that synchronization is healthy.
+
+Best-quality preparation consults that signal only when hydration is actually required. Already-local originals continue through normal immutable verification without depending on OneDrive process availability. An online-only original with a confirmed unavailable client enters an explicit `onedrive-unavailable` recovery phase immediately rather than waiting for the generic no-progress threshold.
+
+The recovery keeps the same preparation session and immutable revision set alive. After OneDrive is started, **Retry preparation** rechecks that same snapshot and, when Photo Identity already owns an in-flight managed hydration, reasserts the Files On-Demand pin once. Externally pinned/local content is never claimed or reasserted by this path. Active/unknown-client downloads retain the existing two-minute no-progress recovery rather than being misclassified as unavailable.
+
+Both the slideshow player and slideshow-library preparation tools render the recovery message and Retry action without exposing a source path.
+
 ## Acceptance criteria
 
 - [ ] A slideshow whose required originals are already local can prepare and play normally while OneDrive is not running.
@@ -40,6 +50,15 @@ On a trusted-LAN phone, starting a slideshow with **Prepare originals** enabled 
 - [ ] Retry after OneDrive becomes available reuses the same immutable snapshot and can resume/reassert Photo-Identity-owned hydration without exceeding the configured storage or concurrency policy.
 - [ ] Automated tests cover already-local behavior, unavailable-client behavior, slow/downloading behavior and retry recovery.
 
+## Automated coverage added
+
+- Source-level coverage protects the bounded process-presence classification used by the Windows adapter.
+- Slideshow preparation coverage verifies that already-local originals remain usable with the client unavailable.
+- Slideshow preparation coverage verifies online-only fail-fast recovery, actionable path-free messaging, same-session Retry and successful hydration after the client becomes available.
+- Slideshow preparation coverage verifies the harder case where Photo Identity already owns a `Downloading` hydration when OneDrive stops; Retry reasserts that app-owned hydration once and completes the same session.
+- Existing no-progress coverage remains responsible for a client that is present/unknown but slow or stuck, preserving the distinction between unavailable and merely not progressing.
+- Web preparation-experience coverage protects immediate parent attention for retryable OneDrive-unavailable state without setting the generic no-progress flag.
+
 ## Verification plan
 
 1. With OneDrive running, prepare a collection containing at least one online-only original and confirm normal best-quality preparation still succeeds.
@@ -47,3 +66,7 @@ On a trusted-LAN phone, starting a slideshow with **Prepare originals** enabled 
 3. Start OneDrive and use Retry; confirm the same slideshow snapshot hydrates and becomes playable.
 4. Repeat with all required originals already local while OneDrive is stopped; confirm playback is unaffected.
 5. Exercise a deliberately slow active hydration and confirm the generic no-progress recovery remains distinct from the unavailable-client failure.
+
+## Verification status
+
+Implementation and automated coverage are present on the WI-0167 branch. The acceptance checkboxes intentionally remain open until CI passes and the Windows/phone verification plan above is exercised on the maintained archive PC.
