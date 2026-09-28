@@ -96,6 +96,19 @@ Automated coverage is also in place and passed in PR #425 CI run #2180:
 
 Completed. The large-scale relevance/language evaluation, provenance/caption-absent behavior, two independent saved-result collections, slideshow playback, application restart and exact ordered-membership persistence have all been verified. English is the supported Visual/CLIP query language for this implementation; the bilingual suite remains as regression/evaluation evidence.
 
+## Post-completion usability follow-up — 2026-09-28
+
+PR #459 addresses maintainer feedback from using the completed Search surface without changing the accepted WI-0162 retrieval model:
+
+- Search keeps its current query, result set, result limit and working selection while the operator opens a photo and returns to Search.
+- Selections accumulate across multiple searches so one explicit slideshow collection can be built incrementally.
+- The accumulated working selection can be saved as a new slideshow or appended to an existing manual slideshow without introducing duplicate revision membership.
+- The request limit is raised from 200 to 1,000 results, with 400, 800 and 1,000 exposed in the Search UI.
+- The user-facing **How search works** section now explains Visual, Captions and combined search directly; benchmark/evaluation metrics remain in this work-item documentation rather than in the product help text.
+- `PhotoSearchSessionStateTests` protect cumulative selection ordering, case-insensitive deselection and clearing of the working collection.
+
+This is a post-completion usability correction. It does not reopen the WI-0162 acceptance decision, change semantic/caption ranking, or change the immutable membership semantics of an already saved slideshow collection.
+
 ## Design notes
 
 - The term "caption" in the UI may cover two different evidence sources, but storage/provenance must not conflate them. WI-0128 text is generated natural-language evidence; CLIP-style retrieval is vector similarity evidence and should remain identifiable as such.
