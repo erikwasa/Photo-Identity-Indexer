@@ -28,6 +28,8 @@ The change must preserve the responsive slideshow-library behavior established b
 - Add an unobtrusive Prepared badge/dot/check treatment to ordinary slideshow-library cards when existing preparation state or a persisted receipt is verified against the exact current revision set.
 - Preserve preparation receipt invalidation semantics: when a Smart/manual slideshow's current contents no longer match the prepared revision set, the Prepared indicator must disappear rather than become stale.
 - Restore a valid Prepared indicator after browser reload using the existing preparation-receipt mechanism without blocking initial card rendering on new expensive work.
+- Treat successful best-quality preparation performed during normal slideshow startup as preparation of that exact immutable revision set, so returning to the slideshow library can establish the same reusable Prepared state as standalone **Prepare originals**.
+- Revalidate a persisted/prepared snapshot before relying on it for later best-quality playback, while avoiding UI wording that implies a new download when the originals are already local and verification completes immediately.
 - Show the exact current member count for manual slideshow collections using their persisted revision membership.
 - Show the current matching-photo count for saved Smart Collection slideshow entries.
 - Obtain Smart Collection counts through a bounded/count-oriented path or asynchronously after the initial library cards render. Do not create full slideshow snapshots solely to obtain a number, and do not regress the WI-0108 library-load latency boundary.
@@ -39,17 +41,27 @@ The change must preserve the responsive slideshow-library behavior established b
 
 ## Performance boundary
 
-WI-0108 intentionally made `/api/slideshows/collections` cheap by returning saved definitions without catalogue query work. This work item must preserve that boundary. The implementation may add a dedicated count-only/batched API or defer count hydration until after the initial card render, but it must not make the initial slideshow-library response generate full collection snapshots or perform unnecessary image/file preparation.
+WI-0108 intentionally made `/api/slideshows/collections` cheap by returning saved definitions without catalogue query work. This work item must preserve that boundary. The implementation may add a dedicated count-only/batched API or defer count hydration until after the initial card render, but it must not make the initial slideshow-library response generate full slideshow snapshots or perform unnecessary image/file preparation.
 
 ## Implementation progress
 
 PR #442 implements the library indicators without changing `/api/slideshows/collections`. Manual counts come from the already-loaded persisted revision membership. Smart counts reuse the existing deferred `limit=1` cover query and its `Total`, so no additional Smart count request or slideshow snapshot is introduced solely for the badge. Creative Collection cards display the recipe quantity as `Up to N photos` rather than an exact materialized count.
 
-The ordinary Smart/manual cards show a compact text-and-check **Prepared** badge only after the existing preparation state has been verified as `ready`; starting, preparing and parent-attention states suppress that passive badge. Persisted manual receipts are now validated directly against the current manual revision membership before prepared-original revalidation, fixing the previous Smart-route-only reload behavior. Automated presentation/receipt tests cover exact/manual/Smart/Creative count semantics, Prepared precedence and revision-set invalidation. Maintainer desktop/phone verification and final CI evidence remain pending.
+The ordinary Smart/manual cards show a compact text-and-check **Prepared** badge only after the existing preparation state has been verified as `ready`; starting, preparing and parent-attention states suppress that passive badge. Persisted manual receipts are now validated directly against the current manual revision membership before prepared-original revalidation, fixing the previous Smart-route-only reload behavior. Automated presentation/receipt tests cover exact/manual/Smart/Creative count semantics, Prepared precedence and revision-set invalidation.
+
+### Maintainer follow-up — 2026-09-29
+
+Real-phone verification found a remaining Prepared-state continuity gap, so WI-0165 must remain `in_review` rather than being completed. A slideshow whose originals had just been downloaded through normal best-quality playback could still appear in the library without a **Prepared** indication. Reopening that collection showed `0 / 14` briefly and then started about half a second later, consistent with fast revalidation of already-local originals rather than a new OneDrive hydration.
+
+Standalone **Prepare originals** records a reusable preparation receipt when it completes, but successful preparation initiated by normal slideshow startup does not currently feed the same library receipt/state consistently. The follow-up must make successful player-triggered preparation establish the exact-snapshot Prepared state while preserving later revalidation and invalidation if the files are evicted or collection membership changes.
+
+Maintainer desktop/phone verification and final CI evidence therefore remain pending.
 
 ## Acceptance criteria
 
 - [ ] A slideshow with preparation verified for its exact current revision set displays a small Prepared indicator.
+- [ ] Successful best-quality preparation initiated by normal slideshow playback records/reuses the exact-snapshot preparation state so the slideshow library can subsequently show **Prepared**.
+- [ ] Reopening an already-local prepared slideshow may revalidate the originals, but the transient UI does not misleadingly imply that a new network download is required when verification completes immediately.
 - [ ] Unprepared slideshows remain visibly playable and are not labelled unavailable or not-ready.
 - [ ] Preparing, parent-attention and starting states remain clear and take precedence over the passive Prepared treatment.
 - [ ] A persisted valid preparation receipt restores the Prepared indicator after reload.
@@ -61,7 +73,7 @@ The ordinary Smart/manual cards show a compact text-and-check **Prepared** badge
 - [ ] Initial slideshow-library rendering remains independent of full slideshow snapshot creation and preserves the bounded library-load behavior established by WI-0108.
 - [ ] The UI remains compact and readable on the maintained desktop Edge and phone layouts.
 - [ ] Prepared/count information is accessible without relying on colour alone.
-- [ ] Automated tests cover preparation-indicator visibility/invalidation, manual exact counts, Smart count semantics and Creative target-versus-exact wording.
+- [ ] Automated tests cover preparation-indicator visibility/invalidation, player-triggered preparation continuity, manual exact counts, Smart count semantics and Creative target-versus-exact wording.
 
 ## Verification plan
 
@@ -69,9 +81,11 @@ The ordinary Smart/manual cards show a compact text-and-check **Prepared** badge
 2. Verify a manual slideshow count against its persisted revision membership.
 3. Verify a Smart Collection count against a newly created slideshow snapshot/query total without requiring the card itself to create that snapshot.
 4. Verify Creative Collection wording against a recipe whose target can exceed the available/generated selection.
-5. Prepare one Smart/manual slideshow and confirm the compact Prepared indicator appears.
-6. Reload the page and confirm a still-valid preparation receipt restores the indicator.
-7. Change the relevant collection membership/filter, reload/refresh its state and confirm the stale indicator is removed.
-8. Exercise preparing and parent-attention states and confirm they remain more prominent than the passive Prepared indicator.
-9. Verify desktop Edge and phone layouts for readability, tap targets and accessible text.
-10. Run the existing slideshow-library performance diagnostics to ensure the change does not reintroduce blocking library or snapshot latency.
+5. Prepare one Smart/manual slideshow using standalone **Prepare originals** and confirm the compact Prepared indicator appears.
+6. Start an unprepared slideshow with best-quality preparation enabled, allow playback preparation to finish, exit to the library and confirm the same collection now shows **Prepared**.
+7. Reopen that already-local prepared slideshow and confirm any verification transition resolves quickly without presenting it as a fresh download; playback still verifies the exact snapshot before relying on originals.
+8. Reload the page and confirm a still-valid preparation receipt restores the Prepared indicator.
+9. Change the relevant collection membership/filter, reload/refresh its state and confirm the stale indicator is removed.
+10. Exercise preparing and parent-attention states and confirm they remain more prominent than the passive Prepared indicator.
+11. Verify desktop Edge and phone layouts for readability, tap targets and accessible text.
+12. Run the existing slideshow-library performance diagnostics to ensure the change does not reintroduce blocking library or snapshot latency.
