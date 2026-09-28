@@ -238,9 +238,9 @@ public sealed class PhotoSearchService
         {
             throw new ArgumentException("Photo search query cannot exceed 300 characters.", nameof(query));
         }
-        if (limit is < 1 or > 200)
+        if (limit is < 1 or > 1000)
         {
-            throw new ArgumentOutOfRangeException(nameof(limit), "Photo search limit must be between 1 and 200.");
+            throw new ArgumentOutOfRangeException(nameof(limit), "Photo search limit must be between 1 and 1000.");
         }
 
         string normalizedMode = PhotoSearchModes.Normalize(mode);
