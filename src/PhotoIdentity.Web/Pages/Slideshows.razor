@@ -156,11 +156,19 @@ else
                     else if (preparation is { State: "preparing" })
                     {
                         <span>@preparation.Ready / @preparation.Total ready</span>
-                        @if (preparation.NoProgressWarning)
+                        @if (preparation.CanRetry)
                         {
                             <div class="slideshow-library-warning" role="alert">
-                                <strong>OneDrive has not made progress</strong>
-                                <span>No progress for @preparation.NoProgressSeconds seconds.</span>
+                                @if (preparation.Phase == "onedrive-unavailable")
+                                {
+                                    <strong>OneDrive is not available</strong>
+                                    <span>@preparation.Message</span>
+                                }
+                                else
+                                {
+                                    <strong>OneDrive has not made progress</strong>
+                                    <span>No progress for @preparation.NoProgressSeconds seconds.</span>
+                                }
                             </div>
                         }
                     }
@@ -179,7 +187,7 @@ else
                     }
 
                     <div class="slideshow-library-actions">
-                        @if (preparation?.NoProgressWarning == true && preparation.CanRetry)
+                        @if (preparation?.CanRetry == true)
                         {
                             <button type="button"
                                     class="button secondary"
