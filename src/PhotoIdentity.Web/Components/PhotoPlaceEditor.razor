@@ -49,9 +49,9 @@
                    autocomplete="off"
                    placeholder="Sweden/Stockholm region/Norrtälje"
                    disabled="@Busy"
-                   onfocus="this.select()"
                    @bind="SelectedValue"
                    @bind:event="oninput"
+                   @onfocus="PrepareManualEntry"
                    @onkeydown="HandleKeyDownAsync" />
         </label>
         <small class="photo-place-help">Click the field, type the full hierarchy, then press Enter. Escape restores the current saved location.</small>
@@ -119,6 +119,16 @@
         finally
         {
             Loading = false;
+        }
+    }
+
+    private void PrepareManualEntry()
+    {
+        if (!Busy &&
+            State?.Place is PhotoPlaceResponse current &&
+            string.Equals(SelectedValue, current.Value, StringComparison.Ordinal))
+        {
+            SelectedValue = string.Empty;
         }
     }
 
