@@ -121,7 +121,7 @@ public static class PhotoSearchRanker
         ArgumentNullException.ThrowIfNull(semantic);
         ArgumentNullException.ThrowIfNull(captions);
         string normalizedMode = PhotoSearchModes.Normalize(mode);
-        if (limit is < 1 or > 500)
+        if (limit is < 1 or > 1000)
         {
             throw new ArgumentOutOfRangeException(nameof(limit));
         }
