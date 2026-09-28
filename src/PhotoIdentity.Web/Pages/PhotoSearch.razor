@@ -2,6 +2,7 @@
 @using System.Net.Http.Json
 @using PhotoIdentity.Web.Contracts
 @inject HttpClient Http
+@inject PhotoSearchSessionState SearchState
 
 <PageTitle>Photo search · Photo Identity</PageTitle>
 
@@ -10,8 +11,8 @@
         <p class="eyebrow">Semantic photo search</p>
         <h1>Search photos in natural language</h1>
         <p>
-            Visual search uses local CLIP similarity and is supported for English queries.
-            Caption evidence searches durable generated captions in their stored language, and results always keep the evidence source visible.
+            Search visually for what a photo looks like, by generated caption text, or with both sources together.
+            Selections stay in your working collection while you run more searches or inspect individual photos.
         </p>
     </div>
     @if (Status is not null)
@@ -63,6 +64,9 @@
             <option value="80">80</option>
             <option value="120">120</option>
             <option value="200">200</option>
+            <option value="400">400</option>
+            <option value="800">800</option>
+            <option value="1000">1000</option>
         </select>
     </label>
 
@@ -85,12 +89,11 @@
         <div>
             <strong>@Results.Items.Length results</strong>
             <span>in @Results.SearchMilliseconds.ToString("0") ms</span>
-            <span>· @Results.IndexedPhotoCount semantic vectors</span>
-            <span>· @Results.DisplayableCaptionCount captions</span>
+            <span>· @SearchState.SelectedCount selected across searches</span>
         </div>
         <div class="photo-search-selection-actions">
-            <button type="button" class="button secondary" @onclick="SelectAll">Select all</button>
-            <button type="button" class="button secondary" @onclick="ClearSelection">Clear</button>
+            <button type="button" class="button secondary" @onclick="SelectAllCurrent">Select current results</button>
+            <button type="button" class="button secondary" @onclick="ClearSelection">Clear collection</button>
         </div>
     </section>
 
@@ -106,7 +109,7 @@
             @for (int index = 0; index < Results.Items.Length; index++)
             {
                 PhotoSearchResultResponse result = Results.Items[index];
-                bool selected = SelectedRevisionIds.Contains(result.RevisionId);
+                bool selected = SearchState.IsSelected(result.RevisionId);
                 <article class="photo-search-card @(selected ? "selected" : null)">
                     <label class="photo-search-select">
                         <input type="checkbox"
@@ -143,68 +146,137 @@
                 </article>
             }
         </section>
+    }
 
-        <section class="photo-search-save" aria-labelledby="photo-search-save-heading">
-            <div>
-                <p class="eyebrow">Frozen slideshow collection</p>
-                <h2 id="photo-search-save-heading">Save selected results</h2>
-                <p>
-                    Saving copies the current ordered revision list. Later captions, embeddings or search-model changes
-                    will not rewrite this slideshow collection.
-                </p>
-            </div>
+    <section class="photo-search-save" aria-labelledby="photo-search-save-heading">
+        <div>
+            <p class="eyebrow">Working collection</p>
+            <h2 id="photo-search-save-heading">Save or add @SearchState.SelectedCount selected photos</h2>
+            <p>
+                Your selection is kept while you run more searches and while you open a photo and return to search.
+                Saving creates an explicit ordered slideshow list; adding to an existing slideshow keeps its current order and appends new photos.
+            </p>
+        </div>
+        <label>
+            <span>New collection name</span>
+            <input @bind="CollectionName"
+                   maxlength="120"
+                   placeholder="Summer memories"
+                   disabled="@Saving" />
+        </label>
+        <button type="button"
+                class="button primary"
+                disabled="@(Saving || SearchState.SelectedCount == 0 || string.IsNullOrWhiteSpace(CollectionName))"
+                @onclick="SaveCollectionAsync">
+            @(Saving ? "Saving…" : $"Save {SearchState.SelectedCount} as new collection")
+        </button>
+
+        @if (LoadingCollections)
+        {
+            <p class="photo-search-muted">Loading existing slideshow collections…</p>
+        }
+        else if (Collections.Count > 0)
+        {
             <label>
-                <span>Collection name</span>
-                <input @bind="CollectionName"
-                       maxlength="120"
-                       placeholder="Summer memories"
-                       disabled="@Saving" />
+                <span>Add to existing collection</span>
+                <select @bind="ExistingCollectionId" disabled="@AddingToExisting">
+                    @foreach (PhotoListCollectionResponse collection in Collections)
+                    {
+                        <option value="@collection.Id">@collection.Name (@collection.RevisionIds.Length)</option>
+                    }
+                </select>
             </label>
             <button type="button"
-                    class="button primary"
-                    disabled="@(Saving || SelectedRevisionIds.Count == 0 || string.IsNullOrWhiteSpace(CollectionName))"
-                    @onclick="SaveCollectionAsync">
-                @(Saving ? "Saving…" : $"Save {SelectedRevisionIds.Count} selected")
+                    class="button secondary"
+                    disabled="@(AddingToExisting || SearchState.SelectedCount == 0 || SelectedExistingCollection is null)"
+                    @onclick="AddToExistingCollectionAsync">
+                @(AddingToExisting ? "Adding…" : $"Add {SearchState.SelectedCount} selected")
             </button>
-            @if (!string.IsNullOrWhiteSpace(SaveMessage))
-            {
-                <p class="photo-search-save-message" role="status">
-                    @SaveMessage <a href="/slideshows">Open Slideshows</a>
-                </p>
-            }
-        </section>
-    }
+        }
+        else
+        {
+            <p class="photo-search-muted">No existing slideshow collections yet.</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(SaveMessage))
+        {
+            <p class="photo-search-save-message" role="status">
+                @SaveMessage <a href="/slideshows">Open Slideshows</a>
+            </p>
+        }
+        @if (!string.IsNullOrWhiteSpace(CollectionError))
+        {
+            <p class="photo-search-error" role="alert">@CollectionError</p>
+        }
+    </section>
 }
 
 <details class="photo-search-details">
     <summary>How search works</summary>
     <p>
-        Visual matches use exact local cosine comparison over versioned CLIP image embeddings. Caption matches use only
-        displayable WI-0128 caption evidence. Similar-photo retrieval and embedding-based slideshow diversity remain disabled.
+        <strong>Visual</strong> compares your English description with the visual content of indexed photos. It can find a scene or object even when no caption contains the same words.
     </p>
     <p>
-        WI-0162's archive-scale evaluation measured 0.89 precision at 10 for English visual queries and 0.29 for Swedish
-        on the same query concepts. Visual search therefore supports English queries; no translation or multilingual CLIP
-        layer is added. Caption-only search can still use the language of the stored generated captions.
+        <strong>Captions</strong> searches the generated text descriptions saved for photos. Caption search works best when you use the same language as the stored captions. <strong>Visual + captions</strong> combines both kinds of matches.
     </p>
 </details>
 
 @code {
-    private string Query { get; set; } = string.Empty;
-    private string Mode { get; set; } = "combined";
-    private int Limit { get; set; } = 80;
+    private string Query
+    {
+        get => SearchState.Query;
+        set => SearchState.Query = value;
+    }
+
+    private string Mode
+    {
+        get => SearchState.Mode;
+        set => SearchState.Mode = value;
+    }
+
+    private int Limit
+    {
+        get => SearchState.Limit;
+        set => SearchState.Limit = value;
+    }
+
+    private string CollectionName
+    {
+        get => SearchState.CollectionName;
+        set => SearchState.CollectionName = value;
+    }
+
+    private string? ExistingCollectionId
+    {
+        get => SearchState.ExistingCollectionId;
+        set => SearchState.ExistingCollectionId = value;
+    }
+
+    private PhotoSearchResponse? Results
+    {
+        get => SearchState.Results;
+        set => SearchState.Results = value;
+    }
+
     private bool Busy { get; set; }
     private bool Saving { get; set; }
+    private bool AddingToExisting { get; set; }
+    private bool LoadingCollections { get; set; }
     private string? Error { get; set; }
     private string? SaveMessage { get; set; }
-    private string CollectionName { get; set; } = string.Empty;
-    private PhotoSearchResponse? Results { get; set; }
+    private string? CollectionError { get; set; }
     private PhotoSearchStatusResponse? Status { get; set; }
-    private HashSet<string> SelectedRevisionIds { get; } = new(StringComparer.Ordinal);
+    private IReadOnlyList<PhotoListCollectionResponse> Collections { get; set; } = [];
+
+    private PhotoListCollectionResponse? SelectedExistingCollection =>
+        Collections.FirstOrDefault(collection => string.Equals(
+            collection.Id,
+            ExistingCollectionId,
+            StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadStatusAsync();
+        await Task.WhenAll(LoadStatusAsync(), LoadCollectionsAsync());
     }
 
     private async Task LoadStatusAsync()
@@ -216,6 +288,33 @@
         catch
         {
             Status = null;
+        }
+    }
+
+    private async Task LoadCollectionsAsync(string? selectId = null)
+    {
+        LoadingCollections = true;
+        CollectionError = null;
+        try
+        {
+            Collections = await Http.GetFromJsonAsync<PhotoListCollectionResponse[]>(
+                "/api/photo-list-collections") ?? [];
+            string? requested = selectId ?? ExistingCollectionId;
+            ExistingCollectionId = Collections.Any(collection => string.Equals(
+                    collection.Id,
+                    requested,
+                    StringComparison.OrdinalIgnoreCase))
+                ? requested
+                : Collections.FirstOrDefault()?.Id;
+        }
+        catch (Exception exception)
+        {
+            Collections = [];
+            CollectionError = $"Existing slideshow collections could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingCollections = false;
         }
     }
 
@@ -241,13 +340,9 @@
             }
 
             Results = await response.Content.ReadFromJsonAsync<PhotoSearchResponse>();
-            SelectedRevisionIds.Clear();
             if (Results is not null)
             {
-                foreach (PhotoSearchResultResponse item in Results.Items)
-                {
-                    SelectedRevisionIds.Add(item.RevisionId);
-                }
+                SearchState.SelectAll(Results.Items.Select(item => item.RevisionId));
             }
             await LoadStatusAsync();
         }
@@ -263,7 +358,7 @@
 
     private async Task SaveCollectionAsync()
     {
-        if (Results is null || Saving || SelectedRevisionIds.Count == 0 || string.IsNullOrWhiteSpace(CollectionName))
+        if (Saving || SearchState.SelectedCount == 0 || string.IsNullOrWhiteSpace(CollectionName))
         {
             return;
         }
@@ -271,15 +366,14 @@
         Saving = true;
         Error = null;
         SaveMessage = null;
+        CollectionError = null;
         try
         {
-            string[] ordered = Results.Items
-                .Where(item => SelectedRevisionIds.Contains(item.RevisionId))
-                .Select(item => item.RevisionId)
-                .ToArray();
             using HttpResponseMessage response = await Http.PostAsJsonAsync(
                 "/api/photo-search/collections",
-                new PhotoSearchSaveCollectionRequest(CollectionName.Trim(), ordered));
+                new PhotoSearchSaveCollectionRequest(
+                    CollectionName.Trim(),
+                    SearchState.SelectedRevisionIds.ToArray()));
             if (!response.IsSuccessStatusCode)
             {
                 Error = await ReadErrorAsync(response, "The slideshow collection could not be saved.");
@@ -292,6 +386,7 @@
                 ? "Saved the selected search results."
                 : $"Saved “{saved.Name}” with {saved.RevisionIds.Length} photos.";
             CollectionName = string.Empty;
+            await LoadCollectionsAsync(saved?.Id);
         }
         catch (Exception exception)
         {
@@ -300,6 +395,68 @@
         finally
         {
             Saving = false;
+        }
+    }
+
+    private async Task AddToExistingCollectionAsync()
+    {
+        PhotoListCollectionResponse? collection = SelectedExistingCollection;
+        if (collection is null || AddingToExisting || SearchState.SelectedCount == 0)
+        {
+            return;
+        }
+
+        string[] revisionIds = collection.RevisionIds
+            .Concat(SearchState.SelectedRevisionIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        int addedCount = revisionIds.Length - collection.RevisionIds.Length;
+        if (addedCount == 0)
+        {
+            SaveMessage = $"“{collection.Name}” already contains all selected photos.";
+            return;
+        }
+
+        AddingToExisting = true;
+        Error = null;
+        SaveMessage = null;
+        CollectionError = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"/api/photo-list-collections/{Uri.EscapeDataString(collection.Id)}",
+                new PhotoListCollectionRequest(collection.Name, revisionIds));
+            if (!response.IsSuccessStatusCode)
+            {
+                CollectionError = await ReadErrorAsync(
+                    response,
+                    "The existing slideshow collection could not be updated.");
+                return;
+            }
+
+            PhotoListCollectionResponse? updated =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionResponse>();
+            if (updated is null)
+            {
+                CollectionError = "The existing slideshow collection response was empty.";
+                return;
+            }
+
+            Collections = Collections
+                .Select(item => string.Equals(item.Id, updated.Id, StringComparison.OrdinalIgnoreCase)
+                    ? updated
+                    : item)
+                .ToArray();
+            ExistingCollectionId = updated.Id;
+            SaveMessage = $"Added {addedCount} photo{(addedCount == 1 ? string.Empty : "s")} to “{updated.Name}”.";
+        }
+        catch (Exception exception)
+        {
+            CollectionError = $"The existing slideshow collection could not be updated: {exception.Message}";
+        }
+        finally
+        {
+            AddingToExisting = false;
         }
     }
 
@@ -314,29 +471,19 @@
     private void SetSelected(string revisionId, ChangeEventArgs args)
     {
         bool selected = args.Value is bool value && value;
-        if (selected)
-        {
-            SelectedRevisionIds.Add(revisionId);
-        }
-        else
-        {
-            SelectedRevisionIds.Remove(revisionId);
-        }
+        SearchState.SetSelected(revisionId, selected);
     }
 
-    private void SelectAll()
+    private void SelectAllCurrent()
     {
         if (Results is null)
         {
             return;
         }
-        foreach (PhotoSearchResultResponse result in Results.Items)
-        {
-            SelectedRevisionIds.Add(result.RevisionId);
-        }
+        SearchState.SelectAll(Results.Items.Select(result => result.RevisionId));
     }
 
-    private void ClearSelection() => SelectedRevisionIds.Clear();
+    private void ClearSelection() => SearchState.ClearSelection();
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string fallback)
     {
