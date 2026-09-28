@@ -1,7 +1,7 @@
 id: WI-0169
 title: Bound Creative Collection materialization for large Broad selections
 milestone: M32
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0169-creative-collection-scale.md
 started_at: 2026-09-29
@@ -12,4 +12,6 @@ blockers:
 - WI-0121
 - WI-0123
 blocker_notes: []
-evidence: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/468
