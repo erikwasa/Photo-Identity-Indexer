@@ -17,7 +17,7 @@ Current work items: **12**. Archived terminal items: **156**.
 | [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0165.yaml) |
 | [WI-0167](../work-items/WI-0167-onedrive-slideshow-availability.md) Fail best-quality slideshow preparation when OneDrive is unavailable | M32 | proposed | unassigned | [YAML](work-items/active/WI-0167.yaml) |
 | [WI-0168](../work-items/WI-0168-pwa-slideshow-navigation.md) Add bidirectional navigation between Slideshows and the full PWA | M32 | proposed | unassigned | [YAML](work-items/active/WI-0168.yaml) |
-| [WI-0169](../work-items/WI-0169-creative-collection-scale.md) Bound Creative Collection materialization for large Broad selections | M32 | proposed | unassigned | [YAML](work-items/active/WI-0169.yaml) |
+| [WI-0169](../work-items/WI-0169-creative-collection-scale.md) Bound Creative Collection materialization for large Broad selections | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0169.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 
