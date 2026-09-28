@@ -9,5 +9,6 @@ builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
 });
+builder.Services.AddScoped<PhotoSearchSessionState>();
 
 await builder.Build().RunAsync();
