@@ -102,7 +102,7 @@ public sealed class CreativeCollectionMaterializationOptimizationTests
     }
 
     private static string GroupSignature(PhotoVisualRedundancyGroup group) =>
-        $"{group.MomentId}:{string.Join(',', group.Members.Select(member => member.RevisionId))}";
+        $"{group.MomentId}:{string.Join(",", group.Members.Select(member => member.RevisionId))}";
 
     private static CreativeCollectionCandidate[] SelectEligible(
         CreativeCollectionCandidate[] candidates,
