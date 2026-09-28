@@ -54,6 +54,29 @@ public sealed class SlideshowPreparationExperienceTests
     }
 
     [Fact]
+    public void OneDrive_unavailable_is_immediately_retryable_without_faking_no_progress()
+    {
+        SlideshowOriginalPreparationResponse unavailable = Status(
+            state: "preparing",
+            ready: 0,
+            total: 4,
+            canRetry: true,
+            message: "OneDrive is not available. Start OneDrive on this computer, then retry.",
+            canContinueWithAvailable: true) with
+        {
+            Phase = "onedrive-unavailable",
+        };
+
+        Assert.Equal(
+            SlideshowPreparationStatusAction.RecoverNoProgress,
+            SlideshowPreparationExperience.StatusAction(unavailable));
+        Assert.True(SlideshowPreparationExperience.NeedsParentAttention(unavailable));
+        Assert.False(unavailable.NoProgressWarning);
+        Assert.True(unavailable.CanRetry);
+        Assert.True(SlideshowPreparationExperience.CanContinueWithAvailable(unavailable));
+    }
+
+    [Fact]
     public void Capacity_failure_is_explicit_and_keeps_available_recovery()
     {
         SlideshowOriginalPreparationResponse capacity = Status(
