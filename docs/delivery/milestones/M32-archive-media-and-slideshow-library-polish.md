@@ -9,14 +9,17 @@ depends_on: [M12, M26, M27, M28]
 
 ## Outcome
 
-Photo Identity handles the real DNG files now present in the maintained archive and makes the slideshow gallery easier to understand at a glance without regressing established slideshow performance.
+Photo Identity handles the real DNG files now present in the maintained archive and makes the slideshow/Creative Collection experience easier to understand and more reliable on desktop and phone without regressing established slideshow performance.
 
-This milestone is intentionally narrow follow-up work. It does not reopen generic RAW support for camera formats that are not present, and it does not redesign slideshow playback.
+This milestone remains follow-up work rather than a slideshow redesign. It does not reopen generic RAW support for camera formats that are not present. The additional follow-ups record real maintainer findings around Prepared-state continuity, OneDrive-unavailable recovery, standalone-PWA navigation and archive-scale Creative materialization.
 
 ## Work items
 
 - [WI-0164](../work-items/WI-0164-dng-archive-support.md) - add verified end-to-end DNG support using representative private archive samples.
-- [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) - show compact preparation state and truthful photo-count information in the slideshow library.
+- [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) - show compact preparation state and truthful photo-count information in the slideshow library, including continuity after player-triggered preparation.
+- [WI-0167](../work-items/WI-0167-onedrive-slideshow-availability.md) - fail best-quality preparation actionably when online-only originals are needed but the OneDrive sync client is unavailable.
+- [WI-0168](../work-items/WI-0168-pwa-slideshow-navigation.md) - add bidirectional navigation between the normal installed PWA and the simplified slideshow surface.
+- [WI-0169](../work-items/WI-0169-creative-collection-scale.md) - bound large/Broad Creative Collection materialization so realistic archive-scale previews do not time out.
 
 ## Delivery principles
 
@@ -26,12 +29,18 @@ This milestone is intentionally narrow follow-up work. It does not reopen generi
 - Do not describe an unprepared slideshow as unplayable.
 - Present exact counts only when the underlying collection semantics make them exact.
 - Keep gallery additions visually small and usable on desktop and phone.
+- Do not require OneDrive merely to play already-local originals; when hydration is required and the sync client is unavailable, fail with an actionable recovery path rather than waiting indefinitely.
+- Keep the slideshow consumer surface simple while ensuring standalone-PWA users can navigate to it and back to the full app.
+- Treat expensive Creative derived evidence as bounded/versioned work suitable for reuse; do not solve archive-scale timeouts only by increasing client timeouts.
 
 ## Exit criteria
 
 - [x] Existing and newly discovered DNG files can enter the normal archive pipeline and be viewed/processed through supported derivatives.
 - [x] Representative private DNG samples have accepted orientation, colour, metadata, runtime and memory evidence.
-- [ ] Slideshow cards show preparation state only when it is valid for the current revision set.
+- [ ] Slideshow cards show preparation state only when it is valid for the current revision set, including after successful best-quality preparation performed during normal slideshow playback.
 - [ ] Manual and Smart slideshow counts are truthful, and Creative Collection quantity wording distinguishes target/maximum from exact membership when necessary.
 - [ ] Slideshow-library card rendering remains responsive and does not require full snapshots solely for decorative status/count information.
-- [ ] Maintainer verifies the DNG path with private archive files and the slideshow indicators on desktop and phone.
+- [ ] Best-quality preparation reports an actionable OneDrive-unavailable failure when an online-only original cannot be hydrated because the sync client is unavailable, without affecting already-local playback.
+- [ ] Installed-PWA navigation provides a discoverable route from the full app to Slideshows and back without relying on browser chrome.
+- [ ] A representative approximately 1,000-photo anchor with target 150 and Broad Creative context completes within the maintained client/server request boundary or reports a bounded actionable failure, with stable expensive derived evidence reused where appropriate.
+- [ ] Maintainer verifies the remaining slideshow/PWA behavior on desktop and phone and the Creative scale case on representative private catalogue data.
