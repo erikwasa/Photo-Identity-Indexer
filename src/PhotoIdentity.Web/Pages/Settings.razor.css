@@ -70,27 +70,27 @@
     padding: 0 0.7rem 0.7rem;
 }
 
-.settings-group-content ::deep(.review-filter-panel) {
+.settings-group-content ::deep .review-filter-panel {
     margin: 0;
     padding: 0.85rem;
 }
 
-.settings-group-content ::deep(.section-heading) {
+.settings-group-content ::deep .section-heading {
     margin-bottom: 0.55rem;
 }
 
-.settings-group-content ::deep(.review-filter-grid) {
+.settings-group-content ::deep .review-filter-grid {
     gap: 0.65rem;
 }
 
-.settings-group-content ::deep(input:not([type="checkbox"])),
-.settings-group-content ::deep(select) {
+.settings-group-content ::deep input:not([type="checkbox"]),
+.settings-group-content ::deep select {
     min-height: 2.35rem;
     padding-top: 0.35rem;
     padding-bottom: 0.35rem;
 }
 
-.settings-group-content ::deep(.card-actions) {
+.settings-group-content ::deep .card-actions {
     margin-top: 0.65rem;
 }
 
@@ -103,7 +103,7 @@
         padding: 0 0.45rem 0.45rem;
     }
 
-    .settings-group-content ::deep(.review-filter-panel) {
+    .settings-group-content ::deep .review-filter-panel {
         padding: 0.7rem;
     }
 }
