@@ -4,26 +4,32 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**WI-0163 Add safe bulk capture-date and Place enrichment is in progress under M31 Bulk archive metadata enrichment. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
+**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0169 Creative Collection scaling is in review under M32 on PR #468. WI-0167 OneDrive-unavailable slideshow recovery is separately in review on PR #467 with CI green. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
 
-The maintainer measured 17,892 current photos: 234 have no effective capture date, 12,603 have no named Place or valid non-zero GPS, and 12,371 of the location-less photos already have an effective date. Directory `1970` is a miscellaneous catch-all and must never be interpreted as a real capture year merely from its path.
+WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`; continue its production-catalogue dry-run/apply verification from the canonical work-item shard.
 
-WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`. Its first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default.
+WI-0169 removes the dominant unbounded visual-evidence work from Creative materialization. Candidates that cannot form an accepted same-moment <=20-second visual group are not hashed; remaining durable review-proxy hashes are cached by immutable revision + proxy content hash + visual algorithm version. Proxy/exclusion resolution is set-oriented, hash concurrency is bounded to 4–12 workers, and aggregate phase diagnostics are path-free. Preview/snapshot requests now have a 60-second server deadline and the Creative workspace visibly reports Working state instead of appearing frozen.
 
-M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M26, M28, M29 and M33 are completed. M29 removed the retired SQLite implementation, executable compatibility paths and obsolete migration-era active references; PostgreSQL is now the only compiled and packaged catalogue implementation. M33 reduced maintained-archive no-change synchronization from 192.264856 seconds on the matched main baseline to 7.421021 seconds on the accepted corrected build, with zero stable-file hashing and fixed per-folder PostgreSQL batching. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+WI-0167 is implemented on `agent/wi-0167-onedrive-slideshow-availability`; CI run #2491 passed. It still needs maintained Windows/phone acceptance for OneDrive stopped/online-only, start-and-retry, already-local with OneDrive stopped, and slow active hydration.
+
+M23 Source-copy lifecycle and privacy exclusion is completed. M26, M28, M29 and M33 are completed. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Continue WI-0163 from its canonical work-item/status shard. WI-0166 requires no further maintainer verification; PR #456 contains the completed implementation and recorded acceptance evidence.
+For WI-0169, run/confirm PR #468 CI and then reproduce the maintainer's roughly 1,000-anchor / target-150 / Broad case twice on the maintained archive, recording the aggregate Creative materialization timing line and confirming the second run reuses cached visual evidence. Verify the phone/PWA Working/error behavior. Keep WI-0169 in review until those archive-scale checks are accepted. Continue WI-0163 from its canonical shard when returning to metadata-enrichment verification.
 
 ## Relevant files
 
-- docs/delivery/milestones/M31-bulk-metadata-enrichment.md
+- docs/delivery/work-items/WI-0169-creative-collection-scale.md
+- docs/delivery/status/work-items/active/WI-0169.yaml
+- src/PhotoIdentity.Api/CreativeCollectionMaterializationService.cs
+- src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs
+- src/PhotoIdentity.Api/CreativeVisualFingerprintCache.cs
+- src/PhotoIdentity.Api/CollectionReviewProxyFileResolver.cs
+- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor
+- tests/PhotoIdentity.Integration.Tests/CreativeCollectionMaterializationOptimizationTests.cs
+- docs/delivery/work-items/WI-0167-onedrive-slideshow-availability.md
 - docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
-- docs/delivery/status/work-items/active/WI-0163.yaml
-- docs/delivery/milestones/M33-archive-synchronization-performance.md
-- docs/delivery/work-items/WI-0166-included-folder-sync-performance.md
-- docs/delivery/status/work-items/archive/WI-0166.yaml
 
 ## Repository validation
 
