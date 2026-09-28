@@ -66,7 +66,7 @@ public static class PhotoSearchEndpoints
                     item.RevisionId.ToString(),
                     $"/api/collections/photos/{item.RevisionId}/thumbnail",
                     $"/api/collections/photos/{item.RevisionId}/preview",
-                    $"/photo/{item.RevisionId}",
+                    $"/photo/{item.RevisionId}?returnUrl=%2Fsearch",
                     item.CombinedScore,
                     item.SemanticScore,
                     item.CaptionScore,
