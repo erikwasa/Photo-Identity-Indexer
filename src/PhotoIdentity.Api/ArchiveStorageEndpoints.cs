@@ -9,6 +9,7 @@ public static class ArchiveStorageEndpoints
     {
         endpoints.MapGet("/api/archive/configuration", GetConfigurationAsync);
         endpoints.MapGet("/api/archive/storage", GetStorageAsync);
+        endpoints.MapPut("/api/archive/storage/policy", UpdateStoragePolicyAsync);
         return endpoints;
     }
 
@@ -56,6 +57,38 @@ public static class ArchiveStorageEndpoints
                 value.ReviewProxyProfileId));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return Results.BadRequest(new ArchiveErrorResponse(exception.Message));
+        }
+    }
+
+    private static async Task<IResult> UpdateStoragePolicyAsync(
+        ArchiveStoragePolicyUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            LauncherSettingsStore store = new();
+            await store.SaveArchiveHydrationPolicyAsync(
+                request.MinimumFreeSpaceReserveGb,
+                request.MaximumManagedHydrationGb,
+                request.MaximumConcurrentOperations,
+                cancellationToken);
+
+            return Results.Ok(new ArchiveStoragePolicyUpdateResponse(
+                request.MinimumFreeSpaceReserveGb,
+                request.MaximumManagedHydrationGb,
+                request.MaximumConcurrentOperations,
+                true,
+                "Storage policy saved. Restart Photo Identity to apply the new limits."));
+        }
+        catch (Exception exception) when (exception is
+            ArgumentOutOfRangeException or
+            OverflowException or
+            IOException or
+            UnauthorizedAccessException or
+            InvalidDataException or
+            InvalidOperationException)
         {
             return Results.BadRequest(new ArchiveErrorResponse(exception.Message));
         }
