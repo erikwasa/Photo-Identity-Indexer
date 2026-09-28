@@ -164,7 +164,7 @@
 
     .primary-nav {
         width: 100%;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         justify-content: flex-start;
         gap: 0.15rem;
     }
