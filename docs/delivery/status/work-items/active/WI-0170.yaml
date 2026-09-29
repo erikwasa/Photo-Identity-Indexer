@@ -1,0 +1,10 @@
+id: WI-0170
+title: Bound review queue refill and show bulk face decisions promptly
+milestone: M34
+status: ready
+owner: unassigned
+document: ../work-items/WI-0170-review-queue-refill.md
+last_updated_at: 2026-09-30
+blockers: []
+blocker_notes: []
+evidence: []
