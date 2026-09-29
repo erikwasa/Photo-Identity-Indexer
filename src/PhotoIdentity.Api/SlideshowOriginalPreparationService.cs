@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Api;
 
@@ -273,6 +274,8 @@ public sealed class SlideshowOriginalPreparationService
                 int managedDownloading = 0;
                 int waitingForRelease = 0;
                 List<AssetRevisionLookup> onlineOnly = [];
+                bool restartAfterRetry = false;
+                bool reassertManagedHydration = session.ReassertHydrationRequested;
 
                 foreach (AssetRevisionLookup revision in session.Revisions)
                 {
@@ -309,7 +312,46 @@ public sealed class SlideshowOriginalPreparationService
                             if (status.ManagedHydration)
                             {
                                 managedDownloading++;
+                                if (reassertManagedHydration)
+                                {
+                                    try
+                                    {
+                                        CollectionOriginalAccessSnapshot? reasserted =
+                                            await _originals.ReassertManagedHydrationAsync(
+                                                revision.RevisionId,
+                                                session.Cancellation.Token);
+                                        if (reasserted is null)
+                                        {
+                                            session.Fail(
+                                                "One or more slideshow originals could not be resolved while retrying hydration.");
+                                            return;
+                                        }
+
+                                        session.RecordHydrationRequest(_timeProvider.GetUtcNow());
+                                    }
+                                    catch (OneDriveSyncClientUnavailableException)
+                                    {
+                                        session.WaitForOneDriveRetry(_timeProvider.GetUtcNow());
+                                        await session.WaitForRetryAsync();
+                                        restartAfterRetry = true;
+                                    }
+                                    catch (Exception exception)
+                                        when (exception is InvalidOperationException or
+                                            IOException or
+                                            PlatformNotSupportedException)
+                                    {
+                                        session.Fail(
+                                            $"Best-quality original preparation failed: {PathFreeMessage(exception.Message)}");
+                                        return;
+                                    }
+                                }
                             }
+                            break;
+
+                        case CollectionOriginalAccessService.OneDriveUnavailableState:
+                            session.WaitForOneDriveRetry(_timeProvider.GetUtcNow());
+                            await session.WaitForRetryAsync();
+                            restartAfterRetry = true;
                             break;
 
                         case CollectionOriginalAccessService.ReleasingState:
@@ -331,6 +373,21 @@ public sealed class SlideshowOriginalPreparationService
                                 "One or more authoritative originals could not be prepared. Continue with available/proxy images or cancel.");
                             return;
                     }
+
+                    if (restartAfterRetry)
+                    {
+                        break;
+                    }
+                }
+
+                if (restartAfterRetry)
+                {
+                    continue;
+                }
+
+                if (reassertManagedHydration)
+                {
+                    session.CompleteRetryReassertion();
                 }
 
                 if (ready.Count >= session.Revisions.Count)
@@ -375,6 +432,13 @@ public sealed class SlideshowOriginalPreparationService
                             ready.Add(revision.RevisionId);
                         }
                     }
+                    catch (OneDriveSyncClientUnavailableException)
+                    {
+                        session.WaitForOneDriveRetry(_timeProvider.GetUtcNow());
+                        await session.WaitForRetryAsync();
+                        restartAfterRetry = true;
+                        break;
+                    }
                     catch (InvalidOperationException exception)
                         when (exception.Message.Contains("concurrency limit", StringComparison.OrdinalIgnoreCase) ||
                               exception.Message.Contains("retry after", StringComparison.OrdinalIgnoreCase))
@@ -390,6 +454,11 @@ public sealed class SlideshowOriginalPreparationService
                             $"Best-quality original preparation failed: {PathFreeMessage(exception.Message)}");
                         return;
                     }
+                }
+
+                if (restartAfterRetry)
+                {
+                    continue;
                 }
 
                 if (ready.Count >= session.Revisions.Count)
@@ -503,6 +572,8 @@ public sealed class SlideshowOriginalPreparationService
         private long _availableManagedCapacity;
         private DateTimeOffset _lastTouchedAtUtc;
         private DateTimeOffset _lastProgressAtUtc;
+        private bool _waitingForRetry;
+        private bool _reassertHydrationRequested;
 
         public Session(
             Guid id,
@@ -529,6 +600,17 @@ public sealed class SlideshowOriginalPreparationService
                 lock (_gate)
                 {
                     return _state;
+                }
+            }
+        }
+
+        public bool ReassertHydrationRequested
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _reassertHydrationRequested;
                 }
             }
         }
@@ -594,7 +676,7 @@ public sealed class SlideshowOriginalPreparationService
         {
             lock (_gate)
             {
-                if (_state != SlideshowOriginalPreparationStates.Preparing)
+                if (_state != SlideshowOriginalPreparationStates.Preparing || _waitingForRetry)
                 {
                     return;
                 }
@@ -634,6 +716,22 @@ public sealed class SlideshowOriginalPreparationService
             }
         }
 
+        public void WaitForOneDriveRetry(DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                if (_state != SlideshowOriginalPreparationStates.Preparing)
+                {
+                    return;
+                }
+
+                _waitingForRetry = true;
+                _phase = "onedrive-unavailable";
+                _message = OneDriveSyncClientUnavailableException.UserMessage;
+                _lastProgressAtUtc = now;
+            }
+        }
+
         public bool RequestRetry(DateTimeOffset now)
         {
             lock (_gate)
@@ -643,6 +741,8 @@ public sealed class SlideshowOriginalPreparationService
                     return false;
                 }
 
+                _waitingForRetry = false;
+                _reassertHydrationRequested = true;
                 _phase = "retrying";
                 _message = "Retry requested; rechecking OneDrive and the same slideshow snapshot.";
                 _lastProgressAtUtc = now;
@@ -662,9 +762,22 @@ public sealed class SlideshowOriginalPreparationService
             return true;
         }
 
+        public async Task WaitForRetryAsync()
+        {
+            await _retrySignal.WaitAsync(Cancellation.Token);
+        }
+
         public async Task WaitForNextPollAsync(TimeSpan delay)
         {
             _ = await _retrySignal.WaitAsync(delay, Cancellation.Token);
+        }
+
+        public void CompleteRetryReassertion()
+        {
+            lock (_gate)
+            {
+                _reassertHydrationRequested = false;
+            }
         }
 
         public void MarkReady(DateTimeOffset now)
@@ -675,6 +788,8 @@ public sealed class SlideshowOriginalPreparationService
                 _downloading = 0;
                 _queued = 0;
                 _waitingForRelease = 0;
+                _waitingForRetry = false;
+                _reassertHydrationRequested = false;
                 _state = SlideshowOriginalPreparationStates.Ready;
                 _phase = "ready";
                 _message = null;
@@ -691,6 +806,8 @@ public sealed class SlideshowOriginalPreparationService
                     return;
                 }
 
+                _waitingForRetry = false;
+                _reassertHydrationRequested = false;
                 _state = SlideshowOriginalPreparationStates.Failed;
                 _phase = "failed";
                 _message = message;
@@ -701,6 +818,8 @@ public sealed class SlideshowOriginalPreparationService
         {
             lock (_gate)
             {
+                _waitingForRetry = false;
+                _reassertHydrationRequested = false;
                 _state = SlideshowOriginalPreparationStates.Cancelled;
                 _phase = "cancelled";
                 _message = "Best-quality original preparation was cancelled.";
@@ -721,11 +840,13 @@ public sealed class SlideshowOriginalPreparationService
         {
             lock (_gate)
             {
-                long noProgressSeconds = _state == SlideshowOriginalPreparationStates.Preparing
-                    ? Math.Max(0L, (long)(now - _lastProgressAtUtc).TotalSeconds)
-                    : 0L;
+                long noProgressSeconds =
+                    _state == SlideshowOriginalPreparationStates.Preparing && !_waitingForRetry
+                        ? Math.Max(0L, (long)(now - _lastProgressAtUtc).TotalSeconds)
+                        : 0L;
                 bool noProgressWarning =
                     _state == SlideshowOriginalPreparationStates.Preparing &&
+                    !_waitingForRetry &&
                     _ready < Revisions.Count &&
                     now - _lastProgressAtUtc >= NoProgressWarningThreshold;
 
@@ -742,13 +863,12 @@ public sealed class SlideshowOriginalPreparationService
                     _lastProgressAtUtc,
                     noProgressSeconds,
                     noProgressWarning,
-                    noProgressWarning,
+                    _waitingForRetry || noProgressWarning,
                     _requiredAdditionalBytes,
                     _availableManagedCapacity,
                     _message,
-                    _state == SlideshowOriginalPreparationStates.Failed);
+                    _state == SlideshowOriginalPreparationStates.Failed || _waitingForRetry);
             }
         }
     }
-
 }

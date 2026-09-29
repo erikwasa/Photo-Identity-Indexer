@@ -15,7 +15,7 @@ Current work items: **12**. Archived terminal items: **156**.
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
 | [WI-0163](../work-items/WI-0163-bulk-metadata-enrichment.md) Add safe bulk capture-date and Place enrichment | M31 | in_progress | ai-agent | [YAML](work-items/active/WI-0163.yaml) |
 | [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0165.yaml) |
-| [WI-0167](../work-items/WI-0167-onedrive-slideshow-availability.md) Fail best-quality slideshow preparation when OneDrive is unavailable | M32 | proposed | unassigned | [YAML](work-items/active/WI-0167.yaml) |
+| [WI-0167](../work-items/WI-0167-onedrive-slideshow-availability.md) Fail best-quality slideshow preparation when OneDrive is unavailable | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0167.yaml) |
 | [WI-0168](../work-items/WI-0168-pwa-slideshow-navigation.md) Add bidirectional navigation between Slideshows and the full PWA | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0168.yaml) |
 | [WI-0169](../work-items/WI-0169-creative-collection-scale.md) Bound Creative Collection materialization for large Broad selections | M32 | proposed | unassigned | [YAML](work-items/active/WI-0169.yaml) |
 

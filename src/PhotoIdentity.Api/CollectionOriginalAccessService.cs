@@ -25,6 +25,7 @@ public sealed class CollectionOriginalAccessService
     public const string ReadyState = "ready";
     public const string OnlineOnlyState = "online-only";
     public const string DownloadingState = "downloading";
+    public const string OneDriveUnavailableState = "onedrive-unavailable";
     public const string ReleasingState = "releasing";
     public const string HashMismatchState = "hash-mismatch";
     public const string UnavailableState = "unavailable";
@@ -103,6 +104,22 @@ public sealed class CollectionOriginalAccessService
 
         bool managed = ownership is { IsActive: true };
         bool releasing = ownership is { IsReleaseRequested: true };
+        if (managed &&
+            !releasing &&
+            platformState.Availability == AssetAvailability.Downloading &&
+            _platform.GetSyncClientAvailability() == OneDriveSyncClientAvailability.Unavailable)
+        {
+            return Snapshot(
+                revisionId,
+                OneDriveUnavailableState,
+                managed,
+                platformState.IsPinned,
+                false,
+                false,
+                managed,
+                OneDriveSyncClientUnavailableException.UserMessage);
+        }
+
         return platformState.Availability switch
         {
             AssetAvailability.Local when releasing => Snapshot(
@@ -161,6 +178,7 @@ public sealed class CollectionOriginalAccessService
         OneDriveFilesOnDemandState state = await ObserveStateAsync(resolved, cancellationToken);
         if (state.Availability == AssetAvailability.OnlineOnly)
         {
+            EnsureSyncClientAvailable();
             ArchiveHydrationAdmission admission = await _capacity.ExecuteHydrationAdmissionAsync(
                 resolved.Revision,
                 async () =>
@@ -185,6 +203,50 @@ public sealed class CollectionOriginalAccessService
                 throw new InvalidOperationException(
                     admission.Message ?? "Managed hydration is blocked by the configured storage policy.");
             }
+        }
+        else if (state.Availability == AssetAvailability.Unavailable)
+        {
+            throw new FileNotFoundException("The authoritative original is unavailable.");
+        }
+        else if (state.Availability == AssetAvailability.Error)
+        {
+            throw new IOException("OneDrive availability could not be determined.");
+        }
+
+        return await GetStatusAsync(revisionId, cancellationToken);
+    }
+
+    public async Task<CollectionOriginalAccessSnapshot?> ReassertManagedHydrationAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default)
+    {
+        ResolvedOriginal? resolved = await ResolveAsync(revisionId, cancellationToken);
+        if (resolved is null)
+        {
+            return null;
+        }
+
+        ArchiveManagedHydrationState? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
+        if (ownership is not { IsActive: true } || ownership.IsReleaseRequested)
+        {
+            return await GetStatusAsync(revisionId, cancellationToken);
+        }
+
+        OneDriveFilesOnDemandState state = await ObserveStateAsync(resolved, cancellationToken);
+        if (state.Availability == AssetAvailability.OnlineOnly)
+        {
+            return await RequestHydrationAsync(revisionId, cancellationToken);
+        }
+
+        if (state.Availability == AssetAvailability.Downloading)
+        {
+            EnsureSyncClientAvailable();
+            using (IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.HydrationRequest))
+            {
+                await _platform.RequestHydrationAsync(resolved.Path, cancellationToken);
+            }
+            _metrics?.RecordCounter(ArchiveThroughputMetricNames.HydrationRequests);
+            await _capacity.TouchAsync(revisionId, cancellationToken);
         }
         else if (state.Availability == AssetAvailability.Unavailable)
         {
@@ -288,6 +350,14 @@ public sealed class CollectionOriginalAccessService
             _timeProvider.GetUtcNow(),
             cancellationToken);
         return state;
+    }
+
+    private void EnsureSyncClientAvailable()
+    {
+        if (_platform.GetSyncClientAvailability() == OneDriveSyncClientAvailability.Unavailable)
+        {
+            throw new OneDriveSyncClientUnavailableException();
+        }
     }
 
     private async Task<VerifiedCollectionOriginal?> OpenVerifiedCoreAsync(
