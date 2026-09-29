@@ -28,6 +28,12 @@ The PWA manifest already uses `/` as both `start_url` and `scope`, so this is an
 - Ensure navigation remains usable in standalone PWA mode on the maintained phone layout and in the ordinary desktop browser.
 - Preserve the existing trusted-private-network and unauthenticated access boundary; this work adds navigation only.
 
+## Implementation progress
+
+PR #465 implements the navigation as a narrow Web UI change. The normal `MainLayout` now includes **Slideshows** in primary navigation, while the slideshow `ConsumerLayout` includes a compact **Full app** link back to `/`. Both cross-surface targets are centralized in `AppSurfaceNavigation`, and the existing slideshow route test suite protects those route values without adding a new browser-test dependency.
+
+The consumer header now uses a space-between layout and a 44 px return control, with a compact small-phone treatment below 420 px. This keeps the read-only slideshow surface intentionally simpler than the operator shell and is designed to avoid introducing horizontal overflow in the installed PWA. Automated build/test/docs validation and maintained phone/desktop acceptance remain pending.
+
 ## Acceptance criteria
 
 - [ ] The normal application navigation includes a discoverable route to `/slideshows`.
