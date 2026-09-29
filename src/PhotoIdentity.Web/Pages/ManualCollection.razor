@@ -1,5 +1,5 @@
 @page "/manual-collections/{CollectionId:guid}"
-@layout ConsumerLayout
+@layout MainLayout
 @using System.Net.Http.Json
 @using PhotoIdentity.Web.Contracts
 @inject HttpClient Http
@@ -14,7 +14,7 @@
         <h1>@(Collection?.Name ?? "Review slideshow")</h1>
         <p>Review the exact photos and order that will be used for playback.</p>
     </div>
-    <a class="button secondary" href="/slideshows">Back to slideshows</a>
+    <a class="button secondary" href="/slideshow-collections">All collections</a>
 </section>
 
 @if (Loading)
@@ -55,6 +55,7 @@ else if (Collection is not null)
 
         <div class="manual-collection-actions">
             <span>@ItemCountLabel</span>
+            <button type="button" class="button secondary" disabled="@Busy" @onclick="DeleteAsync">Delete collection</button>
             <button type="button"
                     class="button primary"
                     disabled="@(Busy || Collection.RevisionIds.Length == 0)"
@@ -172,6 +173,31 @@ else if (Collection is not null)
         finally
         {
             Loading = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (Collection is null || Busy || !await JS.InvokeAsync<bool>(
+                "confirm", $"Delete collection '{Collection.Name}'? The original photos will remain in the archive."))
+        {
+            return;
+        }
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync($"api/photo-list-collections/{CollectionId:D}");
+            response.EnsureSuccessStatusCode();
+            Navigation.NavigateTo("/slideshow-collections");
+        }
+        catch (Exception exception)
+        {
+            Error = $"The manual collection could not be deleted: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
         }
     }
 

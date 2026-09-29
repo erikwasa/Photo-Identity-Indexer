@@ -89,3 +89,15 @@ Maintainer desktop/phone verification and final CI evidence therefore remain pen
 10. Exercise preparing and parent-attention states and confirm they remain more prominent than the passive Prepared indicator.
 11. Verify desktop Edge and phone layouts for readability, tap targets and accessible text.
 12. Run the existing slideshow-library performance diagnostics to ensure the change does not reintroduce blocking library or snapshot latency.
+
+### Maintainer acceptance — 2026-09-30 (Europe/Stockholm)
+
+Manual slideshow with 53 photos took 3 minutes 20 seconds to begin with **Prepare originals** enabled. After preparation and reload, the library still did not show **Prepared**. Acceptance failed; the item was reopened for implementation. The supplied stdout log records preparation polling and served originals but does not separate cloud download time from verification time, so the entire delay must not be attributed to either without measurement.
+
+The follow-up records successful player preparation using the same browser-local receipt key and exact immutable revision set as standalone preparation. Library reload continues to check membership and original availability/content; a receipt never bypasses those checks. Original status checks and receipt revalidation now use four workers, while hydration admission/pinning remain governed by the existing capacity policy. This reduces serial verification overhead but cannot guarantee cloud-download duration. Focused receipt tests cover reload, replacement, unrelated receipts and corrupt browser state.
+
+Retest the 53-photo case twice, noting whether originals are cloud-only or already local; check **Prepared** after exit/reload and its removal after membership change or eviction. Desktop/phone acceptance remains outstanding.
+
+## Follow-up validation
+
+The affected API/Web/test projects build, and 50 focused non-host slideshow/receipt/cache/route/Creative optimization tests pass. Documentation `validate` and `generate --check` pass. PostgreSQL-backed preparation tests could not run locally because the test admin connection was unavailable; those cases remain required in CI. Maintained archive/phone acceptance is not claimed.
