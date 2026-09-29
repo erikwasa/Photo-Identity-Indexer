@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using PhotoIdentity.Core.Sources;
 
@@ -9,9 +10,30 @@ public sealed record OneDriveFilesOnDemandState(
     bool IsUnpinned,
     string? Error = null);
 
+public enum OneDriveSyncClientAvailability
+{
+    Unknown,
+    Available,
+    Unavailable,
+}
+
+public sealed class OneDriveSyncClientUnavailableException : IOException
+{
+    public const string UserMessage =
+        "OneDrive is not available. Start OneDrive on this computer, then retry.";
+
+    public OneDriveSyncClientUnavailableException()
+        : base(UserMessage)
+    {
+    }
+}
+
 public interface IOneDriveFilesOnDemandPlatform
 {
     OneDriveFilesOnDemandState GetState(string path);
+
+    OneDriveSyncClientAvailability GetSyncClientAvailability() =>
+        OneDriveSyncClientAvailability.Unknown;
 
     Task RequestHydrationAsync(string path, CancellationToken cancellationToken = default);
 
@@ -53,6 +75,37 @@ public sealed class WindowsOneDriveFilesOnDemandPlatform : IOneDriveFilesOnDeman
         }
     }
 
+    public OneDriveSyncClientAvailability GetSyncClientAvailability()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return OneDriveSyncClientAvailability.Unknown;
+        }
+
+        try
+        {
+            Process[] processes = Process.GetProcessesByName("OneDrive");
+            try
+            {
+                return ClassifySyncClientProcessCount(processes.Length);
+            }
+            finally
+            {
+                foreach (Process process in processes)
+                {
+                    process.Dispose();
+                }
+            }
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or Win32Exception or NotSupportedException)
+        {
+            // Process enumeration is only a bounded one-way absence signal. If Windows cannot
+            // establish that absence safely, preserve existing Files On-Demand behavior.
+            return OneDriveSyncClientAvailability.Unknown;
+        }
+    }
+
     public Task RequestHydrationAsync(string path, CancellationToken cancellationToken = default) =>
         RunAttribAsync("+p", path, cancellationToken);
 
@@ -76,6 +129,11 @@ public sealed class WindowsOneDriveFilesOnDemandPlatform : IOneDriveFilesOnDeman
             : AssetAvailability.Local;
         return new OneDriveFilesOnDemandState(availability, pinned, unpinned);
     }
+
+    internal static OneDriveSyncClientAvailability ClassifySyncClientProcessCount(int processCount) =>
+        processCount > 0
+            ? OneDriveSyncClientAvailability.Available
+            : OneDriveSyncClientAvailability.Unavailable;
 
     private static async Task RunAttribAsync(
         string attribute,

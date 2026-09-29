@@ -4,19 +4,19 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0169 Creative Collection scaling is in review under M32 on PR #468. WI-0167 OneDrive-unavailable slideshow recovery is separately in review on PR #467 with CI green. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
+**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0169 Creative Collection scaling is in review under M32 on PR #468. WI-0167 OneDrive-unavailable slideshow recovery remains in review after PR #467 merged, pending maintained Windows/phone acceptance. WI-0168 PWA slideshow navigation is also in review under M32. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
 
 WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`; continue its production-catalogue dry-run/apply verification from the canonical work-item shard.
 
 WI-0169 removes the dominant unbounded visual-evidence work from Creative materialization. Candidates that cannot form an accepted same-moment <=20-second visual group are not hashed; remaining durable review-proxy hashes are cached by immutable revision + proxy content hash + visual algorithm version. Proxy/exclusion resolution is set-oriented, hash concurrency is bounded to 4–12 workers, and aggregate phase diagnostics are path-free. Preview/snapshot requests now have a 60-second server deadline and the Creative workspace visibly reports Working state instead of appearing frozen.
 
-WI-0167 is implemented on `agent/wi-0167-onedrive-slideshow-availability`; CI run #2491 passed. It still needs maintained Windows/phone acceptance for OneDrive stopped/online-only, start-and-retry, already-local with OneDrive stopped, and slow active hydration.
+WI-0167 adds a bounded Windows OneDrive-client absence signal only when hydration is needed. Already-local originals do not depend on OneDrive process availability. A cloud-only best-quality preparation enters an actionable `onedrive-unavailable` recovery state instead of remaining indefinitely at `0 / N`; Retry preserves the immutable slideshow session and can reassert Photo-Identity-owned in-flight hydration after OneDrive starts. Active/unknown but slow downloads retain the existing no-progress recovery. Maintainer acceptance remains outstanding.
 
 M23 Source-copy lifecycle and privacy exclusion is completed. M26, M28, M29 and M33 are completed. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-For WI-0169, run/confirm PR #468 CI and then reproduce the maintainer's roughly 1,000-anchor / target-150 / Broad case twice on the maintained archive, recording the aggregate Creative materialization timing line and confirming the second run reuses cached visual evidence. Verify the phone/PWA Working/error behavior. Keep WI-0169 in review until those archive-scale checks are accepted. Continue WI-0163 from its canonical shard when returning to metadata-enrichment verification.
+For WI-0169, run/confirm PR #468 CI and then reproduce the maintainer's roughly 1,000-anchor / target-150 / Broad case twice on the maintained archive, recording the aggregate Creative materialization timing line and confirming the second run reuses cached visual evidence. Verify the phone/PWA Working/error behavior. Keep WI-0169 in review until those archive-scale checks are accepted. Continue WI-0167 maintained Windows/phone acceptance and WI-0163 metadata-enrichment verification independently.
 
 ## Relevant files
 

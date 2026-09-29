@@ -50,6 +50,20 @@ public sealed class OneDriveFileAttributeStatusProviderTests
     }
 
     [Fact]
+    public void Sync_client_process_presence_is_a_bounded_one_way_availability_signal()
+    {
+        Assert.Equal(
+            OneDriveSyncClientAvailability.Unavailable,
+            WindowsOneDriveFilesOnDemandPlatform.ClassifySyncClientProcessCount(0));
+        Assert.Equal(
+            OneDriveSyncClientAvailability.Available,
+            WindowsOneDriveFilesOnDemandPlatform.ClassifySyncClientProcessCount(1));
+        Assert.Equal(
+            OneDriveSyncClientAvailability.Available,
+            WindowsOneDriveFilesOnDemandPlatform.ClassifySyncClientProcessCount(3));
+    }
+
+    [Fact]
     public void Traversal_skips_reparse_directories_without_filtering_reparse_files()
     {
         Assert.True(OneDriveSyncAssetSource.ShouldTraverseDirectory(FileAttributes.Directory));

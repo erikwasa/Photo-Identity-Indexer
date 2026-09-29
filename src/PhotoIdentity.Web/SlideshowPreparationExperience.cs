@@ -44,7 +44,7 @@ public static class SlideshowPreparationExperience
 
         if (string.Equals(status.State, "preparing", StringComparison.OrdinalIgnoreCase))
         {
-            return status.NoProgressWarning
+            return status.CanRetry
                 ? SlideshowPreparationStatusAction.RecoverNoProgress
                 : SlideshowPreparationStatusAction.ContinuePreparing;
         }

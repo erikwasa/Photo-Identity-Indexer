@@ -5,12 +5,17 @@
 }
 
 .consumer-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
     padding: max(0.9rem, env(safe-area-inset-top)) clamp(1rem, 4vw, 2.5rem) 0.9rem;
     color: #f7f4eb;
     background: #162a2d;
 }
 
 .consumer-brand {
+    min-width: 0;
     display: inline-flex;
     align-items: center;
     gap: 0.8rem;
@@ -36,6 +41,24 @@
     color: #b9c7c8;
 }
 
+.consumer-app-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 0.55rem 0.8rem;
+    color: #f7f4eb;
+    border: 1px solid rgba(247, 244, 235, 0.28);
+    border-radius: 0.7rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.consumer-app-link:hover,
+.consumer-app-link:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 .consumer-content {
     width: min(980px, 100%);
     margin: 0 auto;
@@ -49,4 +72,31 @@
     border-top: 1px solid #dedad1;
     text-align: center;
     font-size: 0.85rem;
+}
+
+@media (max-width: 420px) {
+    .consumer-topbar {
+        gap: 0.65rem;
+        padding-inline: 0.75rem;
+    }
+
+    .consumer-brand {
+        gap: 0.6rem;
+    }
+
+    .consumer-brand-mark {
+        width: 2.35rem;
+        height: 2.35rem;
+        border-radius: 0.72rem;
+    }
+
+    .consumer-brand small {
+        display: none;
+    }
+
+    .consumer-app-link {
+        min-height: 40px;
+        padding: 0.45rem 0.65rem;
+        font-size: 0.92rem;
+    }
 }
