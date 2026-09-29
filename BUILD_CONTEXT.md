@@ -4,28 +4,32 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0167 OneDrive-unavailable slideshow recovery is in review under M32 on PR #467. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
+**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0169 Creative Collection scaling is in review under M32 on PR #468. WI-0167 OneDrive-unavailable slideshow recovery remains in review after PR #467 merged, pending maintained Windows/phone acceptance. WI-0168 PWA slideshow navigation is also in review under M32. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
 
 WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`; continue its production-catalogue dry-run/apply verification from the canonical work-item shard.
 
-WI-0167 adds a bounded Windows OneDrive-client absence signal only when hydration is needed. Already-local originals do not depend on OneDrive process availability. A cloud-only best-quality preparation now enters an actionable `onedrive-unavailable` recovery state instead of remaining indefinitely at `0 / N`; Retry preserves the immutable slideshow session and can reassert Photo-Identity-owned in-flight hydration after OneDrive starts. Active/unknown but slow downloads retain the existing no-progress recovery.
+WI-0169 removes the dominant unbounded visual-evidence work from Creative materialization. Candidates that cannot form an accepted same-moment <=20-second visual group are not hashed; remaining durable review-proxy hashes are cached by immutable revision + proxy content hash + visual algorithm version. Proxy/exclusion resolution is set-oriented, hash concurrency is bounded to 4–12 workers, and aggregate phase diagnostics are path-free. Preview/snapshot requests now have a 60-second server deadline and the Creative workspace visibly reports Working state instead of appearing frozen.
+
+WI-0167 adds a bounded Windows OneDrive-client absence signal only when hydration is needed. Already-local originals do not depend on OneDrive process availability. A cloud-only best-quality preparation enters an actionable `onedrive-unavailable` recovery state instead of remaining indefinitely at `0 / N`; Retry preserves the immutable slideshow session and can reassert Photo-Identity-owned in-flight hydration after OneDrive starts. Active/unknown but slow downloads retain the existing no-progress recovery. Maintainer acceptance remains outstanding.
 
 M23 Source-copy lifecycle and privacy exclusion is completed. M26, M28, M29 and M33 are completed. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Run PR #467 CI, then verify WI-0167 on the maintained Windows archive PC/phone: online-only with OneDrive stopped, start OneDrive and Retry, already-local with OneDrive stopped, and a slow active hydration. Keep WI-0167 in review until that acceptance is recorded. Continue WI-0163 from its canonical shard when returning to metadata-enrichment verification.
+For WI-0169, run/confirm PR #468 CI and then reproduce the maintainer's roughly 1,000-anchor / target-150 / Broad case twice on the maintained archive, recording the aggregate Creative materialization timing line and confirming the second run reuses cached visual evidence. Verify the phone/PWA Working/error behavior. Keep WI-0169 in review until those archive-scale checks are accepted. Continue WI-0167 maintained Windows/phone acceptance and WI-0163 metadata-enrichment verification independently.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0169-creative-collection-scale.md
+- docs/delivery/status/work-items/active/WI-0169.yaml
+- src/PhotoIdentity.Api/CreativeCollectionMaterializationService.cs
+- src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs
+- src/PhotoIdentity.Api/CreativeVisualFingerprintCache.cs
+- src/PhotoIdentity.Api/CollectionReviewProxyFileResolver.cs
+- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor
+- tests/PhotoIdentity.Integration.Tests/CreativeCollectionMaterializationOptimizationTests.cs
 - docs/delivery/work-items/WI-0167-onedrive-slideshow-availability.md
-- docs/delivery/status/work-items/active/WI-0167.yaml
-- src/PhotoIdentity.Source.OneDriveSync/OneDriveFilesOnDemandPlatform.cs
-- src/PhotoIdentity.Api/CollectionOriginalAccessService.cs
-- src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowOneDriveAvailabilityTests.cs
 - docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
-- docs/delivery/status/work-items/active/WI-0163.yaml
 
 ## Repository validation
 

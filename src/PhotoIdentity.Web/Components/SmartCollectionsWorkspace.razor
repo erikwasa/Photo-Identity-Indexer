@@ -399,7 +399,7 @@
                                     same-moment context and curate the result toward a target size.
                                 </p>
                             </div>
-                            <span class="smart-result-label">@CreativeRecipeStatus</span>
+                            <span class="smart-result-label">@(Busy ? "Working…" : CreativeRecipeStatus)</span>
                         </div>
 
                         <div class="creative-controls">
@@ -446,7 +446,7 @@
                                     class="button secondary"
                                     disabled="@Busy"
                                     @onclick="PreviewCreativeAsync">
-                                Preview creative selection
+                                @(Busy ? "Working…" : "Preview creative selection")
                             </button>
                             <button type="button"
                                     class="button secondary"
@@ -461,6 +461,13 @@
                                 Save &amp; start creative slideshow
                             </button>
                         </div>
+
+                        @if (Busy)
+                        {
+                            <p class="smart-help" role="status" aria-live="polite">
+                                Creative Collection work is running. Large Broad selections may take longer; the request will return a clear error instead of waiting indefinitely.
+                            </p>
+                        }
 
                         @if (CreativePreview is CreativeCollectionPreviewResponse creative)
                         {

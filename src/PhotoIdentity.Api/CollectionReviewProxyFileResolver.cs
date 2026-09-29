@@ -13,6 +13,10 @@ public sealed record ReviewProxyServingConfiguration(
         !string.IsNullOrWhiteSpace(ProfileId);
 }
 
+public sealed record ResolvedCollectionReviewProxy(
+    CollectionPhotoFile File,
+    ArchiveReviewProxyMetadata Metadata);
+
 /// <summary>
 /// Resolves durable review derivative metadata to verified paths under the configured derivative
 /// root. It never falls back to or opens the authoritative source original. Excluded source copies
@@ -58,6 +62,16 @@ public sealed class CollectionReviewProxyFileResolver
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
     {
+        ResolvedCollectionReviewProxy? resolved = await ResolveWithMetadataAsync(
+            revisionId,
+            cancellationToken);
+        return resolved?.File;
+    }
+
+    public async Task<ResolvedCollectionReviewProxy?> ResolveWithMetadataAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default)
+    {
         if (!_configuration.IsConfigured ||
             (_exclusions is not null && await _exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken)))
         {
@@ -68,13 +82,47 @@ public sealed class CollectionReviewProxyFileResolver
             revisionId,
             _configuration.ProfileId!,
             cancellationToken);
-        if (proxy is null)
+        return proxy is null ? null : ResolveMetadata(proxy);
+    }
+
+    public async Task<IReadOnlyDictionary<AssetRevisionId, ResolvedCollectionReviewProxy>> ResolveManyWithMetadataAsync(
+        IReadOnlyCollection<AssetRevisionId> revisionIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(revisionIds);
+        if (!_configuration.IsConfigured || revisionIds.Count == 0)
         {
-            return null;
+            return new Dictionary<AssetRevisionId, ResolvedCollectionReviewProxy>();
         }
 
-        string? path = ResolveStoredPath(proxy.RelativePath, proxy.EncodedByteLength);
-        return path is null ? null : new CollectionPhotoFile(path, "image/jpeg");
+        AssetRevisionId[] distinct = revisionIds.Distinct().ToArray();
+        IReadOnlySet<AssetRevisionId> excluded = _exclusions is null
+            ? new HashSet<AssetRevisionId>()
+            : await _exclusions.GetExcludedRevisionIdsAsync(distinct, cancellationToken);
+        AssetRevisionId[] allowed = distinct
+            .Where(id => !excluded.Contains(id))
+            .ToArray();
+        if (allowed.Length == 0)
+        {
+            return new Dictionary<AssetRevisionId, ResolvedCollectionReviewProxy>();
+        }
+
+        IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata> proxies =
+            await _repository.GetManyAsync(
+                allowed,
+                _configuration.ProfileId!,
+                cancellationToken);
+        Dictionary<AssetRevisionId, ResolvedCollectionReviewProxy> resolved = [];
+        foreach ((AssetRevisionId revisionId, ArchiveReviewProxyMetadata proxy) in proxies)
+        {
+            ResolvedCollectionReviewProxy? file = ResolveMetadata(proxy);
+            if (file is not null)
+            {
+                resolved[revisionId] = file;
+            }
+        }
+
+        return resolved;
     }
 
     public async Task<FaceReviewDerivativeFile?> ResolveFaceReviewAsync(
@@ -89,6 +137,16 @@ public sealed class CollectionReviewProxyFileResolver
 
         return await new FaceReviewDerivativeFileResolver(_derivatives, _exclusions, _configuration)
             .ResolveAsync(faceOccurrenceId, cancellationToken);
+    }
+
+    private ResolvedCollectionReviewProxy? ResolveMetadata(ArchiveReviewProxyMetadata proxy)
+    {
+        string? path = ResolveStoredPath(proxy.RelativePath, proxy.EncodedByteLength);
+        return path is null
+            ? null
+            : new ResolvedCollectionReviewProxy(
+                new CollectionPhotoFile(path, "image/jpeg"),
+                proxy);
     }
 
     private string? ResolveStoredPath(string relativePath, long encodedByteLength)

@@ -58,6 +58,8 @@ public sealed record CreativeCollectionPreviewResponse(
 
 public static class CreativeCollectionPreviewEndpoints
 {
+    internal static TimeSpan MaterializationTimeout { get; } = TimeSpan.FromSeconds(60);
+
     public static IEndpointRouteBuilder MapCreativeCollectionPreviewEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -93,13 +95,23 @@ public static class CreativeCollectionPreviewEndpoints
             return error!;
         }
 
-        CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-            collectionId,
-            settings!,
-            cancellationToken);
-        return materialized is null
-            ? Results.NotFound()
-            : Results.Ok(ToPreviewResponse(materialized));
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(MaterializationTimeout);
+        try
+        {
+            CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
+                collectionId,
+                settings!,
+                deadline.Token);
+            return materialized is null
+                ? Results.NotFound()
+                : Results.Ok(ToPreviewResponse(materialized));
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return MaterializationTimeoutResult();
+        }
     }
 
     private static async Task<IResult> CreateCreativeSlideshowSnapshotAsync(
@@ -125,13 +137,23 @@ public static class CreativeCollectionPreviewEndpoints
             return error!;
         }
 
-        CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-            collectionId,
-            settings!,
-            cancellationToken);
-        return materialized is null
-            ? Results.NotFound()
-            : Results.Ok(ToSnapshotResponse(materialized, timeProvider.GetUtcNow().ToUniversalTime()));
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(MaterializationTimeout);
+        try
+        {
+            CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
+                collectionId,
+                settings!,
+                deadline.Token);
+            return materialized is null
+                ? Results.NotFound()
+                : Results.Ok(ToSnapshotResponse(materialized, timeProvider.GetUtcNow().ToUniversalTime()));
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return MaterializationTimeoutResult();
+        }
     }
 
     internal static CreativeCollectionPreviewResponse ToPreviewResponse(
@@ -238,6 +260,15 @@ public static class CreativeCollectionPreviewEndpoints
             return false;
         }
     }
+
+    private static IResult MaterializationTimeoutResult() =>
+        Results.Json(
+            new
+            {
+                error =
+                    "Creative Collection materialization exceeded the 60-second server limit. Retry once derived visual evidence is warm, or use a narrower context while investigating archive-scale performance.",
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
 
     private static CreativeCollectionPreviewCandidateResponse ToPreviewCandidate(
         CreativeCollectionCandidate candidate,

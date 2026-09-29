@@ -232,6 +232,47 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
     public Task<bool> IsRevisionExcludedAsync(AssetRevisionId revisionId, CancellationToken cancellationToken = default) =>
         ExistsByJoinAsync("revision.id = @id", revisionId.Value, cancellationToken);
 
+    public async Task<IReadOnlySet<AssetRevisionId>> GetExcludedRevisionIdsAsync(
+        IReadOnlyCollection<AssetRevisionId> revisionIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(revisionIds);
+        Guid[] values = revisionIds
+            .Distinct()
+            .Select(id => id.Value)
+            .ToArray();
+        if (values.Length == 0)
+        {
+            return new HashSet<AssetRevisionId>();
+        }
+
+        await EnsureSchemaAsync(cancellationToken);
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT revision.id
+            FROM asset_revisions AS revision
+            INNER JOIN assets AS asset ON asset.id = revision.asset_id
+            INNER JOIN source_copy_exclusions AS exclusion
+                ON exclusion.source_id = asset.source_id
+               AND exclusion.source_key = asset.source_key
+            WHERE revision.id = ANY(@revision_ids);
+            """;
+        command.Parameters.AddWithValue(
+            "revision_ids",
+            NpgsqlDbType.Array | NpgsqlDbType.Uuid,
+            values);
+
+        HashSet<AssetRevisionId> excluded = [];
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            excluded.Add(AssetRevisionId.From(reader.GetGuid(0)));
+        }
+
+        return excluded;
+    }
+
     public Task<bool> IsFaceOccurrenceExcludedAsync(FaceOccurrenceId faceOccurrenceId, CancellationToken cancellationToken = default) =>
         ExistsByJoinAsync("face.id = @id", faceOccurrenceId.Value, cancellationToken);
 
