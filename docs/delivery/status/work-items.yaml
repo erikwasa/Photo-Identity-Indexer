@@ -112,6 +112,8 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/442
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
 - id: WI-0167
   title: Fail best-quality slideshow preparation when OneDrive is unavailable
   milestone: M32
@@ -145,6 +147,8 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/468
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
 - id: WI-0170
   title: Reuse slideshow library cards and covers across navigation
   milestone: M32
@@ -157,7 +161,9 @@ work_items:
   blockers:
   - WI-0108
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
 - id: WI-0171
   title: Diagnose thin grid-like lines during phone slideshow playback
   milestone: M32
@@ -179,4 +185,6 @@ work_items:
   branch: agent/slideshow-acceptance-followups
   blockers: []
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470

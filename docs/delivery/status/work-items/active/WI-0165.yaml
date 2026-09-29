@@ -15,3 +15,5 @@ blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/442
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
