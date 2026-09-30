@@ -8,7 +8,8 @@ public sealed record PhotoCaptionEnrichmentWorkerSnapshot(
     string State,
     string Message,
     DateTimeOffset? LastActivityAtUtc,
-    DateTimeOffset? NextAttemptAtUtc);
+    DateTimeOffset? NextAttemptAtUtc,
+    string? ModelDigest = null);
 
 public sealed class PhotoCaptionEnrichmentWorkerState
 {
@@ -27,6 +28,14 @@ public sealed class PhotoCaptionEnrichmentWorkerState
         }
     }
 
+    public void SetModelDigest(string digest)
+    {
+        lock (_gate)
+        {
+            _snapshot = _snapshot with { ModelDigest = digest };
+        }
+    }
+
     public void Update(
         string state,
         string message,
@@ -39,7 +48,8 @@ public sealed class PhotoCaptionEnrichmentWorkerState
                 state,
                 message,
                 lastActivityAtUtc,
-                nextAttemptAtUtc);
+                nextAttemptAtUtc,
+                _snapshot.ModelDigest);
         }
     }
 }
@@ -100,30 +110,43 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             TimeSpan delay;
             try
             {
-                delay = await RunOnceAsync(stoppingToken);
+                delay = await RunWithBackoffAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
-            catch (Exception exception)
-            {
-                DateTimeOffset now = _timeProvider.GetUtcNow();
-                _logger.LogWarning(
-                    exception,
-                    "Automatic photo caption enrichment failed and will retry.");
-                _state.Update(
-                    "waiting",
-                    "Caption enrichment hit a local model or storage error and will retry.",
-                    now,
-                    now.Add(FailureDelay));
-                delay = FailureDelay;
-            }
+
 
             if (delay > TimeSpan.Zero)
             {
                 await Task.Delay(delay, _timeProvider, stoppingToken);
             }
+        }
+    }
+
+    internal async Task<TimeSpan> RunWithBackoffAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RunOnceAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            DateTimeOffset now = _timeProvider.GetUtcNow();
+            _logger.LogWarning(
+                "Automatic photo caption enrichment failed ({FailureType}) and will retry.",
+                exception.GetType().Name);
+            _state.Update(
+                "waiting",
+                "Caption enrichment hit a model, transport or storage error and will retry.",
+                now,
+                now.Add(FailureDelay));
+            return FailureDelay;
         }
     }
 
@@ -158,6 +181,7 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
         string promptVersion = PhotoCaptionPrompt.VersionFor(language);
         LocalPhotoCaptionModel model =
             await _generator.GetInstalledModelAsync(cancellationToken);
+        _state.SetModelDigest(model.Digest);
         IReadOnlyList<AssetRevisionId> candidates =
             await _captions.GetCandidatesAsync(
                 _proxyConfiguration.ProfileId!,
@@ -241,6 +265,7 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             return ContinueDelay;
         }
 
+        _state.Update("running", $"Generating one {LanguageLabel(language)} caption through {_generation.InferenceMode.ToString().ToLowerInvariant()} inference.", now, null);
         LocalPhotoCaption generated = await _generator.GenerateAsync(
             proxy.Path,
             language,

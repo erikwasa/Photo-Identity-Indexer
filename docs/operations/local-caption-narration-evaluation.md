@@ -2,11 +2,11 @@
 
 This runbook covers the bounded WI-0128 experiment for deciding whether local image captions add enough value to Creative Collections to justify any future generative-model integration.
 
-The experiment is deliberately local, optional and read-only:
+The experiment is optional and read-only. Local loopback inference remains the default; [ADR-0011](../decisions/ADR-0011-operator-authorized-remote-caption-inference.md) permits explicit Remote HTTPS thumbnail inference:
 
 - it reads one saved Smart Collection from PostgreSQL;
 - it samples only photos already selected by the existing metadata-first Creative selector;
-- it sends only existing durable review-proxy bytes to an Ollama endpoint that is required to be loopback;
+- Local sends existing durable review-proxy bytes or an in-memory thumbnail to loopback Ollama; Remote sends only the in-memory bounded thumbnail;
 - it compares deterministic catalogue-derived text with one local vision-model caption per sampled photo;
 - generated text stays in memory and the private review artifact only;
 - the aggregate JSON report contains no captions, filenames, Smart Collection names or revision IDs; and
@@ -36,7 +36,7 @@ $captionModel = .\models\Get-WI0128CaptionModel.ps1
 
 The helper explicitly runs `ollama pull qwen2.5vl:3b`, confirms the model is present in the local Ollama inventory, and prints the exact digest, package size, family, parameter size and quantization.
 
-The evaluator itself does **not** pull models or download anything. It refuses non-loopback Ollama URLs.
+The evaluator itself does **not** pull models or download anything. It refuses non-loopback Ollama URLs unless `--inference-mode Remote` is explicitly selected. The model helper remains local-only.
 
 ## Safety boundary
 
@@ -119,7 +119,8 @@ The privacy-safe JSON report records:
 - average prompt/generated token counts;
 - guard pass/flag counts by risk category;
 - `GeneratedTextPersisted=false`;
-- `ExternalPhotoUploads=false`; and
+- `ExternalPhotoUploads=false` in Local mode, `true` in Remote mode (bounded thumbnails only);
+- inference mode and endpoint host (no URL paths, credentials or query strings); and
 - `CatalogueWrites=0`.
 
 Caption text itself is intentionally excluded from the report.
@@ -175,7 +176,7 @@ The positive WI-0128 result is retained as optional **photo enrichment**. Produc
 - Changing the active generation language does not rewrite older evidence. Swedish and English caption rows may coexist for the same immutable revision, and search can continue to find older Swedish text when queried in Swedish.
 - When enabled, one background worker gradually selects current photo revisions that already have the configured durable review proxy and lack caption evidence for the active generation policy.
 - Only the configured durable review proxy is opened. Photo Identity derives a temporary 480x320 JPEG in memory before model inference.
-- The Ollama endpoint remains loopback-only.
+- The Ollama endpoint is loopback-only by default. Operator-configured Remote mode requires HTTPS under ADR-0011.
 - Generation is serial and continues independently of what the user views. Opening a photo, Smart Collection or slideshow never queues caption work.
 - Guard-passing and guard-blocked results are persisted as versioned revision-bound derived evidence with model/prompt/image-mode/context provenance.
 - Guard-blocked output is not exposed as a displayable caption.
@@ -195,13 +196,14 @@ Request timeout: 600 seconds
 Optional runtime configuration keys are:
 
 ~~~text
+PhotoIdentity:CaptionEnrichment:InferenceMode   # Local (default) or Remote
 PhotoIdentity:CaptionEnrichment:OllamaBaseUrl
 PhotoIdentity:CaptionEnrichment:Model
 PhotoIdentity:CaptionEnrichment:ContextTokens
 PhotoIdentity:CaptionEnrichment:TimeoutSeconds
 ~~~
 
-The configured Ollama URL is rejected unless it is an absolute loopback HTTP(S) address. Ollama/model installation remains an explicit operator action; enabling archive enrichment does not download a model.
+Local requires an absolute loopback HTTP(S) address. Remote requires explicit mode and an explicit absolute HTTPS address. Both modes reject URL credentials, query strings and fragments; redirects are disabled. Conflicting current and legacy endpoint settings fail startup. Ollama/model installation remains an explicit operator action; enabling archive enrichment does not download a model.
 
 ### Accepted private evidence
 
@@ -228,3 +230,91 @@ Maintainer sampling on 2026-09-22 inspected the 30 most recent Swedish `wi-0128-
 - Some captions contained awkward Swedish wording. Language quality remains model-dependent and is distinct from the factual-claim guard.
 
 The corrective production contract is therefore stronger than the prompt alone. Generation policy `wi-0128-photo-caption-v3` deterministically collapses whitespace, keeps the first complete sentence and enforces at most 20 words before claim-guard evaluation and persistence. If the first sentence exceeds the bound, it may be shortened only at a clause boundary inside the limit. Output that cannot produce a complete bounded sentence is retained internally with `caption-output-format` and is not displayable. Retained v1/v2 captions are normalized and promoted locally where possible so archive-wide correction does not require another vision-model pass. WI-0128 remains in progress until this behavior is confirmed with a fresh production sample.
+
+
+## Temporary remote caption backlog procedure (WI-0174)
+
+This procedure is provider-neutral. It does not provision infrastructure. The maintained Windows host runs Photo Identity, resolves catalogue candidates and review proxies, renders thumbnails, normalizes/guards output and writes PostgreSQL. The remote endpoint never receives database access or archive access.
+
+### Prerequisites and privacy
+
+Prepare an operator-controlled Ollama-compatible HTTPS endpoint with a valid trusted TLS certificate, `/api/tags` and `/api/chat`, and the selected vision model already installed. Model installation is independent of Photo Identity. Provide independent endpoint access controls, such as a network allow-list or hosting-platform authentication compatible with the client. Photo Identity does not implement credential headers in this contract: endpoints needing a client bearer header are not supported here. Never embed credentials/tokens in the URL. URLs with user information, queries or fragments are rejected. Routing base paths are supported and normalized with a trailing slash. Redirects are rejected rather than followed; use the final endpoint directly.
+
+Remote mode discloses a locally rendered 480x320 JPEG depicting the photo, the neutral prompt, model name and Ollama protocol/generation options. It strips source EXIF by decoding and re-encoding the review proxy. Original files/bytes, review-proxy/source paths, identities/assignments, face crops/embeddings, Places/GPS, dates, collection membership and connection information are not serialized. People and locations visible in the image are still visible to the endpoint. Choose a trusted endpoint and its retention policy accordingly. The private evaluator review page stays on the Windows machine; do not publish it.
+
+### Verify exact model identity and benchmark first
+
+Leave automatic enrichment disabled in Settings while preparing the run. Record the local model inventory, then compare the remote inventory before switching:
+
+~~~powershell
+$remoteCaptionEndpoint = "https://<operator-controlled-host>/"
+$modelName = "qwen2.5vl:3b"
+$localModel = (Invoke-RestMethod "http://127.0.0.1:11434/api/tags").models |
+    Where-Object { $_.name -eq $modelName }
+$remoteModel = (Invoke-RestMethod ($remoteCaptionEndpoint.TrimEnd('/') + "/api/tags")).models |
+    Where-Object { $_.name -eq $modelName }
+$localModel | Select-Object name, digest
+$remoteModel | Select-Object name, digest
+~~~
+
+Use a final HTTPS endpoint; Photo Identity does not follow redirects. Compare the full normalized SHA-256 digests, not just model tags. The evaluator and worker resolve and record the actual digest themselves. A different digest is a different model policy candidate; do not describe it as identical. For a performance comparison, run Local and Remote with the same collection, thumbnail mode, model digest, sample size and context:
+
+~~~powershell
+$proxyRoot = Join-Path $env:LOCALAPPDATA "PhotoIdentity\review-proxies"
+$collectionId = "<saved Smart Collection GUID>"
+$env:PHOTOIDENTITY_NARRATION_TEST = $env:PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- narration evaluate `
+  --postgres-connection-env PHOTOIDENTITY_NARRATION_TEST `
+  --collection $collectionId --proxy-root $proxyRoot --proxy-profile jpeg-1600-q78 `
+  --inference-mode Local --ollama-base-url http://127.0.0.1:11434/ `
+  --model $modelName --caption-image-mode thumbnail --ollama-context 1024 `
+  --sample-count 4 --timeout-seconds 600 --report artifacts/caption-local.json
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- narration evaluate `
+  --postgres-connection-env PHOTOIDENTITY_NARRATION_TEST `
+  --collection $collectionId --proxy-root $proxyRoot --proxy-profile jpeg-1600-q78 `
+  --inference-mode Remote --ollama-base-url $remoteCaptionEndpoint `
+  --model $modelName --caption-image-mode thumbnail --ollama-context 1024 `
+  --sample-count 4 --timeout-seconds 600 --report artifacts/caption-remote.json `
+  --review-output "$env:TEMP\PhotoIdentity\remote-caption-review"
+~~~
+
+Remote defaults to thumbnail mode and rejects explicit proxy mode. Reports record `InferenceMode`, `EndpointHost`, exact digest, image mode, context, quality-guard counts and timing, with `ExternalPhotoUploads=true` for Remote. The evaluator remains read-only and uses its existing experiment prompt; compare evaluator runs to each other rather than assuming evaluator and production prompt versions are interchangeable. Review the small qualitative sample before enabling archive enrichment.
+
+### Opt in for the worker
+
+Stop Photo Identity. Set deployment configuration in the PowerShell session that launches it, preserving the same model/context/language/prompt policy:
+
+~~~powershell
+$env:PhotoIdentity__CaptionEnrichment__InferenceMode = "Remote"
+$env:PhotoIdentity__CaptionEnrichment__OllamaBaseUrl = $remoteCaptionEndpoint
+$env:PhotoIdentity__CaptionEnrichment__Model = $modelName
+$env:PhotoIdentity__CaptionEnrichment__ContextTokens = "1024"
+$env:PhotoIdentity__CaptionEnrichment__TimeoutSeconds = "600"
+& ".\.artifacts\packages\PhotoIdentity-win-x64\PhotoIdentity.cmd"
+~~~
+
+If deployment JSON already specifies these keys, update them there or ensure these process environment overrides apply. Remove any conflicting `PhotoIdentity:GeneratedCaptions:OllamaBaseUrl` legacy setting. Endpoint selection is operator configuration and is not editable from the browser. In Settings, confirm Remote, endpoint host and configured model; enable the desired language and watch the resolved digest, worker state/message and the remote-processing notice. The worker remains serial; a failure waits five minutes before retry and never falls back to Local. Disable enrichment after a small batch first and inspect stored caption provenance/guards/timing before letting the backlog continue.
+
+~~~powershell
+$Api = "http://127.0.0.1:5080"
+Invoke-RestMethod "$Api/api/caption-enrichment/status" |
+    Format-List inferenceMode, endpointHost, model, modelDigest, state, message, nextAttemptAtUtc
+~~~
+
+### Return to normal Local processing
+
+Disable enrichment and stop Photo Identity. Restore the local endpoint and restart from the same configuration source/session:
+
+~~~powershell
+$env:PhotoIdentity__CaptionEnrichment__InferenceMode = "Local"
+$env:PhotoIdentity__CaptionEnrichment__OllamaBaseUrl = "http://127.0.0.1:11434/"
+& ".\.artifacts\packages\PhotoIdentity-win-x64\PhotoIdentity.cmd"
+~~~
+
+Confirm Local in Settings/status, verify the same model digest, then re-enable enrichment as needed. No database migration or caption rewrite is required. Matching model name/digest, language, generation/prompt version, thumbnail mode and context reuse remote evidence; changing transport alone does not regenerate it. A changed digest/policy retains the normal existing candidate behavior. Remove temporary endpoint capacity/access separately using the hosting platform's own process.
+
+### Maintained-machine acceptance record
+
+Record the small remote benchmark and batch size; full local/remote model digests; policy/language/context; representative guard and timing results; sanitized failure/backoff observations; then Local restart status and evidence that the same remotely completed revisions were not generated again. This acceptance is pending until performed on the maintained catalogue; technical endpoint feasibility from the issue is not application acceptance evidence.

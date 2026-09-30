@@ -52,18 +52,8 @@ public partial class Program
                 "WI-0126",
                 PhotoSemanticSearchConfiguration.DefaultModelFolderName);
 
-        string captionBaseUrl =
-            builder.Configuration["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"]
-            ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"]
-            ?? PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri;
-        if (!Uri.TryCreate(captionBaseUrl, UriKind.Absolute, out Uri? captionBaseUri) ||
-            !captionBaseUri.IsLoopback ||
-            (captionBaseUri.Scheme != Uri.UriSchemeHttp &&
-             captionBaseUri.Scheme != Uri.UriSchemeHttps))
-        {
-            throw new InvalidOperationException(
-                "PhotoIdentity:CaptionEnrichment:OllamaBaseUrl must be an absolute loopback HTTP(S) URL.");
-        }
+        (CaptionInferenceMode captionInferenceMode, Uri captionBaseUri) =
+            PhotoCaptionGenerationConfiguration.ResolveEndpoint(builder.Configuration);
 
         int captionContextTokens =
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:CaptionEnrichment:ContextTokens")
@@ -89,7 +79,8 @@ public partial class Program
                 ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
                 ?? PhotoCaptionGenerationConfiguration.DefaultModel,
             captionContextTokens,
-            captionTimeoutSeconds);
+            captionTimeoutSeconds,
+            captionInferenceMode);
 
         int? automaticGeoNamesMinimumRequestInterval = ParseOptionalInt(
             builder.Configuration,
@@ -179,7 +170,9 @@ public partial class Program
         builder.Services.AddHttpClient("GeoNames");
         builder.Services.AddHttpClient(
             LocalPhotoCaptionGenerator.HttpClientName,
-            client => client.Timeout = TimeSpan.FromSeconds(captionConfiguration.TimeoutSeconds));
+            client => client.Timeout = TimeSpan.FromSeconds(captionConfiguration.TimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+            .RemoveAllLoggers();
         builder.Services.AddSingleton<LocalPhotoCaptionGenerator>();
         builder.Services.AddHostedService<PhotoCaptionEnrichmentHostedService>();
         builder.Services.AddSingleton<PhotoSemanticSearchModel>();

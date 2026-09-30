@@ -12,8 +12,42 @@ public sealed record PhotoCaptionGenerationConfiguration(
     Uri OllamaBaseUri,
     string Model,
     int ContextTokens,
-    int TimeoutSeconds)
+    int TimeoutSeconds,
+    CaptionInferenceMode InferenceMode = CaptionInferenceMode.Local)
 {
+    public static (CaptionInferenceMode Mode, Uri BaseUri) ResolveEndpoint(IConfiguration configuration)
+    {
+        CaptionInferenceMode captionInferenceMode;
+        Uri captionBaseUri;
+        try
+        {
+            captionInferenceMode = CaptionInferenceEndpoint.ParseMode(
+                configuration["PhotoIdentity:CaptionEnrichment:InferenceMode"]);
+            string? captionUrl = configuration["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"];
+            string? legacyCaptionUrl = configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"];
+            if (captionUrl is not null && legacyCaptionUrl is not null &&
+                CaptionInferenceEndpoint.Parse(captionUrl, captionInferenceMode) !=
+                CaptionInferenceEndpoint.Parse(legacyCaptionUrl, captionInferenceMode))
+            {
+                throw new ArgumentException("Current and legacy caption endpoint settings conflict.");
+            }
+            string? selectedCaptionUrl = captionUrl ?? legacyCaptionUrl;
+            if (captionInferenceMode == CaptionInferenceMode.Remote && selectedCaptionUrl is null)
+            {
+                throw new ArgumentException("Remote caption inference requires an explicit OllamaBaseUrl.");
+            }
+            captionBaseUri = CaptionInferenceEndpoint.Parse(
+                selectedCaptionUrl ?? PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri,
+                captionInferenceMode);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(
+                "PhotoIdentity:CaptionEnrichment configuration is invalid. " + exception.Message);
+        }
+        return (captionInferenceMode, captionBaseUri);
+    }
+
     public const string GenerationVersion = "wi-0128-photo-caption-v3";
     public const string SentenceAwareGenerationVersion = "wi-0128-photo-caption-v2";
     public const string LegacyGenerationVersion = "wi-0128-photo-caption-v1";
@@ -119,17 +153,31 @@ public sealed class LocalPhotoCaptionGenerator
         ArgumentNullException.ThrowIfNull(configuration);
         _httpClientFactory = httpClientFactory;
         _thumbnailRenderer = thumbnailRenderer;
-        _configuration = configuration;
+        _configuration = configuration with
+        {
+            OllamaBaseUri = CaptionInferenceEndpoint.Validate(configuration.OllamaBaseUri, configuration.InferenceMode),
+        };
     }
 
-    public async Task<LocalPhotoCaptionModel> GetInstalledModelAsync(
+    public Task<LocalPhotoCaptionModel> GetInstalledModelAsync(
+        CancellationToken cancellationToken) =>
+        WithoutSensitiveErrorsAsync(() => GetInstalledModelCoreAsync(cancellationToken), cancellationToken);
+
+    private async Task<LocalPhotoCaptionModel> GetInstalledModelCoreAsync(
         CancellationToken cancellationToken)
     {
         HttpClient http = _httpClientFactory.CreateClient(HttpClientName);
         return await GetInstalledModelAsync(http, cancellationToken);
     }
 
-    public async Task<LocalPhotoCaption> GenerateAsync(
+    public Task<LocalPhotoCaption> GenerateAsync(
+        string proxyPath,
+        string language,
+        LocalPhotoCaptionModel model,
+        CancellationToken cancellationToken) =>
+        WithoutSensitiveErrorsAsync(() => GenerateCoreAsync(proxyPath, language, model, cancellationToken), cancellationToken);
+
+    private async Task<LocalPhotoCaption> GenerateCoreAsync(
         string proxyPath,
         string language,
         LocalPhotoCaptionModel model,
@@ -184,20 +232,20 @@ public sealed class LocalPhotoCaptionGenerator
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException(
-                $"Local Ollama caption request failed with HTTP {(int)response.StatusCode}.");
+                $"Ollama caption request failed with HTTP {(int)response.StatusCode}.");
         }
 
         OllamaChatResponse chat = JsonSerializer.Deserialize<OllamaChatResponse>(
             payload,
             SerializerOptions)
-            ?? throw new InvalidDataException("Local Ollama caption response was empty.");
+            ?? throw new InvalidDataException("Ollama caption response was empty.");
         string caption = chat.Message?.Content?.Trim()
             ?? throw new InvalidDataException(
-                "Local Ollama caption response did not contain message content.");
+                "Ollama caption response did not contain message content.");
         if (caption.Length is 0 or > 500)
         {
             throw new InvalidDataException(
-                "Local Ollama caption was empty or exceeded the bounded length.");
+                "Ollama caption was empty or exceeded the bounded length.");
         }
 
         return new LocalPhotoCaption(
@@ -219,13 +267,13 @@ public sealed class LocalPhotoCaptionGenerator
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException(
-                $"Local Ollama model inventory failed with HTTP {(int)response.StatusCode}.");
+                $"Ollama model inventory failed with HTTP {(int)response.StatusCode}.");
         }
 
         OllamaTagsResponse tags = JsonSerializer.Deserialize<OllamaTagsResponse>(
             payload,
             SerializerOptions)
-            ?? throw new InvalidDataException("Local Ollama model inventory response was empty.");
+            ?? throw new InvalidDataException("Ollama model inventory response was empty.");
 
         OllamaModelInfo? model = tags.Models.FirstOrDefault(candidate =>
             string.Equals(candidate.Name, _configuration.Model, StringComparison.Ordinal) ||
@@ -233,12 +281,34 @@ public sealed class LocalPhotoCaptionGenerator
         if (model is null)
         {
             throw new InvalidOperationException(
-                $"Local Ollama model '{_configuration.Model}' is not installed.");
+                "The configured Ollama caption model is not installed.");
         }
 
         return new LocalPhotoCaptionModel(
             model.Name ?? model.Model ?? _configuration.Model,
             NormalizeDigest(model.Digest));
+    }
+
+    private static async Task<T> WithoutSensitiveErrorsAsync<T>(
+        Func<Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await operation();
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new HttpRequestException("Ollama caption transport failed; no fallback was attempted.", null, exception.StatusCode);
+        }
+        catch (JsonException)
+        {
+            throw new InvalidDataException("Ollama returned invalid caption protocol data.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw new TaskCanceledException("Ollama caption request was cancelled or timed out.", null, cancellationToken);
+        }
     }
 
     private static string NormalizeDigest(string? digest)
@@ -253,7 +323,7 @@ public sealed class LocalPhotoCaptionGenerator
             normalized.Any(character => !Uri.IsHexDigit(character)))
         {
             throw new InvalidDataException(
-                "Local Ollama model digest must contain exactly 64 hexadecimal characters.");
+                "Ollama model digest must contain exactly 64 hexadecimal characters.");
         }
 
         return normalized;

@@ -12,7 +12,10 @@ public sealed record PhotoCaptionEnrichmentStatusResponse(
     DateTimeOffset? LastActivityAtUtc,
     DateTimeOffset? NextAttemptAtUtc,
     string Model,
-    string GenerationVersion);
+    string GenerationVersion,
+    string InferenceMode = "local",
+    string? EndpointHost = null,
+    string? ModelDigest = null);
 
 public sealed record PhotoCaptionResponse(
     string RevisionId,

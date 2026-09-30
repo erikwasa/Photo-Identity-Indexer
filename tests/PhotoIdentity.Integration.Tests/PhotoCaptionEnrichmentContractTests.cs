@@ -1,4 +1,6 @@
 using PhotoIdentity.Api;
+using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using Xunit;
@@ -7,6 +9,63 @@ namespace PhotoIdentity_Integration_Tests;
 
 public sealed class PhotoCaptionEnrichmentContractTests
 {
+    [Fact]
+    public void Server_endpoint_defaults_and_opt_in_fail_fast_without_a_host()
+    {
+        IConfiguration local = new ConfigurationBuilder().Build();
+        var defaults = PhotoCaptionGenerationConfiguration.ResolveEndpoint(local);
+        Assert.Equal(CaptionInferenceMode.Local, defaults.Mode);
+        Assert.Equal(PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri, defaults.BaseUri);
+
+        IConfiguration remote = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PhotoIdentity:CaptionEnrichment:InferenceMode"] = "Remote",
+            ["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"] = "https://caption.example.test/ollama",
+        }).Build();
+        var selected = PhotoCaptionGenerationConfiguration.ResolveEndpoint(remote);
+        Assert.Equal(CaptionInferenceMode.Remote, selected.Mode);
+        Assert.Equal("https://caption.example.test/ollama/", selected.BaseUri.AbsoluteUri);
+    }
+
+    [Theory]
+    [InlineData(null, "https://caption.example.test/", null)]
+    [InlineData("Remote", null, null)]
+    [InlineData("Auto", "https://caption.example.test/", null)]
+    [InlineData("Remote", "http://caption.example.test/", null)]
+    [InlineData("Remote", "https://user:secret@caption.example.test/", null)]
+    [InlineData("Remote", "https://caption.example.test/?token=secret", null)]
+    [InlineData("Remote", "https://caption.example.test/", "https://other.example.test/")]
+    public void Server_rejects_invalid_and_conflicting_configuration(string? mode, string? endpoint, string? legacy)
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PhotoIdentity:CaptionEnrichment:InferenceMode"] = mode,
+            ["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"] = endpoint,
+            ["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"] = legacy,
+        }).Build();
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
+            PhotoCaptionGenerationConfiguration.ResolveEndpoint(configuration));
+        Assert.DoesNotContain("secret", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Status_reports_host_mode_and_resolved_digest_without_endpoint_paths()
+    {
+        PhotoCaptionEnrichmentWorkerState state = new();
+        state.SetModelDigest(new string('a', 64));
+        state.Update("idle", "No captions waiting.", DateTimeOffset.UtcNow, null);
+        var status = PhotoCaptionEndpoints.CreateStatus(
+            new(false, "en", DateTimeOffset.UtcNow), state.GetSnapshot(),
+            new(new Uri("https://caption.example.test/private-routing-path/"), "qwen2.5vl:3b", 1024, 600, CaptionInferenceMode.Remote));
+        Assert.Equal("remote", status.InferenceMode);
+        Assert.Equal("caption.example.test", status.EndpointHost);
+        Assert.Equal(new string('a', 64), status.ModelDigest);
+        Assert.Equal("idle", status.State);
+        Assert.DoesNotContain("private-routing-path", JsonSerializer.Serialize(status), StringComparison.Ordinal);
+        Assert.Equal(new[] { "Enabled", "Language" }, typeof(PhotoIdentity.Web.Contracts.PhotoCaptionEnrichmentSettingsRequest)
+            .GetProperties().Select(property => property.Name).ToArray());
+    }
+
     [Theory]
     [InlineData("sv", PhotoCaptionLanguages.Swedish)]
     [InlineData("SV", PhotoCaptionLanguages.Swedish)]

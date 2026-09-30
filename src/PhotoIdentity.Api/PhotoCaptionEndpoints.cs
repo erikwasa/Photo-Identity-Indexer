@@ -33,15 +33,7 @@ public static class PhotoCaptionEndpoints
         PhotoCaptionEnrichmentSettings settings =
             await repository.GetSettingsAsync(cancellationToken);
         PhotoCaptionEnrichmentWorkerSnapshot worker = workerState.GetSnapshot();
-        return Results.Ok(new PhotoCaptionEnrichmentStatusResponse(
-            settings.Enabled,
-            settings.Language,
-            worker.State,
-            worker.Message,
-            worker.LastActivityAtUtc,
-            worker.NextAttemptAtUtc,
-            generation.Model,
-            PhotoCaptionGenerationConfiguration.GenerationVersion));
+        return Results.Ok(CreateStatus(settings, worker, generation));
     }
 
     private static async Task<IResult> UpdateSettingsAsync(
@@ -67,7 +59,13 @@ public static class PhotoCaptionEndpoints
                 timeProvider.GetUtcNow(),
                 cancellationToken);
         PhotoCaptionEnrichmentWorkerSnapshot worker = workerState.GetSnapshot();
-        return Results.Ok(new PhotoCaptionEnrichmentStatusResponse(
+        return Results.Ok(CreateStatus(settings, worker, generation));
+    }
+
+    internal static PhotoCaptionEnrichmentStatusResponse CreateStatus(
+        PhotoCaptionEnrichmentSettings settings,
+        PhotoCaptionEnrichmentWorkerSnapshot worker,
+        PhotoCaptionGenerationConfiguration generation) => new(
             settings.Enabled,
             settings.Language,
             worker.State,
@@ -75,8 +73,10 @@ public static class PhotoCaptionEndpoints
             worker.LastActivityAtUtc,
             worker.NextAttemptAtUtc,
             generation.Model,
-            PhotoCaptionGenerationConfiguration.GenerationVersion));
-    }
+            PhotoCaptionGenerationConfiguration.GenerationVersion,
+            generation.InferenceMode.ToString().ToLowerInvariant(),
+            generation.OllamaBaseUri.Host,
+            worker.ModelDigest);
 
     private static async Task<IResult> GetCurrentCaptionAsync(
         string revisionId,

@@ -347,3 +347,9 @@ milestones:
   document: ../milestones/M34-review-queue-reliability.md
   work_items:
   - WI-0170
+- id: M35
+  title: Operator-authorized remote caption inference
+  status: in_progress
+  document: ../milestones/M35-remote-caption-inference.md
+  work_items:
+  - WI-0174

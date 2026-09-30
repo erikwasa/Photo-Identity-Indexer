@@ -176,6 +176,7 @@ public static class Program
                                  --proxy-root DIR --proxy-profile ID
                                  [--ollama-base-url LOOPBACK_URL]
                                  [--model NAME]
+                                 [--inference-mode Local|Remote]
                                  [--caption-image-mode proxy|thumbnail]
                                  [--ollama-context TOKENS]
                                  [--target-count COUNT]

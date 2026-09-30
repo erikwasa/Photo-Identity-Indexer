@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using PhotoIdentity.Core.Collections;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Imaging.OpenCv;
@@ -23,7 +24,8 @@ internal sealed record NarrationEvaluationCommandOptions(
     int SampleCount,
     int TimeoutSeconds,
     string? ReportPath,
-    string? ReviewOutputDirectory)
+    string? ReviewOutputDirectory,
+    CaptionInferenceMode InferenceMode = CaptionInferenceMode.Local)
 {
     public static NarrationEvaluationCommandOptions Parse(string[] args)
     {
@@ -32,6 +34,9 @@ internal sealed record NarrationEvaluationCommandOptions(
         string? proxyRoot = null;
         string? proxyProfile = null;
         Uri ollamaBaseUri = OllamaVisionCaptionClient.DefaultBaseUri;
+        string? inferenceModeValue = null;
+        string? endpointValue = null;
+        bool imageModeSpecified = false;
         string model = OllamaVisionCaptionClient.DefaultModel;
         bool modelSpecified = false;
         string captionImageMode = "proxy";
@@ -74,16 +79,11 @@ internal sealed record NarrationEvaluationCommandOptions(
                 case "--proxy-profile":
                     proxyProfile = Single(proxyProfile, value, option);
                     break;
+                case "--inference-mode":
+                    inferenceModeValue = Single(inferenceModeValue, value, option);
+                    break;
                 case "--ollama-base-url":
-                    if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? parsedUri) ||
-                        !parsedUri.IsLoopback ||
-                        (parsedUri.Scheme != Uri.UriSchemeHttp &&
-                         parsedUri.Scheme != Uri.UriSchemeHttps))
-                    {
-                        throw new ArgumentException(
-                            "Option '--ollama-base-url' must be an absolute loopback HTTP(S) URL.");
-                    }
-                    ollamaBaseUri = parsedUri;
+                    endpointValue = Single(endpointValue, value, option);
                     break;
                 case "--model":
                     if (modelSpecified)
@@ -98,6 +98,11 @@ internal sealed record NarrationEvaluationCommandOptions(
                     modelSpecified = true;
                     break;
                 case "--caption-image-mode":
+                    if (imageModeSpecified)
+                    {
+                        throw new ArgumentException("Option '--caption-image-mode' may be supplied only once.");
+                    }
+                    imageModeSpecified = true;
                     captionImageMode = value.Trim().ToLowerInvariant() switch
                     {
                         "proxy" => "proxy",
@@ -156,6 +161,22 @@ internal sealed record NarrationEvaluationCommandOptions(
             throw new ArgumentException("Option '--proxy-profile' is required.");
         }
 
+        CaptionInferenceMode inferenceMode = CaptionInferenceEndpoint.ParseMode(inferenceModeValue);
+        if (inferenceMode == CaptionInferenceMode.Remote && endpointValue is null)
+        {
+            throw new ArgumentException("Remote caption inference requires an explicit '--ollama-base-url'.");
+        }
+        ollamaBaseUri = CaptionInferenceEndpoint.Parse(
+            endpointValue ?? ollamaBaseUri.AbsoluteUri, inferenceMode);
+        if (inferenceMode == CaptionInferenceMode.Remote)
+        {
+            if (imageModeSpecified && captionImageMode != "thumbnail")
+            {
+                throw new ArgumentException("Remote caption evaluation requires '--caption-image-mode thumbnail'.");
+            }
+            captionImageMode = "thumbnail";
+        }
+
         CreativeCollectionSelectionPolicy.ValidateTargetCount(targetCount);
         _ = PhotoMomentGapPolicy.CreateTimeGapEvaluation(momentGapMinutes);
 
@@ -173,7 +194,8 @@ internal sealed record NarrationEvaluationCommandOptions(
             sampleCount,
             timeoutSeconds,
             report is null ? null : Path.GetFullPath(report),
-            reviewOutput is null ? null : Path.GetFullPath(reviewOutput));
+            reviewOutput is null ? null : Path.GetFullPath(reviewOutput),
+            inferenceMode);
     }
 
     private static string Single(string? current, string value, string option)
@@ -233,7 +255,7 @@ internal static class NarrationEvaluationCommandRunner
                 "The configured review-proxy root does not exist.");
         }
 
-        using HttpClient httpClient = new()
+        using HttpClient httpClient = new(new HttpClientHandler { AllowAutoRedirect = false })
         {
             Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
         };
@@ -241,7 +263,8 @@ internal static class NarrationEvaluationCommandRunner
             httpClient,
             options.OllamaBaseUri,
             options.Model,
-            options.OllamaContextTokens);
+            options.OllamaContextTokens,
+            options.InferenceMode);
         OpenCvThumbnailRenderer thumbnailRenderer = new();
         LocalVisionModelDescriptor model =
             await captionClient.GetInstalledModelAsync(cancellationToken);
@@ -516,11 +539,32 @@ internal static class NarrationEvaluationCommandRunner
         output.WriteLine($"model-package-bytes: {model.SizeBytes}");
         output.WriteLine($"caption-image-mode: {options.CaptionImageMode}");
         output.WriteLine($"ollama-context: {options.OllamaContextTokens}");
-        output.WriteLine("loopback-only: true");
-        output.WriteLine("external-photo-uploads: false");
+        output.WriteLine($"inference-mode: {options.InferenceMode.ToString().ToLowerInvariant()}");
+        output.WriteLine($"endpoint-host: {options.OllamaBaseUri.Host}");
+        output.WriteLine($"loopback-only: {options.InferenceMode == CaptionInferenceMode.Local}");
+        output.WriteLine($"external-photo-uploads: {options.InferenceMode == CaptionInferenceMode.Remote}");
         output.WriteLine("catalogue-writes: 0");
         return 0;
     }
+
+    internal static NarrationPipelineEvidence CreatePipelineEvidence(
+        NarrationEvaluationCommandOptions options,
+        LocalVisionModelDescriptor model) => new(
+                Runtime: "ollama",
+                Model: model.Name,
+                ModelDigest: model.Digest,
+                model.SizeBytes,
+                model.Family,
+                model.ParameterSize,
+                model.QuantizationLevel,
+                OllamaVisionCaptionClient.PromptVersion,
+                CreativeCollectionGeneratedTextPolicies.DeterministicCaptionV1,
+                options.ProxyProfile,
+                options.CaptionImageMode,
+                options.OllamaContextTokens,
+                LoopbackOnly: options.InferenceMode == CaptionInferenceMode.Local,
+                InferenceMode: options.InferenceMode.ToString().ToLowerInvariant(),
+                EndpointHost: options.OllamaBaseUri.Host);
 
     private static NarrationEvaluationReport BuildReport(
         NarrationEvaluationCommandOptions options,
@@ -555,20 +599,7 @@ internal static class NarrationEvaluationCommandRunner
         return new NarrationEvaluationReport(
             SchemaVersion: 1,
             ExperimentVersion,
-            new NarrationPipelineEvidence(
-                Runtime: "ollama",
-                Model: model.Name,
-                ModelDigest: model.Digest,
-                model.SizeBytes,
-                model.Family,
-                model.ParameterSize,
-                model.QuantizationLevel,
-                OllamaVisionCaptionClient.PromptVersion,
-                CreativeCollectionGeneratedTextPolicies.DeterministicCaptionV1,
-                options.ProxyProfile,
-                options.CaptionImageMode,
-                options.OllamaContextTokens,
-                LoopbackOnly: true),
+            CreatePipelineEvidence(options, model),
             new NarrationSampleEvidence(
                 generated.TotalCandidateCount,
                 selection.SelectedCount,
@@ -593,7 +624,7 @@ internal static class NarrationEvaluationCommandRunner
                 FlaggedCount: flagged,
                 RiskFlagCounts: riskCounts),
             GeneratedTextPersisted: false,
-            ExternalPhotoUploads: false,
+            ExternalPhotoUploads: options.InferenceMode == CaptionInferenceMode.Remote,
             CatalogueWrites: 0);
     }
 
@@ -817,7 +848,9 @@ internal sealed record NarrationPipelineEvidence(
     string ProxyProfile,
     string CaptionImageMode,
     int OllamaContextTokens,
-    bool LoopbackOnly);
+    bool LoopbackOnly,
+    string InferenceMode,
+    string EndpointHost);
 
 internal sealed record NarrationSampleEvidence(
     int CandidateCount,

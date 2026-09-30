@@ -32,6 +32,12 @@
     }
     else if (Status is not null)
     {
+        @if (Status.InferenceMode == "remote")
+        {
+            <div class="notice" role="status">Remote caption processing is active. Bounded photo thumbnails are sent to the operator-configured HTTPS endpoint.</div>
+        }
+        <p>Inference: @Status.InferenceMode · Host: @Status.EndpointHost · Model: @Status.Model</p>
+        <p>Resolved digest: @(Status.ModelDigest ?? "Not resolved yet")</p>
         <div class="review-filter-grid">
             <div>
                 <label>

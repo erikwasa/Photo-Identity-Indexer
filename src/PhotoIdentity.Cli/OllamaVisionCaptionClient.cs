@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PhotoIdentity.Core.Catalogue;
 
 namespace PhotoIdentity.Cli;
 
@@ -43,7 +44,8 @@ internal sealed class OllamaVisionCaptionClient
         HttpClient httpClient,
         Uri baseUri,
         string model,
-        int contextTokens = 4096)
+        int contextTokens = 4096,
+        CaptionInferenceMode inferenceMode = CaptionInferenceMode.Local)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(baseUri);
@@ -54,23 +56,17 @@ internal sealed class OllamaVisionCaptionClient
                 nameof(contextTokens),
                 "Ollama context tokens must be between 256 and 32768.");
         }
-        if (!baseUri.IsAbsoluteUri ||
-            !baseUri.IsLoopback ||
-            (baseUri.Scheme != Uri.UriSchemeHttp &&
-             baseUri.Scheme != Uri.UriSchemeHttps))
-        {
-            throw new ArgumentException(
-                "The local vision endpoint must be an absolute loopback HTTP(S) URL.",
-                nameof(baseUri));
-        }
-
         _httpClient = httpClient;
-        _baseUri = EnsureTrailingSlash(baseUri);
+        _baseUri = CaptionInferenceEndpoint.Validate(baseUri, inferenceMode);
         _model = model.Trim();
         _contextTokens = contextTokens;
     }
 
-    public async Task<LocalVisionModelDescriptor> GetInstalledModelAsync(
+    public Task<LocalVisionModelDescriptor> GetInstalledModelAsync(
+        CancellationToken cancellationToken) =>
+        WithoutSensitiveErrorsAsync(() => GetInstalledModelCoreAsync(cancellationToken), cancellationToken);
+
+    private async Task<LocalVisionModelDescriptor> GetInstalledModelCoreAsync(
         CancellationToken cancellationToken)
     {
         using HttpResponseMessage response = await _httpClient.GetAsync(
@@ -80,14 +76,14 @@ internal sealed class OllamaVisionCaptionClient
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(
-                $"Local Ollama model inventory failed with HTTP {(int)response.StatusCode}.");
+                $"Ollama model inventory failed with HTTP {(int)response.StatusCode}.");
         }
 
         OllamaTagsResponse tags = JsonSerializer.Deserialize<OllamaTagsResponse>(
             payload,
             SerializerOptions)
             ?? throw new InvalidDataException(
-                "Local Ollama model inventory response was empty.");
+                "Ollama model inventory response was empty.");
 
         OllamaModelInfo? model = tags.Models.FirstOrDefault(candidate =>
             string.Equals(candidate.Name, _model, StringComparison.Ordinal) ||
@@ -95,7 +91,7 @@ internal sealed class OllamaVisionCaptionClient
         if (model is null)
         {
             throw new InvalidOperationException(
-                $"Local Ollama model '{_model}' is not installed. Run 'ollama pull {_model}' explicitly before the experiment.");
+                "The configured Ollama caption model is not installed. Install it explicitly before the experiment.");
         }
 
         string digest = NormalizeDigest(model.Digest);
@@ -108,7 +104,12 @@ internal sealed class OllamaVisionCaptionClient
             model.Details?.QuantizationLevel);
     }
 
-    public async Task<LocalVisionCaptionResult> CaptionAsync(
+    public Task<LocalVisionCaptionResult> CaptionAsync(
+        ReadOnlyMemory<byte> imageBytes,
+        CancellationToken cancellationToken) =>
+        WithoutSensitiveErrorsAsync(() => CaptionCoreAsync(imageBytes, cancellationToken), cancellationToken);
+
+    private async Task<LocalVisionCaptionResult> CaptionCoreAsync(
         ReadOnlyMemory<byte> imageBytes,
         CancellationToken cancellationToken)
     {
@@ -154,26 +155,26 @@ internal sealed class OllamaVisionCaptionClient
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(
-                $"Local Ollama caption request failed with HTTP {(int)response.StatusCode}.");
+                $"Ollama caption request failed with HTTP {(int)response.StatusCode}.");
         }
 
         OllamaChatResponse chat = JsonSerializer.Deserialize<OllamaChatResponse>(
             payload,
             SerializerOptions)
             ?? throw new InvalidDataException(
-                "Local Ollama caption response was empty.");
+                "Ollama caption response was empty.");
         string content = chat.Message?.Content?.Trim()
             ?? throw new InvalidDataException(
-                "Local Ollama caption response did not contain message content.");
+                "Ollama caption response did not contain message content.");
         if (content.Length == 0)
         {
             throw new InvalidDataException(
-                "Local Ollama caption response contained an empty caption.");
+                "Ollama caption response contained an empty caption.");
         }
         if (content.Length > 500)
         {
             throw new InvalidDataException(
-                "Local Ollama caption exceeded the bounded 500-character experiment limit.");
+                "Ollama caption exceeded the bounded 500-character experiment limit.");
         }
 
         return new(
@@ -184,10 +185,27 @@ internal sealed class OllamaVisionCaptionClient
             chat.EvalCount);
     }
 
-    private static Uri EnsureTrailingSlash(Uri value) =>
-        value.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
-            ? value
-            : new Uri(value.AbsoluteUri + "/", UriKind.Absolute);
+    private static async Task<T> WithoutSensitiveErrorsAsync<T>(
+        Func<Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await operation();
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new HttpRequestException("Ollama caption transport failed; no fallback was attempted.", null, exception.StatusCode);
+        }
+        catch (JsonException)
+        {
+            throw new InvalidDataException("Ollama returned invalid caption protocol data.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw new TaskCanceledException("Ollama caption request was cancelled or timed out.", null, cancellationToken);
+        }
+    }
 
     private static string NormalizeDigest(string? digest)
     {
@@ -201,7 +219,7 @@ internal sealed class OllamaVisionCaptionClient
             normalized.Any(character => !Uri.IsHexDigit(character)))
         {
             throw new InvalidDataException(
-                "Local Ollama model digest must contain exactly 64 hexadecimal characters.");
+                "Ollama model digest must contain exactly 64 hexadecimal characters.");
         }
 
         return normalized;

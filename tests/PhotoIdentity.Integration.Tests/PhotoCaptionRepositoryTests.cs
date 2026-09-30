@@ -1,4 +1,8 @@
 using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Api;
+using PhotoIdentity.Imaging.OpenCv;
+using Microsoft.Extensions.Logging.Abstractions;
+using OpenCvSharp;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
@@ -181,6 +185,96 @@ public sealed class PhotoCaptionRepositoryTests
         }
     }
 
+    [Fact]
+    public async Task Remote_worker_persists_bounded_payload_and_return_to_same_local_digest_is_idle()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "caption-remote-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            PostgresTestCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            AssetRevisionId revision = AssetRevisionId.New();
+            await SeedRevisionAsync(database, revision);
+            byte[] proxyBytes;
+            using (Mat proxy = new(480, 640, MatType.CV_8UC3, new Scalar(80, 100, 120)))
+            {
+                Cv2.ImEncode(".jpg", proxy, out proxyBytes);
+            }
+            // A JPEG APP1 segment represents private EXIF/catalogue material that must be stripped.
+            const string privateMetadata = "PRIVATE_PERSON_ASSIGNMENT_FACE_EMBEDDING_GPS_CAPTURE_DATE_COLLECTION_DATABASE_SOURCE_PATH";
+            byte[] metadata = System.Text.Encoding.UTF8.GetBytes(privateMetadata);
+            int segmentLength = metadata.Length + 2;
+            proxyBytes = [.. proxyBytes[..2], 0xff, 0xe1, (byte)(segmentLength >> 8), (byte)segmentLength, .. metadata, .. proxyBytes[2..]];
+            string proxyPath = Path.Combine(directory, "review", ReviewProxyProfileId, revision + ".jpg");
+            Directory.CreateDirectory(Path.GetDirectoryName(proxyPath)!);
+            await File.WriteAllBytesAsync(proxyPath, proxyBytes);
+            await SeedReviewProxyAsync(database, revision, proxyBytes.LongLength);
+            PostgresPhotoCaptionRepository captions = new(database);
+            await captions.UpdateSettingsAsync(true, "en", DateTimeOffset.UtcNow);
+            ReviewProxyServingConfiguration proxies = new(directory, ReviewProxyProfileId);
+            CollectionReviewProxyFileResolver resolver = new(new PostgresArchiveReviewProxyRepository(database), proxies);
+            RemoteCaptionRecordingHandler remoteHandler = new();
+            using HttpClient remoteHttp = new(remoteHandler);
+            PhotoCaptionGenerationConfiguration remoteConfig = new(new Uri("https://caption.example.test/ollama/"), "qwen2.5vl:3b", 1024, 600, CaptionInferenceMode.Remote);
+            PhotoCaptionEnrichmentWorkerState state = new();
+            using PhotoCaptionEnrichmentHostedService remoteWorker = CreateWorker(remoteHttp, remoteConfig);
+            await remoteWorker.RunOnceAsync();
+            PhotoGeneratedCaption? persisted = await captions.GetLatestAsync(revision, "en");
+            Assert.NotNull(persisted);
+            Assert.Equal(new string('a', 64), persisted.ModelDigest);
+            Assert.Equal(PhotoCaptionGenerationConfiguration.GenerationVersion, persisted.GenerationVersion);
+            Assert.Equal(PhotoCaptionPrompt.VersionFor("en"), persisted.PromptVersion);
+            Assert.Equal(PhotoCaptionGenerationConfiguration.ImageMode, persisted.ImageMode);
+            Assert.True(persisted.GenerationMilliseconds >= 0);
+            byte[] uploaded = RemoteCaptionRecordingHandler.AssertProductionPayload(remoteHandler.ChatBody);
+            Assert.NotEqual(proxyBytes, uploaded);
+            Assert.DoesNotContain(privateMetadata, System.Text.Encoding.UTF8.GetString(uploaded), StringComparison.Ordinal);
+            Assert.DoesNotContain(directory, remoteHandler.ChatBody, StringComparison.Ordinal);
+            using Mat decoded = Cv2.ImDecode(uploaded, ImreadModes.Color);
+            Assert.Equal(480, decoded.Cols);
+            Assert.Equal(320, decoded.Rows);
+            Assert.All(remoteHandler.Requests, uri => Assert.Equal("caption.example.test", uri.Host));
+
+            RemoteCaptionRecordingHandler localHandler = new();
+            using HttpClient localHttp = new(localHandler);
+            PhotoCaptionGenerationConfiguration localConfig = remoteConfig with
+            {
+                OllamaBaseUri = PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri,
+                InferenceMode = CaptionInferenceMode.Local,
+            };
+            using PhotoCaptionEnrichmentHostedService localWorker = CreateWorker(localHttp, localConfig);
+            await localWorker.RunOnceAsync();
+            Assert.Equal("idle", state.GetSnapshot().State);
+            Assert.Single(localHandler.Requests);
+            Assert.Empty(localHandler.ChatBody);
+            Assert.Equal(persisted.GeneratedAtUtc, (await captions.GetLatestAsync(revision, "en"))!.GeneratedAtUtc);
+
+            localHandler.Digest = new string('b', 64);
+            await localWorker.RunOnceAsync();
+            Assert.NotEmpty(localHandler.ChatBody);
+            Assert.Equal(new string('b', 64), (await captions.GetLatestAsync(revision, "en"))!.ModelDigest);
+
+            remoteHandler.TransportFailure = true;
+            int previousRequests = remoteHandler.Requests.Count;
+            Assert.Equal(TimeSpan.FromMinutes(5), await remoteWorker.RunWithBackoffAsync(CancellationToken.None));
+            Assert.Equal(previousRequests + 1, remoteHandler.Requests.Count);
+            Assert.Equal("waiting", state.GetSnapshot().State);
+            Assert.NotNull(state.GetSnapshot().NextAttemptAtUtc);
+            Assert.DoesNotContain("SECRET", state.GetSnapshot().Message, StringComparison.Ordinal);
+            Assert.Equal(new string('b', 64), (await captions.GetLatestAsync(revision, "en"))!.ModelDigest);
+
+            PhotoCaptionEnrichmentHostedService CreateWorker(HttpClient http, PhotoCaptionGenerationConfiguration configuration) => new(
+                captions, resolver, proxies,
+                new LocalPhotoCaptionGenerator(new CaptionTestHttpClientFactory(http), new OpenCvThumbnailRenderer(), configuration),
+                configuration, state, TimeProvider.System, NullLogger<PhotoCaptionEnrichmentHostedService>.Instance);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private const string PhotoCaptionGenerationVersion = "wi-0128-photo-caption-v1";
     private const string ReviewProxyProfileId = "jpeg-1600-q78";
 
@@ -224,7 +318,8 @@ public sealed class PhotoCaptionRepositoryTests
 
     private static async Task SeedReviewProxyAsync(
         PostgresTestCatalogueDatabase database,
-        AssetRevisionId revisionId)
+        AssetRevisionId revisionId,
+        long encodedByteLength = 120_000)
     {
         DateTimeOffset now = new(2026, 9, 20, 20, 55, 0, TimeSpan.Zero);
         PostgresArchiveReviewProxyRepository repository = new(database);
@@ -234,7 +329,7 @@ public sealed class PhotoCaptionRepositoryTests
             new ArchiveReviewProxyRecord(
                 revisionId,
                 profile.Id,
-                120_000,
+                encodedByteLength,
                 new Sha256Digest(new string('c', 64)),
                 640,
                 480,

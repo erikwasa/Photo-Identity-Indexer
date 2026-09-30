@@ -89,6 +89,31 @@ jobs:
           path: restore.log
           retention-days: 1
 
+      # Temporary WI-0174 verification bridge; remove after retrieving generated Docs outputs.
+      - name: Run WI-0174 lifecycle and generation
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- show WI-0174
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- review WI-0174
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+          exit $LASTEXITCODE
+
+      - name: Preserve generated WI-0174 delivery outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: wi-0174-generated-docs
+          path: |
+            docs/delivery/status/work-items/active/WI-0174.yaml
+            docs/delivery/status/work-items.yaml
+            docs/delivery/status/work-items-index.md
+            docs/delivery/status/milestones.yaml
+            docs/delivery/roadmap.md
+          retention-days: 1
+
       - name: Build
         shell: pwsh
         run: |
