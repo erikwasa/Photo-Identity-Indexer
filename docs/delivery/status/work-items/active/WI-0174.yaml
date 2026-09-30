@@ -1,14 +1,14 @@
 id: WI-0174
 title: Support operator-authorized remote caption inference for backlog bursts
 milestone: M35
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0174-remote-caption-inference.md
+started_at: 2026-09-30
+last_updated_at: 2026-09-30
+branch: agent/wi-0174-remote-caption-inference
 blockers: []
 blocker_notes: []
 evidence:
 - type: issue
   value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/472
-started_at: 2026-09-30
-last_updated_at: 2026-09-30
-branch: agent/wi-0174-remote-caption-inference

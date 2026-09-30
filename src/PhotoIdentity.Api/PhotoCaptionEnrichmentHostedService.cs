@@ -117,7 +117,6 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
                 break;
             }
 
-
             if (delay > TimeSpan.Zero)
             {
                 await Task.Delay(delay, _timeProvider, stoppingToken);

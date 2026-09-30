@@ -78,3 +78,8 @@ Each executable selects and wires the adapters it needs:
 - the Web client consumes API contracts only.
 
 See [Applications](applications.md), [Canonical data model](data-model.md) and [Portable processing bundles](portable-bundles.md).
+
+
+## Caption inference transport
+
+[ADR-0011](../decisions/ADR-0011-operator-authorized-remote-caption-inference.md) permits the API caption enrichment worker and CLI evaluator to send locally rendered bounded caption thumbnails to an explicit operator-configured HTTPS Ollama endpoint. The shared Core mode/endpoint contract contains only neutral .NET types. Executable composition roots own HTTP configuration; the remote endpoint owns inference only and receives no catalogue connection or identity/archive state. Local remains default. Transport mode is status/benchmark evidence, not caption generation-policy identity. All other processing retains [ADR-0010](../decisions/ADR-0010-local-production-execution.md).

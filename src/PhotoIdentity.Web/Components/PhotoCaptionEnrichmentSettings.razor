@@ -34,10 +34,9 @@
     {
         @if (Status.InferenceMode == "remote")
         {
-            <div class="notice" role="status">Remote caption processing is active. Bounded photo thumbnails are sent to the operator-configured HTTPS endpoint.</div>
+            <div class="notice" role="status">Remote caption inference is configured. While enrichment is enabled, bounded photo thumbnails are sent to the operator-configured HTTPS endpoint.</div>
         }
-        <p>Inference: @Status.InferenceMode · Host: @Status.EndpointHost · Model: @Status.Model</p>
-        <p>Resolved digest: @(Status.ModelDigest ?? "Not resolved yet")</p>
+        <p>Inference: @Status.InferenceMode · Host: @Status.EndpointHost</p>
         <div class="review-filter-grid">
             <div>
                 <label>
@@ -63,6 +62,7 @@
                 <span class="field-label">Model</span>
                 <strong>@Status.Model</strong>
                 <p>Generation policy: @Status.GenerationVersion</p>
+                <p>Resolved digest: <code style="overflow-wrap: anywhere;">@(Status.ModelDigest ?? "Not resolved yet")</code></p>
             </div>
         </div>
 
@@ -82,7 +82,7 @@
         </div>
 
         <p class="field-help">
-            Caption generation uses only the configured durable review proxy, reduced to a temporary 480×320 image, and sends it only to the local loopback Ollama runtime.
+            Caption generation uses only the configured durable review proxy, reduced to a temporary 480×320 image, and sends it to the operator-configured Ollama runtime. Local loopback inference is the default; Remote mode uses HTTPS.
             Generated captions are versioned derived photo evidence. Smart Collections, slideshows and future features may consume that evidence, but they do not trigger generation.
         </p>
     }

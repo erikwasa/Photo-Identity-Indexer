@@ -550,21 +550,21 @@ internal static class NarrationEvaluationCommandRunner
     internal static NarrationPipelineEvidence CreatePipelineEvidence(
         NarrationEvaluationCommandOptions options,
         LocalVisionModelDescriptor model) => new(
-                Runtime: "ollama",
-                Model: model.Name,
-                ModelDigest: model.Digest,
-                model.SizeBytes,
-                model.Family,
-                model.ParameterSize,
-                model.QuantizationLevel,
-                OllamaVisionCaptionClient.PromptVersion,
-                CreativeCollectionGeneratedTextPolicies.DeterministicCaptionV1,
-                options.ProxyProfile,
-                options.CaptionImageMode,
-                options.OllamaContextTokens,
-                LoopbackOnly: options.InferenceMode == CaptionInferenceMode.Local,
-                InferenceMode: options.InferenceMode.ToString().ToLowerInvariant(),
-                EndpointHost: options.OllamaBaseUri.Host);
+            Runtime: "ollama",
+            Model: model.Name,
+            ModelDigest: model.Digest,
+            model.SizeBytes,
+            model.Family,
+            model.ParameterSize,
+            model.QuantizationLevel,
+            OllamaVisionCaptionClient.PromptVersion,
+            CreativeCollectionGeneratedTextPolicies.DeterministicCaptionV1,
+            options.ProxyProfile,
+            options.CaptionImageMode,
+            options.OllamaContextTokens,
+            LoopbackOnly: options.InferenceMode == CaptionInferenceMode.Local,
+            InferenceMode: options.InferenceMode.ToString().ToLowerInvariant(),
+            EndpointHost: options.OllamaBaseUri.Host);
 
     private static NarrationEvaluationReport BuildReport(
         NarrationEvaluationCommandOptions options,
