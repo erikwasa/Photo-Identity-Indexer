@@ -96,3 +96,15 @@ The existing Smart Collections `Busy` state now becomes visibly explicit in the 
 ## Verification status
 
 Implementation and automated scaling/reuse guards are present on the WI-0169 branch. The acceptance checkboxes intentionally remain open until CI passes and the maintained archive reproduces the reported approximately 1,000-anchor / target-150 / Broad case with before/after timing evidence.
+
+### Maintainer acceptance — 2026-09-30 (Europe/Stockholm)
+
+The maintained archive failed the approximately 1,000-photo anchor / target 150 / Broad case. The attached stdout log records HTTP 503 after **60026.3396 ms** for `creative-preview` with `momentGapMinutes=30`, `contextStrength=broad` and `novelty=false`. This passes the bounded error behavior only; it fails the archive-scale responsiveness criterion. No completed `Creative materialization` aggregate line exists in the supplied log, so no specific bottleneck or warm-cache improvement can be inferred. The item was reopened. No private log, source path or photo identifier is committed.
+
+The follow-up dispatches cold proxy decoding/hash computation to worker tasks instead of allowing synchronously completed file reads to serialize CPU work during task enumeration. A service-wide gate bounds hash concurrency across simultaneous preview/snapshot requests. Phase transitions and an unconditional final phase/timing record now survive cancellation; visual-work counters are emitted even for cancelled hash work. The existing 60-second deadline and accepted hash/selection policy remain unchanged. This is a candidate performance improvement, not evidence that the maintained archive case now passes.
+
+Retest twice in the same application process. Capture `Creative materialization phase`, `Creative visual evidence`, and `Creative materialization ended` lines, including the final active phase if the deadline still occurs. Maintained archive acceptance remains required.
+
+## Follow-up validation
+
+The affected API/Web/test projects build, and 50 focused non-host slideshow/receipt/cache/route/Creative optimization tests pass. Documentation `validate` and `generate --check` pass. PostgreSQL-backed preparation tests could not run locally because the test admin connection was unavailable; those cases remain required in CI. Maintained archive/phone acceptance is not claimed.

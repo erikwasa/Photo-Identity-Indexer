@@ -18,6 +18,7 @@ public sealed class CreativeCollectionMaterializationService
 {
     private static readonly int VisualHashConcurrency = Math.Clamp(Environment.ProcessorCount, 4, 12);
 
+    private readonly SemaphoreSlim _visualHashGate = new(VisualHashConcurrency);
     private readonly ISmartCollectionRepository _definitions;
     private readonly ISmartCollectionQueryRepository _query;
     private readonly CollectionReviewProxyFileResolver _proxyResolver;
@@ -83,146 +84,175 @@ public sealed class CreativeCollectionMaterializationService
         settings.ValidateSupported();
 
         Stopwatch totalTimer = Stopwatch.StartNew();
-        long definitionAndAnchorMilliseconds;
-        long catalogueAndCandidatesMilliseconds;
-        long visualMilliseconds;
-        long preferenceAndExposureMilliseconds;
-        long selectionMilliseconds;
-
-        Stopwatch phase = Stopwatch.StartNew();
-        SmartCollectionDefinition? definition =
-            await _definitions.GetAsync(collectionId, cancellationToken);
-        if (definition is null)
+        string currentPhase = "anchor";
+        long phaseStarted = Stopwatch.GetTimestamp();
+        void ReportPhase(string next)
         {
-            return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            _logger?.LogInformation(
+                "Creative materialization phase: completed={Phase} next={NextPhase} msPhase={PhaseMilliseconds} msElapsed={ElapsedMilliseconds} target={TargetCount}.",
+                currentPhase, next, Stopwatch.GetElapsedTime(phaseStarted).TotalMilliseconds,
+                totalTimer.ElapsedMilliseconds, settings.TargetCount);
+            currentPhase = next;
+            phaseStarted = Stopwatch.GetTimestamp();
         }
 
-        SmartCollectionSlideshowSnapshot? anchorSnapshot =
-            await _query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
-        if (anchorSnapshot is null)
+        try
         {
-            return null;
-        }
-        definitionAndAnchorMilliseconds = phase.ElapsedMilliseconds;
+            long definitionAndAnchorMilliseconds;
+            long catalogueAndCandidatesMilliseconds;
+            long visualMilliseconds;
+            long preferenceAndExposureMilliseconds;
+            long selectionMilliseconds;
 
-        PhotoMomentGapPolicy momentPolicy =
-            PhotoMomentGapPolicy.CreateTimeGapEvaluation(settings.MomentGapMinutes);
-        CreativeCollectionContextPolicy contextPolicy =
-            CreativeCollectionContextPolicy.FromVersion(settings.ContextPolicyVersion);
+            Stopwatch phase = Stopwatch.StartNew();
+            SmartCollectionDefinition? definition =
+                await _definitions.GetAsync(collectionId, cancellationToken);
+            if (definition is null)
+            {
+                return null;
+            }
 
-        IReadOnlyList<AssetRevisionId> anchorRevisionIds = anchorSnapshot.RevisionIds;
-        if (anchorRevisionIds.Count == 0)
-        {
-            PhotoMomentClusteringResult noMoments = PhotoMomentClusterer.Cluster([], momentPolicy);
-            CreativeCollectionCandidateSet noCandidates = CreativeCollectionCandidateGenerator.Generate(
-                [],
-                [],
-                noMoments,
+            SmartCollectionSlideshowSnapshot? anchorSnapshot =
+                await _query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
+            if (anchorSnapshot is null)
+            {
+                return null;
+            }
+            definitionAndAnchorMilliseconds = phase.ElapsedMilliseconds;
+
+            PhotoMomentGapPolicy momentPolicy =
+                PhotoMomentGapPolicy.CreateTimeGapEvaluation(settings.MomentGapMinutes);
+            CreativeCollectionContextPolicy contextPolicy =
+                CreativeCollectionContextPolicy.FromVersion(settings.ContextPolicyVersion);
+
+            IReadOnlyList<AssetRevisionId> anchorRevisionIds = anchorSnapshot.RevisionIds;
+            if (anchorRevisionIds.Count == 0)
+            {
+                PhotoMomentClusteringResult noMoments = PhotoMomentClusterer.Cluster([], momentPolicy);
+                CreativeCollectionCandidateSet noCandidates = CreativeCollectionCandidateGenerator.Generate(
+                    [],
+                    [],
+                    noMoments,
+                    contextPolicy);
+                CreativeCollectionSelectionResult noSelection = CreativeCollectionSelector.Select(
+                    noCandidates,
+                    [],
+                    noMoments,
+                    settings.TargetCount,
+                    CreativeCollectionSelectionPolicy.BalancedV1);
+                PhotoVisualRedundancyResult noVisualRedundancy = PhotoVisualRedundancyGrouper.Group(
+                    [],
+                    noMoments,
+                    PhotoVisualRedundancyPolicy.AcceptedCreativeV1);
+                return new CreativeCollectionMaterialization(
+                    definition,
+                    noCandidates,
+                    noSelection,
+                    noVisualRedundancy,
+                    new Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary>(),
+                    settings.NoveltyEnabled
+                        ? CreativeCollectionNoveltyPolicies.BalancedV1
+                        : CreativeCollectionNoveltyPolicies.Disabled);
+            }
+
+            ReportPhase("catalogue-query");
+            phase.Restart();
+            IReadOnlyList<SmartCollectionPhoto> cataloguePhotos = await _query.QueryAllAsync(
+                new SmartCollectionFilter(),
+                cancellationToken);
+
+            ReportPhase("moment-clustering");
+            PhotoMomentCandidate[] momentCandidates = cataloguePhotos
+                .Select(photo => new PhotoMomentCandidate(
+                    photo.RevisionId,
+                    photo.TakenAtLocal,
+                    PeopleKeys: photo.PeopleKeys,
+                    Latitude: photo.Latitude,
+                    Longitude: photo.Longitude))
+                .ToArray();
+            PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
+                momentCandidates,
+                momentPolicy);
+            ReportPhase("candidate-expansion");
+            CreativeCollectionCandidateSet generated = CreativeCollectionCandidateGenerator.Generate(
+                momentCandidates,
+                anchorRevisionIds,
+                moments,
                 contextPolicy);
-            CreativeCollectionSelectionResult noSelection = CreativeCollectionSelector.Select(
-                noCandidates,
-                [],
-                noMoments,
+            catalogueAndCandidatesMilliseconds = phase.ElapsedMilliseconds;
+
+            ReportPhase("visual-evidence");
+            phase.Restart();
+            VisualRedundancyBuild visual = await BuildAcceptedVisualRedundancyAsync(
+                generated.Candidates,
+                moments,
+                cancellationToken);
+            visualMilliseconds = phase.ElapsedMilliseconds;
+
+            ReportPhase("preferences-and-exposure");
+            phase.Restart();
+            IReadOnlyDictionary<AssetRevisionId, string> presentationPreferences =
+                await _presentationPreferences.GetEffectiveAsync(
+                    generated.Candidates.Select(candidate => candidate.RevisionId),
+                    cancellationToken);
+            IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> exposureHistory =
+                await _exposures.GetSummariesAsync(
+                    generated.Candidates.Select(candidate => candidate.RevisionId),
+                    cancellationToken);
+            preferenceAndExposureMilliseconds = phase.ElapsedMilliseconds;
+
+            ReportPhase("selection");
+            phase.Restart();
+            CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
+                generated,
+                momentCandidates,
+                moments,
+                visual.Result,
+                presentationPreferences,
+                exposureHistory,
+                settings.NoveltyEnabled,
+                _timeProvider.GetUtcNow().ToUniversalTime(),
                 settings.TargetCount,
                 CreativeCollectionSelectionPolicy.BalancedV1);
-            PhotoVisualRedundancyResult noVisualRedundancy = PhotoVisualRedundancyGrouper.Group(
-                [],
-                noMoments,
-                PhotoVisualRedundancyPolicy.AcceptedCreativeV1);
+            selectionMilliseconds = phase.ElapsedMilliseconds;
+            totalTimer.Stop();
+            currentPhase = "completed";
+
+            _logger?.LogInformation(
+                "Creative materialization: anchors={AnchorCount} catalogue={CatalogueCount} candidates={CandidateCount} target={TargetCount} visualEligible={VisualEligibleCount} proxies={ResolvedProxyCount} cacheHits={CacheHitCount} hashesComputed={HashesComputed} missingOrUnreadable={MissingOrUnreadableCount} msAnchor={AnchorMilliseconds} msCatalogueCandidates={CatalogueCandidatesMilliseconds} msVisual={VisualMilliseconds} msPreferencesExposure={PreferenceExposureMilliseconds} msSelection={SelectionMilliseconds} msTotal={TotalMilliseconds}.",
+                anchorRevisionIds.Count,
+                cataloguePhotos.Count,
+                generated.TotalCandidateCount,
+                settings.TargetCount,
+                visual.EligibleCandidateCount,
+                visual.ResolvedProxyCount,
+                visual.CacheHitCount,
+                visual.ComputedCount,
+                visual.MissingOrUnreadableCount,
+                definitionAndAnchorMilliseconds,
+                catalogueAndCandidatesMilliseconds,
+                visualMilliseconds,
+                preferenceAndExposureMilliseconds,
+                selectionMilliseconds,
+                totalTimer.ElapsedMilliseconds);
+
             return new CreativeCollectionMaterialization(
                 definition,
-                noCandidates,
-                noSelection,
-                noVisualRedundancy,
-                new Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary>(),
+                generated,
+                selection,
+                visual.Result,
+                exposureHistory,
                 settings.NoveltyEnabled
                     ? CreativeCollectionNoveltyPolicies.BalancedV1
                     : CreativeCollectionNoveltyPolicies.Disabled);
         }
-
-        phase.Restart();
-        IReadOnlyList<SmartCollectionPhoto> cataloguePhotos = await _query.QueryAllAsync(
-            new SmartCollectionFilter(),
-            cancellationToken);
-
-        PhotoMomentCandidate[] momentCandidates = cataloguePhotos
-            .Select(photo => new PhotoMomentCandidate(
-                photo.RevisionId,
-                photo.TakenAtLocal,
-                PeopleKeys: photo.PeopleKeys,
-                Latitude: photo.Latitude,
-                Longitude: photo.Longitude))
-            .ToArray();
-        PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
-            momentCandidates,
-            momentPolicy);
-        CreativeCollectionCandidateSet generated = CreativeCollectionCandidateGenerator.Generate(
-            momentCandidates,
-            anchorRevisionIds,
-            moments,
-            contextPolicy);
-        catalogueAndCandidatesMilliseconds = phase.ElapsedMilliseconds;
-
-        phase.Restart();
-        VisualRedundancyBuild visual = await BuildAcceptedVisualRedundancyAsync(
-            generated.Candidates,
-            moments,
-            cancellationToken);
-        visualMilliseconds = phase.ElapsedMilliseconds;
-
-        phase.Restart();
-        IReadOnlyDictionary<AssetRevisionId, string> presentationPreferences =
-            await _presentationPreferences.GetEffectiveAsync(
-                generated.Candidates.Select(candidate => candidate.RevisionId),
-                cancellationToken);
-        IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> exposureHistory =
-            await _exposures.GetSummariesAsync(
-                generated.Candidates.Select(candidate => candidate.RevisionId),
-                cancellationToken);
-        preferenceAndExposureMilliseconds = phase.ElapsedMilliseconds;
-
-        phase.Restart();
-        CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
-            generated,
-            momentCandidates,
-            moments,
-            visual.Result,
-            presentationPreferences,
-            exposureHistory,
-            settings.NoveltyEnabled,
-            _timeProvider.GetUtcNow().ToUniversalTime(),
-            settings.TargetCount,
-            CreativeCollectionSelectionPolicy.BalancedV1);
-        selectionMilliseconds = phase.ElapsedMilliseconds;
-        totalTimer.Stop();
-
-        _logger?.LogInformation(
-            "Creative materialization: anchors={AnchorCount} catalogue={CatalogueCount} candidates={CandidateCount} target={TargetCount} visualEligible={VisualEligibleCount} proxies={ResolvedProxyCount} cacheHits={CacheHitCount} hashesComputed={HashesComputed} missingOrUnreadable={MissingOrUnreadableCount} msAnchor={AnchorMilliseconds} msCatalogueCandidates={CatalogueCandidatesMilliseconds} msVisual={VisualMilliseconds} msPreferencesExposure={PreferenceExposureMilliseconds} msSelection={SelectionMilliseconds} msTotal={TotalMilliseconds}.",
-            anchorRevisionIds.Count,
-            cataloguePhotos.Count,
-            generated.TotalCandidateCount,
-            settings.TargetCount,
-            visual.EligibleCandidateCount,
-            visual.ResolvedProxyCount,
-            visual.CacheHitCount,
-            visual.ComputedCount,
-            visual.MissingOrUnreadableCount,
-            definitionAndAnchorMilliseconds,
-            catalogueAndCandidatesMilliseconds,
-            visualMilliseconds,
-            preferenceAndExposureMilliseconds,
-            selectionMilliseconds,
-            totalTimer.ElapsedMilliseconds);
-
-        return new CreativeCollectionMaterialization(
-            definition,
-            generated,
-            selection,
-            visual.Result,
-            exposureHistory,
-            settings.NoveltyEnabled
-                ? CreativeCollectionNoveltyPolicies.BalancedV1
-                : CreativeCollectionNoveltyPolicies.Disabled);
+        finally
+        {
+            _logger?.LogInformation(
+                "Creative materialization ended: phase={Phase} cancelled={Cancelled} msTotal={TotalMilliseconds} target={TargetCount}.",
+                currentPhase, cancellationToken.IsCancellationRequested, totalTimer.ElapsedMilliseconds, settings.TargetCount);
+        }
     }
 
     internal static CreativeCollectionCandidate[] SelectVisualFingerprintCandidates(
@@ -291,16 +321,20 @@ public sealed class CreativeCollectionMaterializationService
                 0);
         }
 
+        Stopwatch visualTimer = Stopwatch.StartNew();
+        _logger?.LogInformation("Creative visual phase: phase=proxy-resolution eligible={EligibleCount}.", eligible.Length);
         IReadOnlyDictionary<AssetRevisionId, ResolvedCollectionReviewProxy> proxies =
             await _proxyResolver.ResolveManyWithMetadataAsync(
                 eligible.Select(candidate => candidate.RevisionId).ToArray(),
                 cancellationToken);
 
+        _logger?.LogInformation(
+            "Creative visual phase: phase=fingerprints eligible={EligibleCount} proxies={ProxyCount} msResolve={ResolveMilliseconds}.",
+            eligible.Length, proxies.Count, visualTimer.ElapsedMilliseconds);
         ConcurrentBag<PhotoVisualFingerprint> fingerprints = [];
         int cacheHits = 0;
         int computed = 0;
         int missingOrUnreadable = eligible.Length - proxies.Count;
-        using SemaphoreSlim gate = new(VisualHashConcurrency);
         OpenCvPerceptualHashCalculator calculator = new();
 
         Task[] work = eligible.Select(async candidate =>
@@ -324,7 +358,7 @@ public sealed class CreativeCollectionMaterializationService
                 return;
             }
 
-            await gate.WaitAsync(cancellationToken);
+            await _visualHashGate.WaitAsync(cancellationToken);
             try
             {
                 // Recheck after waiting so concurrent materializations converge on the same cache.
@@ -344,8 +378,10 @@ public sealed class CreativeCollectionMaterializationService
 
                 try
                 {
-                    PhotoPerceptualHash64 hash = await calculator.ComputeAsync(
-                        proxy.File.Path,
+                    // Cached file reads may complete synchronously. Dispatch CPU decoding so
+                    // LINQ task creation cannot serialize all hashes on the request thread.
+                    PhotoPerceptualHash64 hash = await Task.Run(
+                        () => calculator.ComputeAsync(proxy.File.Path, cancellationToken),
                         cancellationToken);
                     _fingerprintCache.Store(
                         candidate.RevisionId,
@@ -370,12 +406,24 @@ public sealed class CreativeCollectionMaterializationService
             }
             finally
             {
-                gate.Release();
+                _visualHashGate.Release();
             }
         }).ToArray();
 
-        await Task.WhenAll(work);
+        try
+        {
+            await Task.WhenAll(work);
+        }
+        finally
+        {
+            _logger?.LogInformation(
+                "Creative visual evidence: eligible={EligibleCount} proxies={ProxyCount} cacheHits={CacheHitCount} hashesComputed={ComputedCount} missingOrUnreadable={MissingCount} cancelled={Cancelled}.",
+                eligible.Length, proxies.Count, cacheHits, computed, missingOrUnreadable,
+                cancellationToken.IsCancellationRequested);
+        }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        _logger?.LogInformation("Creative visual phase: phase=grouping msElapsed={ElapsedMilliseconds}.", visualTimer.ElapsedMilliseconds);
         return new VisualRedundancyBuild(
             PhotoVisualRedundancyGrouper.Group(
                 fingerprints,

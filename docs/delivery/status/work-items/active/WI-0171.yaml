@@ -1,0 +1,10 @@
+id: WI-0171
+title: Diagnose thin grid-like lines during phone slideshow playback
+milestone: M32
+status: ready
+owner: unassigned
+document: ../work-items/WI-0171-phone-slideshow-grid-artifacts.md
+last_updated_at: 2026-09-29
+blockers: []
+blocker_notes: []
+evidence: []

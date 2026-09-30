@@ -21,6 +21,10 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 - [WI-0168](../work-items/WI-0168-pwa-slideshow-navigation.md) - add bidirectional navigation between the normal installed PWA and the simplified slideshow surface.
 - [WI-0169](../work-items/WI-0169-creative-collection-scale.md) - bound large/Broad Creative Collection materialization so realistic archive-scale previews do not time out.
 
+- [WI-0173](../work-items/WI-0173-slideshow-library-navigation-cache.md) - reuse library cards and covers across navigation.
+- [WI-0171](../work-items/WI-0171-phone-slideshow-grid-artifacts.md) - diagnose and resolve thin grid-like phone rendering artifacts.
+- [WI-0172](../work-items/WI-0172-slideshow-collection-management.md) - provide a separate full-app collection-management hub.
+
 ## Delivery principles
 
 - Implement RAW support from real archive evidence rather than guessing generic camera-format behavior.

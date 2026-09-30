@@ -1,0 +1,98 @@
+@page "/slideshow-collections"
+@layout MainLayout
+@inject HttpClient Http
+
+<PageTitle>Manage slideshow collections · Photo Identity</PageTitle>
+
+<section class="smart-workspace" aria-labelledby="slideshow-collections-heading">
+    <div class="smart-workspace-heading">
+        <div>
+            <p class="eyebrow">Collection management</p>
+            <h1 id="slideshow-collections-heading">Manage slideshow collections</h1>
+            <p>Choose a collection to edit its name, photos or recipe. Changes apply to future slideshow sessions.</p>
+        </div>
+        <a class="button secondary" href="/slideshows">View slideshows</a>
+    </div>
+
+    @if (Error is not null)
+    {
+        <div class="notice error" role="alert">@Error</div>
+        <button class="button secondary" @onclick="LoadAsync">Retry</button>
+    }
+    @if (Loading)
+    {
+        <p role="status">Loading collections…</p>
+    }
+    else
+    {
+        <section class="collection-management-group" aria-labelledby="manage-smart">
+            <h2 id="manage-smart">Smart Collections</h2>
+            <p>Edit matching filters and names, or delete a saved definition.</p>
+            <a class="button secondary" href="/smart-collections">Create Smart Collection</a>
+            @foreach (var collection in Smart)
+            {
+                <a class="collection-management-entry" href="@($"/smart-collections?mode=saved&collection={Uri.EscapeDataString(collection.Id)}")">
+                    <strong>@collection.Name</strong><span>Edit Smart Collection</span>
+                </a>
+            }
+        </section>
+
+        <section class="collection-management-group" aria-labelledby="manage-manual">
+            <h2 id="manage-manual">Manual collections</h2>
+            <p>Rename a collection, reorder or remove photos, or delete the collection. Add photos from a photo’s Manual slideshow control.</p>
+            @if (Manual.Length == 0) { <p>No manual collections yet.</p> }
+            @foreach (var collection in Manual)
+            {
+                <a class="collection-management-entry" href="@($"/manual-collections/{Uri.EscapeDataString(collection.Id)}")">
+                    <strong>@collection.Name</strong><span>@SlideshowLibraryPresentation.PhotoCountLabel(collection.RevisionIds.Length) · Edit manual collection</span>
+                </a>
+            }
+        </section>
+
+        <section class="collection-management-group" aria-labelledby="manage-creative">
+            <h2 id="manage-creative">Creative Collections</h2>
+            <p>Edit names and recipes, or delete a Creative Collection. Its source Smart Collection and other recipes remain separate.</p>
+            <a class="button secondary" href="/creative-collections">Create Creative Collection</a>
+            @foreach (var collection in Creative)
+            {
+                <a class="collection-management-entry" href="@($"/creative-collections?collection={Uri.EscapeDataString(collection.Id)}")">
+                    <strong>@collection.Name</strong><span>From @collection.AnchorCollectionName · @SlideshowLibraryPresentation.CreativeTargetLabel(collection.TargetCount) · Edit recipe</span>
+                </a>
+            }
+        </section>
+    }
+</section>
+
+@code {
+    private SlideshowLibraryCollectionResponse[] Smart = [];
+    private PhotoListCollectionResponse[] Manual = [];
+    private CreativeCollectionRecipeResponse[] Creative = [];
+    private bool Loading = true;
+    private string? Error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            var smart = Http.GetFromJsonAsync<SlideshowLibraryCollectionResponse[]>("api/slideshows/collections");
+            var manual = Http.GetFromJsonAsync<PhotoListCollectionResponse[]>("api/photo-list-collections");
+            var creative = Http.GetFromJsonAsync<CreativeCollectionRecipeResponse[]>("api/creative-collections");
+            await Task.WhenAll(smart, manual, creative);
+            Smart = (await smart ?? []).OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+            Manual = (await manual ?? []).OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+            Creative = (await creative ?? []).OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+        catch (Exception exception)
+        {
+            Error = $"Collection management could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+}

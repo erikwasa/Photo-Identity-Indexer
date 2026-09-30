@@ -36,12 +36,12 @@ The consumer header now uses a space-between layout and a 44 px return control, 
 
 ## Acceptance criteria
 
-- [ ] The normal application navigation includes a discoverable route to `/slideshows`.
-- [ ] The slideshow library/consumer surface includes a discoverable route back to the normal application.
-- [ ] Both directions work in an installed standalone PWA without relying on a browser address bar or browser Back history.
-- [ ] The slideshow consumer layout remains visually simple and focused on read-only playback.
-- [ ] The new navigation is responsive and accessible on the maintained desktop Edge and phone layouts.
-- [ ] Automated route/presentation coverage protects the presence and targets of the two navigation affordances where practical.
+- [x] The normal application navigation includes a discoverable route to `/slideshows`.
+- [x] The slideshow library/consumer surface includes a discoverable route back to the normal application.
+- [x] Both directions work in an installed standalone PWA without relying on a browser address bar or browser Back history.
+- [x] The slideshow consumer layout remains visually simple and focused on read-only playback.
+- [x] The new navigation is responsive and accessible on the maintained desktop Edge and phone layouts.
+- [x] Automated route/presentation coverage protects the presence and targets of the two navigation affordances where practical.
 
 ## Verification plan
 
@@ -49,3 +49,7 @@ The consumer header now uses a space-between layout and a 44 px return control, 
 2. From the normal app, navigate to Slideshows using only in-app controls.
 3. From the slideshow library, return to the full app using only in-app controls.
 4. Repeat the two directions in desktop Edge and confirm the consumer layout remains compact.
+
+## Maintainer acceptance — 2026-09-30 (Europe/Stockholm)
+
+Maintainer reports: **“WI-0168 works as expected.”** Accepted as completion of the requested bidirectional navigation. PR #465 is merged; focused route coverage protects `/` and `/slideshows`. The report did not provide separate device-by-device measurements; no additional measurements are claimed. Collection-management discoverability is tracked separately.

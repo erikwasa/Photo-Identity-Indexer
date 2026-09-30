@@ -70,3 +70,7 @@ Both the slideshow player and slideshow-library preparation tools render the rec
 ## Verification status
 
 Implementation and automated coverage are present on the WI-0167 branch. The acceptance checkboxes intentionally remain open until CI passes and the Windows/phone verification plan above is exercised on the maintained archive PC.
+
+### Maintainer verification update — 2026-09-30 (Europe/Stockholm)
+
+Maintainer explicitly reports **not tested yet**. Keep `in_review`; the unavailable-client / Retry / already-local-original checks remain outstanding. The attached log and other slideshow observations do not substitute for these checks.

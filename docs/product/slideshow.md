@@ -222,3 +222,11 @@ If the document becomes hidden, autoplay pauses and the active timer is preserve
 - Automatically supporting unsaved/transient Smart Collection previews.
 - Treating the read-only slideshow library as an authentication/authorization boundary; the trusted-LAN application remains unauthenticated.
 - Preventing operating-system Home/app-switch/power/notification gestures; use OS app/screen pinning in addition to Protected slideshow when stronger containment is required.
+
+## Collection management
+
+Use **Full app → Manage collections** (`/slideshow-collections`) to find Smart, manual and Creative Collections and open their editors. The viewing library is reserved for playback, settings and preparation.
+
+To delete a Creative Collection in the existing application, open `/creative-collections`, choose its source Smart Collection, select the saved Creative Collection, and choose **Delete Creative Collection**. The management hub adds a direct link that selects the correct saved recipe. Deleting a Creative Collection deletes its recipe, not its source Smart Collection or the original photos.
+
+Manual collection editing lives in the full-app layout: rename, reorder, remove membership or delete the collection. Adding photos continues through a photo's Manual slideshow control. Running immutable slideshow sessions retain their snapshot; edits affect subsequent sessions.

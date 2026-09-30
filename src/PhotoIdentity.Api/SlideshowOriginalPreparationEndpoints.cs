@@ -138,24 +138,20 @@ public static class SlideshowOriginalPreparationEndpoints
         }
 
         int ready = 0;
-        foreach (AssetRevisionId revisionId in revisionIds)
-        {
-            CollectionOriginalAccessSnapshot? status = await originals.GetStatusAsync(
-                revisionId,
-                cancellationToken);
-            if (status?.State != CollectionOriginalAccessService.ReadyState)
+        await Parallel.ForEachAsync(
+            revisionIds,
+            new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = cancellationToken },
+            async (revisionId, token) =>
             {
-                return Results.Ok(new SlideshowOriginalRevalidationResponse(
-                    false,
-                    ready,
-                    revisionIds.Length));
-            }
-
-            ready++;
-        }
+                CollectionOriginalAccessSnapshot? status = await originals.GetStatusAsync(revisionId, token);
+                if (status?.State == CollectionOriginalAccessService.ReadyState)
+                {
+                    Interlocked.Increment(ref ready);
+                }
+            });
 
         return Results.Ok(new SlideshowOriginalRevalidationResponse(
-            true,
+            ready == revisionIds.Length,
             ready,
             revisionIds.Length));
     }

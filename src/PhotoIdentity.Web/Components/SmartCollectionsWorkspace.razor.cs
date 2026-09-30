@@ -15,6 +15,9 @@ public partial class SmartCollectionsWorkspace
     private static readonly JsonSerializerOptions NavigationJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Inject]
+    public SlideshowLibrarySessionState LibrarySession { get; set; } = default!;
+
+    [Inject]
     public HttpClient Http { get; set; } = default!;
 
     [Inject]
@@ -326,6 +329,7 @@ public partial class SmartCollectionsWorkspace
             SmartCollectionDefinitionResponse saved =
                 await response.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException("The saved collection response was empty.");
+            LibrarySession.InvalidateCover(saved.Id);
             ApplyDefinition(saved);
             await RefreshDefinitionsAsync();
             await LoadCreativeRecipeAsync();
@@ -670,6 +674,7 @@ public partial class SmartCollectionsWorkspace
                 return;
             }
 
+            LibrarySession.InvalidateCover(definition.Id);
             if (string.Equals(EditingId, definition.Id, StringComparison.Ordinal))
             {
                 ResetEditor();
