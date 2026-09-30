@@ -18,7 +18,7 @@ Current work items: **13**. Archived terminal items: **156**.
 | [WI-0167](../work-items/WI-0167-onedrive-slideshow-availability.md) Fail best-quality slideshow preparation when OneDrive is unavailable | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0167.yaml) |
 | [WI-0168](../work-items/WI-0168-pwa-slideshow-navigation.md) Add bidirectional navigation between Slideshows and the full PWA | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0168.yaml) |
 | [WI-0169](../work-items/WI-0169-creative-collection-scale.md) Bound Creative Collection materialization for large Broad selections | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0169.yaml) |
-| [WI-0170](../work-items/WI-0170-review-queue-refill.md) Bound review queue refill and show bulk face decisions promptly | M34 | ready | unassigned | [YAML](work-items/active/WI-0170.yaml) |
+| [WI-0170](../work-items/WI-0170-review-queue-refill.md) Bound review queue refill and show bulk face decisions promptly | M34 | in_review | ai-agent | [YAML](work-items/active/WI-0170.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 

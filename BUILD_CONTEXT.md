@@ -16,10 +16,16 @@ M23 Source-copy lifecycle and privacy exclusion is completed. M26, M28, M29 and 
 
 ## Next concrete step
 
-For WI-0169, run/confirm PR #468 CI and then reproduce the maintainer's roughly 1,000-anchor / target-150 / Broad case twice on the maintained archive, recording the aggregate Creative materialization timing line and confirming the second run reuses cached visual evidence. Verify the phone/PWA Working/error behavior. Keep WI-0169 in review until those archive-scale checks are accepted. Continue WI-0167 maintained Windows/phone acceptance and WI-0163 metadata-enrichment verification independently.
+WI-0170 review-queue refill implementation is ready for CI and maintained Windows acceptance on branch `agent/wi-0170-review-queue-refill`. Verify bulk Assign and Accept suggestions with 10 selected faces: committed success must appear independently of refill, and repeated/overlapping pages must stop with Reload queue rather than causing a request storm. Use the canonical WI-0170 document for separate commit/refill timing and stale-load checks. Keep it in review until private-catalogue acceptance is recorded.
+
+Continue the independent WI-0169 archive-scale Creative, WI-0167 Windows/phone and WI-0163 metadata-enrichment verification from their canonical work items.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0170-review-queue-refill.md
+- docs/delivery/status/work-items/active/WI-0170.yaml
+- src/PhotoIdentity.Web/Components/ReviewWorkspace.razor
+- tests/PhotoIdentity.Integration.Tests/ReviewWorkspacePagingTests.cs
 - docs/delivery/work-items/WI-0169-creative-collection-scale.md
 - docs/delivery/status/work-items/active/WI-0169.yaml
 - src/PhotoIdentity.Api/CreativeCollectionMaterializationService.cs

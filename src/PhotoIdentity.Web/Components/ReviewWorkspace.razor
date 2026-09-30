@@ -1,4 +1,5 @@
 @using System.Net.Http.Json
+@implements IDisposable
 @inject HttpClient Http
 
 <PageTitle>Review faces · Photo Identity</PageTitle>
@@ -32,7 +33,7 @@
     @foreach ((string Value, string Label) filter in StateFilters)
     {
         <button class="filter-tab @(State == filter.Value ? "active" : "")"
-                disabled="@Loading"
+                disabled="@(Loading || BulkBusy)"
                 @onclick="() => ChangeStateAsync(filter.Value)">
             @filter.Label
         </button>
@@ -57,7 +58,7 @@
             <select id="review-run"
                     @bind="SelectedRunIndex"
                     @bind:after="ApplyRunAsync"
-                    disabled="@(Loading || Options.ProcessingRuns.Count == 0)">
+                    disabled="@(Loading || BulkBusy || Options.ProcessingRuns.Count == 0)">
                 <option value="">All processing runs</option>
                 @for (int index = 0; index < Options.ProcessingRuns.Count; index++)
                 {
@@ -72,7 +73,7 @@
             <select id="review-model"
                     @bind="SelectedModelIndex"
                     @bind:after="ApplyModelAsync"
-                    disabled="@(Loading || Options.ModelRevisions.Count == 0)">
+                    disabled="@(Loading || BulkBusy || Options.ModelRevisions.Count == 0)">
                 <option value="">No suggestion context</option>
                 @for (int index = 0; index < Options.ModelRevisions.Count; index++)
                 {
@@ -85,14 +86,14 @@
         <ReviewSuggestedPersonPicker People="People"
                                      SelectedPersonId="@SuggestedPersonId"
                                      SelectedPersonIdChanged="ChangeSuggestedPersonAsync"
-                                     Disabled="@(Loading || SelectedModel is null)" />
+                                     Disabled="@(Loading || BulkBusy || SelectedModel is null)" />
 
         <div>
             <label class="field-label" for="review-confidence-group">Confidence group</label>
             <select id="review-confidence-group"
                     @bind="ConfidenceGroup"
                     @bind:after="ApplyFiltersAsync"
-                    disabled="@(Loading || SelectedModel is null)">
+                    disabled="@(Loading || BulkBusy || SelectedModel is null)">
                 @foreach ((string Value, string Label) option in ConfidenceFilters)
                 {
                     <option value="@option.Value">@option.Label</option>
@@ -105,7 +106,7 @@
             <select id="review-sort"
                     @bind="Sort"
                     @bind:after="ApplyFiltersAsync"
-                    disabled="@Loading">
+                    disabled="@(Loading || BulkBusy)">
                 @foreach ((string Value, string Label, bool RequiresModel) option in SortOptions)
                 {
                     <option value="@option.Value" disabled="@(option.RequiresModel && SelectedModel is null)">
@@ -124,6 +125,19 @@
 @if (!string.IsNullOrWhiteSpace(Message))
 {
     <div class="notice success" role="status">@Message</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(QueueNotice))
+{
+    <div class="notice" role="status">
+        <span>@QueueNotice</span>
+        <button class="button secondary" disabled="@(Loading || LoadingMore || BulkBusy)"
+                @onclick="ReloadQueueAsync">Reload queue</button>
+    </div>
+}
+@if (BulkBusy)
+{
+    <div class="notice" role="status">Saving selected face decisions…</div>
 }
 
 @if (Faces.Count > 0)
@@ -205,7 +219,7 @@ else
                                Busy="false"
                                LoadMore="LoadMoreAsync" />
     }
-    else
+    else if (!PagingStopped)
     {
         <p class="end-of-queue">End of this queue.</p>
     }
@@ -276,6 +290,7 @@ else
 @code {
     private const int PageSize = 40;
     private const int MaximumInitialLoad = 200;
+    private const int MaximumPagesPerLoad = 5;
     private const string Actor = "local-reviewer";
     private const string CreatedSort = "created-desc";
     private const string DefaultSuggestionSort = "suggested-person";
@@ -337,6 +352,13 @@ else
     private string BulkNote { get; set; } = "";
     private string? SelectionAnchorFaceId { get; set; }
     private int Total { get; set; }
+    private int NextOffset { get; set; }
+    private bool PagingStopped { get; set; }
+    private string? QueueNotice { get; set; }
+    private CancellationTokenSource? FaceLoadCancellation;
+    private long FaceLoadGeneration;
+    private bool Disposed;
+    private Task RefillTask = Task.CompletedTask;
     private int ScrollGeneration { get; set; }
     private bool Loading { get; set; }
     private bool LoadingMore { get; set; }
@@ -387,7 +409,7 @@ else
 
     private int SelectedCount => SelectedFaceIds.Count;
     private int LoadedUnreviewedCount => Faces.Count(face => face.State == "unreviewed");
-    private bool HasMore => Faces.Count < Total;
+    private bool HasMore => !PagingStopped && NextOffset < Total;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -474,31 +496,45 @@ else
 
     private async Task LoadFacesAsync(bool reset, int targetCount = PageSize)
     {
+        if (Disposed || BulkBusy || (!reset && (Loading || LoadingMore || !HasMore)))
+        {
+            return;
+        }
+
+        CancelFaceLoad();
+        using CancellationTokenSource cancellation = new();
+        FaceLoadCancellation = cancellation;
+        long generation = FaceLoadGeneration;
         if (reset)
         {
             Loading = true;
+            Error = null;
             Faces.Clear();
             Total = 0;
+            NextOffset = 0;
+            PagingStopped = false;
             ResetBulkSelection();
         }
         else
         {
-            if (LoadingMore || !HasMore)
-            {
-                return;
-            }
             LoadingMore = true;
         }
 
-        Error = null;
+        QueueNotice = null;
         try
         {
-            do
+            for (int request = 0; request < MaximumPagesPerLoad; request++)
             {
                 int remaining = Math.Max(PageSize, targetCount - Faces.Count);
                 int limit = Math.Min(MaximumInitialLoad, remaining);
+                int offset = NextOffset;
                 ReviewFacePageResponse? page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
-                    BuildFacesApiUrl(Faces.Count, limit));
+                    BuildFacesApiUrl(offset, limit), cancellation.Token);
+                // Even a transport that ignores cancellation must not mutate a newer queue.
+                if (Disposed || generation != FaceLoadGeneration)
+                {
+                    return;
+                }
                 if (page is null)
                 {
                     throw new InvalidOperationException("The review queue response was empty.");
@@ -506,25 +542,71 @@ else
 
                 Total = page.Total;
                 HashSet<string> existingIds = Faces.Select(face => face.Id).ToHashSet(StringComparer.Ordinal);
+                int before = Faces.Count;
                 Faces.AddRange(page.Items.Where(face => existingIds.Add(face.Id)));
+                // The server offset counts returned rows, not the deduplicated cards.
+                NextOffset = checked(offset + page.Items.Count);
                 ScrollGeneration++;
 
-                if (Faces.Count >= targetCount || Faces.Count >= Total || page.Items.Count == 0)
+                if (page.Items.Count == 0 && offset >= Total)
                 {
-                    break;
+                    return;
+                }
+                if (page.Items.Count == 0 || Faces.Count == before)
+                {
+                    StopPaging("Queue loading paused because the page added no new faces. Reload the queue to refresh its order.");
+                    return;
+                }
+                if (Faces.Count >= targetCount || !HasMore)
+                {
+                    return;
                 }
             }
-            while (true);
+
+            StopPaging("Queue loading paused after several overlapping pages. Reload the queue to refresh its order.");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
-            Error = $"The review queue could not be loaded: {exception.Message}";
+            if (!Disposed && generation == FaceLoadGeneration)
+            {
+                StopPaging($"The queue could not be refreshed. Any saved decisions remain saved. Reload the queue to try again. {exception.Message}");
+            }
         }
         finally
         {
-            Loading = false;
-            LoadingMore = false;
+            if (!Disposed && generation == FaceLoadGeneration)
+            {
+                FaceLoadCancellation = null;
+                Loading = false;
+                LoadingMore = false;
+            }
         }
+    }
+
+    private void StopPaging(string notice)
+    {
+        PagingStopped = true;
+        QueueNotice = notice;
+    }
+
+    private Task ReloadQueueAsync() => LoadFacesAsync(reset: true);
+
+    private void CancelFaceLoad()
+    {
+        FaceLoadGeneration++;
+        FaceLoadCancellation?.Cancel();
+        FaceLoadCancellation = null;
+        Loading = false;
+        LoadingMore = false;
+    }
+
+    public void Dispose()
+    {
+        Disposed = true;
+        CancelFaceLoad();
     }
 
     private string BuildFacesApiUrl(int offset, int limit)
@@ -746,6 +828,7 @@ else
 
         string[] faceIds = SelectedFaceIds.OrderBy(value => value, StringComparer.Ordinal).ToArray();
         int desiredLoaded = Faces.Count;
+        CancelFaceLoad();
         BulkBusy = true;
         Error = null;
         Message = null;
@@ -753,7 +836,9 @@ else
         {
             if (action == AcceptSuggestionsAction)
             {
-                await ExecuteSuggestionBulkAsync(faceIds, desiredLoaded);
+                await ExecuteSuggestionBulkAsync(faceIds);
+                BulkBusy = false;
+                StartRefill(desiredLoaded);
                 return;
             }
 
@@ -801,7 +886,8 @@ else
                 UnknownAction => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as Unknown.",
                 _ => $"Assigned {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} to {assignedPerson?.DisplayName}.",
             };
-            await BackfillAfterBulkAsync(desiredLoaded);
+            BulkBusy = false;
+            StartRefill(desiredLoaded);
         }
         catch (Exception exception)
         {
@@ -813,7 +899,7 @@ else
         }
     }
 
-    private async Task ExecuteSuggestionBulkAsync(string[] faceIds, int desiredLoaded)
+    private async Task ExecuteSuggestionBulkAsync(string[] faceIds)
     {
         ReviewModelRevisionFilterResponse model = SelectedModel
             ?? throw new InvalidOperationException("A suggestion model is required.");
@@ -854,7 +940,6 @@ else
         ApplyCommittedFaces(faceIds, AssignAction, result.Person);
         BulkNote = "";
         Message = $"Accepted {result.AffectedCount} suggestion{(result.AffectedCount == 1 ? "" : "s")} for {result.Person.DisplayName}.";
-        await BackfillAfterBulkAsync(desiredLoaded);
     }
 
     private static void RequireExactPreview(int affectedCount, int skippedCount, int selectedCount)
@@ -876,6 +961,7 @@ else
         {
             int removed = Faces.RemoveAll(face => affected.Contains(face.Id));
             Total = Math.Max(0, Total - removed);
+            NextOffset = Math.Max(0, NextOffset - removed);
         }
         else
         {
@@ -901,19 +987,28 @@ else
         ScrollGeneration++;
     }
 
-    private async Task BackfillAfterBulkAsync(int desiredLoaded)
+    private void StartRefill(int desiredLoaded)
     {
-        if (State != "unreviewed" || !HasMore || Faces.Count >= desiredLoaded)
+        if (Disposed || !HasMore || Faces.Count >= desiredLoaded)
         {
             return;
         }
+        RefillTask = RefillAndRenderAsync(Math.Min(desiredLoaded, MaximumInitialLoad));
+    }
 
-        await LoadFacesAsync(reset: false, targetCount: Math.Min(desiredLoaded, MaximumInitialLoad));
+    private async Task RefillAndRenderAsync(int desiredLoaded)
+    {
+        await LoadFacesAsync(reset: false, targetCount: desiredLoaded);
+        if (!Disposed)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task AcceptSuggestionAsync((string FaceId, long SuggestionId) request)
     {
         int desiredLoaded = Faces.Count;
+        CancelFaceLoad();
         Error = null;
         Message = null;
         try
@@ -929,7 +1024,7 @@ else
                 People.FirstOrDefault(candidate => candidate.Id == accepted.Person.Id) ?? accepted.Person;
             ApplySingleFaceDecision(request.FaceId, "assigned", person, topSuggestion: null);
             Message = "Suggestion accepted.";
-            await BackfillAfterSingleAsync(desiredLoaded);
+            StartRefill(desiredLoaded);
         }
         catch (Exception exception)
         {
@@ -970,6 +1065,7 @@ else
     private async Task UndoAsync(string faceId)
     {
         int desiredLoaded = Faces.Count;
+        CancelFaceLoad();
         Error = null;
         Message = null;
         try
@@ -981,7 +1077,7 @@ else
             ReviewFaceResponse refreshed = await LoadSingleFaceAsync(faceId);
             ReconcileSingleFace(refreshed);
             Message = "Latest review action undone.";
-            await BackfillAfterSingleAsync(desiredLoaded);
+            StartRefill(desiredLoaded);
         }
         catch (Exception exception)
         {
@@ -998,6 +1094,7 @@ else
         string successMessage)
     {
         int desiredLoaded = Faces.Count;
+        CancelFaceLoad();
         Error = null;
         Message = null;
         try
@@ -1006,7 +1103,7 @@ else
             await RequireSuccessAsync(response);
             ApplySingleFaceDecision(faceId, state, person);
             Message = successMessage;
-            await BackfillAfterSingleAsync(desiredLoaded);
+            StartRefill(desiredLoaded);
         }
         catch (Exception exception)
         {
@@ -1058,6 +1155,7 @@ else
         {
             Faces.RemoveAt(index);
             Total = Math.Max(0, Total - 1);
+            NextOffset = Math.Max(0, NextOffset - 1);
             SelectedFaceIds.Remove(updated.Id);
             if (SelectionAnchorFaceId == updated.Id)
             {
@@ -1138,16 +1236,6 @@ else
                 top.GeneratedAtUtc,
                 confidenceGroup),
         };
-    }
-
-    private async Task BackfillAfterSingleAsync(int desiredLoaded)
-    {
-        if (!HasMore || Faces.Count >= desiredLoaded)
-        {
-            return;
-        }
-
-        await LoadFacesAsync(reset: false, targetCount: Math.Min(desiredLoaded, MaximumInitialLoad));
     }
 
     private static string PersonLabel(ReviewPersonResponse person) =>

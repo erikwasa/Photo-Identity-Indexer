@@ -57,10 +57,30 @@ Automated verification is required at the lowest practical layer: deterministic 
 
 Human verification is required on the maintained Windows catalogue for both bulk actions, with representative queue ordering and background regeneration where applicable. Record bounded request counts and separate commit/refill duration, using aggregate diagnostics without private identifiers.
 
-Run relevant builds/tests and PhotoIdentity.Docs validate plus generate --check. This tracking change does not implement the fix.
+Run relevant builds/tests and PhotoIdentity.Docs validate plus generate --check.
+
+## Implementation and verification evidence — 2026-09-30
+
+- ReviewWorkspace now counts paging progress separately from displayed unique cards. Overlapping responses advance by returned row count, and removals decrement the cursor for the changed queue membership.
+- A nonempty page adding zero faces, an empty page inconsistent with the total, or five partial/overlapping requests pauses loading with an explicit Reload queue action. Normal exhaustion does not show a warning. Pausing disables automatic scroll requests; it does not silently claim the queue is complete.
+- Bulk Assign and Accept suggestions complete their commit event before refill finishes. Success and cleared selection render immediately; refill has a separate loading state and failures preserve committed success. Single-face decisions reuse the same bounded refill path.
+- Loads use cancellation plus a generation guard; newer filters, decisions and component disposal invalidate older responses. Concurrent initial/load-more requests are suppressed. Bulk preview/commit and canonical audit/undo contracts are unchanged.
+- Server investigation: identity_suggestion_rankings has a primary key on face/model/hash/rank, and gallery order ends with face ID. No duplicate-row or unstable tie-breaker defect was reproduced, so no persistence change or migration was introduced. Live regeneration/review can still shift an offset-based queue; this implementation bounds that behavior rather than claiming snapshot pagination.
+- Added 11 deterministic component tests in ReviewWorkspacePagingTests. They exercise the actual component and event rendering using a small renderer and controlled HTTP responses, without an API host, PostgreSQL, production workers or browser. Coverage includes duplicate-only/overlapping/empty pages, the request budget, both bulk actions with delayed/failed refill, concurrent load suppression, reset and disposal.
+- Web build passed with zero warnings/errors. Filtered component tests passed: 11/11, approximately 1.23 seconds total test-run time on this Linux workspace. The existing integration assembly and required CI gate are unchanged.
+- Remaining acceptance: repository CI and maintained Windows/private-catalogue verification below. Do not mark completed from deterministic fixtures alone.
+
+## Maintained Windows verification
+
+1. Open the review queue with the suggestion ordering used for the reported delay. Select 10 faces and use Accept suggestions; separately verify Assign on an appropriate selection.
+2. Confirm Saving feedback appears during the request, success appears when commit finishes, selected faces are reconciled, and refill is visibly separate. Inspect browser Network timings for preview, commit and refill separately.
+3. Confirm stdout no longer contains hundreds of consecutive requests at the same offset. If the queue shifts during background regeneration, loading must stop with Reload queue after no progress or the bounded request budget.
+4. Change filters during refill and navigate away/back. Verify older pages do not populate the new queue. Check normal scroll, near-end loading and single-face decisions/undo.
+5. If refill fails after a successful commit, verify the success remains visible and Reload queue retries reading only; do not submit the same decision again to refresh the view.
 
 ## Completion notes
 
-- Status: ready; no prerequisites beyond the existing review workflow.
-- Investigation evidence: private maintainer report and aggregate stdout analysis, plus the missing no-progress guard in ReviewWorkspace.razor.
-- Deferred: implementation, deterministic regression tests and maintained-catalogue acceptance.
+- Files changed: ReviewWorkspace.razor, ReviewWorkspacePagingTests.cs, canonical WI-0170 lifecycle/documentation and generated status views, BUILD_CONTEXT.md.
+- Trade-off: offset paging under concurrent mutations remains a changing view. The component bounds recovery and offers explicit reload; a stable server snapshot/cursor contract is not introduced without a reproduced need.
+- Deferred: maintained Windows/private-catalogue acceptance and any separately reproduced server ordering/count defect.
+- Commands run: web build; filtered ReviewWorkspacePagingTests; PhotoIdentity.Docs show, review, generate, validate and generate --check.
