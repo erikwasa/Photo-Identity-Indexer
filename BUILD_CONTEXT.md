@@ -14,6 +14,8 @@ WI-0163 bulk enrichment remains independently in progress on `agent/wi-0163-bulk
 
 ## Next concrete step
 
+WI-0170 is in review on PR #471. Verify bulk Assign and Accept suggestions with 10 selected faces on the maintained Windows catalogue: committed success must appear independently of refill, and repeated/overlapping pages must stop with Reload queue rather than causing a request storm. Record separate commit/refill timing and stale-load behavior using the canonical WI-0170 document.
+
 Check the follow-up PR's CI, then retest the 53-photo manual preparation twice (cloud-only vs already local), Prepared after exit/reload/invalidation, and the ~1,000-anchor Broad/150 Creative preview twice in the same process. For another timeout capture the new phase/final diagnostics. Test cached library returns and the management hub on desktop/phone. Reproduce WI-0171 with phone/browser details, screenshot/video, same-photo proxy/original comparison, and paused/moving/fading state. Continue WI-0167 OneDrive-unavailable acceptance independently.
 
 ## Relevant pointers
