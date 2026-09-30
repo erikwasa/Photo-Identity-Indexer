@@ -12,7 +12,7 @@ public partial class Slideshows : IAsyncDisposable
     internal const string PreparationBookmarksStorageKey =
         "photoidentity.slideshow.library.preparations.v2";
     internal const string PreparationReceiptsStorageKey =
-        "photoidentity.slideshow.library.prepared.v1";
+        SlideshowPreparationReceiptStore.StorageKey;
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(750);
 
@@ -29,6 +29,9 @@ public partial class Slideshows : IAsyncDisposable
     private readonly HashSet<string> _starting =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _lifetime = new();
+
+    [Inject]
+    public SlideshowLibrarySessionState Session { get; set; } = default!;
 
     [Inject]
     public HttpClient Http { get; set; } = default!;
@@ -83,7 +86,11 @@ public partial class Slideshows : IAsyncDisposable
 
     private async Task LoadCollectionsAsync()
     {
-        Loading = true;
+        if (Session.SmartCollections is not null && Session.ManualCollections is not null)
+        {
+            ApplyCollections(Session.SmartCollections, Session.ManualCollections);
+        }
+        Loading = Session.SmartCollections is null;
         Error = null;
         try
         {
@@ -112,24 +119,9 @@ public partial class Slideshows : IAsyncDisposable
                 }
             }
 
-            Collections = smartCollections
-                .Select(collection => new SlideshowLibraryEntry(
-                    collection.Id,
-                    collection.Name,
-                    Manual: false,
-                    CoverRevisionId: null,
-                    RevisionIds: [],
-                    PhotoCount: null))
-                .Concat(manualCollections.Select(collection => new SlideshowLibraryEntry(
-                    collection.Id,
-                    collection.Name,
-                    Manual: true,
-                    CoverRevisionId: collection.RevisionIds.FirstOrDefault(),
-                    RevisionIds: collection.RevisionIds,
-                    PhotoCount: SlideshowLibraryPresentation.ManualPhotoCount(collection))))
-                .OrderBy(collection => collection.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(collection => collection.Id, StringComparer.Ordinal)
-                .ToArray();
+            Session.SmartCollections = smartCollections;
+            Session.ManualCollections = manualCollections;
+            ApplyCollections(smartCollections, manualCollections);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -142,6 +134,30 @@ public partial class Slideshows : IAsyncDisposable
         {
             Loading = false;
         }
+    }
+
+    private void ApplyCollections(
+        SlideshowLibraryCollectionResponse[] smartCollections,
+        PhotoListCollectionResponse[] manualCollections)
+    {
+        Collections = smartCollections
+            .Select(collection => new SlideshowLibraryEntry(
+                collection.Id,
+                collection.Name,
+                Manual: false,
+                CoverRevisionId: null,
+                RevisionIds: [],
+                PhotoCount: null))
+            .Concat(manualCollections.Select(collection => new SlideshowLibraryEntry(
+                collection.Id,
+                collection.Name,
+                Manual: true,
+                CoverRevisionId: collection.RevisionIds.FirstOrDefault(),
+                RevisionIds: collection.RevisionIds,
+                PhotoCount: SlideshowLibraryPresentation.ManualPhotoCount(collection))))
+            .OrderBy(collection => collection.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(collection => collection.Id, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private async Task ChangeSettingsAsync(SlideshowSettings settings)

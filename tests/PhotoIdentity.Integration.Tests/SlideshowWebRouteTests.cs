@@ -37,6 +37,21 @@ public sealed class SlideshowWebRouteTests
     }
 
     [Fact]
+    public void Collection_management_and_manual_editing_use_the_full_application_layout()
+    {
+        foreach (Type page in new[] { typeof(SlideshowCollections), typeof(ManualCollection) })
+        {
+            LayoutAttribute layout = page.GetCustomAttributes(typeof(LayoutAttribute), inherit: true)
+                .Cast<LayoutAttribute>().Single();
+            Assert.Equal(typeof(MainLayout), layout.LayoutType);
+        }
+        Assert.Contains(
+            typeof(SlideshowCollections).GetCustomAttributes(typeof(RouteAttribute), inherit: true)
+                .Cast<RouteAttribute>(),
+            route => route.Template == "/slideshow-collections");
+    }
+
+    [Fact]
     public void App_surface_navigation_targets_stay_inside_the_installed_pwa_scope()
     {
         Assert.Equal("/", AppSurfaceNavigation.FullAppPath);

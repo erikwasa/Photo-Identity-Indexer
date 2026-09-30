@@ -1,6 +1,6 @@
 @using System.Net.Http.Json
 @using PhotoIdentity.Web.Contracts
-@inject HttpClient Http
+@inject SlideshowLibrarySessionState Session
 @implements IAsyncDisposable
 
 <div class="slideshow-library-cover" aria-hidden="true">
@@ -55,7 +55,7 @@
             if (!string.IsNullOrWhiteSpace(CoverRevisionId))
             {
                 _coverUrl =
-                    $"/api/collections/photos/{Uri.EscapeDataString(CoverRevisionId)}/viewer-preview";
+                    $"/api/collections/photos/{Uri.EscapeDataString(CoverRevisionId)}/thumbnail";
             }
 
             return;
@@ -63,9 +63,13 @@
 
         try
         {
-            SmartCollectionPageResponse? page = await Http.GetFromJsonAsync<SmartCollectionPageResponse>(
-                $"api/smart-collections/{Uri.EscapeDataString(CollectionId)}/query?offset=0&limit=1",
-                _lifetime.Token);
+            SmartCollectionPageResponse? cached = Session.CachedCover(CollectionId);
+            if (cached is not null)
+            {
+                _coverUrl = SlideshowLibraryPresentation.SelectCoverThumbnailUrl(cached);
+                await PhotoCountChanged.InvokeAsync(SlideshowLibraryPresentation.SmartPhotoCount(cached));
+            }
+            SmartCollectionPageResponse? page = await Session.GetCoverAsync(CollectionId, _lifetime.Token);
             _coverUrl = SlideshowLibraryPresentation.SelectCoverThumbnailUrl(page);
             await PhotoCountChanged.InvokeAsync(SlideshowLibraryPresentation.SmartPhotoCount(page));
         }
@@ -74,7 +78,10 @@
         }
         catch
         {
-            await PhotoCountChanged.InvokeAsync(null);
+            if (_coverUrl is null)
+            {
+                await PhotoCountChanged.InvokeAsync(null);
+            }
             // Covers and counts are decorative. A failed query keeps the card playable and the
             // stable neutral cover fallback.
         }

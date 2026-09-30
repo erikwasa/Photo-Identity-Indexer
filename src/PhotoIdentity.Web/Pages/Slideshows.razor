@@ -11,6 +11,14 @@
     </div>
 </section>
 
+@if (!string.IsNullOrWhiteSpace(Error) && Collections.Count > 0)
+{
+    <div class="notice error" role="alert">
+        @Error
+        <button type="button" class="button secondary" @onclick="LoadCollectionsAsync">Retry refresh</button>
+    </div>
+}
+
 @if (Loading)
 {
     <section class="slideshow-library-state" role="status">
@@ -18,7 +26,7 @@
         <p>Finding your slideshows…</p>
     </section>
 }
-else if (!string.IsNullOrWhiteSpace(Error))
+else if (!string.IsNullOrWhiteSpace(Error) && Collections.Count == 0)
 {
     <section class="slideshow-library-state" role="alert">
         <strong>Slideshows could not be loaded</strong>
@@ -49,7 +57,7 @@ else
                 ? SlideshowLibraryPresentation.PhotoCountLabel(photoCount.Value)
                 : null;
 
-            <article class="slideshow-library-card">
+            <article @key="collection.Id" class="slideshow-library-card">
                 <button type="button"
                         class="slideshow-library-primary"
                         disabled="@busy"
@@ -105,13 +113,7 @@ else
                         </span>
                     </span>
                 </button>
-                @if (collection.Manual)
-                {
-                    <a class="slideshow-library-review"
-                       href="@($"/manual-collections/{collection.Id}")">
-                        Review photos
-                    </a>
-                }
+
             </article>
         }
     </section>
@@ -221,5 +223,5 @@ else
 
 <section class="slideshow-library-boundary">
     <strong>Viewing only</strong>
-    <p>Slideshow playback does not edit Smart Collections or photo metadata. Manual slideshow membership is edited only through its Review photos view or a photo's Manual slideshow control. Creative Collection recipes are edited from Smart Collections.</p>
+    <p>To edit or delete collections, open Full app and choose Manage collections. This space is for viewing slideshows.</p>
 </section>

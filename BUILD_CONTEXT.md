@@ -1,41 +1,30 @@
 # Build context
 
-This file is intentionally a short handoff for the next development or verification session. Formal work-item lifecycle status is resolved through `PhotoIdentity.Docs`.
+Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read only the target shard and linked work-item document before continuing.
 
 ## Current focus
 
-**WI-0163 Add safe bulk capture-date and Place enrichment remains in progress under M31. WI-0169 Creative Collection scaling is in review under M32 on PR #468. WI-0167 OneDrive-unavailable slideshow recovery remains in review after PR #467 merged, pending maintained Windows/phone acceptance. WI-0168 PWA slideshow navigation is also in review under M32. WI-0166 and M33 Archive synchronization performance are completed after maintainer archive-scale acceptance.**
+Maintainer M32 acceptance (2026-09-30 Europe/Stockholm) accepted WI-0168 navigation, left WI-0167 untested, and failed WI-0165 player preparation continuity (53 photos, 3m20s) and WI-0169 Broad/150 preview (~60s HTTP 503). The private stdout log has no completed Creative phase summary; a particular bottleneck is not established.
 
-WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`; continue its production-catalogue dry-run/apply verification from the canonical work-item shard.
+PR #470 (`agent/slideshow-acceptance-followups`) implements the WI-0165 receipt write and bounded local verification; WI-0169 worker dispatch, shared hash gate and cancellation-surviving phase diagnostics; WI-0173 browser-session card/cover reuse; and WI-0172 separate full-app collection management. These items remain in review pending CI and maintained-machine acceptance. WI-0171 tracks the unconfirmed phone grid-like rendering artifact and remains ready for reproduction. WI-0168 is completed from the maintainer's explicit acceptance.
 
-WI-0169 removes the dominant unbounded visual-evidence work from Creative materialization. Candidates that cannot form an accepted same-moment <=20-second visual group are not hashed; remaining durable review-proxy hashes are cached by immutable revision + proxy content hash + visual algorithm version. Proxy/exclusion resolution is set-oriented, hash concurrency is bounded to 4–12 workers, and aggregate phase diagnostics are path-free. Preview/snapshot requests now have a 60-second server deadline and the Creative workspace visibly reports Working state instead of appearing frozen.
+WI-0170/M34 review-queue refill remains ready independently; slideshow caching is WI-0173 after resolving the ID collision with PR #469.
 
-WI-0167 adds a bounded Windows OneDrive-client absence signal only when hydration is needed. Already-local originals do not depend on OneDrive process availability. A cloud-only best-quality preparation enters an actionable `onedrive-unavailable` recovery state instead of remaining indefinitely at `0 / N`; Retry preserves the immutable slideshow session and can reassert Photo-Identity-owned in-flight hydration after OneDrive starts. Active/unknown but slow downloads retain the existing no-progress recovery. Maintainer acceptance remains outstanding.
-
-M23 Source-copy lifecycle and privacy exclusion is completed. M26, M28, M29 and M33 are completed. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+WI-0163 bulk enrichment remains independently in progress on `agent/wi-0163-bulk-metadata-enrichment`. Do not change its state as part of slideshow work. M30 video support remains blocked.
 
 ## Next concrete step
 
-WI-0170 review-queue refill implementation is ready for CI and maintained Windows acceptance on branch `agent/wi-0170-review-queue-refill`. Verify bulk Assign and Accept suggestions with 10 selected faces: committed success must appear independently of refill, and repeated/overlapping pages must stop with Reload queue rather than causing a request storm. Use the canonical WI-0170 document for separate commit/refill timing and stale-load checks. Keep it in review until private-catalogue acceptance is recorded.
+WI-0170 is in review on PR #471. Verify bulk Assign and Accept suggestions with 10 selected faces on the maintained Windows catalogue: committed success must appear independently of refill, and repeated/overlapping pages must stop with Reload queue rather than causing a request storm. Record separate commit/refill timing and stale-load behavior using the canonical WI-0170 document.
 
-Continue the independent WI-0169 archive-scale Creative, WI-0167 Windows/phone and WI-0163 metadata-enrichment verification from their canonical work items.
+Check the follow-up PR's CI, then retest the 53-photo manual preparation twice (cloud-only vs already local), Prepared after exit/reload/invalidation, and the ~1,000-anchor Broad/150 Creative preview twice in the same process. For another timeout capture the new phase/final diagnostics. Test cached library returns and the management hub on desktop/phone. Reproduce WI-0171 with phone/browser details, screenshot/video, same-photo proxy/original comparison, and paused/moving/fading state. Continue WI-0167 OneDrive-unavailable acceptance independently.
 
-## Relevant files
+## Relevant pointers
 
-- docs/delivery/work-items/WI-0170-review-queue-refill.md
-- docs/delivery/status/work-items/active/WI-0170.yaml
-- src/PhotoIdentity.Web/Components/ReviewWorkspace.razor
-- tests/PhotoIdentity.Integration.Tests/ReviewWorkspacePagingTests.cs
+- docs/delivery/work-items/WI-0165-slideshow-library-status-counts.md
 - docs/delivery/work-items/WI-0169-creative-collection-scale.md
-- docs/delivery/status/work-items/active/WI-0169.yaml
-- src/PhotoIdentity.Api/CreativeCollectionMaterializationService.cs
-- src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs
-- src/PhotoIdentity.Api/CreativeVisualFingerprintCache.cs
-- src/PhotoIdentity.Api/CollectionReviewProxyFileResolver.cs
-- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor
-- tests/PhotoIdentity.Integration.Tests/CreativeCollectionMaterializationOptimizationTests.cs
-- docs/delivery/work-items/WI-0167-onedrive-slideshow-availability.md
-- docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
+- docs/delivery/work-items/WI-0173-slideshow-library-navigation-cache.md
+- docs/delivery/work-items/WI-0171-phone-slideshow-grid-artifacts.md
+- docs/delivery/work-items/WI-0172-slideshow-collection-management.md
 
 ## Repository validation
 

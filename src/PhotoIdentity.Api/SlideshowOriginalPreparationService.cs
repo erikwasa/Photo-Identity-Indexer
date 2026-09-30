@@ -277,6 +277,22 @@ public sealed class SlideshowOriginalPreparationService
                 bool restartAfterRetry = false;
                 bool reassertManagedHydration = session.ReassertHydrationRequested;
 
+                // Inspect/verify a bounded batch concurrently. The previous serial scan delayed
+                // every hydration request behind all remaining local-file hashes. Admission and
+                // pin requests below remain serialized through the existing capacity policy.
+                ConcurrentDictionary<AssetRevisionId, CollectionOriginalAccessSnapshot?> statuses = new();
+                await Parallel.ForEachAsync(
+                    session.Revisions.Where(revision => !ready.Contains(revision.RevisionId)),
+                    new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = 4,
+                        CancellationToken = session.Cancellation.Token,
+                    },
+                    async (revision, token) =>
+                    {
+                        statuses[revision.RevisionId] = await _originals.GetStatusAsync(revision.RevisionId, token);
+                    });
+
                 foreach (AssetRevisionLookup revision in session.Revisions)
                 {
                     if (ready.Contains(revision.RevisionId))
@@ -284,9 +300,7 @@ public sealed class SlideshowOriginalPreparationService
                         continue;
                     }
 
-                    CollectionOriginalAccessSnapshot? status = await _originals.GetStatusAsync(
-                        revision.RevisionId,
-                        session.Cancellation.Token);
+                    CollectionOriginalAccessSnapshot? status = statuses[revision.RevisionId];
                     if (status is null)
                     {
                         session.Fail(

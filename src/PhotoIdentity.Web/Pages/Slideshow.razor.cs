@@ -1101,6 +1101,11 @@ public partial class Slideshow : IAsyncDisposable
             case "ready":
                 if (!_preparedOriginalsReady)
                 {
+                    if (!Creative && Snapshot is not null)
+                    {
+                        await SlideshowPreparationReceiptStore.RecordAsync(
+                            JS, CollectionId.ToString("D"), Snapshot);
+                    }
                     _preparedOriginalsReady = true;
                     ImageError = null;
                     await UpdatePrefetchAsync();

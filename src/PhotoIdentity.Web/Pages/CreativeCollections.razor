@@ -15,7 +15,7 @@
             <h2 id="creative-collections-heading">Named creative slideshows</h2>
             <p>Create several independent Creative Collections from the same Smart Collection and tune each recipe separately.</p>
         </div>
-        <a class="button secondary" href="/slideshows">View slideshows</a>
+        <a class="button secondary" href="/slideshow-collections">All collections</a>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(Error))
@@ -137,9 +137,13 @@
                     Each named Creative Collection owns these settings independently. The source Smart Collection remains unchanged and supplies the exact anchor photos.
                 </p>
 
+                @if (Busy)
+                {
+                    <p role="status" aria-live="polite">Working… Preparing the Creative Collection.</p>
+                }
                 <div class="smart-actions">
                     <button type="button" class="button secondary" disabled="@Busy" @onclick="PreviewAsync">
-                        Preview current recipe
+                        @(Busy ? "Working…" : "Preview current recipe")
                     </button>
                     <button type="button" class="button secondary" disabled="@Busy" @onclick="SaveAsync">
                         Save Creative Collection
@@ -197,6 +201,9 @@
 </section>
 
 @code {
+    [SupplyParameterFromQuery(Name = "collection")]
+    public string? RequestedRecipeId { get; set; }
+
     private IReadOnlyList<SmartCollectionDefinitionResponse> SmartCollections { get; set; } = [];
     private IReadOnlyList<CreativeCollectionRecipeResponse> Recipes { get; set; } = [];
     private CreativeCollectionPreviewResponse? Preview { get; set; }
@@ -226,8 +233,17 @@
         try
         {
             await ReloadAsync();
-            SelectedAnchorId = SmartCollections.FirstOrDefault()?.Id;
-            NewRecipe();
+            CreativeCollectionRecipeResponse? requested = Recipes.FirstOrDefault(
+                recipe => string.Equals(recipe.Id, RequestedRecipeId, StringComparison.OrdinalIgnoreCase));
+            if (requested is not null)
+            {
+                SelectRecipe(requested);
+            }
+            else
+            {
+                SelectedAnchorId = SmartCollections.FirstOrDefault()?.Id;
+                NewRecipe();
+            }
         }
         catch (Exception exception)
         {
@@ -325,8 +341,14 @@
         try
         {
             string strength = Uri.EscapeDataString(ContextStrength);
-            Preview = await Http.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+            using HttpResponseMessage response = await Http.GetAsync(
                 $"api/smart-collections/{Uri.EscapeDataString(SelectedAnchorId!)}/creative-preview?targetCount={TargetCount}&momentGapMinutes=30&contextStrength={strength}&novelty={NoveltyEnabled.ToString().ToLowerInvariant()}");
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await ReadErrorAsync(response, "The Creative Collection preview could not be generated.");
+                return;
+            }
+            Preview = await response.Content.ReadFromJsonAsync<CreativeCollectionPreviewResponse>();
         }
         catch (Exception exception)
         {

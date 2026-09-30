@@ -1,10 +1,13 @@
 id: WI-0168
 title: Add bidirectional navigation between Slideshows and the full PWA
 milestone: M32
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0168-pwa-slideshow-navigation.md
 started_at: 2026-09-29
+completed_at: 2026-09-29
+verified_at: 2026-09-29
+verified_by: maintainer
 last_updated_at: 2026-09-29
 branch: agent/wi-0168-pwa-slideshow-navigation
 blockers:
@@ -13,3 +16,5 @@ blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/465
+- type: maintainer_verification
+  value: Maintainer reports WI-0168 works as expected, 2026-09-30 Europe/Stockholm
