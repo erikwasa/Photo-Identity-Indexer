@@ -332,7 +332,7 @@ milestones:
   - WI-0167
   - WI-0168
   - WI-0169
-  - WI-0170
+  - WI-0173
   - WI-0171
   - WI-0172
 - id: M33
@@ -341,3 +341,9 @@ milestones:
   document: ../milestones/M33-archive-synchronization-performance.md
   work_items:
   - WI-0166
+- id: M34
+  title: Review queue reliability
+  status: ready
+  document: ../milestones/M34-review-queue-reliability.md
+  work_items:
+  - WI-0170

@@ -6,7 +6,9 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read only the 
 
 Maintainer M32 acceptance (2026-09-30 Europe/Stockholm) accepted WI-0168 navigation, left WI-0167 untested, and failed WI-0165 player preparation continuity (53 photos, 3m20s) and WI-0169 Broad/150 preview (~60s HTTP 503). The private stdout log has no completed Creative phase summary; a particular bottleneck is not established.
 
-PR #470 (`agent/slideshow-acceptance-followups`) implements the WI-0165 receipt write and bounded local verification; WI-0169 worker dispatch, shared hash gate and cancellation-surviving phase diagnostics; WI-0170 browser-session card/cover reuse; and WI-0172 separate full-app collection management. These items remain in review pending CI and maintained-machine acceptance. WI-0171 tracks the unconfirmed phone grid-like rendering artifact and remains ready for reproduction. WI-0168 is completed from the maintainer's explicit acceptance.
+PR #470 (`agent/slideshow-acceptance-followups`) implements the WI-0165 receipt write and bounded local verification; WI-0169 worker dispatch, shared hash gate and cancellation-surviving phase diagnostics; WI-0173 browser-session card/cover reuse; and WI-0172 separate full-app collection management. These items remain in review pending CI and maintained-machine acceptance. WI-0171 tracks the unconfirmed phone grid-like rendering artifact and remains ready for reproduction. WI-0168 is completed from the maintainer's explicit acceptance.
+
+WI-0170/M34 review-queue refill remains ready independently; slideshow caching is WI-0173 after resolving the ID collision with PR #469.
 
 WI-0163 bulk enrichment remains independently in progress on `agent/wi-0163-bulk-metadata-enrichment`. Do not change its state as part of slideshow work. M30 video support remains blocked.
 
@@ -18,7 +20,7 @@ Check the follow-up PR's CI, then retest the 53-photo manual preparation twice (
 
 - docs/delivery/work-items/WI-0165-slideshow-library-status-counts.md
 - docs/delivery/work-items/WI-0169-creative-collection-scale.md
-- docs/delivery/work-items/WI-0170-slideshow-library-navigation-cache.md
+- docs/delivery/work-items/WI-0173-slideshow-library-navigation-cache.md
 - docs/delivery/work-items/WI-0171-phone-slideshow-grid-artifacts.md
 - docs/delivery/work-items/WI-0172-slideshow-collection-management.md
 

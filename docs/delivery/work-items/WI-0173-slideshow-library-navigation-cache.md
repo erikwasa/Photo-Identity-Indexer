@@ -1,5 +1,5 @@
 ---
-id: WI-0170
+id: WI-0173
 title: Reuse slideshow library cards and covers across navigation
 milestone: M32
 status_source: ../status/work-items.yaml
@@ -8,7 +8,7 @@ related_adrs: []
 affected_modules: [PhotoIdentity.Web, PhotoIdentity.Integration.Tests, docs]
 ---
 
-# WI-0170: Reuse slideshow library cards and covers across navigation
+# WI-0173: Reuse slideshow library cards and covers across navigation
 
 ## Objective and maintainer evidence
 
