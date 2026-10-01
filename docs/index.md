@@ -23,6 +23,7 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
 - [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
+- [Azure burst captioning](operations/azure-burst-captioning.md) — optional temporary Remote caption inference through an operator-controlled Azure GPU endpoint
 - [Historical SQLite persistence record — retired](operations/sqlite-persistence.md)
 
 ## Architecture
@@ -57,13 +58,14 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Candidate models](models/candidate-models.md)
 - [Model manifests and governance](models/model-governance.md)
 
-## Azure — historical reference
+## Azure
 
-- [Tenant and identity constraints](azure/constraints.md)
-- [Identity-free execution](azure/identity-free-execution.md)
-- [Cost controls](azure/cost-controls.md)
+- [Azure burst captioning](operations/azure-burst-captioning.md) — current optional operational use of ADR-0011 Remote caption inference
+- [Tenant and identity constraints](azure/constraints.md) — historical reference
+- [Identity-free execution](azure/identity-free-execution.md) — historical reference
+- [Cost controls](azure/cost-controls.md) — historical general reference
 
-Azure documentation is retained as historical design/reference material. [ADR-0010](decisions/ADR-0010-local-production-execution.md) establishes maintainer-controlled local hardware as the current production execution strategy; no active milestone depends on Azure.
+The older Azure design documents are retained as historical reference. [ADR-0010](decisions/ADR-0010-local-production-execution.md) keeps the maintainer-controlled Windows computer as the production authority. [ADR-0011](decisions/ADR-0011-operator-authorized-remote-caption-inference.md) adds only a narrow, explicit exception: an operator may temporarily send bounded caption thumbnails to an Ollama-compatible Remote HTTPS endpoint, including one hosted on Azure. No active milestone depends on Azure infrastructure itself.
 
 ## Delivery
 
