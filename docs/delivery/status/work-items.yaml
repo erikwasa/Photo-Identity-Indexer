@@ -83,18 +83,6 @@ work_items:
   - WI-0151
   blocker_notes: []
   evidence: []
-- id: WI-0163
-  title: Add safe bulk capture-date and Place enrichment
-  milestone: M31
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0163-bulk-metadata-enrichment.md
-  started_at: 2026-09-25
-  last_updated_at: 2026-09-25
-  branch: agent/wi-0163-bulk-metadata-enrichment
-  blockers: []
-  blocker_notes: []
-  evidence: []
 - id: WI-0165
   title: Show slideshow preparation state and photo counts in the library
   milestone: M32
@@ -114,55 +102,6 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/442
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
-- id: WI-0167
-  title: Fail best-quality slideshow preparation when OneDrive is unavailable
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0167-onedrive-slideshow-availability.md
-  started_at: 2026-09-29
-  last_updated_at: 2026-09-29
-  branch: agent/wi-0167-onedrive-slideshow-availability
-  blockers:
-  - WI-0093
-  - WI-0096
-  blocker_notes: []
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/467
-- id: WI-0169
-  title: Bound Creative Collection materialization for large Broad selections
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0169-creative-collection-scale.md
-  started_at: 2026-09-29
-  last_updated_at: 2026-09-29
-  branch: agent/slideshow-acceptance-followups
-  blockers:
-  - WI-0120
-  - WI-0121
-  - WI-0123
-  blocker_notes: []
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/468
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
-- id: WI-0170
-  title: Bound review queue refill and show bulk face decisions promptly
-  milestone: M34
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0170-review-queue-refill.md
-  started_at: 2026-09-30
-  last_updated_at: 2026-09-30
-  branch: agent/wi-0170-review-queue-refill
-  blockers: []
-  blocker_notes: []
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/471
 - id: WI-0171
   title: Diagnose thin grid-like lines during phone slideshow playback
   milestone: M32
@@ -179,35 +118,6 @@ work_items:
     value: '2026-10-01: Maintainer reproduced fixed-position thin grid seams in the installed PWA on a Google Pixel 9 Pro XL for some prepared originals; the seams were not seen on PC and flickered while playback motion was active. Private screenshots were supplied but are not committed.'
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/478
-- id: WI-0172
-  title: Provide a separate operator space for slideshow collection management
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0172-slideshow-collection-management.md
-  started_at: 2026-09-29
-  last_updated_at: 2026-09-29
-  branch: agent/slideshow-acceptance-followups
-  blockers: []
-  blocker_notes: []
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
-- id: WI-0173
-  title: Reuse slideshow library cards and covers across navigation
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0173-slideshow-library-navigation-cache.md
-  started_at: 2026-09-29
-  last_updated_at: 2026-09-29
-  branch: agent/slideshow-acceptance-followups
-  blockers:
-  - WI-0108
-  blocker_notes: []
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
 - id: WI-0175
   title: Fix slideshow catalogue connection churn and reload recovery
   milestone: M32
@@ -222,3 +132,17 @@ work_items:
   evidence:
   - type: issue
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/476
+- id: WI-0176
+  title: Keep full-app navigation within landscape viewports
+  milestone: M32
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0176-full-app-landscape-navigation.md
+  started_at: 2026-10-01
+  last_updated_at: 2026-10-01
+  branch: agent/issue-461-landscape-verification
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/461
