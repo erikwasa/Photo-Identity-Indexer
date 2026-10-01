@@ -95,23 +95,16 @@ public static class CreativeCollectionPreviewEndpoints
             return error!;
         }
 
-        using CancellationTokenSource deadline =
-            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(MaterializationTimeout);
-        try
+        return await WithMaterializationDeadlineAsync(async token =>
         {
             CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
                 collectionId,
                 settings!,
-                deadline.Token);
+                token);
             return materialized is null
                 ? Results.NotFound()
                 : Results.Ok(ToPreviewResponse(materialized));
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return MaterializationTimeoutResult();
-        }
+        }, cancellationToken);
     }
 
     private static async Task<IResult> CreateCreativeSlideshowSnapshotAsync(
@@ -137,20 +130,30 @@ public static class CreativeCollectionPreviewEndpoints
             return error!;
         }
 
-        using CancellationTokenSource deadline =
-            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(MaterializationTimeout);
-        try
+        return await WithMaterializationDeadlineAsync(async token =>
         {
             CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
                 collectionId,
                 settings!,
-                deadline.Token);
+                token);
             return materialized is null
                 ? Results.NotFound()
                 : Results.Ok(ToSnapshotResponse(materialized, timeProvider.GetUtcNow().ToUniversalTime()));
+        }, cancellationToken);
+    }
+
+    internal static async Task<IResult> WithMaterializationDeadlineAsync(
+        Func<CancellationToken, Task<IResult>> operation,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null)
+    {
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout ?? MaterializationTimeout);
+        try
+        {
+            return await operation(deadline.Token);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             return MaterializationTimeoutResult();
         }

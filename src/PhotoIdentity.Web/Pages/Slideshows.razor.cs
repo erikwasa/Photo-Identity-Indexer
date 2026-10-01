@@ -30,6 +30,10 @@ public partial class Slideshows : IAsyncDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _lifetime = new();
 
+    private readonly CancellationToken _lifetimeToken;
+
+    public Slideshows() => _lifetimeToken = _lifetime.Token;
+
     [Inject]
     public SlideshowLibrarySessionState Session { get; set; } = default!;
 
@@ -54,6 +58,12 @@ public partial class Slideshows : IAsyncDisposable
     private IReadOnlyList<SlideshowLibraryEntry> Collections { get; set; } = [];
     private bool Loading { get; set; } = true;
     private string? Error { get; set; }
+    private string? VerificationError { get; set; }
+    private bool _collectionsVerified;
+    private bool _loadingCollections;
+    private bool _browserStateRestored;
+    private bool _refreshing;
+    private int _collectionGeneration;
 
     protected override async Task OnInitializedAsync()
     {
@@ -74,18 +84,56 @@ public partial class Slideshows : IAsyncDisposable
                 SlideshowSettings.StorageKey);
             Settings = SlideshowSettings.FromJson(storedSettings);
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
             Settings = SlideshowSettings.Defaults;
         }
 
-        await RestorePreparationBookmarksAsync();
-        await RestorePreparationReceiptsAsync();
-        await InvokeAsync(StateHasChanged);
+        try
+        {
+            await RestorePreparationBookmarksAsync();
+            await RestorePreparationReceiptsAsync();
+            _browserStateRestored = true;
+            if (!_lifetime.IsCancellationRequested)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_refreshing || _loadingCollections || _lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        _refreshing = true;
+        try
+        {
+            await LoadCollectionsAsync();
+            if (_browserStateRestored && !_lifetime.IsCancellationRequested)
+            {
+                await RestorePreparationReceiptsAsync();
+            }
+        }
+        finally
+        {
+            _refreshing = false;
+        }
     }
 
     private async Task LoadCollectionsAsync()
     {
+        if (_loadingCollections || _lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        _loadingCollections = true;
+        _collectionGeneration++;
+        _collectionsVerified = false;
         if (Session.SmartCollections is not null && Session.ManualCollections is not null)
         {
             ApplyCollections(Session.SmartCollections, Session.ManualCollections);
@@ -97,19 +145,19 @@ public partial class Slideshows : IAsyncDisposable
             SlideshowLibraryCollectionResponse[] smartCollections =
                 await Http.GetFromJsonAsync<SlideshowLibraryCollectionResponse[]>(
                     "api/slideshows/collections",
-                    _lifetime.Token)
+                    _lifetimeToken)
                 ?? [];
 
             PhotoListCollectionResponse[] manualCollections = [];
             using (HttpResponseMessage manualResponse = await Http.GetAsync(
                        "api/photo-list-collections",
-                       _lifetime.Token))
+                       _lifetimeToken))
             {
                 if (manualResponse.IsSuccessStatusCode)
                 {
                     manualCollections =
                         await manualResponse.Content.ReadFromJsonAsync<PhotoListCollectionResponse[]>(
-                            cancellationToken: _lifetime.Token)
+                            cancellationToken: _lifetimeToken)
                         ?? [];
                 }
                 else if (manualResponse.StatusCode != HttpStatusCode.NotFound)
@@ -119,9 +167,11 @@ public partial class Slideshows : IAsyncDisposable
                 }
             }
 
+            _lifetimeToken.ThrowIfCancellationRequested();
             Session.SmartCollections = smartCollections;
             Session.ManualCollections = manualCollections;
             ApplyCollections(smartCollections, manualCollections);
+            _collectionsVerified = true;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -133,6 +183,7 @@ public partial class Slideshows : IAsyncDisposable
         finally
         {
             Loading = false;
+            _loadingCollections = false;
         }
     }
 
@@ -170,7 +221,7 @@ public partial class Slideshows : IAsyncDisposable
                 SlideshowSettings.StorageKey,
                 Settings.ToJson());
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
             // Settings remain active for this browser session.
         }
@@ -209,7 +260,7 @@ public partial class Slideshows : IAsyncDisposable
             using HttpResponseMessage snapshotResponse = await Http.PostAsync(
                 snapshotPath,
                 content: null,
-                _lifetime.Token);
+                _lifetimeToken);
             if (!snapshotResponse.IsSuccessStatusCode)
             {
                 SetLocalFailure(
@@ -220,7 +271,7 @@ public partial class Slideshows : IAsyncDisposable
 
             SmartCollectionSlideshowSnapshotResponse snapshot =
                 await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>(
-                    cancellationToken: _lifetime.Token)
+                    cancellationToken: _lifetimeToken)
                 ?? throw new InvalidOperationException("The slideshow snapshot response was empty.");
 
             SlideshowPreparationReceipt receipt = SlideshowPreparationReceipt.FromSnapshot(snapshot);
@@ -231,7 +282,7 @@ public partial class Slideshows : IAsyncDisposable
             using HttpResponseMessage preparationResponse = await Http.PostAsJsonAsync(
                 "api/slideshows/original-preparation",
                 request,
-                _lifetime.Token);
+                _lifetimeToken);
             if (!preparationResponse.IsSuccessStatusCode)
             {
                 _preparationRevisionIds.Remove(collection.Id);
@@ -243,7 +294,7 @@ public partial class Slideshows : IAsyncDisposable
 
             SlideshowOriginalPreparationResponse status =
                 await preparationResponse.Content.ReadFromJsonAsync<SlideshowOriginalPreparationResponse>(
-                    cancellationToken: _lifetime.Token)
+                    cancellationToken: _lifetimeToken)
                 ?? throw new InvalidOperationException("The original preparation response was empty.");
 
             _preparations[collection.Id] = status;
@@ -282,7 +333,7 @@ public partial class Slideshows : IAsyncDisposable
             using HttpResponseMessage response = await Http.PostAsync(
                 $"api/slideshows/original-preparation/{sessionId:D}/retry",
                 content: null,
-                _lifetime.Token);
+                _lifetimeToken);
             if (!response.IsSuccessStatusCode)
             {
                 _preparations[collectionId] = current with
@@ -294,7 +345,7 @@ public partial class Slideshows : IAsyncDisposable
 
             SlideshowOriginalPreparationResponse status =
                 await response.Content.ReadFromJsonAsync<SlideshowOriginalPreparationResponse>(
-                    cancellationToken: _lifetime.Token)
+                    cancellationToken: _lifetimeToken)
                 ?? throw new InvalidOperationException("The preparation retry response was empty.");
             _preparations[collectionId] = status;
             await PersistPreparationBookmarksAsync();
@@ -326,7 +377,7 @@ public partial class Slideshows : IAsyncDisposable
             {
                 using HttpResponseMessage _ = await Http.DeleteAsync(
                     $"api/slideshows/original-preparation/{sessionId:D}",
-                    _lifetime.Token);
+                    _lifetimeToken);
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
             {
@@ -372,7 +423,7 @@ public partial class Slideshows : IAsyncDisposable
         }
 
         CancellationTokenSource cancellation =
-            CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            CancellationTokenSource.CreateLinkedTokenSource(_lifetimeToken);
         _polling[collectionId] = cancellation;
         _ = PollPreparationAsync(collectionId, sessionId, cancellation);
     }
@@ -471,7 +522,7 @@ public partial class Slideshows : IAsyncDisposable
             {
                 using HttpResponseMessage _ = await Http.DeleteAsync(
                     $"api/slideshows/original-preparation/{sessionId:D}",
-                    _lifetime.Token);
+                    _lifetimeToken);
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
             {
@@ -502,7 +553,7 @@ public partial class Slideshows : IAsyncDisposable
                 "localStorage.getItem",
                 PreparationBookmarksStorageKey);
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
             return;
         }
@@ -530,7 +581,7 @@ public partial class Slideshows : IAsyncDisposable
 
         foreach ((string collectionId, SlideshowPreparationBookmark bookmark) in bookmarks)
         {
-            if (!Guid.TryParse(bookmark.SessionId, out Guid sessionId) || sessionId == Guid.Empty)
+            if (bookmark is null || !Guid.TryParse(bookmark.SessionId, out Guid sessionId) || sessionId == Guid.Empty)
             {
                 continue;
             }
@@ -542,7 +593,7 @@ public partial class Slideshows : IAsyncDisposable
             {
                 using HttpResponseMessage response = await Http.GetAsync(
                     $"api/slideshows/original-preparation/{sessionId:D}",
-                    _lifetime.Token);
+                    _lifetimeToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     _preparationRevisionIds.Remove(collectionId);
@@ -551,7 +602,7 @@ public partial class Slideshows : IAsyncDisposable
 
                 SlideshowOriginalPreparationResponse status =
                     await response.Content.ReadFromJsonAsync<SlideshowOriginalPreparationResponse>(
-                        cancellationToken: _lifetime.Token)
+                        cancellationToken: _lifetimeToken)
                     ?? throw new InvalidOperationException("The preparation status response was empty.");
                 _preparations[collectionId] = status;
 
@@ -580,6 +631,8 @@ public partial class Slideshows : IAsyncDisposable
 
     private async Task RestorePreparationReceiptsAsync()
     {
+        int generation = _collectionGeneration;
+        VerificationError = null;
         string? json;
         try
         {
@@ -587,12 +640,17 @@ public partial class Slideshows : IAsyncDisposable
                 "localStorage.getItem",
                 PreparationReceiptsStorageKey);
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
             return;
         }
 
         if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        if (generation != _collectionGeneration || _lifetime.IsCancellationRequested)
         {
             return;
         }
@@ -615,7 +673,27 @@ public partial class Slideshows : IAsyncDisposable
 
         foreach ((string collectionId, SlideshowPreparationReceipt receipt) in receipts)
         {
-            _receipts[collectionId] = receipt;
+            if (receipt is not null)
+            {
+                _receipts[collectionId] = receipt;
+            }
+        }
+
+        if (!_collectionsVerified)
+        {
+            foreach (string collectionId in _receipts.Keys)
+            {
+                if (_preparations.GetValueOrDefault(collectionId)?.State == "ready")
+                {
+                    _preparations.Remove(collectionId);
+                }
+            }
+            if (_receipts.Count > 0)
+            {
+                VerificationError = "Prepared originals could not be verified while slideshows are unavailable. Retry refresh to check them again.";
+            }
+            // An absent card after a failed list request is not proof of deletion.
+            return;
         }
 
         foreach (string collectionId in _receipts.Keys.ToArray())
@@ -634,6 +712,10 @@ public partial class Slideshows : IAsyncDisposable
             }
 
             SlideshowPreparationReceipt receipt = _receipts[collectionId];
+            if (_preparations.GetValueOrDefault(collectionId)?.State == "ready")
+            {
+                _preparations.Remove(collectionId);
+            }
             try
             {
                 if (collection.Manual)
@@ -650,7 +732,11 @@ public partial class Slideshows : IAsyncDisposable
                     using HttpResponseMessage snapshotResponse = await Http.PostAsync(
                         $"api/smart-collections/{Uri.EscapeDataString(collectionId)}/slideshow-snapshot",
                         content: null,
-                        _lifetime.Token);
+                        _lifetimeToken);
+                    if (generation != _collectionGeneration || _lifetime.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     if (snapshotResponse.StatusCode == HttpStatusCode.NotFound)
                     {
                         _receipts.Remove(collectionId);
@@ -659,13 +745,18 @@ public partial class Slideshows : IAsyncDisposable
 
                     if (!snapshotResponse.IsSuccessStatusCode)
                     {
+                        VerificationError = "Prepared originals could not be verified. Retry refresh to check them again.";
                         continue;
                     }
 
                     SmartCollectionSlideshowSnapshotResponse snapshot =
                         await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>(
-                            cancellationToken: _lifetime.Token)
+                            cancellationToken: _lifetimeToken)
                         ?? throw new InvalidOperationException("The slideshow snapshot response was empty.");
+                    if (generation != _collectionGeneration || _lifetime.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     if (!receipt.MatchesSnapshot(snapshot))
                     {
                         _receipts.Remove(collectionId);
@@ -678,16 +769,25 @@ public partial class Slideshows : IAsyncDisposable
                 using HttpResponseMessage validationResponse = await Http.PostAsJsonAsync(
                     "api/slideshows/original-preparation/revalidate",
                     new SlideshowOriginalPreparationRequest(revisionIds),
-                    _lifetime.Token);
+                    _lifetimeToken);
+                if (generation != _collectionGeneration || _lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
                 if (!validationResponse.IsSuccessStatusCode)
                 {
+                    VerificationError = "Prepared originals could not be verified. Retry refresh to check them again.";
                     continue;
                 }
 
                 SlideshowOriginalRevalidationResponse validation =
                     await validationResponse.Content.ReadFromJsonAsync<SlideshowOriginalRevalidationResponse>(
-                        cancellationToken: _lifetime.Token)
+                        cancellationToken: _lifetimeToken)
                     ?? throw new InvalidOperationException("The prepared-original revalidation response was empty.");
+                if (generation != _collectionGeneration || _lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
                 if (!validation.Reusable || validation.Ready != revisionIds.Length || validation.Total != revisionIds.Length)
                 {
                     _receipts.Remove(collectionId);
@@ -695,6 +795,7 @@ public partial class Slideshows : IAsyncDisposable
                     continue;
                 }
 
+                _lifetimeToken.ThrowIfCancellationRequested();
                 _preparations[collectionId] = ReadyPreparation(validation.Total);
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
@@ -703,9 +804,14 @@ public partial class Slideshows : IAsyncDisposable
             }
             catch
             {
+                if (generation != _collectionGeneration || _lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
                 // Keep the receipt for a future page load, but do not display stale prepared state
                 // when the application cannot currently revalidate it.
                 _preparations.Remove(collectionId);
+                VerificationError = "Prepared originals could not be verified. Retry refresh to check them again.";
             }
         }
 
@@ -741,7 +847,7 @@ public partial class Slideshows : IAsyncDisposable
                     JsonSerializer.Serialize(bookmarks));
             }
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
             // Reattachment is best effort; server preparation still follows its own lifetime.
         }
@@ -763,7 +869,7 @@ public partial class Slideshows : IAsyncDisposable
                     JsonSerializer.Serialize(_receipts));
             }
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
             // The preparation itself remains valid even when browser-local persistence is unavailable.
         }
@@ -777,7 +883,7 @@ public partial class Slideshows : IAsyncDisposable
                 "localStorage.removeItem",
                 PreparationBookmarksStorageKey);
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
         }
     }
@@ -790,7 +896,7 @@ public partial class Slideshows : IAsyncDisposable
                 "localStorage.removeItem",
                 PreparationReceiptsStorageKey);
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException)
         {
         }
     }

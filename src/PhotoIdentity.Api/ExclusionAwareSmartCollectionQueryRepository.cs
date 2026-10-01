@@ -55,30 +55,17 @@ public sealed class ExclusionAwareSmartCollectionQueryRepository : ISmartCollect
             return null;
         }
 
-        List<PhotoIdentity.Core.Identifiers.AssetRevisionId> visible = [];
-        foreach (PhotoIdentity.Core.Identifiers.AssetRevisionId revisionId in snapshot.RevisionIds)
-        {
-            if (!await _exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
-            {
-                visible.Add(revisionId);
-            }
-        }
-
-        return snapshot with { RevisionIds = visible };
+        var excluded = await _exclusions.GetExcludedRevisionIdsAsync(
+            snapshot.RevisionIds.ToArray(), cancellationToken);
+        return snapshot with { RevisionIds = snapshot.RevisionIds.Where(id => !excluded.Contains(id)).ToArray() };
     }
 
     private async Task<IReadOnlyList<SmartCollectionPhoto>> FilterPhotosAsync(
         IReadOnlyList<SmartCollectionPhoto> values,
         CancellationToken cancellationToken)
     {
-        List<SmartCollectionPhoto> visible = new(values.Count);
-        foreach (SmartCollectionPhoto value in values)
-        {
-            if (!await _exclusions.IsRevisionExcludedAsync(value.RevisionId, cancellationToken))
-            {
-                visible.Add(value);
-            }
-        }
-        return visible;
+        var excluded = await _exclusions.GetExcludedRevisionIdsAsync(
+            values.Select(value => value.RevisionId).Distinct().ToArray(), cancellationToken);
+        return values.Where(value => !excluded.Contains(value.RevisionId)).ToArray();
     }
 }

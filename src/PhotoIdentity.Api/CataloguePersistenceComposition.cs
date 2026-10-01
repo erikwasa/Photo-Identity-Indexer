@@ -13,6 +13,16 @@ namespace PhotoIdentity.Api;
 
 internal static class CataloguePersistenceComposition
 {
+    internal static string RuntimeConnectionString(string connectionString)
+    {
+        // The long-running host opens connections for bounded concurrent requests/workers.
+        // Legacy maintenance strings may disable pooling, causing thousands of TCP opens.
+        // Keep the operator's pool limits and all other settings; direct CLI/test construction
+        // still respects its own explicit pooling setting.
+        Npgsql.NpgsqlConnectionStringBuilder settings = new(connectionString) { Pooling = true };
+        return settings.ConnectionString;
+    }
+
     public static string GetRequiredPostgresConnectionString(IConfiguration configuration)
     {
         string? connectionString = configuration["PhotoIdentity:Postgres:ConnectionString"];
@@ -25,7 +35,7 @@ internal static class CataloguePersistenceComposition
     public static PostgresCatalogueDatabase AddPostgres(IServiceCollection services, string connectionString)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        PostgresCatalogueDatabase database = new(connectionString);
+        PostgresCatalogueDatabase database = new(RuntimeConnectionString(connectionString));
         services.AddSingleton(database);
         services.AddSingleton<ICatalogueStoreInitializer>(sp => sp.GetRequiredService<PostgresCatalogueDatabase>());
         services.AddSingleton<PostgresSourceCopyExclusionRepository>();

@@ -1,35 +1,22 @@
 # Build context
 
-Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read only the target shard and linked work-item document before continuing.
+Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the target shard and linked document before continuing.
 
 ## Current focus
 
-Maintainer M32 acceptance (2026-09-30 Europe/Stockholm) accepted WI-0168 navigation, left WI-0167 untested, and failed WI-0165 player preparation continuity (53 photos, 3m20s) and WI-0169 Broad/150 preview (~60s HTTP 503). The private stdout log has no completed Creative phase summary; a particular bottleneck is not established.
+WI-0175 / issue #476 repairs the 2026-10-01 failed slideshow acceptance: saved Creative catalogue-query timeouts, unpooled PostgreSQL socket 10048 failures in manual listing/revalidation, and receipt loss when collection loading fails. Branch: `agent/wi-0175-slideshow-reliability`.
 
-PR #470 (`agent/slideshow-acceptance-followups`) implements the WI-0165 receipt write and bounded local verification; WI-0169 worker dispatch, shared hash gate and cancellation-surviving phase diagnostics; WI-0173 browser-session card/cover reuse; and WI-0172 separate full-app collection management. These items remain in review pending CI and maintained-machine acceptance. WI-0171 tracks the unconfirmed phone grid-like rendering artifact and remains ready for reproduction. WI-0168 is completed from the maintainer's explicit acceptance.
-
-WI-0170/M34 review-queue refill remains ready independently; slideshow caching is WI-0173 after resolving the ID collision with PR #469.
-
-WI-0163 bulk enrichment remains independently in progress on `agent/wi-0163-bulk-metadata-enrichment`. Do not change its state as part of slideshow work. M30 video support remains blocked.
+WI-0165 and WI-0169 acceptance failed; WI-0173 navigation caching is partially verified. Keep those items in review until maintained Windows/phone retest. The generic frontend error has no captured browser exception; do not claim its exact cause from server logs.
 
 ## Next concrete step
 
-WI-0170 is in review on PR #471. Verify bulk Assign and Accept suggestions with 10 selected faces on the maintained Windows catalogue: committed success must appear independently of refill, and repeated/overlapping pages must stop with Reload queue rather than causing a request storm. Record separate commit/refill timing and stale-load behavior using the canonical WI-0170 document.
+Windows preparation CI #36928766356 passed 23 focused tests and documentation lifecycle/generation checks. WI-0175 is in_review; the temporary workflow was removed. Check standard PR CI, then retest saved Creative targets 30/50 and Broad/150, manual refresh, Prepared after F5, and retry after temporary verification failure. Capture browser console details if the generic error recurs.
 
-Check the follow-up PR's CI, then retest the 53-photo manual preparation twice (cloud-only vs already local), Prepared after exit/reload/invalidation, and the ~1,000-anchor Broad/150 Creative preview twice in the same process. For another timeout capture the new phase/final diagnostics. Test cached library returns and the management hub on desktop/phone. Reproduce WI-0171 with phone/browser details, screenshot/video, same-photo proxy/original comparison, and paused/moving/fading state. Continue WI-0167 OneDrive-unavailable acceptance independently.
+WI-0167 remains untested. WI-0170 needs maintained bulk-review acceptance. WI-0163 remains independently in progress; do not change its lifecycle. WI-0171 remains ready for phone rendering reproduction. M30 video support is intentionally deferred.
 
 ## Relevant pointers
 
+- docs/delivery/work-items/WI-0175-slideshow-catalogue-recovery.md
 - docs/delivery/work-items/WI-0165-slideshow-library-status-counts.md
 - docs/delivery/work-items/WI-0169-creative-collection-scale.md
 - docs/delivery/work-items/WI-0173-slideshow-library-navigation-cache.md
-- docs/delivery/work-items/WI-0171-phone-slideshow-grid-artifacts.md
-- docs/delivery/work-items/WI-0172-slideshow-collection-management.md
-
-## Repository validation
-
-    ./build.ps1
-    ./test.ps1
-    dotnet run --project tools/PhotoIdentity.Docs -- validate
-    dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-    ./verify-postgres.ps1

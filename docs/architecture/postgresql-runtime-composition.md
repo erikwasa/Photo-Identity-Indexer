@@ -42,3 +42,7 @@ Normal CI additionally exercises disposable PostgreSQL integration databases, th
 On 2026-09-10 the maintainer ran the WI-0101 PostgreSQL verifier against the configured Podman PostgreSQL service. WI-0102 subsequently imported and verified the maintainer catalogue, completed the single-authority production switch, exercised rollback from a working copy of the preserved migration backup, and restored PostgreSQL as the accepted authority.
 
 Those SQLite-to-PostgreSQL migration and rollback records remain historical evidence. They do not constitute a current SQLite runtime/provider path. Current day-to-day backup, restore, restart and upgrade procedures are owned by [PostgreSQL production operations](../operations/postgresql-operations.md).
+
+## Runtime connection reuse
+
+WI-0175 requires the long-running API to use its shared pooled Npgsql data source even if a legacy operator connection string contains `Pooling=false`. API composition normalizes only pooling to true; configured minimum/maximum pool sizes, timeouts, authentication and transport settings are retained. Npgsql's bounded default maximum applies when no explicit pool maximum is provided. Direct `PostgresCatalogueDatabase` construction in CLI/test tooling still respects explicit unpooled settings. This prevents per-operation TCP connection churn on the maintained Windows host; batch exclusion queries additionally avoid N+1 database work. No catalogue schema or authority change is introduced.
