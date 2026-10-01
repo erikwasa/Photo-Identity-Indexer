@@ -1,11 +1,16 @@
 id: WI-0171
 title: Diagnose thin grid-like lines during phone slideshow playback
 milestone: M32
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0171-phone-slideshow-grid-artifacts.md
+started_at: 2026-10-01
 last_updated_at: 2026-10-01
+branch: agent/wi-0171-phone-grid-artifacts
 blockers: []
 blocker_notes: []
 evidence:
-  - "Maintainer reproduced thin fixed-position grid seams on a Google Pixel 9 Pro XL installed PWA while displaying prepared originals; the seams were not seen on PC, occurred only for some originals, and flickered while playback motion was active."
+- type: maintainer-observation
+  value: '2026-10-01: Maintainer reproduced fixed-position thin grid seams in the installed PWA on a Google Pixel 9 Pro XL for some prepared originals; the seams were not seen on PC and flickered while playback motion was active. Private screenshots were supplied but are not committed.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/478
