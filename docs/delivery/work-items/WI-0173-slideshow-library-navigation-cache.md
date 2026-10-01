@@ -35,3 +35,7 @@ Focused non-host tests verify request coalescing, consumer cancellation isolatio
 ## Follow-up validation
 
 The affected API/Web/test projects build, and 50 focused non-host slideshow/receipt/cache/route/Creative optimization tests pass. Documentation `validate` and `generate --check` pass. PostgreSQL-backed preparation tests could not run locally because the test admin connection was unavailable; those cases remain required in CI. Maintained archive/phone acceptance is not claimed.
+
+## Partial maintainer acceptance — 2026-10-01 (Europe/Stockholm)
+
+Cards remain on navigation returns, consistent with session-cache reuse. Manual refresh HTTP 500 and a generic review application error block full acceptance. F5 intentionally starts a fresh display session, but valid Prepared receipts must be restored independently after verification. WI-0175 / issue #476 repairs catalogue connection churn and receipt recovery; this item remains in review pending desktop/phone retest.

@@ -101,3 +101,7 @@ Retest the 53-photo case twice, noting whether originals are cloud-only or alrea
 ## Follow-up validation
 
 The affected API/Web/test projects build, and 50 focused non-host slideshow/receipt/cache/route/Creative optimization tests pass. Documentation `validate` and `generate --check` pass. PostgreSQL-backed preparation tests could not run locally because the test admin connection was unavailable; those cases remain required in CI. Maintained archive/phone acceptance is not claimed.
+
+## Maintainer acceptance — 2026-10-01 (Europe/Stockholm)
+
+Acceptance failed and further verification stopped. Already-local Smart/manual preparation displays Prepared; navigation returns retain cards, but F5 loses the indicator. Manual listing and original revalidation return HTTP 500 with unpooled PostgreSQL connection failure / Windows socket 10048. Temporary list failure can incorrectly remove receipts; failed byte revalidation cannot establish Prepared. WI-0175 / issue #476 owns the repair and recovery tests. This item remains in review; no full acceptance is claimed.

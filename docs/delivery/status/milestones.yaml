@@ -335,6 +335,7 @@ milestones:
   - WI-0173
   - WI-0171
   - WI-0172
+  - WI-0175
 - id: M33
   title: Archive synchronization performance
   status: completed

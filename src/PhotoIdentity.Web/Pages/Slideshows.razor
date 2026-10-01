@@ -15,7 +15,7 @@
 {
     <div class="notice error" role="alert">
         @Error
-        <button type="button" class="button secondary" @onclick="LoadCollectionsAsync">Retry refresh</button>
+        <button type="button" class="button secondary" @onclick="RefreshAsync">Retry refresh</button>
     </div>
 }
 
@@ -31,7 +31,7 @@ else if (!string.IsNullOrWhiteSpace(Error) && Collections.Count == 0)
     <section class="slideshow-library-state" role="alert">
         <strong>Slideshows could not be loaded</strong>
         <p>@Error</p>
-        <button type="button" class="button secondary" @onclick="LoadCollectionsAsync">Retry</button>
+        <button type="button" class="button secondary" @onclick="RefreshAsync">Retry</button>
     </section>
 }
 else if (Collections.Count == 0)
@@ -120,6 +120,14 @@ else
 }
 
 <CreativeSlideshowLibrary />
+
+@if (!string.IsNullOrWhiteSpace(VerificationError))
+{
+    <div class="notice error" role="alert">
+        @VerificationError
+        <button type="button" class="button secondary" @onclick="RefreshAsync">Retry verification</button>
+    </div>
+}
 
 <details class="slideshow-library-settings">
     <summary>Playback preferences</summary>

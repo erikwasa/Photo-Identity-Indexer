@@ -18,6 +18,20 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class CataloguePersistenceCompositionTests
 {
     [Fact]
+    public void Runtime_pooling_preserves_configured_capacity_and_other_connection_settings()
+    {
+        Npgsql.NpgsqlConnectionStringBuilder result = new(CataloguePersistenceComposition.RuntimeConnectionString(
+            "Host=example.test;Database=catalogue;Username=operator;Pooling=false;Maximum Pool Size=12;Timeout=7;Command Timeout=31"));
+        Assert.True(result.Pooling);
+        Assert.Equal(12, result.MaxPoolSize);
+        Assert.Equal(7, result.Timeout);
+        Assert.Equal(31, result.CommandTimeout);
+        Assert.Equal("example.test", result.Host);
+        Assert.Equal("catalogue", result.Database);
+        Assert.Equal("operator", result.Username);
+    }
+
+    [Fact]
     public async Task PostgreSQL_composition_binds_authoritative_domains_without_SQLite_catalogue()
     {
         ServiceCollection services = new();

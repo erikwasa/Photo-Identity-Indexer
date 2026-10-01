@@ -78,12 +78,10 @@ public static class PhotoListCollectionEndpoints
     {
         IReadOnlyList<PhotoListCollectionDefinition> definitions =
             await repository.ListAsync(cancellationToken);
-        List<PhotoListCollectionResponse> responses = new(definitions.Count);
-        foreach (PhotoListCollectionDefinition definition in definitions)
-        {
-            responses.Add(await ToResponseAsync(definition, exclusions, cancellationToken));
-        }
-        return Results.Ok(responses);
+        IReadOnlySet<AssetRevisionId> excluded = await exclusions.GetExcludedRevisionIdsAsync(
+            definitions.SelectMany(definition => definition.RevisionIds).Distinct().ToArray(),
+            cancellationToken);
+        return Results.Ok(definitions.Select(definition => ToResponse(definition, excluded)).ToArray());
     }
 
     private static async Task<IResult> GetAsync(
@@ -186,21 +184,19 @@ public static class PhotoListCollectionEndpoints
             return Results.NotFound();
         }
 
-        List<SmartCollectionSlideshowSnapshotItemResponse> items = [];
-        foreach (AssetRevisionId revisionId in snapshot.RevisionIds)
-        {
-            if (!await exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
-            {
-                items.Add(new SmartCollectionSlideshowSnapshotItemResponse(revisionId.ToString()));
-            }
-        }
+        IReadOnlySet<AssetRevisionId> excluded = await exclusions.GetExcludedRevisionIdsAsync(
+            snapshot.RevisionIds.ToArray(), cancellationToken);
+        SmartCollectionSlideshowSnapshotItemResponse[] items = snapshot.RevisionIds
+            .Where(id => !excluded.Contains(id))
+            .Select(id => new SmartCollectionSlideshowSnapshotItemResponse(id.ToString()))
+            .ToArray();
 
         return Results.Ok(new SmartCollectionSlideshowSnapshotResponse(
             snapshot.CollectionId.ToString(),
             snapshot.CollectionName,
             snapshot.CreatedAtUtc,
-            items.ToArray(),
-            items.Count));
+            items,
+            items.Length));
     }
 
     private static async Task<PhotoListCollectionResponse> ToResponseAsync(
@@ -208,36 +204,28 @@ public static class PhotoListCollectionEndpoints
         ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
-        List<string> visible = [];
-        foreach (AssetRevisionId revisionId in definition.RevisionIds)
-        {
-            if (!await exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
-            {
-                visible.Add(revisionId.ToString());
-            }
-        }
+        IReadOnlySet<AssetRevisionId> excluded = await exclusions.GetExcludedRevisionIdsAsync(
+            definition.RevisionIds.ToArray(), cancellationToken);
+        return ToResponse(definition, excluded);
+    }
 
-        return new PhotoListCollectionResponse(
+    private static PhotoListCollectionResponse ToResponse(
+        PhotoListCollectionDefinition definition,
+        IReadOnlySet<AssetRevisionId> excluded) => new(
             definition.Id.ToString(),
             definition.Name,
-            visible.ToArray(),
+            definition.RevisionIds.Where(id => !excluded.Contains(id)).Select(id => id.ToString()).ToArray(),
             definition.CreatedAtUtc,
             definition.UpdatedAtUtc);
-    }
 
     private static async Task<bool> ContainsExcludedAsync(
         IReadOnlyList<AssetRevisionId> revisionIds,
         ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
-        foreach (AssetRevisionId revisionId in revisionIds)
-        {
-            if (await exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
-            {
-                return true;
-            }
-        }
-        return false;
+        IReadOnlySet<AssetRevisionId> excluded = await exclusions.GetExcludedRevisionIdsAsync(
+            revisionIds.ToArray(), cancellationToken);
+        return excluded.Count > 0;
     }
 
     private static AssetRevisionId[] ParseRevisionIds(string[]? values)

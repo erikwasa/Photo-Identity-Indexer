@@ -108,3 +108,7 @@ Retest twice in the same application process. Capture `Creative materialization 
 ## Follow-up validation
 
 The affected API/Web/test projects build, and 50 focused non-host slideshow/receipt/cache/route/Creative optimization tests pass. Documentation `validate` and `generate --check` pass. PostgreSQL-backed preparation tests could not run locally because the test admin connection was unavailable; those cases remain required in CI. Maintained archive/phone acceptance is not claimed.
+
+## Maintainer acceptance — 2026-10-01 (Europe/Stockholm)
+
+Saved Creative playback fails for targets 30/50 and 150. Three snapshots cancel at approximately 100 seconds in `catalogue-query`, before visual hashing. Another snapshot fails after approximately 98 seconds with PostgreSQL socket error 10048. Saved-recipe paths lack the deadline used by ad hoc preview. WI-0175 / issue #476 addresses batch exclusion lookups, runtime pooling and deadline coverage. Archive-scale acceptance remains failed; these diagnostics identify catalogue-query work rather than establishing a visual-hash bottleneck.

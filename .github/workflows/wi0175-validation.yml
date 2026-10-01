@@ -1,0 +1,54 @@
+name: WI-0175 preparation
+on:
+  push:
+    branches: [agent/wi-0175-slideshow-reliability]
+permissions:
+  contents: write
+concurrency:
+  group: wi0175-preparation
+  cancel-in-progress: true
+jobs:
+  prepare:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Generate and validate documentation
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- generate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and run focused non-host regression tests
+        shell: pwsh
+        run: |
+          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter "FullyQualifiedName~SlideshowExclusionBatchTests|FullyQualifiedName~CreativeMaterializationDeadlineTests|FullyQualifiedName~SlideshowLibraryRecoveryTests|FullyQualifiedName~CataloguePersistenceCompositionTests|FullyQualifiedName~SlideshowPreparationReceiptStoreTests|FullyQualifiedName~SlideshowLibrarySessionStateTests|FullyQualifiedName~CreativeCollectionMaterializationOptimizationTests" --logger "trx;LogFileName=wi0175.trx"
+          exit $LASTEXITCODE
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wi0175-test-evidence
+          path: tests/PhotoIdentity.Integration.Tests/TestResults/*.trx
+      - name: Enter review and remove temporary preparation workflow
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- review WI-0175
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- generate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item .github/workflows/wi0175-validation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs .github/workflows/wi0175-validation.yml
+          git commit -m "Generate WI-0175 review status after focused validation"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git push origin HEAD:agent/wi-0175-slideshow-reliability
+          exit $LASTEXITCODE
