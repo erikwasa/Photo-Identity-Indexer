@@ -20,6 +20,7 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Operations documentation map](operations/index.md)
 - [Local operator guide](operations/local-operator-guide.md)
 - [PostgreSQL operations](operations/postgresql-operations.md)
+- [Azure caption burst through a localhost bridge](operations/azure-caption-burst-bridge.md) — conditional operator procedure for temporary generated-caption GPU acceleration under ADR-0011
 - [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
 - [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
@@ -57,13 +58,13 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Candidate models](models/candidate-models.md)
 - [Model manifests and governance](models/model-governance.md)
 
-## Azure — historical reference
+## Azure — historical reference plus one narrow caption exception
 
 - [Tenant and identity constraints](azure/constraints.md)
 - [Identity-free execution](azure/identity-free-execution.md)
 - [Cost controls](azure/cost-controls.md)
 
-Azure documentation is retained as historical design/reference material. [ADR-0010](decisions/ADR-0010-local-production-execution.md) establishes maintainer-controlled local hardware as the current production execution strategy; no active milestone depends on Azure.
+Most Azure documentation is retained as historical design/reference material. [ADR-0010](decisions/ADR-0010-local-production-execution.md) establishes maintainer-controlled local hardware as the normal production execution strategy. [ADR-0011](decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) adds one narrow operator-authorized exception for temporary generated-caption inference through a localhost bridge; it does not revive general Azure archive processing.
 
 ## Delivery
 
