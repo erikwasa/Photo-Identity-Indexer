@@ -21,6 +21,7 @@ PostgreSQL production operations own the current backup/restore procedure.
 
 ## Conditional maintenance and engineering procedures
 
+- [Azure caption burst through a localhost bridge](azure-caption-burst-bridge.md) — operator-authorized temporary GPU acceleration for a generated-caption backlog while Photo Identity itself remains loopback-only; includes exact-digest checks, benchmark, production enable/monitor, inspection, shutdown/scale-to-zero and later reactivation.
 - [Testing and CI strategy](testing-and-ci-strategy.md) — engineering policy for test-layer choice, integration-host isolation, flaky-test handling, PR gates and timing evidence.
 - [Review-proxy measurement](review-proxy-measurement.md) — calibration/measurement procedure for selecting or re-evaluating a proxy profile; not a routine daily task.
 - [Detector pipeline rollout](detector-rollout.md) — maintenance-only migration procedure for an existing catalogue created with a different detector. New permanent-archive analysis already uses the governed CenterFace profile and does not require a rollout first.
