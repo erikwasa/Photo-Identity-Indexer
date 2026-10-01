@@ -18,7 +18,7 @@ Current work items: **16**. Archived terminal items: **157**.
 | [WI-0167](../work-items/WI-0167-onedrive-slideshow-availability.md) Fail best-quality slideshow preparation when OneDrive is unavailable | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0167.yaml) |
 | [WI-0169](../work-items/WI-0169-creative-collection-scale.md) Bound Creative Collection materialization for large Broad selections | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0169.yaml) |
 | [WI-0170](../work-items/WI-0170-review-queue-refill.md) Bound review queue refill and show bulk face decisions promptly | M34 | in_review | ai-agent | [YAML](work-items/active/WI-0170.yaml) |
-| [WI-0171](../work-items/WI-0171-phone-slideshow-grid-artifacts.md) Diagnose thin grid-like lines during phone slideshow playback | M32 | ready | unassigned | [YAML](work-items/active/WI-0171.yaml) |
+| [WI-0171](../work-items/WI-0171-phone-slideshow-grid-artifacts.md) Diagnose thin grid-like lines during phone slideshow playback | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0171.yaml) |
 | [WI-0172](../work-items/WI-0172-slideshow-collection-management.md) Provide a separate operator space for slideshow collection management | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0172.yaml) |
 | [WI-0173](../work-items/WI-0173-slideshow-library-navigation-cache.md) Reuse slideshow library cards and covers across navigation | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0173.yaml) |
 | [WI-0175](../work-items/WI-0175-slideshow-catalogue-recovery.md) Fix slideshow catalogue connection churn and reload recovery | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0175.yaml) |
