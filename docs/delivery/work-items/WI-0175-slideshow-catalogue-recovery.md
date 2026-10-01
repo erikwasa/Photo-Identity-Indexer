@@ -51,10 +51,13 @@ Use direct repository/endpoint tests and component fixtures rather than new host
 5. Edit membership or make a required original unavailable; successful verification must invalidate Prepared.
 6. Verify desktop/phone navigation and monitor for HTTP 500/socket 10048 and generic application error. Capture browser console details if the banner recurs.
 
-## Completion notes
+## Implementation and verification evidence
 
-Local .NET 10 SDK startup failed with CoreCLR HRESULT 0x8007000E in the restricted execution environment. Lifecycle generation and executable verification must run in GitHub Actions; no local build/test pass is claimed.
-
-Implementation is prepared locally: batch privacy filtering, API runtime pooling normalization, shared saved-Creative deadlines, receipt-preserving refresh/revalidation retry, null browser-state handling and generation/disposal guards. Added deterministic regression coverage at repository/endpoint/component layers; no required CI gate change is proposed. Whitespace checks and syntax parsing passed for all 10 changed C# files. Compilation/tests and generated-view checks remain unperformed locally. A temporary branch-only Actions preparation workflow runs the repository lifecycle generator and focused tests, then removes itself; it is not intended to remain in the final PR.
-
-Branch publication was rejected by automatic approval review, which stated that source/workflow publication to the remote required explicit user authorization. No publication is claimed; lifecycle remains in_progress until executable checks pass.
+- Smart all-photo queries/pages/snapshots and manual collection listing/snapshots now use batch exclusion lookups, preserving order and source-copy privacy.
+- API composition normalizes runtime pooling to true while preserving configured pool capacity and other connection settings; direct CLI/test construction is unchanged.
+- Saved and ad hoc Creative preview/snapshot routes share the 60-second deadline and actionable HTTP 503. Caller cancellation propagates.
+- Failed collection refresh preserves receipts; failed verification hides Prepared and exposes retry. Successful membership/local-byte verification still invalidates stale receipts. Generation and lifetime guards reject old responses; null browser entries and storage interop failures remain recoverable.
+- Added focused non-host batch/deadline/component fixtures, including receipt preservation/retry, membership/local-byte invalidation, stale validation and navigation during verification. No required CI gate or database migration changed.
+- [Windows preparation CI](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36928766356) built the affected dependency graph and passed **23/23** focused tests (0 skipped, reported test duration **576 ms**). `PhotoIdentity.Docs generate`, `validate`, `review WI-0175`, and `generate --check` passed. The temporary branch-only preparation workflow removed itself after validation; it does not remain in the final PR.
+- Local whitespace and C# syntax checks passed. Local .NET 10 startup was unavailable (CoreCLR HRESULT 0x8007000E); executable evidence above is from Windows CI.
+- Standard PR CI and maintained Windows/phone acceptance remain required. WI-0175 is in_review, not completed. The exact exception behind the generic frontend banner remains unconfirmed until retested.

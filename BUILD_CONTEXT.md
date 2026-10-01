@@ -10,7 +10,7 @@ WI-0165 and WI-0169 acceptance failed; WI-0173 navigation caching is partially v
 
 ## Next concrete step
 
-Run focused batch/deadline/component regression tests, affected builds and documentation checks. Local .NET startup is unavailable in the restricted environment; use GitHub Actions to generate lifecycle views and verify executables. After CI passes, retest saved Creative targets 30/50 and Broad/150, manual refresh, Prepared after F5, and retry after temporary verification failure. Capture browser console details if the generic error recurs.
+Windows preparation CI #36928766356 passed 23 focused tests and documentation lifecycle/generation checks. WI-0175 is in_review; the temporary workflow was removed. Check standard PR CI, then retest saved Creative targets 30/50 and Broad/150, manual refresh, Prepared after F5, and retry after temporary verification failure. Capture browser console details if the generic error recurs.
 
 WI-0167 remains untested. WI-0170 needs maintained bulk-review acceptance. WI-0163 remains independently in progress; do not change its lifecycle. WI-0171 remains ready for phone rendering reproduction. M30 video support is intentionally deferred.
 
