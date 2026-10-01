@@ -4,18 +4,19 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0175 / issue #476 repairs the 2026-10-01 failed slideshow acceptance: saved Creative catalogue-query timeouts, unpooled PostgreSQL socket 10048 failures in manual listing/revalidation, and receipt loss when collection loading fails. Branch: `agent/wi-0175-slideshow-reliability`.
+WI-0171 / PR #478 addresses the reproduced phone slideshow grid artifact. On a Google Pixel 9 Pro XL installed PWA, some prepared originals showed fixed-position thin raster seams that flickered while the subtle scale motion ran; the maintainer did not see the lines on PC. The targeted fallback keeps prepared originals and cross-fades but suppresses the foreground scale transform for prepared-original playback on coarse-pointer/no-hover devices.
 
-WI-0165 and WI-0169 acceptance failed; WI-0173 navigation caching is partially verified. Keep those items in review until maintained Windows/phone retest. The generic frontend error has no captured browser exception; do not claim its exact cause from server logs.
+WI-0175 / PR #477 is merged but remains in review pending maintained slideshow reliability acceptance. WI-0165 and WI-0169 acceptance previously failed; WI-0173 navigation caching is partially verified. Keep those items in review until maintained Windows/phone retest.
 
 ## Next concrete step
 
-Windows preparation CI #36928766356 passed 23 focused tests and documentation lifecycle/generation checks. WI-0175 is in_review; the temporary workflow was removed. Check standard PR CI, then retest saved Creative targets 30/50 and Broad/150, manual refresh, Prepared after F5, and retry after temporary verification failure. Capture browser console details if the generic error recurs.
+Check standard PR #478 CI, then retest an affected photo on the Pixel 9 Pro XL with Prepare originals enabled while paused, playing and during a cross-fade. Compare the same photo with Prepare originals disabled, and confirm desktop playback still retains the normal subtle scale motion. Complete WI-0171 only after the maintained phone/desktop verification passes.
 
-WI-0167 remains untested. WI-0170 needs maintained bulk-review acceptance. WI-0163 remains independently in progress; do not change its lifecycle. WI-0171 remains ready for phone rendering reproduction. M30 video support is intentionally deferred.
+WI-0167 remains untested. WI-0170 needs maintained bulk-review acceptance. WI-0163 remains independently in progress; do not change its lifecycle. M30 video support is intentionally deferred.
 
 ## Relevant pointers
 
+- docs/delivery/work-items/WI-0171-phone-slideshow-grid-artifacts.md
 - docs/delivery/work-items/WI-0175-slideshow-catalogue-recovery.md
 - docs/delivery/work-items/WI-0165-slideshow-library-status-counts.md
 - docs/delivery/work-items/WI-0169-creative-collection-scale.md

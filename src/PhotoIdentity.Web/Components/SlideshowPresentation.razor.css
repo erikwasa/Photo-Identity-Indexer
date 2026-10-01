@@ -85,6 +85,20 @@
     }
 }
 
+/*
+ * Chromium on high-DPR phones can expose raster-tile seams while a prepared
+ * full-resolution original is held on a transformed compositor layer. Keep
+ * cross-fades and the prepared original itself, but avoid the decorative
+ * scale transform on coarse-pointer devices for that source path.
+ */
+@media (hover: none) and (pointer: coarse) {
+    .slideshow-image-motion[src*="/api/slideshows/original-preparation/"] {
+        animation: none;
+        transform: none;
+        will-change: auto;
+    }
+}
+
 @supports not (filter: blur(1px)) {
     .slideshow-backdrop-image,
     .slideshow-backdrop-shade {
