@@ -22,10 +22,11 @@ PostgreSQL production operations own the current backup/restore procedure.
 ## Conditional maintenance and engineering procedures
 
 - [Testing and CI strategy](testing-and-ci-strategy.md) — engineering policy for test-layer choice, integration-host isolation, flaky-test handling, PR gates and timing evidence.
+- [Azure burst captioning](azure-burst-captioning.md) — optional WI-0174 procedure for temporarily accelerating the caption backlog through an operator-controlled Azure GPU endpoint while Windows/PostgreSQL remain authoritative.
 - [Review-proxy measurement](review-proxy-measurement.md) — calibration/measurement procedure for selecting or re-evaluating a proxy profile; not a routine daily task.
 - [Detector pipeline rollout](detector-rollout.md) — maintenance-only migration procedure for an existing catalogue created with a different detector. New permanent-archive analysis already uses the governed CenterFace profile and does not require a rollout first.
 - [Whole-image embedding evaluation](whole-image-embedding-evaluation.md) — bounded WI-0127 exact-vector experiment for semantic retrieval, similar-photo retrieval and Creative Collection diversity; not a production vector-store procedure.
-- [Local caption and narration evaluation](local-caption-narration-evaluation.md) — WI-0128 experiment evidence plus the retained loopback-only archive caption-enrichment policy; generated captions are revision-bound derived photo evidence and consumers do not trigger generation.
+- [Local caption and narration evaluation](local-caption-narration-evaluation.md) — WI-0128 experiment evidence plus the retained caption-enrichment policy and WI-0174 provider-neutral Remote procedure; generated captions are revision-bound derived photo evidence and consumers do not trigger generation.
 
 ## Retained model-evaluation evidence
 
