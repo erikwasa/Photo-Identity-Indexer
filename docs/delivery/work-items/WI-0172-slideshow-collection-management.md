@@ -37,3 +37,7 @@ Verify a disposable collection of each type, direct editor selection and rename/
 ## Follow-up validation
 
 The affected API/Web/test projects build, and 50 focused non-host slideshow/receipt/cache/route/Creative optimization tests pass. Documentation `validate` and `generate --check` pass. PostgreSQL-backed preparation tests could not run locally because the test admin connection was unavailable; those cases remain required in CI. Maintained archive/phone acceptance is not claimed.
+
+## Maintainer acceptance — 2026-10-02 (Europe/Stockholm)
+
+The maintainer confirms slideshow collection management works as expected. This records maintained acceptance of the management experience. Canonical lifecycle is completed, verified by erikwasa. This acceptance supersedes earlier outstanding-verification statements above.

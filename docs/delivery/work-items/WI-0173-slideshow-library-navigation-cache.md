@@ -39,3 +39,7 @@ The affected API/Web/test projects build, and 50 focused non-host slideshow/rece
 ## Partial maintainer acceptance — 2026-10-01 (Europe/Stockholm)
 
 Cards remain on navigation returns, consistent with session-cache reuse. Manual refresh HTTP 500 and a generic review application error block full acceptance. F5 intentionally starts a fresh display session, but valid Prepared receipts must be restored independently after verification. WI-0175 / issue #476 repairs catalogue connection churn and receipt recovery; this item remains in review pending desktop/phone retest.
+
+## Maintainer acceptance — 2026-10-02 (Europe/Stockholm)
+
+The maintainer confirms slideshow library navigation caching works as expected. This supersedes the earlier partial navigation-cache acceptance. It does not independently close WI-0165 or WI-0175, whose remaining verification was not included in this report. Canonical lifecycle is completed, verified by erikwasa. This acceptance supersedes earlier outstanding-verification statements above.

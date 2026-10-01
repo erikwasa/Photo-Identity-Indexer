@@ -110,22 +110,22 @@ A rerun should be safe: already-effective values are not proposed, and repositor
 
 ## Acceptance criteria
 
-- [ ] `metadata enrich` is dry-run unless `--apply` is supplied.
-- [ ] The command scans only current image revisions and reports aggregate missing/proposed/ambiguous counts without printing private paths by default.
-- [ ] Existing effective capture dates are never replaced by filename/directory inference.
-- [ ] Existing named Places and valid non-zero GPS locations are not replaced by date-range Place rules.
-- [ ] `1970/...` is excluded from directory-date inference by default, while a plausible timestamp encoded in a filename can still supply a date.
-- [ ] Filename dates that disagree with a non-excluded `YYYY/MM` directory are reported as ambiguous rather than written.
-- [ ] Folder-only inference stores `YYYY-MM` precision rather than inventing a day.
-- [ ] Date-range Place rules require full containment of the photo's effective precision range.
-- [ ] A Place rule with `sourcePrefix` affects only source keys under that folder boundary; similarly named sibling folders remain unaffected.
-- [ ] Different source-scoped Place rules can safely assign different Places for the same date without conflicting when their source scopes do not overlap.
-- [ ] Conflicting matching Place rules are ambiguous and do not write a Place.
-- [ ] Apply uses the existing PostgreSQL capture-date and Place repositories and rechecks current state before each write.
-- [ ] Optional private report is sufficient to inspect proposed revision/source/value changes before apply.
-- [ ] Place-heavy private reports can be summarized and reduced to an approved rule subset without catalogue writes.
-- [ ] Automated tests cover filename, directory, catch-all, conflict, precision-containment and source-prefix behavior.
-- [ ] Maintainer verifies a production-catalogue dry-run before any broad apply operation.
+- [x] `metadata enrich` is dry-run unless `--apply` is supplied.
+- [x] The command scans only current image revisions and reports aggregate missing/proposed/ambiguous counts without printing private paths by default.
+- [x] Existing effective capture dates are never replaced by filename/directory inference.
+- [x] Existing named Places and valid non-zero GPS locations are not replaced by date-range Place rules.
+- [x] `1970/...` is excluded from directory-date inference by default, while a plausible timestamp encoded in a filename can still supply a date.
+- [x] Filename dates that disagree with a non-excluded `YYYY/MM` directory are reported as ambiguous rather than written.
+- [x] Folder-only inference stores `YYYY-MM` precision rather than inventing a day.
+- [x] Date-range Place rules require full containment of the photo's effective precision range.
+- [x] A Place rule with `sourcePrefix` affects only source keys under that folder boundary; similarly named sibling folders remain unaffected.
+- [x] Different source-scoped Place rules can safely assign different Places for the same date without conflicting when their source scopes do not overlap.
+- [x] Conflicting matching Place rules are ambiguous and do not write a Place.
+- [x] Apply uses the existing PostgreSQL capture-date and Place repositories and rechecks current state before each write.
+- [x] Optional private report is sufficient to inspect proposed revision/source/value changes before apply.
+- [x] Place-heavy private reports can be summarized and reduced to an approved rule subset without catalogue writes.
+- [x] Automated tests cover filename, directory, catch-all, conflict, precision-containment and source-prefix behavior.
+- [x] Maintainer verifies a production-catalogue dry-run before any broad apply operation.
 
 ## Verification plan
 
@@ -141,3 +141,7 @@ A rerun should be safe: already-effective values are not proposed, and repositor
 ## Privacy and safety notes
 
 The rule and report files can contain private archive paths and travel/location history. They are operator-local artifacts and must not be committed. CLI stdout intentionally exposes only aggregate counts. The grouped review helper reads only the local report/rules files and writes only a new local approved-rules file when requested. Source originals remain read-only throughout this workflow.
+
+## Maintainer acceptance — 2026-10-02 (Europe/Stockholm)
+
+The maintainer confirms that bulk metadata enrichment has already been run and verified and works fine. This satisfies the pending maintained-catalogue acceptance; no new enrichment run or catalogue mutation is performed for this closeout. Canonical lifecycle is completed, verified by erikwasa. This acceptance supersedes earlier outstanding-verification statements above.

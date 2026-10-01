@@ -43,13 +43,13 @@ The reported success wording belongs to the Accept suggestions path; the separat
 
 ## Acceptance criteria
 
-- [ ] A nonempty duplicate-only page terminates or advances through a bounded recovery path without repeated requests at an unchanged offset.
-- [ ] Overlapping pages add each face once, retain deterministic order and reach later unique results without an unbounded loop.
-- [ ] Bulk Assign and Accept suggestions show success as soon as commit succeeds; a delayed refill does not delay success or retain the action-busy state.
-- [ ] A refill failure after commit preserves truthful success and reports refresh failure separately, without duplicate review actions.
-- [ ] Changing filters or leaving the queue during refill cannot apply stale results to a new view; concurrent refill/load-more requests remain controlled.
-- [ ] Normal initial loading, infinite scroll, near-end queues, single-face actions and bulk refill preserve selection, counts and audit/undo behavior.
-- [ ] On the maintained Windows catalogue, selecting 10 faces and using each bulk path produces prompt feedback with no repeated-page request storm; record commit and refill timings separately.
+- [x] A nonempty duplicate-only page terminates or advances through a bounded recovery path without repeated requests at an unchanged offset.
+- [x] Overlapping pages add each face once, retain deterministic order and reach later unique results without an unbounded loop.
+- [x] Bulk Assign and Accept suggestions show success as soon as commit succeeds; a delayed refill does not delay success or retain the action-busy state.
+- [x] A refill failure after commit preserves truthful success and reports refresh failure separately, without duplicate review actions.
+- [x] Changing filters or leaving the queue during refill cannot apply stale results to a new view; concurrent refill/load-more requests remain controlled.
+- [x] Normal initial loading, infinite scroll, near-end queues, single-face actions and bulk refill preserve selection, counts and audit/undo behavior.
+- [x] On the maintained Windows catalogue, selecting 10 faces and using each bulk path produces prompt feedback with no repeated-page request storm; record commit and refill timings separately.
 
 ## Verification requirements
 
@@ -84,3 +84,7 @@ Run relevant builds/tests and PhotoIdentity.Docs validate plus generate --check.
 - Trade-off: offset paging under concurrent mutations remains a changing view. The component bounds recovery and offers explicit reload; a stable server snapshot/cursor contract is not introduced without a reproduced need.
 - Deferred: maintained Windows/private-catalogue acceptance and any separately reproduced server ordering/count defect.
 - Commands run: web build; filtered ReviewWorkspacePagingTests; PhotoIdentity.Docs show, review, generate, validate and generate --check.
+
+## Maintainer acceptance — 2026-10-02 (Europe/Stockholm)
+
+The maintainer reports the review queue seems to work fine and explicitly states that timing measurements are unnecessary. The maintainer accepts the observed behavior in place of the planned commit/refill timing report; no numerical timing or unreported scenario is claimed. Canonical lifecycle is completed, verified by erikwasa. This acceptance supersedes earlier outstanding-verification statements above.
