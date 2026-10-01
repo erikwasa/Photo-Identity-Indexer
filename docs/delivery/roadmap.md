@@ -35,10 +35,10 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M28 | Library curation and metadata editing | completed |
 | M29 | PostgreSQL-only catalogue cleanup | completed |
 | M30 | Video media support | blocked |
-| M31 | Bulk archive metadata enrichment | in_progress |
+| M31 | Bulk archive metadata enrichment | completed |
 | M32 | Archive media compatibility and slideshow library polish | in_progress |
 | M33 | Archive synchronization performance | completed |
-| M34 | Review queue reliability | in_progress |
+| M34 | Review queue reliability | completed |
 
 Expected evolution:
 
