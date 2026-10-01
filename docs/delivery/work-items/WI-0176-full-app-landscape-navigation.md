@@ -34,3 +34,5 @@ Remain in review until this maintained phone/PWA verification passes.
 ## Automated evidence
 
 [Validation run 36938800682](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36938800682) reproduced a document width of 1133px at a 900px viewport before the fix. After the fix, all 24 closed/open menu checks across nine distinct widths and repeated rotation widths passed. Lifecycle completion/review commands, documentation validation and generated-view freshness passed. The temporary workflow was removed after recording the generated lifecycle changes; the permanent CI gate is unchanged.
+
+[Windows documentation run 36939419884](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36939419884) regenerated and validated all delivery views, including the roadmap. Implementation and the six accepted lifecycle updates are submitted in [PR #479](https://github.com/erikwasa/Photo-Identity-Indexer/pull/479).
