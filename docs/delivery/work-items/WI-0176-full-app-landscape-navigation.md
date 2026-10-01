@@ -16,7 +16,7 @@ Issue #461: the maintainer can pan slightly right in the full app in phone lands
 
 ## Implementation
 
-Previously the primary navigation only wrapped at 860px and below. At wider phone landscape and intermediate desktop widths, its combined intrinsic width plus the brand exceeded the header. Make wrapping unconditional, give the navigation the available flex space with a zero minimum width, and preserve the brand width. All primary destinations and the Advanced menu remain accessible. No global overflow clipping is introduced.
+Previously the primary navigation only wrapped at 860px and below. At wider phone landscape and intermediate desktop widths, its combined intrinsic width plus the brand exceeded the header. Make wrapping unconditional, give the navigation the available flex space with a zero minimum width, and preserve the brand width. On narrow screens, anchor the Advanced panel to the navigation area instead of its wrapped summary so the menu also stays within the viewport. All primary destinations and the Advanced menu remain accessible. No global overflow clipping is introduced.
 
 ## Verification
 
@@ -30,3 +30,7 @@ Maintainer retest after merging and rebuilding:
 4. Rotate back to portrait without reloading and repeat. Check a desktop window around 900–1280px wide as well.
 
 Remain in review until this maintained phone/PWA verification passes.
+
+## Automated evidence
+
+[Validation run 36938800682](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36938800682) reproduced a document width of 1133px at a 900px viewport before the fix. After the fix, all 24 closed/open menu checks across nine distinct widths and repeated rotation widths passed. Lifecycle completion/review commands, documentation validation and generated-view freshness passed. The temporary workflow was removed after recording the generated lifecycle changes; the permanent CI gate is unchanged.
