@@ -16,7 +16,7 @@ Current work items: **12**. Archived terminal items: **164**.
 | [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0165.yaml) |
 | [WI-0171](../work-items/WI-0171-phone-slideshow-grid-artifacts.md) Diagnose thin grid-like lines during phone slideshow playback | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0171.yaml) |
 | [WI-0175](../work-items/WI-0175-slideshow-catalogue-recovery.md) Fix slideshow catalogue connection churn and reload recovery | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0175.yaml) |
-| [WI-0177](../work-items/WI-0177-unified-slideshow-library.md) Unify slideshow library into one consumer-facing grid | M32 | in_progress | ai-agent | [YAML](work-items/active/WI-0177.yaml) |
+| [WI-0177](../work-items/WI-0177-unified-slideshow-library.md) Unify slideshow library into one consumer-facing grid | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0177.yaml) |
 | [WI-0178](../work-items/WI-0178-slideshow-library-filtering.md) Add minimal slideshow library filtering and sorting | M32 | blocked | unassigned | [YAML](work-items/active/WI-0178.yaml) |
 
 Historical items stay queryable without opening the archive directory:
