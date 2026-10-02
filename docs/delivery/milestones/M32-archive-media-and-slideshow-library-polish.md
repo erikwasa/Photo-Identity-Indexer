@@ -11,7 +11,7 @@ depends_on: [M12, M26, M27, M28]
 
 Photo Identity handles the real DNG files now present in the maintained archive and makes the slideshow/Creative Collection experience easier to understand and more reliable on desktop and phone without regressing established slideshow performance.
 
-This milestone remains follow-up work rather than a slideshow redesign. It does not reopen generic RAW support for camera formats that are not present. The additional follow-ups record real maintainer findings around Prepared-state continuity, OneDrive-unavailable recovery, standalone-PWA navigation, archive-scale Creative materialization and navigation of a growing slideshow library.
+This milestone remains follow-up work rather than a slideshow redesign. It does not reopen generic RAW support for camera formats that are not present. The additional follow-ups record real maintainer findings around Prepared-state continuity, OneDrive-unavailable recovery, standalone-PWA navigation, archive-scale Creative materialization, navigation of a growing slideshow library, and collection-authoring usability.
 
 ## Work items
 
@@ -25,6 +25,12 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 - [WI-0172](../work-items/WI-0172-slideshow-collection-management.md) - provide a separate full-app collection-management hub.
 - [WI-0177](../work-items/WI-0177-unified-slideshow-library.md) - present Smart, manual and Creative slideshows as one consumer-facing library without creation-type grouping.
 - [WI-0178](../work-items/WI-0178-slideshow-library-filtering.md) - add compact name filtering and deterministic sorting over the unified slideshow library.
+- [WI-0179](../work-items/WI-0179-smart-collection-orientation-filter.md) - add visually correct portrait/landscape filtering to Smart Collections with existing-catalogue geometry fallback.
+- [WI-0180](../work-items/WI-0180-playback-preferences-ui.md) - improve playback-preference checkbox alignment, touch targets and compact duration layout.
+- [WI-0181](../work-items/WI-0181-creative-collection-checkbox-alignment.md) - fix Creative Collection checkbox alignment and make shared collection-form styling explicit.
+- [WI-0182](../work-items/WI-0182-photo-quality-scoring-evaluation.md) - evaluate inspectable technical photo-quality evidence before deciding whether it should influence selection.
+- [WI-0183](../work-items/WI-0183-smart-collection-progressive-disclosure.md) - shorten Smart Collection authoring with progressive disclosure and remove unused Tags authoring without losing legacy criteria.
+- [WI-0184](../work-items/WI-0184-manual-collection-date-sort.md) - add one-action oldest/newest chronological sorting for manual collections.
 
 ## Delivery principles
 
@@ -39,6 +45,8 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 - Treat Smart, manual and Creative as authoring/implementation distinctions rather than primary consumer-library navigation categories.
 - Keep large-library navigation visually quiet: prefer lightweight presentation-layer search/sort over a management-style filter surface.
 - Treat expensive Creative derived evidence as bounded/versioned work suitable for reuse; do not solve archive-scale timeouts only by increasing client timeouts.
+- Keep collection authoring compact through progressive disclosure and small, explicit controls rather than new management-heavy surfaces.
+- Keep derived orientation/quality evidence separate from canonical archive truth and do not hydrate originals solely for presentation classification when trustworthy derivatives suffice.
 
 ## Exit criteria
 
@@ -52,4 +60,8 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 - [ ] A representative approximately 1,000-photo anchor with target 150 and Broad Creative context completes within the maintained client/server request boundary or reports a bounded actionable failure, with stable expensive derived evidence reused where appropriate.
 - [ ] Smart, manual and Creative slideshows appear in one continuous consumer library without creation-type sections while preserving correct playback and preparation behavior.
 - [ ] A populated unified library can be narrowed quickly by slideshow name using a compact filter/search control on desktop and phone/PWA, with deterministic ordering and an accessible no-results recovery path.
+- [ ] Smart Collection authoring supports portrait/landscape filtering with correct existing-catalogue behavior and presents optional filters progressively rather than keeping inactive detail fields visible.
+- [ ] Playback/Creative authoring checkboxes and duration controls are clearly aligned, associated and phone-friendly.
+- [ ] Manual collections can be reordered oldest/newest in one action without losing explicit manual ordering semantics.
+- [ ] Technical photo-quality scoring has representative evaluation evidence and a documented adoption/no-adoption decision before it changes selection behavior.
 - [ ] Maintainer verifies the remaining slideshow/PWA behavior on desktop and phone and the Creative scale case on representative private catalogue data.
