@@ -48,3 +48,7 @@ The follow-up applies the existing mobile header layout whenever the primary inp
 Retest Archive in phone landscape and portrait, including rotation without reload: the dark header should span the page, there should be no pale badge strip, and all primary/Advanced destinations must remain reachable. Also confirm desktop navigation at intermediate widths. WI-0176 remains in review after implementation until maintained phone acceptance.
 
 [Mobile validation run 37032772684](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/37032772684) passed 24 scenarios: 20 mobile header/menu checks at 16px and 20px root text size, including repeated portrait/landscape rotation with mobile viewport metadata, coarse/no-hover touch input and 2.625 device scale; plus four desktop width checks. The previous landscape rules left the badge visible; the follow-up hides it and keeps a static full-width header. Mobile checks include viewport bounds for primary and Advanced destinations. Lifecycle review, documentation validation and generated-view checks also passed. These are shell-layout checks, not a claim that the physical phone's pale-strip rendering has been reproduced or accepted. The temporary workflow is removed from the final diff.
+
+## Maintainer acceptance — 2026-10-02
+
+After the follow-up was merged, the maintainer reported that WI-0176 verified successfully on the maintained device. This satisfies the pending phone/PWA acceptance gate for the landscape navigation fix and completes the work item.
