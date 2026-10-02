@@ -82,7 +82,7 @@ public sealed class SmartCollectionProgressiveDisclosureTests
             JsonSerializer.Deserialize<SmartCollectionTransientNavigationState>(json, options);
 
         Assert.NotNull(restored);
-        Assert.Equal(["family", "travel"], restored.Tags);
+        Assert.Equal(new[] { "family", "travel" }, restored.Tags);
         Assert.Equal("any", restored.TagMatch);
     }
 
