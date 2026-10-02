@@ -1,0 +1,11 @@
+id: WI-0181
+title: Fix Creative Collections checkbox alignment and shared form styling
+milestone: M32
+status: ready
+owner: unassigned
+document: ../work-items/WI-0181-creative-collection-checkbox-alignment.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/489
