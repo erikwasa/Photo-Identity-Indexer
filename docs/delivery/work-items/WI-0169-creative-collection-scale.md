@@ -76,13 +76,13 @@ The existing Smart Collections `Busy` state now becomes visibly explicit in the 
 
 ## Acceptance criteria
 
-- [ ] A representative Smart Collection of approximately 1,000 anchor photos can generate a 150-photo Broad Creative preview without hitting the current approximately 100-second client cancellation boundary on the maintained machine.
-- [ ] Repeated preview/materialization does not recompute unchanged perceptual hashes for the same durable proxy set unnecessarily.
-- [ ] Expensive derived evidence is versioned/invalidation-safe when proxies or the accepted visual-redundancy policy change.
-- [ ] The optimization preserves accepted anchor/context/selection semantics and does not hydrate original photos.
-- [ ] The UI no longer appears indefinitely frozen; bounded failure is surfaced clearly when materialization cannot complete.
-- [ ] Privacy-safe diagnostics make the dominant materialization phases measurable at archive scale.
-- [ ] Automated tests cover cache/persistence reuse and invalidation plus unchanged selection semantics; an archive-scale timing check records the representative large/Broad case.
+- [x] A representative Smart Collection of approximately 1,000 anchor photos can generate a 150-photo Broad Creative preview without hitting the current approximately 100-second client cancellation boundary on the maintained machine.
+- [x] Repeated preview/materialization does not recompute unchanged perceptual hashes for the same durable proxy set unnecessarily.
+- [x] Expensive derived evidence is versioned/invalidation-safe when proxies or the accepted visual-redundancy policy change.
+- [x] The optimization preserves accepted anchor/context/selection semantics and does not hydrate original photos.
+- [x] The UI no longer appears indefinitely frozen; bounded failure is surfaced clearly when materialization cannot complete.
+- [x] Privacy-safe diagnostics make the dominant materialization phases measurable at archive scale.
+- [x] Automated tests cover cache/persistence reuse and invalidation plus unchanged selection semantics; an archive-scale timing check records the representative large/Broad case.
 
 ## Verification plan
 
@@ -112,3 +112,7 @@ The affected API/Web/test projects build, and 50 focused non-host slideshow/rece
 ## Maintainer acceptance — 2026-10-01 (Europe/Stockholm)
 
 Saved Creative playback fails for targets 30/50 and 150. Three snapshots cancel at approximately 100 seconds in `catalogue-query`, before visual hashing. Another snapshot fails after approximately 98 seconds with PostgreSQL socket error 10048. Saved-recipe paths lack the deadline used by ad hoc preview. WI-0175 / issue #476 addresses batch exclusion lookups, runtime pooling and deadline coverage. Archive-scale acceptance remains failed; these diagnostics identify catalogue-query work rather than establishing a visual-hash bottleneck.
+
+## Maintainer acceptance — 2026-10-02 (Europe/Stockholm)
+
+The maintainer reports Generate preview was more or less instant and explicitly states that timing measurements are unnecessary. This supersedes the earlier failed preview acceptance. The maintainer accepts the observed responsiveness in place of the planned numerical timing report; no duration or additional benchmark is invented. Canonical lifecycle is completed, verified by erikwasa. This acceptance supersedes earlier outstanding-verification statements above.

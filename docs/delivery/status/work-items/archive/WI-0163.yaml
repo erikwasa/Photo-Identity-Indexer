@@ -1,0 +1,17 @@
+id: WI-0163
+title: Add safe bulk capture-date and Place enrichment
+milestone: M31
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0163-bulk-metadata-enrichment.md
+started_at: 2026-09-25
+completed_at: 2026-10-01
+verified_at: 2026-10-01
+verified_by: erikwasa
+last_updated_at: 2026-10-01
+branch: agent/wi-0163-bulk-metadata-enrichment
+blockers: []
+blocker_notes: []
+evidence:
+- type: maintainer-acceptance
+  value: '2026-10-02 Europe/Stockholm: erikwasa confirms acceptance; see the Maintainer acceptance section in the work-item document. Numerical timing explicitly waived for WI-0169 and WI-0170.'

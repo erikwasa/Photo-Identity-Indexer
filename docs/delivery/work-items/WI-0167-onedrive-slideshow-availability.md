@@ -43,12 +43,12 @@ Both the slideshow player and slideshow-library preparation tools render the rec
 
 ## Acceptance criteria
 
-- [ ] A slideshow whose required originals are already local can prepare and play normally while OneDrive is not running.
-- [ ] When an online-only original is required and OneDrive is unavailable, preparation reaches an actionable failure/recovery state within a bounded interval rather than waiting indefinitely at `0 / N`.
-- [ ] An active but slow OneDrive hydration is not misclassified merely because the ready count is temporarily unchanged.
-- [ ] The failure message tells the maintainer to start OneDrive and retry without exposing source paths.
-- [ ] Retry after OneDrive becomes available reuses the same immutable snapshot and can resume/reassert Photo-Identity-owned hydration without exceeding the configured storage or concurrency policy.
-- [ ] Automated tests cover already-local behavior, unavailable-client behavior, slow/downloading behavior and retry recovery.
+- [x] A slideshow whose required originals are already local can prepare and play normally while OneDrive is not running.
+- [x] When an online-only original is required and OneDrive is unavailable, preparation reaches an actionable failure/recovery state within a bounded interval rather than waiting indefinitely at `0 / N`.
+- [x] An active but slow OneDrive hydration is not misclassified merely because the ready count is temporarily unchanged.
+- [x] The failure message tells the maintainer to start OneDrive and retry without exposing source paths.
+- [x] Retry after OneDrive becomes available reuses the same immutable snapshot and can resume/reassert Photo-Identity-owned hydration without exceeding the configured storage or concurrency policy.
+- [x] Automated tests cover already-local behavior, unavailable-client behavior, slow/downloading behavior and retry recovery.
 
 ## Automated coverage added
 
@@ -74,3 +74,7 @@ Implementation and automated coverage are present on the WI-0167 branch. The acc
 ### Maintainer verification update — 2026-09-30 (Europe/Stockholm)
 
 Maintainer explicitly reports **not tested yet**. Keep `in_review`; the unavailable-client / Retry / already-local-original checks remain outstanding. The attached log and other slideshow observations do not substitute for these checks.
+
+## Maintainer acceptance — 2026-10-02 (Europe/Stockholm)
+
+The maintainer confirms WI-0167 works as expected. The prior not-tested note is superseded by this maintained acceptance. Canonical lifecycle is completed, verified by erikwasa. This acceptance supersedes earlier outstanding-verification statements above.

@@ -1,14 +1,19 @@
 id: WI-0170
 title: Bound review queue refill and show bulk face decisions promptly
 milestone: M34
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0170-review-queue-refill.md
 started_at: 2026-09-30
-last_updated_at: 2026-09-30
+completed_at: 2026-10-01
+verified_at: 2026-10-01
+verified_by: erikwasa
+last_updated_at: 2026-10-01
 branch: agent/wi-0170-review-queue-refill
 blockers: []
 blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/471
+- type: maintainer-acceptance
+  value: '2026-10-02 Europe/Stockholm: erikwasa confirms acceptance; see the Maintainer acceptance section in the work-item document. Numerical timing explicitly waived for WI-0169 and WI-0170.'
