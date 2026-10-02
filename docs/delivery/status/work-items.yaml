@@ -135,7 +135,7 @@ work_items:
 - id: WI-0177
   title: Unify slideshow library into one consumer-facing grid
   milestone: M32
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0177-unified-slideshow-library.md
   started_at: 2026-10-02
@@ -146,6 +146,10 @@ work_items:
   evidence:
   - type: issue
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/480
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/484
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/486
 - id: WI-0178
   title: Add minimal slideshow library filtering and sorting
   milestone: M32
