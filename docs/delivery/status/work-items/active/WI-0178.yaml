@@ -1,0 +1,13 @@
+id: WI-0178
+title: Add minimal slideshow library filtering and sorting
+milestone: M32
+status: blocked
+owner: unassigned
+document: ../work-items/WI-0178-slideshow-library-filtering.md
+blockers:
+- WI-0177
+blocker_notes:
+- Implement filtering after WI-0177 establishes one unified slideshow catalogue and grid.
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/481
