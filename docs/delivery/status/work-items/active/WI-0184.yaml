@@ -1,0 +1,11 @@
+id: WI-0184
+title: Add whole-collection chronological sorting for manual collections
+milestone: M32
+status: ready
+owner: unassigned
+document: ../work-items/WI-0184-manual-collection-date-sort.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/492

@@ -1,0 +1,11 @@
+id: WI-0182
+title: Evaluate automatic technical photo quality scoring
+milestone: M32
+status: ready
+owner: unassigned
+document: ../work-items/WI-0182-photo-quality-scoring-evaluation.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/490
