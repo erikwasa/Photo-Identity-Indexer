@@ -35,9 +35,21 @@ Keep the fix visually quiet and consistent with the existing full-app forms. Do 
 
 ## Acceptance criteria
 
-- `Favor photos not shown recently` is vertically aligned with its checkbox on desktop and phone/PWA.
-- The checkbox and label behave as one accessible/tappable control.
-- Shared collection-form styling no longer relies on CSS isolation accidentally crossing component/page boundaries.
-- Existing Smart Collection form styling does not regress after extracting/reusing shared rules.
-- No new horizontal overflow or awkward wrapping appears on supported phone widths.
-- Focused Web/markup regression coverage plus maintainer desktop/phone verification confirm the result.
+- [ ] `Favor photos not shown recently` is vertically aligned with its checkbox on desktop and phone/PWA.
+- [ ] The checkbox and label behave as one accessible/tappable control.
+- [x] Shared collection-form styling no longer relies on CSS isolation accidentally crossing component/page boundaries.
+- [ ] Existing Smart Collection form styling does not regress after extracting/reusing shared rules.
+- [ ] No new horizontal overflow or awkward wrapping appears on supported phone widths.
+- [x] Focused Web/markup regression coverage is present; maintainer desktop/phone verification remains required.
+
+## Implementation notes
+
+PR #494 extracts the Smart/Creative authoring shell, shared fields, actions and Creative recipe styles into `wwwroot/css/collection-workspace.css`, loaded explicitly by the Web shell before component-isolated styles. The shared rules are scoped to the `smart-collections-heading` and `creative-collections-heading` workspaces, so the separate slideshow collection-management page is not restyled merely because it reuses some `smart-*` class names.
+
+`SmartCollectionsWorkspace.razor.css` now retains only Smart Collection-specific filter/result/place rules. The Creative novelty toggle remains a semantic `<label>` containing the checkbox and text, but receives an explicit two-column alignment, a 44 px minimum touch target, a 1.25 rem checkbox and a full-width row inside Creative controls. At phone widths, Creative controls and preview summary collapse to one column to avoid cramped wrapping or horizontal overflow.
+
+`CollectionWorkspaceStyleContractTests` verifies that the shared stylesheet is loaded before isolated component styles, that the Creative novelty markup retains the label/checkbox/text contract, that the touch/alignment rules are present, and that the shared selectors do not drift back into the Smart component-isolated stylesheet.
+
+## Verification status
+
+Implementation is in review in PR #494. Required CI plus maintainer visual verification on desktop and phone/PWA remain outstanding. Maintainer verification should check the novelty checkbox alignment and whole-label tap behavior, target/context field wrapping, horizontal overflow, and unchanged `/smart-collections` authoring layout.
