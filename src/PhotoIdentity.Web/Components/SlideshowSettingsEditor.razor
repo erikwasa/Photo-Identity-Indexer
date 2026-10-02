@@ -1,33 +1,37 @@
 @using System.Globalization
 
 <div class="slideshow-settings-editor">
-    <label>
+    <label class="slideshow-settings-check">
         <input type="checkbox" checked="@Settings.Autoplay" @onchange="ChangeAutoplayAsync" />
         <span>Autoplay</span>
     </label>
 
     <label class="slideshow-settings-field">
-        <span>Image duration</span>
-        <input type="number"
-               min="@SlideshowSettings.MinimumImageDurationSeconds"
-               max="@SlideshowSettings.MaximumImageDurationSeconds"
-               value="@Settings.ImageDurationSeconds"
-               @onchange="ChangeDurationAsync" />
-        <span>seconds</span>
+        <span class="slideshow-settings-label">Image duration</span>
+        <span class="slideshow-settings-duration-control">
+            <input class="slideshow-settings-duration"
+                   type="number"
+                   min="@SlideshowSettings.MinimumImageDurationSeconds"
+                   max="@SlideshowSettings.MaximumImageDurationSeconds"
+                   inputmode="numeric"
+                   value="@Settings.ImageDurationSeconds"
+                   @onchange="ChangeDurationAsync" />
+            <span>seconds</span>
+        </span>
     </label>
 
-    <label>
+    <label class="slideshow-settings-check">
         <input type="checkbox" checked="@Settings.ShowTimerProgress" @onchange="ChangeProgressAsync" />
         <span>Show timer progress</span>
     </label>
 
-    <label>
+    <label class="slideshow-settings-check">
         <input type="checkbox" checked="@Settings.ManualNavigation" @onchange="ChangeManualNavigationAsync" />
         <span>Manual navigation</span>
     </label>
 
     <label class="slideshow-settings-field">
-        <span>Orientation</span>
+        <span class="slideshow-settings-label">Orientation</span>
         <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
             <option value="@SlideshowSettings.CurrentOrientation">Current at start</option>
             <option value="@SlideshowSettings.PortraitOrientation">Portrait</option>
@@ -36,7 +40,7 @@
     </label>
 
     <label class="slideshow-settings-field">
-        <span>After last photo</span>
+        <span class="slideshow-settings-label">After last photo</span>
         <select value="@Settings.AfterLastPhoto" @onchange="ChangeEndBehaviorAsync">
             <option value="@SlideshowSettings.Loop">Loop</option>
             <option value="@SlideshowSettings.Stop">Stop</option>
@@ -44,12 +48,12 @@
         </select>
     </label>
 
-    <label>
+    <label class="slideshow-settings-check">
         <input type="checkbox" checked="@Settings.ProtectedSlideshow" @onchange="ChangeProtectedAsync" />
         <span>Protected slideshow</span>
     </label>
 
-    <label>
+    <label class="slideshow-settings-check">
         <input type="checkbox" checked="@Settings.ShowCaptions" @onchange="ChangeShowCaptionsAsync" />
         <span>Show photo captions</span>
     </label>
@@ -61,7 +65,7 @@
 
     @if (ShowPrepareOriginals)
     {
-        <label>
+        <label class="slideshow-settings-check">
             <input type="checkbox" checked="@Settings.PrepareOriginals" @onchange="ChangePrepareOriginalsAsync" />
             <span>Prepare originals when slideshow starts</span>
         </label>
