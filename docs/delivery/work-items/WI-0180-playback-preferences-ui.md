@@ -39,11 +39,23 @@ This is presentation polish, not a settings redesign. Do not rename or remove ex
 
 ## Acceptance criteria
 
-- Each checkbox is visually adjacent to the text it controls on desktop and phone/PWA.
-- Checkbox rows provide a comfortable touch target on phone and remain keyboard accessible.
-- Image duration renders as a compact control with its value and unit kept together.
-- The duration label does not split above and below the input in a confusing way at narrow widths.
-- The settings editor introduces no horizontal overflow at supported phone widths.
-- The same shared component works correctly from both `/slideshows` playback preferences and the in-player settings panel.
-- Existing settings values persist and behave exactly as before.
-- Focused Web/markup coverage plus maintainer desktop and phone verification confirm the layout.
+- [ ] Each checkbox is visually adjacent to the text it controls on desktop and phone/PWA.
+- [ ] Checkbox rows provide a comfortable touch target on phone and remain keyboard accessible.
+- [ ] Image duration renders as a compact control with its value and unit kept together.
+- [ ] The duration label does not split above and below the input in a confusing way at narrow widths.
+- [ ] The settings editor introduces no horizontal overflow at supported phone widths.
+- [ ] The same shared component works correctly from both `/slideshows` playback preferences and the in-player settings panel.
+- [x] Existing settings values persist and behave exactly as before; no settings state, normalization or callback code changed.
+- [x] Focused Web/markup coverage is present; maintainer desktop and phone verification remains required.
+
+## Implementation notes
+
+PR #495 keeps all behavior in the existing shared `SlideshowSettingsEditor` and changes only its presentation markup and isolated CSS. Boolean preferences now use an explicit `slideshow-settings-check` label row with the checkbox immediately beside its text, a 44 px desktop minimum row height, and a 48 px phone minimum row height with a slightly larger native checkbox.
+
+`Image duration` now groups the compact numeric input and `seconds` inside one nowrap duration-control span. On narrow screens the field label may stack above that grouped control, so the meaningful `value + unit` pair never splits around the input. Orientation and After last photo use the same field grid and selects expand safely to the available phone width.
+
+`SlideshowSettingsEditorStyleContractTests` verifies that both the slideshow library and in-player panel still use the shared component and protects the checkbox-row and grouped-duration layout contract.
+
+## Verification status
+
+Implementation is in review in PR #495. Required CI plus maintainer visual verification on desktop and phone/PWA remain outstanding. Verify both Playback preferences on `/slideshows` and the in-player Settings panel, including checkbox association/tapping, duration layout and horizontal overflow.
