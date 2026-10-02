@@ -1,0 +1,11 @@
+id: WI-0179
+title: Add photo orientation filtering to Smart Collections
+milestone: M32
+status: ready
+owner: unassigned
+document: ../work-items/WI-0179-smart-collection-orientation-filter.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/487
