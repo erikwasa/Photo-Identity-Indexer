@@ -7,127 +7,16 @@
     <div>
         <p class="eyebrow">Family slideshows</p>
         <h1>Choose a slideshow</h1>
-        <p>Tap a collection and start watching.</p>
+        <p>Tap a slideshow and start watching.</p>
     </div>
 </section>
 
-@if (!string.IsNullOrWhiteSpace(Error) && Collections.Count > 0)
-{
-    <div class="notice error" role="alert">
-        @Error
-        <button type="button" class="button secondary" @onclick="RefreshAsync">Retry refresh</button>
-    </div>
-}
-
-@if (Loading)
-{
-    <section class="slideshow-library-state" role="status">
-        <div class="spinner" aria-hidden="true"></div>
-        <p>Finding your slideshows…</p>
-    </section>
-}
-else if (!string.IsNullOrWhiteSpace(Error) && Collections.Count == 0)
-{
-    <section class="slideshow-library-state" role="alert">
-        <strong>Slideshows could not be loaded</strong>
-        <p>@Error</p>
-        <button type="button" class="button secondary" @onclick="RefreshAsync">Retry</button>
-    </section>
-}
-else if (Collections.Count == 0)
-{
-    <section class="slideshow-library-state">
-        <h2>No Smart or manual slideshows yet</h2>
-        <p>Saved Smart Collections and manual slideshows will appear here when they are available. Saved Creative Collections are listed below.</p>
-    </section>
-}
-else
-{
-    <section class="slideshow-library-grid" aria-label="Slideshows">
-        @foreach (SlideshowLibraryEntry collection in Collections)
-        {
-            SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
-            bool preparing = preparation?.State == "preparing";
-            bool needsAttention = SlideshowPreparationExperience.NeedsParentAttention(preparation);
-            bool starting = IsStarting(collection.Id);
-            bool busy = preparing || needsAttention || starting;
-            bool prepared = SlideshowLibraryPresentation.ShowPreparedIndicator(preparation?.State, busy);
-            int? photoCount = PhotoCountFor(collection);
-            string? quantityLabel = photoCount.HasValue
-                ? SlideshowLibraryPresentation.PhotoCountLabel(photoCount.Value)
-                : null;
-
-            <article @key="collection.Id" class="slideshow-library-card">
-                <button type="button"
-                        class="slideshow-library-primary"
-                        disabled="@busy"
-                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name, quantityLabel, prepared)"
-                        @onclick="() => StartSlideshowAsync(collection)">
-                    <SlideshowLibraryCover CollectionId="@collection.Id"
-                                           Manual="@collection.Manual"
-                                           CoverRevisionId="@collection.CoverRevisionId"
-                                           PhotoCountChanged="@(count => SetSmartPhotoCountAsync(collection.Id, count))" />
-                    <span class="slideshow-library-card-shade" aria-hidden="true"></span>
-                    <span class="slideshow-library-card-copy">
-                        @if (photoCount.HasValue || prepared)
-                        {
-                            <span class="slideshow-library-card-meta">
-                                @if (photoCount.HasValue)
-                                {
-                                    <span class="slideshow-library-card-badge">
-                                        @quantityLabel
-                                    </span>
-                                }
-                                @if (prepared)
-                                {
-                                    <span class="slideshow-library-card-badge slideshow-library-card-badge-prepared">
-                                        <span aria-hidden="true">✓</span>
-                                        <span>Prepared</span>
-                                    </span>
-                                }
-                            </span>
-                        }
-                        <span class="slideshow-library-card-title">@collection.Name</span>
-                        @if (collection.Manual)
-                        {
-                            <span class="slideshow-library-card-kind">Manual · @((collection.CoverRevisionId is null) ? "empty" : "explicit photos")</span>
-                        }
-                        <span class="slideshow-library-card-cue">
-                            <span class="slideshow-library-play-mark" aria-hidden="true">▶</span>
-                            @if (starting)
-                            {
-                                <span>Starting…</span>
-                            }
-                            else if (needsAttention)
-                            {
-                                <span>Parent attention needed</span>
-                            }
-                            else if (preparing)
-                            {
-                                <span>Getting originals ready…</span>
-                            }
-                            else
-                            {
-                                <span>Play slideshow</span>
-                            }
-                        </span>
-                    </span>
-                </button>
-
-            </article>
-        }
-    </section>
-}
-
-<CreativeSlideshowLibrary />
-
-@if (!string.IsNullOrWhiteSpace(VerificationError))
-{
-    <div class="notice error" role="alert">
-        @VerificationError
-        <button type="button" class="button secondary" @onclick="RefreshAsync">Retry verification</button>
-    </div>
-}
+<UnifiedSlideshowLibrary CatalogueLoading="@Loading"
+                         CatalogueError="@Error"
+                         RefreshRequested="RefreshAsync"
+                         PreparationLookup="@PreparationFor"
+                         BusyLookup="@IsBusy"
+                         StartingLookup="@IsStarting" />
 
 <details class="slideshow-library-settings">
     <summary>Playback preferences</summary>
