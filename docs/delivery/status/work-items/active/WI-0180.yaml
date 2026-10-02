@@ -1,7 +1,7 @@
 id: WI-0180
 title: Polish slideshow playback preferences controls
 milestone: M32
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0180-playback-preferences-ui.md
 started_at: 2026-10-03
@@ -12,3 +12,5 @@ blocker_notes: []
 evidence:
 - type: issue
   value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/488
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/495
