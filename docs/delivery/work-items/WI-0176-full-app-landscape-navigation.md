@@ -36,3 +36,13 @@ Remain in review until this maintained phone/PWA verification passes.
 [Validation run 36938800682](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36938800682) reproduced a document width of 1133px at a 900px viewport before the fix. After the fix, all 24 closed/open menu checks across nine distinct widths and repeated rotation widths passed. Lifecycle completion/review commands, documentation validation and generated-view freshness passed. The temporary workflow was removed after recording the generated lifecycle changes; the permanent CI gate is unchanged.
 
 [Windows documentation run 36939419884](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36939419884) regenerated and validated all delivery views, including the roadmap. Implementation and the six accepted lifecycle updates are submitted in [PR #479](https://github.com/erikwasa/Photo-Identity-Indexer/pull/479).
+
+## Maintainer landscape retest — 2026-10-02
+
+PR #479 is merged. The maintainer confirms phone landscape no longer pans, but the supplied Archive screenshot shows the Local catalogue badge on a pale right-hand strip outside the painted header/workflow area. This is partial acceptance only; issue #461 remains open. The screenshot is not committed.
+
+The earlier fixture resized a desktop Chromium page; it did not emulate a mobile viewport, touch capabilities or device scale. Width/link bounds alone did not establish correct phone rendering.
+
+The follow-up applies the existing mobile header layout whenever the primary input is coarse with no hover, as well as below 680px. Phone landscape therefore keeps the same static header, wrapped navigation, hidden redundant catalogue badge and navigation-anchored Advanced menu as portrait. Desktop pointer layouts retain their current behavior. No global overflow clipping is added. The screenshot establishes the visible defect; it does not establish a browser compositor root cause.
+
+Retest Archive in phone landscape and portrait, including rotation without reload: the dark header should span the page, there should be no pale badge strip, and all primary/Advanced destinations must remain reachable. Also confirm desktop navigation at intermediate widths. WI-0176 remains in review after implementation until maintained phone acceptance.

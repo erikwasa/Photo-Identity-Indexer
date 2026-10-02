@@ -1,12 +1,12 @@
 id: WI-0176
 title: Keep full-app navigation within landscape viewports
 milestone: M32
-status: in_review
+status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0176-full-app-landscape-navigation.md
 started_at: 2026-10-01
-last_updated_at: 2026-10-01
-branch: agent/issue-461-landscape-verification
+last_updated_at: 2026-10-02
+branch: agent/wi-0176-header-strip
 blockers: []
 blocker_notes: []
 evidence:
