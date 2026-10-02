@@ -232,9 +232,18 @@ else
                 : null;
         }
 
-        int? count = item.Manual
-            ? item.PhotoCount
-            : _smartPhotoCounts.GetValueOrDefault(item.Id);
+        int? count;
+        if (item.Manual)
+        {
+            count = item.PhotoCount;
+        }
+        else
+        {
+            count = _smartPhotoCounts.TryGetValue(item.Id, out int smartCount)
+                ? smartCount
+                : null;
+        }
+
         return count.HasValue
             ? SlideshowLibraryPresentation.PhotoCountLabel(count.Value)
             : null;
