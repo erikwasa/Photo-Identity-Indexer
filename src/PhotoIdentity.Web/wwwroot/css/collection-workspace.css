@@ -1,0 +1,328 @@
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) {
+    display: grid;
+    gap: 0.9rem;
+    min-width: 0;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 1rem;
+    background: var(--surface, #fff);
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-subheading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading h2,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading h3,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading p {
+    margin-top: 0;
+    overflow-wrap: anywhere;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading h2,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading h3 {
+    margin-bottom: 0.35rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading p {
+    margin-bottom: 0;
+    line-height: 1.4;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading.compact {
+    align-items: center;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-layout {
+    display: grid;
+    grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 2.2fr);
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-saved-list,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-editor {
+    display: grid;
+    gap: 0.7rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-saved-list {
+    position: sticky;
+    top: 5.5rem;
+    align-self: start;
+    align-content: start;
+    max-height: calc(100vh - 7rem);
+    overflow-y: auto;
+    padding-right: 0.3rem;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-saved-list > .smart-subheading {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.15rem 0 0.4rem;
+    background: var(--surface, #fff);
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-subheading {
+    align-items: center;
+    color: var(--text-muted, #667085);
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-saved-card {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.55rem;
+    overflow: hidden;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.75rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-saved-card.selected {
+    box-shadow: inset 0 0 0 2px currentColor;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-open-button {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-open-button strong,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-open-button span,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-muted,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-help {
+    overflow-wrap: anywhere;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-open-button span,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-muted,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-help {
+    color: var(--text-muted, #667085);
+    font-size: 0.82rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-field,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-location-toggle {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-editor .field-label {
+    margin-bottom: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-editor input:not([type="checkbox"]),
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-editor select {
+    min-height: 34px;
+    max-width: 100%;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.55rem;
+    line-height: 1.2;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-location-toggle {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 44px;
+    padding: 0.25rem 0;
+    cursor: pointer;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-location-toggle > input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-location-toggle > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-actions > * {
+    max-width: 100%;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-actions .button,
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading > .button {
+    min-height: 34px;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.55rem;
+    line-height: 1.15;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-recipe {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.7rem;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.85rem;
+    background: var(--surface, #fff);
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-controls {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.45fr) minmax(10rem, 0.55fr);
+    gap: 0.65rem;
+    max-width: 34rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-controls > .smart-location-toggle {
+    grid-column: 1 / -1;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-summary {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(5.5rem, 1fr));
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-stat {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.7rem;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.65rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-stat strong {
+    font-size: 1.2rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-stat span {
+    color: var(--text-muted, #667085);
+    font-size: 0.8rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 0.7rem;
+    min-width: 0;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-preview-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.65rem;
+    background: var(--surface, #fff);
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-preview-card img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: #111;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-preview-card > div {
+    display: grid;
+    gap: 0.3rem;
+    min-width: 0;
+    padding: 0.55rem;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-preview-card strong {
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-kind {
+    justify-self: start;
+    max-width: 100%;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+:is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-kind.context {
+    opacity: 0.72;
+}
+
+@media (max-width: 900px) {
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-layout {
+        grid-template-columns: 1fr;
+    }
+
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-saved-list {
+        position: static;
+        max-height: 24rem;
+    }
+
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-summary {
+        grid-template-columns: repeat(3, minmax(5rem, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) {
+        padding: 0.9rem;
+    }
+
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading,
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-subheading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-editor input:not([type="checkbox"]),
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-editor select {
+        min-height: 44px;
+        padding: 0.7rem 0.8rem;
+        border-radius: 0.72rem;
+    }
+
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-actions .button,
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .smart-workspace-heading > .button {
+        min-height: 44px;
+        padding: 0.65rem 0.82rem;
+        border-radius: 0.72rem;
+    }
+
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-controls,
+    :is(.smart-workspace[aria-labelledby="smart-collections-heading"], .smart-workspace[aria-labelledby="creative-collections-heading"]) .creative-summary {
+        grid-template-columns: 1fr;
+    }
+}
