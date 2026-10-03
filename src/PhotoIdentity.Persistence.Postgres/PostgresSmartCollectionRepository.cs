@@ -227,7 +227,8 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
         taken: filter.Taken,
         locationPlaces: filter.LocationPlaces,
         age: filter.Age,
-        relationship: filter.Relationship);
+        relationship: filter.Relationship,
+        orientation: filter.Orientation);
 
     private static string SerializeFilter(SmartCollectionFilter filter)
     {
@@ -260,7 +261,8 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
                 ? null
                 : new PersistedRelationship(
                     filter.Relationship.PersonId.ToString(),
-                    filter.Relationship.Kinds.ToArray()));
+                    filter.Relationship.Kinds.ToArray()),
+            filter.Orientation);
         return JsonSerializer.Serialize(payload, JsonOptions);
     }
 
@@ -291,7 +293,8 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
                 ? null
                 : new SmartCollectionRelationshipCriterion(
                     ParsePersonId(payload.Relationship.PersonId),
-                    payload.Relationship.Kinds));
+                    payload.Relationship.Kinds),
+            orientation: payload.Orientation);
     }
 
     private static SmartCollectionGeoBounds? ParseBounds(PersistedLocation? location)
@@ -343,7 +346,8 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
         PersistedLocation? Location,
         PersistedTaken? Taken,
         PersistedAge? Age = null,
-        PersistedRelationship? Relationship = null);
+        PersistedRelationship? Relationship = null,
+        string? Orientation = null);
 
     private sealed record PersistedLocation(
         string? Place = null,

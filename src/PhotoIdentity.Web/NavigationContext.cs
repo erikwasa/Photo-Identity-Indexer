@@ -26,7 +26,8 @@ public sealed record SmartCollectionTransientNavigationState(
     string? TakenTo = null,
     string[]? Places = null,
     SmartCollectionAgeRequest? Age = null,
-    SmartCollectionRelationshipRequest? Relationship = null);
+    SmartCollectionRelationshipRequest? Relationship = null,
+    string? Orientation = null);
 
 public sealed record SmartCollectionWorkspaceContext(
     string Mode,
@@ -249,7 +250,8 @@ public static class SmartCollectionNavigation
             Limit: limit,
             TakenRange: takenRange,
             Age: state.Age,
-            Relationship: state.Relationship);
+            Relationship: state.Relationship,
+            Orientation: state.Orientation);
         return true;
     }
 

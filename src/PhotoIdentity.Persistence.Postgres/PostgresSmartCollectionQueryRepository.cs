@@ -163,6 +163,28 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
         ),
+        preferred_review_proxy AS (
+            SELECT DISTINCT ON (asset_revision_id)
+                asset_revision_id,
+                width,
+                height
+            FROM asset_revision_review_proxies
+            ORDER BY asset_revision_id, generated_at_utc DESC, profile_id
+        ),
+        effective_visual_geometry AS (
+            SELECT
+                asset_revisions.id AS revision_id,
+                COALESCE(preferred_review_proxy.width, asset_revisions.width) AS width,
+                COALESCE(preferred_review_proxy.height, asset_revisions.height) AS height,
+                CASE
+                    WHEN preferred_review_proxy.asset_revision_id IS NOT NULL THEN 'review-proxy'
+                    WHEN asset_revisions.width IS NOT NULL AND asset_revisions.height IS NOT NULL THEN 'catalogue'
+                    ELSE NULL
+                END AS source
+            FROM asset_revisions
+            LEFT JOIN preferred_review_proxy
+                ON preferred_review_proxy.asset_revision_id = asset_revisions.id
+        ),
         person_birth_ranges AS (
             SELECT
                 person_id,
@@ -551,6 +573,18 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         {
             predicates.Add("AND effective_capture_dates.date_from <= @taken_to");
             predicates.Add("AND effective_capture_dates.date_to >= @taken_from");
+        }
+
+        if (filter.Orientation != SmartCollectionOrientations.Any)
+        {
+            string comparison = filter.Orientation == SmartCollectionOrientations.Landscape ? ">" : "<";
+            predicates.Add($"""
+                AND EXISTS (
+                    SELECT 1
+                    FROM effective_visual_geometry
+                    WHERE effective_visual_geometry.revision_id = asset_revisions.id
+                      AND effective_visual_geometry.width {comparison} effective_visual_geometry.height)
+                """);
         }
 
         if (filter.Age is not null)

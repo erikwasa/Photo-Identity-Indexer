@@ -27,6 +27,29 @@ public static class SmartCollectionMatchModes
     }
 }
 
+public static class SmartCollectionOrientations
+{
+    public const string Any = "any";
+    public const string Landscape = "landscape";
+    public const string Portrait = "portrait";
+
+    public static string Normalize(string? value, string parameterName)
+    {
+        string normalized = string.IsNullOrWhiteSpace(value)
+            ? Any
+            : value.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            Any => Any,
+            Landscape => Landscape,
+            Portrait => Portrait,
+            _ => throw new ArgumentException(
+                $"Unsupported orientation '{value}'. Use 'any', 'landscape' or 'portrait'.",
+                parameterName),
+        };
+    }
+}
+
 public sealed record SmartCollectionGeoBounds
 {
     public SmartCollectionGeoBounds(double south, double west, double north, double east)
@@ -205,7 +228,8 @@ public sealed record SmartCollectionFilter
         string? locationPlace = null,
         IEnumerable<string>? locationPlaces = null,
         SmartCollectionAgeCriterion? age = null,
-        SmartCollectionRelationshipCriterion? relationship = null)
+        SmartCollectionRelationshipCriterion? relationship = null,
+        string? orientation = null)
     {
         People = (people ?? []).Distinct().ToArray();
         if (People.Count > 100)
@@ -286,6 +310,7 @@ public sealed record SmartCollectionFilter
         Taken = taken;
         Age = age;
         Relationship = relationship;
+        Orientation = SmartCollectionOrientations.Normalize(orientation, nameof(orientation));
     }
 
     public IReadOnlyList<PersonId> People { get; }
@@ -301,6 +326,7 @@ public sealed record SmartCollectionFilter
     public SmartCollectionDateRange? Taken { get; }
     public SmartCollectionAgeCriterion? Age { get; }
     public SmartCollectionRelationshipCriterion? Relationship { get; }
+    public string Orientation { get; }
 
     private static IReadOnlyList<string> NormalizeLocationPlaces(
         IEnumerable<string> values,

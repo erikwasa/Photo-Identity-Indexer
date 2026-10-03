@@ -38,7 +38,8 @@ public sealed record SmartCollectionQueryRequest(
     int Limit = 40,
     SmartCollectionDateRangeRequest? TakenRange = null,
     SmartCollectionAgeRequest? Age = null,
-    SmartCollectionRelationshipRequest? Relationship = null);
+    SmartCollectionRelationshipRequest? Relationship = null,
+    string? Orientation = null);
 
 public sealed record SmartCollectionDefinitionRequest(
     string Name,
@@ -50,7 +51,8 @@ public sealed record SmartCollectionDefinitionRequest(
     string? Taken = null,
     SmartCollectionDateRangeRequest? TakenRange = null,
     SmartCollectionAgeRequest? Age = null,
-    SmartCollectionRelationshipRequest? Relationship = null);
+    SmartCollectionRelationshipRequest? Relationship = null,
+    string? Orientation = null);
 
 public sealed record SmartCollectionDateRangeResponse(
     string From,
@@ -64,7 +66,8 @@ public sealed record SmartCollectionFilterResponse(
     SmartCollectionLocationRequest? Location,
     SmartCollectionDateRangeResponse? Taken,
     SmartCollectionAgeRequest? Age = null,
-    SmartCollectionRelationshipRequest? Relationship = null);
+    SmartCollectionRelationshipRequest? Relationship = null,
+    string? Orientation = null);
 
 public sealed record SmartCollectionDefinitionResponse(
     string Id,
@@ -226,7 +229,10 @@ public static class SmartCollectionEndpoints
             SmartCollectionDefinition? definition = await repository.UpdateAsync(
                 collectionId,
                 request.Name,
-                ToFilter(request, fallbackLocationPlaces),
+                ToFilter(
+                    request,
+                    fallbackLocationPlaces,
+                    fallbackOrientation: existing.Filter.Orientation),
                 cancellationToken);
             return definition is null
                 ? Results.NotFound()
@@ -359,12 +365,15 @@ public static class SmartCollectionEndpoints
             request.TakenRange,
             request.Age,
             request.Relationship,
-            fallbackLocationPlaces: null);
+            request.Orientation,
+            fallbackLocationPlaces: null,
+            fallbackOrientation: null);
     }
 
     private static SmartCollectionFilter ToFilter(
         SmartCollectionDefinitionRequest request,
-        IReadOnlyList<string>? fallbackLocationPlaces = null)
+        IReadOnlyList<string>? fallbackLocationPlaces = null,
+        string? fallbackOrientation = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ToFilter(
@@ -377,7 +386,9 @@ public static class SmartCollectionEndpoints
             request.TakenRange,
             request.Age,
             request.Relationship,
-            fallbackLocationPlaces);
+            request.Orientation,
+            fallbackLocationPlaces,
+            fallbackOrientation);
     }
 
     private static SmartCollectionFilter ToFilter(
@@ -390,7 +401,9 @@ public static class SmartCollectionEndpoints
         SmartCollectionDateRangeRequest? takenRange,
         SmartCollectionAgeRequest? age,
         SmartCollectionRelationshipRequest? relationship,
-        IReadOnlyList<string>? fallbackLocationPlaces)
+        string? orientation,
+        IReadOnlyList<string>? fallbackLocationPlaces,
+        string? fallbackOrientation)
     {
         ValidateGenericTags(tags);
 
@@ -448,7 +461,8 @@ public static class SmartCollectionEndpoints
                 ? null
                 : new SmartCollectionRelationshipCriterion(
                     ParsePersonId(relationship.PersonId),
-                    relationship.Kinds ?? []));
+                    relationship.Kinds ?? []),
+            orientation: orientation ?? fallbackOrientation);
     }
 
     private static SmartCollectionDateRange ParseTakenRange(
@@ -594,7 +608,8 @@ public static class SmartCollectionEndpoints
             ? null
             : new SmartCollectionRelationshipRequest(
                 filter.Relationship.PersonId.ToString(),
-                filter.Relationship.Kinds.ToArray()));
+                filter.Relationship.Kinds.ToArray()),
+        filter.Orientation);
 
     private static bool TryGetId(
         Guid id,

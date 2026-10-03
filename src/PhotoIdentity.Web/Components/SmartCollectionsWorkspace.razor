@@ -6,7 +6,7 @@
     <div class="smart-workspace-heading">
         <div>
             <p class="eyebrow">Saved smart collections</p>
-            <h2 id="smart-collections-heading">People, family, location and taken time</h2>
+            <h2 id="smart-collections-heading">People, family, orientation, location and taken time</h2>
             <p>Save a filter definition and reopen it later. Results are always evaluated against the current catalogue.</p>
         </div>
         <button type="button" class="button secondary" disabled="@Busy" @onclick="NewCollection">New collection</button>
@@ -58,6 +58,7 @@
                                 {
                                     <span>@TagsSummary(definition.Filter)</span>
                                 }
+                                <span>@OrientationSummary(definition.Filter)</span>
                                 <span>@DateSummary(definition.Filter)</span>
                                 <span>@LocationSummary(definition.Filter)</span>
                             </button>
@@ -88,6 +89,16 @@
                            placeholder="Example: Summer 2025 in Stockholm"
                            @bind="Name"
                            disabled="@Busy" />
+                </label>
+
+                <label class="smart-field">
+                    <span class="field-label">Photo orientation</span>
+                    <select @bind="Orientation" disabled="@Busy">
+                        <option value="any">Any</option>
+                        <option value="landscape">Landscape</option>
+                        <option value="portrait">Portrait</option>
+                    </select>
+                    <small class="smart-help">Square photos and photos without usable geometry remain available only with Any.</small>
                 </label>
 
                 @if (SelectedTags.Count > 0)

@@ -50,3 +50,32 @@ A persisted/versioned derived orientation value may be introduced if query-time 
 - Square/unknown photos have documented conservative behavior and do not silently drift between Portrait and Landscape.
 - Persistence, PostgreSQL query, API contract/navigation and Web behavior have focused automated coverage.
 - Maintainer verifies representative portrait, landscape, EXIF-rotated and existing-catalogue examples on the real archive.
+
+## Implementation notes
+
+- Core now normalizes the criterion to `any`, `landscape` or `portrait`; absent values remain `any` so legacy definitions retain their previous membership.
+- The existing filter schema version remains v3 because orientation is an additive optional JSON property. This avoids a catalogue migration/backfill while preserving compatibility with existing v1-v3 rows.
+- PostgreSQL derives effective visual geometry set-wise. When a durable review proxy exists, its rendered width/height is authoritative for aspect-ratio classification because proxy pixels are produced after decoder EXIF auto-orientation. Catalogue `asset_revisions.width/height` is the fallback when no proxy is available.
+- Proxy geometry is used only as an aspect-ratio surrogate. It is not written back as original image geometry.
+- Landscape requires `width > height`; Portrait requires `width < height`. Square and unknown geometry therefore match only `Any`.
+- API definition updates preserve a saved orientation when an older client omits the new optional field. New definitions and transient queries default an omitted field to `Any`.
+- Web editor state, saved-definition summaries and transient browser-tab navigation all carry the orientation value.
+- Creative Collection direct anchors inherit the criterion through the existing saved Smart Collection slideshow snapshot. No duplicate Creative recipe option was added.
+
+## Automated verification
+
+- Core tests cover defaulting, normalization and invalid orientation rejection.
+- Live PostgreSQL coverage exercises catalogue-only Landscape/Portrait geometry, square and unknown exclusions, missing-original proxy fallback, proxy override of uncorrected source geometry, persisted/reopened definitions, legacy JSON without the field, and saved slideshow snapshot membership.
+- API integration coverage verifies query request/response propagation, invalid-value rejection, and preservation of orientation when an older update request omits the field.
+- Navigation/Web coverage verifies transient-state round trips, request construction, editor options/summaries, absence of a duplicate Creative control, and the EXIF `AutoOrient` decoder contract.
+
+## Maintainer verification still required
+
+After the implementation PR is merged, verify `/smart-collections` on the maintained archive using representative examples:
+
+- Landscape and Portrait previews contain the expected photos.
+- At least one EXIF-rotated phone photo follows its visual orientation.
+- At least one historical item whose catalogue dimensions are missing but whose durable review proxy exists is classified correctly.
+- Square or still-unknown items are absent from both Landscape and Portrait but remain present with Any.
+- Save/reopen preserves the selected orientation, and starting a saved Smart slideshow/Creative collection uses the filtered anchor membership.
+- Check the editor on desktop and phone/PWA for wrapping or horizontal overflow.
