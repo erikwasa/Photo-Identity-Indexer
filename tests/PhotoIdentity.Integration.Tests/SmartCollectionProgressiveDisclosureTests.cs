@@ -100,7 +100,8 @@ public sealed class SmartCollectionProgressiveDisclosureTests
     }
 
     private static string ReadRepositoryFile(params string[] segments) =>
-        File.ReadAllText(Path.Combine(ResolveRepositoryRoot(), Path.Combine(segments)));
+        File.ReadAllText(Path.Combine(ResolveRepositoryRoot(), Path.Combine(segments)))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string ResolveRepositoryRoot()
     {
