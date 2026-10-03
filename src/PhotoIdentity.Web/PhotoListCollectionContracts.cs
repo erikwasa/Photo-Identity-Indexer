@@ -4,6 +4,8 @@ public sealed record PhotoListCollectionRequest(
     string Name,
     string[]? RevisionIds = null);
 
+public sealed record PhotoListCollectionSortRequest(string Direction);
+
 public sealed record PhotoListCollectionResponse(
     string Id,
     string Name,
