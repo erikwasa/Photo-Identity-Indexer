@@ -6,7 +6,7 @@
     <div class="smart-workspace-heading">
         <div>
             <p class="eyebrow">Saved smart collections</p>
-            <h2 id="smart-collections-heading">People, family, tags, location and taken time</h2>
+            <h2 id="smart-collections-heading">People, family, location and taken time</h2>
             <p>Save a filter definition and reopen it later. Results are always evaluated against the current catalogue.</p>
         </div>
         <button type="button" class="button secondary" disabled="@Busy" @onclick="NewCollection">New collection</button>
@@ -54,7 +54,10 @@
                                 <span>@PeopleSummary(definition.Filter)</span>
                                 <span>@AgeSummary(definition.Filter)</span>
                                 <span>@RelationshipSummary(definition.Filter)</span>
-                                <span>@TagsSummary(definition.Filter)</span>
+                                @if (definition.Filter.Tags.Length > 0)
+                                {
+                                    <span>@TagsSummary(definition.Filter)</span>
+                                }
                                 <span>@DateSummary(definition.Filter)</span>
                                 <span>@LocationSummary(definition.Filter)</span>
                             </button>
@@ -87,53 +90,28 @@
                            disabled="@Busy" />
                 </label>
 
-                <div class="smart-filter-grid">
-                    <fieldset class="smart-filter-card">
-                        <legend>People</legend>
-                        <label class="smart-inline-field">
-                            <span>Match</span>
-                            <select @bind="PeopleMatch" disabled="@Busy">
-                                <option value="all">All selected</option>
-                                <option value="any">Any selected</option>
-                            </select>
-                        </label>
+                @if (SelectedTags.Count > 0)
+                {
+                    <div class="notice" role="status">
+                        This collection includes @SelectedTags.Count hidden tag filter@(SelectedTags.Count == 1 ? "" : "s").
+                        Tag authoring is no longer shown here; saving or previewing preserves the existing tag criteria.
+                    </div>
+                }
 
-                        <SmartCollectionPeoplePicker People="People"
-                                                     SelectedPersonIds="SelectedPeople"
-                                                     Disabled="Busy" />
-                    </fieldset>
+                <fieldset class="smart-filter-card">
+                    <legend>People</legend>
+                    <label class="smart-inline-field">
+                        <span>Match</span>
+                        <select @bind="PeopleMatch" disabled="@Busy">
+                            <option value="all">All selected</option>
+                            <option value="any">Any selected</option>
+                        </select>
+                    </label>
 
-                    <fieldset class="smart-filter-card">
-                        <legend>Tags</legend>
-                        <label class="smart-inline-field">
-                            <span>Match</span>
-                            <select @bind="TagMatch" disabled="@Busy">
-                                <option value="all">All selected</option>
-                                <option value="any">Any selected</option>
-                            </select>
-                        </label>
-
-                        <div class="smart-option-list" role="group" aria-label="Tag filter">
-                            @if (OrderedTags.Count == 0)
-                            {
-                                <span class="smart-muted">No canonical tags yet.</span>
-                            }
-                            else
-                            {
-                                @foreach (PhotoTagDefinitionResponse tag in OrderedTags)
-                                {
-                                    <label class="smart-check-option">
-                                        <input type="checkbox"
-                                               checked="@SelectedTags.Contains(tag.Value)"
-                                               disabled="@Busy"
-                                               @onchange="args => ToggleTag(tag.Value, args)" />
-                                        <span>@tag.Value</span>
-                                    </label>
-                                }
-                            }
-                        </div>
-                    </fieldset>
-                </div>
+                    <SmartCollectionPeoplePicker People="People"
+                                                 SelectedPersonIds="SelectedPeople"
+                                                 Disabled="Busy" />
+                </fieldset>
 
                 <div class="smart-filter-grid smart-secondary-grid">
                     <fieldset class="smart-filter-card">
@@ -257,25 +235,28 @@
                             <span>Also limit to GPS rectangle</span>
                         </label>
 
-                        <div class="smart-coordinate-grid">
-                            <label>
-                                <span>South</span>
-                                <input type="text" inputmode="decimal" @bind="South" disabled="@(!UseLocation || Busy)" />
-                            </label>
-                            <label>
-                                <span>West</span>
-                                <input type="text" inputmode="decimal" @bind="West" disabled="@(!UseLocation || Busy)" />
-                            </label>
-                            <label>
-                                <span>North</span>
-                                <input type="text" inputmode="decimal" @bind="North" disabled="@(!UseLocation || Busy)" />
-                            </label>
-                            <label>
-                                <span>East</span>
-                                <input type="text" inputmode="decimal" @bind="East" disabled="@(!UseLocation || Busy)" />
-                            </label>
-                        </div>
-                        <small class="smart-help">The named-place group and GPS rectangle are independent. If both are populated, a photo must match any selected place AND the GPS rectangle. Missing GPS metadata will not match a populated rectangle.</small>
+                        @if (UseLocation)
+                        {
+                            <div class="smart-coordinate-grid">
+                                <label>
+                                    <span>South</span>
+                                    <input type="text" inputmode="decimal" @bind="South" disabled="@Busy" />
+                                </label>
+                                <label>
+                                    <span>West</span>
+                                    <input type="text" inputmode="decimal" @bind="West" disabled="@Busy" />
+                                </label>
+                                <label>
+                                    <span>North</span>
+                                    <input type="text" inputmode="decimal" @bind="North" disabled="@Busy" />
+                                </label>
+                                <label>
+                                    <span>East</span>
+                                    <input type="text" inputmode="decimal" @bind="East" disabled="@Busy" />
+                                </label>
+                            </div>
+                            <small class="smart-help">The named-place group and GPS rectangle are independent. If both are populated, a photo must match any selected place AND the GPS rectangle. Missing GPS metadata will not match a populated rectangle.</small>
+                        }
                     </fieldset>
                 </div>
 
@@ -288,45 +269,48 @@
                             <span>Limit one person to an age range</span>
                         </label>
 
-                        <label class="smart-field">
-                            <span class="field-label">Person</span>
-                            <select @bind="AgePersonId" disabled="@(!UseAgeFilter || Busy)">
-                                <option value="">Choose person</option>
-                                @foreach (ReviewPersonResponse person in OrderedPeople)
-                                {
-                                    <option value="@person.Id">@person.DisplayName</option>
-                                }
-                            </select>
-                        </label>
-
-                        <div class="smart-date-range">
+                        @if (UseAgeFilter)
+                        {
                             <label class="smart-field">
-                                <span class="field-label">Minimum age</span>
-                                <input type="number"
-                                       min="0"
-                                       max="130"
-                                       step="1"
-                                       inputmode="numeric"
-                                       @bind="AgeMinimumYears"
-                                       disabled="@(!UseAgeFilter || Busy)" />
+                                <span class="field-label">Person</span>
+                                <select @bind="AgePersonId" disabled="@Busy">
+                                    <option value="">Choose person</option>
+                                    @foreach (ReviewPersonResponse person in OrderedPeople)
+                                    {
+                                        <option value="@person.Id">@person.DisplayName</option>
+                                    }
+                                </select>
                             </label>
-                            <label class="smart-field">
-                                <span class="field-label">Maximum age</span>
-                                <input type="number"
-                                       min="0"
-                                       max="130"
-                                       step="1"
-                                       inputmode="numeric"
-                                       @bind="AgeMaximumYears"
-                                       disabled="@(!UseAgeFilter || Busy)" />
-                            </label>
-                        </div>
 
-                        <small class="smart-help">
-                            The selected person must appear in the photo. The photo's effective capture-date range and the person's
-                            birth-date precision are used to calculate a possible age range; a match occurs when that range overlaps this filter.
-                            Photos without enough date evidence do not match.
-                        </small>
+                            <div class="smart-date-range">
+                                <label class="smart-field">
+                                    <span class="field-label">Minimum age</span>
+                                    <input type="number"
+                                           min="0"
+                                           max="130"
+                                           step="1"
+                                           inputmode="numeric"
+                                           @bind="AgeMinimumYears"
+                                           disabled="@Busy" />
+                                </label>
+                                <label class="smart-field">
+                                    <span class="field-label">Maximum age</span>
+                                    <input type="number"
+                                           min="0"
+                                           max="130"
+                                           step="1"
+                                           inputmode="numeric"
+                                           @bind="AgeMaximumYears"
+                                           disabled="@Busy" />
+                                </label>
+                            </div>
+
+                            <small class="smart-help">
+                                The selected person must appear in the photo. The photo's effective capture-date range and the person's
+                                birth-date precision are used to calculate a possible age range; a match occurs when that range overlaps this filter.
+                                Photos without enough date evidence do not match.
+                            </small>
+                        }
                     </fieldset>
 
                     <fieldset class="smart-filter-card">
@@ -337,35 +321,38 @@
                             <span>Require a relative of one person</span>
                         </label>
 
-                        <label class="smart-field">
-                            <span class="field-label">Related to</span>
-                            <select @bind="RelationshipPersonId" disabled="@(!UseRelationshipFilter || Busy)">
-                                <option value="">Choose person</option>
-                                @foreach (ReviewPersonResponse person in OrderedPeople)
+                        @if (UseRelationshipFilter)
+                        {
+                            <label class="smart-field">
+                                <span class="field-label">Related to</span>
+                                <select @bind="RelationshipPersonId" disabled="@Busy">
+                                    <option value="">Choose person</option>
+                                    @foreach (ReviewPersonResponse person in OrderedPeople)
+                                    {
+                                        <option value="@person.Id">@person.DisplayName</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <div class="smart-option-list" role="group" aria-label="Family relationship filter">
+                                @foreach (FamilyRelationshipOption option in FamilyRelationshipOptions)
                                 {
-                                    <option value="@person.Id">@person.DisplayName</option>
+                                    <label class="smart-check-option">
+                                        <input type="checkbox"
+                                               checked="@SelectedRelationshipKinds.Contains(option.Value)"
+                                               disabled="@Busy"
+                                               @onchange="args => ToggleRelationshipKind(option.Value, args)" />
+                                        <span>@option.Label</span>
+                                    </label>
                                 }
-                            </select>
-                        </label>
+                            </div>
 
-                        <div class="smart-option-list" role="group" aria-label="Family relationship filter">
-                            @foreach (FamilyRelationshipOption option in FamilyRelationshipOptions)
-                            {
-                                <label class="smart-check-option">
-                                    <input type="checkbox"
-                                           checked="@SelectedRelationshipKinds.Contains(option.Value)"
-                                           disabled="@(!UseRelationshipFilter || Busy)"
-                                           @onchange="args => ToggleRelationshipKind(option.Value, args)" />
-                                    <span>@option.Label</span>
-                                </label>
-                            }
-                        </div>
-
-                        <small class="smart-help">
-                            Match photos containing at least one person who has any selected relationship to the focal person.
-                            Parent/child and grandparent/grandchild directions are shown from the focal person's perspective;
-                            spouse and sibling are symmetric. The focal person does not also need to appear in the photo.
-                        </small>
+                            <small class="smart-help">
+                                Match photos containing at least one person who has any selected relationship to the focal person.
+                                Parent/child and grandparent/grandchild directions are shown from the focal person's perspective;
+                                spouse and sibling are symmetric. The focal person does not also need to appear in the photo.
+                            </small>
+                        }
                     </fieldset>
                 </div>
 
