@@ -11,7 +11,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 public sealed class PostgresSmartCollectionRepository : ISmartCollectionRepository
 {
-    private const int FilterSchemaVersion = 4;
+    private const int FilterSchemaVersion = 3;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly PostgresCatalogueDatabase _database;
