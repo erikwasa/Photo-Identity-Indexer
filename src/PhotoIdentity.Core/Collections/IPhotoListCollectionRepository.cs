@@ -24,10 +24,6 @@ public sealed class PhotoListCollectionRevisionUnavailableException : Exception
     public IReadOnlyList<AssetRevisionId> RevisionIds { get; }
 }
 
-public sealed record PhotoListCollectionCaptureTime(
-    AssetRevisionId RevisionId,
-    DateTime? EffectiveTakenAtLocal);
-
 public interface IPhotoListCollectionRepository
 {
     Task<PhotoListCollectionDefinition> CreateAsync(
@@ -40,10 +36,6 @@ public interface IPhotoListCollectionRepository
 
     Task<PhotoListCollectionDefinition?> GetAsync(
         PhotoListCollectionId id,
-        CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<PhotoListCollectionCaptureTime>> GetCaptureTimesAsync(
-        IReadOnlyList<AssetRevisionId> revisionIds,
         CancellationToken cancellationToken = default);
 
     Task<PhotoListCollectionDefinition?> UpdateAsync(
