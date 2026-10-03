@@ -53,9 +53,10 @@ public sealed class PhotoListCollectionSortEndpointTests
         PhotoListCollectionResponse created =
             await createResponse.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
             ?? throw new InvalidOperationException();
+        PhotoListCollectionId collectionId = PhotoListCollectionId.From(Guid.Parse(created.Id));
 
         PhotoListCollectionSlideshowSnapshot beforeSort =
-            await collections.CreateSlideshowSnapshotAsync(PhotoListCollectionId.Parse(created.Id))
+            await collections.CreateSlideshowSnapshotAsync(collectionId)
             ?? throw new InvalidOperationException();
 
         using HttpResponseMessage oldestResponse = await client.PostAsJsonAsync(
@@ -85,7 +86,7 @@ public sealed class PhotoListCollectionSortEndpointTests
         Assert.Equal(2, captureTimes.CallCount);
 
         PhotoListCollectionSlideshowSnapshot afterSort =
-            await collections.CreateSlideshowSnapshotAsync(PhotoListCollectionId.Parse(created.Id))
+            await collections.CreateSlideshowSnapshotAsync(collectionId)
             ?? throw new InvalidOperationException();
         Assert.Equal(
             [newest, tiedFirst, tiedSecond, oldest, undatedFirst, undatedSecond],
