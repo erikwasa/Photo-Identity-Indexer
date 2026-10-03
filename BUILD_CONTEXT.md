@@ -4,7 +4,9 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0184 / issue #492: PR #497 adds one-action oldest-first/newest-first sorting to manual collections. Sorting resolves effective capture evidence for the whole collection in one set-oriented PostgreSQL query, keeps undated photos last in either direction, preserves prior relative order for equal timestamps, and persists the result as the existing explicit `RevisionIds` sequence. The implementation is in review; require CI plus maintainer desktop/phone verification before completion.
+WI-0179 / issue #487: PR #498 adds `Any`, `Landscape` and `Portrait` Smart Collection filtering. The criterion is an additive optional field in the existing v3 saved-filter JSON. PostgreSQL uses durable review-proxy geometry first because those pixels are EXIF-auto-oriented, then falls back to catalogue dimensions; square and unknown geometry match only `Any`. The implementation is in review; require CI plus maintainer real-archive verification of representative landscape, portrait, EXIF-rotated, historical missing-dimension/proxy and square/unknown examples before completion.
+
+WI-0184 / issue #492: PR #497 is merged. The manual-collection oldest-first/newest-first implementation still requires explicit maintainer desktop/phone verification, including undated/equal-date behavior, reload persistence and subsequent manual ↑/↓ adjustment.
 
 WI-0183 / issue #491: PR #496 is merged. The Smart Collection progressive-disclosure implementation still requires explicit desktop/phone verification and a representative save of an existing tagged Smart Collection to confirm its hidden tag criteria remain unchanged.
 
@@ -18,10 +20,11 @@ The maintainer accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0172 and WI-0173 
 
 ## Next concrete step
 
-Verify WI-0184 after PR #497 CI: on desktop and phone/PWA exercise Oldest first and Newest first with dated, equal-date and undated photos; confirm undated photos remain last, equal-date order is stable, reload preserves the result and manual ↑/↓ adjustment still works. If practical, confirm a slideshow snapshot already running before a reorder is unchanged while a new session uses the saved order. WI-0183, WI-0180, WI-0181, WI-0176, WI-0165, WI-0175 and WI-0171 still retain their documented acceptance checks. M30 video support remains deferred.
+Verify WI-0179 after PR #498 CI: on desktop and phone/PWA exercise Any/Landscape/Portrait, save/reopen a filtered definition, and use representative real archive examples including an EXIF-rotated phone photo and a historical revision whose catalogue dimensions are missing but whose durable review proxy exists. Confirm square/unknown photos stay out of Landscape/Portrait, and that saved Smart slideshow plus Creative anchor membership follow the selected orientation. WI-0184, WI-0183, WI-0180, WI-0181, WI-0176, WI-0165, WI-0175 and WI-0171 still retain their documented acceptance checks. M30 video support remains deferred.
 
 ## Relevant pointers
 
+- docs/delivery/work-items/WI-0179-smart-collection-orientation-filter.md
 - docs/delivery/work-items/WI-0184-manual-collection-date-sort.md
 - docs/delivery/work-items/WI-0183-smart-collection-progressive-disclosure.md
 - docs/delivery/work-items/WI-0180-playback-preferences-ui.md
