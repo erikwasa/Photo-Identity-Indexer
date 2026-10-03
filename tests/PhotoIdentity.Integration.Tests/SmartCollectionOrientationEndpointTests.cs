@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Worker;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -17,9 +18,12 @@ public sealed class SmartCollectionOrientationEndpointTests
     public async Task Query_endpoint_carries_orientation_into_filter_and_response()
     {
         RecordingQueryRepository query = new();
+        InMemoryDefinitionRepository definitions = new(new SmartCollectionFilter());
         WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
         builder.WebHost.UseTestServer();
+        builder.Services.AddSingleton<ISmartCollectionRepository>(definitions);
         builder.Services.AddSingleton<ISmartCollectionQueryRepository>(query);
+        builder.Services.AddSingleton(new ArchiveThroughputMetrics());
 
         await using WebApplication app = builder.Build();
         app.MapSmartCollectionEndpoints();
@@ -48,9 +52,12 @@ public sealed class SmartCollectionOrientationEndpointTests
     {
         InMemoryDefinitionRepository definitions = new(
             new SmartCollectionFilter(orientation: SmartCollectionOrientations.Landscape));
+        RecordingQueryRepository query = new();
         WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
         builder.WebHost.UseTestServer();
         builder.Services.AddSingleton<ISmartCollectionRepository>(definitions);
+        builder.Services.AddSingleton<ISmartCollectionQueryRepository>(query);
+        builder.Services.AddSingleton(new ArchiveThroughputMetrics());
 
         await using WebApplication app = builder.Build();
         app.MapSmartCollectionEndpoints();
