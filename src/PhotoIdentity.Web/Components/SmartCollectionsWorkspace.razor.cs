@@ -59,6 +59,7 @@ public partial class SmartCollectionsWorkspace
     private string Name { get; set; } = "";
     private string PeopleMatch { get; set; } = "all";
     private string TagMatch { get; set; } = "all";
+    private string Orientation { get; set; } = "any";
     private string TakenMode { get; set; } = SmartCollectionDateModes.Any;
     private string TakenYear { get; set; } = "";
     private string TakenMonth { get; set; } = "";
@@ -157,6 +158,7 @@ public partial class SmartCollectionsWorkspace
         SelectedTags.Clear();
         PeopleMatch = "all";
         TagMatch = "all";
+        Orientation = "any";
         ResetTakenEditor();
         SelectedPlaces.Clear();
         PendingPlace = null;
@@ -196,6 +198,7 @@ public partial class SmartCollectionsWorkspace
 
         PeopleMatch = definition.Filter.PeopleMatch;
         TagMatch = definition.Filter.TagMatch;
+        Orientation = NormalizeOrientation(definition.Filter.Orientation);
         ApplyTakenState(SmartCollectionDateEditorModel.FromRange(definition.Filter.Taken));
         SelectedPlaces.Clear();
         if (definition.Filter.Location is SmartCollectionLocationRequest location)
@@ -250,6 +253,7 @@ public partial class SmartCollectionsWorkspace
 
         PeopleMatch = state.PeopleMatch;
         TagMatch = state.TagMatch;
+        Orientation = NormalizeOrientation(state.Orientation);
         SmartCollectionDateEditorState takenState = string.IsNullOrWhiteSpace(state.TakenMode)
             ? SmartCollectionDateEditorModel.FromLegacyExpression(state.Taken)
             : new SmartCollectionDateEditorState(
@@ -905,7 +909,8 @@ public partial class SmartCollectionsWorkspace
             TakenTo,
             Places: SelectedPlaces.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
             Age: CurrentAgeRequest,
-            Relationship: CurrentRelationshipRequest);
+            Relationship: CurrentRelationshipRequest,
+            Orientation: Orientation);
 
         try
         {
@@ -993,7 +998,8 @@ public partial class SmartCollectionsWorkspace
             Taken: null,
             TakenRange: takenRange,
             Age: age,
-            Relationship: relationship);
+            Relationship: relationship,
+            Orientation: Orientation);
         return true;
     }
 
@@ -1028,7 +1034,8 @@ public partial class SmartCollectionsWorkspace
             Limit: PageSize,
             TakenRange: takenRange,
             Age: age,
-            Relationship: relationship);
+            Relationship: relationship,
+            Orientation: Orientation);
         return true;
     }
 
@@ -1114,6 +1121,14 @@ public partial class SmartCollectionsWorkspace
 
     private static string DateSummary(SmartCollectionFilterResponse filter) =>
         SmartCollectionDateEditorModel.Summary(filter.Taken);
+
+    private static string OrientationSummary(SmartCollectionFilterResponse filter) =>
+        NormalizeOrientation(filter.Orientation) switch
+        {
+            "landscape" => "Landscape photos",
+            "portrait" => "Portrait photos",
+            _ => "Any orientation",
+        };
 
     private static string LocationSummary(SmartCollectionFilterResponse filter)
     {
@@ -1232,6 +1247,13 @@ public partial class SmartCollectionsWorkspace
         TakenFrom = state.From;
         TakenTo = state.To;
     }
+
+    private static string NormalizeOrientation(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "landscape" => "landscape",
+        "portrait" => "portrait",
+        _ => "any",
+    };
 
     private static string PhotoDate(SmartCollectionPhotoResponse photo) => photo.TakenAtLocal is DateTime taken
         ? taken.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
