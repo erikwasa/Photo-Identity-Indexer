@@ -1,4 +1,5 @@
 using PhotoIdentity.Web;
+using PhotoIdentity.Web.Contracts;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -33,7 +34,7 @@ public sealed class SmartCollectionOrientationNavigationTests
             restored,
             offset: 40,
             limit: 40,
-            out Contracts.SmartCollectionQueryRequest? request));
+            out SmartCollectionQueryRequest? request));
         Assert.NotNull(request);
         Assert.Equal("portrait", request.Orientation);
     }
