@@ -45,7 +45,7 @@ work_items:
   milestone: M30
   status: proposed
   owner: unassigned
-  document: ../work-items/WI-0153-video-ingestion-metadata-posters.md
+  document: ../work-items/WI-0153-video-metadata-collections.md
   blockers:
   - WI-0151
   - WI-0141
