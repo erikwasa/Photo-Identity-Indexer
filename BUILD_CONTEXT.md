@@ -4,7 +4,9 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0183 / issue #491: PR #496 simplifies `/smart-collections` with progressive disclosure. GPS, age and family-relationship detail controls are now conditional, normal Tags authoring is removed, and hidden legacy tag criteria remain carried through saved/query/navigation state with an explicit preservation notice. The implementation is in review; require CI plus maintainer desktop/phone verification and a representative save of an existing tagged Smart Collection before completion.
+WI-0184 / issue #492: PR #497 adds one-action oldest-first/newest-first sorting to manual collections. Sorting resolves effective capture evidence for the whole collection in one set-oriented PostgreSQL query, keeps undated photos last in either direction, preserves prior relative order for equal timestamps, and persists the result as the existing explicit `RevisionIds` sequence. The implementation is in review; require CI plus maintainer desktop/phone verification before completion.
+
+WI-0183 / issue #491: PR #496 is merged. The Smart Collection progressive-disclosure implementation still requires explicit desktop/phone verification and a representative save of an existing tagged Smart Collection to confirm its hidden tag criteria remain unchanged.
 
 WI-0180 / issue #488: PR #495 is merged. The shared slideshow playback-preferences UI still requires explicit maintainer verification on desktop and phone/PWA in both `/slideshows` Playback preferences and the in-player Settings panel before WI-0180 can be completed.
 
@@ -16,10 +18,11 @@ The maintainer accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0172 and WI-0173 
 
 ## Next concrete step
 
-Verify WI-0183 after PR #496 CI: confirm the default Smart Collection editor is shorter, toggle GPS/age/family details on and off, check desktop/phone overflow, and save a representative pre-existing tagged collection to confirm its hidden tag criteria remain unchanged. WI-0180, WI-0181, WI-0176, WI-0165, WI-0175 and WI-0171 still retain their previously documented acceptance checks. M30 video support remains deferred.
+Verify WI-0184 after PR #497 CI: on desktop and phone/PWA exercise Oldest first and Newest first with dated, equal-date and undated photos; confirm undated photos remain last, equal-date order is stable, reload preserves the result and manual ↑/↓ adjustment still works. If practical, confirm a slideshow snapshot already running before a reorder is unchanged while a new session uses the saved order. WI-0183, WI-0180, WI-0181, WI-0176, WI-0165, WI-0175 and WI-0171 still retain their documented acceptance checks. M30 video support remains deferred.
 
 ## Relevant pointers
 
+- docs/delivery/work-items/WI-0184-manual-collection-date-sort.md
 - docs/delivery/work-items/WI-0183-smart-collection-progressive-disclosure.md
 - docs/delivery/work-items/WI-0180-playback-preferences-ui.md
 - docs/delivery/work-items/WI-0181-creative-collection-checkbox-alignment.md
