@@ -220,14 +220,19 @@ work_items:
 - id: WI-0183
   title: Simplify Smart Collection editor with progressive disclosure
   milestone: M32
-  status: ready
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0183-smart-collection-progressive-disclosure.md
+  started_at: 2026-10-03
+  last_updated_at: 2026-10-03
+  branch: agent/WI-0183-smart-progressive-disclosure
   blockers: []
   blocker_notes: []
   evidence:
   - type: issue
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/491
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/496
 - id: WI-0184
   title: Add whole-collection chronological sorting for manual collections
   milestone: M32
