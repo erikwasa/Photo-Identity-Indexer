@@ -53,6 +53,22 @@ else if (Collection is not null)
             </div>
         </div>
 
+        <div class="manual-collection-sort-actions" role="group" aria-label="Order slideshow photos">
+            <span class="field-label">Order photos</span>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@(Busy || Collection.RevisionIds.Length < 2)"
+                    @onclick="() => SortAsync(OldestFirstSort)">
+                Oldest first
+            </button>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@(Busy || Collection.RevisionIds.Length < 2)"
+                    @onclick="() => SortAsync(NewestFirstSort)">
+                Newest first
+            </button>
+        </div>
+
         <div class="manual-collection-actions">
             <span>@ItemCountLabel</span>
             <button type="button" class="button secondary" disabled="@Busy" @onclick="DeleteAsync">Delete collection</button>
@@ -125,6 +141,9 @@ else if (Collection is not null)
 }
 
 @code {
+    private const string OldestFirstSort = "oldest-first";
+    private const string NewestFirstSort = "newest-first";
+
     [Parameter]
     public Guid CollectionId { get; set; }
 
@@ -209,6 +228,54 @@ else if (Collection is not null)
         }
 
         await SaveAsync(Name, Collection.RevisionIds, "Slideshow name saved.");
+    }
+
+    private async Task SortAsync(string direction)
+    {
+        if (Collection is null || Busy || Collection.RevisionIds.Length < 2)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/photo-list-collections/{CollectionId:D}/sort",
+                new PhotoListCollectionSortRequest(direction));
+            if (!response.IsSuccessStatusCode)
+            {
+                PhotoListCollectionErrorResponse? error = null;
+                try
+                {
+                    error = await response.Content.ReadFromJsonAsync<PhotoListCollectionErrorResponse>();
+                }
+                catch
+                {
+                }
+
+                throw new InvalidOperationException(
+                    error?.Error ?? $"Sort failed with HTTP {(int)response.StatusCode}.");
+            }
+
+            Collection =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+                ?? throw new InvalidOperationException("The manual slideshow response was empty.");
+            Name = Collection.Name;
+            Notice = direction == OldestFirstSort
+                ? "Photos sorted oldest first."
+                : "Photos sorted newest first.";
+        }
+        catch (Exception exception)
+        {
+            Error = $"The photo order could not be sorted: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     private async Task RemoveAsync(int index)
