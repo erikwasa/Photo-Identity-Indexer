@@ -37,6 +37,17 @@
     gap: 0.5rem;
 }
 
+.manual-collection-sort-actions {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 0.4rem;
+    align-items: end;
+}
+
+.manual-collection-sort-actions .field-label {
+    grid-column: 1 / -1;
+}
+
 .manual-collection-actions {
     display: flex;
     gap: 0.7rem;
@@ -113,6 +124,15 @@
 
     .manual-collection-name-row {
         grid-template-columns: 1fr;
+    }
+
+    .manual-collection-sort-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .manual-collection-sort-actions .button {
+        width: 100%;
+        min-width: 0;
     }
 
     .manual-collection-actions {

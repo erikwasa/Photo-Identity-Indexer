@@ -49,3 +49,38 @@ Do not infer or persist new capture metadata merely to sort a collection. Use ex
 - Individual up/down moves continue to work after an automatic sort.
 - A slideshow already running from an immutable snapshot is unchanged; a subsequent session uses the newly saved order.
 - Focused API/persistence/Web tests plus maintainer desktop and phone/PWA verification cover both sort directions and undated/tied timestamps.
+
+## Implementation notes
+
+Implemented on `agent/WI-0184-manual-collection-date-sort` in PR #497.
+
+- The Web editor sends one `POST /api/photo-list-collections/{id}/sort` request for either `oldest-first` or `newest-first`; it does not issue per-photo metadata requests.
+- `PostgresPhotoListCollectionCaptureTimeRepository` resolves the full requested revision batch in one PostgreSQL query. It follows the existing effective capture-date policy: the latest manual `set` action wins, otherwise extracted `photo_capture_metadata.taken_at_local` is used, and missing evidence remains undated.
+- For imprecise manual year/month evidence, chronological ordering uses the start of the accepted range (January 1 for year precision, the first day of the month for month precision). Day precision uses that day; extracted timestamps retain their full wall-clock time.
+- `PhotoListCollectionChronologicalOrdering` keeps undated photos after all dated photos in either direction and preserves the collection's prior relative order for equal timestamps and for undated photos.
+- The sorted sequence is persisted through the existing `IPhotoListCollectionRepository.UpdateAsync` path. No schema migration or persisted dynamic sort mode was added.
+- Existing per-photo up/down controls remain available after sorting.
+- Snapshot tests capture a manual slideshow snapshot before reordering, then verify it remains unchanged while a later snapshot observes the newly persisted order.
+
+## Automated verification
+
+Focused coverage added in:
+
+- `PhotoListCollectionChronologicalOrderingTests` for oldest/newest direction, stable timestamp ties and undated-last behavior.
+- `PostgresPhotoListCollectionCaptureTimeRepositoryTests` for one ordered batch containing extracted metadata, a manual-date override and an undated revision.
+- `PhotoListCollectionSortEndpointTests` for the one-request API flow, persisted order, stable ties, undated-last behavior, invalid directions and immutable prior snapshots.
+- `ManualCollectionChronologicalSortUiTests` for the two compact Web actions, server-side sort request and continued availability of manual up/down moves.
+
+CI and maintainer verification remain required before completion.
+
+## Maintainer verification
+
+After PR #497 CI passes, verify `/manual-collections/{id}` on desktop and phone/PWA with a representative collection containing dated, undated and at least two equal-date photos:
+
+1. Run `Oldest first`; dated photos should be ascending and undated photos should remain last.
+2. Run `Newest first`; dated photos should be descending and undated photos should still remain last.
+3. Confirm equal-date photos retain their previous relative order.
+4. Reload the page and confirm the sorted explicit order persisted.
+5. Use ↑/↓ after sorting and confirm manual fine-tuning still persists.
+6. If practical, start a slideshow, reorder the source collection separately, and confirm that already-running snapshot does not change while a newly started session uses the new saved order.
+7. Confirm the two sort buttons remain compact and usable without horizontal overflow on phone/PWA.

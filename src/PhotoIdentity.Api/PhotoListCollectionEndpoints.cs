@@ -1,12 +1,15 @@
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.Api;
 
 public sealed record PhotoListCollectionRequest(
     string Name,
     string[]? RevisionIds = null);
+
+public sealed record PhotoListCollectionSortRequest(string Direction);
 
 public sealed record PhotoListCollectionResponse(
     string Id,
@@ -17,6 +20,9 @@ public sealed record PhotoListCollectionResponse(
 
 public static class PhotoListCollectionEndpoints
 {
+    private const string OldestFirst = "oldest-first";
+    private const string NewestFirst = "newest-first";
+
     public static IEndpointRouteBuilder MapPhotoListCollectionEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -24,6 +30,7 @@ public static class PhotoListCollectionEndpoints
         endpoints.MapGet("/api/photo-list-collections", ListAsync);
         endpoints.MapGet("/api/photo-list-collections/{id:guid}", GetAsync);
         endpoints.MapPut("/api/photo-list-collections/{id:guid}", UpdateAsync);
+        endpoints.MapPost("/api/photo-list-collections/{id:guid}/sort", SortAsync);
         endpoints.MapDelete("/api/photo-list-collections/{id:guid}", DeleteAsync);
         endpoints.MapPost(
             "/api/photo-list-collections/{id:guid}/slideshow-snapshot",
@@ -149,6 +156,78 @@ public static class PhotoListCollectionEndpoints
         }
     }
 
+    private static async Task<IResult> SortAsync(
+        Guid id,
+        PhotoListCollectionSortRequest request,
+        IPhotoListCollectionRepository repository,
+        ISourceCopyExclusionRepository exclusions,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetId(id, out PhotoListCollectionId collectionId, out IResult? error))
+        {
+            return error!;
+        }
+
+        PhotoListCollectionChronologicalOrder order;
+        switch (request.Direction?.Trim().ToLowerInvariant())
+        {
+            case OldestFirst:
+                order = PhotoListCollectionChronologicalOrder.OldestFirst;
+                break;
+            case NewestFirst:
+                order = PhotoListCollectionChronologicalOrder.NewestFirst;
+                break;
+            default:
+                return Results.BadRequest(new
+                {
+                    error = $"Sort direction must be '{OldestFirst}' or '{NewestFirst}'.",
+                });
+        }
+
+        PhotoListCollectionDefinition? definition =
+            await repository.GetAsync(collectionId, cancellationToken);
+        if (definition is null)
+        {
+            return Results.NotFound();
+        }
+
+        try
+        {
+            IPhotoListCollectionCaptureTimeRepository captureTimes =
+                ResolveCaptureTimeRepository(services);
+            IReadOnlyList<PhotoListCollectionCaptureTime> evidence =
+                await captureTimes.GetCaptureTimesAsync(
+                    definition.RevisionIds,
+                    cancellationToken);
+            AssetRevisionId[] sorted = PhotoListCollectionChronologicalOrdering.Apply(
+                definition.RevisionIds,
+                evidence,
+                order);
+
+            PhotoListCollectionDefinition? updated = await repository.UpdateAsync(
+                definition.Id,
+                definition.Name,
+                sorted,
+                cancellationToken);
+            return updated is null
+                ? Results.NotFound()
+                : Results.Ok(await ToResponseAsync(updated, exclusions, cancellationToken));
+        }
+        catch (PhotoListCollectionRevisionUnavailableException exception)
+        {
+            return Results.BadRequest(new
+            {
+                error = exception.Message,
+                revisionIds = exception.RevisionIds.Select(item => item.ToString()).ToArray(),
+            });
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
+    }
+
     private static async Task<IResult> DeleteAsync(
         Guid id,
         IPhotoListCollectionRepository repository,
@@ -197,6 +276,21 @@ public static class PhotoListCollectionEndpoints
             snapshot.CreatedAtUtc,
             items,
             items.Length));
+    }
+
+    private static IPhotoListCollectionCaptureTimeRepository ResolveCaptureTimeRepository(
+        IServiceProvider services)
+    {
+        IPhotoListCollectionCaptureTimeRepository? configured =
+            services.GetService<IPhotoListCollectionCaptureTimeRepository>();
+        if (configured is not null)
+        {
+            return configured;
+        }
+
+        PostgresCatalogueDatabase database =
+            services.GetRequiredService<PostgresCatalogueDatabase>();
+        return new PostgresPhotoListCollectionCaptureTimeRepository(database);
     }
 
     private static async Task<PhotoListCollectionResponse> ToResponseAsync(

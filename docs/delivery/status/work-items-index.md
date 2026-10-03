@@ -23,7 +23,7 @@ Current work items: **18**. Archived terminal items: **164**.
 | [WI-0181](../work-items/WI-0181-creative-collection-checkbox-alignment.md) Fix Creative Collections checkbox alignment and shared form styling | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0181.yaml) |
 | [WI-0182](../work-items/WI-0182-photo-quality-scoring-evaluation.md) Evaluate automatic technical photo quality scoring | M32 | ready | unassigned | [YAML](work-items/active/WI-0182.yaml) |
 | [WI-0183](../work-items/WI-0183-smart-collection-progressive-disclosure.md) Simplify Smart Collection editor with progressive disclosure | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0183.yaml) |
-| [WI-0184](../work-items/WI-0184-manual-collection-date-sort.md) Add whole-collection chronological sorting for manual collections | M32 | ready | unassigned | [YAML](work-items/active/WI-0184.yaml) |
+| [WI-0184](../work-items/WI-0184-manual-collection-date-sort.md) Add whole-collection chronological sorting for manual collections | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0184.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 
