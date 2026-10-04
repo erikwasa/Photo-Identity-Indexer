@@ -91,7 +91,7 @@ work_items:
   document: ../work-items/WI-0165-slideshow-library-status-counts.md
   started_at: 2026-09-26
   last_updated_at: 2026-10-04
-  branch: agent/slideshow-acceptance-followups
+  branch: agent/WI-0165-prepared-state-continuity
   blockers:
   - WI-0108
   - WI-0146
@@ -106,6 +106,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/499
   - type: maintainer-observation
     value: '2026-10-04 Europe/Stockholm: counts are correct and standalone Prepare originals shows Prepared, but player-triggered preparation does not produce Prepared and page reload does not restore Prepared. WI-0165 remains in_review.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/505
 - id: WI-0178
   title: Add minimal slideshow library filtering and sorting
   milestone: M32
