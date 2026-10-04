@@ -79,3 +79,7 @@ Verify with a sufficiently populated mixed slideshow library on desktop and phon
 6. Enter a query with no matches and confirm the no-results state is understandable and its clear action restores the grid.
 7. Press Escape while the search field is active and confirm the query clears and the compact control returns.
 8. Repeat on phone/PWA and desktop, checking touch targets, keyboard focus, screen-reader labels and absence of horizontal overflow.
+
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+The maintainer completed the maintained desktop and phone/PWA verification and reports WI-0178 works as expected. The compact search interaction, focus behavior, full/partial/case/whitespace matching, clear/Escape recovery, no-results state, alphabetical ordering and responsive layout are accepted. WI-0178 is complete.
