@@ -90,7 +90,7 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0165-slideshow-library-status-counts.md
   started_at: 2026-09-26
-  last_updated_at: 2026-09-29
+  last_updated_at: 2026-10-04
   branch: agent/slideshow-acceptance-followups
   blockers:
   - WI-0108
@@ -102,64 +102,19 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/442
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
-- id: WI-0171
-  title: Diagnose thin grid-like lines during phone slideshow playback
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0171-phone-slideshow-grid-artifacts.md
-  started_at: 2026-10-01
-  last_updated_at: 2026-10-01
-  branch: agent/wi-0171-phone-grid-artifacts
-  blockers: []
-  blocker_notes: []
-  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/499
   - type: maintainer-observation
-    value: '2026-10-01: Maintainer reproduced fixed-position thin grid seams in the installed PWA on a Google Pixel 9 Pro XL for some prepared originals; the seams were not seen on PC and flickered while playback motion was active. Private screenshots were supplied but are not committed.'
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/478
-- id: WI-0175
-  title: Fix slideshow catalogue connection churn and reload recovery
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0175-slideshow-catalogue-recovery.md
-  started_at: 2026-10-01
-  last_updated_at: 2026-10-01
-  branch: agent/wi-0175-slideshow-reliability
-  blockers: []
-  blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/476
-- id: WI-0177
-  title: Unify slideshow library into one consumer-facing grid
-  milestone: M32
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0177-unified-slideshow-library.md
-  started_at: 2026-10-02
-  last_updated_at: 2026-10-02
-  branch: agent/WI-0177-unified-slideshow-library
-  blockers: []
-  blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/480
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/484
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/486
+    value: '2026-10-04 Europe/Stockholm: counts are correct and standalone Prepare originals shows Prepared, but player-triggered preparation does not produce Prepared and page reload does not restore Prepared. WI-0165 remains in_review.'
 - id: WI-0178
   title: Add minimal slideshow library filtering and sorting
   milestone: M32
-  status: blocked
+  status: ready
   owner: unassigned
   document: ../work-items/WI-0178-slideshow-library-filtering.md
-  blockers:
-  - WI-0177
-  blocker_notes:
-  - Implement filtering after WI-0177 establishes one unified slideshow catalogue and grid.
+  last_updated_at: 2026-10-04
+  blockers: []
+  blocker_notes: []
   evidence:
   - type: issue
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/481
