@@ -20,5 +20,6 @@
   <Project Path="tools/PhotoIdentity.ClusterEvaluation/PhotoIdentity.ClusterEvaluation.csproj" />
   <Project Path="tools/PhotoIdentity.Docs/PhotoIdentity.Docs.csproj" />
   <Project Path="tools/PhotoIdentity.Models/PhotoIdentity.Models.csproj" />
+  <Project Path="tools/PhotoIdentity.PhotoQualityEvaluation/PhotoIdentity.PhotoQualityEvaluation.csproj" />
   <Project Path="tools/PhotoIdentity.ReviewVerification/PhotoIdentity.ReviewVerification.csproj" />
 </Solution>
