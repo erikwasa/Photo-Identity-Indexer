@@ -24,7 +24,7 @@ public sealed class AssignmentAuditWebContractTests
         Assert.Contains("loading=\"lazy\"", page, StringComparison.Ordinal);
         Assert.Contains("Load more", page, StringComparison.Ordinal);
         Assert.Contains("visible=", page, StringComparison.Ordinal);
-        Assert.Contains("#\{PersonAnchor(face.AssignedPerson.Id)\}", page, StringComparison.Ordinal);
+        Assert.Contains("$\"#{PersonAnchor(face.AssignedPerson.Id)}\"", page, StringComparison.Ordinal);
     }
 
     [Fact]
