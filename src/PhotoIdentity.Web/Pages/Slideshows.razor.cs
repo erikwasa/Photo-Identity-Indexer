@@ -1035,7 +1035,6 @@ public partial class Slideshows : IAsyncDisposable
         }
 
         _polling.Clear();
-        _receiptRestoreGate.Dispose();
         _lifetime.Dispose();
         await Task.CompletedTask;
     }
