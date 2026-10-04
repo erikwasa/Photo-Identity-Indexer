@@ -16,7 +16,7 @@ Current work items: **11**. Archived terminal items: **172**.
 | [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0165.yaml) |
 | [WI-0178](../work-items/WI-0178-slideshow-library-filtering.md) Add minimal slideshow library filtering and sorting | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0178.yaml) |
 | [WI-0182](../work-items/WI-0182-photo-quality-scoring-evaluation.md) Evaluate automatic technical photo quality scoring | M32 | ready | unassigned | [YAML](work-items/active/WI-0182.yaml) |
-| [WI-0185](../work-items/WI-0185-automatic-assignment-audit.md) Redesign identity audit around cross-person automatic assignments | M35 | ready | unassigned | [YAML](work-items/active/WI-0185.yaml) |
+| [WI-0185](../work-items/WI-0185-automatic-assignment-audit.md) Redesign identity audit around cross-person automatic assignments | M35 | in_review | ai-agent | [YAML](work-items/active/WI-0185.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 
