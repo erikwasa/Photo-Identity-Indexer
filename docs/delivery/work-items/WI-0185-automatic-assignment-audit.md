@@ -56,17 +56,17 @@ Paging must be deterministic and bounded under concurrent catalogue changes. Pre
 
 ## Acceptance criteria
 
-- [ ] `/audit` can show matching assignments across all people without requiring a person dropdown selection.
-- [ ] Source filtering can show Automatic assignments, covering both ordinary and multi-evidence automatic actors, while cards distinguish which source made the assignment.
-- [ ] Optional From/To controls filter on canonical assignment time with defined UTC conversion and inclusive-lower/exclusive-upper semantics.
-- [ ] Results are visibly grouped by assigned person, with clear/sticky person context and no repeated assigned-person sentence required on every card.
-- [ ] Automatic assignments within each person are ordered by score margin ascending with deterministic ties, making the weakest accepted margins appear first.
-- [ ] Each automatic card exposes the accepted score, margin, exact model revision and assignment time from the assignment-linked suggestion provenance.
-- [ ] A face manually corrected after automatic assignment no longer appears in the default current Automatic result, while its historical actions remain visible in face history.
-- [ ] Opening a face for correction and returning restores the audit query/filter context and does not force the maintainer to restart at a person selector.
+- [x] `/audit` can show matching assignments across all people without requiring a person dropdown selection.
+- [x] Source filtering can show Automatic assignments, covering both ordinary and multi-evidence automatic actors, while cards distinguish which source made the assignment.
+- [x] Optional From/To controls filter on canonical assignment time with defined UTC conversion and inclusive-lower/exclusive-upper semantics.
+- [x] Results are visibly grouped by assigned person, with clear/sticky person context and no repeated assigned-person sentence required on every card.
+- [x] Automatic assignments within each person are ordered by score margin ascending with deterministic ties, making the weakest accepted margins appear first.
+- [x] Each automatic card exposes the accepted score, margin, exact model revision and assignment time from the assignment-linked suggestion provenance.
+- [x] A face manually corrected after automatic assignment no longer appears in the default current Automatic result, while its historical actions remain visible in face history.
+- [x] Opening a face for correction and returning restores the audit query/filter context and does not force the maintainer to restart at a person selector.
 - [ ] Thousands of matching assignments can be browsed through bounded lazy loading without fetching all thumbnails up front and without one request per person.
-- [ ] PostgreSQL access for the cross-person audit is set-oriented, deterministic and covered by focused persistence/API tests; any required index is delivered through the normal schema migration path.
-- [ ] Existing face-history correction/undo semantics and append-only canonical review history are preserved.
+- [x] PostgreSQL access for the cross-person audit is set-oriented, deterministic and covered by focused persistence/API tests; any required index is delivered through the normal schema migration path.
+- [x] Existing face-history correction/undo semantics and append-only canonical review history are preserved.
 - [ ] Maintainer verification on the real catalogue confirms that a time-bounded automatic-assignment run can be skimmed continuously across many people and suspicious assignments can be corrected without losing audit context.
 
 ## Verification requirements
@@ -76,6 +76,35 @@ Add focused persistence tests for current-decision selection, automatic actor fi
 On the maintained Windows catalogue, use a representative automatic-assignment time window containing many people. Verify that the page can move continuously through the result set, weakest margins appear first inside each person group, ordinary/multi-evidence provenance is truthful, correcting a suspicious face removes it from the current Automatic audit after refresh, and navigation back restores the audit context.
 
 Run relevant builds/tests plus `PhotoIdentity.Docs validate` and `PhotoIdentity.Docs generate --check`.
+
+## Implementation — 2026-10-04
+
+PR #506 replaces the person-selector audit with a catalogue-wide assignment stream. `PostgresAssignmentAuditRepository` selects the latest unreversed canonical face decision, filters by assignment source and inclusive-lower/exclusive-upper assignment timestamps, joins accepted suggestion evidence through `identity_suggestion_review_actions.review_action_id`, and orders deterministically by assigned person then accepted score margin. Both ordinary and multi-evidence automatic actors are included under the Automatic source while the exact actor remains available to the UI.
+
+`/audit` now exposes source and local From/To filters, optional current-model disagreement comparison, grouped person sections with sticky person headers, lazy-loaded face images and bounded 120-item pages. Face-detail links encode the audit query, loaded-item target and person anchor so correction/history navigation can return to the same practical audit context. A later manual correction is excluded from current Automatic results because filtering is applied to the latest canonical decision rather than historical assignment rows.
+
+PR #506's application test covers automatic actor filtering, accepted score/margin/model provenance, weakest-margin ordering, UTC time-bound semantics, manual source results and suppression of a superseded automatic assignment. CI run #2622 passed the full build/test, both integration shards, documentation generation/validation, published review verification, Windows mixed-media verification, package verification and launcher verification.
+
+A follow-up acceptance-coverage change adds:
+
+- `AssignmentAuditEndpointPagingTests` for deterministic API offset pages and non-overlap;
+- `AssignmentAuditPagingTests` for overlapping/fully-overlapping client pages, proving de-duplication and forward offset progress rather than a duplicate loop; and
+- `AssignmentAuditWebContractTests` for cross-person grouping, source/time controls, lazy images, sticky filters/person context, phone single-column behavior and encoded return context.
+
+No new database index is added in this slice. Synthetic tests establish the query semantics and bounded access shape, but realistic catalogue-volume query/runtime behavior is deliberately left to the maintained-catalogue verification below. If that verification shows an unacceptable query plan or browsing latency, WI-0185 remains open and the index/migration must be delivered before completion.
+
+## Remaining maintainer verification
+
+On the maintained Windows catalogue, choose a time window from a recent automatic-assignment run containing many people and verify:
+
+1. `/audit` opens directly to cross-person results without requiring a person choice.
+2. Automatic includes both ordinary and multi-evidence assignments and the card badge distinguishes them.
+3. From/To local times bound the expected assignment run; boundary behavior is sensible for the chosen window.
+4. Person groups remain understandable while scrolling and weakest accepted margins appear first inside each person.
+5. Score, margin, exact model revision and assignment time look truthful on representative automatic cards.
+6. Load more can move through a large result set without duplicates, loops, excessive delay or loading all thumbnails up front.
+7. Open one suspicious face, correct it manually, return to the audit and confirm the filters/context are restored; after refresh that face no longer appears in current Automatic results while its history remains available.
+8. Note approximate result count and responsiveness. If the maintained catalogue exposes a material query/performance problem, profile it before accepting WI-0185 and add an index migration only with measured evidence.
 
 ## Deferred calibration follow-up
 
