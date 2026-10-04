@@ -1,7 +1,7 @@
 id: WI-0185
 title: Redesign identity audit around cross-person automatic assignments
 milestone: M35
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0185-automatic-assignment-audit.md
 started_at: 2026-10-04
