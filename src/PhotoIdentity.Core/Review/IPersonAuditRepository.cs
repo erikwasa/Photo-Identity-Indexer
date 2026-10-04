@@ -11,6 +11,13 @@ public static class PersonAuditSorts
     public const string ConfidenceAscending = "confidence-asc";
 }
 
+public static class AssignmentAuditSources
+{
+    public const string All = "all";
+    public const string Automatic = "automatic";
+    public const string Manual = "manual";
+}
+
 public sealed record PersonAuditTopSuggestion(
     long Id,
     ReviewPerson Person,
@@ -48,8 +55,36 @@ public sealed record PersonAuditPage(
     int DisagreementCount,
     string Sort);
 
+public sealed record AssignmentAuditFace(
+    FaceOccurrenceId Id,
+    int Ordinal,
+    DateTimeOffset FaceCreatedAtUtc,
+    DateTimeOffset AssignedAtUtc,
+    string PhotoName,
+    string MediaType,
+    int? PhotoWidth,
+    int? PhotoHeight,
+    Sha256Digest RevisionHash,
+    string? CropStoragePath,
+    double? Confidence,
+    long AssignmentActionId,
+    string AssignmentActor,
+    ReviewPerson AssignedPerson,
+    PersonAuditTopSuggestion? AcceptedSuggestion,
+    PersonAuditTopSuggestion? CurrentTopSuggestion,
+    bool CurrentSuggestionDisagrees);
+
+public sealed record AssignmentAuditPage(
+    IReadOnlyList<AssignmentAuditFace> Items,
+    int Offset,
+    int Limit,
+    int Total,
+    string Source,
+    DateTimeOffset? FromUtc,
+    DateTimeOffset? ToUtc);
+
 /// <summary>
-/// Read-only audit view over active human assignments with optional exact-model suggestion comparison.
+/// Read-only audit view over active assignments for one person with optional exact-model suggestion comparison.
 /// </summary>
 public interface IPersonAuditRepository
 {
@@ -61,5 +96,21 @@ public interface IPersonAuditRepository
         int limit = 40,
         bool disagreementsOnly = false,
         string sort = PersonAuditSorts.AssignedDescending,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Read-only catalogue-wide audit view over current assignments and their assignment-linked suggestion provenance.
+/// </summary>
+public interface IAssignmentAuditRepository
+{
+    Task<AssignmentAuditPage> GetAssignmentsAsync(
+        string source = AssignmentAuditSources.Automatic,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null,
+        ModelId? modelId = null,
+        Sha256Digest? modelHash = null,
+        int offset = 0,
+        int limit = 120,
         CancellationToken cancellationToken = default);
 }
