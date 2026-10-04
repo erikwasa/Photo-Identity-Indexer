@@ -18,7 +18,12 @@ public sealed class AssignmentAuditWebContractTests
         Assert.Contains("<h1>Audit assignments</h1>", page, StringComparison.Ordinal);
         Assert.DoesNotContain("Choose person", page, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("id=\"audit-source\"", page, StringComparison.Ordinal);
-        Assert.Contains("type=\"datetime-local\"", page, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(page, "type=\"date\""));
+        Assert.DoesNotContain("type=\"datetime-local\"", page, StringComparison.Ordinal);
+        Assert.Contains("From date", page, StringComparison.Ordinal);
+        Assert.Contains("To date", page, StringComparison.Ordinal);
+        Assert.Contains("ToLocalDate?.Date.AddDays(1)", page, StringComparison.Ordinal);
+        Assert.Contains("From date must be on or before To date.", page, StringComparison.Ordinal);
         Assert.Contains("Items.GroupBy(item => item.AssignedPerson.Id)", page, StringComparison.Ordinal);
         Assert.Contains("face.AcceptedSuggestion", page, StringComparison.Ordinal);
         Assert.Contains("loading=\"lazy\"", page, StringComparison.Ordinal);
@@ -44,6 +49,19 @@ public sealed class AssignmentAuditWebContractTests
         Assert.Contains("grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));", css, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 760px)", css, StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: 1fr;", css, StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string value, string fragment)
+    {
+        int count = 0;
+        int start = 0;
+        while ((start = value.IndexOf(fragment, start, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            start += fragment.Length;
+        }
+
+        return count;
     }
 
     private static string ResolveRepositoryRoot()

@@ -4,6 +4,8 @@ milestone: M32
 status: in_review
 owner: ai-agent
 branch: agent/WI-0182-photo-quality-evaluation
+started_at: 2026-10-04
+last_updated_at: 2026-10-04
 document: ../work-items/WI-0182-photo-quality-scoring-evaluation.md
 blockers: []
 blocker_notes: []

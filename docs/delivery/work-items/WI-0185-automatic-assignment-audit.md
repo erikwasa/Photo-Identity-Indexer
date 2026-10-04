@@ -23,9 +23,9 @@ Tracked by GitHub issue #503.
 ## Scope
 
 - Redesign `/audit` so a person selection is not required to see results.
-- Add catalogue-wide assignment filtering by assignment source and assignment time range.
+- Add catalogue-wide assignment filtering by assignment source and assignment date range.
 - Treat `identity-matcher:auto` and `identity-matcher:auto-multi-evidence` as Automatic while retaining enough source detail to distinguish ordinary and multi-evidence assignments on individual cards.
-- Define time filtering against canonical assignment `review_actions.created_at_utc`; local date/time controls must convert explicitly to UTC. Use an inclusive lower bound and exclusive upper bound when both are supplied.
+- Define filtering against canonical assignment `review_actions.created_at_utc`; local From/To date controls convert explicitly to UTC. The selected From date begins at local midnight inclusively and the selected To date covers the whole local calendar day by using the following local midnight as the exclusive upper bound.
 - Default audit semantics to currently active assignments. A later manual correction, Unknown or Reject decision must remove the superseded automatic assignment from the normal current audit result without deleting its append-only history.
 - Group the continuous result stream by assigned person with a prominent person header. Keep the person context visible while scrolling through a large group so cards do not need to repeat the assigned person's name.
 - Keep the audit filters accessible while scrolling instead of requiring a return to the top of a long result set.
@@ -39,7 +39,7 @@ Tracked by GitHub issue #503.
 
 ## Architecture constraints
 
-The canonical current face decision remains the latest unreversed `assign`, `unknown` or `reject` review action for that face. Source/time filtering for the default audit view must apply to that current decision, so an older automatic assignment does not reappear after a later manual correction.
+The canonical current face decision remains the latest unreversed `assign`, `unknown` or `reject` review action for that face. Source/date filtering for the default audit view must apply to that current decision, so an older automatic assignment does not reappear after a later manual correction.
 
 Automatic-assignment provenance should follow `identity_suggestion_review_actions.review_action_id` to the accepted suggestion and its exact-model ranking. The audit must remain correct if current suggestion rankings later change or are regenerated.
 
@@ -58,7 +58,7 @@ Paging must be deterministic and bounded under concurrent catalogue changes. Pre
 
 - [x] `/audit` can show matching assignments across all people without requiring a person dropdown selection.
 - [x] Source filtering can show Automatic assignments, covering both ordinary and multi-evidence automatic actors, while cards distinguish which source made the assignment.
-- [x] Optional From/To controls filter on canonical assignment time with defined UTC conversion and inclusive-lower/exclusive-upper semantics.
+- [x] Optional From/To date controls filter on canonical assignment time with explicit local-day-to-UTC conversion; the From date is inclusive and the To date includes the full selected local calendar day.
 - [x] Results are visibly grouped by assigned person, with clear/sticky person context and no repeated assigned-person sentence required on every card.
 - [x] Automatic assignments within each person are ordered by score margin ascending with deterministic ties, making the weakest accepted margins appear first.
 - [x] Each automatic card exposes the accepted score, margin, exact model revision and assignment time from the assignment-linked suggestion provenance.
@@ -67,13 +67,13 @@ Paging must be deterministic and bounded under concurrent catalogue changes. Pre
 - [ ] Thousands of matching assignments can be browsed through bounded lazy loading without fetching all thumbnails up front and without one request per person.
 - [x] PostgreSQL access for the cross-person audit is set-oriented, deterministic and covered by focused persistence/API tests; any required index is delivered through the normal schema migration path.
 - [x] Existing face-history correction/undo semantics and append-only canonical review history are preserved.
-- [ ] Maintainer verification on the real catalogue confirms that a time-bounded automatic-assignment run can be skimmed continuously across many people and suspicious assignments can be corrected without losing audit context.
+- [ ] Maintainer verification on the real catalogue confirms that a date-bounded automatic-assignment run can be skimmed continuously across many people and suspicious assignments can be corrected without losing audit context.
 
 ## Verification requirements
 
 Add focused persistence tests for current-decision selection, automatic actor filtering, assignment-time boundaries, accepted-suggestion provenance joins, corrected/superseded assignments and deterministic ordering. Add API tests for cross-person filtering/paging and Web/component coverage for grouping, sticky/filter state, lazy loading and return navigation.
 
-On the maintained Windows catalogue, use a representative automatic-assignment time window containing many people. Verify that the page can move continuously through the result set, weakest margins appear first inside each person group, ordinary/multi-evidence provenance is truthful, correcting a suspicious face removes it from the current Automatic audit after refresh, and navigation back restores the audit context.
+On the maintained Windows catalogue, use a representative automatic-assignment date range containing many people. Verify that the page can move continuously through the result set, weakest margins appear first inside each person group, ordinary/multi-evidence provenance is truthful, correcting a suspicious face removes it from the current Automatic audit after refresh, and navigation back restores the audit context.
 
 Run relevant builds/tests plus `PhotoIdentity.Docs validate` and `PhotoIdentity.Docs generate --check`.
 
@@ -81,7 +81,7 @@ Run relevant builds/tests plus `PhotoIdentity.Docs validate` and `PhotoIdentity.
 
 PR #506 replaces the person-selector audit with a catalogue-wide assignment stream. `PostgresAssignmentAuditRepository` selects the latest unreversed canonical face decision, filters by assignment source and inclusive-lower/exclusive-upper assignment timestamps, joins accepted suggestion evidence through `identity_suggestion_review_actions.review_action_id`, and orders deterministically by assigned person then accepted score margin. Both ordinary and multi-evidence automatic actors are included under the Automatic source while the exact actor remains available to the UI.
 
-`/audit` now exposes source and local From/To filters, optional current-model disagreement comparison, grouped person sections with sticky person headers, lazy-loaded face images and bounded 120-item pages. Face-detail links encode the audit query, loaded-item target and person anchor so correction/history navigation can return to the same practical audit context. A later manual correction is excluded from current Automatic results because filtering is applied to the latest canonical decision rather than historical assignment rows.
+`/audit` now exposes source and local From/To date filters, optional current-model disagreement comparison, grouped person sections with sticky person headers, lazy-loaded face images and bounded 120-item pages. Face-detail links encode the audit query, loaded-item target and person anchor so correction/history navigation can return to the same practical audit context. A later manual correction is excluded from current Automatic results because filtering is applied to the latest canonical decision rather than historical assignment rows.
 
 PR #506's application test covers automatic actor filtering, accepted score/margin/model provenance, weakest-margin ordering, UTC time-bound semantics, manual source results and suppression of a superseded automatic assignment. CI run #2622 passed the full build/test, both integration shards, documentation generation/validation, published review verification, Windows mixed-media verification, package verification and launcher verification.
 
@@ -89,17 +89,23 @@ A follow-up acceptance-coverage change adds:
 
 - `AssignmentAuditEndpointPagingTests` for deterministic API offset pages and non-overlap;
 - `AssignmentAuditPagingTests` for overlapping/fully-overlapping client pages, proving de-duplication and forward offset progress rather than a duplicate loop; and
-- `AssignmentAuditWebContractTests` for cross-person grouping, source/time controls, lazy images, sticky filters/person context, phone single-column behavior and encoded return context.
+- `AssignmentAuditWebContractTests` for cross-person grouping, source/date controls, lazy images, sticky filters/person context, phone single-column behavior and encoded return context.
 
 No new database index is added in this slice. Synthetic tests establish the query semantics and bounded access shape, but realistic catalogue-volume query/runtime behavior is deliberately left to the maintained-catalogue verification below. If that verification shows an unacceptable query plan or browsing latency, WI-0185 remains open and the index/migration must be delivered before completion.
 
+## Maintainer verification — 2026-10-04 (Europe/Stockholm)
+
+Maintained verification exposed a usability defect in the original `datetime-local` From/To controls before the wider catalogue checks could be completed. Typing a time reset the control, calendar-selected values disappeared, and applying a From/To range appeared to have no filtering effect. The maintainer requested date-only From/To controls because day-level specificity is sufficient for assignment-run auditing.
+
+The follow-up changes the audit UI to standard date inputs while preserving the API's UTC timestamp contract. From converts to local start-of-day inclusively; To is user-inclusive and converts to the following local midnight as the exclusive upper bound. WI-0185 remains `in_review` until this date-only interaction and the remaining large-catalogue checks pass.
+
 ## Remaining maintainer verification
 
-On the maintained Windows catalogue, choose a time window from a recent automatic-assignment run containing many people and verify:
+On the maintained Windows catalogue, choose a date range from a recent automatic-assignment run containing many people and verify:
 
 1. `/audit` opens directly to cross-person results without requiring a person choice.
 2. Automatic includes both ordinary and multi-evidence assignments and the card badge distinguishes them.
-3. From/To local times bound the expected assignment run; boundary behavior is sensible for the chosen window.
+3. From/To dates remain selected after calendar entry and Apply filters bounds the expected assignment run, including the whole selected To date.
 4. Person groups remain understandable while scrolling and weakest accepted margins appear first inside each person.
 5. Score, margin, exact model revision and assignment time look truthful on representative automatic cards.
 6. Load more can move through a large result set without duplicates, loops, excessive delay or loading all thumbnails up front.
