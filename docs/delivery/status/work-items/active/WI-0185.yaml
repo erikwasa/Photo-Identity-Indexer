@@ -1,0 +1,11 @@
+id: WI-0185
+title: Redesign identity audit around cross-person automatic assignments
+milestone: M35
+status: ready
+owner: unassigned
+document: ../work-items/WI-0185-automatic-assignment-audit.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/503
