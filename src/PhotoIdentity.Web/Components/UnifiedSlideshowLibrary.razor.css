@@ -1,3 +1,69 @@
+.slideshow-library-tools {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+    margin-bottom: 0.8rem;
+}
+
+.slideshow-library-search-toggle,
+.slideshow-library-search-clear {
+    display: inline-grid;
+    place-items: center;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.slideshow-library-search-toggle svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+}
+
+.slideshow-library-search {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: min(100%, 22rem);
+    min-width: 0;
+}
+
+.slideshow-library-search-input {
+    width: 100%;
+    min-width: 0;
+    height: 2.75rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+}
+
+.slideshow-library-search-input::placeholder {
+    color: var(--muted);
+}
+
+.slideshow-library-search-toggle:focus-visible,
+.slideshow-library-search-clear:focus-visible,
+.slideshow-library-search-input:focus-visible {
+    outline: 3px solid var(--ink);
+    outline-offset: 2px;
+}
+
+.slideshow-library-no-results {
+    text-align: center;
+}
+
 .slideshow-library-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));

@@ -39,74 +39,124 @@ else if (Items.Count == 0)
 }
 else
 {
-    <section class="slideshow-library-grid" aria-label="Slideshows">
-        @foreach (SlideshowLibraryItem item in Items)
+    <div class="slideshow-library-tools" role="search" aria-label="Slideshow library search">
+        @if (_searchExpanded)
         {
-            SlideshowOriginalPreparationResponse? preparation = PreparationFor(item);
-            bool preparing = preparation?.State == "preparing";
-            bool needsAttention = item.SupportsPreparation && SlideshowPreparationExperience.NeedsParentAttention(preparation);
-            bool starting = IsStarting(item);
-            bool busy = IsBusy(item);
-            bool prepared = item.SupportsPreparation && SlideshowLibraryPresentation.ShowPreparedIndicator(preparation?.State, busy);
-            string? quantityLabel = QuantityLabel(item);
-
-            <article @key="item.Key" class="slideshow-library-card">
+            <div class="slideshow-library-search">
+                <input @ref="_searchInput"
+                       id="slideshow-library-search-input"
+                       type="search"
+                       class="slideshow-library-search-input"
+                       placeholder="Search slideshows"
+                       aria-label="Search slideshows"
+                       autocomplete="off"
+                       @bind="SearchQuery"
+                       @bind:event="oninput"
+                       @onkeydown="HandleSearchKeyDown" />
                 <button type="button"
-                        class="slideshow-library-primary"
-                        disabled="@busy"
-                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(item.Name, quantityLabel, prepared)"
-                        @onclick="() => StartAsync(item)">
-                    <SlideshowLibraryCover CollectionId="@item.CoverCollectionId"
-                                           Manual="@item.Manual"
-                                           CoverRevisionId="@item.CoverRevisionId"
-                                           PhotoCountChanged="@(count => SetSmartPhotoCountAsync(item, count))" />
-                    <span class="slideshow-library-card-shade" aria-hidden="true"></span>
-                    <span class="slideshow-library-card-copy">
-                        @if (!string.IsNullOrWhiteSpace(quantityLabel) || prepared)
-                        {
-                            <span class="slideshow-library-card-meta">
-                                @if (!string.IsNullOrWhiteSpace(quantityLabel))
+                        class="slideshow-library-search-clear"
+                        aria-label="Clear slideshow search"
+                        title="Clear search"
+                        @onclick="ClearSearch">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+        }
+        else
+        {
+            <button @ref="_searchToggle"
+                    type="button"
+                    class="slideshow-library-search-toggle"
+                    aria-label="Search slideshows"
+                    aria-expanded="false"
+                    @onclick="OpenSearch">
+                <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                    <circle cx="11" cy="11" r="6.5"></circle>
+                    <path d="M16 16l5 5"></path>
+                </svg>
+            </button>
+        }
+    </div>
+
+    @if (VisibleItems.Count == 0)
+    {
+        <section class="slideshow-library-state slideshow-library-no-results" role="status">
+            <strong>No slideshows match “@NormalizedSearchQuery”</strong>
+            <p>Try another name or clear the search.</p>
+            <button type="button" class="button secondary" @onclick="ClearSearch">Clear search</button>
+        </section>
+    }
+    else
+    {
+        <section class="slideshow-library-grid" aria-label="Slideshows">
+            @foreach (SlideshowLibraryItem item in VisibleItems)
+            {
+                SlideshowOriginalPreparationResponse? preparation = PreparationFor(item);
+                bool preparing = preparation?.State == "preparing";
+                bool needsAttention = item.SupportsPreparation && SlideshowPreparationExperience.NeedsParentAttention(preparation);
+                bool starting = IsStarting(item);
+                bool busy = IsBusy(item);
+                bool prepared = item.SupportsPreparation && SlideshowLibraryPresentation.ShowPreparedIndicator(preparation?.State, busy);
+                string? quantityLabel = QuantityLabel(item);
+
+                <article @key="item.Key" class="slideshow-library-card">
+                    <button type="button"
+                            class="slideshow-library-primary"
+                            disabled="@busy"
+                            aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(item.Name, quantityLabel, prepared)"
+                            @onclick="() => StartAsync(item)">
+                        <SlideshowLibraryCover CollectionId="@item.CoverCollectionId"
+                                               Manual="@item.Manual"
+                                               CoverRevisionId="@item.CoverRevisionId"
+                                               PhotoCountChanged="@(count => SetSmartPhotoCountAsync(item, count))" />
+                        <span class="slideshow-library-card-shade" aria-hidden="true"></span>
+                        <span class="slideshow-library-card-copy">
+                            @if (!string.IsNullOrWhiteSpace(quantityLabel) || prepared)
+                            {
+                                <span class="slideshow-library-card-meta">
+                                    @if (!string.IsNullOrWhiteSpace(quantityLabel))
+                                    {
+                                        <span class="slideshow-library-card-badge">@quantityLabel</span>
+                                    }
+                                    @if (prepared)
+                                    {
+                                        <span class="slideshow-library-card-badge slideshow-library-card-badge-prepared">
+                                            <span aria-hidden="true">✓</span>
+                                            <span>Prepared</span>
+                                        </span>
+                                    }
+                                </span>
+                            }
+                            <span class="slideshow-library-card-title">@item.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(item.SourceCollectionName))
+                            {
+                                <span class="slideshow-library-card-kind">From @item.SourceCollectionName</span>
+                            }
+                            <span class="slideshow-library-card-cue">
+                                <span class="slideshow-library-play-mark" aria-hidden="true">▶</span>
+                                @if (starting)
                                 {
-                                    <span class="slideshow-library-card-badge">@quantityLabel</span>
+                                    <span>Starting…</span>
                                 }
-                                @if (prepared)
+                                else if (needsAttention)
                                 {
-                                    <span class="slideshow-library-card-badge slideshow-library-card-badge-prepared">
-                                        <span aria-hidden="true">✓</span>
-                                        <span>Prepared</span>
-                                    </span>
+                                    <span>Parent attention needed</span>
+                                }
+                                else if (preparing)
+                                {
+                                    <span>Getting originals ready…</span>
+                                }
+                                else
+                                {
+                                    <span>Play slideshow</span>
                                 }
                             </span>
-                        }
-                        <span class="slideshow-library-card-title">@item.Name</span>
-                        @if (!string.IsNullOrWhiteSpace(item.SourceCollectionName))
-                        {
-                            <span class="slideshow-library-card-kind">From @item.SourceCollectionName</span>
-                        }
-                        <span class="slideshow-library-card-cue">
-                            <span class="slideshow-library-play-mark" aria-hidden="true">▶</span>
-                            @if (starting)
-                            {
-                                <span>Starting…</span>
-                            }
-                            else if (needsAttention)
-                            {
-                                <span>Parent attention needed</span>
-                            }
-                            else if (preparing)
-                            {
-                                <span>Getting originals ready…</span>
-                            }
-                            else
-                            {
-                                <span>Play slideshow</span>
-                            }
                         </span>
-                    </span>
-                </button>
-            </article>
-        }
-    </section>
+                    </button>
+                </article>
+            }
+        </section>
+    }
 }
 
 @code {
@@ -114,6 +164,13 @@ else
     private readonly Dictionary<string, int> _smartPhotoCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _launching = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<SlideshowLibraryItem> Items { get; set; } = [];
+    private IReadOnlyList<SlideshowLibraryItem> VisibleItems { get; set; } = [];
+    private ElementReference _searchInput;
+    private ElementReference _searchToggle;
+    private string _searchQuery = string.Empty;
+    private bool _searchExpanded;
+    private bool _focusSearchOnRender;
+    private bool _focusSearchToggleOnRender;
     private bool _loadingCreative;
     private bool _creativeRefreshFailed;
     private bool _refreshing;
@@ -138,6 +195,22 @@ else
 
     private bool HasFailure => !string.IsNullOrWhiteSpace(CatalogueError) || _creativeRefreshFailed;
     private bool HasPartialFailure => HasFailure && Items.Count > 0 && !CatalogueLoading && !_loadingCreative;
+    private string NormalizedSearchQuery => SlideshowLibraryFilter.NormalizeQuery(_searchQuery);
+
+    private string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (string.Equals(_searchQuery, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _searchQuery = value;
+            RefreshVisibleItems();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -148,6 +221,22 @@ else
     protected override void OnParametersSet()
     {
         RefreshItems();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusSearchOnRender)
+        {
+            _focusSearchOnRender = false;
+            await _searchInput.FocusAsync();
+            return;
+        }
+
+        if (_focusSearchToggleOnRender)
+        {
+            _focusSearchToggleOnRender = false;
+            await _searchToggle.FocusAsync();
+        }
     }
 
     private async Task LoadCreativeAsync()
@@ -186,6 +275,36 @@ else
             Session.SmartCollections ?? [],
             Session.ManualCollections ?? [],
             Session.CreativeCollections ?? []);
+        RefreshVisibleItems();
+    }
+
+    private void RefreshVisibleItems()
+    {
+        VisibleItems = SlideshowLibraryFilter.ByName(Items, _searchQuery);
+    }
+
+    private void OpenSearch()
+    {
+        _searchExpanded = true;
+        _focusSearchOnRender = true;
+        _focusSearchToggleOnRender = false;
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = string.Empty;
+        _searchExpanded = false;
+        _focusSearchOnRender = false;
+        _focusSearchToggleOnRender = true;
+        RefreshVisibleItems();
+    }
+
+    private void HandleSearchKeyDown(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Escape", StringComparison.Ordinal))
+        {
+            ClearSearch();
+        }
     }
 
     private async Task RefreshAsync()
