@@ -116,3 +116,13 @@ Two required continuity cases still fail:
 - reloading `/slideshows` does not restore **Prepared** for a preparation that was visible before reload.
 
 These failures directly cover the player-triggered preparation and persisted-receipt reload acceptance criteria above. WI-0165 therefore remains `in_review`. Follow-up issue #499 tracks the remaining implementation work. WI-0175 / issue #476 is accepted independently and is no longer the blocker.
+
+## Issue #499 implementation — PR #505
+
+The player path was already writing the same exact-snapshot browser receipt when best-quality preparation reached `ready`; the remaining defect was in `/slideshows` page lifecycle coordination. During a fresh page render, browser-local receipt restoration can run while the asynchronous Smart/manual catalogue load is still unverified. The receipt was intentionally retained rather than trusted, but there was no guaranteed automatic revalidation after the catalogue later became authoritative. That same ordering explains both maintained failures: returning from player-triggered preparation and an F5 reload could leave a valid receipt stranded without a visible **Prepared** state.
+
+PR #505 coordinates those two asynchronous prerequisites. Browser state is marked available before the first receipt restore, receipt restore/revalidation is serialized, and a verified catalogue load retries receipt validation when browser state is already available. A normal in-flight initial catalogue request no longer produces a misleading verification error. Exact current membership and the existing `/api/slideshows/original-preparation/revalidate` local-byte checks still gate the Prepared indicator; no receipt, API, PostgreSQL, hydration or preparation semantics changed.
+
+`SlideshowPreparedStateContinuityTests` reproduces the missing ordering directly: a valid browser receipt is restored while the manual collection request is pending, no Prepared state is trusted early, then catalogue completion causes automatic revalidation and establishes `ready` without a user refresh. Existing recovery tests continue to cover failed catalogue/revalidation recovery, stale membership generations and disposal/navigation cancellation.
+
+WI-0165 remains `in_review`. After PR #505 CI/merge, maintainer verification should repeat the two previously failing cases: complete preparation through normal **Start slideshow**, return to `/slideshows` and confirm **Prepared**; then reload `/slideshows` and confirm the indicator returns after revalidation. Stale membership/local-byte invalidation should remain unchanged.
