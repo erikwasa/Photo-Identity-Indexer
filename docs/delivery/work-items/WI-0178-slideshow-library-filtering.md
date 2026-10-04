@@ -55,6 +55,27 @@ A collapsed/revealable search control is preferred over a permanently large filt
 - Keyboard, focus and screen-reader behavior are covered by focused tests.
 - Filtering/sorting is implemented at the presentation layer and does not require persistence redesign for the expected catalogue size.
 
+## Implementation — 2026-10-04
+
+`UnifiedSlideshowLibrary` now exposes a compact magnifier button above the unified grid. Activating it reveals one inline search field and moves keyboard focus into that field after render. The input filters immediately on `oninput`; Escape or the clear action removes the query, collapses the field and restores the already-loaded library without making another catalogue request.
+
+`SlideshowLibraryFilter` owns the presentation-only matching rule. It trims surrounding whitespace, matches slideshow names with `OrdinalIgnoreCase`, and preserves the input catalogue order. It deliberately does not search creation kind or Creative anchor/source metadata, so consumers are never asked to navigate by Smart/manual/Creative implementation categories.
+
+No new sort control or persisted sort metadata is introduced. `SlideshowLibraryCatalogue.Combine` already supplies deterministic case-insensitive alphabetical name ordering with stable ID/kind tie-breaks, which satisfies the required consumer-friendly alphabetical ordering without inventing unreliable recent-use/creation semantics.
+
+The search surface uses an accessible search landmark and labels, a labelled clear action, visible focus treatment and minimum 44-pixel-equivalent controls. Its width is bounded by the available container so phone/PWA layouts cannot grow horizontally. A zero-match search replaces the grid with a clear no-results message and recovery action while leaving the underlying catalogue untouched.
+
+Focused `SlideshowLibraryFilterTests` cover whitespace normalization, case-insensitive partial-name matching, mixed Smart/manual/Creative results, preservation of catalogue ordering, restoration for an empty query, and the rule that source/type metadata is not searched. Existing catalogue tests continue to own deterministic combined ordering.
+
 ## Maintainer verification
 
-After WI-0177 is implemented, verify with a sufficiently populated mixed slideshow library on desktop and phone/PWA. Search by full and partial names, mixed casing and surrounding spaces; clear the query; confirm all slideshow types participate in the same results; and verify the controls remain visually secondary to the slideshow cards.
+Verify with a sufficiently populated mixed slideshow library on desktop and phone/PWA:
+
+1. Confirm the library initially shows only the compact search icon and remains alphabetically ordered.
+2. Open search and confirm focus moves into the input.
+3. Search by full and partial slideshow names, mixed casing, and names entered with leading/trailing spaces; results should update immediately across Smart, manual and Creative slideshows.
+4. Confirm names are the only search surface: creation type and Creative source context should not unexpectedly match.
+5. Clear the query and confirm the full already-loaded library returns immediately without a visible catalogue reload.
+6. Enter a query with no matches and confirm the no-results state is understandable and its clear action restores the grid.
+7. Press Escape while the search field is active and confirm the query clears and the compact control returns.
+8. Repeat on phone/PWA and desktop, checking touch targets, keyboard focus, screen-reader labels and absence of horizontal overflow.
