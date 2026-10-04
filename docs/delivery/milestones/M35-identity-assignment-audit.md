@@ -17,6 +17,10 @@ Automatic identity assignments can be reviewed efficiently across the whole cata
 
 ## Exit criteria
 
-- [ ] The maintainer can audit a bounded time range of automatic assignments without selecting people one at a time.
-- [ ] Results are grouped clearly by assigned person, preserve correction/history navigation, and remain usable at catalogue scale.
-- [ ] Automatic-assignment score, margin and exact-model provenance come from the accepted assignment evidence rather than the current suggestion state.
+- [x] The maintainer can audit a bounded date range of automatic assignments without selecting people one at a time.
+- [x] Results are grouped clearly by assigned person, preserve correction/history navigation, and remain usable at catalogue scale.
+- [x] Automatic-assignment score, margin and exact-model provenance come from the accepted assignment evidence rather than the current suggestion state.
+
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+After PRs #506 and #507 and the date-only filter follow-up in PR #508, the maintainer re-verified the maintained `/audit` workflow and reports WI-0185 works as expected. Date-range filtering, cross-person browsing, provenance/order, paging and correction/return-context behavior are accepted. M35 is complete.
