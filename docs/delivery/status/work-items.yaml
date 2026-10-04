@@ -127,14 +127,21 @@ work_items:
 - id: WI-0182
   title: Evaluate automatic technical photo quality scoring
   milestone: M32
-  status: ready
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0182-photo-quality-scoring-evaluation.md
+  started_at: 2026-10-04
+  last_updated_at: 2026-10-04
+  branch: agent/WI-0182-photo-quality-evaluation
   blockers: []
   blocker_notes: []
   evidence:
   - type: issue
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/490
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/509
+  - type: documentation
+    value: docs/operations/photo-quality-evaluation.md
 - id: WI-0185
   title: Redesign identity audit around cross-person automatic assignments
   milestone: M35
