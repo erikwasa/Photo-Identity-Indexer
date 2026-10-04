@@ -357,3 +357,9 @@ milestones:
   document: ../milestones/M34-review-queue-reliability.md
   work_items:
   - WI-0170
+- id: M35
+  title: Identity assignment audit and calibration
+  status: ready
+  document: ../milestones/M35-identity-assignment-audit.md
+  work_items:
+  - WI-0185
