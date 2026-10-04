@@ -107,11 +107,18 @@ public sealed class SlideshowLibraryRecoveryTests
                 default: throw new InvalidOperationException();
             }
         });
+        // Direct catalogue loads in this test deliberately isolate generation invalidation from
+        // the production auto-restore path. Browser restore is enabled only for the explicit
+        // validation calls under test.
+        h.Set("_browserStateRestored", false);
         await h.Invoke("LoadCollectionsAsync");
+        h.Set("_browserStateRestored", true);
         Task old = h.Invoke("RestorePreparationReceiptsAsync");
         await started.Task;
         changed = true;
+        h.Set("_browserStateRestored", false);
         await h.Invoke("LoadCollectionsAsync");
+        h.Set("_browserStateRestored", true);
         validation.SetResult(Json(new SlideshowOriginalRevalidationResponse(true, 1, 1)));
         await old;
         Assert.Empty(h.Preparations);
@@ -136,7 +143,9 @@ public sealed class SlideshowLibraryRecoveryTests
                 default: throw new InvalidOperationException();
             }
         });
+        h.Set("_browserStateRestored", false);
         await h.Invoke("LoadCollectionsAsync");
+        h.Set("_browserStateRestored", true);
         Task pending = h.Invoke("RestorePreparationReceiptsAsync");
         await started.Task;
         await h.DisposeAsync();
@@ -185,6 +194,7 @@ public sealed class SlideshowLibraryRecoveryTests
         }
         public T Get<T>(string name) => (T)(typeof(Slideshows).GetField(name, Private)?.GetValue(_component) ??
             typeof(Slideshows).GetProperty(name, Private)?.GetValue(_component))!;
+        public void Set(string name, object value) => typeof(Slideshows).GetField(name, Private)!.SetValue(_component, value);
         public Task Invoke(string name) => (Task)typeof(Slideshows).GetMethod(name, Private)!.Invoke(_component, null)!;
         public async ValueTask DisposeAsync() { await _component.DisposeAsync(); _http.Dispose(); }
     }
