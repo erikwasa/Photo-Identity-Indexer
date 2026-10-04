@@ -25,20 +25,20 @@
     </div>
 
     <div>
-        <label class="field-label" for="audit-from">From · local time</label>
+        <label class="field-label" for="audit-from">From date</label>
         <input id="audit-from"
-               type="datetime-local"
-               @bind="FromLocal"
-               @bind:format="yyyy-MM-ddTHH:mm"
+               type="date"
+               @bind="FromLocalDate"
+               @bind:format="yyyy-MM-dd"
                disabled="@Loading" />
     </div>
 
     <div>
-        <label class="field-label" for="audit-to">To · local time</label>
+        <label class="field-label" for="audit-to">To date</label>
         <input id="audit-to"
-               type="datetime-local"
-               @bind="ToLocal"
-               @bind:format="yyyy-MM-ddTHH:mm"
+               type="date"
+               @bind="ToLocalDate"
+               @bind:format="yyyy-MM-dd"
                disabled="@Loading" />
     </div>
 
@@ -74,7 +74,7 @@ else if (Items.Count == 0)
 {
     <section class="empty-state">
         <h2>No assignments in this view</h2>
-        <p>Adjust the assignment source or time range and try again.</p>
+        <p>Adjust the assignment source or date range and try again.</p>
     </section>
 }
 else
@@ -216,8 +216,8 @@ else
     private List<AssignmentAuditFaceResponse> Items { get; } = [];
     private string SelectedSource { get; set; } = "automatic";
     private string SelectedModelKey { get; set; } = "";
-    private DateTime? FromLocal { get; set; }
-    private DateTime? ToLocal { get; set; }
+    private DateTime? FromLocalDate { get; set; }
+    private DateTime? ToLocalDate { get; set; }
     private int ServerOffset { get; set; }
     private int Total { get; set; }
     private bool Loading { get; set; }
@@ -267,8 +267,8 @@ else
         DateTimeOffset? toUtc = ParseUtc(ToUtcValue);
         FromUtcValue = fromUtc?.ToString("O");
         ToUtcValue = toUtc?.ToString("O");
-        FromLocal = fromUtc?.ToLocalTime().DateTime;
-        ToLocal = toUtc?.ToLocalTime().DateTime;
+        FromLocalDate = fromUtc?.ToLocalTime().Date;
+        ToLocalDate = InclusiveLocalDateFromExclusiveUtc(toUtc);
 
         ReviewModelRevisionFilterResponse? selectedModel =
             ModelRevisions.FirstOrDefault(model =>
@@ -349,15 +349,16 @@ else
     private void ApplyFilters()
     {
         Error = null;
-        DateTimeOffset? fromUtc = LocalToUtc(FromLocal);
-        DateTimeOffset? toUtc = LocalToUtc(ToLocal);
-        if (fromUtc is DateTimeOffset from &&
-            toUtc is DateTimeOffset to &&
-            from >= to)
+        if (FromLocalDate is DateTime fromDate &&
+            ToLocalDate is DateTime toDate &&
+            fromDate.Date > toDate.Date)
         {
-            Error = "From must be earlier than To.";
+            Error = "From date must be on or before To date.";
             return;
         }
+
+        DateTimeOffset? fromUtc = LocalDateStartToUtc(FromLocalDate);
+        DateTimeOffset? toUtc = LocalDateStartToUtc(ToLocalDate?.Date.AddDays(1));
 
         Source = SelectedSource;
         FromUtcValue = fromUtc?.ToString("O");
@@ -417,15 +418,28 @@ else
                $"?state=all&returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
-    private static DateTimeOffset? LocalToUtc(DateTime? value)
+    private static DateTimeOffset? LocalDateStartToUtc(DateTime? value)
     {
         if (value is null)
         {
             return null;
         }
 
-        DateTime local = DateTime.SpecifyKind(value.Value, DateTimeKind.Local);
+        DateTime local = DateTime.SpecifyKind(value.Value.Date, DateTimeKind.Local);
         return new DateTimeOffset(local).ToUniversalTime();
+    }
+
+    private static DateTime? InclusiveLocalDateFromExclusiveUtc(DateTimeOffset? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        DateTime local = value.Value.ToLocalTime().DateTime;
+        return local.TimeOfDay == TimeSpan.Zero
+            ? local.Date.AddDays(-1)
+            : local.Date;
     }
 
     private static DateTimeOffset? ParseUtc(string? value) =>
