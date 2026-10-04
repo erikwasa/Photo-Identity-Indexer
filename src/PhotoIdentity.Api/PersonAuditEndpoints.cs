@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -10,7 +11,57 @@ public static class PersonAuditEndpoints
     public static IEndpointRouteBuilder MapPersonAuditEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/review/people/{id}/assigned-faces", GetFacesAsync);
+        endpoints.MapGet("/api/review/assigned-faces/audit", GetAssignmentAuditAsync);
         return endpoints;
+    }
+
+    private static async Task<IResult> GetAssignmentAuditAsync(
+        PostgresCatalogueDatabase database,
+        string source = AssignmentAuditSources.Automatic,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null,
+        string? modelId = null,
+        string? modelHash = null,
+        int offset = 0,
+        int limit = 120,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryModelRevision(
+                modelId,
+                modelHash,
+                out ModelId? parsedModelId,
+                out Sha256Digest? parsedModelHash))
+        {
+            return BadRequest("The suggestion model revision is invalid.");
+        }
+
+        try
+        {
+            IAssignmentAuditRepository repository =
+                new PostgresAssignmentAuditRepository(database);
+            AssignmentAuditPage page = await repository.GetAssignmentsAsync(
+                source,
+                fromUtc,
+                toUtc,
+                parsedModelId,
+                parsedModelHash,
+                offset,
+                limit,
+                cancellationToken);
+
+            return Results.Ok(new AssignmentAuditPageResponse(
+                page.Items.Select(ToResponse).ToArray(),
+                page.Offset,
+                page.Limit,
+                page.Total,
+                page.Source,
+                page.FromUtc,
+                page.ToUtc));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
     }
 
     private static async Task<IResult> GetFacesAsync(
@@ -60,6 +111,21 @@ public static class PersonAuditEndpoints
             return BadRequest(exception.Message);
         }
     }
+
+    private static AssignmentAuditFaceResponse ToResponse(AssignmentAuditFace face) => new(
+        face.Id.ToString(),
+        $"/api/review/faces/{face.Id}/image",
+        face.PhotoName,
+        face.Ordinal,
+        face.Confidence,
+        face.FaceCreatedAtUtc,
+        face.AssignedAtUtc,
+        face.AssignmentActionId,
+        face.AssignmentActor,
+        ToResponse(face.AssignedPerson),
+        face.AcceptedSuggestion is null ? null : ToResponse(face.AcceptedSuggestion),
+        face.CurrentTopSuggestion is null ? null : ToResponse(face.CurrentTopSuggestion),
+        face.CurrentSuggestionDisagrees);
 
     private static PersonAuditFaceResponse ToResponse(PersonAuditFace face) => new(
         face.Id.ToString(),
