@@ -16,6 +16,8 @@ Issue #481 tracks navigation of a slideshow library that may contain many saved 
 
 WI-0177 first unifies Smart, manual and Creative slideshows into one consumer-facing catalogue. This item adds lightweight navigation over that unified catalogue.
 
+On 2026-10-04 the maintainer accepted WI-0177 on the maintained slideshow surface. The dependency is satisfied and WI-0178 is ready for implementation.
+
 ## Scope
 
 - Add a compact search/filter affordance to `/slideshows` that is visually minimal when inactive.
