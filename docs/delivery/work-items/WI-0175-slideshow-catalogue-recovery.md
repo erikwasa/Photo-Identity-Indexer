@@ -61,3 +61,9 @@ Use direct repository/endpoint tests and component fixtures rather than new host
 - [Windows preparation CI](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36928766356) built the affected dependency graph and passed **23/23** focused tests (0 skipped, reported test duration **576 ms**). `PhotoIdentity.Docs generate`, `validate`, `review WI-0175`, and `generate --check` passed. The temporary branch-only preparation workflow removed itself after validation; it does not remain in the final PR.
 - Local whitespace and C# syntax checks passed. Local .NET 10 startup was unavailable (CoreCLR HRESULT 0x8007000E); executable evidence above is from Windows CI.
 - Standard PR CI and maintained Windows/phone acceptance remain required. WI-0175 is in_review, not completed. The exact exception behind the generic frontend banner remains unconfirmed until retested.
+
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+The maintainer repeated the WI-0175 / issue #476 reliability verification after the fixes were merged and reports that the workflow works as expected. The previously blocking Creative playback, manual catalogue/reload and connection-reliability failures did not recur during the maintained verification. WI-0175 is accepted and complete.
+
+The separate WI-0165 Prepared-state continuity problem remains open because Prepared still does not appear after player-triggered preparation and is not restored after page reload; that follow-up is tracked by issue #499 rather than keeping WI-0175 open.

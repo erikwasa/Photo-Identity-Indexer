@@ -58,10 +58,16 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 - [ ] Best-quality preparation reports an actionable OneDrive-unavailable failure when an online-only original cannot be hydrated because the sync client is unavailable, without affecting already-local playback.
 - [ ] Installed-PWA navigation provides a discoverable route from the full app to Slideshows and back without relying on browser chrome.
 - [ ] A representative approximately 1,000-photo anchor with target 150 and Broad Creative context completes within the maintained client/server request boundary or reports a bounded actionable failure, with stable expensive derived evidence reused where appropriate.
-- [ ] Smart, manual and Creative slideshows appear in one continuous consumer library without creation-type sections while preserving correct playback and preparation behavior.
+- [x] Smart, manual and Creative slideshows appear in one continuous consumer library without creation-type sections while preserving correct playback and preparation behavior.
 - [ ] A populated unified library can be narrowed quickly by slideshow name using a compact filter/search control on desktop and phone/PWA, with deterministic ordering and an accessible no-results recovery path.
 - [ ] Smart Collection authoring supports portrait/landscape filtering with correct existing-catalogue behavior and presents optional filters progressively rather than keeping inactive detail fields visible.
 - [ ] Playback/Creative authoring checkboxes and duration controls are clearly aligned, associated and phone-friendly.
 - [ ] Manual collections can be reordered oldest/newest in one action without losing explicit manual ordering semantics.
 - [ ] Technical photo-quality scoring has representative evaluation evidence and a documented adoption/no-adoption decision before it changes selection behavior.
 - [ ] Maintainer verifies the remaining slideshow/PWA behavior on desktop and phone and the Creative scale case on representative private catalogue data.
+
+## Maintainer verification update — 2026-10-04
+
+Maintained verification accepted WI-0171 (phone slideshow grid artifacts), WI-0175 (slideshow catalogue/reload reliability) and WI-0177 (unified slideshow library). WI-0178 is therefore unblocked and ready for implementation.
+
+WI-0165 remains open: counts are correct and standalone **Prepare originals** shows **Prepared**, but player-triggered preparation still does not establish the library Prepared state and a page reload does not restore a previously visible Prepared state. Issue #499 tracks those remaining acceptance failures. M32 remains in progress.

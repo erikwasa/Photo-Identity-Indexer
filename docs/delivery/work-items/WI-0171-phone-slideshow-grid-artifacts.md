@@ -41,3 +41,7 @@ No new host-heavy test or CI gate is justified for this change: the defect is a 
 ## Status
 
 Implementation is ready for maintained verification. Retest one of the affected photos on the Pixel 9 Pro XL with Prepare originals enabled while paused, playing and during a cross-fade, then compare the same photo with Prepare originals disabled. Confirm desktop playback still retains the normal subtle scale motion and no grid seams.
+
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+The maintainer repeated the WI-0171 phone/PWA verification and reports that the fix works as expected. The previously observed thin grid/compositor seams no longer block acceptance. WI-0171 is complete.

@@ -1,0 +1,21 @@
+id: WI-0175
+title: Fix slideshow catalogue connection churn and reload recovery
+milestone: M32
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0175-slideshow-catalogue-recovery.md
+started_at: 2026-10-01
+completed_at: 2026-10-04
+verified_at: 2026-10-04
+verified_by: erikwasa
+last_updated_at: 2026-10-04
+branch: agent/wi-0175-slideshow-reliability
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/476
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/477
+- type: maintainer-acceptance
+  value: '2026-10-04 Europe/Stockholm: erikwasa retested the slideshow catalogue reliability scenarios and reports WI-0175 / issue #476 works as expected.'

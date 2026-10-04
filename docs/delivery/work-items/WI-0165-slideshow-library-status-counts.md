@@ -105,3 +105,14 @@ The affected API/Web/test projects build, and 50 focused non-host slideshow/rece
 ## Maintainer acceptance — 2026-10-01 (Europe/Stockholm)
 
 Acceptance failed and further verification stopped. Already-local Smart/manual preparation displays Prepared; navigation returns retain cards, but F5 loses the indicator. Manual listing and original revalidation return HTTP 500 with unpooled PostgreSQL connection failure / Windows socket 10048. Temporary list failure can incorrectly remove receipts; failed byte revalidation cannot establish Prepared. WI-0175 / issue #476 owns the repair and recovery tests. This item remains in review; no full acceptance is claimed.
+
+## Maintainer verification — 2026-10-04 (Europe/Stockholm)
+
+The maintainer resumed WI-0165 verification after accepting WI-0175. Count presentation is correct, and using the standalone **Prepare originals** action causes the expected **Prepared** indicator to appear.
+
+Two required continuity cases still fail:
+
+- preparation performed as part of **Start slideshow** does not result in a **Prepared** indicator when returning to the library; and
+- reloading `/slideshows` does not restore **Prepared** for a preparation that was visible before reload.
+
+These failures directly cover the player-triggered preparation and persisted-receipt reload acceptance criteria above. WI-0165 therefore remains `in_review`. Follow-up issue #499 tracks the remaining implementation work. WI-0175 / issue #476 is accepted independently and is no longer the blocker.
