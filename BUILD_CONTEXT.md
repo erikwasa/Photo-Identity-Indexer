@@ -16,20 +16,20 @@ WI-0181 / issue #489: PR #494 is merged. The Creative novelty checkbox/shared co
 
 WI-0165 / issue #499: maintained verification on 2026-10-04 confirmed slideshow counts and standalone **Prepare originals** state, but **Prepared** still does not appear after player-triggered preparation and is not restored after reloading `/slideshows`. Keep WI-0165 in review until both continuity failures are fixed and reverified.
 
-WI-0178 / issue #481 is now ready: WI-0177 passed maintained verification on 2026-10-04, so the unified-library dependency is satisfied and slideshow filtering/sorting can proceed when prioritized.
+WI-0178 / issue #481: PR #501 implements compact client-side slideshow-name filtering over the unified library. The search is trimmed/case-insensitive, preserves the existing deterministic alphabetical order, restores cached items without a reload, and keeps creation kind out of consumer navigation. After CI, verify desktop and phone/PWA search reveal/focus, full/partial/mixed-case/whitespace queries, clear/Escape/no-results recovery and no horizontal overflow.
 
 The maintainer accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, WI-0172, WI-0173, WI-0175, WI-0176 and WI-0177. WI-0175 / issue #476 and the WI-0177 issues are resolved; the remaining Prepared-state continuity defect belongs to WI-0165 / issue #499.
 
 ## Next concrete step
 
-Verify WI-0179 after PR #498 CI: on desktop and phone/PWA exercise Any/Landscape/Portrait, save/reopen a filtered definition, and use representative real archive examples including an EXIF-rotated phone photo and a historical revision whose catalogue dimensions are missing but whose durable review proxy exists. Confirm square/unknown photos stay out of Landscape/Portrait, and that saved Smart slideshow plus Creative anchor membership follow the selected orientation. WI-0184, WI-0183, WI-0180 and WI-0181 still retain their documented acceptance checks. WI-0165 requires implementation for #499 before re-verification. WI-0178 is ready for implementation. M30 video support remains deferred.
+Verify WI-0179 after PR #498 CI: on desktop and phone/PWA exercise Any/Landscape/Portrait, save/reopen a filtered definition, and use representative real archive examples including an EXIF-rotated phone photo and a historical revision whose catalogue dimensions are missing but whose durable review proxy exists. Confirm square/unknown photos stay out of Landscape/Portrait, and that saved Smart slideshow plus Creative anchor membership follow the selected orientation. WI-0178 requires maintainer verification after PR #501 CI. WI-0184, WI-0183, WI-0180 and WI-0181 still retain their documented acceptance checks. WI-0165 requires implementation for #499 before re-verification. M30 video support remains deferred.
 
 ## Relevant pointers
 
 - docs/delivery/work-items/WI-0179-smart-collection-orientation-filter.md
+- docs/delivery/work-items/WI-0178-slideshow-library-filtering.md
 - docs/delivery/work-items/WI-0184-manual-collection-date-sort.md
 - docs/delivery/work-items/WI-0183-smart-collection-progressive-disclosure.md
 - docs/delivery/work-items/WI-0180-playback-preferences-ui.md
 - docs/delivery/work-items/WI-0181-creative-collection-checkbox-alignment.md
 - docs/delivery/work-items/WI-0165-slideshow-library-status-counts.md
-- docs/delivery/work-items/WI-0178-slideshow-library-filtering.md
