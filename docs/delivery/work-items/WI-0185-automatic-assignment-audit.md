@@ -64,10 +64,10 @@ Paging must be deterministic and bounded under concurrent catalogue changes. Pre
 - [x] Each automatic card exposes the accepted score, margin, exact model revision and assignment time from the assignment-linked suggestion provenance.
 - [x] A face manually corrected after automatic assignment no longer appears in the default current Automatic result, while its historical actions remain visible in face history.
 - [x] Opening a face for correction and returning restores the audit query/filter context and does not force the maintainer to restart at a person selector.
-- [ ] Thousands of matching assignments can be browsed through bounded lazy loading without fetching all thumbnails up front and without one request per person.
+- [x] Thousands of matching assignments can be browsed through bounded lazy loading without fetching all thumbnails up front and without one request per person.
 - [x] PostgreSQL access for the cross-person audit is set-oriented, deterministic and covered by focused persistence/API tests; any required index is delivered through the normal schema migration path.
 - [x] Existing face-history correction/undo semantics and append-only canonical review history are preserved.
-- [ ] Maintainer verification on the real catalogue confirms that a date-bounded automatic-assignment run can be skimmed continuously across many people and suspicious assignments can be corrected without losing audit context.
+- [x] Maintainer verification on the real catalogue confirms that a date-bounded automatic-assignment run can be skimmed continuously across many people and suspicious assignments can be corrected without losing audit context.
 
 ## Verification requirements
 
@@ -97,20 +97,15 @@ No new database index is added in this slice. Synthetic tests establish the quer
 
 Maintained verification exposed a usability defect in the original `datetime-local` From/To controls before the wider catalogue checks could be completed. Typing a time reset the control, calendar-selected values disappeared, and applying a From/To range appeared to have no filtering effect. The maintainer requested date-only From/To controls because day-level specificity is sufficient for assignment-run auditing.
 
-The follow-up changes the audit UI to standard date inputs while preserving the API's UTC timestamp contract. From converts to local start-of-day inclusively; To is user-inclusive and converts to the following local midnight as the exclusive upper bound. WI-0185 remains `in_review` until this date-only interaction and the remaining large-catalogue checks pass.
+The follow-up changes the audit UI to standard date inputs while preserving the API's UTC timestamp contract. From converts to local start-of-day inclusively; To is user-inclusive and converts to the following local midnight as the exclusive upper bound. WI-0185 remained `in_review` until this date-only interaction and the remaining large-catalogue checks passed.
 
-## Remaining maintainer verification
+## Maintainer re-verification
 
-On the maintained Windows catalogue, choose a date range from a recent automatic-assignment run containing many people and verify:
+On the maintained Windows catalogue, the maintainer re-ran the audit workflow after PR #508 and confirmed the date-only filters and the remaining cross-person audit behavior work as expected, including date-range application, large-result browsing, weakest-margin ordering, provenance, paging, correction removal and return-context restoration.
 
-1. `/audit` opens directly to cross-person results without requiring a person choice.
-2. Automatic includes both ordinary and multi-evidence assignments and the card badge distinguishes them.
-3. From/To dates remain selected after calendar entry and Apply filters bounds the expected assignment run, including the whole selected To date.
-4. Person groups remain understandable while scrolling and weakest accepted margins appear first inside each person.
-5. Score, margin, exact model revision and assignment time look truthful on representative automatic cards.
-6. Load more can move through a large result set without duplicates, loops, excessive delay or loading all thumbnails up front.
-7. Open one suspicious face, correct it manually, return to the audit and confirm the filters/context are restored; after refresh that face no longer appears in current Automatic results while its history remains available.
-8. Note approximate result count and responsiveness. If the maintained catalogue exposes a material query/performance problem, profile it before accepting WI-0185 and add an index migration only with measured evidence.
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+WI-0185 is accepted and complete. The maintained catalogue verification satisfies the remaining scale and correction-context acceptance criteria, and no measured index/migration follow-up is required for this slice. M35 is complete.
 
 ## Deferred calibration follow-up
 
