@@ -64,7 +64,8 @@ else
         }
         else
         {
-            <button type="button"
+            <button @ref="_searchToggle"
+                    type="button"
                     class="slideshow-library-search-toggle"
                     aria-label="Search slideshows"
                     aria-expanded="false"
@@ -165,9 +166,11 @@ else
     private IReadOnlyList<SlideshowLibraryItem> Items { get; set; } = [];
     private IReadOnlyList<SlideshowLibraryItem> VisibleItems { get; set; } = [];
     private ElementReference _searchInput;
+    private ElementReference _searchToggle;
     private string _searchQuery = string.Empty;
     private bool _searchExpanded;
     private bool _focusSearchOnRender;
+    private bool _focusSearchToggleOnRender;
     private bool _loadingCreative;
     private bool _creativeRefreshFailed;
     private bool _refreshing;
@@ -222,13 +225,18 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_focusSearchOnRender)
+        if (_focusSearchOnRender)
         {
+            _focusSearchOnRender = false;
+            await _searchInput.FocusAsync();
             return;
         }
 
-        _focusSearchOnRender = false;
-        await _searchInput.FocusAsync();
+        if (_focusSearchToggleOnRender)
+        {
+            _focusSearchToggleOnRender = false;
+            await _searchToggle.FocusAsync();
+        }
     }
 
     private async Task LoadCreativeAsync()
@@ -279,6 +287,7 @@ else
     {
         _searchExpanded = true;
         _focusSearchOnRender = true;
+        _focusSearchToggleOnRender = false;
     }
 
     private void ClearSearch()
@@ -286,6 +295,7 @@ else
         _searchQuery = string.Empty;
         _searchExpanded = false;
         _focusSearchOnRender = false;
+        _focusSearchToggleOnRender = true;
         RefreshVisibleItems();
     }
 
