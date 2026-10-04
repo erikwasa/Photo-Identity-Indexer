@@ -26,12 +26,20 @@
 
     <div>
         <label class="field-label" for="audit-from">From · local time</label>
-        <input id="audit-from" type="datetime-local" @bind="FromLocal" disabled="@Loading" />
+        <input id="audit-from"
+               type="datetime-local"
+               @bind="FromLocal"
+               @bind:format="yyyy-MM-ddTHH:mm"
+               disabled="@Loading" />
     </div>
 
     <div>
         <label class="field-label" for="audit-to">To · local time</label>
-        <input id="audit-to" type="datetime-local" @bind="ToLocal" disabled="@Loading" />
+        <input id="audit-to"
+               type="datetime-local"
+               @bind="ToLocal"
+               @bind:format="yyyy-MM-ddTHH:mm"
+               disabled="@Loading" />
     </div>
 
     <div>
@@ -208,8 +216,8 @@ else
     private List<AssignmentAuditFaceResponse> Items { get; } = [];
     private string SelectedSource { get; set; } = "automatic";
     private string SelectedModelKey { get; set; } = "";
-    private string FromLocal { get; set; } = "";
-    private string ToLocal { get; set; } = "";
+    private DateTime? FromLocal { get; set; }
+    private DateTime? ToLocal { get; set; }
     private int ServerOffset { get; set; }
     private int Total { get; set; }
     private bool Loading { get; set; }
@@ -259,8 +267,8 @@ else
         DateTimeOffset? toUtc = ParseUtc(ToUtcValue);
         FromUtcValue = fromUtc?.ToString("O");
         ToUtcValue = toUtc?.ToString("O");
-        FromLocal = FormatLocal(fromUtc);
-        ToLocal = FormatLocal(toUtc);
+        FromLocal = fromUtc?.ToLocalTime().DateTime;
+        ToLocal = toUtc?.ToLocalTime().DateTime;
 
         ReviewModelRevisionFilterResponse? selectedModel =
             ModelRevisions.FirstOrDefault(model =>
@@ -341,13 +349,8 @@ else
     private void ApplyFilters()
     {
         Error = null;
-        if (!TryParseLocal(FromLocal, out DateTimeOffset? fromUtc) ||
-            !TryParseLocal(ToLocal, out DateTimeOffset? toUtc))
-        {
-            Error = "From and To must be valid local date/time values.";
-            return;
-        }
-
+        DateTimeOffset? fromUtc = LocalToUtc(FromLocal);
+        DateTimeOffset? toUtc = LocalToUtc(ToLocal);
         if (fromUtc is DateTimeOffset from &&
             toUtc is DateTimeOffset to &&
             from >= to)
@@ -414,27 +417,15 @@ else
                $"?state=all&returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
-    private static bool TryParseLocal(string value, out DateTimeOffset? utc)
+    private static DateTimeOffset? LocalToUtc(DateTime? value)
     {
-        utc = null;
-        if (string.IsNullOrWhiteSpace(value))
+        if (value is null)
         {
-            return true;
+            return null;
         }
 
-        if (!DateTime.TryParseExact(
-                value,
-                "yyyy-MM-ddTHH:mm",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out DateTime local))
-        {
-            return false;
-        }
-
-        local = DateTime.SpecifyKind(local, DateTimeKind.Local);
-        utc = new DateTimeOffset(local).ToUniversalTime();
-        return true;
+        DateTime local = DateTime.SpecifyKind(value.Value, DateTimeKind.Local);
+        return new DateTimeOffset(local).ToUniversalTime();
     }
 
     private static DateTimeOffset? ParseUtc(string? value) =>
@@ -446,18 +437,15 @@ else
             ? parsed.ToUniversalTime()
             : null;
 
-    private static string FormatLocal(DateTimeOffset? value) =>
-        value?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? "";
-
-    private static double? WeakestMargin(IEnumerable<AssignmentAuditFaceResponse> items) =>
-        items
+    private static double? WeakestMargin(IEnumerable<AssignmentAuditFaceResponse> items)
+    {
+        double[] margins = items
             .Select(item => item.AcceptedSuggestion?.ScoreMargin)
             .Where(margin => margin.HasValue)
             .Select(margin => margin!.Value)
-            .DefaultIfEmpty()
-            .Min() is double value && value > 0
-                ? value
-                : null;
+            .ToArray();
+        return margins.Length == 0 ? null : margins.Min();
+    }
 
     private static string SourceLabel(string actor) => actor switch
     {
