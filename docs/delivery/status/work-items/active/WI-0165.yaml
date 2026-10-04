@@ -1,12 +1,12 @@
 id: WI-0165
 title: Show slideshow preparation state and photo counts in the library
 milestone: M32
-status: in_review
+status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0165-slideshow-library-status-counts.md
 started_at: 2026-09-26
 last_updated_at: 2026-10-04
-branch: agent/slideshow-acceptance-followups
+branch: agent/WI-0165-prepared-state-continuity
 blockers:
 - WI-0108
 - WI-0146
