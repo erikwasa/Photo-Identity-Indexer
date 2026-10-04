@@ -1,10 +1,13 @@
 id: WI-0185
 title: Redesign identity audit around cross-person automatic assignments
 milestone: M35
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0185-automatic-assignment-audit.md
 started_at: 2026-10-04
+completed_at: 2026-10-04
+verified_at: 2026-10-04
+verified_by: erikwasa
 last_updated_at: 2026-10-04
 branch: agent/WI-0185-lifecycle-review
 blockers: []
@@ -16,3 +19,7 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/506
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/507
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/508
+- type: maintainer-acceptance
+  value: '2026-10-04 Europe/Stockholm: erikwasa re-verified WI-0185 after the date-only filter follow-up and reports the maintained cross-person assignment audit works as expected, including date filtering and the remaining catalogue audit workflow.'

@@ -59,21 +59,21 @@ Maintainer desktop/phone verification and final CI evidence therefore remain pen
 
 ## Acceptance criteria
 
-- [ ] A slideshow with preparation verified for its exact current revision set displays a small Prepared indicator.
-- [ ] Successful best-quality preparation initiated by normal slideshow playback records/reuses the exact-snapshot preparation state so the slideshow library can subsequently show **Prepared**.
-- [ ] Reopening an already-local prepared slideshow may revalidate the originals, but the transient UI does not misleadingly imply that a new network download is required when verification completes immediately.
-- [ ] Unprepared slideshows remain visibly playable and are not labelled unavailable or not-ready.
-- [ ] Preparing, parent-attention and starting states remain clear and take precedence over the passive Prepared treatment.
-- [ ] A persisted valid preparation receipt restores the Prepared indicator after reload.
-- [ ] Changing slideshow membership/filter results invalidates a stale Prepared indicator once the current revision set no longer matches the receipt.
-- [ ] Manual slideshow cards show their exact persisted photo count.
-- [ ] Smart Collection cards show a count that agrees with the current collection query/snapshot total at verification time.
-- [ ] Creative Collection cards never present `TargetCount` as an exact member count when the actual generated selection may contain fewer photos; the UI distinguishes target/maximum from an exact materialized count.
-- [ ] Count retrieval failure does not prevent cards from rendering or starting playback.
-- [ ] Initial slideshow-library rendering remains independent of full slideshow snapshot creation and preserves the bounded library-load behavior established by WI-0108.
-- [ ] The UI remains compact and readable on the maintained desktop Edge and phone layouts.
-- [ ] Prepared/count information is accessible without relying on colour alone.
-- [ ] Automated tests cover preparation-indicator visibility/invalidation, player-triggered preparation continuity, manual exact counts, Smart count semantics and Creative target-versus-exact wording.
+- [x] A slideshow with preparation verified for its exact current revision set displays a small Prepared indicator.
+- [x] Successful best-quality preparation initiated by normal slideshow playback records/reuses the exact-snapshot preparation state so the slideshow library can subsequently show **Prepared**.
+- [x] Reopening an already-local prepared slideshow may revalidate the originals, but the transient UI does not misleadingly imply that a new network download is required when verification completes immediately.
+- [x] Unprepared slideshows remain visibly playable and are not labelled unavailable or not-ready.
+- [x] Preparing, parent-attention and starting states remain clear and take precedence over the passive Prepared treatment.
+- [x] A persisted valid preparation receipt restores the Prepared indicator after reload.
+- [x] Changing slideshow membership/filter results invalidates a stale Prepared indicator once the current revision set no longer matches the receipt.
+- [x] Manual slideshow cards show their exact persisted photo count.
+- [x] Smart Collection cards show a count that agrees with the current collection query/snapshot total at verification time.
+- [x] Creative Collection cards never present `TargetCount` as an exact member count when the actual generated selection may contain fewer photos; the UI distinguishes target/maximum from an exact materialized count.
+- [x] Count retrieval failure does not prevent cards from rendering or starting playback.
+- [x] Initial slideshow-library rendering remains independent of full slideshow snapshot creation and preserves the bounded library-load behavior established by WI-0108.
+- [x] The UI remains compact and readable on the maintained desktop Edge and phone layouts.
+- [x] Prepared/count information is accessible without relying on colour alone.
+- [x] Automated tests cover preparation-indicator visibility/invalidation, player-triggered preparation continuity, manual exact counts, Smart count semantics and Creative target-versus-exact wording.
 
 ## Verification plan
 
@@ -115,7 +115,7 @@ Two required continuity cases still fail:
 - preparation performed as part of **Start slideshow** does not result in a **Prepared** indicator when returning to the library; and
 - reloading `/slideshows` does not restore **Prepared** for a preparation that was visible before reload.
 
-These failures directly cover the player-triggered preparation and persisted-receipt reload acceptance criteria above. WI-0165 therefore remains `in_review`. Follow-up issue #499 tracks the remaining implementation work. WI-0175 / issue #476 is accepted independently and is no longer the blocker.
+These failures directly cover the player-triggered preparation and persisted-receipt reload acceptance criteria above. WI-0165 therefore remained `in_review`. Follow-up issue #499 tracked the remaining implementation work. WI-0175 / issue #476 was accepted independently and was no longer the blocker.
 
 ## Issue #499 implementation — PR #505
 
@@ -125,4 +125,6 @@ PR #505 coordinates those two asynchronous prerequisites. Browser state is marke
 
 `SlideshowPreparedStateContinuityTests` reproduces the missing ordering directly: a valid browser receipt is restored while the manual collection request is pending, no Prepared state is trusted early, then catalogue completion causes automatic revalidation and establishes `ready` without a user refresh. Existing recovery tests continue to cover failed catalogue/revalidation recovery, stale membership generations and disposal/navigation cancellation.
 
-WI-0165 remains `in_review`. After PR #505 CI/merge, maintainer verification should repeat the two previously failing cases: complete preparation through normal **Start slideshow**, return to `/slideshows` and confirm **Prepared**; then reload `/slideshows` and confirm the indicator returns after revalidation. Stale membership/local-byte invalidation should remain unchanged.
+## Final maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+After PR #505, the maintainer repeated the previously failing maintained scenarios and reports WI-0165 works as expected. Player-triggered best-quality preparation now produces **Prepared** on return to `/slideshows`, a valid receipt restores **Prepared** after F5/reload and revalidation, and stale preparation state still invalidates correctly. The previously accepted count presentation and standalone preparation behavior remain correct. WI-0165 is complete.

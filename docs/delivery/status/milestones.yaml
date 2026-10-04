@@ -359,7 +359,7 @@ milestones:
   - WI-0170
 - id: M35
   title: Identity assignment audit and calibration
-  status: in_progress
+  status: completed
   document: ../milestones/M35-identity-assignment-audit.md
   work_items:
   - WI-0185

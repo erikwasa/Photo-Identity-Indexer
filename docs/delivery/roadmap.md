@@ -39,7 +39,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M32 | Archive media compatibility and slideshow library polish | in_progress |
 | M33 | Archive synchronization performance | completed |
 | M34 | Review queue reliability | completed |
-| M35 | Identity assignment audit and calibration | in_progress |
+| M35 | Identity assignment audit and calibration | completed |
 
 Expected evolution:
 
