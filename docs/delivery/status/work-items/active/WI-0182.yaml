@@ -1,8 +1,9 @@
 id: WI-0182
 title: Evaluate automatic technical photo quality scoring
 milestone: M32
-status: ready
-owner: unassigned
+status: in_progress
+owner: ai-agent
+branch: agent/WI-0182-photo-quality-evaluation
 document: ../work-items/WI-0182-photo-quality-scoring-evaluation.md
 blockers: []
 blocker_notes: []
