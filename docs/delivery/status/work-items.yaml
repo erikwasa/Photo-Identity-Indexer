@@ -151,3 +151,5 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/503
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/506
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/507
