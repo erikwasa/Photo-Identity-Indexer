@@ -170,7 +170,6 @@ milestones:
   - WI-0065
   - WI-0066
   - WI-0067
-  - WI-0068
   - WI-0072
 - id: M20
   title: Operator polish and archive throughput
@@ -359,7 +358,7 @@ milestones:
   - WI-0170
 - id: M35
   title: Identity assignment audit and calibration
-  status: ready
+  status: in_progress
   document: ../milestones/M35-identity-assignment-audit.md
   work_items:
   - WI-0185
