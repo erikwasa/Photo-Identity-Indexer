@@ -1,11 +1,14 @@
 id: WI-0183
 title: Simplify Smart Collection editor with progressive disclosure
 milestone: M32
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0183-smart-collection-progressive-disclosure.md
 started_at: 2026-10-03
-last_updated_at: 2026-10-03
+completed_at: 2026-10-04
+verified_at: 2026-10-04
+verified_by: erikwasa
+last_updated_at: 2026-10-04
 branch: agent/WI-0183-smart-progressive-disclosure
 blockers: []
 blocker_notes: []
@@ -14,3 +17,5 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/491
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/496
+- type: maintainer-acceptance
+  value: '2026-10-04 Europe/Stockholm: erikwasa verified WI-0183 and reports the Smart Collection progressive disclosure works as expected.'

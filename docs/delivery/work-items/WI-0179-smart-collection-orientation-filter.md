@@ -42,14 +42,14 @@ A persisted/versioned derived orientation value may be introduced if query-time 
 
 ## Acceptance criteria
 
-- A user can create, preview, save and reopen a Smart Collection filtered to Landscape or Portrait photos.
-- Existing Smart Collections without the new field retain identical membership and display as `Any`.
-- Orientation filtering affects normal Smart Collection results and subsequent slideshow/Creative anchor membership consistently.
-- EXIF-rotated images are classified by visual orientation rather than uncorrected storage orientation.
-- Existing revisions with missing original dimensions are handled deterministically without original hydration solely for classification.
-- Square/unknown photos have documented conservative behavior and do not silently drift between Portrait and Landscape.
-- Persistence, PostgreSQL query, API contract/navigation and Web behavior have focused automated coverage.
-- Maintainer verifies representative portrait, landscape, EXIF-rotated and existing-catalogue examples on the real archive.
+- [x] A user can create, preview, save and reopen a Smart Collection filtered to Landscape or Portrait photos.
+- [x] Existing Smart Collections without the new field retain identical membership and display as `Any`.
+- [x] Orientation filtering affects normal Smart Collection results and subsequent slideshow/Creative anchor membership consistently.
+- [x] EXIF-rotated images are classified by visual orientation rather than uncorrected storage orientation.
+- [x] Existing revisions with missing original dimensions are handled deterministically without original hydration solely for classification.
+- [x] Square/unknown photos have documented conservative behavior and do not silently drift between Portrait and Landscape.
+- [x] Persistence, PostgreSQL query, API contract/navigation and Web behavior have focused automated coverage.
+- [x] Maintainer verifies representative portrait, landscape, EXIF-rotated and existing-catalogue examples on the real archive.
 
 ## Implementation notes
 
@@ -69,13 +69,6 @@ A persisted/versioned derived orientation value may be introduced if query-time 
 - API integration coverage verifies query request/response propagation, invalid-value rejection, and preservation of orientation when an older update request omits the field.
 - Navigation/Web coverage verifies transient-state round trips, request construction, editor options/summaries, absence of a duplicate Creative control, and the EXIF `AutoOrient` decoder contract.
 
-## Maintainer verification still required
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
-After the implementation PR is merged, verify `/smart-collections` on the maintained archive using representative examples:
-
-- Landscape and Portrait previews contain the expected photos.
-- At least one EXIF-rotated phone photo follows its visual orientation.
-- At least one historical item whose catalogue dimensions are missing but whose durable review proxy exists is classified correctly.
-- Square or still-unknown items are absent from both Landscape and Portrait but remain present with Any.
-- Save/reopen preserves the selected orientation, and starting a saved Smart slideshow/Creative collection uses the filtered anchor membership.
-- Check the editor on desktop and phone/PWA for wrapping or horizontal overflow.
+The maintainer verified the implemented Smart Collection orientation workflow and reports WI-0179 works as expected. The representative archive checks, save/reopen behavior, Smart slideshow/Creative anchor behavior and desktop/phone presentation are accepted. WI-0179 is complete.

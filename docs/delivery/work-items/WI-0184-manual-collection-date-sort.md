@@ -41,14 +41,14 @@ Do not infer or persist new capture metadata merely to sort a collection. Use ex
 
 ## Acceptance criteria
 
-- A manual collection can be reordered oldest-first with one action.
-- The same collection can be reordered newest-first with one action.
-- Capture timestamps are resolved in a set-oriented/bounded way suitable for realistically sized manual collections.
-- Undated photos appear after dated photos for either direction and ties are deterministic.
-- The resulting order is persisted in the existing explicit `RevisionIds` sequence and survives reload/restart.
-- Individual up/down moves continue to work after an automatic sort.
-- A slideshow already running from an immutable snapshot is unchanged; a subsequent session uses the newly saved order.
-- Focused API/persistence/Web tests plus maintainer desktop and phone/PWA verification cover both sort directions and undated/tied timestamps.
+- [x] A manual collection can be reordered oldest-first with one action.
+- [x] The same collection can be reordered newest-first with one action.
+- [x] Capture timestamps are resolved in a set-oriented/bounded way suitable for realistically sized manual collections.
+- [x] Undated photos appear after dated photos for either direction and ties are deterministic.
+- [x] The resulting order is persisted in the existing explicit `RevisionIds` sequence and survives reload/restart.
+- [x] Individual up/down moves continue to work after an automatic sort.
+- [x] A slideshow already running from an immutable snapshot is unchanged; a subsequent session uses the newly saved order.
+- [x] Focused API/persistence/Web tests plus maintainer desktop and phone/PWA verification cover both sort directions and undated/tied timestamps.
 
 ## Implementation notes
 
@@ -71,16 +71,6 @@ Focused coverage added in:
 - `PhotoListCollectionSortEndpointTests` for the one-request API flow, persisted order, stable ties, undated-last behavior, invalid directions and immutable prior snapshots.
 - `ManualCollectionChronologicalSortUiTests` for the two compact Web actions, server-side sort request and continued availability of manual up/down moves.
 
-CI and maintainer verification remain required before completion.
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
-## Maintainer verification
-
-After PR #497 CI passes, verify `/manual-collections/{id}` on desktop and phone/PWA with a representative collection containing dated, undated and at least two equal-date photos:
-
-1. Run `Oldest first`; dated photos should be ascending and undated photos should remain last.
-2. Run `Newest first`; dated photos should be descending and undated photos should still remain last.
-3. Confirm equal-date photos retain their previous relative order.
-4. Reload the page and confirm the sorted explicit order persisted.
-5. Use ↑/↓ after sorting and confirm manual fine-tuning still persists.
-6. If practical, start a slideshow, reorder the source collection separately, and confirm that already-running snapshot does not change while a newly started session uses the new saved order.
-7. Confirm the two sort buttons remain compact and usable without horizontal overflow on phone/PWA.
+The maintainer verified both chronological sort directions, persistence, undated/tied behavior, subsequent manual adjustment and phone/PWA presentation and reports WI-0184 works as expected. WI-0184 is complete.
