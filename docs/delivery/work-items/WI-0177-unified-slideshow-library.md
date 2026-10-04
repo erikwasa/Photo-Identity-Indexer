@@ -78,3 +78,7 @@ After implementation, populate the maintained catalogue with a mix of Smart, man
 Also reproduce the earlier prepared-original verification-unavailable condition if practical. The slideshow page must not show `Prepared originals could not be verified...` or require `Retry verification`; any unverified Prepared badge should simply be absent until normal revalidation succeeds.
 
 Implementation is submitted in PR #486.
+
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
+
+The maintainer completed the WI-0177 verification after PR #486 was merged and reports that the unified slideshow library works as expected. Smart, manual and Creative slideshows can be consumed through the unified presentation without the previous type-based library split. WI-0177 is accepted and complete, and its dependency on WI-0178 is therefore released.
