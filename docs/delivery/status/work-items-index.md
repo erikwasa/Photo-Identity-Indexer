@@ -14,7 +14,7 @@ Current work items: **15**. Archived terminal items: **167**.
 | [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | proposed | unassigned | [YAML](work-items/active/WI-0155.yaml) |
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
 | [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0165.yaml) |
-| [WI-0178](../work-items/WI-0178-slideshow-library-filtering.md) Add minimal slideshow library filtering and sorting | M32 | ready | unassigned | [YAML](work-items/active/WI-0178.yaml) |
+| [WI-0178](../work-items/WI-0178-slideshow-library-filtering.md) Add minimal slideshow library filtering and sorting | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0178.yaml) |
 | [WI-0179](../work-items/WI-0179-smart-collection-orientation-filter.md) Add photo orientation filtering to Smart Collections | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0179.yaml) |
 | [WI-0180](../work-items/WI-0180-playback-preferences-ui.md) Polish slideshow playback preferences controls | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0180.yaml) |
 | [WI-0181](../work-items/WI-0181-creative-collection-checkbox-alignment.md) Fix Creative Collections checkbox alignment and shared form styling | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0181.yaml) |
