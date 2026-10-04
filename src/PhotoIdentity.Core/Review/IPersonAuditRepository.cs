@@ -84,7 +84,7 @@ public sealed record AssignmentAuditPage(
     DateTimeOffset? ToUtc);
 
 /// <summary>
-/// Read-only audit view over active assignments with assignment-linked provenance and optional exact-model suggestion comparison.
+/// Read-only audit view over active assignments for one person with optional exact-model suggestion comparison.
 /// </summary>
 public interface IPersonAuditRepository
 {
@@ -97,7 +97,13 @@ public interface IPersonAuditRepository
         bool disagreementsOnly = false,
         string sort = PersonAuditSorts.AssignedDescending,
         CancellationToken cancellationToken = default);
+}
 
+/// <summary>
+/// Read-only catalogue-wide audit view over current assignments and their assignment-linked suggestion provenance.
+/// </summary>
+public interface IAssignmentAuditRepository
+{
     Task<AssignmentAuditPage> GetAssignmentsAsync(
         string source = AssignmentAuditSources.Automatic,
         DateTimeOffset? fromUtc = null,
