@@ -29,6 +29,7 @@ public partial class Slideshows : IAsyncDisposable
     private readonly HashSet<string> _starting =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _receiptRestoreGate = new(1, 1);
 
     private readonly CancellationToken _lifetimeToken;
 
@@ -92,8 +93,10 @@ public partial class Slideshows : IAsyncDisposable
         try
         {
             await RestorePreparationBookmarksAsync();
-            await RestorePreparationReceiptsAsync();
+            // Browser storage is available now. Mark that fact before receipt restoration so a
+            // concurrently finishing catalogue load can queue the same validation behind the gate.
             _browserStateRestored = true;
+            await RestorePreparationReceiptsAsync();
             if (!_lifetime.IsCancellationRequested)
             {
                 await InvokeAsync(StateHasChanged);
@@ -114,10 +117,6 @@ public partial class Slideshows : IAsyncDisposable
         try
         {
             await LoadCollectionsAsync();
-            if (_browserStateRestored && !_lifetime.IsCancellationRequested)
-            {
-                await RestorePreparationReceiptsAsync();
-            }
         }
         finally
         {
@@ -184,6 +183,14 @@ public partial class Slideshows : IAsyncDisposable
         {
             Loading = false;
             _loadingCollections = false;
+        }
+
+        // On a fresh page instance browser-local receipts can become available before the async
+        // catalogue load completes. Re-run validation once the authoritative collection list is
+        // known so player-written and standalone receipts are not stranded until manual refresh.
+        if (_collectionsVerified && _browserStateRestored && !_lifetime.IsCancellationRequested)
+        {
+            await RestorePreparationReceiptsAsync();
         }
     }
 
@@ -631,6 +638,32 @@ public partial class Slideshows : IAsyncDisposable
 
     private async Task RestorePreparationReceiptsAsync()
     {
+        if (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            await _receiptRestoreGate.WaitAsync(_lifetimeToken);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            await RestorePreparationReceiptsCoreAsync();
+        }
+        finally
+        {
+            _receiptRestoreGate.Release();
+        }
+    }
+
+    private async Task RestorePreparationReceiptsCoreAsync()
+    {
         int generation = _collectionGeneration;
         VerificationError = null;
         string? json;
@@ -688,11 +721,13 @@ public partial class Slideshows : IAsyncDisposable
                     _preparations.Remove(collectionId);
                 }
             }
-            if (_receipts.Count > 0)
+
+            // During the initial async catalogue load this is a normal ordering race, not a
+            // verification failure. Once loading finishes LoadCollectionsAsync retries here.
+            if (!_loadingCollections && _receipts.Count > 0)
             {
                 VerificationError = "Prepared originals could not be verified while slideshows are unavailable. Retry refresh to check them again.";
             }
-            // An absent card after a failed list request is not proof of deletion.
             return;
         }
 
@@ -1000,6 +1035,7 @@ public partial class Slideshows : IAsyncDisposable
         }
 
         _polling.Clear();
+        _receiptRestoreGate.Dispose();
         _lifetime.Dispose();
         await Task.CompletedTask;
     }
