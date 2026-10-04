@@ -39,14 +39,14 @@ This is presentation polish, not a settings redesign. Do not rename or remove ex
 
 ## Acceptance criteria
 
-- [ ] Each checkbox is visually adjacent to the text it controls on desktop and phone/PWA.
-- [ ] Checkbox rows provide a comfortable touch target on phone and remain keyboard accessible.
-- [ ] Image duration renders as a compact control with its value and unit kept together.
-- [ ] The duration label does not split above and below the input in a confusing way at narrow widths.
-- [ ] The settings editor introduces no horizontal overflow at supported phone widths.
-- [ ] The same shared component works correctly from both `/slideshows` playback preferences and the in-player settings panel.
+- [x] Each checkbox is visually adjacent to the text it controls on desktop and phone/PWA.
+- [x] Checkbox rows provide a comfortable touch target on phone and remain keyboard accessible.
+- [x] Image duration renders as a compact control with its value and unit kept together.
+- [x] The duration label does not split above and below the input in a confusing way at narrow widths.
+- [x] The settings editor introduces no horizontal overflow at supported phone widths.
+- [x] The same shared component works correctly from both `/slideshows` playback preferences and the in-player settings panel.
 - [x] Existing settings values persist and behave exactly as before; no settings state, normalization or callback code changed.
-- [x] Focused Web/markup coverage is present; maintainer desktop and phone verification remains required.
+- [x] Focused Web/markup coverage is present and maintainer desktop/phone verification passed.
 
 ## Implementation notes
 
@@ -56,6 +56,6 @@ PR #495 keeps all behavior in the existing shared `SlideshowSettingsEditor` and 
 
 `SlideshowSettingsEditorStyleContractTests` verifies that both the slideshow library and in-player panel still use the shared component and protects the checkbox-row and grouped-duration layout contract.
 
-## Verification status
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
-Implementation is in review in PR #495. Required CI plus maintainer visual verification on desktop and phone/PWA remain outstanding. Verify both Playback preferences on `/slideshows` and the in-player Settings panel, including checkbox association/tapping, duration layout and horizontal overflow.
+The maintainer verified both `/slideshows` Playback preferences and the in-player Settings panel and reports WI-0180 works as expected. Checkbox association/tapping, compact duration layout, persistence and phone/PWA overflow behavior are accepted. WI-0180 is complete.

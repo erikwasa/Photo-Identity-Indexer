@@ -43,10 +43,10 @@ Progressive disclosure should reduce page length without turning optional filter
 - [x] Age-at-photo detail controls are absent until the age criterion is enabled.
 - [x] Family-relationship detail controls are absent until the relationship criterion is enabled.
 - [x] Generic Tags authoring is no longer shown in the normal new/edit Smart Collection UI.
-- [ ] Existing definitions containing tag criteria can be opened and saved without silently dropping their tags; automated coverage confirms the request/navigation state remains tag-aware, while a representative maintainer save is still required.
-- [ ] Enabling/disabling optional criteria remains keyboard and screen-reader accessible and restores/clears editor state according to existing semantics; native checkbox semantics are retained, with maintainer interaction verification still required.
-- [ ] The editor is materially shorter in its default state and remains usable on desktop and phone/PWA without horizontal overflow; visual verification remains required.
-- [x] Focused Web/navigation-state coverage is present; maintainer desktop/phone verification remains required.
+- [x] Existing definitions containing tag criteria can be opened and saved without silently dropping their tags.
+- [x] Enabling/disabling optional criteria remains keyboard and screen-reader accessible and restores/clears editor state according to existing semantics.
+- [x] The editor is materially shorter in its default state and remains usable on desktop and phone/PWA without horizontal overflow.
+- [x] Focused Web/navigation-state coverage is present and maintainer desktop/phone verification passed.
 
 ## Implementation notes
 
@@ -56,6 +56,6 @@ The GPS coordinate grid now renders only while `UseLocation` is enabled. Age per
 
 `SmartCollectionProgressiveDisclosureTests` protects the conditional-rendering source contract, verifies the normal Tags authoring UI stays absent, confirms saved/query/navigation paths continue carrying hidden tag criteria, and exercises JSON round-tripping of tag values and match mode through `SmartCollectionTransientNavigationState`.
 
-## Verification status
+## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
-Implementation is in review in PR #496. CI plus maintainer desktop/phone verification remain outstanding. In addition to the compact-layout checks, maintainer verification should open a representative pre-existing Smart Collection containing tag criteria, confirm the preservation notice is visible, save it, and confirm its membership/tag criteria remain unchanged.
+The maintainer verified the progressive-disclosure interactions, compact desktop/phone layout and legacy hidden-tag preservation workflow and reports WI-0183 works as expected. WI-0183 is complete.
