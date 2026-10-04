@@ -4,11 +4,11 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0165 / issue #499: PR #505 is merged and fixes the remaining **Prepared** continuity race on `/slideshows`. Player preparation already wrote an exact-snapshot browser receipt; receipt restoration is now serialized and re-run after catalogue verification when browser state is available. CI passed. Keep WI-0165 in review until maintainer re-verification confirms Prepared appears after player-triggered preparation and returns after F5/reload.
+WI-0165 / issue #499: PR #505 is merged. On 2026-10-04 (Europe/Stockholm), maintained re-verification passed: player-triggered preparation now produces **Prepared** on return to `/slideshows`, F5/reload restores it after revalidation, and the maintained behavior works as expected. Lifecycle closeout remains separate from the WI-0185 follow-up.
 
-WI-0178 / issue #481: PR #501 is merged and implements compact client-side slideshow-name filtering over the unified library. CI and focused filter tests pass. Verify desktop and phone/PWA search reveal/focus, full/partial/mixed-case/whitespace queries, clear/Escape/no-results recovery and no horizontal overflow before completion.
+WI-0178 / issue #481: PR #501 is merged. On 2026-10-04 (Europe/Stockholm), maintained desktop/phone/PWA verification passed and the slideshow-library filtering behavior works as expected. Lifecycle closeout remains separate from the WI-0185 follow-up.
 
-WI-0185 / issue #503: implementation PR #506 is merged. PR #507 adds the remaining endpoint/component/Web acceptance coverage and corrects lifecycle state to `in_review`. After #507 CI/merge, verify the cross-person automatic-assignment audit on the maintained catalogue: source/time filtering, weakest-margin order, provenance, large-result responsiveness, correction removal and return-context restoration.
+WI-0185 / issue #503: implementation PR #506 and acceptance-coverage PR #507 are merged. Maintained verification found the original `datetime-local` From/To controls unusable: typed times reset, calendar-selected values disappeared, and applying the range appeared to have no effect. The follow-up changes the UI to ordinary date-only From/To controls. From maps to local midnight inclusively; To includes the complete selected local day by mapping to the following local midnight as the API's exclusive upper bound. Keep WI-0185 `in_review` until the date filter interaction and remaining catalogue-scale/provenance/correction checks pass.
 
 WI-0182 / issue #490 remains ready for the technical photo-quality scoring evaluation. It cannot be completed without representative private-archive review and runtime evidence.
 
@@ -16,7 +16,7 @@ The maintainer accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, WI-0172, WI
 
 ## Next concrete step
 
-Batch maintained verification for WI-0165, WI-0178 and WI-0185 after PR #507 is green and merged. WI-0182 remains the only ready M32 item but requires representative private-photo evaluation rather than implementation-only evidence. M30 video support remains deferred.
+Run CI for the WI-0185 date-only filter follow-up, then repeat maintained audit verification with a From/To date range. Confirm selected dates persist, Apply filters changes the result set, the complete To date is included, large-result paging remains responsive and duplicate-free, provenance/order look truthful, and correction/return-context behavior still passes. Close out WI-0165 and WI-0178 separately from this follow-up. WI-0182 remains the only ready M32 item but requires representative private-photo evaluation rather than implementation-only evidence. M30 video support remains deferred.
 
 ## Relevant pointers
 
