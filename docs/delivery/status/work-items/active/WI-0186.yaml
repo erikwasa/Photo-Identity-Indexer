@@ -1,0 +1,11 @@
+id: WI-0186
+title: Scope visual and caption search with Smart Collection criteria
+milestone: M36
+status: ready
+owner: unassigned
+document: ../work-items/WI-0186-scoped-semantic-caption-search.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/512
