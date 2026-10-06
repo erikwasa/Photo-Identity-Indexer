@@ -1,0 +1,12 @@
+id: WI-0187
+title: Use semantic and caption search results as Creative Collection anchors
+milestone: M36
+status: blocked
+owner: unassigned
+document: ../work-items/WI-0187-search-creative-anchors.md
+blockers:
+- WI-0186
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/513

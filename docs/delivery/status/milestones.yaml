@@ -363,3 +363,10 @@ milestones:
   document: ../milestones/M35-identity-assignment-audit.md
   work_items:
   - WI-0185
+- id: M36
+  title: Semantic collection composition
+  status: blocked
+  document: ../milestones/M36-semantic-collection-composition.md
+  work_items:
+  - WI-0186
+  - WI-0187
