@@ -13,7 +13,7 @@
         <div>
             <p class="eyebrow">Creative Collections</p>
             <h2 id="creative-collections-heading">Named creative slideshows</h2>
-            <p>Create several independent Creative Collections from the same Smart Collection and tune each recipe separately.</p>
+            <p>Start from an exact Smart Collection or a ranked Visual/Caption search, then add nearby moment context.</p>
         </div>
         <a class="button secondary" href="/slideshow-collections">All collections</a>
     </div>
@@ -34,45 +34,27 @@
             <span>Loading Creative Collections…</span>
         </div>
     }
-    else if (SmartCollections.Count == 0)
-    {
-        <div class="empty-state compact">
-            <p>Create a Smart Collection first. Creative Collections always keep a Smart Collection as their exact anchor.</p>
-            <a class="button primary" href="/smart-collections">Open Smart Collections</a>
-        </div>
-    }
     else
     {
         <div class="smart-layout">
-            <aside class="smart-saved-list" aria-label="Creative Collection source and saved variants">
-                <div class="smart-subheading">
-                    <strong>Source Smart Collection</strong>
-                </div>
-                <label class="smart-field">
-                    <span class="field-label">Anchor</span>
-                    <select value="@SelectedAnchorId" @onchange="ChangeAnchorAsync" disabled="@Busy">
-                        @foreach (SmartCollectionDefinitionResponse collection in SmartCollections)
-                        {
-                            <option value="@collection.Id">@collection.Name</option>
-                        }
-                    </select>
-                </label>
-
+            <aside class="smart-saved-list" aria-label="Saved Creative Collections">
                 <div class="smart-subheading">
                     <strong>Saved Creative Collections</strong>
-                    <span>@AnchorRecipes.Count</span>
+                    <span>@Recipes.Count</span>
                 </div>
                 <button type="button" class="button secondary" disabled="@Busy" @onclick="NewRecipe">
                     New Creative Collection
                 </button>
 
-                @if (AnchorRecipes.Count == 0)
+                @if (Recipes.Count == 0)
                 {
-                    <p class="smart-muted">No Creative Collections use this anchor yet.</p>
+                    <p class="smart-muted">No Creative Collections yet.</p>
                 }
                 else
                 {
-                    @foreach (CreativeCollectionRecipeResponse recipe in AnchorRecipes)
+                    @foreach (CreativeCollectionRecipeResponse recipe in Recipes
+                        .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(item => item.Id, StringComparer.Ordinal))
                     {
                         <article class="smart-saved-card @(SelectedRecipeId == recipe.Id ? "selected" : "")">
                             <button type="button"
@@ -80,8 +62,8 @@
                                     disabled="@Busy"
                                     @onclick="() => SelectRecipe(recipe)">
                                 <strong>@recipe.Name</strong>
-                                <span>@recipe.TargetCount photos · @recipe.ContextStrength context</span>
-                                <span>Freshness @(recipe.NoveltyEnabled ? "on" : "off")</span>
+                                <span>@SourceLabel(recipe)</span>
+                                <span>@recipe.TargetCount photos · @recipe.ContextStrength context · Freshness @(recipe.NoveltyEnabled ? "on" : "off")</span>
                             </button>
                         </article>
                     }
@@ -91,7 +73,7 @@
             <div class="smart-editor">
                 <div class="smart-subheading">
                     <strong>@(SelectedRecipeId is null ? "New Creative Collection" : "Edit Creative Collection")</strong>
-                    <span>Anchor: @SelectedAnchorName</span>
+                    <span>@CurrentSourceLabel</span>
                 </div>
 
                 <label class="smart-field">
@@ -102,6 +84,81 @@
                            @bind:after="ClearPreview"
                            disabled="@Busy" />
                 </label>
+
+                <label class="smart-field">
+                    <span class="field-label">Anchor source</span>
+                    <select @bind="AnchorKind"
+                            @bind:after="AnchorKindChanged"
+                            disabled="@(Busy || SelectedRecipeId is not null)">
+                        @if (SmartCollections.Count > 0)
+                        {
+                            <option value="smart-collection">Smart Collection</option>
+                        }
+                        <option value="search">Visual / Caption search</option>
+                    </select>
+                </label>
+
+                @if (AnchorKind == "smart-collection")
+                {
+                    <label class="smart-field">
+                        <span class="field-label">Smart Collection</span>
+                        <select @bind="SmartAnchorId" @bind:after="ClearPreview" disabled="@Busy">
+                            @foreach (SmartCollectionDefinitionResponse collection in SmartCollections)
+                            {
+                                <option value="@collection.Id">@collection.Name</option>
+                            }
+                        </select>
+                    </label>
+                }
+                else
+                {
+                    <label class="smart-field">
+                        <span class="field-label">Search concept</span>
+                        <input type="text"
+                               maxlength="300"
+                               placeholder="e.g. swimming at the beach"
+                               @bind="SearchQuery"
+                               @bind:after="ClearPreview"
+                               disabled="@Busy" />
+                    </label>
+
+                    <div class="creative-controls">
+                        <label class="smart-field">
+                            <span class="field-label">Search evidence</span>
+                            <select @bind="SearchMode" @bind:after="ClearPreview" disabled="@Busy">
+                                <option value="combined">Visual + Captions</option>
+                                <option value="semantic">Visual</option>
+                                <option value="caption">Captions</option>
+                            </select>
+                        </label>
+
+                        <label class="smart-field">
+                            <span class="field-label">Smart scope</span>
+                            <select @bind="SearchScopeId" @bind:after="ClearPreview" disabled="@Busy">
+                                <option value="">All photos</option>
+                                @foreach (SmartCollectionDefinitionResponse collection in SmartCollections)
+                                {
+                                    <option value="@collection.Id">@collection.Name</option>
+                                }
+                            </select>
+                        </label>
+
+                        <label class="smart-field">
+                            <span class="field-label">Maximum search anchors</span>
+                            <input type="number"
+                                   min="1"
+                                   max="250"
+                                   inputmode="numeric"
+                                   @bind="SearchAnchorLimit"
+                                   @bind:after="ClearPreview"
+                                   disabled="@Busy" />
+                        </label>
+                    </div>
+
+                    <p class="smart-help">
+                        Search anchors are ranked top-N matches. Future caption or visual-model evidence can change future materializations; an already-created slideshow snapshot stays fixed.
+                    </p>
+                }
 
                 <div class="creative-controls">
                     <label class="smart-field">
@@ -134,7 +191,7 @@
                 </div>
 
                 <p class="smart-help">
-                    Each named Creative Collection owns these settings independently. The source Smart Collection remains unchanged and supplies the exact anchor photos.
+                    Direct anchors establish relevance. Nearby photos can be added only as moment context; they do not become recursive search anchors.
                 </p>
 
                 @if (Busy)
@@ -168,10 +225,21 @@
                         <div class="creative-stat"><strong>@preview.RepresentedMomentCount</strong><span>moments</span></div>
                     </div>
 
+                    @if (preview.SearchAnchor is CreativeCollectionSearchAnchorPreviewResponse search)
+                    {
+                        <p class="smart-help">
+                            Search: <strong>@search.Query</strong> · @SearchModeLabel(search.Mode) ·
+                            @(string.IsNullOrWhiteSpace(search.ScopeCollectionName) ? "All photos" : search.ScopeCollectionName) ·
+                            top @search.AnchorLimit.
+                        </p>
+                    }
+
                     @if (preview.NoAnchors)
                     {
                         <div class="empty-state compact">
-                            <p>No photos currently match the anchor Smart Collection.</p>
+                            <p>@(AnchorKind == "search"
+                                ? "No ranked photos matched this search anchor."
+                                : "No photos currently match the anchor Smart Collection.")</p>
                         </div>
                     }
                     else
@@ -189,6 +257,10 @@
                                             @(photo.Kind == "direct-anchor" ? "Anchor" : "Context")
                                         </span>
                                         <strong>@(photo.TakenAtLocal?.ToString("yyyy-MM-dd") ?? "Date unavailable")</strong>
+                                        @if (photo.Kind == "direct-anchor" && AnchorEvidence(photo.RevisionId) is string evidence)
+                                        {
+                                            <span>@evidence</span>
+                                        }
                                     </div>
                                 </article>
                             }
@@ -207,8 +279,13 @@
     private IReadOnlyList<SmartCollectionDefinitionResponse> SmartCollections { get; set; } = [];
     private IReadOnlyList<CreativeCollectionRecipeResponse> Recipes { get; set; } = [];
     private CreativeCollectionPreviewResponse? Preview { get; set; }
-    private string? SelectedAnchorId { get; set; }
     private string? SelectedRecipeId { get; set; }
+    private string AnchorKind { get; set; } = "smart-collection";
+    private string? SmartAnchorId { get; set; }
+    private string SearchQuery { get; set; } = string.Empty;
+    private string SearchMode { get; set; } = "combined";
+    private string SearchScopeId { get; set; } = string.Empty;
+    private int SearchAnchorLimit { get; set; } = 80;
     private string RecipeName { get; set; } = string.Empty;
     private int TargetCount { get; set; } = 50;
     private string ContextStrength { get; set; } = "balanced";
@@ -218,15 +295,15 @@
     private string? Error { get; set; }
     private string? Notice { get; set; }
 
-    private IReadOnlyList<CreativeCollectionRecipeResponse> AnchorRecipes => Recipes
-        .Where(recipe => string.Equals(recipe.AnchorCollectionId, SelectedAnchorId, StringComparison.Ordinal))
-        .OrderBy(recipe => recipe.Name, StringComparer.OrdinalIgnoreCase)
-        .ThenBy(recipe => recipe.Id, StringComparer.Ordinal)
-        .ToArray();
-
-    private string SelectedAnchorName => SmartCollections
-        .FirstOrDefault(collection => string.Equals(collection.Id, SelectedAnchorId, StringComparison.Ordinal))?.Name
+    private string SmartAnchorName => SmartCollections
+        .FirstOrDefault(collection => string.Equals(collection.Id, SmartAnchorId, StringComparison.Ordinal))?.Name
         ?? "Smart Collection";
+
+    private string CurrentSourceLabel => AnchorKind == "search"
+        ? string.IsNullOrWhiteSpace(SearchQuery)
+            ? "Search anchor"
+            : $"Search: {SearchQuery}"
+        : $"Smart: {SmartAnchorName}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -241,7 +318,6 @@
             }
             else
             {
-                SelectedAnchorId = SmartCollections.FirstOrDefault()?.Id;
                 NewRecipe();
             }
         }
@@ -268,21 +344,19 @@
         Recipes = creative;
     }
 
-    private Task ChangeAnchorAsync(ChangeEventArgs args)
-    {
-        SelectedAnchorId = args.Value?.ToString();
-        NewRecipe();
-        return Task.CompletedTask;
-    }
-
     private void NewRecipe()
     {
         SelectedRecipeId = null;
-        RecipeName = $"{SelectedAnchorName} Creative";
-        if (RecipeName.Length > 120)
-        {
-            RecipeName = RecipeName[..120];
-        }
+        AnchorKind = SmartCollections.Count > 0 ? "smart-collection" : "search";
+        SmartAnchorId = SmartCollections.FirstOrDefault()?.Id;
+        SearchQuery = string.Empty;
+        SearchMode = "combined";
+        SearchScopeId = string.Empty;
+        SearchAnchorLimit = 80;
+        RecipeName = AnchorKind == "smart-collection"
+            ? $"{SmartAnchorName} Creative"
+            : "Search Creative";
+        TrimRecipeName();
         TargetCount = 50;
         ContextStrength = "balanced";
         NoveltyEnabled = false;
@@ -291,10 +365,29 @@
         Notice = null;
     }
 
+    private void AnchorKindChanged()
+    {
+        if (AnchorKind == "smart-collection" && string.IsNullOrWhiteSpace(SmartAnchorId))
+        {
+            SmartAnchorId = SmartCollections.FirstOrDefault()?.Id;
+        }
+
+        RecipeName = AnchorKind == "smart-collection"
+            ? $"{SmartAnchorName} Creative"
+            : "Search Creative";
+        TrimRecipeName();
+        ClearPreview();
+    }
+
     private void SelectRecipe(CreativeCollectionRecipeResponse recipe)
     {
-        SelectedAnchorId = recipe.AnchorCollectionId;
         SelectedRecipeId = recipe.Id;
+        AnchorKind = recipe.SearchAnchor is null ? "smart-collection" : "search";
+        SmartAnchorId = recipe.AnchorCollectionId ?? SmartCollections.FirstOrDefault()?.Id;
+        SearchQuery = recipe.SearchAnchor?.Query ?? string.Empty;
+        SearchMode = recipe.SearchAnchor?.Mode ?? "combined";
+        SearchScopeId = recipe.SearchAnchor?.SmartCollectionId ?? string.Empty;
+        SearchAnchorLimit = recipe.SearchAnchor?.AnchorLimit ?? 80;
         RecipeName = recipe.Name;
         TargetCount = recipe.TargetCount;
         ContextStrength = recipe.ContextStrength;
@@ -306,11 +399,6 @@
 
     private bool Validate()
     {
-        if (string.IsNullOrWhiteSpace(SelectedAnchorId))
-        {
-            Error = "Choose a source Smart Collection.";
-            return false;
-        }
         if (string.IsNullOrWhiteSpace(RecipeName))
         {
             Error = "Creative Collection name is required.";
@@ -326,7 +414,55 @@
             Error = "Context must be Focused, Balanced or Broad.";
             return false;
         }
+
+        if (AnchorKind == "smart-collection")
+        {
+            if (string.IsNullOrWhiteSpace(SmartAnchorId))
+            {
+                Error = "Choose a source Smart Collection.";
+                return false;
+            }
+            return true;
+        }
+
+        if (AnchorKind != "search")
+        {
+            Error = "Choose a supported anchor source.";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            Error = "Enter a search concept.";
+            return false;
+        }
+        if (SearchMode is not ("combined" or "semantic" or "caption"))
+        {
+            Error = "Search evidence must be Visual, Captions or Visual + Captions.";
+            return false;
+        }
+        if (SearchAnchorLimit is < 1 or > 250)
+        {
+            Error = "Maximum search anchors must be between 1 and 250.";
+            return false;
+        }
         return true;
+    }
+
+    private CreativeCollectionRecipeRequest BuildRequest()
+    {
+        CreativeCollectionSearchAnchorRequest? searchAnchor = AnchorKind == "search"
+            ? new CreativeCollectionSearchAnchorRequest(
+                SearchQuery.Trim(),
+                SearchMode,
+                string.IsNullOrWhiteSpace(SearchScopeId) ? null : SearchScopeId,
+                SearchAnchorLimit)
+            : null;
+        return new CreativeCollectionRecipeRequest(
+            TargetCount,
+            ContextStrength,
+            NoveltyEnabled,
+            RecipeName.Trim(),
+            searchAnchor);
     }
 
     private async Task PreviewAsync()
@@ -335,20 +471,35 @@
         {
             return;
         }
+
         Busy = true;
         Error = null;
         Notice = null;
         try
         {
-            string strength = Uri.EscapeDataString(ContextStrength);
-            using HttpResponseMessage response = await Http.GetAsync(
-                $"api/smart-collections/{Uri.EscapeDataString(SelectedAnchorId!)}/creative-preview?targetCount={TargetCount}&momentGapMinutes=30&contextStrength={strength}&novelty={NoveltyEnabled.ToString().ToLowerInvariant()}");
-            if (!response.IsSuccessStatusCode)
+            HttpResponseMessage response;
+            if (AnchorKind == "search")
             {
-                Error = await ReadErrorAsync(response, "The Creative Collection preview could not be generated.");
-                return;
+                response = await Http.PostAsJsonAsync(
+                    "api/creative-collections/preview",
+                    BuildRequest());
             }
-            Preview = await response.Content.ReadFromJsonAsync<CreativeCollectionPreviewResponse>();
+            else
+            {
+                string strength = Uri.EscapeDataString(ContextStrength);
+                response = await Http.GetAsync(
+                    $"api/smart-collections/{Uri.EscapeDataString(SmartAnchorId!)}/creative-preview?targetCount={TargetCount}&momentGapMinutes=30&contextStrength={strength}&novelty={NoveltyEnabled.ToString().ToLowerInvariant()}");
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    Error = await ReadErrorAsync(response, "The Creative Collection preview could not be generated.");
+                    return;
+                }
+                Preview = await response.Content.ReadFromJsonAsync<CreativeCollectionPreviewResponse>();
+            }
         }
         catch (Exception exception)
         {
@@ -367,14 +518,16 @@
             return null;
         }
 
-        CreativeCollectionRecipeRequest request = new(TargetCount, ContextStrength, NoveltyEnabled, RecipeName.Trim());
-        using HttpResponseMessage response = SelectedRecipeId is null
-            ? await Http.PostAsJsonAsync(
-                $"api/smart-collections/{Uri.EscapeDataString(SelectedAnchorId!)}/creative-collections",
-                request)
-            : await Http.PutAsJsonAsync(
+        CreativeCollectionRecipeRequest request = BuildRequest();
+        using HttpResponseMessage response = SelectedRecipeId is not null
+            ? await Http.PutAsJsonAsync(
                 $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}",
-                request);
+                request)
+            : AnchorKind == "search"
+                ? await Http.PostAsJsonAsync("api/creative-collections", request)
+                : await Http.PostAsJsonAsync(
+                    $"api/smart-collections/{Uri.EscapeDataString(SmartAnchorId!)}/creative-collections",
+                    request);
         if (!response.IsSuccessStatusCode)
         {
             Error = await ReadErrorAsync(response, "The Creative Collection could not be saved.");
@@ -384,12 +537,8 @@
         CreativeCollectionRecipeResponse saved =
             await response.Content.ReadFromJsonAsync<CreativeCollectionRecipeResponse>()
             ?? throw new InvalidOperationException("The saved Creative Collection response was empty.");
-        SelectedRecipeId = saved.Id;
-        RecipeName = saved.Name;
-        TargetCount = saved.TargetCount;
-        ContextStrength = saved.ContextStrength;
-        NoveltyEnabled = saved.NoveltyEnabled;
         await ReloadAsync();
+        SelectRecipe(saved);
         return saved;
     }
 
@@ -478,6 +627,50 @@
         finally
         {
             Busy = false;
+        }
+    }
+
+    private string SourceLabel(CreativeCollectionRecipeResponse recipe)
+    {
+        if (recipe.SearchAnchor is CreativeCollectionSearchAnchorResponse search)
+        {
+            string scope = string.IsNullOrWhiteSpace(search.SmartCollectionName)
+                ? "all photos"
+                : search.SmartCollectionName;
+            return $"Search · {SearchModeLabel(search.Mode)} · {scope}";
+        }
+
+        return $"Smart · {recipe.AnchorCollectionName ?? "Unavailable"}";
+    }
+
+    private string? AnchorEvidence(string revisionId)
+    {
+        CreativeCollectionSearchAnchorHitResponse? hit = Preview?.SearchAnchors?
+            .FirstOrDefault(item => string.Equals(item.RevisionId, revisionId, StringComparison.OrdinalIgnoreCase));
+        return hit is null
+            ? null
+            : $"#{hit.Rank} · {string.Join(" + ", hit.Sources.Select(SourceLabel))}";
+    }
+
+    private static string SearchModeLabel(string mode) => mode switch
+    {
+        "semantic" => "Visual",
+        "caption" => "Captions",
+        _ => "Visual + Captions",
+    };
+
+    private static string SourceLabel(string source) => source switch
+    {
+        "semantic" => "Visual",
+        "caption" => "Caption",
+        _ => source,
+    };
+
+    private void TrimRecipeName()
+    {
+        if (RecipeName.Length > 120)
+        {
+            RecipeName = RecipeName[..120];
         }
     }
 
