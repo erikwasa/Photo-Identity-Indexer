@@ -13,6 +13,8 @@ public sealed class PhotoSearchSessionState
 
     public int Limit { get; set; } = 80;
 
+    public string SmartCollectionId { get; set; } = string.Empty;
+
     public string CollectionName { get; set; } = string.Empty;
 
     public string? ExistingCollectionId { get; set; }
