@@ -165,6 +165,26 @@ public sealed record CreativeCollectionSearchAnchor(
     }
 }
 
+public static class CreativeCollectionSearchAnchorAdmission
+{
+    public static AssetRevisionId[] AdmitRanked(
+        IEnumerable<AssetRevisionId> rankedRevisionIds,
+        int limit)
+    {
+        ArgumentNullException.ThrowIfNull(rankedRevisionIds);
+        if (limit is < 1 or > CreativeCollectionSearchAnchor.MaximumLimit)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(limit),
+                $"Creative Collection search anchor limit must be between 1 and {CreativeCollectionSearchAnchor.MaximumLimit}.");
+        }
+
+        return rankedRevisionIds
+            .Take(limit)
+            .ToArray();
+    }
+}
+
 public sealed record CreativeCollectionRecipe(
     CreativeCollectionId Id,
     string Name,
