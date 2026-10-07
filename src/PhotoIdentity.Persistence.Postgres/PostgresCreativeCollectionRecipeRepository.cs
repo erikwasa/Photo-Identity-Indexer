@@ -88,6 +88,50 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
             ?? throw new InvalidOperationException("Creative Collection was not persisted.");
     }
 
+    public async Task<CreativeCollectionRecipe> CreateSearchAsync(
+        string name,
+        CreativeCollectionSearchAnchor searchAnchor,
+        CreativeCollectionRecipeSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureNamedSchemaAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(searchAnchor);
+        ArgumentNullException.ThrowIfNull(settings);
+        searchAnchor.ValidateSupported();
+        settings.ValidateSupported();
+        string displayName = CreativeCollectionName.Parse(name).DisplayValue;
+        CreativeCollectionId id = CreativeCollectionId.New();
+        DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
+
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO creative_collection_recipes (
+                id, display_name, anchor_collection_id, target_count,
+                moment_gap_minutes, moment_policy_version, context_policy_version,
+                selection_policy_version, ordering_policy_version, novelty_enabled,
+                anchor_kind, search_query, search_mode, search_scope_collection_id,
+                search_anchor_limit, anchor_policy_version,
+                created_at_utc, updated_at_utc)
+            VALUES (
+                @id, @display_name, NULL, @target_count,
+                @moment_gap_minutes, @moment_policy_version, @context_policy_version,
+                @selection_policy_version, @ordering_policy_version, @novelty_enabled,
+                'search', @search_query, @search_mode, @search_scope_collection_id,
+                @search_anchor_limit, @anchor_policy_version,
+                @created_at_utc, @updated_at_utc);
+            """;
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id.Value);
+        command.Parameters.AddWithValue("display_name", displayName);
+        AddSearchAnchorParameters(command, searchAnchor);
+        AddSettingsParameters(command, settings, now);
+        command.Parameters.AddWithValue("created_at_utc", now);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return await GetCoreAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException("Creative Collection was not persisted.");
+    }
+
     public async Task<CreativeCollectionRecipe> UpdateAsync(
         CreativeCollectionId id,
         string name,
@@ -121,6 +165,55 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
         if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
         {
             throw new KeyNotFoundException($"Creative Collection '{id}' was not found.");
+        }
+
+        return await GetCoreAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException("Creative Collection update could not be read back.");
+    }
+
+    public async Task<CreativeCollectionRecipe> UpdateSearchAsync(
+        CreativeCollectionId id,
+        string name,
+        CreativeCollectionSearchAnchor searchAnchor,
+        CreativeCollectionRecipeSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureNamedSchemaAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(searchAnchor);
+        ArgumentNullException.ThrowIfNull(settings);
+        searchAnchor.ValidateSupported();
+        settings.ValidateSupported();
+        string displayName = CreativeCollectionName.Parse(name).DisplayValue;
+        DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
+
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE creative_collection_recipes
+            SET display_name = @display_name,
+                search_query = @search_query,
+                search_mode = @search_mode,
+                search_scope_collection_id = @search_scope_collection_id,
+                search_anchor_limit = @search_anchor_limit,
+                anchor_policy_version = @anchor_policy_version,
+                target_count = @target_count,
+                moment_gap_minutes = @moment_gap_minutes,
+                moment_policy_version = @moment_policy_version,
+                context_policy_version = @context_policy_version,
+                selection_policy_version = @selection_policy_version,
+                ordering_policy_version = @ordering_policy_version,
+                novelty_enabled = @novelty_enabled,
+                updated_at_utc = @updated_at_utc
+            WHERE id = @id
+              AND anchor_kind = 'search';
+            """;
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id.Value);
+        command.Parameters.AddWithValue("display_name", displayName);
+        AddSearchAnchorParameters(command, searchAnchor);
+        AddSettingsParameters(command, settings, now);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+        {
+            throw new KeyNotFoundException($"Search-anchored Creative Collection '{id}' was not found.");
         }
 
         return await GetCoreAsync(id, cancellationToken)
@@ -343,12 +436,58 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
         command.Parameters.AddWithValue("updated_at_utc", now);
     }
 
+    private static void AddSearchAnchorParameters(
+        NpgsqlCommand command,
+        CreativeCollectionSearchAnchor searchAnchor)
+    {
+        command.Parameters.AddWithValue("search_query", searchAnchor.Query);
+        command.Parameters.AddWithValue("search_mode", searchAnchor.Mode);
+        command.Parameters.AddWithValue(
+            "search_scope_collection_id",
+            NpgsqlDbType.Uuid,
+            searchAnchor.ScopeCollectionId is SmartCollectionId scope
+                ? scope.Value
+                : DBNull.Value);
+        command.Parameters.AddWithValue(
+            "search_anchor_limit",
+            NpgsqlDbType.Integer,
+            searchAnchor.Limit);
+        command.Parameters.AddWithValue("anchor_policy_version", searchAnchor.PolicyVersion);
+    }
+
     private static CreativeCollectionRecipe ReadRecipe(NpgsqlDataReader reader)
     {
+        SmartCollectionId? anchorCollectionId = reader.IsDBNull(2)
+            ? null
+            : SmartCollectionId.From(reader.GetGuid(2));
+        string anchorKind = reader.GetString(12);
+        string anchorPolicyVersion = reader.GetString(17);
+        CreativeCollectionSearchAnchor? searchAnchor = null;
+        if (string.Equals(anchorKind, CreativeCollectionAnchorKinds.Search, StringComparison.Ordinal))
+        {
+            searchAnchor = new CreativeCollectionSearchAnchor(
+                reader.GetString(13),
+                reader.GetString(14),
+                reader.IsDBNull(15)
+                    ? null
+                    : SmartCollectionId.From(reader.GetGuid(15)),
+                reader.GetInt32(16),
+                anchorPolicyVersion);
+        }
+        else if (!string.Equals(anchorKind, CreativeCollectionAnchorKinds.SmartCollection, StringComparison.Ordinal) ||
+                 !string.Equals(
+                     anchorPolicyVersion,
+                     CreativeCollectionAnchorPolicies.SmartCollectionV1,
+                     StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Creative Collection anchor kind '{anchorKind}' or policy '{anchorPolicyVersion}' is not supported.");
+        }
+
         CreativeCollectionRecipe recipe = new(
             CreativeCollectionId.From(reader.GetGuid(0)),
             reader.GetString(1),
-            SmartCollectionId.From(reader.GetGuid(2)),
+            anchorCollectionId,
             reader.GetInt32(3),
             reader.GetInt32(4),
             reader.GetString(5),
@@ -357,9 +496,11 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
             reader.GetString(8),
             reader.GetBoolean(9),
             reader.GetFieldValue<DateTimeOffset>(10),
-            reader.GetFieldValue<DateTimeOffset>(11));
+            reader.GetFieldValue<DateTimeOffset>(11),
+            searchAnchor);
 
         _ = CreativeCollectionName.Parse(recipe.Name);
+        recipe.ValidateAnchorSupported();
         new CreativeCollectionRecipeSettings(
             recipe.TargetCount,
             recipe.MomentGapMinutes,
@@ -383,6 +524,12 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
                ordering_policy_version,
                novelty_enabled,
                created_at_utc,
-               updated_at_utc
+               updated_at_utc,
+               anchor_kind,
+               search_query,
+               search_mode,
+               search_scope_collection_id,
+               search_anchor_limit,
+               anchor_policy_version
         """;
 }
