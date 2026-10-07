@@ -40,7 +40,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M33 | Archive synchronization performance | completed |
 | M34 | Review queue reliability | completed |
 | M35 | Identity assignment audit and calibration | completed |
-| M36 | Semantic collection composition | blocked |
+| M36 | Semantic collection composition | in_progress |
 
 Expected evolution:
 

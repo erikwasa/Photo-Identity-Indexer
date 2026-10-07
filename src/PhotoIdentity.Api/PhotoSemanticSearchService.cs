@@ -191,6 +191,7 @@ public sealed record PhotoSearchExecutionResult(
     int IndexedPhotoCount,
     int DisplayableCaptionCount,
     double SearchMilliseconds,
+    PhotoSearchScopeSummary? Scope,
     IReadOnlyList<PhotoSearchExecutionItem> Items);
 
 public sealed record PhotoSearchStatus(
@@ -226,10 +227,18 @@ public sealed class PhotoSearchService
         _model = model;
     }
 
+    public Task<PhotoSearchExecutionResult> SearchAsync(
+        string query,
+        string? mode,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        SearchAsync(query, mode, limit, scope: null, cancellationToken);
+
     public async Task<PhotoSearchExecutionResult> SearchAsync(
         string query,
         string? mode,
         int limit,
+        PhotoSearchScope? scope,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -249,16 +258,20 @@ public sealed class PhotoSearchService
             await _model.GetDescriptorAsync(cancellationToken);
 
         IReadOnlyList<PhotoSearchSemanticHit> semanticHits = [];
-        if (normalizedMode is not PhotoSearchModes.Caption && descriptor is not null)
+        if (normalizedMode is not PhotoSearchModes.Caption
+            && descriptor is not null
+            && (scope is null || scope.EligiblePhotoCount > 0))
         {
             await EnsureEmbeddingsLoadedAsync(descriptor, cancellationToken);
             ClipEmbeddingResult? queryEmbedding =
                 await _model.EncodeTextAsync(normalizedQuery, cancellationToken);
             if (queryEmbedding is not null && _embeddings.Count > 0)
             {
-                semanticHits = FindSemanticHits(
+                semanticHits = PhotoSearchSemanticRanker.Find(
+                    _embeddings,
                     queryEmbedding.Vector,
-                    Math.Min(1000, Math.Max(limit * 4, 100)));
+                    Math.Min(1000, Math.Max(limit * 4, 100)),
+                    scope?.RevisionIds);
             }
         }
 
@@ -268,6 +281,7 @@ public sealed class PhotoSearchService
                 : await _repository.SearchCaptionsAsync(
                     normalizedQuery,
                     Math.Min(1000, Math.Max(limit * 4, 100)),
+                    scope?.RevisionIds,
                     cancellationToken);
 
         IReadOnlyList<PhotoSearchRankedHit> ranked = PhotoSearchRanker.Fuse(
@@ -295,6 +309,12 @@ public sealed class PhotoSearchService
             statistics.EmbeddingCount,
             statistics.DisplayableCaptionCount,
             elapsed,
+            scope is null
+                ? null
+                : new PhotoSearchScopeSummary(
+                    scope.CollectionId.ToString(),
+                    scope.CollectionName,
+                    scope.EligiblePhotoCount),
             ranked.Select(hit => new PhotoSearchExecutionItem(
                 hit.RevisionId,
                 hit.CombinedScore,
@@ -402,39 +422,6 @@ public sealed class PhotoSearchService
         }
     }
 
-    private IReadOnlyList<PhotoSearchSemanticHit> FindSemanticHits(
-        IReadOnlyList<float> queryEmbedding,
-        int candidateCount)
-    {
-        PriorityQueue<PhotoSearchSemanticHit, double> queue = new();
-        foreach ((AssetRevisionId revisionId, PhotoEmbeddingEvidence evidence) in _embeddings)
-        {
-            if (evidence.Dimensions != queryEmbedding.Count)
-            {
-                continue;
-            }
-
-            double score = PhotoEmbeddingSimilarity.Cosine(queryEmbedding, evidence.Values);
-            PhotoSearchSemanticHit hit = new(revisionId, score);
-            if (queue.Count < candidateCount)
-            {
-                queue.Enqueue(hit, score);
-                continue;
-            }
-
-            if (queue.TryPeek(out _, out double lowest) && score > lowest)
-            {
-                queue.Dequeue();
-                queue.Enqueue(hit, score);
-            }
-        }
-
-        return queue.UnorderedItems
-            .Select(item => item.Element)
-            .OrderByDescending(item => item.Score)
-            .ThenBy(item => item.RevisionId.ToString(), StringComparer.Ordinal)
-            .ToArray();
-    }
 }
 
 public sealed class PhotoSemanticEmbeddingHostedService : BackgroundService

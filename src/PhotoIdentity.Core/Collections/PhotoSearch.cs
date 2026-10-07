@@ -90,6 +90,7 @@ public interface IPhotoSearchRepository
     Task<IReadOnlyList<PhotoSearchCaptionHit>> SearchCaptionsAsync(
         string query,
         int limit,
+        IReadOnlyCollection<AssetRevisionId>? eligibleRevisionIds = null,
         CancellationToken cancellationToken = default);
 
     Task<PhotoSearchCatalogueStatistics> GetCatalogueStatisticsAsync(
@@ -101,6 +102,61 @@ public interface IPhotoSearchRepository
         string preprocessingVersion,
         string vectorEncoding,
         CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Ranks exact cosine similarity over the currently loaded semantic embeddings.
+/// An optional eligibility set is applied before the bounded top-k queue so scoped search cannot
+/// lose lower-ranked eligible photos to higher-ranked photos outside the scope.
+/// </summary>
+public static class PhotoSearchSemanticRanker
+{
+    public static IReadOnlyList<PhotoSearchSemanticHit> Find(
+        IReadOnlyDictionary<AssetRevisionId, PhotoEmbeddingEvidence> embeddings,
+        IReadOnlyList<float> queryEmbedding,
+        int candidateCount,
+        IReadOnlySet<AssetRevisionId>? eligibleRevisionIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(embeddings);
+        ArgumentNullException.ThrowIfNull(queryEmbedding);
+        if (candidateCount is < 1 or > 1000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(candidateCount));
+        }
+
+        PriorityQueue<PhotoSearchSemanticHit, double> queue = new();
+        foreach ((AssetRevisionId revisionId, PhotoEmbeddingEvidence evidence) in embeddings)
+        {
+            if (eligibleRevisionIds is not null && !eligibleRevisionIds.Contains(revisionId))
+            {
+                continue;
+            }
+            if (evidence.Dimensions != queryEmbedding.Count)
+            {
+                continue;
+            }
+
+            double score = PhotoEmbeddingSimilarity.Cosine(queryEmbedding, evidence.Values);
+            PhotoSearchSemanticHit hit = new(revisionId, score);
+            if (queue.Count < candidateCount)
+            {
+                queue.Enqueue(hit, score);
+                continue;
+            }
+
+            if (queue.TryPeek(out _, out double lowest) && score > lowest)
+            {
+                queue.Dequeue();
+                queue.Enqueue(hit, score);
+            }
+        }
+
+        return queue.UnorderedItems
+            .Select(item => item.Element)
+            .OrderByDescending(item => item.Score)
+            .ThenBy(item => item.RevisionId.ToString(), StringComparer.Ordinal)
+            .ToArray();
+    }
 }
 
 /// <summary>

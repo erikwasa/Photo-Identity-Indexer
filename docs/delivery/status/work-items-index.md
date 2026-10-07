@@ -14,7 +14,7 @@ Current work items: **10**. Archived terminal items: **175**.
 | [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | proposed | unassigned | [YAML](work-items/active/WI-0155.yaml) |
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
 | [WI-0182](../work-items/WI-0182-photo-quality-scoring-evaluation.md) Evaluate automatic technical photo quality scoring | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0182.yaml) |
-| [WI-0186](../work-items/WI-0186-scoped-semantic-caption-search.md) Scope visual and caption search with Smart Collection criteria | M36 | ready | unassigned | [YAML](work-items/active/WI-0186.yaml) |
+| [WI-0186](../work-items/WI-0186-scoped-semantic-caption-search.md) Scope visual and caption search with Smart Collection criteria | M36 | in_review | ai-agent | [YAML](work-items/active/WI-0186.yaml) |
 | [WI-0187](../work-items/WI-0187-search-creative-anchors.md) Use semantic and caption search results as Creative Collection anchors | M36 | blocked | unassigned | [YAML](work-items/active/WI-0187.yaml) |
 
 Historical items stay queryable without opening the archive directory:

@@ -3,7 +3,8 @@ namespace PhotoIdentity.Web.Contracts;
 public sealed record PhotoSearchRequest(
     string Query,
     string? Mode = null,
-    int Limit = 80);
+    int Limit = 80,
+    string? SmartCollectionId = null);
 
 public sealed record PhotoSearchResultResponse(
     string RevisionId,
@@ -17,6 +18,11 @@ public sealed record PhotoSearchResultResponse(
     string? Caption,
     string[] Sources);
 
+public sealed record PhotoSearchScopeResponse(
+    string CollectionId,
+    string CollectionName,
+    int EligiblePhotoCount);
+
 public sealed record PhotoSearchResponse(
     string Query,
     string Mode,
@@ -24,6 +30,7 @@ public sealed record PhotoSearchResponse(
     int IndexedPhotoCount,
     int DisplayableCaptionCount,
     double SearchMilliseconds,
+    PhotoSearchScopeResponse? Scope,
     PhotoSearchResultResponse[] Items);
 
 public sealed record PhotoSearchSaveCollectionRequest(

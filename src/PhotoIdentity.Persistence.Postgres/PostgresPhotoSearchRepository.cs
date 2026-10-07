@@ -247,6 +247,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
     public async Task<IReadOnlyList<PhotoSearchCaptionHit>> SearchCaptionsAsync(
         string query,
         int limit,
+        IReadOnlyCollection<AssetRevisionId>? eligibleRevisionIds = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
@@ -255,11 +256,23 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             throw new ArgumentOutOfRangeException(nameof(limit));
         }
 
+        Guid[]? eligibleRevisionGuids = eligibleRevisionIds?
+            .Select(id => id.Value)
+            .Distinct()
+            .ToArray();
+        if (eligibleRevisionGuids is { Length: 0 })
+        {
+            return [];
+        }
+        string scopePredicate = eligibleRevisionGuids is null
+            ? string.Empty
+            : "AND caption.asset_revision_id = ANY(@eligible_revision_ids)";
+
         await EnsureSchemaAsync(cancellationToken);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             WITH current_revisions AS (
                 SELECT revision.id
                 FROM assets AS asset
@@ -282,6 +295,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 FROM photo_generated_captions AS caption
                 INNER JOIN current_revisions AS current
                     ON current.id = caption.asset_revision_id
+                {scopePredicate}
                 ORDER BY
                     caption.asset_revision_id,
                     caption.language,
@@ -330,6 +344,13 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             """;
         command.Parameters.AddWithValue("query", NpgsqlDbType.Text, query.Trim());
         command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
+        if (eligibleRevisionGuids is not null)
+        {
+            command.Parameters.AddWithValue(
+                "eligible_revision_ids",
+                NpgsqlDbType.Array | NpgsqlDbType.Uuid,
+                eligibleRevisionGuids);
+        }
 
         List<PhotoSearchCaptionHit> result = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);

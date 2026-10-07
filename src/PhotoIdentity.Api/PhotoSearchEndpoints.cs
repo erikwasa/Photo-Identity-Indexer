@@ -6,7 +6,8 @@ namespace PhotoIdentity.Api;
 public sealed record PhotoSearchRequest(
     string Query,
     string? Mode = null,
-    int Limit = 80);
+    int Limit = 80,
+    string? SmartCollectionId = null);
 
 public sealed record PhotoSearchResultResponse(
     string RevisionId,
@@ -20,6 +21,11 @@ public sealed record PhotoSearchResultResponse(
     string? Caption,
     string[] Sources);
 
+public sealed record PhotoSearchScopeResponse(
+    string CollectionId,
+    string CollectionName,
+    int EligiblePhotoCount);
+
 public sealed record PhotoSearchResponse(
     string Query,
     string Mode,
@@ -27,6 +33,7 @@ public sealed record PhotoSearchResponse(
     int IndexedPhotoCount,
     int DisplayableCaptionCount,
     double SearchMilliseconds,
+    PhotoSearchScopeResponse? Scope,
     PhotoSearchResultResponse[] Items);
 
 public sealed record PhotoSearchSaveCollectionRequest(
@@ -46,14 +53,19 @@ public static class PhotoSearchEndpoints
     private static async Task<IResult> QueryAsync(
         PhotoSearchRequest request,
         PhotoSearchService search,
+        PhotoSearchScopeResolver scopes,
         CancellationToken cancellationToken)
     {
         try
         {
+            PhotoSearchScope? scope = await scopes.ResolveAsync(
+                request.SmartCollectionId,
+                cancellationToken);
             PhotoSearchExecutionResult result = await search.SearchAsync(
                 request.Query,
                 request.Mode,
                 request.Limit,
+                scope,
                 cancellationToken);
             return Results.Ok(new PhotoSearchResponse(
                 result.Query,
@@ -62,6 +74,12 @@ public static class PhotoSearchEndpoints
                 result.IndexedPhotoCount,
                 result.DisplayableCaptionCount,
                 result.SearchMilliseconds,
+                result.Scope is null
+                    ? null
+                    : new PhotoSearchScopeResponse(
+                        result.Scope.CollectionId,
+                        result.Scope.CollectionName,
+                        result.Scope.EligiblePhotoCount),
                 result.Items.Select(item => new PhotoSearchResultResponse(
                     item.RevisionId.ToString(),
                     $"/api/collections/photos/{item.RevisionId}/thumbnail",
@@ -73,6 +91,10 @@ public static class PhotoSearchEndpoints
                     item.CaptionLanguage,
                     item.Caption,
                     item.Sources.ToArray())).ToArray()));
+        }
+        catch (PhotoSearchScopeNotFoundException exception)
+        {
+            return Results.NotFound(new { error = exception.Message });
         }
         catch (ArgumentException exception)
         {
