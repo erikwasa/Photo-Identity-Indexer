@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Collections;
+using PhotoIdentity.Core.Identifiers;
 
 namespace PhotoIdentity.Core.Tests;
 
@@ -51,6 +52,20 @@ public sealed class CreativeCollectionSearchAnchorTests
             AnchorCollectionId = SmartCollectionId.New(),
         };
         Assert.Throws<InvalidDataException>(invalid.ValidateAnchorSupported);
+    }
+
+    [Fact]
+    public void Ranked_admission_preserves_order_and_applies_top_n()
+    {
+        AssetRevisionId first = AssetRevisionId.From(Guid.Parse("00000000-0000-0000-0000-000000000001"));
+        AssetRevisionId second = AssetRevisionId.From(Guid.Parse("00000000-0000-0000-0000-000000000002"));
+        AssetRevisionId third = AssetRevisionId.From(Guid.Parse("00000000-0000-0000-0000-000000000003"));
+
+        AssetRevisionId[] admitted = CreativeCollectionSearchAnchorAdmission.AdmitRanked(
+            [first, second, third],
+            limit: 2);
+
+        Assert.Equal([first, second], admitted);
     }
 
     [Fact]
