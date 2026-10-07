@@ -183,6 +183,7 @@ public partial class Program
         builder.Services.AddSingleton<LocalPhotoCaptionGenerator>();
         builder.Services.AddHostedService<PhotoCaptionEnrichmentHostedService>();
         builder.Services.AddSingleton<PhotoSemanticSearchModel>();
+        builder.Services.AddSingleton<PhotoSearchScopeResolver>();
         builder.Services.AddSingleton<PhotoSearchService>();
         builder.Services.AddHostedService<PhotoSemanticEmbeddingHostedService>();
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
