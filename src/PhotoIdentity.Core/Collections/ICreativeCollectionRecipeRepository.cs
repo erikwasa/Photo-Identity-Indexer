@@ -19,9 +19,22 @@ public interface ICreativeCollectionRecipeRepository
         CreativeCollectionRecipeSettings settings,
         CancellationToken cancellationToken = default);
 
+    Task<CreativeCollectionRecipe> CreateSearchAsync(
+        string name,
+        CreativeCollectionSearchAnchor searchAnchor,
+        CreativeCollectionRecipeSettings settings,
+        CancellationToken cancellationToken = default);
+
     Task<CreativeCollectionRecipe> UpdateAsync(
         CreativeCollectionId id,
         string name,
+        CreativeCollectionRecipeSettings settings,
+        CancellationToken cancellationToken = default);
+
+    Task<CreativeCollectionRecipe> UpdateSearchAsync(
+        CreativeCollectionId id,
+        string name,
+        CreativeCollectionSearchAnchor searchAnchor,
         CreativeCollectionRecipeSettings settings,
         CancellationToken cancellationToken = default);
 
