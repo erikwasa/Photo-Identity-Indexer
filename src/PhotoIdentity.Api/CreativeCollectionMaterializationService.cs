@@ -210,9 +210,11 @@ public sealed class CreativeCollectionMaterializationService
             searchAnchor.Limit,
             scope,
             cancellationToken);
-        AssetRevisionId[] anchorRevisionIds = search.Items
-            .Select(item => item.RevisionId)
-            .Take(searchAnchor.Limit)
+        AssetRevisionId[] anchorRevisionIds = CreativeCollectionSearchAnchorAdmission.AdmitRanked(
+            search.Items.Select(item => item.RevisionId),
+            searchAnchor.Limit);
+        PhotoSearchExecutionItem[] admittedHits = search.Items
+            .Take(anchorRevisionIds.Length)
             .ToArray();
 
         return await MaterializeResolvedAsync(
@@ -223,7 +225,7 @@ public sealed class CreativeCollectionMaterializationService
             settings,
             searchAnchor,
             search.Scope,
-            search.Items.Take(searchAnchor.Limit).ToArray(),
+            admittedHits,
             anchorTimer.ElapsedMilliseconds,
             cancellationToken);
     }
