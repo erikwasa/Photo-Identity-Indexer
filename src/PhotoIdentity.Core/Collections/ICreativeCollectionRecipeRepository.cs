@@ -23,7 +23,8 @@ public interface ICreativeCollectionRecipeRepository
         string name,
         CreativeCollectionSearchAnchor searchAnchor,
         CreativeCollectionRecipeSettings settings,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Search-anchored Creative Collections are not supported by this repository.");
 
     Task<CreativeCollectionRecipe> UpdateAsync(
         CreativeCollectionId id,
@@ -36,7 +37,8 @@ public interface ICreativeCollectionRecipeRepository
         string name,
         CreativeCollectionSearchAnchor searchAnchor,
         CreativeCollectionRecipeSettings settings,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Search-anchored Creative Collections are not supported by this repository.");
 
     Task<bool> DeleteAsync(
         CreativeCollectionId id,
