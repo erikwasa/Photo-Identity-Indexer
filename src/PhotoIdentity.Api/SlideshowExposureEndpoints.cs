@@ -41,15 +41,21 @@ public static class SlideshowExposureEndpoints
 
         try
         {
-            SmartCollectionId collectionId = SmartCollectionId.From(request.CollectionId);
+            Guid collectionId = request.CollectionId;
             if (request.Creative)
             {
                 CreativeCollectionRecipe? named = await creativeCollections.GetAsync(
                     CreativeCollectionId.From(request.CollectionId),
                     cancellationToken);
-                if (named is not null)
+                if (named is null)
                 {
-                    collectionId = named.AnchorCollectionId;
+                    CreativeCollectionRecipe? legacy = await creativeCollections.GetAsync(
+                        SmartCollectionId.From(request.CollectionId),
+                        cancellationToken);
+                    if (legacy is not null)
+                    {
+                        collectionId = legacy.Id.Value;
+                    }
                 }
             }
 
