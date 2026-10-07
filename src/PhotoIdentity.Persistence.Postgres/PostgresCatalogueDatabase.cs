@@ -1296,7 +1296,7 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
 
             CREATE INDEX ix_photo_list_collection_items_revision
                 ON photo_list_collection_items (asset_revision_id);
-            """),,
+            """),
         new(32, "creative-collection-search-anchors", """
             ALTER TABLE creative_collection_recipes
                 ADD COLUMN IF NOT EXISTS id uuid NULL,
