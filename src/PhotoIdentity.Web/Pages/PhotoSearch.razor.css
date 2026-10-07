@@ -54,7 +54,7 @@
 
 .photo-search-controls {
     display: grid;
-    grid-template-columns: minmax(18rem, 1fr) minmax(10rem, 13rem) minmax(7rem, 9rem) auto;
+    grid-template-columns: minmax(18rem, 1fr) minmax(12rem, 18rem) minmax(10rem, 13rem) minmax(7rem, 9rem) auto;
     gap: 0.75rem;
     align-items: end;
     margin-bottom: 1rem;
