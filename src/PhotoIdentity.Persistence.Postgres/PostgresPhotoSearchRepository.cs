@@ -247,12 +247,22 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
     public async Task<IReadOnlyList<PhotoSearchCaptionHit>> SearchCaptionsAsync(
         string query,
         int limit,
+        IReadOnlyCollection<AssetRevisionId>? eligibleRevisionIds = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         if (limit is < 1 or > 1000)
         {
             throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        Guid[]? eligibleRevisionGuids = eligibleRevisionIds?
+            .Select(id => id.Value)
+            .Distinct()
+            .ToArray();
+        if (eligibleRevisionGuids is { Length: 0 })
+        {
+            return [];
         }
 
         await EnsureSchemaAsync(cancellationToken);
@@ -282,6 +292,8 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 FROM photo_generated_captions AS caption
                 INNER JOIN current_revisions AS current
                     ON current.id = caption.asset_revision_id
+                WHERE (@eligible_revision_ids IS NULL
+                       OR caption.asset_revision_id = ANY(@eligible_revision_ids))
                 ORDER BY
                     caption.asset_revision_id,
                     caption.language,
@@ -330,6 +342,10 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             """;
         command.Parameters.AddWithValue("query", NpgsqlDbType.Text, query.Trim());
         command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
+        command.Parameters.AddWithValue(
+            "eligible_revision_ids",
+            NpgsqlDbType.Array | NpgsqlDbType.Uuid,
+            (object?)eligibleRevisionGuids ?? DBNull.Value);
 
         List<PhotoSearchCaptionHit> result = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
