@@ -193,7 +193,7 @@ public static class CreativeCollectionRecipeEndpoints
                 string.IsNullOrWhiteSpace(request.Name)
                     ? "Search Creative preview"
                     : CreativeCollectionName.Parse(request.Name).DisplayValue,
-                AnchorCollectionId: null,
+                null,
                 settings.TargetCount,
                 settings.MomentGapMinutes,
                 settings.MomentPolicyVersion,
