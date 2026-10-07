@@ -34,6 +34,46 @@ The response keeps the uncurated WI-0119 candidate set for comparison and also r
 
 Zero exact matches produce `noAnchors: true`, an empty candidate list and an empty selected list. Creative generation never broadens a zero-anchor query.
 
+## Search anchors
+
+WI-0187 adds a second versioned anchor source without changing the Smart Collection path. A Creative Collection may now persist a ranked Search anchor containing:
+
+- a natural-language query;
+- **semantic** (Visual), **caption** or **combined** evidence mode;
+- an optional saved Smart Collection scope;
+- a bounded top-N anchor limit from 1 through 250; and
+- the anchor policy version **m36-search-ranked-top-n-v1**.
+
+Search recipes use the same scoped retrieval path as WI-0186. When a Smart scope is selected, its exact current membership is resolved first and semantic/caption ranking only sees eligible revisions. The resulting ranked top-N revision IDs become **direct anchors**. They then enter the same moment/context expansion and Creative selection pipeline as Smart anchors; contextual additions never trigger another semantic search and never recursively become anchors.
+
+The Creative editor exposes **Smart Collection** or **Visual / Caption search** as the source. Search previews report the query/mode/scope/limit and ranked direct-anchor provenance. Each admitted search hit keeps its rank, combined score, optional Visual score, optional Caption score/caption, and source labels for debugging. That evidence remains derived presentation state and is not written back as tags, people, Places, quality or other canonical metadata.
+
+Search-anchored recipes are intentionally regenerable. New captions, regenerated visual embeddings or an explicitly adopted search-policy/model change may alter a future preview. This differs from an explicit photo-list collection saved from Search, whose ordered revision membership is frozen when saved. Once a Creative slideshow snapshot is created, that snapshot is also immutable and playback never reruns the search inside the session.
+
+API example:
+
+~~~text
+POST /api/creative-collections
+{
+  "name": "Beach swimming",
+  "targetCount": 50,
+  "contextStrength": "balanced",
+  "noveltyEnabled": true,
+  "searchAnchor": {
+    "query": "children swimming at the beach",
+    "mode": "combined",
+    "smartCollectionId": "<optional-scope-id>",
+    "anchorLimit": 80
+  }
+}
+
+POST /api/creative-collections/preview
+GET  /api/creative-collections/{creative-id}/preview
+POST /api/creative-collections/{creative-id}/slideshow-snapshot
+~~~
+
+The non-persistent preview endpoint accepts the same request shape, so evaluating a search recipe does not silently save it.
+
 ## Anchor/context policy
 
 `m26-anchor-context-balanced-v1` admits at most six contextual photos per moment that contains at least one direct anchor. Context candidates are chosen by capture-time proximity to the direct anchors with stable timestamp/revision-ID tie breaking. Context-only photos never become new anchors, so expansion cannot recurse into a later moment.
@@ -76,7 +116,7 @@ Photo Details exposes the current preference and append-only history:
 
 WI-0124 records presentation history only after the slideshow presentation component reports that a revision was actually displayed. Snapshot membership, prefetching, original preparation and failed image loads do not count as exposure.
 
-Each slideshow page load owns a fresh session identifier. The history table accepts at most one row per immutable revision per session, so repeated callbacks or navigating back to the same photo in that session do not inflate counts. A later slideshow session can record the revision again. The stored presentation state contains only session ID, revision ID, Smart Collection ID, Creative/classic mode and server timestamp.
+Each slideshow page load owns a fresh session identifier. The history table accepts at most one row per immutable revision per session, so repeated callbacks or navigating back to the same photo in that session do not inflate counts. A later slideshow session can record the revision again. The stored presentation state contains only session ID, revision ID, collection provenance ID, Creative/classic mode and server timestamp. For legacy/Smart slideshow paths that provenance remains the Smart Collection ID; named Creative slideshows can use their Creative recipe ID, which also supports unscoped search anchors.
 
 Creative preview reports `showCount` and `lastShownAtUtc` for eligible candidates. The saved recipe adds an optional **Favor photos not shown recently** control. It is off by default and maps to `m26-slideshow-novelty-balanced-v1`:
 
