@@ -62,16 +62,27 @@ public static class SlideshowLibraryCatalogue
                 SourceCollectionName: null));
 
         IEnumerable<SlideshowLibraryItem> creative = creativeCollections.Select(collection =>
-            new SlideshowLibraryItem(
+        {
+            string coverCollectionId = collection.AnchorCollectionId
+                ?? collection.SearchAnchor?.SmartCollectionId
+                ?? string.Empty;
+            string sourceName = collection.SearchAnchor is CreativeCollectionSearchAnchorResponse search
+                ? string.IsNullOrWhiteSpace(search.SmartCollectionName)
+                    ? $"Search: {search.Query}"
+                    : $"Search: {search.Query} · {search.SmartCollectionName}"
+                : collection.AnchorCollectionName ?? "Smart Collection";
+
+            return new SlideshowLibraryItem(
                 collection.Id,
                 collection.Name,
                 SlideshowLibraryItemKind.Creative,
-                collection.AnchorCollectionId,
+                coverCollectionId,
                 CoverRevisionId: null,
                 RevisionIds: [],
                 PhotoCount: null,
                 CreativeTargetCount: collection.TargetCount,
-                SourceCollectionName: collection.AnchorCollectionName));
+                SourceCollectionName: sourceName);
+        });
 
         return smart
             .Concat(manual)
