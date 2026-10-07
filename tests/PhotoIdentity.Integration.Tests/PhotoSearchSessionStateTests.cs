@@ -31,6 +31,24 @@ public sealed class PhotoSearchSessionStateTests
         Assert.Equal(["revision-1", "revision-3"], state.SelectedRevisionIds);
     }
 
+
+    [Fact]
+    public void Smart_collection_scope_is_part_of_the_persistent_search_state()
+    {
+        PhotoSearchSessionState state = new()
+        {
+            Query = "playing by water",
+            SmartCollectionId = "00000000-0000-0000-0000-000000000186",
+        };
+
+        state.SelectAll(["revision-1"]);
+        state.Query = "swimming";
+
+        Assert.Equal("00000000-0000-0000-0000-000000000186", state.SmartCollectionId);
+        Assert.Equal("swimming", state.Query);
+        Assert.Equal(["revision-1"], state.SelectedRevisionIds);
+    }
+
     [Fact]
     public void Clear_selection_resets_the_working_collection()
     {
