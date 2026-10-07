@@ -7,7 +7,12 @@ using PhotoIdentity.Imaging.OpenCv;
 namespace PhotoIdentity.Api;
 
 public sealed record CreativeCollectionMaterialization(
-    SmartCollectionDefinition Definition,
+    string AnchorKind,
+    string AnchorId,
+    string AnchorName,
+    CreativeCollectionSearchAnchor? SearchAnchor,
+    PhotoSearchScopeSummary? SearchScope,
+    IReadOnlyList<PhotoSearchExecutionItem> SearchAnchorHits,
     CreativeCollectionCandidateSet Generated,
     CreativeCollectionSelectionResult Selection,
     PhotoVisualRedundancyResult VisualRedundancy,
@@ -26,6 +31,8 @@ public sealed class CreativeCollectionMaterializationService
     private readonly IPhotoSlideshowExposureRepository _exposures;
     private readonly TimeProvider _timeProvider;
     private readonly CreativeVisualFingerprintCache _fingerprintCache;
+    private readonly PhotoSearchService? _photoSearch;
+    private readonly PhotoSearchScopeResolver? _searchScopes;
     private readonly ILogger<CreativeCollectionMaterializationService>? _logger;
 
     public CreativeCollectionMaterializationService(
@@ -44,6 +51,8 @@ public sealed class CreativeCollectionMaterializationService
             exposures,
             timeProvider,
             new CreativeVisualFingerprintCache(),
+            photoSearch: null,
+            searchScopes: null,
             logger)
     {
     }
@@ -57,6 +66,55 @@ public sealed class CreativeCollectionMaterializationService
         TimeProvider timeProvider,
         CreativeVisualFingerprintCache fingerprintCache,
         ILogger<CreativeCollectionMaterializationService>? logger = null)
+        : this(
+            definitions,
+            query,
+            proxyResolver,
+            presentationPreferences,
+            exposures,
+            timeProvider,
+            fingerprintCache,
+            photoSearch: null,
+            searchScopes: null,
+            logger)
+    {
+    }
+
+    public CreativeCollectionMaterializationService(
+        ISmartCollectionRepository definitions,
+        ISmartCollectionQueryRepository query,
+        CollectionReviewProxyFileResolver proxyResolver,
+        IPhotoPresentationPreferenceRepository presentationPreferences,
+        IPhotoSlideshowExposureRepository exposures,
+        TimeProvider timeProvider,
+        PhotoSearchService photoSearch,
+        PhotoSearchScopeResolver searchScopes,
+        ILogger<CreativeCollectionMaterializationService>? logger = null)
+        : this(
+            definitions,
+            query,
+            proxyResolver,
+            presentationPreferences,
+            exposures,
+            timeProvider,
+            new CreativeVisualFingerprintCache(),
+            photoSearch,
+            searchScopes,
+            logger)
+    {
+    }
+
+    private CreativeCollectionMaterializationService(
+        ISmartCollectionRepository definitions,
+        ISmartCollectionQueryRepository query,
+        CollectionReviewProxyFileResolver proxyResolver,
+        IPhotoPresentationPreferenceRepository presentationPreferences,
+        IPhotoSlideshowExposureRepository exposures,
+        TimeProvider timeProvider,
+        CreativeVisualFingerprintCache fingerprintCache,
+        PhotoSearchService? photoSearch,
+        PhotoSearchScopeResolver? searchScopes,
+        ILogger<CreativeCollectionMaterializationService>? logger)
     {
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentNullException.ThrowIfNull(query);
@@ -72,6 +130,8 @@ public sealed class CreativeCollectionMaterializationService
         _exposures = exposures;
         _timeProvider = timeProvider;
         _fingerprintCache = fingerprintCache;
+        _photoSearch = photoSearch;
+        _searchScopes = searchScopes;
         _logger = logger;
     }
 
@@ -79,6 +139,108 @@ public sealed class CreativeCollectionMaterializationService
         SmartCollectionId collectionId,
         CreativeCollectionRecipeSettings settings,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        settings.ValidateSupported();
+
+        Stopwatch anchorTimer = Stopwatch.StartNew();
+        SmartCollectionDefinition? definition =
+            await _definitions.GetAsync(collectionId, cancellationToken);
+        if (definition is null)
+        {
+            return null;
+        }
+
+        SmartCollectionSlideshowSnapshot? anchorSnapshot =
+            await _query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
+        if (anchorSnapshot is null)
+        {
+            return null;
+        }
+
+        return await MaterializeResolvedAsync(
+            CreativeCollectionAnchorKinds.SmartCollection,
+            definition.Id.ToString(),
+            definition.Name,
+            anchorSnapshot.RevisionIds,
+            settings,
+            searchAnchor: null,
+            searchScope: null,
+            searchAnchorHits: [],
+            anchorTimer.ElapsedMilliseconds,
+            cancellationToken);
+    }
+
+    public async Task<CreativeCollectionMaterialization?> MaterializeAsync(
+        CreativeCollectionRecipe recipe,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+        recipe.ValidateAnchorSupported();
+        CreativeCollectionRecipeSettings settings = new(
+            recipe.TargetCount,
+            recipe.MomentGapMinutes,
+            recipe.MomentPolicyVersion,
+            recipe.ContextPolicyVersion,
+            recipe.SelectionPolicyVersion,
+            recipe.OrderingPolicyVersion,
+            recipe.NoveltyEnabled);
+        settings.ValidateSupported();
+
+        if (recipe.AnchorCollectionId is SmartCollectionId smartAnchor)
+        {
+            return await MaterializeAsync(smartAnchor, settings, cancellationToken);
+        }
+
+        CreativeCollectionSearchAnchor searchAnchor = recipe.SearchAnchor
+            ?? throw new InvalidDataException("Search-anchored Creative Collection is missing its search definition.");
+        if (_photoSearch is null || _searchScopes is null)
+        {
+            throw new InvalidOperationException(
+                "Creative Collection search anchors require Photo Search services.");
+        }
+
+        Stopwatch anchorTimer = Stopwatch.StartNew();
+        PhotoSearchScope? scope = searchAnchor.ScopeCollectionId is SmartCollectionId scopeId
+            ? await _searchScopes.ResolveAsync(scopeId, cancellationToken)
+            : null;
+        PhotoSearchExecutionResult search = await _photoSearch.SearchAsync(
+            searchAnchor.Query,
+            searchAnchor.Mode,
+            searchAnchor.Limit,
+            scope,
+            cancellationToken);
+        AssetRevisionId[] anchorRevisionIds = CreativeCollectionSearchAnchorAdmission.AdmitRanked(
+            search.Items.Select(item => item.RevisionId),
+            searchAnchor.Limit);
+        PhotoSearchExecutionItem[] admittedHits = search.Items
+            .Take(anchorRevisionIds.Length)
+            .ToArray();
+
+        return await MaterializeResolvedAsync(
+            CreativeCollectionAnchorKinds.Search,
+            recipe.Id.ToString(),
+            recipe.Name,
+            anchorRevisionIds,
+            settings,
+            searchAnchor,
+            search.Scope,
+            admittedHits,
+            anchorTimer.ElapsedMilliseconds,
+            cancellationToken);
+    }
+
+    private async Task<CreativeCollectionMaterialization> MaterializeResolvedAsync(
+        string anchorKind,
+        string anchorId,
+        string anchorName,
+        IReadOnlyList<AssetRevisionId> anchorRevisionIds,
+        CreativeCollectionRecipeSettings settings,
+        CreativeCollectionSearchAnchor? searchAnchor,
+        PhotoSearchScopeSummary? searchScope,
+        IReadOnlyList<PhotoSearchExecutionItem> searchAnchorHits,
+        long anchorResolutionMilliseconds,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.ValidateSupported();
@@ -99,34 +261,19 @@ public sealed class CreativeCollectionMaterializationService
 
         try
         {
-            long definitionAndAnchorMilliseconds;
+            long definitionAndAnchorMilliseconds = anchorResolutionMilliseconds;
             long catalogueAndCandidatesMilliseconds;
             long visualMilliseconds;
             long preferenceAndExposureMilliseconds;
             long selectionMilliseconds;
 
             Stopwatch phase = Stopwatch.StartNew();
-            SmartCollectionDefinition? definition =
-                await _definitions.GetAsync(collectionId, cancellationToken);
-            if (definition is null)
-            {
-                return null;
-            }
-
-            SmartCollectionSlideshowSnapshot? anchorSnapshot =
-                await _query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
-            if (anchorSnapshot is null)
-            {
-                return null;
-            }
-            definitionAndAnchorMilliseconds = phase.ElapsedMilliseconds;
 
             PhotoMomentGapPolicy momentPolicy =
                 PhotoMomentGapPolicy.CreateTimeGapEvaluation(settings.MomentGapMinutes);
             CreativeCollectionContextPolicy contextPolicy =
                 CreativeCollectionContextPolicy.FromVersion(settings.ContextPolicyVersion);
 
-            IReadOnlyList<AssetRevisionId> anchorRevisionIds = anchorSnapshot.RevisionIds;
             if (anchorRevisionIds.Count == 0)
             {
                 PhotoMomentClusteringResult noMoments = PhotoMomentClusterer.Cluster([], momentPolicy);
@@ -146,7 +293,12 @@ public sealed class CreativeCollectionMaterializationService
                     noMoments,
                     PhotoVisualRedundancyPolicy.AcceptedCreativeV1);
                 return new CreativeCollectionMaterialization(
-                    definition,
+                    anchorKind,
+                    anchorId,
+                    anchorName,
+                    searchAnchor,
+                    searchScope,
+                    searchAnchorHits,
                     noCandidates,
                     noSelection,
                     noVisualRedundancy,
@@ -238,7 +390,12 @@ public sealed class CreativeCollectionMaterializationService
                 totalTimer.ElapsedMilliseconds);
 
             return new CreativeCollectionMaterialization(
-                definition,
+                anchorKind,
+                anchorId,
+                anchorName,
+                searchAnchor,
+                searchScope,
+                searchAnchorHits,
                 generated,
                 selection,
                 visual.Result,

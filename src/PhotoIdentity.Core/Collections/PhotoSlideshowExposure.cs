@@ -16,6 +16,19 @@ public interface IPhotoSlideshowExposureRepository
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> RecordPresentedAsync(
+        Guid sessionId,
+        Guid collectionId,
+        bool creative,
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default) =>
+        RecordPresentedAsync(
+            sessionId,
+            SmartCollectionId.From(collectionId),
+            creative,
+            revisionId,
+            cancellationToken);
+
     Task<IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary>> GetSummariesAsync(
         IEnumerable<AssetRevisionId> revisionIds,
         CancellationToken cancellationToken = default);

@@ -110,17 +110,32 @@ public sealed record SmartCollectionSlideshowSnapshotResponse(
 
 public sealed record SmartCollectionErrorResponse(string Error);
 
+public sealed record CreativeCollectionSearchAnchorRequest(
+    string Query,
+    string Mode = "combined",
+    string? SmartCollectionId = null,
+    int AnchorLimit = 80);
+
 public sealed record CreativeCollectionRecipeRequest(
     int TargetCount = 50,
     string ContextStrength = "balanced",
     bool NoveltyEnabled = false,
-    string? Name = null);
+    string? Name = null,
+    CreativeCollectionSearchAnchorRequest? SearchAnchor = null);
+
+public sealed record CreativeCollectionSearchAnchorResponse(
+    string Query,
+    string Mode,
+    string? SmartCollectionId,
+    string? SmartCollectionName,
+    int AnchorLimit,
+    string PolicyVersion);
 
 public sealed record CreativeCollectionRecipeResponse(
     string Id,
     string Name,
-    string AnchorCollectionId,
-    string AnchorCollectionName,
+    string? AnchorCollectionId,
+    string? AnchorCollectionName,
     int TargetCount,
     int MomentGapMinutes,
     string MomentPolicyVersion,
@@ -131,7 +146,9 @@ public sealed record CreativeCollectionRecipeResponse(
     bool NoveltyEnabled,
     string NoveltyPolicyVersion,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string AnchorKind = "smart-collection",
+    CreativeCollectionSearchAnchorResponse? SearchAnchor = null);
 
 public sealed record CreativeCollectionContextReasonResponse(
     string MomentId,
@@ -164,6 +181,25 @@ public sealed record CreativeCollectionSelectedCandidateResponse(
     CreativeCollectionSelectionReasonResponse[] SelectionReasons,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
+public sealed record CreativeCollectionSearchAnchorPreviewResponse(
+    string Query,
+    string Mode,
+    string? ScopeCollectionId,
+    string? ScopeCollectionName,
+    int? ScopeEligiblePhotoCount,
+    int AnchorLimit,
+    string PolicyVersion);
+
+public sealed record CreativeCollectionSearchAnchorHitResponse(
+    string RevisionId,
+    int Rank,
+    double CombinedScore,
+    double? SemanticScore,
+    double? CaptionScore,
+    string? CaptionLanguage,
+    string? Caption,
+    string[] Sources);
+
 public sealed record CreativeCollectionPreviewResponse(
     string CollectionId,
     string CollectionName,
@@ -183,4 +219,7 @@ public sealed record CreativeCollectionPreviewResponse(
     int RepresentedMomentCount,
     int RepresentedTimePeriodCount,
     CreativeCollectionPreviewCandidateResponse[] Candidates,
-    CreativeCollectionSelectedCandidateResponse[] SelectedCandidates);
+    CreativeCollectionSelectedCandidateResponse[] SelectedCandidates,
+    string AnchorKind = "smart-collection",
+    CreativeCollectionSearchAnchorPreviewResponse? SearchAnchor = null,
+    CreativeCollectionSearchAnchorHitResponse[]? SearchAnchors = null);

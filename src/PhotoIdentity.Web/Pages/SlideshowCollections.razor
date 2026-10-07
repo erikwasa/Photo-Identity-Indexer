@@ -51,12 +51,12 @@
 
         <section class="collection-management-group" aria-labelledby="manage-creative">
             <h2 id="manage-creative">Creative Collections</h2>
-            <p>Edit names and recipes, or delete a Creative Collection. Its source Smart Collection and other recipes remain separate.</p>
+            <p>Edit names and recipes, or delete a Creative Collection. A recipe can use a Smart Collection or a ranked Visual/Caption search as its anchor source.</p>
             <a class="button secondary" href="/creative-collections">Create Creative Collection</a>
             @foreach (var collection in Creative)
             {
                 <a class="collection-management-entry" href="@($"/creative-collections?collection={Uri.EscapeDataString(collection.Id)}")">
-                    <strong>@collection.Name</strong><span>From @collection.AnchorCollectionName · @SlideshowLibraryPresentation.CreativeTargetLabel(collection.TargetCount) · Edit recipe</span>
+                    <strong>@collection.Name</strong><span>@CreativeSourceLabel(collection) · @SlideshowLibraryPresentation.CreativeTargetLabel(collection.TargetCount) · Edit recipe</span>
                 </a>
             }
         </section>
@@ -71,6 +71,19 @@
     private string? Error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static string CreativeSourceLabel(CreativeCollectionRecipeResponse collection)
+    {
+        if (collection.SearchAnchor is CreativeCollectionSearchAnchorResponse search)
+        {
+            string scope = string.IsNullOrWhiteSpace(search.SmartCollectionName)
+                ? "all photos"
+                : search.SmartCollectionName;
+            return $"Search: {search.Query} · {scope}";
+        }
+
+        return $"From {collection.AnchorCollectionName ?? "Smart Collection"}";
+    }
 
     private async Task LoadAsync()
     {

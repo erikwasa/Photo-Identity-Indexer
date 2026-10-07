@@ -14,7 +14,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class NamedCreativeCollectionApplicationTests
 {
     [Fact]
-    public async Task Legacy_singleton_migrates_to_named_collection_and_allows_siblings()
+    public async Task Migrated_legacy_singleton_allows_named_collection_siblings()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -39,6 +39,8 @@ public sealed class NamedCreativeCollectionApplicationTests
                 using PostgresCompatibilityCommand insert = connection.CreateCommand();
                 insert.CommandText = """
                     INSERT INTO creative_collection_recipes (
+                        id,
+                        display_name,
                         anchor_collection_id,
                         target_count,
                         moment_gap_minutes,
@@ -50,6 +52,8 @@ public sealed class NamedCreativeCollectionApplicationTests
                         created_at_utc,
                         updated_at_utc)
                     VALUES (
+                        $anchor,
+                        'Family trips Creative',
                         $anchor,
                         $target,
                         $gap,
