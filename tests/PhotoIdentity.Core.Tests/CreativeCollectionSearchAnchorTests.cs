@@ -33,7 +33,7 @@ public sealed class CreativeCollectionSearchAnchorTests
         CreativeCollectionRecipe searchRecipe = new(
             CreativeCollectionId.New(),
             "Search",
-            AnchorCollectionId: null,
+            null,
             settings.TargetCount,
             settings.MomentGapMinutes,
             settings.MomentPolicyVersion,
