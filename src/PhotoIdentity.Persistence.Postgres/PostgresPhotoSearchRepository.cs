@@ -264,12 +264,15 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
         {
             return [];
         }
+        string scopePredicate = eligibleRevisionGuids is null
+            ? string.Empty
+            : "AND caption.asset_revision_id = ANY(@eligible_revision_ids)";
 
         await EnsureSchemaAsync(cancellationToken);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             WITH current_revisions AS (
                 SELECT revision.id
                 FROM assets AS asset
@@ -292,8 +295,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 FROM photo_generated_captions AS caption
                 INNER JOIN current_revisions AS current
                     ON current.id = caption.asset_revision_id
-                WHERE (@eligible_revision_ids IS NULL
-                       OR caption.asset_revision_id = ANY(@eligible_revision_ids))
+                {scopePredicate}
                 ORDER BY
                     caption.asset_revision_id,
                     caption.language,
@@ -342,10 +344,13 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             """;
         command.Parameters.AddWithValue("query", NpgsqlDbType.Text, query.Trim());
         command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
-        command.Parameters.AddWithValue(
-            "eligible_revision_ids",
-            NpgsqlDbType.Array | NpgsqlDbType.Uuid,
-            (object?)eligibleRevisionGuids ?? DBNull.Value);
+        if (eligibleRevisionGuids is not null)
+        {
+            command.Parameters.AddWithValue(
+                "eligible_revision_ids",
+                NpgsqlDbType.Array | NpgsqlDbType.Uuid,
+                eligibleRevisionGuids);
+        }
 
         List<PhotoSearchCaptionHit> result = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
