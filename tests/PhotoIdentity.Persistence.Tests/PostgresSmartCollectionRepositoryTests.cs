@@ -263,8 +263,60 @@ public sealed class PostgresSmartCollectionRepositoryTests
             Assert.Equal(CreativeCollectionContextPolicy.BroadV1.Version, updated.ContextPolicyVersion);
             Assert.True(updated.NoveltyEnabled);
 
+            CreativeCollectionRecipe scopedSearch = await recipes.CreateSearchAsync(
+                "Swimming search",
+                CreativeCollectionSearchAnchor.Create(
+                    "children swimming",
+                    PhotoSearchModes.Combined,
+                    anchor.Id,
+                    limit: 25),
+                CreativeCollectionRecipeSettings.Create(
+                    50,
+                    CreativeCollectionContextPolicy.BalancedV1.Version));
+            Assert.Null(scopedSearch.AnchorCollectionId);
+            Assert.Equal(CreativeCollectionAnchorKinds.Search, scopedSearch.AnchorKind);
+            Assert.Equal("children swimming", scopedSearch.SearchAnchor?.Query);
+            Assert.Equal(PhotoSearchModes.Combined, scopedSearch.SearchAnchor?.Mode);
+            Assert.Equal(anchor.Id, scopedSearch.SearchAnchor?.ScopeCollectionId);
+            Assert.Equal(25, scopedSearch.SearchAnchor?.Limit);
+
+            CreativeCollectionRecipe unscopedSearch = await recipes.CreateSearchAsync(
+                "Caption search",
+                CreativeCollectionSearchAnchor.Create(
+                    "birthday cake",
+                    PhotoSearchModes.Caption,
+                    limit: 10),
+                CreativeCollectionRecipeSettings.Create(
+                    30,
+                    CreativeCollectionContextPolicy.FocusedV1.Version));
+            CreativeCollectionRecipe reopenedSearch =
+                await recipes.GetAsync(unscopedSearch.Id)
+                ?? throw new InvalidOperationException();
+            Assert.Null(reopenedSearch.SearchAnchor?.ScopeCollectionId);
+            Assert.Equal(PhotoSearchModes.Caption, reopenedSearch.SearchAnchor?.Mode);
+            Assert.Equal(10, reopenedSearch.SearchAnchor?.Limit);
+
+            CreativeCollectionRecipe changedSearch = await recipes.UpdateSearchAsync(
+                unscopedSearch.Id,
+                "Caption search updated",
+                CreativeCollectionSearchAnchor.Create(
+                    "birthday candles",
+                    PhotoSearchModes.Caption,
+                    limit: 12),
+                CreativeCollectionRecipeSettings.Create(
+                    35,
+                    CreativeCollectionContextPolicy.BalancedV1.Version));
+            Assert.Equal("Caption search updated", changedSearch.Name);
+            Assert.Equal("birthday candles", changedSearch.SearchAnchor?.Query);
+            Assert.Equal(12, changedSearch.SearchAnchor?.Limit);
+            Assert.Equal(35, changedSearch.TargetCount);
+            Assert.Equal(3, (await recipes.ListAsync()).Count);
+
             Assert.True(await definitions.DeleteAsync(anchor.Id));
             Assert.Null(await recipes.GetAsync(anchor.Id));
+            Assert.Null(await recipes.GetAsync(scopedSearch.Id));
+            Assert.NotNull(await recipes.GetAsync(unscopedSearch.Id));
+            Assert.True(await recipes.DeleteAsync(unscopedSearch.Id));
         }
         finally
         {
@@ -445,12 +497,17 @@ public sealed class PostgresSmartCollectionRepositoryTests
                 collection.Id,
                 creative: true,
                 revisionId));
+            Assert.True(await repository.RecordPresentedAsync(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                creative: true,
+                revisionId));
 
             IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> summaries =
                 await repository.GetSummariesAsync([revisionId]);
             PhotoSlideshowExposureSummary summary = Assert.Single(summaries).Value;
             Assert.Equal(revisionId, summary.RevisionId);
-            Assert.Equal(2, summary.ShowCount);
+            Assert.Equal(3, summary.ShowCount);
             Assert.NotNull(summary.LastShownAtUtc);
         }
         finally
