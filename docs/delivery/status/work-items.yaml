@@ -104,9 +104,12 @@ work_items:
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0186-scoped-semantic-caption-search.md
+  started_at: 2026-10-07
+  last_updated_at: 2026-10-07
+  branch: agent/WI-0186-scoped-semantic-caption-search
   blockers: []
   blocker_notes: []
   evidence:
