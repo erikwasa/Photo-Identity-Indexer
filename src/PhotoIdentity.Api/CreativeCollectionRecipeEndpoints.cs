@@ -2,17 +2,32 @@ using PhotoIdentity.Core.Collections;
 
 namespace PhotoIdentity.Api;
 
+public sealed record CreativeCollectionSearchAnchorRequest(
+    string Query,
+    string Mode = PhotoSearchModes.Combined,
+    string? SmartCollectionId = null,
+    int AnchorLimit = CreativeCollectionSearchAnchor.DefaultLimit);
+
 public sealed record CreativeCollectionRecipeRequest(
     int TargetCount = CreativeCollectionRecipe.DefaultTargetCount,
     string ContextStrength = "balanced",
     bool NoveltyEnabled = false,
-    string? Name = null);
+    string? Name = null,
+    CreativeCollectionSearchAnchorRequest? SearchAnchor = null);
+
+public sealed record CreativeCollectionSearchAnchorResponse(
+    string Query,
+    string Mode,
+    string? SmartCollectionId,
+    string? SmartCollectionName,
+    int AnchorLimit,
+    string PolicyVersion);
 
 public sealed record CreativeCollectionRecipeResponse(
     string Id,
     string Name,
-    string AnchorCollectionId,
-    string AnchorCollectionName,
+    string? AnchorCollectionId,
+    string? AnchorCollectionName,
     int TargetCount,
     int MomentGapMinutes,
     string MomentPolicyVersion,
@@ -23,7 +38,9 @@ public sealed record CreativeCollectionRecipeResponse(
     bool NoveltyEnabled,
     string NoveltyPolicyVersion,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string AnchorKind = CreativeCollectionAnchorKinds.SmartCollection,
+    CreativeCollectionSearchAnchorResponse? SearchAnchor = null);
 
 public static class CreativeCollectionRecipeEndpoints
 {
@@ -31,6 +48,7 @@ public static class CreativeCollectionRecipeEndpoints
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/creative-collections", ListAsync);
+        endpoints.MapPost("/api/creative-collections", CreateSearchAsync);
         endpoints.MapGet("/api/creative-collections/{id:guid}", GetByIdAsync);
         endpoints.MapPut("/api/creative-collections/{id:guid}", UpdateByIdAsync);
         endpoints.MapDelete("/api/creative-collections/{id:guid}", DeleteByIdAsync);
@@ -76,7 +94,7 @@ public static class CreativeCollectionRecipeEndpoints
 
         IReadOnlyList<CreativeCollectionRecipe> items =
             await recipes.ListForAnchorAsync(collectionId, cancellationToken);
-        return Results.Ok(items.Select(recipe => ToResponse(recipe, definition.Name)).ToArray());
+        return Results.Ok(items.Select(recipe => ToResponse(recipe, definition.Name, null)).ToArray());
     }
 
     private static async Task<IResult> GetByIdAsync(
@@ -96,11 +114,51 @@ public static class CreativeCollectionRecipeEndpoints
             return Results.NotFound();
         }
 
-        SmartCollectionDefinition? definition =
-            await definitions.GetAsync(recipe.AnchorCollectionId, cancellationToken);
-        return definition is null
-            ? Results.NotFound()
-            : Results.Ok(ToResponse(recipe, definition.Name));
+        CreativeCollectionRecipeResponse? response =
+            await ToResponseAsync(recipe, definitions, cancellationToken);
+        return response is null ? Results.NotFound() : Results.Ok(response);
+    }
+
+    private static async Task<IResult> CreateSearchAsync(
+        CreativeCollectionRecipeRequest request,
+        ISmartCollectionRepository definitions,
+        ICreativeCollectionRecipeRepository recipes,
+        CancellationToken cancellationToken)
+    {
+        if (request.SearchAnchor is null)
+        {
+            return Results.BadRequest(new
+            {
+                error = "Creating a Creative Collection without a Smart Collection route requires a search anchor.",
+            });
+        }
+
+        try
+        {
+            string name = CreativeCollectionName.Parse(request.Name ?? string.Empty).DisplayValue;
+            CreativeCollectionSearchAnchor searchAnchor = ParseSearchAnchor(request.SearchAnchor);
+            SmartCollectionDefinition? scope = await ResolveScopeDefinitionAsync(
+                searchAnchor,
+                definitions,
+                cancellationToken);
+            if (searchAnchor.ScopeCollectionId is not null && scope is null)
+            {
+                return Results.NotFound(new { error = "The selected Smart Collection search scope was not found." });
+            }
+
+            CreativeCollectionRecipe recipe = await recipes.CreateSearchAsync(
+                name,
+                searchAnchor,
+                Settings(request),
+                cancellationToken);
+            return Results.Created(
+                $"/api/creative-collections/{recipe.Id}",
+                ToResponse(recipe, null, scope?.Name));
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
     }
 
     private static async Task<IResult> CreateForAnchorAsync(
@@ -113,6 +171,13 @@ public static class CreativeCollectionRecipeEndpoints
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
         {
             return error!;
+        }
+        if (request.SearchAnchor is not null)
+        {
+            return Results.BadRequest(new
+            {
+                error = "A Smart-anchored Creative Collection cannot also define a search anchor.",
+            });
         }
 
         SmartCollectionDefinition? definition = await definitions.GetAsync(collectionId, cancellationToken);
@@ -129,7 +194,9 @@ public static class CreativeCollectionRecipeEndpoints
                 name,
                 Settings(request),
                 cancellationToken);
-            return Results.Created($"/api/creative-collections/{recipe.Id}", ToResponse(recipe, definition.Name));
+            return Results.Created(
+                $"/api/creative-collections/{recipe.Id}",
+                ToResponse(recipe, definition.Name, null));
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
         {
@@ -155,19 +222,69 @@ public static class CreativeCollectionRecipeEndpoints
             return Results.NotFound();
         }
 
-        SmartCollectionDefinition? definition =
-            await definitions.GetAsync(existing.AnchorCollectionId, cancellationToken);
-        if (definition is null)
-        {
-            return Results.NotFound();
-        }
-
         try
         {
             string name = CreativeCollectionName.Parse(request.Name ?? string.Empty).DisplayValue;
-            CreativeCollectionRecipe recipe =
-                await recipes.UpdateAsync(creativeId, name, Settings(request), cancellationToken);
-            return Results.Ok(ToResponse(recipe, definition.Name));
+            CreativeCollectionRecipe recipe;
+            string? smartAnchorName = null;
+            string? searchScopeName = null;
+
+            if (existing.SearchAnchor is not null)
+            {
+                if (request.SearchAnchor is null)
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "A search-anchored Creative Collection must retain its search anchor.",
+                    });
+                }
+
+                CreativeCollectionSearchAnchor searchAnchor = ParseSearchAnchor(request.SearchAnchor);
+                SmartCollectionDefinition? scope = await ResolveScopeDefinitionAsync(
+                    searchAnchor,
+                    definitions,
+                    cancellationToken);
+                if (searchAnchor.ScopeCollectionId is not null && scope is null)
+                {
+                    return Results.NotFound(new { error = "The selected Smart Collection search scope was not found." });
+                }
+
+                recipe = await recipes.UpdateSearchAsync(
+                    creativeId,
+                    name,
+                    searchAnchor,
+                    Settings(request),
+                    cancellationToken);
+                searchScopeName = scope?.Name;
+            }
+            else
+            {
+                if (request.SearchAnchor is not null)
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "Changing an existing Smart anchor into a search anchor is not supported. Create a new Creative Collection instead.",
+                    });
+                }
+
+                SmartCollectionId anchorId = existing.AnchorCollectionId
+                    ?? throw new InvalidDataException("Smart-anchored Creative Collection is missing its anchor.");
+                SmartCollectionDefinition? definition =
+                    await definitions.GetAsync(anchorId, cancellationToken);
+                if (definition is null)
+                {
+                    return Results.NotFound();
+                }
+
+                recipe = await recipes.UpdateAsync(
+                    creativeId,
+                    name,
+                    Settings(request),
+                    cancellationToken);
+                smartAnchorName = definition.Name;
+            }
+
+            return Results.Ok(ToResponse(recipe, smartAnchorName, searchScopeName));
         }
         catch (KeyNotFoundException)
         {
@@ -213,10 +330,8 @@ public static class CreativeCollectionRecipeEndpoints
 
         return await CreativeCollectionPreviewEndpoints.WithMaterializationDeadlineAsync(async token =>
         {
-            CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-                recipe.AnchorCollectionId,
-                Settings(recipe),
-                token);
+            CreativeCollectionMaterialization? materialized =
+                await materializer.MaterializeAsync(recipe, token);
             if (materialized is null)
             {
                 return Results.NotFound();
@@ -271,7 +386,9 @@ public static class CreativeCollectionRecipeEndpoints
         }
 
         CreativeCollectionRecipe? recipe = await recipes.GetAsync(collectionId, cancellationToken);
-        return recipe is null ? Results.NotFound() : Results.Ok(ToResponse(recipe, definition.Name));
+        return recipe is null
+            ? Results.NotFound()
+            : Results.Ok(ToResponse(recipe, definition.Name, null));
     }
 
     private static async Task<IResult> UpsertAsync(
@@ -284,6 +401,13 @@ public static class CreativeCollectionRecipeEndpoints
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
         {
             return error!;
+        }
+        if (request.SearchAnchor is not null)
+        {
+            return Results.BadRequest(new
+            {
+                error = "The legacy Smart Collection recipe route does not accept a search anchor.",
+            });
         }
 
         SmartCollectionDefinition? definition = await definitions.GetAsync(collectionId, cancellationToken);
@@ -309,7 +433,7 @@ public static class CreativeCollectionRecipeEndpoints
                 recipe = await recipes.UpsertAsync(collectionId, Settings(request), cancellationToken);
             }
 
-            return Results.Ok(ToResponse(recipe, definition.Name));
+            return Results.Ok(ToResponse(recipe, definition.Name, null));
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
         {
@@ -351,10 +475,8 @@ public static class CreativeCollectionRecipeEndpoints
 
         return await CreativeCollectionPreviewEndpoints.WithMaterializationDeadlineAsync(async token =>
         {
-            CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-                collectionId,
-                Settings(recipe),
-                token);
+            CreativeCollectionMaterialization? materialized =
+                await materializer.MaterializeAsync(collectionId, Settings(recipe), token);
             return materialized is null
                 ? Results.NotFound()
                 : Results.Ok(CreativeCollectionPreviewEndpoints.ToPreviewResponse(materialized));
@@ -393,10 +515,8 @@ public static class CreativeCollectionRecipeEndpoints
     {
         return await CreativeCollectionPreviewEndpoints.WithMaterializationDeadlineAsync(async token =>
         {
-            CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-                recipe.AnchorCollectionId,
-                Settings(recipe),
-                token);
+            CreativeCollectionMaterialization? materialized =
+                await materializer.MaterializeAsync(recipe, token);
             if (materialized is null)
             {
                 return Results.NotFound();
@@ -433,6 +553,37 @@ public static class CreativeCollectionRecipeEndpoints
         recipe.OrderingPolicyVersion,
         recipe.NoveltyEnabled);
 
+    private static CreativeCollectionSearchAnchor ParseSearchAnchor(
+        CreativeCollectionSearchAnchorRequest request)
+    {
+        SmartCollectionId? scopeId = null;
+        if (!string.IsNullOrWhiteSpace(request.SmartCollectionId))
+        {
+            if (!Guid.TryParse(request.SmartCollectionId.Trim(), out Guid parsed) || parsed == Guid.Empty)
+            {
+                throw new ArgumentException(
+                    "Search anchor Smart Collection scope must be a valid non-empty GUID.",
+                    nameof(request));
+            }
+
+            scopeId = SmartCollectionId.From(parsed);
+        }
+
+        return CreativeCollectionSearchAnchor.Create(
+            request.Query,
+            request.Mode,
+            scopeId,
+            request.AnchorLimit);
+    }
+
+    private static async Task<SmartCollectionDefinition?> ResolveScopeDefinitionAsync(
+        CreativeCollectionSearchAnchor searchAnchor,
+        ISmartCollectionRepository definitions,
+        CancellationToken cancellationToken) =>
+        searchAnchor.ScopeCollectionId is SmartCollectionId scopeId
+            ? await definitions.GetAsync(scopeId, cancellationToken)
+            : null;
+
     private static async Task<CreativeCollectionRecipeResponse[]> ToResponsesAsync(
         IReadOnlyList<CreativeCollectionRecipe> recipes,
         ISmartCollectionRepository definitions,
@@ -441,37 +592,82 @@ public static class CreativeCollectionRecipeEndpoints
         List<CreativeCollectionRecipeResponse> responses = [];
         foreach (CreativeCollectionRecipe recipe in recipes)
         {
-            SmartCollectionDefinition? definition =
-                await definitions.GetAsync(recipe.AnchorCollectionId, cancellationToken);
-            if (definition is not null)
+            CreativeCollectionRecipeResponse? response =
+                await ToResponseAsync(recipe, definitions, cancellationToken);
+            if (response is not null)
             {
-                responses.Add(ToResponse(recipe, definition.Name));
+                responses.Add(response);
             }
         }
 
         return responses.ToArray();
     }
 
+    private static async Task<CreativeCollectionRecipeResponse?> ToResponseAsync(
+        CreativeCollectionRecipe recipe,
+        ISmartCollectionRepository definitions,
+        CancellationToken cancellationToken)
+    {
+        if (recipe.AnchorCollectionId is SmartCollectionId anchorId)
+        {
+            SmartCollectionDefinition? definition =
+                await definitions.GetAsync(anchorId, cancellationToken);
+            return definition is null
+                ? null
+                : ToResponse(recipe, definition.Name, null);
+        }
+
+        string? scopeName = null;
+        if (recipe.SearchAnchor?.ScopeCollectionId is SmartCollectionId scopeId)
+        {
+            SmartCollectionDefinition? scope =
+                await definitions.GetAsync(scopeId, cancellationToken);
+            if (scope is null)
+            {
+                return null;
+            }
+            scopeName = scope.Name;
+        }
+
+        return ToResponse(recipe, null, scopeName);
+    }
+
     private static CreativeCollectionRecipeResponse ToResponse(
         CreativeCollectionRecipe recipe,
-        string anchorCollectionName) => new(
-        recipe.Id.ToString(),
-        recipe.Name,
-        recipe.AnchorCollectionId.ToString(),
-        anchorCollectionName,
-        recipe.TargetCount,
-        recipe.MomentGapMinutes,
-        recipe.MomentPolicyVersion,
-        CreativeCollectionContextPolicy.StrengthForVersion(recipe.ContextPolicyVersion),
-        recipe.ContextPolicyVersion,
-        recipe.SelectionPolicyVersion,
-        recipe.OrderingPolicyVersion,
-        recipe.NoveltyEnabled,
-        recipe.NoveltyEnabled
-            ? CreativeCollectionNoveltyPolicies.BalancedV1
-            : CreativeCollectionNoveltyPolicies.Disabled,
-        recipe.CreatedAtUtc,
-        recipe.UpdatedAtUtc);
+        string? anchorCollectionName,
+        string? searchScopeName)
+    {
+        CreativeCollectionSearchAnchorResponse? searchAnchor = recipe.SearchAnchor is null
+            ? null
+            : new CreativeCollectionSearchAnchorResponse(
+                recipe.SearchAnchor.Query,
+                recipe.SearchAnchor.Mode,
+                recipe.SearchAnchor.ScopeCollectionId?.ToString(),
+                searchScopeName,
+                recipe.SearchAnchor.Limit,
+                recipe.SearchAnchor.PolicyVersion);
+
+        return new CreativeCollectionRecipeResponse(
+            recipe.Id.ToString(),
+            recipe.Name,
+            recipe.AnchorCollectionId?.ToString(),
+            anchorCollectionName,
+            recipe.TargetCount,
+            recipe.MomentGapMinutes,
+            recipe.MomentPolicyVersion,
+            CreativeCollectionContextPolicy.StrengthForVersion(recipe.ContextPolicyVersion),
+            recipe.ContextPolicyVersion,
+            recipe.SelectionPolicyVersion,
+            recipe.OrderingPolicyVersion,
+            recipe.NoveltyEnabled,
+            recipe.NoveltyEnabled
+                ? CreativeCollectionNoveltyPolicies.BalancedV1
+                : CreativeCollectionNoveltyPolicies.Disabled,
+            recipe.CreatedAtUtc,
+            recipe.UpdatedAtUtc,
+            recipe.AnchorKind,
+            searchAnchor);
+    }
 
     private static bool TryGetId(Guid id, out SmartCollectionId collectionId, out IResult? error)
     {
