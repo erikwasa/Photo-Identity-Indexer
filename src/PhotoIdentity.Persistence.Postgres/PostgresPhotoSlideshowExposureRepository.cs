@@ -20,9 +20,22 @@ public sealed class PostgresPhotoSlideshowExposureRepository : IPhotoSlideshowEx
         _timeProvider = timeProvider;
     }
 
-    public async Task<bool> RecordPresentedAsync(
+    public Task<bool> RecordPresentedAsync(
         Guid sessionId,
         SmartCollectionId collectionId,
+        bool creative,
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default) =>
+        RecordPresentedAsync(
+            sessionId,
+            collectionId.Value,
+            creative,
+            revisionId,
+            cancellationToken);
+
+    public async Task<bool> RecordPresentedAsync(
+        Guid sessionId,
+        Guid collectionId,
         bool creative,
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
@@ -30,6 +43,10 @@ public sealed class PostgresPhotoSlideshowExposureRepository : IPhotoSlideshowEx
         if (sessionId == Guid.Empty)
         {
             throw new ArgumentException("Slideshow session identifier cannot be empty.", nameof(sessionId));
+        }
+        if (collectionId == Guid.Empty)
+        {
+            throw new ArgumentException("Slideshow collection identifier cannot be empty.", nameof(collectionId));
         }
 
         DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
@@ -52,7 +69,7 @@ public sealed class PostgresPhotoSlideshowExposureRepository : IPhotoSlideshowEx
             """;
         command.Parameters.AddWithValue("session_id", NpgsqlDbType.Uuid, sessionId);
         command.Parameters.AddWithValue("revision_id", NpgsqlDbType.Uuid, revisionId.Value);
-        command.Parameters.AddWithValue("collection_id", NpgsqlDbType.Uuid, collectionId.Value);
+        command.Parameters.AddWithValue("collection_id", NpgsqlDbType.Uuid, collectionId);
         command.Parameters.AddWithValue("creative", NpgsqlDbType.Boolean, creative);
         command.Parameters.AddWithValue("shown_at_utc", NpgsqlDbType.TimestampTz, now);
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
