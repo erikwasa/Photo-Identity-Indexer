@@ -88,10 +88,87 @@ public static class CreativeCollectionOrderingPolicies
     public const string ChronologicalV1 = "m26-creative-order-chronological-v1";
 }
 
+public static class CreativeCollectionAnchorKinds
+{
+    public const string SmartCollection = "smart-collection";
+    public const string Search = "search";
+}
+
+public static class CreativeCollectionAnchorPolicies
+{
+    public const string SmartCollectionV1 = "m26-smart-collection-anchor-v1";
+    public const string SearchRankedTopNV1 = "m36-search-ranked-top-n-v1";
+}
+
+public sealed record CreativeCollectionSearchAnchor(
+    string Query,
+    string Mode,
+    SmartCollectionId? ScopeCollectionId,
+    int Limit,
+    string PolicyVersion)
+{
+    public const int DefaultLimit = 80;
+    public const int MaximumLimit = 250;
+
+    public static CreativeCollectionSearchAnchor Create(
+        string query,
+        string? mode = null,
+        SmartCollectionId? scopeCollectionId = null,
+        int limit = DefaultLimit)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        string normalizedQuery = query.Trim();
+        if (normalizedQuery.Length > 300)
+        {
+            throw new ArgumentException(
+                "Creative Collection search query cannot exceed 300 characters.",
+                nameof(query));
+        }
+
+        if (limit is < 1 or > MaximumLimit)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(limit),
+                $"Creative Collection search anchor limit must be between 1 and {MaximumLimit}.");
+        }
+
+        return new CreativeCollectionSearchAnchor(
+            normalizedQuery,
+            PhotoSearchModes.Normalize(mode),
+            scopeCollectionId,
+            limit,
+            CreativeCollectionAnchorPolicies.SearchRankedTopNV1);
+    }
+
+    public void ValidateSupported()
+    {
+        CreativeCollectionSearchAnchor normalized = Create(
+            Query,
+            Mode,
+            ScopeCollectionId,
+            Limit);
+        if (!string.Equals(
+                PolicyVersion,
+                CreativeCollectionAnchorPolicies.SearchRankedTopNV1,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Creative Collection search anchor policy '{PolicyVersion}' is not supported.");
+        }
+
+        if (!string.Equals(Query, normalized.Query, StringComparison.Ordinal) ||
+            !string.Equals(Mode, normalized.Mode, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Creative Collection search anchor query or mode is not normalized.");
+        }
+    }
+}
+
 public sealed record CreativeCollectionRecipe(
     CreativeCollectionId Id,
     string Name,
-    SmartCollectionId AnchorCollectionId,
+    SmartCollectionId? AnchorCollectionId,
     int TargetCount,
     int MomentGapMinutes,
     string MomentPolicyVersion,
@@ -100,8 +177,25 @@ public sealed record CreativeCollectionRecipe(
     string OrderingPolicyVersion,
     bool NoveltyEnabled,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc)
+    DateTimeOffset UpdatedAtUtc,
+    CreativeCollectionSearchAnchor? SearchAnchor = null)
 {
+    public string AnchorKind =>
+        SearchAnchor is null
+            ? CreativeCollectionAnchorKinds.SmartCollection
+            : CreativeCollectionAnchorKinds.Search;
+
+    public void ValidateAnchorSupported()
+    {
+        if ((AnchorCollectionId is null) == (SearchAnchor is null))
+        {
+            throw new InvalidDataException(
+                "Creative Collection recipes must have exactly one anchor source.");
+        }
+
+        SearchAnchor?.ValidateSupported();
+    }
+
     public const int DefaultTargetCount = 50;
     public const int DefaultMomentGapMinutes = 30;
 
