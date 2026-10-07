@@ -49,6 +49,7 @@ public static class CreativeCollectionRecipeEndpoints
     {
         endpoints.MapGet("/api/creative-collections", ListAsync);
         endpoints.MapPost("/api/creative-collections", CreateSearchAsync);
+        endpoints.MapPost("/api/creative-collections/preview", PreviewSearchAsync);
         endpoints.MapGet("/api/creative-collections/{id:guid}", GetByIdAsync);
         endpoints.MapPut("/api/creative-collections/{id:guid}", UpdateByIdAsync);
         endpoints.MapDelete("/api/creative-collections/{id:guid}", DeleteByIdAsync);
@@ -154,6 +155,68 @@ public static class CreativeCollectionRecipeEndpoints
             return Results.Created(
                 $"/api/creative-collections/{recipe.Id}",
                 ToResponse(recipe, null, scope?.Name));
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
+        {
+            return Results.BadRequest(new { error = exception.Message });
+        }
+    }
+
+    private static async Task<IResult> PreviewSearchAsync(
+        CreativeCollectionRecipeRequest request,
+        ISmartCollectionRepository definitions,
+        CreativeCollectionMaterializationService materializer,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (request.SearchAnchor is null)
+        {
+            return Results.BadRequest(new { error = "A search anchor is required for a search Creative Collection preview." });
+        }
+
+        try
+        {
+            CreativeCollectionSearchAnchor searchAnchor = ParseSearchAnchor(request.SearchAnchor);
+            SmartCollectionDefinition? scope = await ResolveScopeDefinitionAsync(
+                searchAnchor,
+                definitions,
+                cancellationToken);
+            if (searchAnchor.ScopeCollectionId is not null && scope is null)
+            {
+                return Results.NotFound(new { error = "The selected Smart Collection search scope was not found." });
+            }
+
+            CreativeCollectionRecipeSettings settings = Settings(request);
+            DateTimeOffset now = timeProvider.GetUtcNow().ToUniversalTime();
+            CreativeCollectionRecipe transient = new(
+                CreativeCollectionId.New(),
+                string.IsNullOrWhiteSpace(request.Name)
+                    ? "Search Creative preview"
+                    : CreativeCollectionName.Parse(request.Name).DisplayValue,
+                AnchorCollectionId: null,
+                settings.TargetCount,
+                settings.MomentGapMinutes,
+                settings.MomentPolicyVersion,
+                settings.ContextPolicyVersion,
+                settings.SelectionPolicyVersion,
+                settings.OrderingPolicyVersion,
+                settings.NoveltyEnabled,
+                now,
+                now,
+                searchAnchor);
+
+            return await CreativeCollectionPreviewEndpoints.WithMaterializationDeadlineAsync(async token =>
+            {
+                CreativeCollectionMaterialization? materialized =
+                    await materializer.MaterializeAsync(transient, token);
+                return materialized is null
+                    ? Results.NotFound()
+                    : Results.Ok(CreativeCollectionPreviewEndpoints.ToPreviewResponse(materialized));
+            }, cancellationToken);
+        }
+        catch (PhotoSearchScopeNotFoundException)
+        {
+            return Results.NotFound(new { error = "The selected Smart Collection search scope was not found." });
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
         {
