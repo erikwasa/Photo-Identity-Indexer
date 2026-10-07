@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 31;
+    public const int CurrentSchemaVersion = 32;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1296,7 +1296,87 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
 
             CREATE INDEX ix_photo_list_collection_items_revision
                 ON photo_list_collection_items (asset_revision_id);
-            """),
+            """),,
+        new(32, "creative-collection-search-anchors", """
+            ALTER TABLE creative_collection_recipes
+                ADD COLUMN IF NOT EXISTS id uuid NULL,
+                ADD COLUMN IF NOT EXISTS display_name text NULL,
+                ADD COLUMN IF NOT EXISTS anchor_kind text NOT NULL DEFAULT 'smart-collection',
+                ADD COLUMN IF NOT EXISTS search_query text NULL,
+                ADD COLUMN IF NOT EXISTS search_mode text NULL,
+                ADD COLUMN IF NOT EXISTS search_scope_collection_id uuid NULL,
+                ADD COLUMN IF NOT EXISTS search_anchor_limit integer NULL,
+                ADD COLUMN IF NOT EXISTS anchor_policy_version text NOT NULL DEFAULT 'm26-smart-collection-anchor-v1';
+
+            UPDATE creative_collection_recipes AS recipe
+            SET id = COALESCE(recipe.id, recipe.anchor_collection_id),
+                display_name = COALESCE(
+                    recipe.display_name,
+                    left(collection.display_name, 111) || ' Creative')
+            FROM smart_collections AS collection
+            WHERE collection.id = recipe.anchor_collection_id
+              AND (recipe.id IS NULL OR recipe.display_name IS NULL);
+
+            UPDATE creative_collection_recipes
+            SET display_name = 'Creative Collection'
+            WHERE display_name IS NULL;
+
+            ALTER TABLE creative_collection_recipes
+                ALTER COLUMN id SET NOT NULL,
+                ALTER COLUMN display_name SET NOT NULL,
+                ALTER COLUMN anchor_collection_id DROP NOT NULL;
+
+            ALTER TABLE creative_collection_recipes
+                DROP CONSTRAINT IF EXISTS creative_collection_recipes_pkey;
+            ALTER TABLE creative_collection_recipes
+                ADD CONSTRAINT creative_collection_recipes_pkey PRIMARY KEY (id);
+
+            ALTER TABLE creative_collection_recipes
+                DROP CONSTRAINT IF EXISTS ck_creative_collection_recipes_display_name;
+            ALTER TABLE creative_collection_recipes
+                ADD CONSTRAINT ck_creative_collection_recipes_display_name
+                CHECK (char_length(btrim(display_name)) BETWEEN 1 AND 120);
+
+            ALTER TABLE creative_collection_recipes
+                DROP CONSTRAINT IF EXISTS fk_creative_collection_recipe_search_scope;
+            ALTER TABLE creative_collection_recipes
+                ADD CONSTRAINT fk_creative_collection_recipe_search_scope
+                FOREIGN KEY (search_scope_collection_id)
+                REFERENCES smart_collections (id) ON DELETE CASCADE;
+
+            ALTER TABLE creative_collection_recipes
+                DROP CONSTRAINT IF EXISTS ck_creative_collection_recipes_anchor_shape;
+            ALTER TABLE creative_collection_recipes
+                ADD CONSTRAINT ck_creative_collection_recipes_anchor_shape
+                CHECK (
+                    (
+                        anchor_kind = 'smart-collection'
+                        AND anchor_collection_id IS NOT NULL
+                        AND search_query IS NULL
+                        AND search_mode IS NULL
+                        AND search_scope_collection_id IS NULL
+                        AND search_anchor_limit IS NULL
+                        AND anchor_policy_version = 'm26-smart-collection-anchor-v1'
+                    )
+                    OR
+                    (
+                        anchor_kind = 'search'
+                        AND anchor_collection_id IS NULL
+                        AND char_length(btrim(search_query)) BETWEEN 1 AND 300
+                        AND search_mode IN ('semantic', 'caption', 'combined')
+                        AND search_anchor_limit BETWEEN 1 AND 250
+                        AND anchor_policy_version = 'm36-search-ranked-top-n-v1'
+                    ));
+
+            CREATE INDEX IF NOT EXISTS ix_creative_collection_recipes_anchor
+                ON creative_collection_recipes (anchor_collection_id, created_at_utc, id);
+            CREATE INDEX IF NOT EXISTS ix_creative_collection_recipes_search_scope
+                ON creative_collection_recipes (search_scope_collection_id, created_at_utc, id)
+                WHERE anchor_kind = 'search';
+
+            ALTER TABLE photo_slideshow_exposures
+                DROP CONSTRAINT IF EXISTS fk_photo_slideshow_exposure_collection;
+            """)
     ];
 
     private readonly NpgsqlDataSource _dataSource;
