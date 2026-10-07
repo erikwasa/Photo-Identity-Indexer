@@ -19,6 +19,20 @@ Caption retrieval uses only displayable WI-0128 evidence: stored caption rows wi
 
 Combined results use reciprocal-rank fusion. Semantic cosine and caption text scores remain independently visible instead of being presented as if they share one calibrated numeric scale.
 
+## Smart Collection scoped search
+
+WI-0186 adds an optional saved Smart Collection scope to the normal Search page. The Smart Collection remains an exact eligibility filter; Visual/CLIP and caption evidence only rank photos that currently satisfy that saved definition.
+
+The browser sends only the Smart Collection identifier. The API resolves the definition and evaluates it server-side, then:
+
+- Visual search ignores embeddings outside the eligible revision set before its bounded top-k selection;
+- caption search applies the same revision set inside PostgreSQL before caption ranking;
+- Combined search fuses only those already-scoped Visual and Caption result lists.
+
+The response reports the selected Smart Collection name and current eligible-photo count. A collection with zero eligible photos is therefore distinct from a non-empty scope where the natural-language query found no ranked matches. Clearing the scope restores the existing full-library search.
+
+Scoped search does not change the WI-0162 save boundary. Saving selected results still creates an explicit ordered photo-list collection whose revision membership is frozen at save time; the Smart Collection ID and search query are not persisted as a live collection definition.
+
 ## Supported query language
 
 The archive-scale WI-0162 evaluation measured the pinned CLIP path on the same paired English and Swedish concepts. English visual search was strong while raw Swedish text through the same CLIP encoder was not consistently useful.
