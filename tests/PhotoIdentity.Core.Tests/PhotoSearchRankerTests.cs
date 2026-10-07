@@ -111,6 +111,58 @@ public sealed class PhotoSearchRankerTests
         Assert.Equal(1000, result.Count);
     }
 
+
+    [Fact]
+    public void Semantic_scope_is_applied_before_bounded_top_k()
+    {
+        AssetRevisionId outside = Revision("00000000-0000-0000-0000-000000000040");
+        AssetRevisionId eligible = Revision("00000000-0000-0000-0000-000000000041");
+        Dictionary<AssetRevisionId, PhotoEmbeddingEvidence> embeddings = new()
+        {
+            [outside] = new PhotoEmbeddingEvidence(
+                outside,
+                "model",
+                new string('a', 64),
+                "preprocess-v1",
+                [1f, 0f]),
+            [eligible] = new PhotoEmbeddingEvidence(
+                eligible,
+                "model",
+                new string('a', 64),
+                "preprocess-v1",
+                [0.8f, 0.6f]),
+        };
+
+        PhotoSearchSemanticHit hit = Assert.Single(PhotoSearchSemanticRanker.Find(
+            embeddings,
+            [1f, 0f],
+            candidateCount: 1,
+            eligibleRevisionIds: new HashSet<AssetRevisionId> { eligible }));
+
+        Assert.Equal(eligible, hit.RevisionId);
+    }
+
+    [Fact]
+    public void Empty_semantic_scope_returns_no_hits()
+    {
+        AssetRevisionId revision = Revision("00000000-0000-0000-0000-000000000042");
+        Dictionary<AssetRevisionId, PhotoEmbeddingEvidence> embeddings = new()
+        {
+            [revision] = new PhotoEmbeddingEvidence(
+                revision,
+                "model",
+                new string('a', 64),
+                "preprocess-v1",
+                [1f, 0f]),
+        };
+
+        Assert.Empty(PhotoSearchSemanticRanker.Find(
+            embeddings,
+            [1f, 0f],
+            candidateCount: 10,
+            eligibleRevisionIds: new HashSet<AssetRevisionId>()));
+    }
+
     private static AssetRevisionId Revision(string value) =>
         AssetRevisionId.From(Guid.Parse(value));
 }
