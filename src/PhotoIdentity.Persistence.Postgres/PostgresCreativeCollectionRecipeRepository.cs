@@ -442,12 +442,12 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
     {
         command.Parameters.AddWithValue("search_query", searchAnchor.Query);
         command.Parameters.AddWithValue("search_mode", searchAnchor.Mode);
-        command.Parameters.AddWithValue(
+        NpgsqlParameter scopeParameter = command.Parameters.Add(
             "search_scope_collection_id",
-            NpgsqlDbType.Uuid,
-            searchAnchor.ScopeCollectionId is SmartCollectionId scope
-                ? scope.Value
-                : DBNull.Value);
+            NpgsqlDbType.Uuid);
+        scopeParameter.Value = searchAnchor.ScopeCollectionId is SmartCollectionId scope
+            ? scope.Value
+            : DBNull.Value;
         command.Parameters.AddWithValue(
             "search_anchor_limit",
             NpgsqlDbType.Integer,
