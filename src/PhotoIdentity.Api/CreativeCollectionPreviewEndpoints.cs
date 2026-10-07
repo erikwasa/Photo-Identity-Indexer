@@ -35,6 +35,25 @@ public sealed record CreativeCollectionSelectedCandidateResponse(
     CreativeCollectionSelectionReasonResponse[] SelectionReasons,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
+public sealed record CreativeCollectionSearchAnchorPreviewResponse(
+    string Query,
+    string Mode,
+    string? ScopeCollectionId,
+    string? ScopeCollectionName,
+    int? ScopeEligiblePhotoCount,
+    int AnchorLimit,
+    string PolicyVersion);
+
+public sealed record CreativeCollectionSearchAnchorHitResponse(
+    string RevisionId,
+    int Rank,
+    double CombinedScore,
+    double? SemanticScore,
+    double? CaptionScore,
+    string? CaptionLanguage,
+    string? Caption,
+    string[] Sources);
+
 public sealed record CreativeCollectionPreviewResponse(
     string CollectionId,
     string CollectionName,
@@ -54,7 +73,10 @@ public sealed record CreativeCollectionPreviewResponse(
     int RepresentedMomentCount,
     int RepresentedTimePeriodCount,
     CreativeCollectionPreviewCandidateResponse[] Candidates,
-    CreativeCollectionSelectedCandidateResponse[] SelectedCandidates);
+    CreativeCollectionSelectedCandidateResponse[] SelectedCandidates,
+    string AnchorKind = CreativeCollectionAnchorKinds.SmartCollection,
+    CreativeCollectionSearchAnchorPreviewResponse? SearchAnchor = null,
+    CreativeCollectionSearchAnchorHitResponse[]? SearchAnchors = null);
 
 public static class CreativeCollectionPreviewEndpoints
 {
@@ -185,8 +207,8 @@ public static class CreativeCollectionPreviewEndpoints
             .Count();
 
         return new CreativeCollectionPreviewResponse(
-            materialized.Definition.Id.ToString(),
-            materialized.Definition.Name,
+            materialized.AnchorId,
+            materialized.AnchorName,
             materialized.Generated.MomentPolicyVersion,
             materialized.Generated.ContextPolicyVersion,
             materialized.Generated.DirectAnchorCount,
@@ -203,7 +225,10 @@ public static class CreativeCollectionPreviewEndpoints
             representedMoments,
             representedPeriods,
             candidates,
-            selected);
+            selected,
+            materialized.AnchorKind,
+            ToSearchAnchorResponse(materialized),
+            ToSearchAnchorHitResponses(materialized));
     }
 
     internal static SmartCollectionSlideshowSnapshotResponse ToSnapshotResponse(
@@ -222,8 +247,8 @@ public static class CreativeCollectionPreviewEndpoints
             .ToArray();
 
         return new SmartCollectionSlideshowSnapshotResponse(
-            materialized.Definition.Id.ToString(),
-            materialized.Definition.Name,
+            materialized.AnchorId,
+            materialized.AnchorName,
             createdAtUtc,
             items,
             items.Length,
@@ -262,6 +287,46 @@ public static class CreativeCollectionPreviewEndpoints
             error = Results.BadRequest(new { error = exception.Message });
             return false;
         }
+    }
+
+    private static CreativeCollectionSearchAnchorPreviewResponse? ToSearchAnchorResponse(
+        CreativeCollectionMaterialization materialized)
+    {
+        if (materialized.SearchAnchor is not CreativeCollectionSearchAnchor anchor)
+        {
+            return null;
+        }
+
+        return new CreativeCollectionSearchAnchorPreviewResponse(
+            anchor.Query,
+            anchor.Mode,
+            materialized.SearchScope?.CollectionId
+                ?? anchor.ScopeCollectionId?.ToString(),
+            materialized.SearchScope?.CollectionName,
+            materialized.SearchScope?.EligiblePhotoCount,
+            anchor.Limit,
+            anchor.PolicyVersion);
+    }
+
+    private static CreativeCollectionSearchAnchorHitResponse[]? ToSearchAnchorHitResponses(
+        CreativeCollectionMaterialization materialized)
+    {
+        if (materialized.SearchAnchor is null)
+        {
+            return null;
+        }
+
+        return materialized.SearchAnchorHits
+            .Select((hit, index) => new CreativeCollectionSearchAnchorHitResponse(
+                hit.RevisionId.ToString(),
+                index + 1,
+                hit.CombinedScore,
+                hit.SemanticScore,
+                hit.CaptionScore,
+                hit.CaptionLanguage,
+                hit.Caption,
+                hit.Sources.ToArray()))
+            .ToArray();
     }
 
     private static IResult MaterializationTimeoutResult() =>
