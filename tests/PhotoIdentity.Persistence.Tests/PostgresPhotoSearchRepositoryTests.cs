@@ -127,6 +127,20 @@ public sealed class PostgresPhotoSearchRepositoryTests
             Assert.Equal(second, car.RevisionId);
             Assert.Equal("sv", car.Language);
 
+            Assert.Empty(await search.SearchCaptionsAsync(
+                "bil",
+                10,
+                new HashSet<AssetRevisionId> { first }));
+            PhotoSearchCaptionHit scopedCar = Assert.Single(await search.SearchCaptionsAsync(
+                "bil",
+                10,
+                new HashSet<AssetRevisionId> { second }));
+            Assert.Equal(second, scopedCar.RevisionId);
+            Assert.Empty(await search.SearchCaptionsAsync(
+                "bil",
+                10,
+                new HashSet<AssetRevisionId>()));
+
             PhotoSearchCatalogueStatistics catalogue = await search.GetCatalogueStatisticsAsync();
             Assert.Equal(2, catalogue.CurrentPhotoCount);
             Assert.Equal(1, catalogue.DisplayableCaptionCount);
