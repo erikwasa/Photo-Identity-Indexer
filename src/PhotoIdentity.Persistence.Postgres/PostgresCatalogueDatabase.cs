@@ -1323,11 +1323,12 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
 
             ALTER TABLE creative_collection_recipes
                 ALTER COLUMN id SET NOT NULL,
-                ALTER COLUMN display_name SET NOT NULL,
-                ALTER COLUMN anchor_collection_id DROP NOT NULL;
+                ALTER COLUMN display_name SET NOT NULL;
 
             ALTER TABLE creative_collection_recipes
                 DROP CONSTRAINT IF EXISTS creative_collection_recipes_pkey;
+            ALTER TABLE creative_collection_recipes
+                ALTER COLUMN anchor_collection_id DROP NOT NULL;
             ALTER TABLE creative_collection_recipes
                 ADD CONSTRAINT creative_collection_recipes_pkey PRIMARY KEY (id);
 
