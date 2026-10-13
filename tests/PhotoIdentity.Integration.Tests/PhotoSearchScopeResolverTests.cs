@@ -45,6 +45,25 @@ public sealed class PhotoSearchScopeResolverTests
     }
 
     [Fact]
+    public async Task Resolver_uses_identity_only_query_instead_of_materializing_photos()
+    {
+        SmartCollectionId collectionId = SmartCollectionId.New();
+        AssetRevisionId revisionId = AssetRevisionId.New();
+        SmartCollectionFilter filter = new();
+        SmartCollectionDefinition definition = new(
+            collectionId, "Large scope", filter, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+        IdentityOnlyQuery query = new([revisionId, revisionId]);
+        PhotoSearchScopeResolver resolver = new(new FakeDefinitions(definition), query);
+
+        PhotoSearchScope scope = await resolver.ResolveAsync(collectionId);
+
+        Assert.Equal(1, query.IdentityQueryCount);
+        Assert.Same(filter, query.LastFilter);
+        Assert.Equal(1, scope.EligiblePhotoCount);
+        Assert.Contains(revisionId, scope.RevisionIds);
+    }
+
+    [Fact]
     public async Task Empty_saved_collection_is_a_valid_empty_scope()
     {
         SmartCollectionId collectionId = SmartCollectionId.From(
@@ -142,6 +161,30 @@ public sealed class PhotoSearchScopeResolverTests
         public Task<bool> DeleteAsync(
             SmartCollectionId id,
             CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class IdentityOnlyQuery(IReadOnlyList<AssetRevisionId> ids)
+        : ISmartCollectionQueryRepository
+    {
+        public int IdentityQueryCount { get; private set; }
+        public SmartCollectionFilter? LastFilter { get; private set; }
+
+        public Task<IReadOnlyList<AssetRevisionId>> QueryRevisionIdsAsync(
+            SmartCollectionFilter filter, CancellationToken cancellationToken = default)
+        {
+            IdentityQueryCount++;
+            LastFilter = filter;
+            return Task.FromResult(ids);
+        }
+
+        public Task<SmartCollectionPhotoPage> QueryAsync(
+            SmartCollectionFilter filter, int offset = 0, int limit = 40,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Full photo query must not run for search scope");
+
+        public Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
+            SmartCollectionId collectionId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 

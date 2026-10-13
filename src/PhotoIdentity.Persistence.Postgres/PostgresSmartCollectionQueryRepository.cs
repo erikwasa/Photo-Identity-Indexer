@@ -406,6 +406,46 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         return items;
     }
 
+    /// <summary>
+    /// Search-scope eligibility query: reuse the authoritative Smart Collection WHERE
+    /// predicates without loading/sorting full photo records or aggregating people metadata.
+    /// </summary>
+    public async Task<IReadOnlyList<AssetRevisionId>> QueryRevisionIdsAsync(
+        SmartCollectionFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        await EnsureFamilySchemaAsync(cancellationToken);
+        string where = BuildWhere(filter);
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = $"""
+            {CommonCtes}
+            SELECT asset_revisions.id
+            FROM asset_revisions
+            INNER JOIN assets ON assets.id = asset_revisions.asset_id
+            LEFT JOIN photo_capture_metadata
+                ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN effective_capture_dates
+                ON effective_capture_dates.revision_id = asset_revisions.id
+            WHERE assets.deleted_at_utc IS NULL
+              {where};
+            """;
+        AddFilterParameters(command, filter);
+
+        List<AssetRevisionId> ids = [];
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ids.Add(AssetRevisionId.From(reader.GetGuid(0)));
+        }
+
+        return ids;
+    }
+
     public async Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
         SmartCollectionId collectionId,
         CancellationToken cancellationToken = default)

@@ -89,3 +89,7 @@ Preview should make the distinction between direct search matches and added cont
 ## Verification requirements
 
 Use representative concepts with enough matching photos to exercise both anchor ranking and context expansion, such as a recurring activity, seasonal scene or event object. For each verification case record the query/mode/scope, admitted anchor count, context additions, requested/selected count and materialization time. Confirm several previewed direct anchors are genuinely relevant, contextual additions belong to sensible moments, and rerunning after ordinary catalogue/search evidence changes never mutates an already-created slideshow snapshot.
+
+## Dependency status — 2026-10-13
+
+Maintained-archive WI-0186 verification identified a PostgreSQL timeout while resolving a roughly 5,600-photo Smart scope in Visual, Captions and Combined search. WI-0187's optional Smart-scoped search anchors reuse this same resolution path, so large-scope Creative preview/materialization is at risk. The corrective WI-0186 PR targets scope resolution without changing Creative anchor semantics. Keep WI-0187 **in review / not verified** until WI-0186 large-scope retesting succeeds, then complete the two private-archive Creative recipes, provenance/context checks and snapshot immutability verification described above.

@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Collections;
+using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Api;
@@ -42,6 +43,17 @@ public sealed class ExclusionAwareSmartCollectionQueryRepository : ISmartCollect
     {
         IReadOnlyList<SmartCollectionPhoto> values = await _inner.QueryAllAsync(filter, cancellationToken);
         return await FilterPhotosAsync(values, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AssetRevisionId>> QueryRevisionIdsAsync(
+        SmartCollectionFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<AssetRevisionId> ids =
+            await _inner.QueryRevisionIdsAsync(filter, cancellationToken);
+        var excluded = await _exclusions.GetExcludedRevisionIdsAsync(
+            ids.Distinct().ToArray(), cancellationToken);
+        return ids.Where(id => !excluded.Contains(id)).ToArray();
     }
 
     public async Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
