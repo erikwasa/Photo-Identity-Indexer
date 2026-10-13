@@ -93,3 +93,9 @@ Use representative concepts with enough matching photos to exercise both anchor 
 ## Dependency status — 2026-10-13
 
 Maintained-archive WI-0186 verification identified a PostgreSQL timeout while resolving a roughly 5,600-photo Smart scope in Visual, Captions and Combined search. WI-0187's optional Smart-scoped search anchors reuse this same resolution path, so large-scope Creative preview/materialization is at risk. The corrective WI-0186 PR targets scope resolution without changing Creative anchor semantics. Keep WI-0187 **in review / not verified** until WI-0186 large-scope retesting succeeds, then complete the two private-archive Creative recipes, provenance/context checks and snapshot immutability verification described above.
+
+## Maintainer functional retest — 2026-10-13
+
+After merging WI-0186's corrective PR #517 and testing search scopes up to Fideli (5,638 eligible), the maintainer reports: **"WI-0187 — Search results as Creative Collection anchors works as expected."** This supersedes the prior timeout-related dependency warning above for the observed workflow. The authoring/preview flow is accepted at the level reported by the maintainer.
+
+No per-recipe anchor/context counts, saved-recipe reopen comparison, earlier Smart-anchored recipe regression evidence, or before/after evidence-change slideshow snapshot membership was supplied in this report. Those detailed acceptance criteria and the required two-case evaluation remain unchecked until evidence is captured; do not infer their completion from the general functional acceptance statement.
