@@ -41,6 +41,12 @@ The corrective path calls `QueryRevisionIdsAsync` and uses a PostgreSQL ID-only 
 
 Record query text, mode, scope name and eligible count, result count, reported search time, and any 503 response. Compare all-photo, small, medium and large scopes. Inspect a subset of IDs against the Smart Collection's exact query result; confirm searches with missing captions still work in Visual mode and confirm saved explicit collection IDs survive restart. If large-scope requests still time out, inspect PostgreSQL query plans and indexes rather than increasing timeout as the primary fix. Keep private logs and identifiers off GitHub.
 
+## Post-correction maintained-archive evidence — 2026-10-13
+
+PR #517 was merged and the maintainer repeated `playing in water` with result limit 80. The large Fideli scope (5,638 eligible) now succeeds: Visual+Captions 80 results / 2,391 ms; Visual 80 / 217 ms; Captions 3 / 2,334 ms. The medium Mor och Dotter scope (1,057 eligible) succeeds: Combined 80 / 704 ms, Visual 80 / 221 ms, Captions 0 / 586 ms. Unscoped Combined returned 80 in 3,657 ms. The originally reported large-scope request failure is no longer observed in any of the three search modes.
+
+Visual and Caption provenance badges were observed in their corresponding modes; Combined may show either or both. These numbers are one maintained-archive retest, not a controlled performance benchmark. Scope correctness by independent revision-ID comparison, missing-caption relevance and explicit saved collection immutability across an application restart still require distinct acceptance evidence.
+
 ## Supported query language
 
 The archive-scale WI-0162 evaluation measured the pinned CLIP path on the same paired English and Swedish concepts. English visual search was strong while raw Swedish text through the same CLIP encoder was not consistently useful.
