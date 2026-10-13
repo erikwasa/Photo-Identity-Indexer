@@ -100,3 +100,18 @@ On the maintained archive, verify at least three combinations where the structur
 - Existing WI-0162 ranker/session/persistence coverage continues to protect Combined provenance, missing-caption semantic results, unscoped search, cumulative selection and immutable explicit saved membership.
 
 The work item remains in review until the maintained archive verification below records representative scoped queries, small/large-scope latency and saved-membership persistence after restart.
+
+## Maintained-archive verification — 2026-10-13 (blocking)
+
+Maintainer verification after PR #515 found a reproducible **archive-scale scoped-search failure**; the unchecked maintained-archive acceptance criterion above remains open. All-photo Visual+Captions queries returned 80 results in 617 ms (`drinking`) and 580 ms (`playing in water`). The 148-photo Fjellis scope returned 80 Combined in 320 ms, 80 Visual in 222 ms, and 11 Captions in 189 ms. A 1,057-photo Mor och Dotter scope returned 80 Combined in 4,495 ms, 80 Visual in 261 ms and 0 Captions in 4,447 ms. The approximately 5,600-photo Fideli scope failed in **all three modes** with `Photo search failed`.
+
+The private API stdout log shows Npgsql read timeouts in `PostgresSmartCollectionQueryRepository.QueryAllAsync` during `PhotoSearchScopeResolver.ResolveAsync`, before ranked retrieval, rather than a demonstrated CLIP or caption-model failure. The existing resolver materializes full Smart Collection photo rows, aggregated people and ordering when it only needs eligible revision IDs. These observations justify a focused corrective change, but are not evidence that the database query plan itself has been fixed.
+
+### Corrective implementation and required review
+
+- Resolve scoped search with a dedicated PostgreSQL **revision-ID-only** projection using the same authoritative `BuildWhere` and parameters as other Smart Collection queries, preserving manual overrides, person/tag/date/place/geometry predicates and exclusion-aware wrapping.
+- Preserve unscoped search behavior, revision-set deduplication, Visual top-k admission, caption SQL eligibility and Combined fusion semantics.
+- Add independent scope-resolution latency logging and an actionable HTTP 503 response for PostgreSQL timeout errors; do not silently raise the database command timeout.
+- Add a resolver regression proving the optimized method is called instead of full photo loading. Check SQL shape and representative Smart Collection compatibility in tests.
+- **Remaining investigation:** profile the actual PostgreSQL plan (`EXPLAIN (ANALYZE, BUFFERS)`) on a private representative database, check relevant indexes and parameter distribution, and add selective query-path timing instrumentation if the ID-only query remains slow. No private archive/logs or photos are committed.
+- **Acceptance is still pending:** repeat the small/medium/large three-mode comparisons, confirm exact Smart membership, caption-missing Visual behavior, and manual saved-result membership after restart. Do not complete WI-0186 on CI passing alone.
