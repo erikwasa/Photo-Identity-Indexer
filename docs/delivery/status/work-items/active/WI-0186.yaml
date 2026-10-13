@@ -17,5 +17,3 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/515
 - type: documentation
   value: docs/operations/semantic-caption-photo-search-evaluation.md
-- type: maintainer_verification
-  value: '2026-10-13: small scope passed; large scope failed all three modes; see WI-0186 work-item verification section'
