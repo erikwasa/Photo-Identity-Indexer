@@ -68,6 +68,15 @@ public interface ISmartCollectionQueryRepository
         return items;
     }
 
+    // Search only needs identity, not full photo metadata. The default keeps test adapters compatible.
+    async Task<IReadOnlyList<AssetRevisionId>> QueryRevisionIdsAsync(
+        SmartCollectionFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SmartCollectionPhoto> photos = await QueryAllAsync(filter, cancellationToken);
+        return photos.Select(photo => photo.RevisionId).Distinct().ToArray();
+    }
+
     Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
         SmartCollectionId collectionId,
         CancellationToken cancellationToken = default);
