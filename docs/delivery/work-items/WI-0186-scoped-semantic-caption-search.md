@@ -115,3 +115,21 @@ The private API stdout log shows Npgsql read timeouts in `PostgresSmartCollectio
 - Add a resolver regression proving the optimized method is called instead of full photo loading. Check SQL shape and representative Smart Collection compatibility in tests.
 - **Remaining investigation:** profile the actual PostgreSQL plan (`EXPLAIN (ANALYZE, BUFFERS)`) on a private representative database, check relevant indexes and parameter distribution, and add selective query-path timing instrumentation if the ID-only query remains slow. No private archive/logs or photos are committed.
 - **Acceptance is still pending:** repeat the small/medium/large three-mode comparisons, confirm exact Smart membership, caption-missing Visual behavior, and manual saved-result membership after restart. Do not complete WI-0186 on CI passing alone.
+
+## Maintained-archive retest after corrective PR #517 — 2026-10-13
+
+The maintainer merged PR #517, rebuilt the application and repeated the previously failing `playing in water` searches. The original Fideli PostgreSQL timeout is **no longer reproduced**:
+
+| Scope | Mode | Result count | Search time |
+| --- | --- | ---: | ---: |
+| All photos | Visual + Captions | 80 | 3,657 ms |
+| Fideli (5,638 eligible) | Visual + Captions | 80 | 2,391 ms |
+| Fideli (5,638 eligible) | Visual | 80 | 217 ms |
+| Fideli (5,638 eligible) | Captions | 3 | 2,334 ms |
+| Mor och Dotter (1,057 eligible) | Visual + Captions | 80 | 704 ms |
+| Mor och Dotter (1,057 eligible) | Visual | 80 | 221 ms |
+| Mor och Dotter (1,057 eligible) | Captions | 0 | 586 ms |
+
+The maintainer confirmed that Visual-only results display a Visual provenance badge, Captions-only results display a Caption badge, and Combined results can show either or both sources. An empty Captions result for Mor och Dotter is a legitimate search outcome rather than a request failure. This retest clears the **reported large-scope timeout blocker** and records a significant improvement in the medium Combined and Caption timings compared with the earlier ~4.5-second requests. The unscoped Combined sample took 3,657 ms on this run; further comparative benchmarking is not claimed.
+
+**Lifecycle:** Keep the maintained-archive acceptance criterion open until the explicitly required independent exact-membership checks across representative predicates, missing-caption case, and immutable saved photo-list membership after restart are recorded. This successful stability retest must not be misrepresented as completing those separate checks.
