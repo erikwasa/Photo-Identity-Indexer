@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Npgsql;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 
@@ -54,13 +56,19 @@ public static class PhotoSearchEndpoints
         PhotoSearchRequest request,
         PhotoSearchService search,
         PhotoSearchScopeResolver scopes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ILoggerFactory loggerFactory)
     {
+        ILogger logger = loggerFactory.CreateLogger("PhotoSearch.Scope");
+        Stopwatch scopeTimer = Stopwatch.StartNew();
         try
         {
             PhotoSearchScope? scope = await scopes.ResolveAsync(
                 request.SmartCollectionId,
                 cancellationToken);
+            scopeTimer.Stop();
+            logger.LogInformation("Photo search scope resolved in {ScopeResolutionMs} ms; eligible {EligibleCount}",
+                scopeTimer.ElapsedMilliseconds, scope?.EligiblePhotoCount);
             PhotoSearchExecutionResult result = await search.SearchAsync(
                 request.Query,
                 request.Mode,
@@ -91,6 +99,18 @@ public static class PhotoSearchEndpoints
                     item.CaptionLanguage,
                     item.Caption,
                     item.Sources.ToArray())).ToArray()));
+        }
+        catch (PostgresException exception) when (exception.SqlState == "57014" && !cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "Photo search database statement timeout (scope phase {ScopePhase})",
+                scopeTimer.IsRunning ? "resolving" : "resolved");
+            return Results.Problem("Photo search database query timed out. Narrow the Smart Collection or retry after database maintenance.", statusCode: 503, title: "Photo search timed out");
+        }
+        catch (NpgsqlException exception) when (!cancellationToken.IsCancellationRequested && exception.InnerException is TimeoutException)
+        {
+            logger.LogWarning(exception, "Photo search database read timeout (scope phase {ScopePhase})",
+                scopeTimer.IsRunning ? "resolving" : "resolved");
+            return Results.Problem("Photo search database query timed out. Narrow the Smart Collection or retry after database maintenance.", statusCode: 503, title: "Photo search timed out");
         }
         catch (PhotoSearchScopeNotFoundException exception)
         {
