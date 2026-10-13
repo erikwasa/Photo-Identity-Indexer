@@ -77,10 +77,9 @@ public sealed class PhotoSearchScopeResolver
             throw new PhotoSearchScopeNotFoundException(collectionId);
         }
 
-        IReadOnlyList<SmartCollectionPhoto> photos =
-            await _query.QueryAllAsync(definition.Filter, cancellationToken);
-        HashSet<AssetRevisionId> revisionIds =
-            photos.Select(photo => photo.RevisionId).ToHashSet();
+        IReadOnlyList<AssetRevisionId> eligibleRevisions =
+            await _query.QueryRevisionIdsAsync(definition.Filter, cancellationToken);
+        HashSet<AssetRevisionId> revisionIds = eligibleRevisions.ToHashSet();
 
         return new PhotoSearchScope(
             definition.Id,
