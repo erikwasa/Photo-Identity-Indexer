@@ -33,6 +33,14 @@ The response reports the selected Smart Collection name and current eligible-pho
 
 Scoped search does not change the WI-0162 save boundary. Saving selected results still creates an explicit ordered photo-list collection whose revision membership is frozen at save time; the Smart Collection ID and search query are not persisted as a live collection definition.
 
+## WI-0186 October 2026 scoped-search regression and troubleshooting
+
+The 2026-10-13 maintained-archive tests found that small (148 eligible) and medium (1,057 eligible) Smart scopes returned results, but a ~5,600-photo Smart scope failed in all three modes. The API log traced an Npgsql read timeout to Smart scope materialization via `QueryAllAsync`; the old scope resolver requested full photo metadata when only revision IDs were needed.
+
+The corrective path calls `QueryRevisionIdsAsync` and uses a PostgreSQL ID-only projection with the same Smart Collection predicate logic. The API records `PhotoSearch.Scope` resolution latency and responds with HTTP 503 and an actionable timeout message for recognized database read/statement timeouts. Neither the new query shape nor a passing CI run by itself establishes private-archive performance: retest against the same Fideli and Mor och Dotter scopes.
+
+Record query text, mode, scope name and eligible count, result count, reported search time, and any 503 response. Compare all-photo, small, medium and large scopes. Inspect a subset of IDs against the Smart Collection's exact query result; confirm searches with missing captions still work in Visual mode and confirm saved explicit collection IDs survive restart. If large-scope requests still time out, inspect PostgreSQL query plans and indexes rather than increasing timeout as the primary fix. Keep private logs and identifiers off GitHub.
+
 ## Supported query language
 
 The archive-scale WI-0162 evaluation measured the pinned CLIP path on the same paired English and Swedish concepts. English visual search was strong while raw Swedish text through the same CLIP encoder was not consistently useful.
