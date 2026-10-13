@@ -5,11 +5,10 @@ status: in_review
 owner: ai-agent
 document: ../work-items/WI-0187-search-creative-anchors.md
 started_at: 2026-10-07
-last_updated_at: 2026-10-13
+last_updated_at: 2026-10-07
 branch: agent/WI-0187-search-creative-anchors
 blockers: []
-blocker_notes:
-- Verification deferred pending WI-0186 large Smart scope timeout fix and private archive recheck.
+blocker_notes: []
 evidence:
 - type: issue
   value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/513
