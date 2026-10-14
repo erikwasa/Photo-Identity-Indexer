@@ -62,8 +62,34 @@ The generated JSON contains a `review` object for every sampled photo. Review a 
 
 Fill `review.category`, `review.verdict` (`acceptable`, `technical-failure`, or `uncertain`), `review.personallyImportant`, and `review.notes`. Compare human judgement with each individual signal/reason, paying particular attention to false positives on personally important or intentionally imperfect images and to failures that receive no candidate reason.
 
+## Private-archive result (2026-10-14)
+
+The maintainer reviewed all 300 photos in the deterministic private sample. The private review export is not committed.
+
+Aggregate human verdicts were 249 acceptable, 11 technical failures and 40 uncertain. The candidate analyzer flagged 36 photos: 25 acceptable, 4 technical failures and 7 uncertain. Excluding uncertain cases, the flagged set therefore had 13.8% precision for definite technical failure. The analyzer found 4 of the 11 definite failures (36.4% recall).
+
+Low sharpness was the dominant candidate reason: 29 photos received `candidate-low-sharpness`, but only 3 were definite technical failures; 20 were acceptable and 6 uncertain. Of the seven definite failures with no candidate reason, five were blur/focus failures, one low-resolution and one low-light/noisy. The review included a missed blur/focus failure with very high whole-image Laplacian variance, demonstrating that whole-image sharpness is not equivalent to subject focus.
+
+Three of the eleven definite technical failures were personally important. This is direct evidence for keeping technical-quality evidence separate from personal value.
+
+Runtime was acceptable for further experimentation: 9.63 seconds for 300 proxies, 25.65 ms median analyzer time, 35.25 ms p95, and about 549 serialized evidence bytes per photo.
+
 ## Current product decision
 
-Until representative private-archive review and maintained-machine runtime evidence are recorded, the decision is **further experiment / no product influence**. Do not use these experimental reasons to suppress photos, alter Creative Collection ordering, or add a Smart Collection criterion.
+The calibrated `proxy-technical-quality-v1` candidate reasons are **not approved for production influence**. Do not use them to suppress photos, alter Creative Collection ordering, add a Smart Collection quality criterion, or generate an authoritative overall quality percentage.
 
-If the private review supports a bounded product use, create a separately scoped work item for the semantic change. Persisting technical evidence also requires an explicit storage/versioning design rather than silently treating the experimental JSON shape as canonical archive metadata.
+The evaluation result is **further experiment / no adoption of the current candidate rules**. The harness and raw evidence remain useful for benchmarking alternatives.
+
+## Follow-up methods worth evaluating
+
+Reuse the same reviewed 300-photo sample as the first benchmark for alternative estimators:
+
+- **BRISQUE** as a low-cost classical no-reference IQA baseline. OpenCV documents BRISQUE as a blind/referenceless quality estimator whose score ranges from best to worst quality.
+- **MUSIQ / TOPIQ / MANIQA** as learned no-reference perceptual-quality estimators. These can provide an overall scalar and are trained to correlate with human quality judgements; TOPIQ is especially interesting because it uses semantic information to focus on locally important distortions.
+- **Subject-aware and face-aware scoring**: detect important subjects/faces first and measure focus, blur, exposure and noise on those regions. Face-quality estimators such as MagFace or SER-FIQ can be evaluated for face crops. This directly targets the dominant blur/focus misses from the first experiment.
+- **Relative quality ranking for near-duplicates/bursts**: rank similar photos against each other instead of assuming one absolute global quality scale. This is likely to be useful when selecting among multiple photos of the same moment.
+- **Personalized pairwise ranking** can be considered later as an opt-in feature, but it should be treated as preference modelling rather than pure technical quality.
+
+A follow-up experiment should benchmark at least BRISQUE, MUSIQ and TOPIQ against the existing human verdicts, add a subject-aware blur/focus experiment, and measure runtime/deployment cost. Any resulting 0-100 presentation score should be a calibrated view over versioned underlying evidence, not an unexplained replacement for it.
+
+If a later evaluation supports a bounded product use, create a separately scoped work item for the semantic change. Persisting technical evidence also requires an explicit storage/versioning design rather than silently treating an experimental result shape as canonical archive metadata.

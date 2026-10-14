@@ -71,11 +71,45 @@ Do not retain as a product signal at this stage:
 
 Noise estimation is deferred from the first calibration because low-light texture, JPEG artifacts, scans and intentional grain make a simple proxy-only noise scalar especially easy to misinterpret. Private review can determine whether it merits a separately versioned experiment.
 
-## Current storage/runtime/product decision
+## Representative private-archive result (2026-10-14)
 
-Until private-archive evidence exists, technical-quality evidence remains evaluation output only: no catalogue column/table and no collection semantics. The harness records median/p95 analyzer time and average serialized evidence bytes per photo on the maintained machine so a later decision between on-demand calculation, process-local caching and persistence can use measured cost rather than assumption.
+The maintainer reviewed the full deterministic 300-photo private sample produced by the evaluation harness. The private JSON remains uncommitted; only aggregate evidence is recorded here.
 
-The current product decision is **further experiment / no product influence**. Representative private review is required before recommending display-only evidence, a bounded Creative tie-breaker, or a future collection criterion. Any such semantic change must be a separate work item.
+Human verdicts:
+
+- 249 acceptable;
+- 11 technical failures;
+- 40 uncertain.
+
+The candidate rules flagged 36 photos and left 264 unflagged. Among the 36 flagged photos, 25 were judged acceptable, 4 technical failures and 7 uncertain. Excluding uncertain judgements, only 4 of 29 definitive flagged cases were technical failures (13.8% precision). Of the 11 definite technical failures in the full sample, 4 were flagged and 7 were missed (36.4% recall).
+
+The most common candidate reason was `candidate-low-sharpness`: 29 photos were flagged, of which 20 were acceptable, 3 technical failures and 6 uncertain. The seven definite failures that received no candidate reason were manually categorized as five blur/focus failures, one low-resolution failure and one low-light/noisy failure. One missed blur/focus failure had very high whole-image Laplacian variance, while multiple acceptable images fell below the current low-sharpness threshold. This shows that whole-image Laplacian variance is not a reliable proxy for whether the important subject is in focus.
+
+Exposure/clipping reasons also proved context-dependent: large dark or bright regions can be intentional or irrelevant to the subject. The low-contrast rule did not fire at all in this sample, so it remains unvalidated. Effective proxy resolution remains objective evidence, but low resolution alone does not establish low personal value.
+
+Three of the eleven definite technical failures were also marked personally important. That reinforces the safety constraint that technical quality must never be treated as permission to delete, hide or aggressively suppress an image.
+
+Maintained-machine cost was small enough for future experimentation: 300 proxies were analyzed in 9.63 seconds, median analyzer time was 25.65 ms/photo, p95 was 35.25 ms/photo, and the average serialized evidence payload was about 549 bytes/photo.
+
+## Product disposition for proxy-technical-quality-v1
+
+The evaluated candidate thresholds are **not suitable for production ranking, filtering, Creative Collection influence, Smart Collection criteria, automatic hiding or deletion**.
+
+The implementation is useful as an evaluation harness and as a source of raw technical evidence, but the calibrated candidate reasons should remain experimental. The main failure is not simply a poorly chosen Laplacian threshold: the private review demonstrates that whole-image sharpness can be high while the intended subject is out of focus, and can be low for otherwise acceptable photographs.
+
+The WI-0182 result is therefore **further experiment / no adoption of the current candidate rules**.
+
+## Alternative quality-rating approaches to evaluate next
+
+The existing 300 human-labelled proxies can be reused as a benchmark, so the next experiment does not require another broad manual review before comparing alternatives.
+
+1. **Classical no-reference IQA baseline (BRISQUE).** OpenCV exposes BRISQUE as a blind/referenceless image-quality estimator with a scalar score. This is cheap to test and gives a useful non-neural baseline, but it is still a global natural-scene statistic and is not expected to solve subject-focus failures by itself.
+2. **Learned no-reference IQA.** Benchmark modern pretrained models such as MUSIQ, TOPIQ and MANIQA. MUSIQ processes multi-scale/native-resolution image representations; TOPIQ explicitly uses high-level semantics to guide attention toward locally important distortions. These models are more promising for an overall perceptual-quality score than hand-written thresholds, but their scores are learned from external opinion-score datasets and must be calibrated against the private archive before product use.
+3. **Subject/face-aware technical quality.** Detect important regions first, then evaluate focus, motion blur, noise and exposure locally instead of over the whole image. For photos containing identified faces, face-quality methods such as MagFace or SER-FIQ are candidates for measuring whether a face crop is useful/robust. This directly targets the dominant miss observed in the evaluation.
+4. **Relative ranking inside similar-photo groups.** For near-duplicates, bursts or visually similar images, compare which image is technically better rather than forcing a globally meaningful absolute score. Pairwise IQA/ranking models can be evaluated here, and Photo Identity can combine relative quality with existing similarity/identity evidence. Relative ranking is likely to be more actionable for slideshow and collection curation than a universal absolute percentage.
+5. **Opt-in personalized ranking as a later experiment.** Pairwise user choices among similar photos could train a lightweight ranker over visual embeddings plus technical features. This could model the maintainer's own notion of a better photograph, but it deliberately mixes technical quality with preference and therefore should remain separate from the first follow-up experiment.
+
+Recommended sequence: first benchmark BRISQUE plus two learned NR-IQA models (MUSIQ and TOPIQ) on the same 300 reviewed proxies, then add subject/face-aware scoring for blur/focus misses, and finally test pairwise ranking on near-duplicate groups. Do not introduce a production 0-100 score until one or more approaches show useful discrimination on the existing human labels. If a single number is later exposed, retain the underlying subscores/reasons and algorithm/calibration version so the number remains inspectable.
 
 ## Acceptance criteria
 
