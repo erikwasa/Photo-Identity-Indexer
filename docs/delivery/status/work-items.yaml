@@ -38,6 +38,7 @@ work_items:
   document: ../work-items/WI-0152-video-serving-playback.md
   blockers:
   - WI-0151
+  - WI-0189
   blocker_notes: []
   evidence: []
 - id: WI-0153
@@ -71,6 +72,7 @@ work_items:
   document: ../work-items/WI-0155-video-face-processing-evaluation.md
   blockers:
   - WI-0151
+  - WI-0188
   blocker_notes: []
   evidence: []
 - id: WI-0156
