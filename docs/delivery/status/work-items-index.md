@@ -6,7 +6,7 @@ Current work items: **14**. Archived terminal items: **175**.
 
 | Work item | Milestone | Status | Owner | Canonical status |
 |---|---|---|---|---|
-| [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) Define the video media architecture and explicitly activate deferred implementation | M30 | blocked | unassigned | [YAML](work-items/active/WI-0150.yaml) |
+| [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) Define the video media architecture and explicitly activate deferred implementation | M30 | in_progress | ai-agent | [YAML](work-items/active/WI-0150.yaml) |
 | [WI-0151](../work-items/WI-0151-video-ingestion-metadata-posters.md) Ingest supported videos and extract metadata plus poster proxies | M30 | proposed | unassigned | [YAML](work-items/active/WI-0151.yaml) |
 | [WI-0152](../work-items/WI-0152-video-serving-playback.md) Add safe browser video serving and viewer playback | M30 | proposed | unassigned | [YAML](work-items/active/WI-0152.yaml) |
 | [WI-0153](../work-items/WI-0153-video-metadata-collections.md) Integrate video with manual metadata and collection queries | M30 | proposed | unassigned | [YAML](work-items/active/WI-0153.yaml) |

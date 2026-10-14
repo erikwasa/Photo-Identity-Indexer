@@ -4,7 +4,7 @@ title: Define the video media architecture and explicitly activate deferred impl
 milestone: M30
 status_source: ../status/work-items.yaml
 depends_on: [WI-0137]
-related_adrs: []
+related_adrs: [ADR-0012, ADR-0007, ADR-0008, ADR-0010]
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, docs]
 ---
 
@@ -39,19 +39,27 @@ Video is feasible but broader than another image format: codecs, duration, poste
 ## Acceptance criteria
 
 - [ ] An accepted design identifies the smallest useful first slice.
-- [ ] Media-neutral versus image-specific contracts are explicit.
+- [x] Media-neutral versus image-specific contracts are explicit in proposed ADR-0012.
 - [ ] FFmpeg/platform codec dependencies, packaging, security and licensing are evaluated before adoption.
-- [ ] Standalone opt-in video lane, limits, cache/invalidation and video search scope are documented and reviewed.
-- [ ] WI-0188 through WI-0191 are separately sequenced; face matching is not a prerequisite for ingestion, proxies or visual evidence.
-- [ ] M30 leaves the intentional hold only by explicit maintainer decision.
+- [x] The separate opt-in lane, resource limits, derivative cache/invalidation and photo-only search defaults are documented in proposed ADR-0012; final maintainer approval remains open.
+- [x] WI-0188 through WI-0191 are separately sequenced; face matching is not a prerequisite for ingestion, proxies or visual evidence.
+- [x] Maintainer explicitly requested beginning WI-0150 on 2026-10-14; M30's **design phase** is active. Runtime implementation remains gated on an accepted ADR and private codec survey.
 
 ## Verification requirements
 
-Architecture review only; no runtime implementation while blocked.
+Architecture review only. Proposed decisions and a privacy-preserving local codec survey are described in [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md) and the [video codec survey runbook](../../operations/video-codec-survey.md). The maintained archive is not available through GitHub and **no real codec survey has been run**; do not mark WI-0150 completed or begin WI-0151 before the survey, executable security/license check and maintainer acceptance.
+
+## Current design status (2026-10-14)
+
+- The maintainer's request to proceed starts WI-0150 **architecture work**, not automatic video ingestion. M30 is now in progress for planning.
+- First proposed implementation slice: opt-in MOV/MP4 cataloguing, revision-bound metadata and still posters (WI-0151). No image pipeline generalization, bulk proxy conversion or automatic face matches.
+- ADR-0012 is **proposed**, not accepted. Pending evidence: representative local MOV/MP4 codec/metadata counts, actual FFprobe/FFmpeg build provenance/license flags and explicit maintainer approval of the design.
+- Survey helper: `tools/VideoArchiveCodecSurvey.ps1` uses bounded local-only sampling and emits a privacy-conscious aggregate JSON report outside the repository.
+
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: ADR-0012, video codec survey runbook/helper, WI-0150 lifecycle and M30 plan/status, project scope/decision index.
+- Trade-offs: opt-in independent video lane avoids changing photo operations, but requires distinct metadata/job/derivative contracts and later measured resource budgets.
+- Deferred work: Maintained-archive codec proof and FFmpeg build compliance check, ADR acceptance, all runtime changes under WI-0151 onward.
+- Commands run: GitHub document/branch operations; .NET CLI and private Windows survey were not runnable in this environment. CI must run `PhotoIdentity.Docs validate` and `generate --check`.

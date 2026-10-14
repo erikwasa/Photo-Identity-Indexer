@@ -9,7 +9,7 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**Intentionally deferred.** Planning this milestone does not activate it. WI-0150 requires an explicit maintainer reactivation and accepted architecture decision before runtime implementation; do not add FFmpeg/video dependencies or change photo operations earlier.
+**Architecture phase activated on 2026-10-14 by maintainer direction to proceed with WI-0150.** M30 is in progress for design review, but **video runtime implementation is not yet approved**. [Proposed ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md) and the [private codec survey](../../operations/video-codec-survey.md) must be accepted before WI-0151 starts. No FFmpeg binaries, video runtime dependencies or photo-behavior changes are introduced by the architecture phase.
 
 ## Goal and rollout
 
@@ -52,7 +52,7 @@ Support private family videos on local hardware without modifying originals, exp
 
 ## Exit criteria
 
-- [ ] Explicit maintainer activation and accepted architecture/ADR before implementation.
+- [ ] WI-0150 architecture phase has begun; accept ADR-0012 and confirm private codec/license evidence before runtime implementation.
 - [ ] Metadata/poster, bounded local playback proxy, timestamped captions and embeddings work for a documented codec subset and do not mutate originals.
 - [ ] Video processing is opt-in, resource-limited, resumable and does not materially regress photo throughput or interactive behavior under measured local load.
 - [ ] Video retrieval is useful and has explicit photo-only compatibility defaults.

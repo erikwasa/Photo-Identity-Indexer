@@ -12,14 +12,20 @@ work_items:
 - id: WI-0150
   title: Define the video media architecture and explicitly activate deferred implementation
   milestone: M30
-  status: blocked
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0150-video-architecture-activation-gate.md
+  started_at: 2026-10-14
+  last_updated_at: 2026-10-14
+  branch: agent/WI-0150-video-architecture-gate
   blockers:
   - WI-0137
-  blocker_notes:
-  - Intentional scheduling hold. Video is planned future work but must not start until the maintainer explicitly reactivates M30 after higher-priority work. WI-0137 is only a minimum sequencing gate.
-  evidence: []
+  blocker_notes: []
+  evidence:
+  - type: documentation
+    value: docs/decisions/ADR-0012-isolated-video-media-architecture.md
+  - type: documentation
+    value: docs/operations/video-codec-survey.md
 - id: WI-0151
   title: Ingest supported videos and extract metadata plus poster proxies
   milestone: M30
