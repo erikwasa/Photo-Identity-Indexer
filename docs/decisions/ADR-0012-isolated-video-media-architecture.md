@@ -1,7 +1,7 @@
 ---
 id: ADR-0012
 title: Introduce video through isolated, opt-in revision-bound processing
-status: proposed
+status: accepted
 date: 2026-10-14
 supersedes: []
 superseded_by: []
@@ -11,7 +11,7 @@ superseded_by: []
 
 ## Status and decision gate
 
-**Proposed for WI-0150 review, not accepted for runtime implementation.** On 2026-10-14 the maintainer requested work on WI-0150, activating the *architecture phase* of M30. A successful limited, anonymous real-archive [video codec survey](../operations/video-codec-survey-evidence-2026-10-14.md) has now established initial H.264/HEVC MOV/MP4 input candidates. Actual processing work under WI-0151 and later items still requires acceptance of this ADR, verification of the specific FFprobe/FFmpeg binary and its packaging/license strategy, and explicit confirmation of the implementation scope.
+**Accepted by the maintainer on 2026-10-14.** The maintainer explicitly approved ADR-0012, the separately installed/external FFmpeg architecture, and starting WI-0151 **after WI-0150 is formally completed and its PR merged**. The initial [private-archive codec survey](../operations/video-codec-survey-evidence-2026-10-14.md) supports H.264/HEVC MOV/MP4 candidate inputs; the user's Winget-installed FFmpeg 9.0.2 build/license and both SHA-256 executable fingerprints are recorded below. This decision authorizes a scoped, opt-in **implementation of WI-0151**, not automatic mass video ingestion, full transcoding, or changes to existing photo-only behavior.
 
 ## Context
 
@@ -21,7 +21,7 @@ Videos differ in probe cost, size, codec support, timeline, transcoding and face
 
 This ADR complements [ADR-0007](ADR-0007-permanent-archive-bounded-storage.md) (permanent source and bounded hydration), [ADR-0008](ADR-0008-source-copy-exclusion-and-purge.md) (source-copy exclusion), [ADR-0010](ADR-0010-local-production-execution.md) (local execution) and [ADR-0006](ADR-0006-canonical-auto-assignment.md) (governed person assignments). ADR-0011's remote caption burst does **not** authorize off-host video processing.
 
-## Proposed decision
+## Accepted decision
 
 ### 1. Media and catalogue contract
 
@@ -46,13 +46,13 @@ The isolated video lane is an application-owned, local worker within the existin
 
 ### 4. FFmpeg deployment, security and license decision
 
-**Proposed implementation packaging decision:** use separately installed, operator-managed local `ffprobe.exe` / `ffmpeg.exe`, invoked as **external processes** by trusted, configurable absolute paths. Photo Identity does not auto-download, embed, redistribute, statically/dynamically link, or package FFmpeg binaries or libraries. Video features report an actionable disabled/unavailable state when the external tools are missing. This avoids taking on FFmpeg binary-redistribution duties inside Photo Identity's Windows package; it is not a general exemption from GPL or patent considerations. Any later bundling, library linking, alternative build or redistributed installer requires a fresh explicit license/compliance decision.
+**Accepted implementation packaging decision:** use separately installed, operator-managed local `ffprobe.exe` / `ffmpeg.exe`, invoked as **external processes** by trusted, configurable absolute paths. Photo Identity does not auto-download, embed, redistribute, statically/dynamically link, or package FFmpeg binaries or libraries. Video features report an actionable disabled/unavailable state when the external tools are missing. This avoids taking on FFmpeg binary-redistribution duties inside Photo Identity's Windows package; it is not a general exemption from GPL or patent considerations. Any later bundling, library linking, alternative build or redistributed installer requires a fresh explicit license/compliance decision.
 
-**Maintained-machine build evidence (2026-10-14):** operator installed via Winget (`Gyan.FFmpeg`). Both `ffmpeg` and `ffprobe` reported `9.0.2-full_build-www.gyan.dev`, GCC 16.2.0, `--enable-gpl --enable-version3 --enable-static --enable-libx264 --enable-libx265` and **no `--enable-nonfree` flag** in their displayed configurations. `ffmpeg -L` identified **GNU GPL version 3 or later**. This is **not LGPL-only** and must not be bundled as if it were. The official Gyan build listing identifies its 9.0.2 full release as a 64-bit static, GPLv3 build. Exact executable SHA-256 values were not provided, so the local installation's byte-level integrity is **not yet recorded**. See [private-archive and build evidence](../operations/video-codec-survey-evidence-2026-10-14.md).
+**Maintained-machine build evidence (2026-10-14):** operator installed via Winget (`Gyan.FFmpeg`). Both `ffmpeg` and `ffprobe` reported `9.0.2-full_build-www.gyan.dev`, GCC 16.2.0, `--enable-gpl --enable-version3 --enable-static --enable-libx264 --enable-libx265` and **no `--enable-nonfree` flag** in their displayed configurations. `ffmpeg -L` identified **GNU GPL version 3 or later**. This is **not LGPL-only** and must not be bundled as if it were. The official Gyan build listing identifies its 9.0.2 full release as a 64-bit static, GPLv3 build. The maintainer provided actual installed SHA-256 fingerprints: **ffmpeg.exe** `589E50B766D251AFDF181DD664D40BD94407E200B019989FD7468C7D118A28D0`; **ffprobe.exe** `02264DFA4F56BAAA31E443ECE8AA16D397F6B008200E7FD184D22B9009E75FD3`. The hashes identify the inspected binaries but are not an independent authenticity or trust-chain verification; recheck on upgrades. See [private-archive and build evidence](../operations/video-codec-survey-evidence-2026-10-14.md).
 
-The proposed external-tool boundary requires trusted configuration of both executable paths, startup version/build validation, opt-in activation only, process argument arrays (no shell), file-only/local protocol allowlisting, bounded input/output/probe duration, per-process CPU/IO concurrency limits, cancellation with process-tree termination, private temp files, sanitized errors, exclusion/hydration checks, and locally recorded executable SHA-256 for provenance and drift detection. Updates occur deliberately via the operator's package manager; probe/profile/version changes invalidate affected derived results. FFmpeg/FFprobe must never fetch network media or run against online-only placeholders without an explicit managed hydration lease.
+The accepted external-tool boundary requires trusted configuration of both executable paths, startup version/build validation, opt-in activation only, process argument arrays (no shell), file-only/local protocol allowlisting, bounded input/output/probe duration, per-process CPU/IO concurrency limits, cancellation with process-tree termination, private temp files, sanitized errors, exclusion/hydration checks, and locally recorded executable SHA-256 for provenance and drift detection. Updates occur deliberately via the operator's package manager; probe/profile/version changes invalidate affected derived results. FFmpeg/FFprobe must never fetch network media or run against online-only placeholders without an explicit managed hydration lease.
 
-The licensing and **separate-install packaging choice have been reviewed as a design**; final ADR approval and exact installed executable fingerprints remain open. H.264/AAC/HEVC also have format/patent considerations independent of FFmpeg's GPL terms; a decision to distribute executable codecs would warrant additional review.
+The separately installed, operator-managed FFmpeg boundary is **accepted**. Operator-reported SHA-256 fingerprints are recorded; binary-origin validation, patch/update handling and secure invocation are WI-0151 implementation/verification responsibilities, not claims of completed runtime testing. H.264/AAC/HEVC also have format/patent considerations independent of FFmpeg's GPL terms; a decision to distribute executable codecs would warrant additional review.
 
 References: https://ffmpeg.org/legal.html ; https://www.gyan.dev/ffmpeg/builds/ ; https://ffmpeg.org/ffprobe.html ; https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Video_codecs .
 
@@ -83,11 +83,11 @@ No personal frame images, identifying tags, embeddings, filenames, source paths 
 
 See [sanitized codec survey findings](../operations/video-codec-survey-evidence-2026-10-14.md). Of 74 MOV and 1,235 MP4 enumerated, 3 MOV and 15 MP4 were locally available; all 18 were probed without error. The rest remained online-only and were not opened. The test inputs were short (15 under 15 seconds, 3 under two minutes), so this does not demonstrate long-video throughput or rare-codec coverage. A separate pilot under WI-0151 must validate actual decoded posters and orientation/HDR/range handling. The private aggregate JSON and personal media were not committed.
 
-This evidence supports the *proposed initial input subset* but does **not** complete the FFmpeg security/license or maintainer-acceptance gates.
+This evidence supports the *accepted initial input candidates* together with the documented Winget GPLv3+ build and approved external-tool packaging. Video decoding, process controls, longer-video performance and original-preservation must still be verified during WI-0151.
 
-## Evidence required before acceptance and subsequent runtime work
+## Acceptance evidence and remaining runtime verification
 
 1. **Initial evidence obtained:** the maintainer ran the [private video codec survey](../operations/video-codec-survey.md) and supplied an anonymous report; the [reviewed aggregate evidence](../operations/video-codec-survey-evidence-2026-10-14.md) establishes an initial MOV/MP4 H.264/HEVC candidate subset. The unsampled 1,291 online-only videos are not assumed to use those codecs. Additional long/rare samples may be collected during the implementation pilot.
-2. **Build and licensing configuration documented:** Winget-installed Gyan 9.0.2 full static GPLv3+ build with libx264/libx265, not `--enable-nonfree`; choose external, operator-installed processes and no redistribution in Photo Identity. Retain a SHA-256 fingerprint for each actual executable before first production execution, and verify opt-in/version/allowlist/timeout/error behavior under WI-0151. No private-machine executable hash was supplied in this review.
-3. Maintainer reviews the opt-in first slice and confirms acceptance of the architecture. The request on 2026-10-14 authorizes **design work**, not unattended mass ingestion.
-4. Once accepted, mark this ADR accepted and complete WI-0150 with evidence through `PhotoIdentity.Docs`, then allow WI-0151 to enter implementation. Record photo baseline and resource thresholds during WI-0188.
+2. **Build, hashes and packaging approved:** Winget-installed Gyan 9.0.2 full static GPLv3+ with libx264/libx265 and no displayed `--enable-nonfree`; the maintainer approved external, operator-installed binaries with no Photo Identity redistribution. SHA-256 `ffmpeg.exe=589E50B766D251AFDF181DD664D40BD94407E200B019989FD7468C7D118A28D0`; `ffprobe.exe=02264DFA4F56BAAA31E443ECE8AA16D397F6B008200E7FD184D22B9009E75FD3`. WI-0151 must validate startup version/hash, allowlist/timeout/error/OneDrive safety before runtime integration.
+3. **Maintainer accepted ADR-0012 on 2026-10-14** and explicitly authorized starting WI-0151 **only after WI-0150 is formally completed and PR #523 merged**. This does not permit unattended mass ingestion.
+4. WI-0150's architecture acceptance is documented in PR #523 with formal completed lifecycle metadata. After merge, WI-0151 may be started through the repository lifecycle command; photo baseline and resource thresholds will be measured during WI-0188.
