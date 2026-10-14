@@ -3,8 +3,9 @@
 .SYNOPSIS
   Private, read-only video codec inventory for WI-0150.
 .DESCRIPTION
-  Never probes OneDrive files marked offline or recall-on-access.
-  Uses a seeded reservoir sample per extension and writes only aggregate, path-free fields.
+  Uses the same OFFLINE/RECALL attribute criteria as the OneDrive source adapter.
+  A locally hydrated unpinned ReparsePoint is eligible; missing-content items are skipped.
+  Uses a seeded reservoir sample per extension and writes path-free technical fields.
   The raw source is never copied, moved, changed, or uploaded.
 #>
 [CmdletBinding()]
@@ -40,7 +41,10 @@ foreach ($extension in $extensions) {
         extension = $extension
         enumerated = 0
         locally_available = 0
-        skipped_online_or_uncertain = 0
+        skipped_online_only = 0
+        skipped_downloading = 0
+        locally_available_reparse_points = 0
+        skipped_unavailable_at_probe = 0
         probed_ok = 0
         probe_failed = 0
         timed_out = 0
@@ -53,6 +57,9 @@ $random = [System.Random]::new(150)
 $recallOnOpen = 0x00040000
 $recallOnDataAccess = 0x00400000
 $offline = [int][System.IO.FileAttributes]::Offline
+$pinned = 0x00080000
+$missingContentFlags = $recallOnOpen -bor $recallOnDataAccess -bor $offline
+
 
 foreach ($file in (Get-ChildItem -LiteralPath $ArchiveRoot -File -Recurse -ErrorAction Stop)) {
     $extension = $file.Extension.ToLowerInvariant()
@@ -63,19 +70,23 @@ foreach ($file in (Get-ChildItem -LiteralPath $ArchiveRoot -File -Recurse -Error
     $record = $stats[$extension]
     $record['enumerated'] = [int]$record['enumerated'] + 1
     $flags = [int]$file.Attributes
-    if ((($flags -band $recallOnOpen) -ne 0) -or
-        (($flags -band $recallOnDataAccess) -ne 0) -or
-        (($flags -band $offline) -ne 0)) {
-        $record['skipped_online_or_uncertain'] = [int]$record['skipped_online_or_uncertain'] + 1
+    # Mirror OneDriveFileAttributeStatusProvider.Classify in PhotoIdentity.Source.OneDriveSync:
+    # ReparsePoint without OFFLINE/RECALL flags can contain fully hydrated content even
+    # when it is not pinned. Pinned means "always keep" rather than "locally available".
+    # Only OFFLINE/RECALL bits establish that content is unavailable for a safe probe.
+    if (($flags -band $missingContentFlags) -ne 0) {
+        $reason = if (($flags -band $pinned) -ne 0) {
+            'skipped_downloading'
+        }
+        else {
+            'skipped_online_only'
+        }
+        $record[$reason] = [int]$record[$reason] + 1
         continue
     }
 
-    # Do not trust generic ReparsePoint entries that lack an explicit locally-pinned flag.
-    $isReparsePoint = ($flags -band [int][System.IO.FileAttributes]::ReparsePoint) -ne 0
-    $isPinned = ($flags -band 0x00080000) -ne 0
-    if ($isReparsePoint -and -not $isPinned) {
-        $record['skipped_online_or_uncertain'] = [int]$record['skipped_online_or_uncertain'] + 1
-        continue
+    if (($flags -band [int][System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        $record['locally_available_reparse_points'] = [int]$record['locally_available_reparse_points'] + 1
     }
 
     $record['locally_available'] = [int]$record['locally_available'] + 1
@@ -160,8 +171,22 @@ function Get-OptionalValue {
 $results = [System.Collections.Generic.List[object]]::new()
 foreach ($extension in $extensions) {
     foreach ($file in $samples[$extension]) {
-        $probeResult = Get-VideoProbe -Executable $probeExecutable -SourcePath $file.FullName -TimeoutSeconds $ProbeTimeoutSeconds
         $record = $stats[$extension]
+        # Re-check immediately before opening: OneDrive may have evicted a file
+        # between enumeration and sampling. Do not trigger opportunistic hydration.
+        try {
+            $currentAttributes = [int][System.IO.File]::GetAttributes($file.FullName)
+            if (($currentAttributes -band $missingContentFlags) -ne 0) {
+                $record['skipped_unavailable_at_probe'] = [int]$record['skipped_unavailable_at_probe'] + 1
+                continue
+            }
+        }
+        catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+            $record['skipped_unavailable_at_probe'] = [int]$record['skipped_unavailable_at_probe'] + 1
+            continue
+        }
+
+        $probeResult = Get-VideoProbe -Executable $probeExecutable -SourcePath $file.FullName -TimeoutSeconds $ProbeTimeoutSeconds
         if ($probeResult.outcome -ne 'ok') {
             $record[$probeResult.outcome] = [int]$record[$probeResult.outcome] + 1
             continue
@@ -222,12 +247,12 @@ foreach ($extension in $extensions) {
 }
 
 $report = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     generated_at_utc = (Get-Date).ToUniversalTime().ToString('o')
-    sampling_policy = 'seeded reservoir per extension; confirmed-local only; no raw tags/paths'
+    sampling_policy = 'seeded reservoir per extension; no offline/recall content; photo-indexer OneDrive classification; no raw tags/paths'
     statistics = @($extensions | ForEach-Object { $stats[$_] })
     sampled_media = @($results)
-    limitations = 'Sparse sample; probe timeouts/failures do not establish unsupported codecs. Local cloud placeholder classification is conservative.'
+    limitations = 'Sparse sample; probe failures do not establish unsupported codecs. Attribute checks cannot eliminate a race with OneDrive eviction; no manual hydration was requested.'
 }
 
 $parent = Split-Path -Parent $OutputPath
@@ -237,5 +262,5 @@ if ($parent) {
 $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $OutputPath -Encoding utf8
 Write-Host "Private aggregate report saved outside the repository: $OutputPath"
 foreach ($row in $report.statistics) {
-    Write-Host "$($row.extension): enumerated=$($row.enumerated) local=$($row.locally_available) skipped=$($row.skipped_online_or_uncertain) probed=$($row.probed_ok) failed=$($row.probe_failed) timed-out=$($row.timed_out)"
+    Write-Host "$($row.extension): enumerated=$($row.enumerated) local=$($row.locally_available) (reparse=$($row.locally_available_reparse_points)) online-only=$($row.skipped_online_only) downloading=$($row.skipped_downloading) evicted=$($row.skipped_unavailable_at_probe) probed=$($row.probed_ok) failed=$($row.probe_failed) timed-out=$($row.timed_out)"
 }
