@@ -45,10 +45,10 @@ These are not required for the local product or for version 1:
 - public hosting or a cloud database;
 - GPU requirements;
 - neural-network fine-tuning; and
-- video processing in the current implementation. Video is a planned later direction under [M30](../delivery/milestones/M30-video-media-support.md), intentionally held until explicitly reactivated.
+- video processing in the current implementation. The [M30](../delivery/milestones/M30-video-media-support.md) **architecture phase** started on 2026-10-14, while actual runtime support remains gated on WI-0150 design acceptance and private archive codec evidence.
 
 Production model execution remains on maintainer-controlled local hardware. Any future remote-compute path requires a new accepted architecture decision and separately scoped work; the canonical catalogue, review workflow and source-of-truth decisions remain local.
 
 ## Future media direction
 
-Video support is intentionally deferred rather than rejected. Until M30 is activated, avoid new runtime dependencies and speculative video implementation. When core source/asset/revision, metadata or collection contracts change for current work, prefer media-neutral semantics where natural and low-cost; keep genuinely image-specific decoding/face pipelines explicit rather than prematurely generalizing them.
+Video support is planned rather than rejected. WI-0150/M30 architecture planning is active, but actual video runtime work remains deferred until proposed ADR-0012 and private archive codec evidence are accepted. Prefer media-neutral source/asset/revision semantics where natural; preserve image-specific processing boundaries until the approved video slice is implemented.

@@ -10,7 +10,7 @@ WI-0186 / issue #512: PR #515 scopes Visual/Caption/Combined search through an o
 
 WI-0187 / issue #513: PR #516 lets Creative Collections use either the existing exact Smart Collection anchor or a versioned ranked Search anchor with Visual/Caption/Combined mode, optional Smart scope and bounded top-N admission. Search anchor materialization reuses WI-0186 retrieval, then enters the existing one-level moment/context and deterministic Creative selection pipeline. The maintainer now reports the search-anchor workflow works as expected. Keep WI-0187 in review pending the specific two-recipe, legacy compatibility and snapshot-immutability evidence in its acceptance criteria.
 
-M30 video support remains intentionally deferred and blocked until explicit maintainer reactivation.
+M30 design phase is in progress under WI-0150 after explicit maintainer authorization on 2026-10-14. Proposed ADR-0012 and private codec survey must be reviewed before video runtime implementation.
 
 ## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-PR #517 was merged and the Fideli/Mor och Dotter scope retest succeeded. Finish WI-0186 exact Smart-membership and saved-list restart checks; for WI-0187, record two Creative recipe cases (one Smart-scoped), legacy Smart-anchor compatibility and snapshot immutability after evidence changes. Confirm an already-created Creative slideshow snapshot keeps the same revision membership if search evidence later changes. WI-0182 separately still needs its representative private photo-quality review/runtime evidence. M30 video support remains deferred.
+PR #517 was merged and the Fideli/Mor och Dotter scope retest succeeded. Finish WI-0186 exact Smart-membership and saved-list restart checks; for WI-0187, record two Creative recipe cases (one Smart-scoped), legacy Smart-anchor compatibility and snapshot immutability after evidence changes. Confirm an already-created Creative slideshow snapshot keeps the same revision membership if search evidence later changes. WI-0182 separately still needs its representative private photo-quality review/runtime evidence. M30/WI-0150 next requires a private aggregated MOV/MP4 codec survey, FFmpeg executable/build licensing review, and maintainer acceptance of proposed ADR-0012 before WI-0151 can start.
 
 ## Relevant pointers
 
@@ -36,3 +36,5 @@ PR #517 was merged and the Fideli/Mor och Dotter scope retest succeeded. Finish 
 - docs/operations/creative-collection-preview.md
 - docs/delivery/work-items/WI-0182-photo-quality-scoring-evaluation.md
 - docs/operations/photo-quality-evaluation.md
+- docs/decisions/ADR-0012-isolated-video-media-architecture.md
+- docs/operations/video-codec-survey.md

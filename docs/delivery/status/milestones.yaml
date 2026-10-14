@@ -306,7 +306,7 @@ milestones:
   - WI-0149
 - id: M30
   title: Video media support
-  status: blocked
+  status: in_progress
   document: ../milestones/M30-video-media-support.md
   work_items:
   - WI-0150
