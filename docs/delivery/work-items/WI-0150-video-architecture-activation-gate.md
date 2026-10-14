@@ -57,6 +57,12 @@ Architecture review only. Proposed decisions and a privacy-preserving local code
 - Survey helper: `tools/VideoArchiveCodecSurvey.ps1` uses bounded local-only sampling and emits a privacy-conscious aggregate JSON report outside the repository.
 
 
+## Private codec survey attempt — 2026-10-14
+
+- Maintainer ran the original local survey: 74 MOV and 1,235 MP4 enumerated, but all 1,309 were marked skipped before FFprobe. This is **not** evidence that the videos are unsupported or genuinely online-only.
+- The survey introduced an extra "ReparsePoint must be pinned" rule absent from `OneDriveFileAttributeStatusProvider.Classify`. A locally hydrated unpinned OneDrive file can have `ReparsePoint` without missing-content flags, and should be eligible. A focused follow-up corrects this mismatch and separates online-only/downloading/local-reparse diagnostics.
+- Actual codecs, metadata, and FFprobe packaging/license evidence remain **unverified** until the revised script is run. No original video content or private paths are recorded here.
+
 ## Completion notes
 
 - Files changed: ADR-0012, video codec survey runbook/helper, WI-0150 lifecycle and M30 plan/status, project scope/decision index.
