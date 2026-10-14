@@ -35,9 +35,17 @@ These **18 intentionally/local-availability-selected videos are not a random or 
 5. OneDrive scope remains strict: 1,291 online-only source videos should not be opened or hydrated by discovery. Any further sampling should individually pin only selected files, ideally one longer clip and another codec/device cohort, not the whole folder.
 6. Keep photo-only UI/query/background processing unchanged by default. Isolate heavy video work under WI-0188; visual search and face tracks remain separate later items.
 
+## FFmpeg executable and licensing evidence — maintained machine, 2026-10-14
+
+- **Installation:** operator confirms Winget installation of the Gyan FFmpeg package (`Gyan.FFmpeg`, based on their install procedure). This is operator-managed tooling, not an application dependency shipped by Photo Identity.
+- **Version and build:** `ffmpeg` and `ffprobe` both report `9.0.2-full_build-www.gyan.dev` and GCC 16.2.0; the 9.0.2 Gyan full release is published on the build distributor's website at https://www.gyan.dev/ffmpeg/builds/ .
+- **License/build flags:** displayed `--enable-gpl --enable-version3 --enable-static --enable-libx264 --enable-libx265`; `--enable-nonfree` is **absent** from the supplied complete configuration string. `ffmpeg -L` says GNU **GPL v3 or later**. This is **not LGPL-only**. FFmpeg's official guidance on GPL-enabled components: https://ffmpeg.org/legal.html .
+- **Architecture/packaging recommendation:** invoke the **separately installed** binaries from trusted absolute paths with restricted local/file protocols, bounded processes and explicit operator upgrades. **No FFmpeg executable/library redistribution or linkage in Photo Identity packages**. Revisit redistribution/linkage and codec-patent compliance before any change to that boundary.
+- **Unverified on the maintained machine:** actual installed executable `SHA256` hashes (none provided), OS-level binary authenticity, actual frame decoding, poster colour/rotation, production process controls. Version/build report is useful provenance but not cryptographic verification.
+
 ## Remaining acceptance gates
 
-- **FFmpeg binary origin, integrity and license not verified.** On the maintained Windows computer, record the actual `ffprobe -version`, `ffprobe -buildconf`, `ffprobe -L` and `ffmpeg -version/-buildconf` output (or a private SHA-256 plus a redacted configuration/license summary). Presence of `--enable-gpl`/`--enable-nonfree` and external libraries such as `--enable-libx264` influences deployment/redistribution. Decide external user-installed binaries vs bundled copies, patch-update strategy and executable allowlist before WI-0151 ships. The current design proposes **external, operator-installed binaries**, not redistributed binaries. Legal review is independent from codec probing.
+- **Maintainer acceptance of the packaging/license choice remains:** the observed Gyan GPLv3+ configuration is documented above; the ADR proposes external, operator-installed executables and no redistribution or linkage. Before any production video process execution, record the SHA-256 of both installed binaries, configure trusted paths and confirm version, update provenance, local protocol-only constraints, cancellation and safe process limits in WI-0151. A GPL-enabled redistributed binary would need separate license compliance review.
 - **Maintainer architecture approval** required before accepting [ADR-0012](../decisions/ADR-0012-isolated-video-media-architecture.md) and transitioning WI-0150 out of `in_progress`.
 - **Real poster decoding proof** for HEVC Main 10/HLG, ordinary HEVC/H.264 and rotated clips is a test requirement under WI-0151 (not yet performed), with measured time/memory/OneDrive behaviour.
 

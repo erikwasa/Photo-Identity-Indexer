@@ -40,7 +40,7 @@ Video is feasible but broader than another image format: codecs, duration, poste
 
 - [ ] An accepted design identifies the smallest useful first slice.
 - [x] Media-neutral versus image-specific contracts are explicit in proposed ADR-0012.
-- [ ] FFmpeg/platform codec dependencies, packaging, security and licensing are evaluated before adoption.
+- [x] FFmpeg platform codec dependencies, observed Gyan GPLv3+ build, operator-installed external-tool packaging and security constraints are evaluated in ADR-0012. Actual binary hashes and runtime validation remain WI-0151 prerequisites.
 - [x] The separate opt-in lane, resource limits, derivative cache/invalidation and photo-only search defaults are documented in proposed ADR-0012; final maintainer approval remains open.
 - [x] WI-0188 through WI-0191 are separately sequenced; face matching is not a prerequisite for ingestion, proxies or visual evidence.
 - [x] Maintainer explicitly requested beginning WI-0150 on 2026-10-14; M30's **design phase** is active. Runtime implementation remains gated on an accepted ADR and private codec survey.
@@ -53,7 +53,7 @@ Architecture review only. Proposed decisions and a privacy-preserving local code
 
 - The maintainer's request to proceed starts WI-0150 **architecture work**, not automatic video ingestion. M30 is now in progress for planning.
 - First proposed implementation slice: opt-in MOV/MP4 cataloguing, revision-bound metadata and still posters (WI-0151). No image pipeline generalization, bulk proxy conversion or automatic face matches.
-- ADR-0012 is **proposed**, not accepted. Initial real-archive MOV/MP4 codec metadata evidence has now been recorded. Pending: actual FFprobe/FFmpeg binary provenance/license flags and explicit maintainer approval of the initial input scope and opt-in design.
+- ADR-0012 is **proposed**, not accepted. Initial real-archive MOV/MP4 codec metadata evidence, installed Gyan FFmpeg 9.0.2 GPLv3+ flags and external-tool packaging recommendation are now recorded. Pending: maintainer acceptance of initial input scope/opt-in design; before production use also record the local SHA-256 tool fingerprints and verify runtime safeguards.
 - Survey helper: `tools/VideoArchiveCodecSurvey.ps1` uses bounded local-only sampling and emits a privacy-conscious aggregate JSON report outside the repository.
 
 
@@ -69,11 +69,12 @@ Architecture review only. Proposed decisions and a privacy-preserving local code
 - 9 H.264/AVC (8 High, 1 Main), 9 HEVC/H.265 (8 Main, 1 Main 10 with HLG transfer); audio AAC 17, PCM 1; -90° rotation 15, missing/unknown 3; one 4K clip. Capture-time tag was present in 15, location tag in 6. 15 clips were under 15 seconds and 3 were under 2 minutes.
 - **Evidence limitation:** 18 availability-selected clips do not represent all 1,309 videos; no actual poster decode/quality, long-video behavior or full-archive codec support has been verified.
 - [Sanitized counts and proposed WI-0151 input set](../../operations/video-codec-survey-evidence-2026-10-14.md) are in Git; the private JSON, identifying metadata and media are not.
-- Remaining architecture acceptance gates: review FFprobe/FFmpeg exact build, origin, integrity, licensing and packaging strategy; maintainer explicitly accept ADR-0012 before WI-0151 implementation.
+- FFmpeg architecture review supplied: Winget-installed Gyan full build 9.0.2; `--enable-gpl --enable-version3 --enable-static --enable-libx264 --enable-libx265`; `--enable-nonfree` absent; reported GPL v3 or later. **Select external, operator-installed binaries only** (no bundled FFmpeg in Photo Identity). SHA-256 fingerprints of exact executables remain unrecorded and must be verified before production tool execution.
+- Remaining WI-0150 architecture gate: maintainer explicitly accept the proposed ADR-0012 and initial opt-in scope before WI-0151 implementation.
 
 ## Completion notes
 
 - Files changed: ADR-0012, video codec survey runbook/helper, WI-0150 lifecycle and M30 plan/status, project scope/decision index.
 - Trade-offs: opt-in independent video lane avoids changing photo operations, but requires distinct metadata/job/derivative contracts and later measured resource budgets.
-- Deferred work: FFmpeg build compliance/packaging check and ADR acceptance; all runtime changes and poster-decode/long-video validation under WI-0151 onward.
+- Deferred work: explicit maintainer ADR acceptance; exact executable SHA-256 and runtime tool-adapter safety checks; all runtime changes and poster-decode/long-video validation under WI-0151 onward.
 - Commands run: GitHub document/branch operations; .NET CLI and private Windows survey were not runnable in this environment. CI must run `PhotoIdentity.Docs validate` and `generate --check`.

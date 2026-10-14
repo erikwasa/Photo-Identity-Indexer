@@ -71,7 +71,7 @@ Get-FileHash -Algorithm SHA256 $ffprobe | Select-Object -ExpandProperty Hash
 Get-FileHash -Algorithm SHA256 $ffmpeg | Select-Object -ExpandProperty Hash
 ```
 
-Record the installation source/package and license/configuration evidence privately. The `--enable-gpl` and other matching flags matter to distribution choices; a blank matched-flags output is meaningful but is not a substitute for verifying the precise build provenance. Avoid bundling binaries in the repository before the licensing/deployment decision.
+**Maintained-machine evidence 2026-10-14:** the operator installed `Gyan.FFmpeg` through Winget; `ffmpeg` and `ffprobe` both reported Gyan **9.0.2 full static** with `--enable-gpl --enable-version3 --enable-libx264 --enable-libx265` and no displayed `--enable-nonfree`; `ffmpeg -L` says GPLv3 or later. The proposed use is **external operator-installed commands, never bundled into Photo Identity**. See [evidence](video-codec-survey-evidence-2026-10-14.md) and [ADR-0012](../decisions/ADR-0012-isolated-video-media-architecture.md). Neither executable's installed SHA-256 has been provided; record both hashes privately before runtime integration, and recheck after Winget upgrades. Hashes identify a binary but are not by themselves proof of publisher integrity: installation origin/manifest and update provenance also matter. Do not commit the binaries or assume GPLv3 build can be bundled without complying with its license.
 
 ## Record these decisions in WI-0150 review
 
