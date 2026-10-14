@@ -1,0 +1,11 @@
+id: WI-0189
+title: Generate and retain bounded local low-resolution video proxies
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0189-video-local-low-resolution-proxies.md
+blockers:
+- WI-0151
+- WI-0188
+blocker_notes: []
+evidence: []

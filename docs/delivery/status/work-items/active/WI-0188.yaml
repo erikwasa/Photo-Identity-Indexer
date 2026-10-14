@@ -1,0 +1,11 @@
+id: WI-0188
+title: Introduce an opt-in, isolated video processing lane
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0188-video-isolated-processing-lane.md
+blockers:
+- WI-0150
+- WI-0151
+blocker_notes: []
+evidence: []

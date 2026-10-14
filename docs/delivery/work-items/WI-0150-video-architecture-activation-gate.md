@@ -22,10 +22,13 @@ Video is feasible but broader than another image format: codecs, duration, poste
 
 - Confirm initial containers/codecs from the maintained archive.
 - Define media-kind contracts without rewriting stable identity.
-- Decide poster/proxy/transcode responsibilities and privacy/storage boundaries.
+- Distinguish still posters from smaller playable video proxies; choose codecs, managed local cache/quota/retention and revision/exclusion cleanup.
+- Define opt-in video-only processing jobs, priority relative to photos, bounded CPU/GPU/IO/hydration and stop/resume controls.
+- Define sampling/caption/visual embedding evidence, model/provenance and search-media defaults without assuming sparse frames describe full motion/audio.
 - Define browser range-serving and hydration expectations.
-- Define how manual metadata and collections apply.
-- Sequence optional face-frame analysis and Live Photo pairing separately.
+- Define optional manual metadata/collection integration *later* while preserving existing photo-only results by default.
+- Sequence face/track identification experiments, viewer/slideshow work and Live Photo pairing separately.
+- Record an accepted ADR, supported archive codec survey and FFprobe/FFmpeg packaging/security/licensing review at activation.
 
 ## Out of scope
 
@@ -37,7 +40,9 @@ Video is feasible but broader than another image format: codecs, duration, poste
 
 - [ ] An accepted design identifies the smallest useful first slice.
 - [ ] Media-neutral versus image-specific contracts are explicit.
-- [ ] FFmpeg/platform codec dependencies are evaluated before adoption.
+- [ ] FFmpeg/platform codec dependencies, packaging, security and licensing are evaluated before adoption.
+- [ ] Standalone opt-in video lane, limits, cache/invalidation and video search scope are documented and reviewed.
+- [ ] WI-0188 through WI-0191 are separately sequenced; face matching is not a prerequisite for ingestion, proxies or visual evidence.
 - [ ] M30 leaves the intentional hold only by explicit maintainer decision.
 
 ## Verification requirements

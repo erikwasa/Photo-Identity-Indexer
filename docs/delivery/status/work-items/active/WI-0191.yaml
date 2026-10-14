@@ -1,0 +1,10 @@
+id: WI-0191
+title: Offer opt-in semantic and caption search over indexed videos
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0191-video-semantic-caption-search.md
+blockers:
+- WI-0190
+blocker_notes: []
+evidence: []

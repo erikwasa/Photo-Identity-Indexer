@@ -21,21 +21,25 @@ The first useful step is making videos visible/searchable rather than silently u
 ## In scope
 
 - Recognize the activated MP4/MOV subset.
-- Persist media kind, duration and available capture metadata.
-- Generate bounded browser-compatible poster/review proxies.
-- Respect OneDrive availability and hydration rules.
+- Persist media kind, duration, dimensions/rotation, frame rate and container/codec/stream details, and available capture time/camera/GPS using documented precedence.
+- Generate bounded durable *still* posters/review images tied to source revision; playable lower-resolution video is WI-0189.
+- Make initial video discovery opt-in and do not automatically enqueue all discovered videos for analysis.
+- Respect OneDrive availability and hydration rules, avoid large-file hydration for cheap enumeration and classify cases requiring local video bytes.
 - Report unsupported codecs/containers explicitly.
 
 ## Out of scope
 
 - Face recognition across frames.
 - Universal transcoding.
+- Video job scheduling (WI-0188), smaller playable video cache (WI-0189) and captions/embeddings (WI-0190).
 - Live Photo pairing.
 
 ## Acceptance criteria
 
 - [ ] Supported videos appear as assets with duration/media kind.
 - [ ] A durable poster supports browsing without replaying the original.
+- [ ] Date, GPS, duration, rotation, stream metadata and unsupported/unknown fields behave predictably.
+- [ ] Default-off video support does not change photo-only ingestion or query results.
 - [ ] Unsupported variants remain visible in reporting.
 - [ ] Original videos remain read-only.
 
