@@ -10,7 +10,7 @@ WI-0186 / issue #512: PR #515 scopes Visual/Caption/Combined search through an o
 
 WI-0187 / issue #513: PR #516 lets Creative Collections use either the existing exact Smart Collection anchor or a versioned ranked Search anchor with Visual/Caption/Combined mode, optional Smart scope and bounded top-N admission. Search anchor materialization reuses WI-0186 retrieval, then enters the existing one-level moment/context and deterministic Creative selection pipeline. The maintainer now reports the search-anchor workflow works as expected. Keep WI-0187 in review pending the specific two-recipe, legacy compatibility and snapshot-immutability evidence in its acceptance criteria.
 
-M30 design phase is in progress under WI-0150 after explicit maintainer authorization on 2026-10-14. Proposed ADR-0012 and private codec survey must be reviewed before video runtime implementation. The 2026-10-14 first survey enumerated 74 MOV and 1,235 MP4, but sampled none due to an over-strict pinned/ReparsePoint check; a follow-up adjusts the survey to match OneDrive source availability. The corrected availability rerun still found all 74 MOV / 1,235 MP4 online-only, and a later rerun hit a PowerShell StrictMode `Properties.Name` error on optional video format tags. A narrow survey parser fix is pending. Rerun privately with a small intentionally hydrated video sample after merge and review actual codecs before accepting ADR-0012.
+M30/WI-0150 design accepted by maintainer on 2026-10-14, with 18 successful local MOV/MP4 probes (9 H.264, 9 HEVC) and Winget Gyan FFmpeg/FFprobe 9.0.2 full static GPLv3+ external-tool approach. SHA-256 fingerprints are in [ADR-0012](docs/decisions/ADR-0012-isolated-video-media-architecture.md) and [survey evidence](docs/operations/video-codec-survey-evidence-2026-10-14.md). WI-0150 is completed in PR #523; start WI-0151 only after merge. No runtime video work or mass OneDrive hydration was done.
 
 ## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-PR #517 was merged and the Fideli/Mor och Dotter scope retest succeeded. Finish WI-0186 exact Smart-membership and saved-list restart checks; for WI-0187, record two Creative recipe cases (one Smart-scoped), legacy Smart-anchor compatibility and snapshot immutability after evidence changes. Confirm an already-created Creative slideshow snapshot keeps the same revision membership if search evidence later changes. WI-0182 separately still needs its representative private photo-quality review/runtime evidence. M30/WI-0150 next requires a private aggregated MOV/MP4 codec survey, FFmpeg executable/build licensing review, and maintainer acceptance of proposed ADR-0012 before WI-0151 can start.
+PR #517 was merged and Fideli/Mor och Dotter scope retests succeeded. Finish WI-0186 exact Smart-membership and saved-list restart checks; WI-0187 two Creative recipe cases, legacy Smart-anchor compatibility and snapshot immutability; WI-0182 private photo-quality evidence. For M30, after PR #523 merges, use PhotoIdentity.Docs to start WI-0151 on a dedicated branch and implement opt-in metadata/poster support under accepted ADR-0012, with no cloud media execution, no bundled FFmpeg, and no implicit online-only hydration.
 
 ## Relevant pointers
 
@@ -38,3 +38,4 @@ PR #517 was merged and the Fideli/Mor och Dotter scope retest succeeded. Finish 
 - docs/operations/photo-quality-evaluation.md
 - docs/decisions/ADR-0012-isolated-video-media-architecture.md
 - docs/operations/video-codec-survey.md
+- docs/operations/video-codec-survey-evidence-2026-10-14.md

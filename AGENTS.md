@@ -20,7 +20,7 @@
 - Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
-- M30's architecture design was explicitly activated by the maintainer on 2026-10-14 under WI-0150. Do not implement video runtime behavior before ADR-0012 acceptance and maintained-archive codec/licensing review; keep stable source/revision and existing photo pipeline contracts unless the approved work item requires a change.
+- M30's architecture gate WI-0150 was completed with maintainer acceptance of ADR-0012 on 2026-10-14. Begin WI-0151 only after WI-0150's PR #523 is merged, using the accepted external FFmpeg boundary. Keep stable source/revision and existing photo pipeline contracts unless the approved work item requires a change.
 
 ## Scope discipline
 

@@ -51,6 +51,28 @@ Then rerun the revised script. If the output still reports only `online-only` vi
 
 The report is path-free but contains individual anonymous codec/resolution rows (not just totals), so review it privately before sharing.
 
+## Initial maintained-archive results (2026-10-14)
+
+The first successful survey sampled 18/1,309 enumerated MOV/MP4 videos, with no FFprobe errors. All 18 were already local and 1,291 were online-only. The [sanitized reviewed evidence](video-codec-survey-evidence-2026-10-14.md) describes observed codecs, colour/HDR, rotation, metadata and the limits of the sample; the private report itself remains outside the repository.
+
+## Binary provenance and licensing gate
+
+Check **both** installed commands on the maintained machine without submitting personal paths or video content:
+
+```powershell
+$ffprobe = (Get-Command ffprobe).Source
+$ffmpeg = (Get-Command ffmpeg).Source
+
+& $ffprobe -version | Select-Object -First 4
+& $ffmpeg -version | Select-Object -First 4
+& $ffmpeg -buildconf | Select-String 'enable-gpl|enable-nonfree|enable-libx264|enable-libx265'
+& $ffmpeg -L | Select-Object -First 12
+Get-FileHash -Algorithm SHA256 $ffprobe | Select-Object -ExpandProperty Hash
+Get-FileHash -Algorithm SHA256 $ffmpeg | Select-Object -ExpandProperty Hash
+```
+
+**Maintained-machine evidence 2026-10-14:** the operator installed `Gyan.FFmpeg` through Winget; `ffmpeg` and `ffprobe` both reported Gyan **9.0.2 full static** with `--enable-gpl --enable-version3 --enable-libx264 --enable-libx265` and no displayed `--enable-nonfree`; `ffmpeg -L` says GPLv3 or later. The proposed use is **external operator-installed commands, never bundled into Photo Identity**. See [evidence](video-codec-survey-evidence-2026-10-14.md) and [ADR-0012](../decisions/ADR-0012-isolated-video-media-architecture.md). Both installed executable SHA-256 fingerprints were provided on 2026-10-14 and are documented in the [accepted ADR-0012](../decisions/ADR-0012-isolated-video-media-architecture.md): `ffmpeg.exe=589E50B766D251AFDF181DD664D40BD94407E200B019989FD7468C7D118A28D0`, `ffprobe.exe=02264DFA4F56BAAA31E443ECE8AA16D397F6B008200E7FD184D22B9009E75FD3`. Verify these again when upgrading or configuring production. Hashes identify a binary but are not by themselves proof of publisher integrity: installation origin/manifest and update provenance also matter. Do not commit the binaries or assume GPLv3 build can be bundled without complying with its license.
+
 ## Record these decisions in WI-0150 review
 
 - Counts for enumerated, locally available and skipped (online-only/uncertain) videos by extension, plus successfully probed versus failed/timeout cases.
