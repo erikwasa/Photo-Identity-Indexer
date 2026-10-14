@@ -144,6 +144,19 @@ function Get-VideoProbe {
     }
 }
 
+function Get-OptionalValue {
+    param($Object, [string]$Name)
+
+    if ($null -eq $Object) {
+        return $null
+    }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+    return $property.Value
+}
+
 $results = [System.Collections.Generic.List[object]]::new()
 foreach ($extension in $extensions) {
     foreach ($file in $samples[$extension]) {
@@ -158,16 +171,16 @@ foreach ($extension in $extensions) {
         $video = @($probe.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1)
         $audio = @($probe.streams | Where-Object { $_.codec_type -eq 'audio' } | Select-Object -First 1)
 
-        $rotation = $null
-        if ($video.Count -gt 0) {
-            if ($null -ne $video[0].tags -and $null -ne $video[0].tags.rotate) {
-                $rotation = [string]$video[0].tags.rotate
-            }
-            foreach ($side in @($video[0].side_data_list)) {
-                if ($null -ne $side -and $null -ne $side.rotation) {
-                    $rotation = [string]$side.rotation
-                    break
-                }
+        $videoStream = if ($video.Count -gt 0) { $video[0] } else { $null }
+        $audioStream = if ($audio.Count -gt 0) { $audio[0] } else { $null }
+        $videoTags = Get-OptionalValue -Object $videoStream -Name 'tags'
+        $rotation = Get-OptionalValue -Object $videoTags -Name 'rotate'
+        $sideList = Get-OptionalValue -Object $videoStream -Name 'side_data_list'
+        foreach ($side in @($sideList)) {
+            $sideRotation = Get-OptionalValue -Object $side -Name 'rotation'
+            if ($null -ne $sideRotation) {
+                $rotation = $sideRotation
+                break
             }
         }
 
@@ -185,22 +198,20 @@ foreach ($extension in $extensions) {
             else { $durationBucket = 'over_10_minutes' }
         }
 
-        $tagNames = @()
-        if ($null -ne $probe.format.tags) {
-            $tagNames = @($probe.format.tags.PSObject.Properties.Name)
-        }
+        $formatTags = Get-OptionalValue -Object $probe.format -Name 'tags'
+        $tagNames = if ($null -ne $formatTags) { @($formatTags.PSObject.Properties.Name) } else { @() }
         $results.Add([ordered]@{
             extension = $extension
-            container = [string]$probe.format.format_name
-            video_codec = if ($video.Count -gt 0) { [string]$video[0].codec_name } else { 'none' }
-            video_profile = if ($video.Count -gt 0) { [string]$video[0].profile } else { '' }
-            pixel_format = if ($video.Count -gt 0) { [string]$video[0].pix_fmt } else { '' }
-            color_transfer = if ($video.Count -gt 0) { [string]$video[0].color_transfer } else { '' }
-            audio_codec = if ($audio.Count -gt 0) { [string]$audio[0].codec_name } else { 'none' }
-            display_width = if ($video.Count -gt 0) { $video[0].width } else { $null }
-            display_height = if ($video.Count -gt 0) { $video[0].height } else { $null }
+            container = [string](Get-OptionalValue -Object $probe.format -Name 'format_name')
+            video_codec = [string](Get-OptionalValue -Object $videoStream -Name 'codec_name')
+            video_profile = [string](Get-OptionalValue -Object $videoStream -Name 'profile')
+            pixel_format = [string](Get-OptionalValue -Object $videoStream -Name 'pix_fmt')
+            color_transfer = [string](Get-OptionalValue -Object $videoStream -Name 'color_transfer')
+            audio_codec = [string](Get-OptionalValue -Object $audioStream -Name 'codec_name')
+            display_width = Get-OptionalValue -Object $videoStream -Name 'width'
+            display_height = Get-OptionalValue -Object $videoStream -Name 'height'
             rotation_degrees = $rotation
-            average_frame_rate = if ($video.Count -gt 0) { [string]$video[0].avg_frame_rate } else { '' }
+            average_frame_rate = [string](Get-OptionalValue -Object $videoStream -Name 'avg_frame_rate')
             duration_bucket = $durationBucket
             creation_time_present = [bool](@($tagNames | Where-Object { $_ -match 'creation' }).Count -gt 0)
             location_tag_present = [bool](@($tagNames | Where-Object { $_ -match '(gps|location)' }).Count -gt 0)
