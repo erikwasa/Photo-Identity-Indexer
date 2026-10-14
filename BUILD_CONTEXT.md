@@ -10,7 +10,7 @@ WI-0186 / issue #512: PR #515 scopes Visual/Caption/Combined search through an o
 
 WI-0187 / issue #513: PR #516 lets Creative Collections use either the existing exact Smart Collection anchor or a versioned ranked Search anchor with Visual/Caption/Combined mode, optional Smart scope and bounded top-N admission. Search anchor materialization reuses WI-0186 retrieval, then enters the existing one-level moment/context and deterministic Creative selection pipeline. The maintainer now reports the search-anchor workflow works as expected. Keep WI-0187 in review pending the specific two-recipe, legacy compatibility and snapshot-immutability evidence in its acceptance criteria.
 
-M30/WI-0150 design accepted by maintainer on 2026-10-14, with 18 successful local MOV/MP4 probes (9 H.264, 9 HEVC) and Winget Gyan FFmpeg/FFprobe 9.0.2 full static GPLv3+ external-tool approach. SHA-256 fingerprints are in [ADR-0012](docs/decisions/ADR-0012-isolated-video-media-architecture.md) and [survey evidence](docs/operations/video-codec-survey-evidence-2026-10-14.md). WI-0150 is completed in PR #523; start WI-0151 only after merge. No runtime video work or mass OneDrive hydration was done.
+M30: WI-0150 completed and ADR-0012 accepted. WI-0151 has now started with an isolated opt-in pilot (MOV/MP4 source enumeration and FFprobe/FFmpeg still poster generation), documented in docs/operations/video-metadata-pilot.md. This checkpoint does **not** yet persist video assets/revisions/metadata/posters or change gallery/other photo operations. Continue WI-0151 by implementing PostgreSQL media-kind/revision-bound storage, privacy/exclusion checks and API browsing, then local HDR/rotation verification before marking complete.
 
 ## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-PR #517 was merged and Fideli/Mor och Dotter scope retests succeeded. Finish WI-0186 exact Smart-membership and saved-list restart checks; WI-0187 two Creative recipe cases, legacy Smart-anchor compatibility and snapshot immutability; WI-0182 private photo-quality evidence. For M30, after PR #523 merges, use PhotoIdentity.Docs to start WI-0151 on a dedicated branch and implement opt-in metadata/poster support under accepted ADR-0012, with no cloud media execution, no bundled FFmpeg, and no implicit online-only hydration.
+WI-0151: after the isolated CLI pilot merges, integrate stable asset/revision identities, opt-in video discovery into the PostgreSQL catalogue, source-copy exclusion/cleanup and durable posters into the application; verify photo-only search/query defaults, OneDrive no-hydration and HDR/rotation on private samples. Other remaining review evidence: WI-0186 saved-list restart/exact Smart membership, WI-0187 Creative snapshots, WI-0182 photo-quality evaluation.
 
 ## Relevant pointers
 
