@@ -180,9 +180,11 @@ public sealed class VideoPilotMediaTools
         using Process process = new() { StartInfo = start };
         using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(_timeout);
+        bool started = false;
         try
         {
-            if (!process.Start()) throw new IOException("Video utility could not be launched.");
+            started = process.Start();
+            if (!started) throw new IOException("Video utility could not be launched.");
             Task<string> standard = process.StandardOutput.ReadToEndAsync();
             Task<string> errors = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync(deadline.Token);
@@ -198,7 +200,7 @@ public sealed class VideoPilotMediaTools
         }
         finally
         {
-            if (!process.HasExited)
+            if (started && !process.HasExited)
             {
                 try { process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { }
