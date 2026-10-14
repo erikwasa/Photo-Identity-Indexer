@@ -168,8 +168,10 @@ foreach ($extension in $extensions) {
         }
         $record['probed_ok'] = [int]$record['probed_ok'] + 1
         $probe = $probeResult.data
-        $video = @($probe.streams | Where-Object { $_.codec_type -eq 'video' } | Select-Object -First 1)
-        $audio = @($probe.streams | Where-Object { $_.codec_type -eq 'audio' } | Select-Object -First 1)
+        $streams = @(Get-OptionalValue -Object $probe -Name 'streams')
+        $video = @($streams | Where-Object { $null -ne $_ -and $_.codec_type -eq 'video' } | Select-Object -First 1)
+        $audio = @($streams | Where-Object { $null -ne $_ -and $_.codec_type -eq 'audio' } | Select-Object -First 1)
+        $format = Get-OptionalValue -Object $probe -Name 'format'
 
         $videoStream = if ($video.Count -gt 0) { $video[0] } else { $null }
         $audioStream = if ($audio.Count -gt 0) { $audio[0] } else { $null }
@@ -186,7 +188,7 @@ foreach ($extension in $extensions) {
 
         $seconds = 0.0
         $hasDuration = [double]::TryParse(
-            [string]$probe.format.duration,
+            [string](Get-OptionalValue -Object $format -Name 'duration'),
             [System.Globalization.NumberStyles]::Float,
             [System.Globalization.CultureInfo]::InvariantCulture,
             [ref]$seconds)
@@ -198,18 +200,18 @@ foreach ($extension in $extensions) {
             else { $durationBucket = 'over_10_minutes' }
         }
 
-        $formatTags = Get-OptionalValue -Object $probe.format -Name 'tags'
+        $formatTags = Get-OptionalValue -Object $format -Name 'tags'
         $tagNames = if ($null -ne $formatTags) { @($formatTags.PSObject.Properties.Name) } else { @() }
         $results.Add([ordered]@{
             extension = $extension
-            container = [string](Get-OptionalValue -Object $probe.format -Name 'format_name')
+            container = [string](Get-OptionalValue -Object $format -Name 'format_name')
             video_codec = [string](Get-OptionalValue -Object $videoStream -Name 'codec_name')
             video_profile = [string](Get-OptionalValue -Object $videoStream -Name 'profile')
             pixel_format = [string](Get-OptionalValue -Object $videoStream -Name 'pix_fmt')
             color_transfer = [string](Get-OptionalValue -Object $videoStream -Name 'color_transfer')
             audio_codec = [string](Get-OptionalValue -Object $audioStream -Name 'codec_name')
-            display_width = Get-OptionalValue -Object $videoStream -Name 'width'
-            display_height = Get-OptionalValue -Object $videoStream -Name 'height'
+            display_width = (Get-OptionalValue -Object $videoStream -Name 'width')
+            display_height = (Get-OptionalValue -Object $videoStream -Name 'height')
             rotation_degrees = $rotation
             average_frame_rate = [string](Get-OptionalValue -Object $videoStream -Name 'avg_frame_rate')
             duration_bucket = $durationBucket
