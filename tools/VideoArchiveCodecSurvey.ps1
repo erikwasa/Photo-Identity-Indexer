@@ -226,7 +226,13 @@ foreach ($extension in $extensions) {
         }
 
         $formatTags = Get-OptionalValue -Object $format -Name 'tags'
-        $tagNames = if ($null -ne $formatTags) { @($formatTags.PSObject.Properties.Name) } else { @() }
+        # PSObject property collections can be empty (common for MOV/MP4 files that
+        # have no format tags). Under StrictMode, .Properties.Name throws on an
+        # empty collection. Enumerate property objects explicitly instead.
+        $tagNames = @()
+        if ($null -ne $formatTags) {
+            $tagNames = @($formatTags.PSObject.Properties | ForEach-Object { $_.Name })
+        }
         $results.Add([ordered]@{
             extension = $extension
             container = [string](Get-OptionalValue -Object $format -Name 'format_name')
