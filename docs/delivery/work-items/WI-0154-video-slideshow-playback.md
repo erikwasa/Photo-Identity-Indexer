@@ -20,6 +20,7 @@ Family slideshows are the main consumption path where catalogued videos would ot
 
 ## In scope
 
+- Enable video playback only for explicitly mixed-media selections, leaving image-only slideshow defaults unchanged.
 - Define clip duration/bounded playback policy and advancement.
 - Reuse fullscreen/no-fullscreen, protected controls and wake behavior.
 - Stage poster/video readiness without charging unrelated photo timing.

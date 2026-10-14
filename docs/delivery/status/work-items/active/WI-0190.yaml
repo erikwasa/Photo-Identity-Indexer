@@ -1,0 +1,11 @@
+id: WI-0190
+title: Extract timestamped video-frame captions and visual embeddings
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0190-video-frame-caption-embedding.md
+blockers:
+- WI-0151
+- WI-0188
+blocker_notes: []
+evidence: []

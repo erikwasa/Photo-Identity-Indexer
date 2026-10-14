@@ -22,9 +22,10 @@ Videos should not become a disconnected parallel library.
 
 - Apply effective date and Place contracts to videos.
 - Allow media-neutral manual tags/people/location/date metadata.
-- Include videos in Smart Collections using documented semantics.
+- Allow explicit opt-in video or mixed-media Smart Collection eligibility; retain existing saved photo-only membership and exact-filter semantics by default.
 - Allow explicit collections to mix images/videos.
-- Add media-kind filtering only if compatibility requires it.
+- Define media-kind filtering and preserved photo-only defaults explicitly.
+- Consider WI-0191 video semantic evidence integration separately; do not add fuzzy semantics to exact Smart filters.
 
 ## Out of scope
 

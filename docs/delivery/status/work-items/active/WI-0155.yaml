@@ -6,5 +6,6 @@ owner: unassigned
 document: ../work-items/WI-0155-video-face-processing-evaluation.md
 blockers:
 - WI-0151
+- WI-0188
 blocker_notes: []
 evidence: []
