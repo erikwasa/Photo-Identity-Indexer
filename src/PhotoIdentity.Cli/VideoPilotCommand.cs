@@ -199,8 +199,8 @@ public static class VideoPilotCommandRunner
     }
 
     public static bool IsSupported(VideoPilotMetadata m) =>
-        (m.VideoCodec == "h264" && m.Profile is "Main" or "High" ||
-         m.VideoCodec == "hevc" && m.Profile is "Main" or "Main 10") &&
+        (m.VideoCodec == "h264" && m.Profile is ("Main" or "High") ||
+         m.VideoCodec == "hevc" && m.Profile is ("Main" or "Main 10")) &&
         m.Width is > 0 and <= 8192 && m.Height is > 0 and <= 8192 &&
         m.DurationSeconds is >= 0 and <= 600;
 
