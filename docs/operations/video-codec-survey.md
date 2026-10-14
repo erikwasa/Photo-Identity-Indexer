@@ -25,9 +25,27 @@ $ffprobe = 'C:\Path\To\ffprobe.exe'
 & $ffprobe -buildconf
 ```
 
-The script reads only already locally available videos, skips files marked offline/recall-on-access, samples at most N inputs per extension, imposes a per-probe timeout and writes no paths, names, GPS coordinates or camera timestamps. Its `creation_time_present` and `location_tag_present` fields are **presence booleans**, not values. Treat classification as conservative: some locally hydrated files with ambiguous OneDrive flags may be skipped. A failed probe does not imply a codec is unsupported.
+The script uses the **same availability rule as Photo Identity's OneDrive source adapter**: Windows `Offline`, `RecallOnOpen` or `RecallOnDataAccess` means content is absent and must not be probed. A `ReparsePoint` alone **does not** mean that an unpinned video is unavailable; OneDrive can retain a local video that is not set to *Always keep on this device*. The script samples at most N eligible inputs per extension, rechecks availability before opening them, caps probe time, and writes no paths, names, GPS coordinates or camera timestamps. Its `creation_time_present` and `location_tag_present` fields are **presence booleans**, not values. A failed probe does not imply a codec is unsupported.
 
 Survey output defaults to `%LOCALAPPDATA%\PhotoIdentity\diagnostics\video-codec-survey.json`. Inspect it privately before sharing aggregated rows. The file deliberately does not contain per-file paths or raw metadata tags, but duration/device/codec combinations may still be sensitive; publishing is optional.
+
+## If every video is skipped
+
+A survey with 0 probes cannot establish codecs. The revised report distinguishes `skipped_online_only`, `skipped_downloading`, `locally_available_reparse_points` and `skipped_unavailable_at_probe`. A OneDrive file may have `ReparsePoint` even when the content is currently available locally; the original WI-0150 script was **too strict** and incorrectly excluded unpinned reparse points.
+
+To inspect the *aggregate Windows attributes* without opening any file contents:
+
+```powershell
+Get-ChildItem -LiteralPath $archiveRoot -File -Recurse |
+  Where-Object { $_.Extension -in '.mov', '.mp4' } |
+  Group-Object Attributes |
+  Sort-Object Count -Descending |
+  Select-Object Count, Name
+```
+
+Then rerun the revised script. If the output still reports only `online-only` videos, **select a handful of representative MOV/MP4 files in File Explorer**, right-click each and choose **Always keep on this device**, and wait for OneDrive to finish downloading. Avoid marking the whole archive folder available offline because it may download 1,000+ large files. Rerun the exact same survey to probe the available sample.
+
+The report is path-free but contains individual anonymous codec/resolution rows (not just totals), so review it privately before sharing.
 
 ## Record these decisions in WI-0150 review
 
