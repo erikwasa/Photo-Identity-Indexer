@@ -127,8 +127,8 @@ public sealed class OneDriveVideoAssetSource : IAssetSource
     private string ResolveVideoPath(SourceAssetReference asset)
     {
         if (asset.SourceId != SourceId) throw new ArgumentException("Incorrect source ID.", nameof(asset));
-        if (Path.GetExtension(asset.ItemKey) is not string extension ||
-            (extension.ToLowerInvariant() is not (".mov" or ".mp4")))
+        string extension = Path.GetExtension(asset.ItemKey).ToLowerInvariant();
+        if (extension is not (".mov" or ".mp4"))
             throw new ArgumentException("Unsupported video extension.", nameof(asset));
         return ResolvePath(asset.ItemKey);
     }
