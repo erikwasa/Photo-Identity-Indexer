@@ -9,7 +9,7 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**Architecture phase activated on 2026-10-14 by maintainer direction to proceed with WI-0150.** M30 is in progress for design review, but **video runtime implementation is not yet approved**. [Proposed ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md) and the [private codec survey](../../operations/video-codec-survey.md) must be accepted before WI-0151 starts. No FFmpeg binaries, video runtime dependencies or photo-behavior changes are introduced by the architecture phase.
+**Architecture phase activated on 2026-10-14 by maintainer direction to proceed with WI-0150.** M30 is in progress for design review, but **video runtime implementation is not yet approved**. A successful limited [maintained-archive codec survey](../../operations/video-codec-survey-evidence-2026-10-14.md) now grounds proposed ADR-0012's H.264/HEVC MOV/MP4 candidate inputs. [Proposed ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md) still requires exact FFmpeg binary/security/licensing review and maintainer approval before WI-0151 starts. No FFmpeg binaries, video runtime dependencies or photo-behavior changes are introduced by the architecture phase.
 
 ## Goal and rollout
 

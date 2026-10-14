@@ -11,7 +11,7 @@ superseded_by: []
 
 ## Status and decision gate
 
-**Proposed for WI-0150 review, not accepted for runtime implementation.** On 2026-10-14 the maintainer requested work on WI-0150, activating the *architecture phase* of M30. Actual processing work under WI-0151 and later items still requires acceptance of this ADR, a private-archive codec/metadata survey, and explicit confirmation of the implementation scope. This document sets the proposed design and separates choices that can be made from repository evidence from choices requiring real media.
+**Proposed for WI-0150 review, not accepted for runtime implementation.** On 2026-10-14 the maintainer requested work on WI-0150, activating the *architecture phase* of M30. A successful limited, anonymous real-archive [video codec survey](../operations/video-codec-survey-evidence-2026-10-14.md) has now established initial H.264/HEVC MOV/MP4 input candidates. Actual processing work under WI-0151 and later items still requires acceptance of this ADR, verification of the specific FFprobe/FFmpeg binary and its packaging/license strategy, and explicit confirmation of the implementation scope.
 
 ## Context
 
@@ -38,7 +38,7 @@ The isolated video lane is an application-owned, local worker within the existin
 
 ### 3. Codec and metadata policy
 
-- **Provisional candidates, not confirmed archive coverage:** `.mov` and `.mp4` containers. Probe local supported media to learn actual codecs (particularly H.264/AVC, HEVC/H.265, AAC, rotation, VFR and HDR) before selecting accepted input combinations. Filename extension does not imply codec or browser-playability.
+- **Survey-backed candidate inputs (not universal archive coverage):** `.mov` and `.mp4` files containing H.264/AVC Main/High and HEVC/H.265 Main/Main 10. The maintained-archive survey probed 18 of 1,309 enumerated files successfully: 9 H.264, 9 HEVC; AAC on 17, PCM audio on 1; 15 reported -90° display rotation; 1 HEVC Main 10 file reported HLG transfer. Probe stream compatibility rather than trusting extension. Other codecs remain reportable unsupported variants. Successful stream probing does not guarantee successful frame decoding, browser playback or coverage of 1,291 online-only items.
 - Prefer an externally invoked, local `ffprobe` adapter for bounded stream/format inspection; `ffmpeg` is a separately selected derivative tool for poster extraction/transcode. Invoke binaries by explicit trusted absolute path with argument-array APIs (never shells or concatenated command lines); disable network protocols, cap process lifetime/streams and surface sanitized failures. Unknown/unavailable tools yield supported errors, not silent photo fallback.
 - Do not open online-only placeholders in source enumeration. Metadata discovery from filename/file attributes is distinct from detailed `ffprobe` metadata; probing media bytes can itself hydrate a placeholder, so run it only on confirmed locally available files or through an explicitly authorized managed hydration lease.
 - Prefer preserved embedded capture time (with offset if present), then other reliable media creation tags, then user-supplied effective date, with clear provenance and unknown states. Never invent a time from file modified date as if camera capture time; UTC/QuickTime local-time ambiguities must be resolved in WI-0151 with test samples. GPS and camera tag values remain sensitive local catalogue data.
@@ -75,9 +75,15 @@ No personal frame images, identifying tags, embeddings, filenames, source paths 
 - Managed framework-only metadata decoding: avoids FFmpeg packaging but inconsistent MOV/HEVC/rotation support across archive inputs. **Keep as a measured fallback**, not assume universal support.
 - Cloud processing: violates local-first intent without a new decision and disclosure contract. **Reject for M30.**
 
+## Initial evidence — maintained archive, 2026-10-14
+
+See [sanitized codec survey findings](../operations/video-codec-survey-evidence-2026-10-14.md). Of 74 MOV and 1,235 MP4 enumerated, 3 MOV and 15 MP4 were locally available; all 18 were probed without error. The rest remained online-only and were not opened. The test inputs were short (15 under 15 seconds, 3 under two minutes), so this does not demonstrate long-video throughput or rare-codec coverage. A separate pilot under WI-0151 must validate actual decoded posters and orientation/HDR/range handling. The private aggregate JSON and personal media were not committed.
+
+This evidence supports the *proposed initial input subset* but does **not** complete the FFmpeg security/license or maintainer-acceptance gates.
+
 ## Evidence required before acceptance and subsequent runtime work
 
-1. Run [private video codec survey](../operations/video-codec-survey.md) on the maintained machine; share only aggregated results, including MOV/MP4 codec/rotation/audio/metadata coverage and unsupported cases. This has **not** been performed in the GitHub planning environment.
+1. **Initial evidence obtained:** the maintainer ran the [private video codec survey](../operations/video-codec-survey.md) and supplied an anonymous report; the [reviewed aggregate evidence](../operations/video-codec-survey-evidence-2026-10-14.md) establishes an initial MOV/MP4 H.264/HEVC candidate subset. The unsampled 1,291 online-only videos are not assumed to use those codecs. Additional long/rare samples may be collected during the implementation pilot.
 2. Select/document an actual FFprobe/FFmpeg build, Windows packaging/update boundary, license posture and restricted input/timeout policy. The format and licensing discussion above is preliminary; no binary has been verified.
 3. Maintainer reviews the opt-in first slice and confirms acceptance of the architecture. The request on 2026-10-14 authorizes **design work**, not unattended mass ingestion.
 4. Once accepted, mark this ADR accepted and complete WI-0150 with evidence through `PhotoIdentity.Docs`, then allow WI-0151 to enter implementation. Record photo baseline and resource thresholds during WI-0188.

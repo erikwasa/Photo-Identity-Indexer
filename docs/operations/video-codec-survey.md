@@ -51,6 +51,28 @@ Then rerun the revised script. If the output still reports only `online-only` vi
 
 The report is path-free but contains individual anonymous codec/resolution rows (not just totals), so review it privately before sharing.
 
+## Initial maintained-archive results (2026-10-14)
+
+The first successful survey sampled 18/1,309 enumerated MOV/MP4 videos, with no FFprobe errors. All 18 were already local and 1,291 were online-only. The [sanitized reviewed evidence](video-codec-survey-evidence-2026-10-14.md) describes observed codecs, colour/HDR, rotation, metadata and the limits of the sample; the private report itself remains outside the repository.
+
+## Binary provenance and licensing gate
+
+Check **both** installed commands on the maintained machine without submitting personal paths or video content:
+
+```powershell
+$ffprobe = (Get-Command ffprobe).Source
+$ffmpeg = (Get-Command ffmpeg).Source
+
+& $ffprobe -version | Select-Object -First 4
+& $ffmpeg -version | Select-Object -First 4
+& $ffmpeg -buildconf | Select-String 'enable-gpl|enable-nonfree|enable-libx264|enable-libx265'
+& $ffmpeg -L | Select-Object -First 12
+Get-FileHash -Algorithm SHA256 $ffprobe | Select-Object -ExpandProperty Hash
+Get-FileHash -Algorithm SHA256 $ffmpeg | Select-Object -ExpandProperty Hash
+```
+
+Record the installation source/package and license/configuration evidence privately. The `--enable-gpl` and other matching flags matter to distribution choices; a blank matched-flags output is meaningful but is not a substitute for verifying the precise build provenance. Avoid bundling binaries in the repository before the licensing/deployment decision.
+
 ## Record these decisions in WI-0150 review
 
 - Counts for enumerated, locally available and skipped (online-only/uncertain) videos by extension, plus successfully probed versus failed/timeout cases.
