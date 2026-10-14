@@ -57,7 +57,7 @@ public sealed class OneDriveVideoAssetSourceTests
             await Assert.ThrowsAsync<OneDriveHydrationRequiredException>(() =>
                 video.OpenContentAsync(key, CancellationToken.None));
             Assert.Throws<IOException>(() => video.GetLocalPath(key));
-            Assert.Equal([1, 2, 3], await File.ReadAllBytesAsync(videoPath));
+            Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(videoPath));
         }
         finally { Directory.Delete(root, recursive: true); }
     }
