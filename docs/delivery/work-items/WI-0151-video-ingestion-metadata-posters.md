@@ -47,6 +47,13 @@ The first useful step is making videos visible/searchable rather than silently u
 
 Source, metadata, persistence and representative real-file verification.
 
+## WI-0151 implementation checkpoint 1 — isolated pilot (2026-10-14)
+
+- Initial PR implements separate MOV/MP4 OneDrive discovery, safe opt-in local FFprobe metadata and bounded FFmpeg still posters. It does **not** yet persist these in the PostgreSQL catalogue or make videos visible in the library.
+- CLI usage, safety contract and follow-up requirements: [video metadata/poster pilot](../../operations/video-metadata-pilot.md).
+- Still required before completion: persisted media-kind/revision metadata and poster lifecycle, default-off app integration, source-copy exclusions/invalidations, gallery browsing, HDR/rotation correctness and tests on real videos.
+- Mark WI-0151 **in_progress**, not complete; the first PR is a foundational implementation checkpoint and does not satisfy the acceptance criteria as a whole.
+
 ## Completion notes
 
 - Files changed:

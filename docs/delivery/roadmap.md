@@ -34,7 +34,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M27 | Slideshow presentation experience | completed |
 | M28 | Library curation and metadata editing | completed |
 | M29 | PostgreSQL-only catalogue cleanup | completed |
-| M30 | Video media support | ready |
+| M30 | Video media support | in_progress |
 | M31 | Bulk archive metadata enrichment | completed |
 | M32 | Archive media compatibility and slideshow library polish | in_progress |
 | M33 | Archive synchronization performance | completed |
