@@ -40,6 +40,10 @@ public static class Program
         {
             return args[0] switch
             {
+                "video" when args.Length > 1 && args[1] == "pilot" =>
+                    await VideoPilotCommandRunner.RunAsync(
+                        VideoPilotOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "archive" when args.Length > 1 && args[1] == "proxy" =>
                     await ArchiveProxyMeasureCommandRunner.RunAsync(
                         ArchiveProxyMeasureCommandOptions.Parse(args.Skip(2).ToArray()),
@@ -110,6 +114,11 @@ public static class Program
     {
         output.WriteLine("""
             Photo Identity Indexer CLI
+
+              video pilot --enable-video --source DIR --derivatives DIR
+                          --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
+                          [--max-videos COUNT (1..50)] [--timeout-seconds SECONDS (1..120)]
+                          (metadata/poster pilot only; no catalogue or OneDrive hydration)
 
               archive proxy measure --source DIR --output DIR
                                     --profile ID:MAX_LONG_EDGE:JPEG_QUALITY
