@@ -139,6 +139,10 @@ jobs:
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
 
+      - name: Verify video survey metadata parsing
+        shell: pwsh
+        run: ./tools/verify-video-codec-survey.ps1
+
       - name: Run published review verification
         shell: powershell
         env:
