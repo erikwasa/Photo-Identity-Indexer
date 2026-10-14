@@ -29,6 +29,10 @@ The script uses the **same availability rule as Photo Identity's OneDrive source
 
 Survey output defaults to `%LOCALAPPDATA%\PhotoIdentity\diagnostics\video-codec-survey.json`. Inspect it privately before sharing aggregated rows. The file deliberately does not contain per-file paths or raw metadata tags, but duration/device/codec combinations may still be sensitive; publishing is optional.
 
+## If the survey fails with `The property 'Name' cannot be found`
+
+This was a parsing defect in the first WI-0150 survey script (PowerShell StrictMode and a video without format tags), not a missing FFprobe executable. The follow-up version safely iterates only existing metadata property names. Update to the corrected version before retesting, and do **not** open or hydrate the full OneDrive directory to work around this error.
+
 ## If every video is skipped
 
 A survey with 0 probes cannot establish codecs. The revised report distinguishes `skipped_online_only`, `skipped_downloading`, `locally_available_reparse_points` and `skipped_unavailable_at_probe`. A OneDrive file may have `ReparsePoint` even when the content is currently available locally; the original WI-0150 script was **too strict** and incorrectly excluded unpinned reparse points.
