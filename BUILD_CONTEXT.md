@@ -10,7 +10,7 @@ WI-0186 / issue #512: PR #515 scopes Visual/Caption/Combined search through an o
 
 WI-0187 / issue #513: PR #516 lets Creative Collections use either the existing exact Smart Collection anchor or a versioned ranked Search anchor with Visual/Caption/Combined mode, optional Smart scope and bounded top-N admission. Search anchor materialization reuses WI-0186 retrieval, then enters the existing one-level moment/context and deterministic Creative selection pipeline. The maintainer now reports the search-anchor workflow works as expected. Keep WI-0187 in review pending the specific two-recipe, legacy compatibility and snapshot-immutability evidence in its acceptance criteria.
 
-M30: WI-0150 completed and ADR-0012 accepted. WI-0151 has now started with an isolated opt-in pilot (MOV/MP4 source enumeration and FFprobe/FFmpeg still poster generation), documented in docs/operations/video-metadata-pilot.md. This checkpoint does **not** yet persist video assets/revisions/metadata/posters or change gallery/other photo operations. Continue WI-0151 by implementing PostgreSQL media-kind/revision-bound storage, privacy/exclusion checks and API browsing, then local HDR/rotation verification before marking complete.
+M30: WI-0150 completed, ADR-0012 accepted, and WI-0151 in progress. The maintainer's 2026-10-15 pilot verified 25 locally available videos (1,284 online-only untouched), 16 correct SDR posters across H.264/HEVC Main and 9 deliberately deferred HEVC Main 10 HLG clips, zero reported failures and no unexpected hydration. Anonymous evidence is documented in docs/operations/video-pilot-evidence-2026-10-15.md. Checkpoint 2 adds PostgreSQL v33 photo-default media-kind and revision-bound video metadata/poster schema with isolation tests. The CLI remains isolated: no automatic video writes, no gallery cards, and no photo-only query changes yet.
 
 ## Maintainer acceptance — 2026-10-04 (Europe/Stockholm)
 
@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: after the isolated CLI pilot merges, integrate stable asset/revision identities, opt-in video discovery into the PostgreSQL catalogue, source-copy exclusion/cleanup and durable posters into the application; verify photo-only search/query defaults, OneDrive no-hydration and HDR/rotation on private samples. Other remaining review evidence: WI-0186 saved-list restart/exact Smart membership, WI-0187 Creative snapshots, WI-0182 photo-quality evaluation.
+WI-0151: review schema v33 isolated regression tests in a throwaway PostgreSQL DB, then implement secure opt-in video asset/revision insertion, metadata/poster write/query, exclusion/invalidation, server-side photo-only query guards and video browsing. Before deploying v33 to maintained catalogue, back up PostgreSQL and rehearse migration. HLG-to-BT.709 thumbnails need a separate colour-verified implementation, not implicit SDR conversion.
 
 ## Relevant pointers
 
@@ -39,3 +39,4 @@ WI-0151: after the isolated CLI pilot merges, integrate stable asset/revision id
 - docs/decisions/ADR-0012-isolated-video-media-architecture.md
 - docs/operations/video-codec-survey.md
 - docs/operations/video-codec-survey-evidence-2026-10-14.md
+- docs/operations/video-pilot-evidence-2026-10-15.md

@@ -16,14 +16,16 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0151-video-ingestion-metadata-posters.md
   started_at: 2026-10-14
-  last_updated_at: 2026-10-14
-  branch: agent/WI-0151-video-pilot-discovery-posters
+  last_updated_at: 2026-10-15
+  branch: agent/WI-0151-video-catalogue-schema-checkpoint2
   blockers:
   - WI-0150
   blocker_notes: []
   evidence:
   - type: documentation
     value: docs/operations/video-metadata-pilot.md
+  - type: documentation
+    value: docs/operations/video-pilot-evidence-2026-10-15.md
 - id: WI-0152
   title: Add safe browser video serving and viewer playback
   milestone: M30
