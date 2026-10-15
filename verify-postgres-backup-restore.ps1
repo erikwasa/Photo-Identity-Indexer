@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BackupPath,
     [string]$VerificationDatabaseName,
-    [switch]$ApplicationStopped
+    [switch]$ApplicationStopped,
+    [switch]$ResumeRestoredDatabase
 )
 
 Set-StrictMode -Version Latest
@@ -25,6 +26,11 @@ if (-not (Test-Path -LiteralPath $backupReportPath -PathType Leaf)) {
 
 $backupReport = Get-Content -LiteralPath $backupReportPath -Raw | ConvertFrom-Json
 $sourceDatabase = [string]$backupReport.sourceDatabase
+if ($ResumeRestoredDatabase -and (
+        [string]::IsNullOrWhiteSpace($VerificationDatabaseName) -or
+        $VerificationDatabaseName -notmatch '^photoidentity_restore_[0-9]{14}_[a-f0-9]{6}$')) {
+    throw "ResumeRestoredDatabase requires the exact generated photoidentity_restore_YYYYMMDDHHMMSS_xxxxxx database name."
+}
 if ([string]::IsNullOrWhiteSpace($sourceDatabase)) {
     throw "The backup report does not identify the source database."
 }
@@ -70,18 +76,33 @@ function Invoke-DatabaseQuery {
         [Parameter(Mandatory = $true)][string]$Sql
     )
 
-    $rows = @(
-        & $podman.Source exec `
-            -e "TARGET_DATABASE=$Database" `
-            -e "PHOTOIDENTITY_SQL=$Sql" `
-            $ContainerId sh -lc `
-            'psql -X -A -t -U "$POSTGRES_USER" -d "$TARGET_DATABASE" -v ON_ERROR_STOP=1 -c "$PHOTOIDENTITY_SQL"' `
-            2>$null)
-    if ($LASTEXITCODE -ne 0) {
-        throw "PostgreSQL verification query failed."
+    # Keep PostgreSQL errors so a missing restored relation, permission failure,
+    # or transient container problem is diagnosable without database secrets.
+    $stderrPath = Join-Path ([IO.Path]::GetTempPath()) (
+        "photoidentity-restore-query-$([Guid]::NewGuid().ToString('N')).stderr")
+    try {
+        $rows = @(
+            & $podman.Source exec `
+                -e "TARGET_DATABASE=$Database" `
+                -e "PHOTOIDENTITY_SQL=$Sql" `
+                $ContainerId sh -lc `
+                'psql -X -A -t -U "$POSTGRES_USER" -d "$TARGET_DATABASE" -v ON_ERROR_STOP=1 -c "$PHOTOIDENTITY_SQL"' `
+                2> $stderrPath)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            $detail = ""
+            if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
+                $detail = (@(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue |
+                    Select-Object -Last 8) -join " ").Trim()
+            }
+            if ($detail.Length -gt 1200) { $detail = $detail.Substring(0, 1200) }
+            throw "PostgreSQL verification query failed in database '$Database' (exit $exitCode; SQL: $Sql). $detail"
+        }
+        @($rows | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -ne "" })
     }
-
-    @($rows | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -ne "" })
+    finally {
+        Remove-Item -LiteralPath $stderrPath -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-CatalogueEvidence {
@@ -134,44 +155,50 @@ try {
 
     $sourceEvidence = Get-CatalogueEvidence -ContainerId $containerId -Database $sourceDatabase
 
-    $exists = @(
+    if ($ResumeRestoredDatabase) {
+        Write-Host "Resuming verification of retained restored database '$VerificationDatabaseName'..."
+        # In resume mode, never create or restore a database.
+    }
+    else {
+        $exists = @(
+            & $podman.Source exec `
+                -e "VERIFY_DATABASE=$VerificationDatabaseName" `
+                $containerId sh -lc `
+                'psql -X -A -t -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = ''$VERIFY_DATABASE''"' `
+                2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not check the verification database name."
+        }
+        if ((($exists -join " ").Trim()) -eq "1") {
+            throw "Verification database '$VerificationDatabaseName' already exists; choose another name."
+        }
+
+        Write-Host "Creating isolated restore-verification database '$VerificationDatabaseName'..."
         & $podman.Source exec `
             -e "VERIFY_DATABASE=$VerificationDatabaseName" `
             $containerId sh -lc `
-            'psql -X -A -t -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = ''$VERIFY_DATABASE''"' `
-            2>$null)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not check the verification database name."
-    }
-    if ((($exists -join " ").Trim()) -eq "1") {
-        throw "Verification database '$VerificationDatabaseName' already exists; choose another name."
-    }
+            'createdb -U "$POSTGRES_USER" --template=template0 "$VERIFY_DATABASE"' | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not create the isolated restore-verification database."
+        }
 
-    Write-Host "Creating isolated restore-verification database '$VerificationDatabaseName'..."
-    & $podman.Source exec `
-        -e "VERIFY_DATABASE=$VerificationDatabaseName" `
-        $containerId sh -lc `
-        'createdb -U "$POSTGRES_USER" --template=template0 "$VERIFY_DATABASE"' | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not create the isolated restore-verification database."
-    }
+        $containerBackupPath = "/tmp/photoidentity-restore-$([Guid]::NewGuid().ToString('N')).dump"
+        $containerDestination = "$containerId`:$containerBackupPath"
+        & $podman.Source cp $BackupPath $containerDestination | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not copy the PostgreSQL backup into the container for isolated restore verification."
+        }
 
-    $containerBackupPath = "/tmp/photoidentity-restore-$([Guid]::NewGuid().ToString('N')).dump"
-    $containerDestination = "$containerId`:$containerBackupPath"
-    & $podman.Source cp $BackupPath $containerDestination | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not copy the PostgreSQL backup into the container for isolated restore verification."
-    }
-
-    Write-Host "Restoring the backup into the isolated database..."
-    & $podman.Source exec `
-        -e "VERIFY_DATABASE=$VerificationDatabaseName" `
-        -e "DUMP_PATH=$containerBackupPath" `
-        $containerId sh -lc `
-        'pg_restore -U "$POSTGRES_USER" -d "$VERIFY_DATABASE" --exit-on-error --single-transaction --no-owner --no-acl "$DUMP_PATH"' `
-        2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Restore failed. The production database was not modified. The isolated verification database was retained for diagnosis."
+        Write-Host "Restoring the backup into the isolated database..."
+        & $podman.Source exec `
+            -e "VERIFY_DATABASE=$VerificationDatabaseName" `
+            -e "DUMP_PATH=$containerBackupPath" `
+            $containerId sh -lc `
+            'pg_restore -U "$POSTGRES_USER" -d "$VERIFY_DATABASE" --exit-on-error --single-transaction --no-owner --no-acl "$DUMP_PATH"' `
+            2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Restore failed. The production database was not modified. The isolated verification database was retained for diagnosis."
+        }
     }
 
     $restoredEvidence = Get-CatalogueEvidence -ContainerId $containerId -Database $VerificationDatabaseName
