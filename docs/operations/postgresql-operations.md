@@ -78,6 +78,12 @@ If multiple migrated/rehearsal databases remain in the server, select the accept
 
 Do not inspect PostgreSQL's physical data files to decide which database is production. Database names and server activity are the supported operational level; PostgreSQL's internal relation files and OID directories are not a safe authority-identification mechanism.
 
+```powershell
+.\backup-postgres-catalogue-improved.ps1 `
+    -DatabaseName "photoidentity_rehearsal_20260910_214641_a808bde" `
+    -CopyToOneDrive
+```
+
 ### Identifying the active production database when rehearsals remain
 
 When several retained rehearsal databases all contain valid Photo Identity schema markers, identify the active catalogue from PostgreSQL activity rather than guessing from the timestamped names.
