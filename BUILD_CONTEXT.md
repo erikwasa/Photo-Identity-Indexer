@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: review schema v33 isolated regression tests in a throwaway PostgreSQL DB, then implement secure opt-in video asset/revision insertion, metadata/poster write/query, exclusion/invalidation, server-side photo-only query guards and video browsing. Before deploying v33 to maintained catalogue, back up PostgreSQL and rehearse migration. HLG-to-BT.709 thumbnails need a separate colour-verified implementation, not implicit SDR conversion.
+WI-0151: the operator's 2026-10-15 local PostgreSQL acceptance passed (56 persistence + 7 integration tests; Podman and Compose recovered). A guarded CLI migration-only rehearsal is now prepared: it requires the successful restored PostgreSQL report and applies v32→v33 only to the matching isolated photoidentity_restore_* database. Next: operator backup/restore rehearsal on the actual maintained catalogue, then opt-in video revision persistence, exclusions/invalidation, photo-only query isolation, browsing and colour-verified HLG poster generation.
 
 ## Relevant pointers
 

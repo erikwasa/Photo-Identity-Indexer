@@ -68,6 +68,12 @@ Source, metadata, persistence and representative real-file verification.
 - Replaced the literal with `PostgresCatalogueDatabase.CurrentSchemaVersion`. Updated the existing Windows CI PostgreSQL package-verification gate to run the **full** `FullyQualifiedName~Postgres` persistence suite against its disposable PostgreSQL runner rather than only the new v33 schema test. This adds small runtime overhead to catch future stale expectations during PR review. The repository run remains production-catalogue safe.
 - Re-run `verify-postgres.ps1` locally after the correction merges. Schema v33 migration on the maintained catalogue still needs a backup and restored-rehearsal verification; the passing test does **not** constitute that rehearsal.
 
+## PostgreSQL runtime acceptance and next safety gate — 2026-10-15
+
+- Maintainer re-ran verify-postgres.ps1 after PR #528: Podman 5.8.5/5.8.6, standalone Docker Compose 5.6.0, PostgreSQL authentication, Windows loopback and Release build passed (zero warnings/errors); 56 PostgreSQL persistence tests and 7 runtime/composition integration tests passed. No production reset or Docker Desktop reinstatement was needed.
+- Introduced an **isolated restored-database schema rehearsal command** in [video PostgreSQL schema rehearsal](../../operations/video-postgres-schema-rehearsal.md). It binds a successful restore report to a local named photoidentity_restore_* DB, requires schema v32 and identical pre-migration counts, then initializes v33 twice and checks that photo state/counts remain intact and video tables are empty.
+- This command is **not** a live catalogue migration authorization. The operator must back up the actual maintained database, complete restore verification, and run the rehearsal before updating the maintained installation. Video catalogue ingestion and HLG poster implementation remain outstanding.
+
 ## Completion notes
 
 - Files changed:
