@@ -40,6 +40,10 @@ public static class Program
         {
             return args[0] switch
             {
+                "catalogue" when args.Length > 1 && args[1] == "rehearse-v33" =>
+                    await VideoSchemaRehearsalCommandRunner.RunAsync(
+                        VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "pilot" =>
                     await VideoPilotCommandRunner.RunAsync(
                         VideoPilotOptions.Parse(args.Skip(2).ToArray()),
@@ -114,6 +118,11 @@ public static class Program
     {
         output.WriteLine("""
             Photo Identity Indexer CLI
+
+              catalogue rehearse-v33 --postgres-connection-env NAME
+                                     --restore-report PATH
+                          (requires successful isolated restore-verification report;
+                           applies v33 ONLY to its matched local photoidentity_restore_* database)
 
               video pilot --enable-video --source DIR --derivatives DIR
                           --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
