@@ -37,7 +37,7 @@ public sealed class VideoSchemaRehearsalCommandTests
     }
 
     [Fact]
-    public async Task Production_like_database_names_are_rejected_before_opening_connection()
+    public async Task Missing_restore_report_and_remote_host_are_rejected_before_opening_connection()
     {
         const string variable = "PHOTOIDENTITY_WI0151_TEST_CONN";
         string? original = Environment.GetEnvironmentVariable(variable);
@@ -45,8 +45,9 @@ public sealed class VideoSchemaRehearsalCommandTests
         {
             Environment.SetEnvironmentVariable(variable,
                 "Host=127.0.0.1;Port=5432;Database=photoidentity_production;Username=example;Password=private");
-            VideoSchemaRehearsalOptions options = new(variable, "missing.json");
-            await Assert.ThrowsAsync<ArgumentException>(() =>
+            VideoSchemaRehearsalOptions options = new(variable, Path.Combine(
+                Path.GetTempPath(), "photoidentity-absent-restore-" + Guid.NewGuid().ToString("N") + ".json"));
+            await Assert.ThrowsAsync<FileNotFoundException>(() =>
                 VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null));
 
             Environment.SetEnvironmentVariable(variable,
@@ -57,6 +58,54 @@ public sealed class VideoSchemaRehearsalCommandTests
         finally
         {
             Environment.SetEnvironmentVariable(variable, original);
+        }
+    }
+
+    [Fact]
+    public async Task Report_selected_database_is_validated_before_attempting_any_connection()
+    {
+        const string variable = "PHOTOIDENTITY_WI0151_TEST_REPORT_SELECTED_CONN";
+        string? original = Environment.GetEnvironmentVariable(variable);
+        string reportPath = Path.Combine(Path.GetTempPath(),
+            "photoidentity-wi0151-report-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            // Simulates the launcher supplying a production DB name. The runner
+            // must derive its target from the independently verified report, not
+            // reject this string or open the launcher database.
+            Environment.SetEnvironmentVariable(variable,
+                "Host=127.0.0.1;Database=photoidentity_production;Username=example;Password=private");
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "photoidentity_production",
+                  "verificationDatabase": "photoidentity_restore_20261015223202_7da49f",
+                  "restoredEvidence": { "schemaVersion": 31 }
+                }
+                """);
+
+            VideoSchemaRehearsalOptions options = new(variable, reportPath);
+            InvalidOperationException wrongSchema = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null));
+            Assert.Contains("schema v32", wrongSchema.Message, StringComparison.Ordinal);
+
+            // A forged report targeting the production database cannot get as far
+            // as opening a connection, regardless of embedded connection database.
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "photoidentity_production",
+                  "verificationDatabase": "photoidentity_production",
+                  "restoredEvidence": { "schemaVersion": 32 }
+                }
+                """);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, original);
+            if (File.Exists(reportPath)) File.Delete(reportPath);
         }
     }
 }
