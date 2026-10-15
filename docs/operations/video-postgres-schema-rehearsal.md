@@ -29,19 +29,19 @@ $rehearsalDb
 
 This restore verifier creates a unique database named photoidentity_restore_* and retains it for inspection. The report contains the source and restored database names, original schema and per-table counts.
 
-## Point a process-only connection variable to the restored copy
+## Select the local PostgreSQL credentials without rewriting the database
 
-The rehearsal CLI never accepts a raw connection string argument. The following reads the configured launcher credentials directly from Windows environment-variable scopes and changes **only** the database name in a process-local connection string. It never prints the password.
+**The restore verification report now selects the target database.** The CLI uses your private launcher connection string only to get localhost server settings and credentials. It overrides any embedded database name with the exact verification database from the report, and verifies its name, source mismatch, v32 schema and table counts before running a migration. This avoids the PowerShell connection-string alias/PSObject issues encountered during maintainer verification.
 
-**Why this is different:** PowerShell can wrap a pipeline result in a PSObject; assigning it directly to the .NET DbConnectionStringBuilder.ConnectionString setter can fail. Use a direct, explicitly typed string from GetEnvironmentVariable instead of the previous ForEach-Object / Select-Object pipeline. Stop on error and do not proceed to migration if parsing fails.
+Do not copy your production connection string into GitHub, a log, or a conversation. The following reads it from the configured launcher environment variable into a **temporary process-scoped variable** without printing it.
 
 ~~~powershell
 $ErrorActionPreference = 'Stop'
 Remove-Item Env:\PHOTOIDENTITY_WI0151_REHEARSAL -ErrorAction SilentlyContinue
 
+$restoreReportPath = "$backupPath.restore-verification.json"
 $restoreReport = Get-Content $restoreReportPath -Raw | ConvertFrom-Json
 if (-not $restoreReport.passed) { throw 'Restore verification failed.' }
-$rehearsalDb = [string]$restoreReport.verificationDatabase
 if ([int]$restoreReport.restoredEvidence.schemaVersion -ne 32) {
     throw "Expected restored schema v32; aborting rehearsal."
 }
@@ -75,17 +75,10 @@ if (-not $connectionString) {
     throw 'Launcher-selected PostgreSQL connection variable is unavailable.'
 }
 
-$builder = [System.Data.Common.DbConnectionStringBuilder]::new()
-$builder.ConnectionString = [string]$connectionString
-if ($builder.ContainsKey('Initial Catalog')) {
-    $null = $builder.Remove('Initial Catalog')
-}
-$builder['Database'] = $rehearsalDb
-$env:PHOTOIDENTITY_WI0151_REHEARSAL = [string]$builder.ConnectionString
-Write-Host "Rehearsal target: $rehearsalDb"
+# Pass credentials unchanged; the CLI selects the target only from the verified report.
+$env:PHOTOIDENTITY_WI0151_REHEARSAL = [string]$connectionString
+Write-Host "Verified rehearsal target: $($restoreReport.verificationDatabase)"
 ~~~
-
-If your launcher is configured elsewhere, use its actual private path. Do not paste connection strings or secrets into GitHub. A previous Cannot convert object of type System.Management.Automation.PSObject error means the earlier snippet failed in PowerShell, not in the database migration. Discard the incomplete rehearsal environment variable and repeat the corrected setup.
 
 ## Rehearse the migration
 
