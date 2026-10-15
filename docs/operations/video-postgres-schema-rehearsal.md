@@ -31,35 +31,72 @@ This restore verifier creates a unique database named photoidentity_restore_* an
 
 ## Point a process-only connection variable to the restored copy
 
-The rehearsal CLI never accepts a raw connection string argument. The following uses credentials configured for the private launcher but changes the database name without printing credentials.
+The rehearsal CLI never accepts a raw connection string argument. The following reads the configured launcher credentials directly from Windows environment-variable scopes and changes **only** the database name in a process-local connection string. It never prints the password.
+
+**Why this is different:** PowerShell can wrap a pipeline result in a PSObject; assigning it directly to the .NET DbConnectionStringBuilder.ConnectionString setter can fail. Use a direct, explicitly typed string from GetEnvironmentVariable instead of the previous ForEach-Object / Select-Object pipeline. Stop on error and do not proceed to migration if parsing fails.
 
 ~~~powershell
-$launcherPath = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\launcher.json'
+$ErrorActionPreference = 'Stop'
+Remove-Item Env:\PHOTOIDENTITY_WI0151_REHEARSAL -ErrorAction SilentlyContinue
+
+$restoreReport = Get-Content $restoreReportPath -Raw | ConvertFrom-Json
+if (-not $restoreReport.passed) { throw 'Restore verification failed.' }
+$rehearsalDb = [string]$restoreReport.verificationDatabase
+if ([int]$restoreReport.restoredEvidence.schemaVersion -ne 32) {
+    throw "Expected restored schema v32; aborting rehearsal."
+}
+
+$launcherPath = @(
+    $env:PHOTOIDENTITY_LAUNCHER_CONFIG
+    (Join-Path (Get-Location) 'PhotoIdentity.launcher.json')
+    (Join-Path $env:LOCALAPPDATA 'PhotoIdentity\launcher.json')
+) | Where-Object {
+    $_ -and (Test-Path -LiteralPath $_ -PathType Leaf)
+} | Select-Object -First 1
+if (-not $launcherPath) { throw 'Launcher configuration not found.' }
+
 $launcher = Get-Content $launcherPath -Raw | ConvertFrom-Json
 $name = [string]$launcher.postgresConnectionEnvironmentVariable
-if (-not $name) { throw 'Missing PostgreSQL environment variable in launcher.' }
+if (-not $name) { throw 'Missing launcher PostgreSQL environment-variable name.' }
 
-$original = @('Process','User','Machine') |
-  ForEach-Object { [Environment]::GetEnvironmentVariable($name, $_) } |
-  Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-  Select-Object -First 1
-if (-not $original) { throw 'Launcher-selected PostgreSQL credentials are unavailable.' }
+[string]$connectionString = ''
+foreach ($scope in @(
+    [EnvironmentVariableTarget]::Process,
+    [EnvironmentVariableTarget]::User,
+    [EnvironmentVariableTarget]::Machine
+)) {
+    [string]$candidate = [Environment]::GetEnvironmentVariable($name, $scope)
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        $connectionString = $candidate
+        break
+    }
+}
+if (-not $connectionString) {
+    throw 'Launcher-selected PostgreSQL connection variable is unavailable.'
+}
 
 $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
-$builder.ConnectionString = $original
-if ($builder.ContainsKey('Initial Catalog')) { $builder.Remove('Initial Catalog') }
+$builder.ConnectionString = [string]$connectionString
+if ($builder.ContainsKey('Initial Catalog')) {
+    $null = $builder.Remove('Initial Catalog')
+}
 $builder['Database'] = $rehearsalDb
-$env:PHOTOIDENTITY_WI0151_REHEARSAL = $builder.ConnectionString
+$env:PHOTOIDENTITY_WI0151_REHEARSAL = [string]$builder.ConnectionString
+Write-Host "Rehearsal target: $rehearsalDb"
 ~~~
 
-If the launcher is configured elsewhere, use its actual private path. Do not paste any connection strings or secrets into GitHub.
+If your launcher is configured elsewhere, use its actual private path. Do not paste connection strings or secrets into GitHub. A previous Cannot convert object of type System.Management.Automation.PSObject error means the earlier snippet failed in PowerShell, not in the database migration. Discard the incomplete rehearsal environment variable and repeat the corrected setup.
 
 ## Rehearse the migration
 
 ~~~powershell
-dotnet run --project src/PhotoIdentity.Cli --configuration Release -- catalogue rehearse-v33 --postgres-connection-env PHOTOIDENTITY_WI0151_REHEARSAL --restore-report $restoreReportPath
-
-Remove-Item Env:\PHOTOIDENTITY_WI0151_REHEARSAL
+try {
+    dotnet run --project src/PhotoIdentity.Cli --configuration Release -- catalogue rehearse-v33 --postgres-connection-env PHOTOIDENTITY_WI0151_REHEARSAL --restore-report $restoreReportPath
+    if ($LASTEXITCODE -ne 0) { throw "Schema rehearsal failed with exit code $LASTEXITCODE." }
+}
+finally {
+    Remove-Item Env:\PHOTOIDENTITY_WI0151_REHEARSAL -ErrorAction SilentlyContinue
+}
 ~~~
 
 The command checks, **before modifying anything**, that the selected database is local, its name matches the successful restore verification report, its name begins with photoidentity_restore_, it differs from the production source database, its schema is v32, and its original per-table counts equal the report.
