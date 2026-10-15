@@ -67,6 +67,12 @@ public sealed partial class PostgresCatalogueDatabase
 
     static PostgresCatalogueDatabase()
     {
+        // The existing initializer appends runtime-owned schemas to the latest migration.
+        // Add the isolated video schema first so fresh and upgraded catalogues both
+        // receive version 33 before the append-only extensions are applied.
+        Migrations = [.. Migrations, new Migration(
+            33, "opt-in-video-revision-metadata-and-posters", VideoCatalogueSchemaMigration)];
+
         int currentMigrationIndex = Array.FindIndex(
             Migrations,
             migration => migration.Version == CurrentSchemaVersion);
