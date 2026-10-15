@@ -56,11 +56,6 @@ public static class VideoSchemaRehearsalCommandRunner
         NpgsqlConnectionStringBuilder builder = new(connectionString);
         if (builder.Host is not ("localhost" or "127.0.0.1" or "::1"))
             throw new ArgumentException("The rehearsal only accepts PostgreSQL on localhost.");
-        if (string.IsNullOrEmpty(builder.Database) ||
-            !builder.Database.StartsWith(RehearsalPrefix, StringComparison.Ordinal) ||
-            !Regex.IsMatch(builder.Database, @"^[a-z][a-z0-9_]{0,62}$"))
-            throw new ArgumentException("Rehearsal requires a uniquely named photoidentity_restore_* database.");
-
         if (!File.Exists(options.RestoreVerificationReportPath))
             throw new FileNotFoundException("The restore verification report does not exist.");
 
@@ -72,10 +67,22 @@ public static class VideoSchemaRehearsalCommandRunner
             passed.ValueKind != JsonValueKind.True ||
             !TryString(root, "verificationDatabase", out string restoredName) ||
             !TryString(root, "sourceDatabase", out string sourceName) ||
-            !restoredName.Equals(builder.Database, StringComparison.Ordinal) ||
-            restoredName.Equals(sourceName, StringComparison.Ordinal))
+            restoredName.Equals(sourceName, StringComparison.Ordinal) ||
+            !restoredName.StartsWith(RehearsalPrefix, StringComparison.Ordinal) ||
+            !Regex.IsMatch(restoredName,
+                @"^photoidentity_restore_[0-9]{14}_[a-f0-9]{6}$",
+                RegexOptions.CultureInvariant))
             throw new InvalidDataException(
-                "Restore report is not a successful isolated verification for the selected database.");
+                "Restore report is not a successful isolated verification for a safe restored database.");
+
+        // The restore report is the only authority for selecting the target database.
+        // The environment variable supplies only localhost server settings and credentials.
+        // This avoids discrepancies between DbConnectionStringBuilder and Npgsql aliases
+        // and never opens the source database embedded in the original connection string.
+        builder.Database = restoredName;
+        if (new NpgsqlConnectionStringBuilder(builder.ConnectionString).Database != restoredName)
+            throw new InvalidDataException(
+                "The restored database could not be selected unambiguously.");
 
         JsonElement evidence = root.GetProperty("restoredEvidence");
         if (evidence.GetProperty("schemaVersion").GetInt32() != PostgresCatalogueDatabase.CurrentSchemaVersion - 1)

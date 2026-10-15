@@ -74,6 +74,13 @@ Source, metadata, persistence and representative real-file verification.
 - Introduced an **isolated restored-database schema rehearsal command** in [video PostgreSQL schema rehearsal](../../operations/video-postgres-schema-rehearsal.md). It binds a successful restore report to a local named photoidentity_restore_* DB, requires schema v32 and identical pre-migration counts, then initializes v33 twice and checks that photo state/counts remain intact and video tables are empty.
 - This command is **not** a live catalogue migration authorization. The operator must back up the actual maintained database, complete restore verification, and run the rehearsal before updating the maintained installation. Video catalogue ingestion and HLG poster implementation remain outstanding.
 
+## Restored-catalogue rehearsal operator blocker — 2026-10-16
+
+- The maintainer successfully completed backup, isolated PostgreSQL restore and source/restored table/constraint verification twice, most recently for a restored schema v32 catalogue. These are restore acceptance results, **not** v33 migration acceptance.
+- The first rehearsal attempt failed while setting a DbConnectionStringBuilder property from a PowerShell PSObject. Corrected PowerShell coercion, but the CLI then rejected the interpreted database name before any database connection or schema migration.
+- To remove the launcher-database-alias ambiguity safely, the CLI now selects the target database **exclusively from the successful restore verification report**, enforces the exact generated photoidentity_restore_YYYYMMDDHHMMSS_xxxxxx format, rejects the source name and non-local host, and still checks real schema v32 plus all pre-migration row counts before applying migration 33. Only localhost credentials are read from the private launcher environment. The operator no longer constructs or rewrites a connection string in PowerShell.
+- CI regression tests cover production-name environment variables, missing/forged reports, remote hosts, and the v32 preflight. The maintainer must still run the actual rehearsal on the retained restored catalogue; WI-0151 remains **in_progress**.
+
 ## Completion notes
 
 - Files changed:
