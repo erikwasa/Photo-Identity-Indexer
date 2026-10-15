@@ -369,12 +369,14 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Verify video catalogue schema v33
+      - name: Verify PostgreSQL persistence suite
         shell: pwsh
         env:
           PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=root
         run: |
-          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresVideoCatalogueSchemaTests"
+          # Run the same live PostgreSQL persistence filter as verify-postgres.ps1.
+          # Previous narrow filtering missed a stale fixed-schema assertion.
+          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~Postgres"
           exit $LASTEXITCODE
 
       - name: Run Windows package verification

@@ -45,7 +45,7 @@ public sealed class PostgresPhotoListCollectionRepositoryTests
             await using PostgresCatalogueDatabase database = new(testBuilder.ConnectionString);
             PostgresInitializationResult initialization = await database.TryInitializeAsync();
             Assert.Null(initialization.Error);
-            Assert.Equal(31, initialization.Health.SchemaVersion);
+            Assert.Equal(PostgresCatalogueDatabase.CurrentSchemaVersion, initialization.Health.SchemaVersion);
 
             AssetRevisionId first = AssetRevisionId.New();
             AssetRevisionId second = AssetRevisionId.New();
