@@ -61,6 +61,13 @@ Source, metadata, persistence and representative real-file verification.
 - This is a foundation PR and must **not** be treated as end-to-end WI-0151 acceptance. Take a PostgreSQL backup and test migration on a rehearsal database before restarting a maintained production instance.
 - Next: secure revision-bound save/query and exclusion filtering, opt-in ingest, deterministic poster invalidation/cleanup and presentation; separately validate HLG colour mapping using selected local clips.
 
+## Maintained PostgreSQL acceptance regression — 2026-10-15
+
+- After removing Docker Desktop, the operator installed standalone Docker Compose 5.6.0, and `podman compose` again started and authenticated the unchanged PostgreSQL 18 container through Podman 5.8.5/5.8.6. The Release build completed without warnings/errors and Windows localhost protocol acceptance passed.
+- The full local `verify-postgres.ps1` persistence test filter exposed a stale literal schema-version expectation (`31`) in `PostgresPhotoListCollectionRepositoryTests`. Schema v33 was **correctly** reported as 33, so this was a test assertion failure (55/56 tests passed), **not** evidence of catalogue corruption or a networking problem.
+- Replaced the literal with `PostgresCatalogueDatabase.CurrentSchemaVersion`. Updated the existing Windows CI PostgreSQL package-verification gate to run the **full** `FullyQualifiedName~Postgres` persistence suite against its disposable PostgreSQL runner rather than only the new v33 schema test. This adds small runtime overhead to catch future stale expectations during PR review. The repository run remains production-catalogue safe.
+- Re-run `verify-postgres.ps1` locally after the correction merges. Schema v33 migration on the maintained catalogue still needs a backup and restored-rehearsal verification; the passing test does **not** constitute that rehearsal.
+
 ## Completion notes
 
 - Files changed:
