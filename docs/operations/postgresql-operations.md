@@ -133,6 +133,24 @@ The verifier:
 
 The isolated verification database is intentionally retained after success or failure. This keeps restore evidence available for maintainer inspection instead of deleting it automatically.
 
+### Resume a retained restore after verification fails
+
+If the script prints **“Restoring the backup into the isolated database...”** and then fails while collecting PostgreSQL evidence, the `pg_restore` command may have completed successfully even though **verification has not passed**. Preserve the original `.dump`, JSON report and the restored database. Do not repeat the backup or choose a different source database until the actual query error is known.
+
+A normal rerun creates another database. With the exact generated name printed in the original attempt, resume **read-only restore verification** of the existing copy instead:
+
+~~~powershell
+.\verify-postgres-backup-restore.ps1 `
+  -BackupPath $backupPath `
+  -ApplicationStopped `
+  -VerificationDatabaseName 'photoidentity_restore_YYYYMMDDHHMMSS_xxxxxx' `
+  -ResumeRestoredDatabase
+~~~
+
+Replace that placeholder with the **exact** name from the previous attempt. The resume switch refuses other name formats, and it does not call `createdb`, copy a dump or call `pg_restore`. It rechecks the backup fingerprint and original source evidence, then compares the retained restored database's version, all public table counts and constraints. SQL query failures now identify the database, the failed read-only SQL query and a short PostgreSQL error message instead of a generic failure. This does not automatically repair a bad restore. If it fails, keep the restored database for diagnosis and do not apply a schema migration.
+
+**Safety:** Keep Photo Identity stopped during count-stable restore verification. The verifier cannot by itself establish that a backup was taken from the current maintained production authority; confirm the selected source from the launcher or database activity before using this as a production migration gate.
+
 After the report has been reviewed and its verification database name has been copied, remove **only that isolated verification database**, never the production database:
 
 ```powershell
