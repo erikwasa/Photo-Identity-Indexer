@@ -369,6 +369,14 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Verify video catalogue schema v33
+        shell: pwsh
+        env:
+          PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=root
+        run: |
+          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~PostgresVideoCatalogueSchemaTests"
+          exit $LASTEXITCODE
+
       - name: Run Windows package verification
         shell: powershell
         env:
