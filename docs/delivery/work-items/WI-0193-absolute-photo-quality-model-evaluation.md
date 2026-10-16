@@ -47,9 +47,35 @@ Determine whether Photo Identity can assign a useful absolute quality rating to 
 
 Reproducible benchmark runs, frozen held-out evaluation, maintainer review of representative disagreements and privacy-safe aggregate result documentation.
 
+## Checkpoint 1: frozen calibration protocol and WI-0182 baseline
+
+The first implementation checkpoint establishes the reusable evaluation boundary before any learned IQA candidate is selected.
+
+- Candidate score exports are versioned and benchmark-bound. They must cover every benchmark revision exactly once and record candidate/model version, framework, license/source, preprocessing, score direction, model size, execution provider, per-photo runtime and explicit inference failures.
+- The WI-0182 baseline is represented as `wi0182-technical-reason-count-v1`: the existing calibrated `proxy-technical-quality-v1` analyzer runs over each durable review proxy and emits a deliberately simple, tie-heavy `100 - 10 * candidate-reason-count` score. This is a fixed comparison baseline, not a production quality model.
+- `benchmark quality-eval calibration-report` evaluates only representative photos in the frozen calibration partition with known five-level labels. Challenge photos, `Unsure` labels and all held-out labels are excluded from metrics.
+- Calibration metrics currently include Spearman rank correlation, pairwise ordering for human ratings separated by at least two tiers, explicit inference-failure counts and a diagnostic Very Low threshold sweep.
+- Very Low threshold evidence reports observed precision, false positives, recall and the 95% Wilson lower bound. Reaching the approximate 98% observed-precision target on a tiny sample does not constitute a safety recommendation.
+- A held-out evaluation command is intentionally absent in this checkpoint. It will only be added after candidate/model selection and calibration policy are frozen.
+
+Example baseline and calibration commands:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline \
+  --input private/photo-quality-benchmark.json \
+  --output private/wi0182-quality-scores.json
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report \
+  --input private/photo-quality-benchmark.json \
+  --scores private/wi0182-quality-scores.json \
+  --output private/wi0182-quality-calibration.json
+~~~
+
+The next checkpoints add justified learned IQA candidates, candidate-disagreement challenge cases, the bounded proxy-versus-original comparison, then freeze one calibration policy before a single held-out evaluation.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: checkpoint 1 adds the benchmark-bound candidate score protocol, WI-0182 baseline scorer, calibration-only metrics/tests, operator guidance and lifecycle status.
+- Trade-offs: the baseline score is intentionally simple and tie-heavy; it preserves WI-0182 as a fixed technical comparison without pretending its hand-written reasons are a calibrated aesthetic score.
+- Deferred work: TOPIQ/MUSIQ/ARNIQA-or-equivalent execution, model-disagreement challenge import, original-pixel comparison, frozen calibration mapping and held-out evaluation.
+- Commands run: repository CI after pull request creation; maintained private benchmark commands are deferred until the checkpoint merges.
