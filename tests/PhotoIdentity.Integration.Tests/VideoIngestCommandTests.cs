@@ -17,6 +17,7 @@ public sealed class VideoIngestCommandTests
         Assert.Equal(8, options.MaximumVideos);
         Assert.Equal(20, options.TimeoutSeconds);
         Assert.Null(options.ConnectionEnvironmentVariable);
+        Assert.Null(options.DatabaseName);
     }
 
     [Fact]
@@ -25,15 +26,23 @@ public sealed class VideoIngestCommandTests
         string[] args = ["--enable-video", "--source", "C:\\Archive",
             "--ffprobe", "C:\\Tools\\ffprobe.exe"];
         Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse([.. args, "--apply"]));
+        Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
+            [.. args, "--postgres-connection-env", "PRIVATE_POSTGRES", "--apply"]));
         VideoIngestOptions valid = VideoIngestOptions.Parse(
-            [.. args, "--postgres-connection-env", "PRIVATE_POSTGRES", "--apply",
+            [.. args, "--postgres-connection-env", "PRIVATE_POSTGRES",
+                "--database", "photoidentity", "--apply",
                 "--max-videos", "3", "--timeout-seconds", "40"]);
         Assert.True(valid.Apply);
         Assert.Equal("PRIVATE_POSTGRES", valid.ConnectionEnvironmentVariable);
+        Assert.Equal("photoidentity", valid.DatabaseName);
         Assert.Equal(3, valid.MaximumVideos);
         Assert.Equal(40, valid.TimeoutSeconds);
         Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
-            [.. args, "--postgres-connection-env", "Host=localhost;Password=secret", "--apply"]));
+            [.. args, "--postgres-connection-env", "Host=localhost;Password=secret",
+                "--database", "photoidentity", "--apply"]));
+        Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
+            [.. args, "--postgres-connection-env", "PRIVATE_POSTGRES",
+                "--database", "photoidentity;DROP DATABASE", "--apply"]));
         Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
             [.. args, "--max-videos", "26"]));
         Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
