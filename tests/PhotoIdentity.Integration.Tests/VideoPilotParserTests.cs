@@ -56,6 +56,117 @@ public sealed class VideoPilotParserTests
     }
 
     [Fact]
+    public void Apple_embedded_capture_and_ISO6709_coordinates_take_precedence_over_generic_creation()
+    {
+        const string json = """
+            {
+              "streams":[{"codec_type":"video","codec_name":"hevc","profile":"Main 10",
+                          "width":1920,"height":1080,
+                          "tags":{"creation_time":"2020-01-01T01:02:03Z"}}],
+              "format":{"format_name":"mov,mp4","duration":"10.5",
+                "tags":{
+                  "creation_time":"2025-12-01T12:00:00Z",
+                  "com.apple.quicktime.creationdate":"2026-02-16T14:12:16+0100",
+                  "com.apple.quicktime.location.ISO6709":"+59.325000+018.065000+010.2/",
+                  "com.apple.quicktime.make":"Apple",
+                  "com.apple.quicktime.model":"iPhone 15 Pro"
+                }}
+            }
+            """;
+        VideoPilotMetadata result = VideoPilotMetadataParser.Parse(json);
+        Assert.True(result.HasCreationTime);
+        Assert.True(result.HasLocation);
+        Assert.Equal(new DateTimeOffset(2026, 2, 16, 13, 12, 16, TimeSpan.Zero),
+            result.CaptureAtUtc);
+        Assert.Equal("format:com.apple.quicktime.creationdate", result.CaptureTimeProvenance);
+        Assert.Equal(59.325, result.GpsLatitude);
+        Assert.Equal(18.065, result.GpsLongitude);
+        Assert.Equal("Apple", result.CameraMake);
+        Assert.Equal("iPhone 15 Pro", result.CameraModel);
+
+        // Pilot report must not leak private camera, location, or capture fields.
+        string serialized = System.Text.Json.JsonSerializer.Serialize(result);
+        Assert.DoesNotContain("59.325", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("iPhone 15 Pro", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("2026-02-16", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("CaptureTimeProvenance", serialized, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("2026-02-16 14:12:16", null)]
+    [InlineData("2026-02-16T14:12:16Z", "2026-02-16T14:12:16+00:00")]
+    [InlineData("2026-02-16T14:12:16-05:30", "2026-02-16T19:42:16+00:00")]
+    [InlineData("2026-02-16T14:12:16+2530", null)]
+    [InlineData("2026-02-16T14:12:16+02", null)]
+    [InlineData("invalid", null)]
+    public void Capture_time_requires_explicit_valid_timezone(string tag, string? utc)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            format = new
+            {
+                tags = new Dictionary<string, string>
+                {
+                    ["com.apple.quicktime.creationdate"] = tag
+                }
+            }
+        });
+        VideoPilotMetadata result = VideoPilotMetadataParser.Parse(json);
+        Assert.True(result.HasCreationTime);
+        Assert.Equal(utc is null ? null : DateTimeOffset.Parse(
+            utc, System.Globalization.CultureInfo.InvariantCulture), result.CaptureAtUtc);
+        Assert.Equal(utc is null ? null : "format:com.apple.quicktime.creationdate",
+            result.CaptureTimeProvenance);
+    }
+
+    [Fact]
+    public void Invalid_Apple_local_clock_falls_back_to_valid_generic_UTC_and_stream_tags()
+    {
+        const string json = """
+            {"format":{"tags":{"com.apple.quicktime.creationdate":"2026-02-16T14:12:16",
+              "creation_time":"2026-02-16T14:12:16.500Z",
+              "com.apple.quicktime.location.ISO6709":"0,0"}},
+             "streams":[{"codec_type":"video","tags":{
+               "com.apple.quicktime.location.ISO6709":"-33.1234+151.2345/",
+               "com.apple.quicktime.make":"Apple"}}]}
+            """;
+        VideoPilotMetadata result = VideoPilotMetadataParser.Parse(json);
+        Assert.Equal(new DateTimeOffset(2026, 2, 16, 14, 12, 16, 500, TimeSpan.Zero),
+            result.CaptureAtUtc);
+        Assert.Equal("format:creation_time", result.CaptureTimeProvenance);
+        Assert.Equal(-33.1234, result.GpsLatitude);
+        Assert.Equal(151.2345, result.GpsLongitude);
+        Assert.Equal("Apple", result.CameraMake);
+        Assert.Null(result.CameraModel);
+    }
+
+    [Theory]
+    [InlineData("+91.0000+018.0000/")]
+    [InlineData("+59.0000+181.0000/")]
+    [InlineData("+59.0000+018.0000")]
+    [InlineData("59.0000,18.0000")]
+    [InlineData("+5900.00+01800.00/")]
+    [InlineData("+59.0+018.0/extra")]
+    [InlineData("bad")]
+    public void Malformed_or_ambiguous_location_remains_unknown(string coordinate)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            format = new
+            {
+                tags = new Dictionary<string, string>
+                {
+                    ["com.apple.quicktime.location.ISO6709"] = coordinate
+                }
+            }
+        });
+        VideoPilotMetadata result = VideoPilotMetadataParser.Parse(json);
+        Assert.True(result.HasLocation);
+        Assert.Null(result.GpsLatitude);
+        Assert.Null(result.GpsLongitude);
+    }
+
+    [Fact]
     public void Unsupported_formats_do_not_silently_fall_back_to_photo_behavior()
     {
         Assert.False(VideoPilotCommandRunner.IsSupported(new VideoPilotMetadata(
