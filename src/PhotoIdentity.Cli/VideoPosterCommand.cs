@@ -61,8 +61,10 @@ public static class VideoPosterCommandRunner
     private const long MaximumPosterBytes = 8L * 1024 * 1024;
 
     public static bool IsEligible(VideoRevisionInspection? inspection) =>
-        inspection is { InspectionStatus: "supported" } &&
-        inspection.ColorTransfer is not ("arib-std-b67" or "smpte2084");
+        // An absent or unrecognized transfer is UNKNOWN, not SDR. Fail closed
+        // until a separately validated color-rendering profile handles it.
+        // This profile supports only explicitly identified Rec.709 transfer.
+        inspection is { InspectionStatus: "supported", ColorTransfer: "bt709" };
 
     public static string RelativePosterPath(AssetRevisionId revision, string ffmpegSha256)
     {
