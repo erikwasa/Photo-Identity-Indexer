@@ -43,3 +43,13 @@ The disposable PostgreSQL regression adds analyzed and pending videos in the SAM
 
 The test does not prove every historical SQL path is video-free. Maintained end-to-end photo/video counts, private exclusion and original read-only verification remain necessary in the final one-time operator review.
 
+
+## Photo annotation and metadata isolation — checkpoint 15
+
+Further audit after PR #555 identified a separate write-side boundary: photo manual person, tag, place and capture-date adapters checked only that a revision ID existed, so explicitly registered video revisions could be annotated through the photo-specific repositories. The local photo metadata backfill enumerated all source revisions, including videos, and the photo capture/extended metadata and inspection adapters accepted arbitrary revision IDs.
+
+Checkpoint 15 requires **both** asset and revision `media_kind = 'photo'` before any manual photo annotation read/write. The photo capture-date editor retains its revision-level PostgreSQL lock (`FOR UPDATE OF revision`) while also checking both media-kind values. Photo metadata backfill now admits photo revisions only, including force mode, so it cannot probe a locally available video via the photo metadata worker. Photo capture/extended metadata and extraction-inspection saves use one SQL `INSERT … SELECT … WHERE EXISTS` gate and reject missing/video IDs without mutating photo tables; corresponding metadata reads hide any legacy video companion rows.
+
+The disposable PostgreSQL photo-metadata backfill fixture now creates a photo and a video in the **same local source**. It verifies the photo remains eligible and persists metadata normally, both ordinary and forced photo backfill omit video, and video revision IDs fail manual-person, tag, place, capture-date and photo-metadata operations. There is no new scanner, schema migration, automatic video processing, cloud hydration, photo-to-video conversion or change to the original media.
+
+The video catalogue has its own capture/GPS/camera contracts. Do not re-enable these photo APIs for videos as a shortcut; WI-0153 will define video-aware manual metadata separately. A broader audit and real-file operator acceptance are still required before WI-0151 is completed.
