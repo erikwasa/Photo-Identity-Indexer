@@ -59,6 +59,8 @@ public sealed class PostgresPhotoMetadataBackfillRepository :
             LEFT JOIN photo_metadata_inspections AS inspection
                 ON inspection.asset_revision_id = revision.id
             WHERE asset.deleted_at_utc IS NULL
+              AND asset.media_kind = 'photo'
+              AND revision.media_kind = 'photo'
               AND source.kind = 'local-folder'
               AND (
                     @force

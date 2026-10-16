@@ -35,7 +35,13 @@ public sealed class PostgresPhotoCaptureMetadataRepository :
                 latitude,
                 longitude
             FROM photo_capture_metadata
-            WHERE asset_revision_id = @asset_revision_id;
+            WHERE asset_revision_id = @asset_revision_id
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id = revision.asset_id
+                  WHERE revision.id = @asset_revision_id
+                    AND revision.media_kind = 'photo'
+                    AND asset.media_kind = 'photo');
             """;
         command.Parameters.AddWithValue(
             "asset_revision_id",
@@ -85,13 +91,19 @@ public sealed class PostgresPhotoCaptureMetadataRepository :
                 latitude,
                 longitude,
                 extracted_at_utc)
-            VALUES (
+            SELECT
                 @asset_revision_id,
                 @taken_at_local,
                 @utc_offset_minutes,
                 @latitude,
                 @longitude,
-                @extracted_at_utc)
+                @extracted_at_utc
+            WHERE EXISTS (
+                SELECT 1 FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                WHERE revision.id = @asset_revision_id
+                  AND revision.media_kind = 'photo'
+                  AND asset.media_kind = 'photo')
             ON CONFLICT(asset_revision_id) DO UPDATE SET
                 taken_at_local = excluded.taken_at_local,
                 utc_offset_minutes = excluded.utc_offset_minutes,
@@ -141,6 +153,7 @@ public sealed class PostgresPhotoCaptureMetadataRepository :
             "extracted_at_utc",
             extractedAtUtc.ToUniversalTime());
 
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new KeyNotFoundException("Photo metadata requires an existing photo revision.");
     }
 }

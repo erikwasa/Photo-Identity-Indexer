@@ -285,7 +285,15 @@ public sealed class PostgresPhotoTagRepository : IPhotoTagRepository
     {
         await using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT EXISTS (SELECT 1 FROM asset_revisions WHERE id = @revision_id);";
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                WHERE revision.id = @revision_id
+                  AND revision.media_kind = 'photo'
+                  AND asset.media_kind = 'photo');
+            """;
         command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));
         if (!((bool?)await command.ExecuteScalarAsync(cancellationToken) ?? false))
         {

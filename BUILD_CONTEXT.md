@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: opt-in video ingestion and metadata, revision-bound SDR posters/exclusion-safe lifecycle, the default-off read-only video library, and HLG private evaluation previews are merged. Checkpoint 14 adds strict photo-only media-kind guards to background analysis/proxy/quality selectors and completion writes, with mixed-media regressions. Remaining: the conservative HDR policy (visually accept a new governed profile only with real-file evidence, or explicitly defer HLG), a final audit of photo/video processing/privacy, and the maintainer's one consolidated local acceptance. No automatic video worker.
+WI-0151: supported opt-in local video ingestion and v33 metadata, exclusion-safe bounded Rec.709 posters, separate default-off read-only video gallery, and private HLG evaluation previews exist. Checkpoints 12 and 14 hardened photo search/collection/archive read paths and photo processing/proxy/quality queues. Checkpoint 15 closes another gap by restricting manual photo annotation and photo metadata backfill/read/write adapters to photo asset/revision kinds. Remaining: final mixed-media/privacy audit and operator's consolidated local test, including visual assessment of HLG colour before any governed HDR poster is activated; unsupported or unvalidated HDR stays visible without a poster. No automatic video worker.
 
 ## Relevant pointers
 
