@@ -48,6 +48,7 @@ public sealed class PostgresArchivePostAnalysisRepository :
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
                     WHERE candidate.asset_id = asset.id
+                      AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1)
             INNER JOIN asset_revision_analysis AS analysis
@@ -57,6 +58,7 @@ public sealed class PostgresArchivePostAnalysisRepository :
                 ON proxy.asset_revision_id = revision.id
                AND proxy.profile_id = @proxy_profile_id
             WHERE asset.source_id = @source_id
+              AND asset.media_kind = 'photo' AND revision.media_kind = 'photo'
               AND asset.deleted_at_utc IS NULL
               AND proxy.asset_revision_id IS NULL
             ORDER BY asset.source_key;
