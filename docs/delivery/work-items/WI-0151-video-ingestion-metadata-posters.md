@@ -159,6 +159,13 @@ Source, metadata, persistence and representative real-file verification.
 - Existing schema-33 photo defaults remain unchanged, no new video scanning or background processing, and no OneDrive hydration. Other photo-specific legacy query paths still require complete workflow-based regression at final acceptance; this checkpoint is not a claim that every SQL query was automatically proven.
 - WI-0151 remains in progress pending conservative HDR/HLG poster validation (the local pilot identified nine HLG clips), comprehensive isolation/privacy regression and the maintainer's one consolidated end-to-end verification.
 
+## Checkpoint 13 — isolated HLG evaluation preview profile (2026-10-16)
+
+- Added explicit FFprobe parsing for per-stream colour primaries and colour matrix (in addition to the already stored transfer evidence). An HDR evaluation poster is admitted only for local HEVC Main 10 `yuv420p10le` explicitly signalling **BT.2020 + BT.2020 nonconstant-luminance + HLG**. Missing/mismatched metadata, PQ, unsupported media or nonlocal placeholders remain deferred; no HDR assumption is made based on codec or camera.
+- The existing isolated `video pilot` command accepts an **additional** `--preview-hlg` switch. Its new `pilot-hlg-tone-map-v1` output uses FFmpeg zscale linearization, Mobius tone mapping and Rec.709 conversion. The existing SDR poster filter/profile and default operation remain unchanged. Output is confined to private pilot derivatives, with original-file stability checks and bounded JPEG verification; it is **not** persisted or served.
+- A synthetic FFmpeg 7.1.5 HEVC Main 10 HLG fixture was rendered to a 1280×720 JPEG, providing filter execution evidence rather than a claim of correct real-world appearance. Tests cover strict HLG eligibility, negative/missing colour metadata, PQ refusal and the exact filter pipeline. See [HLG evaluation runbook](../../operations/video-hlg-preview.md).
+- This is an **engineering preparation checkpoint**, not end-to-end HDR acceptance. The maintainer's real HLG review remains deferred as requested. A later checkpoint must integrate any visually accepted profile through durable publication, exclusion/purge cleanup and safe browser delivery; remaining photo-only regressions and the consolidated real-file review also remain open. WI-0151 stays **in_progress**.
+
 ## Completion notes
 
 - Files changed:
