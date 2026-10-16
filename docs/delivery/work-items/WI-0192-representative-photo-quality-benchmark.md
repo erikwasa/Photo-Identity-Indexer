@@ -5,7 +5,7 @@ milestone: M37
 status_source: PhotoIdentity.Docs
 depends_on: []
 related_adrs: []
-affected_modules: [PhotoIdentity.Persistence.Postgres, tools, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Imaging.OpenCv, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Core.Tests, PhotoIdentity.Persistence.Tests, tools, docs]
 ---
 
 # WI-0192: Build a representative archive benchmark and blinded quality review workflow
@@ -26,6 +26,16 @@ Create a reusable, privacy-safe evaluation benchmark that represents the maintai
 - Freeze a calibration/held-out partition before model tuning; keep known exact/near-identical photos in the same partition to avoid leakage.
 - Export private labels/source keys only under private/data/staging or an external path. Commit only tooling, aggregate counts and privacy-safe protocol documentation.
 - Make the benchmark/review format reusable by WI-0193 and the review infrastructure reusable by WI-0194 where practical.
+
+## Checkpoint 1 implementation — representative core
+
+The first implementation checkpoint introduces a provider-independent deterministic selector plus PostgreSQL population reader and a `benchmark` mode on the existing photo-quality evaluation tool.
+
+The representative core defaults to 400 photos. It balances the marginal maintained-archive distribution across capture decade, camera/device family, media family, resolution bucket, orientation and detected-face count rather than taking one stable pseudo-random slice. Capture year uses extracted capture metadata first and can fall back to a year-prefixed source segment when metadata is absent.
+
+The benchmark command reads only current `photo` revisions with the requested durable review-proxy profile. It records private source/proxy information only in an ignored private export. Selected proxy bytes are length/SHA-256 verified and receive the existing strict 64-bit dHash. Exact-content duplicates and selected dHash neighbors at Hamming <= 4 are forced into the same deterministic 60/40 calibration/held-out partition to reduce obvious leakage.
+
+The JSON records population and selected coverage, the frozen policy/version identifiers and blank human-review fields. It deliberately reserves (by default) 200 challenge slots but does **not** populate them yet; the next checkpoint will add challenge selection and the blinded resumable review surface without replacing the representative core.
 
 ## Out of scope
 
@@ -49,7 +59,7 @@ Automated sampling/export/resume tests plus maintainer inspection of stratum cov
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core benchmark selection/split policy, PostgreSQL benchmark population query, photo-quality evaluation `benchmark` command, Core/Persistence tests and benchmark runbook.
+- Trade-offs: checkpoint 1 freezes the representative core and split before adding challenge cases/review UX. Strict dHash is used only as a leakage guard, not as a claim that those photos are production visual duplicates.
+- Deferred work: challenge tranche selection, blinded/resumable review UI and maintained-archive coverage acceptance remain in WI-0192.
+- Commands run: repository CI for the checkpoint PR; maintained private benchmark generation follows after merge.

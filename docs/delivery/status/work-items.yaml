@@ -181,9 +181,12 @@ work_items:
 - id: WI-0192
   title: Build a representative archive benchmark and blinded quality review workflow
   milestone: M37
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0192-representative-photo-quality-benchmark.md
+  started_at: 2026-10-16
+  last_updated_at: 2026-10-16
+  branch: agent/WI-0192-representative-benchmark
   blockers: []
   blocker_notes: []
   evidence:
