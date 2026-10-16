@@ -45,3 +45,10 @@ WI-0151: maintained PostgreSQL v33 accepted, and PR #540 merged opt-in dry-run-f
 - docs/operations/video-codec-survey.md
 - docs/operations/video-codec-survey-evidence-2026-10-14.md
 - docs/operations/video-pilot-evidence-2026-10-15.md
+
+\nWI-0193 checkpoint 2 adds the private, explicit opt-in Python `pyiqa`
+runner for `topiq_nr`, `musiq`, and `arniqa` with SHA-verified
+benchmark proxies and schema-compatible scored exports. The runner has offline
+contract tests but no maintained-archive scores, frozen weight hashes, original
+comparison or held-out decision yet. Do not confuse candidate support with
+model acceptance.
