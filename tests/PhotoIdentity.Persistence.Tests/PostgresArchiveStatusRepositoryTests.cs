@@ -169,6 +169,8 @@ public sealed class PostgresArchiveStatusRepositoryTests
 
             PostgresArchiveReviewProxyRepository proxies = new(database);
             const string photoProxyProfile = "mixed-media-photo-proxy";
+            await proxies.RegisterProfileAsync(
+                new ReviewProxyProfile(photoProxyProfile, 1600, 78), DateTimeOffset.UtcNow);
             IReadOnlyList<AssetRevisionId> pendingProxies =
                 await proxies.GetPendingCurrentRevisionIdsAsync(sourceId, photoProxyProfile);
             Assert.Contains(AssetRevisionId.From(analysedRevisionId), pendingProxies);
@@ -210,12 +212,6 @@ public sealed class PostgresArchiveStatusRepositoryTests
                 addLegacy.CommandText = """
                     INSERT INTO archive_configuration(id, source_id, configured_at_utc)
                     VALUES (1, @source, @now);
-
-                    INSERT INTO archive_review_proxy_profiles (
-                        profile_id, protocol_version, encoder, format, jpeg_quality,
-                        maximum_long_edge, resize_policy, canonical_definition, recorded_at_utc)
-                    VALUES (@proxy_profile, 'v1', 'test', 'jpeg', 78, 1600,
-                        'fit', 'synthetic mixed-media regression', @now);
 
                     INSERT INTO asset_revision_analysis(
                         asset_revision_id, profile_hash, processing_run_id, completed_at_utc)
