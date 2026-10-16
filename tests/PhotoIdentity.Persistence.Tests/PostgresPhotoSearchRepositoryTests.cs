@@ -196,6 +196,8 @@ public sealed class PostgresPhotoSearchRepositoryTests
         Guid source = Guid.NewGuid();
         Guid firstAsset = Guid.NewGuid();
         Guid secondAsset = Guid.NewGuid();
+        Guid videoAsset = Guid.NewGuid();
+        Guid videoRevision = Guid.NewGuid();
 
         await using NpgsqlConnection connection = await database.OpenConnectionAsync();
         await using NpgsqlCommand command = connection.CreateCommand();
@@ -207,12 +209,18 @@ public sealed class PostgresPhotoSearchRepositoryTests
             VALUES
                 (@first_asset, @source, 'a-first.jpg', @now),
                 (@second_asset, @source, 'b-second.jpg', @now);
+            INSERT INTO assets (id, source_id, source_key, media_kind, created_at_utc)
+            VALUES (@video_asset, @source, 'c-video.mov', 'video', @now);
 
             INSERT INTO asset_revisions (
                 id, asset_id, content_sha256, size_bytes, observed_at_utc, media_type, width, height)
             VALUES
                 (@first_revision, @first_asset, @first_hash, 123, @now, 'image/jpeg', 1000, 700),
                 (@second_revision, @second_asset, @second_hash, 123, @now, 'image/jpeg', 1000, 700);
+            INSERT INTO asset_revisions (id, asset_id, content_sha256,
+                size_bytes, observed_at_utc, media_type, width, height, media_kind)
+            VALUES (@video_revision, @video_asset, repeat('f',64),
+                123, @now, 'video/quicktime', 1000, 700, 'video');
 
             INSERT INTO archive_review_proxy_profiles (
                 profile_id,
@@ -246,13 +254,16 @@ public sealed class PostgresPhotoSearchRepositoryTests
                 relative_path)
             VALUES
                 (@first_revision, @profile_id, 42, @proxy_hash_1, 100, 80, @now, 'review-proxies/first.jpg'),
-                (@second_revision, @profile_id, 42, @proxy_hash_2, 100, 80, @now, 'review-proxies/second.jpg');
+                (@second_revision, @profile_id, 42, @proxy_hash_2, 100, 80, @now, 'review-proxies/second.jpg'),
+                (@video_revision, @profile_id, 42, @proxy_hash_3, 100, 80, @now, 'review-proxies/legacy-video.jpg');
             """;
         command.Parameters.AddWithValue("source", NpgsqlDbType.Uuid, source);
         command.Parameters.AddWithValue("root", NpgsqlDbType.Text, $"search-{source:N}");
         command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
         command.Parameters.AddWithValue("first_asset", NpgsqlDbType.Uuid, firstAsset);
         command.Parameters.AddWithValue("second_asset", NpgsqlDbType.Uuid, secondAsset);
+        command.Parameters.AddWithValue("video_asset", NpgsqlDbType.Uuid, videoAsset);
+        command.Parameters.AddWithValue("video_revision", NpgsqlDbType.Uuid, videoRevision);
         command.Parameters.AddWithValue("first_revision", NpgsqlDbType.Uuid, first.Value);
         command.Parameters.AddWithValue("second_revision", NpgsqlDbType.Uuid, second.Value);
         command.Parameters.AddWithValue("first_hash", NpgsqlDbType.Text, new string('1', 64));
@@ -260,6 +271,7 @@ public sealed class PostgresPhotoSearchRepositoryTests
         command.Parameters.AddWithValue("profile_id", NpgsqlDbType.Text, ProfileId);
         command.Parameters.AddWithValue("proxy_hash_1", NpgsqlDbType.Text, new string('3', 64));
         command.Parameters.AddWithValue("proxy_hash_2", NpgsqlDbType.Text, new string('4', 64));
+        command.Parameters.AddWithValue("proxy_hash_3", NpgsqlDbType.Text, new string('5', 64));
         await command.ExecuteNonQueryAsync();
     }
 

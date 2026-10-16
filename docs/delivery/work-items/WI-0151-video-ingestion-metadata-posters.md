@@ -152,6 +152,13 @@ Source, metadata, persistence and representative real-file verification.
 - Tests on disposable PostgreSQL cover photo-video isolation, superseded/other revision exclusion, tombstones, valid poster bytes, checksum tampering and pagination. No schema migration, no background video queue, no OneDrive hydration or original video serving.
 - See [operator video library runbook](../../operations/video-library-readonly.md). Remaining gates are HDR color profile/real-file verification, photo-only query audit and maintainer's consolidated acceptance. WI-0151 stays in progress.
 
+## Checkpoint 12 — default photo query isolation audit (2026-10-16)
+
+- Hardened direct photo-only catalogue reads with explicit photo media-kind checks on asset and current revision: Photo Search candidates/embeddings/captions, Smart and Creative Collection queries, manual photo list create/update/snapshot, face-based collections and review, photo details, photo caption candidates and photo archive status/items. Video revisions remain exclusively accessible through opt-in video-specific APIs.
+- Disposable PostgreSQL fixtures exercise video in the **same archive folder** without changing photo totals, video with a deliberately misleading legacy review proxy without joining photo semantic candidates, and refusal of real video revisions in manual photo lists. See [query isolation runbook](../../operations/video-photo-query-isolation.md).
+- Existing schema-33 photo defaults remain unchanged, no new video scanning or background processing, and no OneDrive hydration. Other photo-specific legacy query paths still require complete workflow-based regression at final acceptance; this checkpoint is not a claim that every SQL query was automatically proven.
+- WI-0151 remains in progress pending conservative HDR/HLG poster validation (the local pilot identified nine HLG clips), comprehensive isolation/privacy regression and the maintainer's one consolidated end-to-end verification.
+
 ## Completion notes
 
 - Files changed:

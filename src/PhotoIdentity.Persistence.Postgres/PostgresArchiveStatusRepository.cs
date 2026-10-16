@@ -49,12 +49,13 @@ public sealed class PostgresArchiveStatusRepository : IArchiveStatusRepository
                     ON revision.id = (
                         SELECT candidate.id
                         FROM asset_revisions AS candidate
-                        WHERE candidate.asset_id = asset.id
+                        WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                         ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                         LIMIT 1)
                 LEFT JOIN archive_source_observations AS source_observation
                     ON source_observation.asset_id = asset.id
                 WHERE asset.source_id = @source_id
+                  AND asset.media_kind = 'photo'
                   AND (
                       @folder = '' OR
                       asset.source_key = @folder OR
@@ -174,7 +175,7 @@ public sealed class PostgresArchiveStatusRepository : IArchiveStatusRepository
                     ON revision.id = (
                         SELECT candidate.id
                         FROM asset_revisions AS candidate
-                        WHERE candidate.asset_id = asset.id
+                        WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                         ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                         LIMIT 1)
                 LEFT JOIN archive_source_observations AS source_observation
@@ -203,6 +204,7 @@ public sealed class PostgresArchiveStatusRepository : IArchiveStatusRepository
                 ) AS latest_job
                     ON latest_job.asset_revision_id = revision.id
                 WHERE asset.source_id = @source_id
+                  AND asset.media_kind = 'photo'
                   AND (
                       @folder = '' OR
                       asset.source_key = @folder OR
@@ -293,7 +295,7 @@ public sealed class PostgresArchiveStatusRepository : IArchiveStatusRepository
                     ON revision.id = (
                         SELECT candidate.id
                         FROM asset_revisions AS candidate
-                        WHERE candidate.asset_id = asset.id
+                        WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                         ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                         LIMIT 1)
                 LEFT JOIN archive_source_observations AS source_observation
@@ -322,6 +324,7 @@ public sealed class PostgresArchiveStatusRepository : IArchiveStatusRepository
                 ) AS latest_job
                     ON latest_job.asset_revision_id = revision.id
                 WHERE asset.source_id = @source_id
+                  AND asset.media_kind = 'photo'
                   AND (
                       @folder = '' OR
                       asset.source_key = @folder OR

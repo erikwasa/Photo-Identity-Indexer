@@ -101,6 +101,7 @@ public sealed class PostgresPhotoDetailsRepository : IPhotoDetailsRepository
                 LEFT JOIN manual_people
                     ON manual_people.person_id = people.id
                 WHERE revision.id = @revision_id
+                  AND revision.media_kind = 'photo' AND asset.media_kind = 'photo'
                 ORDER BY lower(people.display_name), people.id;
                 """;
             command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));

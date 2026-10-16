@@ -109,7 +109,7 @@ public sealed class PostgresPhotoCaptionRepository : IPhotoCaptionRepository
                 ON revision.id = (
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
-                    WHERE candidate.asset_id = asset.id
+                    WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1)
             INNER JOIN asset_revision_review_proxies AS proxy
