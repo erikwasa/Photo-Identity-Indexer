@@ -58,7 +58,7 @@ public sealed record VideoIngestOptions(
 public static class VideoIngestCommandRunner
 {
     public const long MaximumSourceBytes = 1024L * 1024 * 1024;
-    public const string InspectionProfile = "wi0151-ffprobe-metadata-v1";
+    public const string InspectionProfile = "wi0151-ffprobe-metadata-v2";
 
     public static VideoRevisionInspection BuildInspection(
         AssetRevisionId revision, VideoPilotMetadata media, string toolHash, DateTimeOffset inspectedAtUtc)
@@ -69,14 +69,17 @@ public static class VideoIngestCommandRunner
             ? decimal.Round((decimal)s, 6, MidpointRounding.AwayFromZero) : null;
         string? rate = media.AverageFrameRate is string raw &&
                        Regex.IsMatch(raw, @"^[0-9]+/[1-9][0-9]*$") ? raw : null;
-        // FFprobe pilot currently exposes only tag PRESENCE, not resolved capture/GPS values.
-        // Never synthesize those fields from file modification timestamps.
+        // Only the parser's explicit-offset embedded timestamp and validated
+        // ISO-6709 coordinates are persisted; unknown fields remain NULL.
+        // Camera tags are local-sensitive metadata, never CLI diagnostic output.
         return new(revision, supported ? "supported" : "unsupported",
             supported ? null : "unsupported_codec_or_profile",
             media.Container, media.VideoCodec, media.Profile, media.AudioCodec,
             media.PixelFormat, media.ColorTransfer, media.Width, media.Height,
             media.RotationDegrees, duration, rate,
-            null, null, null, null, null, null,
+            media.CaptureAtUtc, media.CaptureTimeProvenance,
+            media.CameraMake, media.CameraModel,
+            media.GpsLatitude, media.GpsLongitude,
             inspectedAtUtc.ToUniversalTime(), toolHash, InspectionProfile);
     }
 
