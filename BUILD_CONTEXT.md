@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: maintained PostgreSQL v33 accepted on 2026-10-16 after backup/restore rehearsal. Checkpoints 3 and 4 provide exclusion-safe video evidence persistence and guarded video revision identity plus photo-scan isolation. The current checkpoint adds an **explicit operator-only** dry-run-first video ingest CLI: confirmed-local MOV/MP4 selection (no online-only hydration), FFprobe metadata, source SHA-256 and stable revision registration with supported/unsupported evidence. No automatic worker/UI or poster file exists. Still needed: capture/GPS precedence, revision-safe durable posters/cleanup, browsing and end-to-end maintained real-file verification. The maintainer prefers one final review after complete WI-0151 development.
+WI-0151: maintained PostgreSQL v33 accepted, and PR #540 merged opt-in dry-run-first MOV/MP4 local ingestion. Current checkpoint implements conservative embedded capture/GPS/camera extraction with explicit timestamp timezone/provenance, strict ISO-6709 coordinates and pilot-report privacy. Next: revision-safe durable poster files and exclusion/deletion cleanup, then safe browsing, full photo-only regression and final maintainer real-file acceptance. No automatic video worker; the maintainer prefers one final review after the entire work item is built.
 
 ## Relevant pointers
 
