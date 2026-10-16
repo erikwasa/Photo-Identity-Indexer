@@ -225,3 +225,66 @@ Candidate score JSON schema version 1 is shared by later learned-model runners. 
 Calibration reports include Spearman rank correlation, pairwise ordering for human labels separated by at least two tiers, inference failures and a diagnostic Very Low threshold scan. The threshold scan reports observed precision plus a 95% Wilson lower bound. A result such as 1/1 or 2/2 at 100% observed precision is therefore visible as weak evidence rather than being mistaken for a safe automatic-exclusion policy.
 
 There is intentionally **no held-out report command yet**. Add that only after candidate selection and the ordinal/Very-Low calibration policy are frozen from calibration evidence. This keeps the final held-out result a one-shot decision rather than an iterative tuning surface.
+
+## WI-0193 checkpoint 2: learned no-reference IQA runner
+
+An optional **Python 3.12+** evaluation-only runner is provided in
+`tools/PhotoIdentity.PhotoQualityEvaluation/learned_iqa.py`.
+It invokes the third-party [IQA-PyTorch](https://github.com/chaofengc/IQA-PyTorch)
+`pyiqa` API using exactly three initial candidate names:
+`topiq_nr`, `musiq`, and `arniqa` (default KonIQ versions).
+These are hypotheses for measurement, **not** accepted production quality models.
+
+In a separate virtual environment (PowerShell):
+
+~~~powershell
+py -3.12 -m venv .venv-iqa
+.\.venv-iqa\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+# Choose the compatible, documented PyTorch CPU/CUDA installation for this machine first.
+python -m pip install pyiqa
+python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_learned_iqa.py
+~~~
+
+The package and model checkpoints are third-party dependencies; installing or
+loading a model may download weights. Review the package and checkpoint licenses,
+storage, network policy, memory requirements and trust of downloaded weights
+before running the command. This PR does **not** vendor or pin their checkpoint
+bytes, nor does it add a Python or GPU dependency to the packaged Photo Identity app.
+
+Run the candidate separately for each metric, using the existing benchmark and
+proxy root (replace `topiq_nr` with `musiq` and `arniqa` for the other two):
+
+~~~powershell
+python tools/PhotoIdentity.PhotoQualityEvaluation/learned_iqa.py `
+  --input private/photo-quality-benchmark.json `
+  --proxy-root "$env:PhotoIdentity__ReviewProxyRoot" `
+  --output private/topiq_nr-scores.json `
+  --metric topiq_nr --device cpu --accept-third-party-weights
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores.json `
+  --output private/topiq_nr-calibration.json
+~~~
+
+For smoke testing, add `--limit 10` with a unique private output filename.
+Limited runs intentionally **cannot** pass the full-coverage validator in the
+calibration-report command.
+
+The runner validates all selected proxy SHA-256 digests before model loading,
+rejects traversal and linked/junction paths, reports bounded inference errors
+without exposing private source paths, and refuses to overwrite outputs. It
+exports raw model scores (higher-is-better) and runtime metrics, not human
+labels, partition names or raw images. Model package version, preprocessing and
+device are recorded, but exact checkpoint hash, footprint, license permission,
+and hardware-specific deployability are **not yet established**. Do not
+interpret these local outputs as a calibrated go/no-go decision.
+
+Before the final WI-0193 candidate decision: record exact package/weight hashes
+and size, model/license terms, host CPU/GPU/runtime evidence, fill remaining
+20 reserved model-disagreement challenges, complete enough blinded ratings, and
+run the bounded proxy-vs-original comparison. Then freeze calibration and
+evaluate held-out exactly once. No production score persistence or automatic
+exclusion is added here.
+
