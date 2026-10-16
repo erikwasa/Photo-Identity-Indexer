@@ -71,7 +71,7 @@ public sealed class PostgresPhotoMetadataInspectionRepository :
         command.CommandText = """
             INSERT INTO photo_metadata_inspections (
                 asset_revision_id, extraction_contract_version, inspected_at_utc)
-            SELECT@revision_id, @version, @inspected_at_utc
+            SELECT @revision_id, @version, @inspected_at_utc
             WHERE EXISTS (
                 SELECT 1 FROM asset_revisions revision
                 JOIN assets asset ON asset.id = revision.asset_id
