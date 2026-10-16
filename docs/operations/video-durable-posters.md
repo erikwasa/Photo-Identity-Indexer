@@ -23,7 +23,7 @@ After reviewing the dry run and taking a normal PostgreSQL backup, the explicit 
 
     dotnet run --project src/PhotoIdentity.Cli -c Release -- video posters --enable-video --apply --source $sourceRoot --derivatives $derivatives --ffmpeg $ffmpeg --postgres-connection-env $connectionVariableName --database $databaseName --max-videos 3 --timeout-seconds 20
 
-The command never requests OneDrive hydration. It checks the CURRENT video revision's content hash against the SHA-256 of the locally available source; excluded, deleted and superseded rows are not eligible. HLG (arib-std-b67) and PQ (smpte2084) are always deferred until an explicitly validated tone-map profile is provided. No implicit HDR conversion is permitted.
+The command never requests OneDrive hydration. It checks the CURRENT video revision's content hash against the SHA-256 of the locally available source; excluded, deleted and superseded rows are not eligible. The initial SDR profile is deliberately fail-closed: only an explicitly reported Rec.709 transfer (bt709) is eligible. Missing, unknown, other unverified SDR transfers, HLG (arib-std-b67), and PQ (smpte2084) are deferred until an explicitly validated rendering profile is provided. No implicit HDR conversion or assumption that missing metadata means SDR is permitted.
 
 The 1280-pixel JPEG profile is bounded to 8 MiB, and requires JPEG signature, decoded header dimensions and SHA-256 validation. Each poster's deterministic relative location is:
 
