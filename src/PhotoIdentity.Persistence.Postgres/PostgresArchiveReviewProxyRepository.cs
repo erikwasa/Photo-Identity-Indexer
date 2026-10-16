@@ -192,7 +192,7 @@ public sealed class PostgresArchiveReviewProxyRepository :
                     height,
                     generated_at_utc,
                     relative_path)
-                VALUES (
+                SELECT
                     @asset_revision_id,
                     @profile_id,
                     @encoded_byte_length,
@@ -200,7 +200,13 @@ public sealed class PostgresArchiveReviewProxyRepository :
                     @width,
                     @height,
                     @generated_at_utc,
-                    @relative_path)
+                    @relative_path
+                WHERE EXISTS (
+                    SELECT 1 FROM asset_revisions revision
+                    JOIN assets asset ON asset.id = revision.asset_id
+                    WHERE revision.id = @asset_revision_id
+                      AND asset.media_kind = 'photo'
+                      AND revision.media_kind = 'photo')
                 ON CONFLICT(asset_revision_id, profile_id) DO NOTHING;
                 """;
             insert.Parameters.AddWithValue(
@@ -299,7 +305,13 @@ public sealed class PostgresArchiveReviewProxyRepository :
                 relative_path
             FROM asset_revision_review_proxies
             WHERE profile_id = @profile_id
-              AND asset_revision_id IN ({string.Join(", ", parameters)});
+              AND asset_revision_id IN ({string.Join(", ", parameters)})
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id = revision.asset_id
+                  WHERE revision.id = asset_revision_id
+                    AND asset.media_kind = 'photo'
+                    AND revision.media_kind = 'photo');
             """;
         command.Parameters.AddWithValue(
             "profile_id",
@@ -395,7 +407,13 @@ public sealed class PostgresArchiveReviewProxyRepository :
                 relative_path
             FROM asset_revision_review_proxies
             WHERE asset_revision_id = @asset_revision_id
-              AND profile_id = @profile_id;
+              AND profile_id = @profile_id
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id = revision.asset_id
+                  WHERE revision.id = @asset_revision_id
+                    AND asset.media_kind = 'photo'
+                    AND revision.media_kind = 'photo');
             """;
         command.Parameters.AddWithValue(
             "asset_revision_id",
