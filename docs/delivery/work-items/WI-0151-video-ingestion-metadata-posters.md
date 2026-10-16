@@ -112,6 +112,14 @@ Source, metadata, persistence and representative real-file verification.
 - Pilot JSON suppresses capture timestamps, GPS and camera values via explicit JsonIgnore metadata properties, preserving privacy of aggregate diagnostic exports. Synthetic parser/projection tests cover offset conversion, precedence, invalid locations, unknowns and JSON suppression.
 - See [embedded metadata precedence and privacy runbook](../../operations/video-local-metadata-ingestion.md). Representative maintained MOV/MP4 file verification stays deferred until the requested final review.
 
+## Checkpoint 7 — revision-bound SDR poster materialization (2026-10-16)
+
+- Added explicit, dry-run-first video posters CLI, separate from the photo scanner and the previously merged local-video metadata ingestion. It requires an existing local-folder source and a currently visible immutable video revision whose stored content SHA-256 exactly matches locally hashed original bytes. No OneDrive hydration, background worker, or full-archive automatically queued processing.
+- For supported SDR files only (HLG/PQ deferred), trusted external FFmpeg generates a bounded JPEG under an app-owned derivative root independent of the source. JPEG signature, dimensions, 8 MiB bound and SHA-256 are verified before recording immutable video_still_posters row with revision, profile, tool checksum and relative path. Generated file paths are deterministic by revision and tool hash; temporary files are atomically moved without overwriting existing evidence; retries check existing bytes.
+- The source file is rehashed after rendering to avoid assigning a poster to mismatched original content. The current active content revision and source-copy exclusions are checked again before saving poster rows; old revisions remain hidden from active poster selection. Existing photo processing stays unchanged.
+- This checkpoint intentionally does not delete orphaned, superseded or excluded poster files: **a bounded dry-run-first physical cleanup and safe-serving/read policy must ship before the UI is enabled**. JSON and console outputs reveal only aggregate counts; original media remains read-only. See [durable poster runbook](../../operations/video-durable-posters.md).
+- Automated tests cover explicit opt-in, exact current revision hash, SDR/HLG/PQ gating, path and JPEG size/dimension guards, and independent derivative roots. The maintainer's hands-on validation is deferred until the complete WI-0151 workflow exists. WI-0151 remains in progress.
+
 ## Completion notes
 
 - Files changed:
