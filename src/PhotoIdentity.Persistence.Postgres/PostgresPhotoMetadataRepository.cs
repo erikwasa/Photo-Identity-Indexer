@@ -32,10 +32,16 @@ public sealed class PostgresExtendedPhotoMetadataRepository : IExtendedPhotoMeta
                 asset_revision_id, camera_make, camera_model, lens_model, orientation,
                 exposure_time, aperture, iso, focal_length, focal_length_35mm,
                 flash, gps_altitude, raw_tags_json)
-            VALUES (
+            SELECT
                 @revision_id, @camera_make, @camera_model, @lens_model, @orientation,
                 @exposure_time, @aperture, @iso, @focal_length, @focal_length_35mm,
-                @flash, @gps_altitude, @raw_tags_json)
+                @flash, @gps_altitude, @raw_tags_json
+            WHERE EXISTS (
+                SELECT 1 FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                WHERE revision.id = @revision_id
+                  AND revision.media_kind = 'photo'
+                  AND asset.media_kind = 'photo')
             ON CONFLICT (asset_revision_id) DO UPDATE SET
                 camera_make = excluded.camera_make,
                 camera_model = excluded.camera_model,
@@ -64,7 +70,8 @@ public sealed class PostgresExtendedPhotoMetadataRepository : IExtendedPhotoMeta
         AddNullable(command, "gps_altitude", metadata.GpsAltitude);
         NpgsqlParameter rawTags = command.Parameters.Add("raw_tags_json", NpgsqlDbType.Jsonb);
         rawTags.Value = JsonSerializer.Serialize(BoundTags(metadata.RawTags), JsonOptions);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new KeyNotFoundException("Photo metadata requires an existing photo revision.");
     }
 
     public async Task<CatalogueExtendedPhotoMetadata?> GetAsync(
@@ -78,7 +85,13 @@ public sealed class PostgresExtendedPhotoMetadataRepository : IExtendedPhotoMeta
                    aperture, iso, focal_length, focal_length_35mm, flash, gps_altitude,
                    raw_tags_json
             FROM photo_extended_metadata
-            WHERE asset_revision_id = @revision_id;
+            WHERE asset_revision_id = @revision_id
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id = revision.asset_id
+                  WHERE revision.id = @revision_id
+                    AND revision.media_kind = 'photo'
+                    AND asset.media_kind = 'photo');
             """;
         command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
