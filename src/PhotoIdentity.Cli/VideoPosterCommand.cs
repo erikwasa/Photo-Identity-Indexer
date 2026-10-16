@@ -41,7 +41,7 @@ public sealed record VideoPosterOptions(
                 throw new ArgumentException($"Missing {key}.");
         int Bounded(string key, int fallback, int max) =>
             values.TryGetValue(key, out string? raw)
-                ? int.TryParse(raw, out int number) && number is >= 1 && number <= max
+                ? int.TryParse(raw, out int number) && number >= 1 && number <= max
                     ? number : throw new ArgumentException($"{key} must be 1..{max}.")
                 : fallback;
         string env = Required("--postgres-connection-env");
