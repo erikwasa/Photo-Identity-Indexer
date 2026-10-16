@@ -57,7 +57,7 @@ public sealed class PostgresPhotoQualityEvaluationRepositoryTests
 
             Assert.Equal(2, population.Count);
             PhotoQualityBenchmarkPopulationRow enriched =
-                Assert.Single(population.Where(row => row.AssetRevisionId == first));
+                Assert.Single(population, row => row.AssetRevisionId == first);
             Assert.Equal("2020/01/first.jpg", enriched.SourceKey);
             Assert.Equal("image/jpeg", enriched.MediaType);
             Assert.Equal(4000, enriched.Width);
@@ -69,7 +69,7 @@ public sealed class PostgresPhotoQualityEvaluationRepositoryTests
             Assert.Equal("review-proxies/first.jpg", enriched.Proxy.RelativePath);
 
             PhotoQualityBenchmarkPopulationRow plain =
-                Assert.Single(population.Where(row => row.AssetRevisionId == second));
+                Assert.Single(population, row => row.AssetRevisionId == second);
             Assert.Null(plain.TakenAtLocal);
             Assert.Null(plain.CameraModel);
             Assert.Equal(0, plain.FaceCount);
