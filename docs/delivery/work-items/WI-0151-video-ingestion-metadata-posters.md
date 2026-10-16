@@ -166,6 +166,13 @@ Source, metadata, persistence and representative real-file verification.
 - A synthetic FFmpeg 7.1.5 HEVC Main 10 HLG fixture was rendered to a 1280×720 JPEG, providing filter execution evidence rather than a claim of correct real-world appearance. Tests cover strict HLG eligibility, negative/missing colour metadata, PQ refusal and the exact filter pipeline. See [HLG evaluation runbook](../../operations/video-hlg-preview.md).
 - This is an **engineering preparation checkpoint**, not end-to-end HDR acceptance. The maintainer's real HLG review remains deferred as requested. A later checkpoint must integrate any visually accepted profile through durable publication, exclusion/purge cleanup and safe browser delivery; remaining photo-only regressions and the consolidated real-file review also remain open. WI-0151 stays **in_progress**.
 
+## Checkpoint 14 — photo background queues and legacy photo evidence isolation (2026-10-16)
+
+- Following checkpoint 12's primary photo search/gallery/collection isolation, audited photo processing selection and found a separate, actionable gap: archive-analysis pending/completed selectors, review-proxy post-analysis/pending queues and evaluation-only photo-quality sampling did not constrain `media_kind`. The presence of a real video in the same source could therefore enqueue it into ordinary photo background work, or let deliberately malformed legacy companion evidence affect the counts/samples.
+- All four selector families now explicitly require photo asset and current revision media kind. The existing photo-analysis completion writer and photo review-proxy writer reject video revision IDs; related photo completion lookups and single/bulk review-proxy reads suppress legacy video companion evidence. Video-specific repository reads, the opt-in video CLI and gallery remain unchanged.
+- Disposable PostgreSQL mixed-media regression seeds both photo and video revisions sharing one source, including video legacy analysis/review-proxy rows, and checks photo-only candidates/completed totals, writer refusal and the photo-quality sample. See [isolation runbook](../../operations/video-photo-query-isolation.md). Existing snapshot UI/collection regressions and final maintainer acceptance remain necessary.
+- No PostgreSQL migration, no new ingestion/worker, no OneDrive hydration, no change to original files and no HLG video promotion. WI-0151 stays **in_progress** until the HDR policy and one consolidated local acceptance are resolved.
+
 ## Completion notes
 
 - Files changed:

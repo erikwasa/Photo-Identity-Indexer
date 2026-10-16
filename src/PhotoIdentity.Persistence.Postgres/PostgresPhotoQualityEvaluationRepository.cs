@@ -57,12 +57,14 @@ public sealed class PostgresPhotoQualityEvaluationRepository
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
                     WHERE candidate.asset_id = asset.id
+                      AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1)
             INNER JOIN asset_revision_review_proxies AS proxy
                 ON proxy.asset_revision_id = revision.id
                AND proxy.profile_id = @profile_id
             WHERE asset.deleted_at_utc IS NULL
+              AND asset.media_kind = 'photo' AND revision.media_kind = 'photo'
             ORDER BY md5(revision.id::text)
             LIMIT @limit;
             """;

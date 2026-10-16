@@ -25,3 +25,21 @@ The CI build, persistence suite and integration shards remain the authoritative 
 - HLG and PQ color transforms still require a separately validated local visual sample; do **not** treat unknown or HDR transfer as verified SDR.
 
 WI-0151 stays in progress. The maintainer requested a single consolidated real-file verification after implementation, not an intermediate manual test for this PR.
+
+## Additional photo-worker queue and derivative isolation — checkpoint 14
+
+The post-PR #552 audit found that the **photo-only background selectors** still lacked an explicit persisted media-kind discriminator. The general photo gallery/search selectors were isolated, but archived photo-analysis scheduling and review-proxy scheduling could admit a video asset from the SAME source when its revision lacked a photo analysis/proxy row.
+
+This checkpoint adds `asset.media_kind = 'photo'` and `revision.media_kind = 'photo'` at all current-revision selection boundaries and filters the latest candidate subqueries in:
+
+- Photo archive-analysis pending/current completed revision counts.
+- Photo post-analysis review-proxy generation.
+- Photo review-proxy generation pending queue.
+- Evaluation-only photo-quality sample of current review proxies.
+
+Photo-analysis completion and review-proxy recording also now **reject video revision IDs**, even with a valid photo processing run or proxy profile. Photo-analysis completion lookups and photo-proxy single/bulk readers suppress legacy video companion rows. No changes are made to the video-specific metadata, poster storage, explicit opt-in ingest or separate video library.
+
+The disposable PostgreSQL regression adds analyzed and pending videos in the SAME source as ordinary photos. It checks that photo processing still schedules the expected photos, that a video cannot be recorded as completed photo analysis/proxy, that legacy video analysis/proxy rows cannot affect photo completed counts or reveal video proxy data, and that a photo-quality sample remains photo-only. The analyzed video is deliberately lexicographically earlier than the photo, so a missing-proxy selector without media guards would choose the video.
+
+The test does not prove every historical SQL path is video-free. Maintained end-to-end photo/video counts, private exclusion and original read-only verification remain necessary in the final one-time operator review.
+
