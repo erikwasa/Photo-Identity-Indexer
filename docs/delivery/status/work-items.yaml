@@ -177,4 +177,51 @@ work_items:
   blockers:
   - WI-0190
   blocker_notes: []
-  evidence: []
+  evidence: []- id: WI-0192
+  title: Build a representative archive benchmark and blinded quality review workflow
+  milestone: M37
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0192-representative-photo-quality-benchmark.md
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/535
+- id: WI-0193
+  title: Evaluate and calibrate absolute per-photo quality models
+  milestone: M37
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0193-absolute-photo-quality-model-evaluation.md
+  blockers:
+  - WI-0192
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/536
+- id: WI-0194
+  title: Evaluate archive-wide visual redundancy embeddings and suppression thresholds
+  milestone: M37
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md
+  blockers:
+  - WI-0192
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/537
+- id: WI-0195
+  title: Simulate quality-aware visual redundancy during collection creation
+  milestone: M37
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0195-quality-aware-collection-simulation.md
+  blockers:
+  - WI-0193
+  - WI-0194
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/538

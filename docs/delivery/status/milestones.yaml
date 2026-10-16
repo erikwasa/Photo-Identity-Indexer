@@ -373,4 +373,12 @@ milestones:
   document: ../milestones/M36-semantic-collection-composition.md
   work_items:
   - WI-0186
-  - WI-0187
+  - WI-0187- id: M37
+  title: Photo quality and visual redundancy evaluation
+  status: ready
+  document: ../milestones/M37-photo-quality-visual-redundancy-evaluation.md
+  work_items:
+  - WI-0192
+  - WI-0193
+  - WI-0194
+  - WI-0195
