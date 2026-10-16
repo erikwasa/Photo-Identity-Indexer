@@ -41,11 +41,16 @@ public sealed class PhotoQualityModelEvaluationTests
         Assert.Equal(3, report.ReviewedKnownTierCount);
         Assert.Equal(3, report.ScoredReviewedCount);
         Assert.Equal(0, report.ReviewedInferenceFailureCount);
-        Assert.Equal(1d, report.SpearmanRankCorrelation, 10);
+        Assert.True(report.SpearmanRankCorrelation.HasValue);
+        Assert.Equal(1d, report.SpearmanRankCorrelation.Value, 10);
         Assert.Equal(2, report.PairwiseTwoTierAgreement.TotalPairs);
         Assert.Equal(2, report.PairwiseTwoTierAgreement.CorrectPairs);
         Assert.Equal(0, report.PairwiseTwoTierAgreement.TiedPairs);
-        Assert.Equal(1d, report.PairwiseTwoTierAgreement.AgreementFraction, 10);
+        Assert.True(report.PairwiseTwoTierAgreement.AgreementFraction.HasValue);
+        Assert.Equal(
+            1d,
+            report.PairwiseTwoTierAgreement.AgreementFraction.Value,
+            10);
         Assert.Equal(1, report.VeryLowReviewedCount);
 
         PhotoQualityVeryLowThresholdSummary threshold =
@@ -57,7 +62,8 @@ public sealed class PhotoQualityModelEvaluationTests
         Assert.Equal(0, threshold.FalsePositiveCount);
         Assert.Equal(1d, threshold.ObservedPrecision);
         Assert.InRange(threshold.Wilson95LowerBound, 0.20d, 0.21d);
-        Assert.Equal(1d, threshold.Recall, 10);
+        Assert.True(threshold.Recall.HasValue);
+        Assert.Equal(1d, threshold.Recall.Value, 10);
     }
 
     [Fact]
@@ -83,7 +89,8 @@ public sealed class PhotoQualityModelEvaluationTests
                 benchmark,
                 scores);
 
-        Assert.Equal(1d, report.SpearmanRankCorrelation, 10);
+        Assert.True(report.SpearmanRankCorrelation.HasValue);
+        Assert.Equal(1d, report.SpearmanRankCorrelation.Value, 10);
         Assert.Equal(2, report.PairwiseTwoTierAgreement.TotalPairs);
         Assert.Equal(2, report.PairwiseTwoTierAgreement.CorrectPairs);
 
