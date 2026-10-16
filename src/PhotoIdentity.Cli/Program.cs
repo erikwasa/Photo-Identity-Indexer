@@ -44,6 +44,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "posters-cleanup" =>
+                    await VideoPosterCleanupCommandRunner.RunAsync(
+                        VideoPosterCleanupOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "posters" =>
                     await VideoPosterCommandRunner.RunAsync(
                         VideoPosterOptions.Parse(args.Skip(2).ToArray()),
@@ -137,6 +141,13 @@ public static class Program
                            [--postgres-connection-env NAME --database DB --apply]
                            (dry-run by default; --apply writes only bounded local video
                             revisions and technical metadata; no posters or photo analysis)
+
+              video posters-cleanup --enable-video --source DIR --derivatives DIR
+                                    --postgres-connection-env NAME --database DB
+                                    [--max-files COUNT (1..25)] [--min-age-hours HOURS (24..720)]
+                                    [--apply]
+                                    (dry-run default; deletes only old, source-proven
+                                     stale SDR JPEG posters, never photo derivatives)
 
               video posters --enable-video --source DIR --derivatives DIR
                             --ffmpeg ABSOLUTE_EXE
