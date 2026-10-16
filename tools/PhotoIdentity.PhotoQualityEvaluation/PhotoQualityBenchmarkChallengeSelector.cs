@@ -152,7 +152,8 @@ internal static class PhotoQualityBenchmarkChallengeSelector
         {
             reasons.Add("extreme-contrast-low");
         }
-        if (evidence.ProxyLongEdgeFraction <= thresholds.ProxyResolutionLow)
+        if (thresholds.ProxyResolutionLow < 0.999999d &&
+            evidence.ProxyLongEdgeFraction <= thresholds.ProxyResolutionLow)
         {
             reasons.Add("extreme-proxy-resolution-low");
         }
