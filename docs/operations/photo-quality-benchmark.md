@@ -67,3 +67,58 @@ Do not fill these by inspecting model scores. The next checkpoint adds the blind
 - The production catalogue is not mutated.
 - No private source key, proxy path, image, model output or human label is committed.
 - A Very Low label is evaluation evidence only; it does not delete, hide or exclude anything in WI-0192.
+
+
+## Checkpoint 2: blinded review and challenge imports
+
+Start the local browser reviewer after generating the representative core:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark review `
+  --input private/photo-quality-benchmark.json
+~~~
+
+The reviewer binds only to `127.0.0.1` and uses a per-process random session token for API writes. It displays the review proxy plus the review controls, but intentionally does **not** expose source path, archive stratum, calibration/held-out partition, candidate/model reasons, or representative/challenge membership.
+
+Keyboard shortcuts:
+
+- `1` Very Low
+- `2` Low
+- `3` Normal
+- `4` High
+- `5` Very High
+- `6` Unsure
+- `P` toggles the separate personally-important flag
+- Left/Right navigate
+- `Ctrl+Enter` re-saves the current label after editing notes
+
+Each label save writes the private manifest atomically. The first save creates `<manifest>.before-review.bak`; subsequent saves do not overwrite that backup. Restarting the command resumes from the labels already stored in the manifest. Review order is a deterministic benchmark-specific SHA-256 shuffle, so manifest order cannot reveal whether the current item is part of the representative or challenge tranche.
+
+The labels mean:
+
+- **Very Low** — technically/presentationally poor enough that you normally would not want the photo selected automatically. This is evaluation evidence, not deletion.
+- **Low** — clearly inferior but still potentially usable.
+- **Normal** — ordinary acceptable archive photo.
+- **High** — clearly better than normal and desirable in presentation.
+- **Very High** — exceptional presentation quality.
+- **Unsure** — you cannot confidently place the photo.
+
+Judge image/presentation quality, not whether you like the people, event, place, or memory. `personallyImportant` stays separate for exactly that reason.
+
+### Append challenge photos without changing the representative core
+
+Checkpoint 2 defines a private interchange format for later challenge generators. A challenge file has schema version 1, the benchmark ID, a versioned `selectionPolicy`, and full private photo/proxy metadata for candidate revisions. Candidate reasons can identify rare strata, likely failure modes, score extremes, or model disagreement.
+
+Append such a file with:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark add-challenges `
+  --input private/photo-quality-benchmark.json `
+  --candidates private/photo-quality-challenges.json
+~~~
+
+The command rejects benchmark-ID mismatches, duplicate/overlapping revisions, and additions beyond the reserved challenge count. Added photos are forcibly marked `sampleKind=challenge` and `partition=challenge`; any supplied human labels are cleared. The frozen representative calibration/held-out counts and membership do not change. A one-time `<manifest>.before-challenge.bak` is created.
+
+Challenge photos are diagnostic. They can improve coverage of hard/model-disagreement cases without contaminating the primary representative held-out result.
+
+The final WI-0192 checkpoint will generate the initial maintained-archive challenge candidate file and run the private coverage/pilot acceptance. Later model-disagreement candidates from WI-0193 can use the same import contract without replacing the representative core.

@@ -37,6 +37,16 @@ The benchmark command reads only current `photo` revisions with the requested du
 
 The JSON records population and selected coverage, the frozen policy/version identifiers and blank human-review fields. It deliberately reserves (by default) 200 challenge slots but does **not** populate them yet; the next checkpoint will add challenge selection and the blinded resumable review surface without replacing the representative core.
 
+## Checkpoint 2 implementation — blinded review and challenge extension
+
+Checkpoint 2 adds a local loopback browser reviewer to the evaluation tool. The UI intentionally exposes only the review proxy, progress, the six quality labels, personally-important toggle and notes. Source paths, strata, calibration/held-out membership, candidate/model reasons and representative/challenge membership are not returned by the review-state API. Review order is a deterministic benchmark-specific shuffle rather than manifest order.
+
+Every review save is atomic and resumable. The first mutation creates a one-time `.before-review.bak`; restarting the reviewer reloads completed labels. Keyboard shortcuts 1–6 map to Very Low / Low / Normal / High / Very High / Unsure, `P` toggles personally-important, Left/Right navigate, and `Ctrl+Enter` re-saves notes for an already-labelled photo.
+
+The benchmark schema now distinguishes representative versus challenge photos without changing the frozen representative split. A generic `benchmark add-challenges` command can append a versioned private candidate file, but forcibly marks imported cases as diagnostic `partition=challenge`, clears supplied human labels, rejects overlap with the representative core and preserves representative calibration/held-out membership and counts.
+
+The initial maintained-archive challenge candidate generator and coverage/pilot acceptance remain the final WI-0192 checkpoint.
+
 ## Out of scope
 
 - Selecting a production quality model.
@@ -61,5 +71,5 @@ Automated sampling/export/resume tests plus maintainer inspection of stratum cov
 
 - Files changed: Core benchmark selection/split policy, PostgreSQL benchmark population query, photo-quality evaluation `benchmark` command, Core/Persistence tests and benchmark runbook.
 - Trade-offs: checkpoint 1 freezes the representative core and split before adding challenge cases/review UX. Strict dHash is used only as a leakage guard, not as a claim that those photos are production visual duplicates.
-- Deferred work: challenge tranche selection, blinded/resumable review UI and maintained-archive coverage acceptance remain in WI-0192.
-- Commands run: repository CI for the checkpoint PR; maintained private benchmark generation follows after merge.
+- Deferred work: initial maintained-archive challenge candidate generation plus maintainer coverage/pilot acceptance remain in WI-0192. The blinded/resumable reviewer and challenge-import contract are implemented in checkpoint 2.
+- Commands run: repository CI for checkpoint PRs; maintained private benchmark generation/review follows after the challenge-generator checkpoint.
