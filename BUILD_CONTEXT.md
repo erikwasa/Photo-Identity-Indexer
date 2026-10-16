@@ -4,6 +4,9 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+WI-0192 / issue #535 is now in progress on `agent/WI-0192-representative-benchmark`. The first checkpoint builds deterministic stratified current-photo/proxy population selection, privacy-safe benchmark export, frozen calibration/held-out assignment and coverage reporting before adding the blinded review surface. The WI-0182 300-photo sample remains diagnostic only and is not reused as the M37 representative benchmark.
+
+
 WI-0182 / issue #490: PR #509 implements the evaluation-only technical-quality harness over durable review proxies. It adds versioned raw sharpness/exposure/clipping/contrast/resolution evidence, q78 profile-gated candidate reasons, deterministic PostgreSQL proxy sampling, private JSON review export, timing/storage measurements and synthetic analyzer coverage. No collection semantics or catalogue quality persistence are introduced. Keep WI-0182 in review until representative private-archive review/runtime evidence is recorded.
 
 WI-0186 / issue #512: PR #515 scopes Visual/Caption/Combined search through an optional saved Smart Collection without weakening exact Smart Collection semantics. The server resolves one eligibility set, applies it before semantic top-k and inside caption SQL, and keeps explicit saved search-result collections immutable. PR #517 corrected the large-scope PostgreSQL timeout. The 2026-10-13 maintainer retest succeeded for Fideli (5,638 eligible) in all three modes and Mor och Dotter (1,057 eligible); provenance badges behave as expected. Keep WI-0186 in review until independent exact-membership and saved-list restart verification is recorded.
@@ -25,6 +28,8 @@ WI-0165, WI-0178 and WI-0185 are completed. M35 is completed. Issues #499 and #5
 The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, WI-0172, WI-0173, WI-0175, WI-0176, WI-0177, WI-0179, WI-0180, WI-0181, WI-0183 and WI-0184.
 
 ## Next concrete step
+
+WI-0192: implement the representative benchmark foundation over current photo revisions with durable review proxies, including metadata strata, deterministic selection, duplicate-safe split assignment, privacy-safe output and tests. Then add the blinded resumable review workflow in the next checkpoint.
 
 WI-0151: maintained PostgreSQL v33 deployment accepted on 2026-10-16 following verified real-catalogue backup/rehearsal. The video inspection/poster repository is merged; the next checkpoint adds a guarded and still-unwired verified-local MOV/MP4 source→asset→content-revision repository, preserves SHA-256 identity and source-copy tombstones, and excludes videos from photo revision lookup, photo scan baselines, photo-only missing reconciliation, and colliding photo batch writes. No automatic video ingest or photo workflow changes are activated. The maintainer prefers reviewing the whole work item after full implementation.
 
