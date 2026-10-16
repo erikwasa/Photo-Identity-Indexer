@@ -1,11 +1,10 @@
 id: WI-0193
 title: Evaluate and calibrate absolute per-photo quality models
 milestone: M37
-status: proposed
+status: ready
 owner: unassigned
 document: ../work-items/WI-0193-absolute-photo-quality-model-evaluation.md
-blockers:
-- WI-0192
+blockers: []
 blocker_notes: []
 evidence:
 - type: issue

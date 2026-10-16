@@ -1,11 +1,10 @@
 id: WI-0194
 title: Evaluate archive-wide visual redundancy embeddings and suppression thresholds
 milestone: M37
-status: proposed
+status: ready
 owner: unassigned
 document: ../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md
-blockers:
-- WI-0192
+blockers: []
 blocker_notes: []
 evidence:
 - type: issue
