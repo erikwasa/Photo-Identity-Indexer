@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace PhotoIdentity.Cli;
 
@@ -21,7 +23,24 @@ public sealed record VideoPilotMetadata(
     double? DurationSeconds,
     string? AverageFrameRate,
     bool HasCreationTime,
-    bool HasLocation);
+    bool HasLocation)
+{
+    // These fields may contain private location and capture information.
+    // They are used exclusively for opt-in local catalogue persistence.
+    // Never include them in the pilot's serialized JSON diagnostic report.
+    [JsonIgnore]
+    public DateTimeOffset? CaptureAtUtc { get; init; }
+    [JsonIgnore]
+    public string? CaptureTimeProvenance { get; init; }
+    [JsonIgnore]
+    public double? GpsLatitude { get; init; }
+    [JsonIgnore]
+    public double? GpsLongitude { get; init; }
+    [JsonIgnore]
+    public string? CameraMake { get; init; }
+    [JsonIgnore]
+    public string? CameraModel { get; init; }
+}
 
 public static class VideoPilotMetadataParser
 {
@@ -60,9 +79,12 @@ public static class VideoPilotMetadataParser
         }
 
         JsonElement tags = Child(format, "tags");
-        string[] keys = tags.ValueKind == JsonValueKind.Object
-            ? tags.EnumerateObject().Select(item => item.Name).ToArray()
-            : [];
+        JsonElement streamTags = Child(video, "tags");
+        string[] keys = Keys(tags).Concat(Keys(streamTags)).ToArray();
+
+        (DateTimeOffset? capture, string? provenance) = SelectCapture(tags, streamTags);
+        (double? latitude, double? longitude) = SelectCoordinates(tags, streamTags);
+
         return new VideoPilotMetadata(
             Text(format, "format_name"),
             Text(video, "codec_name"),
@@ -77,7 +99,149 @@ public static class VideoPilotMetadataParser
             Text(video, "avg_frame_rate"),
             keys.Any(name => name.Contains("creation", StringComparison.OrdinalIgnoreCase)),
             keys.Any(name => name.Contains("location", StringComparison.OrdinalIgnoreCase) ||
-                             name.Contains("gps", StringComparison.OrdinalIgnoreCase)));
+                             name.Contains("gps", StringComparison.OrdinalIgnoreCase)))
+        {
+            CaptureAtUtc = capture,
+            CaptureTimeProvenance = provenance,
+            GpsLatitude = latitude,
+            GpsLongitude = longitude,
+            CameraMake = SelectShortTag(tags, streamTags, "com.apple.quicktime.make", "make"),
+            CameraModel = SelectShortTag(tags, streamTags, "com.apple.quicktime.model", "model")
+        };
+    }
+
+    private static IEnumerable<string> Keys(JsonElement tags) =>
+        tags.ValueKind == JsonValueKind.Object
+            ? tags.EnumerateObject().Select(static item => item.Name)
+            : [];
+
+    private static string? Tag(JsonElement tags, string name)
+    {
+        if (tags.ValueKind != JsonValueKind.Object) return null;
+        foreach (JsonProperty property in tags.EnumerateObject())
+        {
+            if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase) &&
+                property.Value.ValueKind == JsonValueKind.String)
+                return property.Value.GetString();
+        }
+        return null;
+    }
+
+    private static (DateTimeOffset?, string?) SelectCapture(JsonElement format, JsonElement video)
+    {
+        // Camera/QuickTime original capture tag has priority over generic muxing
+        // creation_time. Only explicit timezone offsets are accepted. No timezone
+        // is inferred from Windows locale, file mtime, or QuickTime's ambiguous clock.
+        foreach ((JsonElement scope, string label) in new[]
+        {
+            (format, "format"),
+            (video, "video")
+        })
+        {
+            string? raw = Tag(scope, "com.apple.quicktime.creationdate");
+            if (TryCaptureTimestamp(raw, out DateTimeOffset capture))
+                return (capture, label + ":com.apple.quicktime.creationdate");
+        }
+        foreach ((JsonElement scope, string label) in new[]
+        {
+            (format, "format"),
+            (video, "video")
+        })
+        {
+            string? raw = Tag(scope, "creation_time");
+            if (TryCaptureTimestamp(raw, out DateTimeOffset capture))
+                return (capture, label + ":creation_time");
+        }
+        return (null, null);
+    }
+
+    private static bool TryCaptureTimestamp(string? input, out DateTimeOffset result)
+    {
+        result = default;
+        if (string.IsNullOrWhiteSpace(input) || input.Length > 80)
+            return false;
+        string raw = input.Trim();
+
+        // Require YYYY-MM-DD (or the QuickTime YYYY:MM:DD variant), seconds
+        // and an explicit Z or signed timezone offset. Reject floating local times.
+        if (!Regex.IsMatch(raw, @"^\d{4}[-:]\d{2}[-:]\d{2}[T ]\d{2}:\d{2}:\d{2}",
+                RegexOptions.CultureInvariant))
+            return false;
+        if (raw.EndsWith('Z'))
+            raw = raw[..^1] + "+00:00";
+        else if (Regex.IsMatch(raw, @"[+-]\d{4}$", RegexOptions.CultureInvariant))
+            raw = raw.Insert(raw.Length - 2, ":");
+        if (!Regex.IsMatch(raw, @"[+-]\d{2}:\d{2}$", RegexOptions.CultureInvariant))
+            return false;
+
+        string[] accepted =
+        [
+            "yyyy-MM-dd'T'HH:mm:sszzz",
+            "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz",
+            "yyyy-MM-dd HH:mm:sszzz",
+            "yyyy-MM-dd HH:mm:ss.FFFFFFFzzz",
+            "yyyy:MM:dd HH:mm:sszzz",
+            "yyyy:MM:dd HH:mm:ss.FFFFFFFzzz"
+        ];
+        if (!DateTimeOffset.TryParseExact(raw, accepted, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out DateTimeOffset parsed))
+            return false;
+
+        result = parsed.ToUniversalTime();
+        return true;
+    }
+
+    private static (double?, double?) SelectCoordinates(JsonElement format, JsonElement video)
+    {
+        // Accept only a defensible ISO-6709 decimal-degree subset used by iPhone
+        // QuickTime tags. Ambiguous DMS, non-ISO pairs, altitude-only, malformed or
+        // out-of-range values remain unknown rather than being guessed.
+        foreach (JsonElement tags in new[] { format, video })
+        {
+            foreach (string name in new[]
+                { "com.apple.quicktime.location.ISO6709", "location" })
+            {
+                if (TryCoordinates(Tag(tags, name), out double latitude, out double longitude))
+                    return (latitude, longitude);
+            }
+        }
+        return (null, null);
+    }
+
+    private static bool TryCoordinates(string? input, out double latitude, out double longitude)
+    {
+        latitude = longitude = default;
+        if (string.IsNullOrWhiteSpace(input) || input.Length > 100) return false;
+        Match match = Regex.Match(input.Trim(),
+            @"^([+-]\d{2}(?:\.\d+)?)([+-]\d{3}(?:\.\d+)?)(?:[+-]\d+(?:\.\d+)?)?/$",
+            RegexOptions.CultureInvariant);
+        if (!match.Success ||
+            !double.TryParse(match.Groups[1].Value,
+                NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out latitude) ||
+            !double.TryParse(match.Groups[2].Value,
+                NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out longitude) ||
+            !double.IsFinite(latitude) || !double.IsFinite(longitude) ||
+            latitude is < -90 or > 90 || longitude is < -180 or > 180)
+            return false;
+        return true;
+    }
+
+    private static string? SelectShortTag(
+        JsonElement format, JsonElement video, string preferredName, string alternateName)
+    {
+        foreach (JsonElement tags in new[] { format, video })
+        {
+            foreach (string name in new[] { preferredName, alternateName })
+            {
+                string? value = Tag(tags, name)?.Trim();
+                if (value is { Length: > 0 and <= 128 } &&
+                    !value.Any(char.IsControl))
+                    return value;
+            }
+        }
+        return null;
     }
 
     private static JsonElement Child(JsonElement item, string name) =>
@@ -143,7 +307,7 @@ public sealed class VideoPilotMediaTools
             "-probesize", "1048576", "-analyzeduration", "1500000",
             "-show_format", "-show_streams",
             "-show_entries",
-            "format=format_name,duration:format_tags=creation_time,location,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709:stream=codec_type,codec_name,profile,width,height,pix_fmt,avg_frame_rate,color_transfer:stream_tags=rotate:stream_side_data=rotation",
+            "format=format_name,duration:format_tags=creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream=codec_type,codec_name,profile,width,height,pix_fmt,avg_frame_rate,color_transfer:stream_tags=rotate,creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream_side_data=rotation",
             "-of", "json", "-i", sourcePath
         ], cancellationToken);
         if (json.Length > 1024 * 1024)

@@ -104,6 +104,14 @@ Source, metadata, persistence and representative real-file verification.
 - The CLI command is capped at 25 selected local files (8 default), at most 1 GiB per file, with bounded FFprobe process duration and no OneDrive hydration. Source-copy and photo-only guards from earlier checkpoints remain mandatory. Added option-gating, unknown-metadata, and observed-file-stability tests.
 - **Not WI-0151 completion:** still requires verified capture/GPS precedence, poster file lifecycle and deletion/exclusion cleanup, safe browsing, and full maintained real-file validation after all checkpoints are developed.
 
+## Checkpoint 6 — embedded capture/GPS/camera precedence (2026-10-16)
+
+- Extends the bounded FFprobe parser to resolve explicit-offset embedded QuickTime creation date (higher precedence) and generic creation_time (fallback), yielding a UTC capture timestamp paired with an exact source scope/tag. Timezone-free local clocks are left unknown; file modified time is **not** substituted.
+- Reads only strict ISO-6709 signed decimal-degree coordinates from available QuickTime/generic location tags and safely bounded camera make/model strings. Invalid/missing/unsupported representations remain NULL rather than guessed. No external web lookups, OneDrive hydration or background tasks.
+- Opt-in video ingest writes these values to existing PostgreSQL v33 columns using inspection profile v2. Existing v1 evidence with conflicting new fields is not silently overwritten; controlled invalidation/backfill remains a later checkpoint.
+- Pilot JSON suppresses capture timestamps, GPS and camera values via explicit JsonIgnore metadata properties, preserving privacy of aggregate diagnostic exports. Synthetic parser/projection tests cover offset conversion, precedence, invalid locations, unknowns and JSON suppression.
+- See [embedded metadata precedence and privacy runbook](../../operations/video-local-metadata-ingestion.md). Representative maintained MOV/MP4 file verification stays deferred until the requested final review.
+
 ## Completion notes
 
 - Files changed:

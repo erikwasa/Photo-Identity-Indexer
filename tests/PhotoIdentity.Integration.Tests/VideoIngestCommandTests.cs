@@ -88,6 +88,37 @@ public sealed class VideoIngestCommandTests
     }
 
     [Fact]
+    public void Verified_tag_metadata_is_projected_with_provenance_into_video_revision_evidence()
+    {
+        const string json = """
+            {"streams":[{"codec_type":"video","codec_name":"h264","profile":"High",
+              "pix_fmt":"yuv420p","color_transfer":"bt709",
+              "width":1920,"height":1080,"avg_frame_rate":"30/1"}],
+             "format":{"format_name":"mov,mp4","duration":"22.125",
+               "tags":{"com.apple.quicktime.creationdate":"2026-02-16T14:12:16+01:00",
+                       "com.apple.quicktime.location.ISO6709":"+59.3123+018.0223/",
+                       "com.apple.quicktime.make":"Apple",
+                       "com.apple.quicktime.model":"iPhone"}}}
+            """;
+        var media = VideoPilotMetadataParser.Parse(json);
+        var revision = AssetRevisionId.New();
+        const string hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var evidence = VideoIngestCommandRunner.BuildInspection(
+            revision, media, hash, DateTimeOffset.UtcNow);
+
+        Assert.Equal("supported", evidence.InspectionStatus);
+        Assert.Equal(new DateTimeOffset(2026, 2, 16, 13, 12, 16, TimeSpan.Zero),
+            evidence.CaptureAtUtc);
+        Assert.Equal("format:com.apple.quicktime.creationdate",
+            evidence.CaptureTimeProvenance);
+        Assert.Equal(59.3123, evidence.GpsLatitude);
+        Assert.Equal(18.0223, evidence.GpsLongitude);
+        Assert.Equal("Apple", evidence.CameraMake);
+        Assert.Equal("iPhone", evidence.CameraModel);
+        Assert.Equal("wi0151-ffprobe-metadata-v2", evidence.InspectionProfileId);
+    }
+
+    [Fact]
     public void File_observation_must_match_both_size_and_timestamp()
     {
         string path = Path.Combine(Path.GetTempPath(),
