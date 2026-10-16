@@ -73,7 +73,8 @@ public sealed class PostgresCollectionQueryRepository : ICollectionQueryReposito
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
-            WHERE @include_assigned
+            WHERE asset_revisions.media_kind = 'photo'
+              AND @include_assigned
               AND latest_action.person_id IN ({0})
               AND (@from_utc IS NULL OR asset_revisions.observed_at_utc >= @from_utc)
               AND (@to_utc IS NULL OR asset_revisions.observed_at_utc <= @to_utc)
@@ -105,7 +106,8 @@ public sealed class PostgresCollectionQueryRepository : ICollectionQueryReposito
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
-            WHERE @include_unreviewed
+            WHERE asset_revisions.media_kind = 'photo'
+              AND @include_unreviewed
               AND latest_action.id IS NULL
               AND top_suggestion.suggested_person_id IN ({0})
               AND top_suggestion.score >= @min_suggestion_score
