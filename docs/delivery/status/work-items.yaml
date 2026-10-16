@@ -17,7 +17,7 @@ work_items:
   document: ../work-items/WI-0151-video-ingestion-metadata-posters.md
   started_at: 2026-10-14
   last_updated_at: 2026-10-16
-  branch: agent/WI-0151-photo-query-isolation
+  branch: agent/WI-0151-hlg-preview-profile
   blockers: []
   blocker_notes: []
   evidence:
@@ -31,6 +31,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/552
   - type: documentation
     value: docs/operations/video-photo-query-isolation.md
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/553
+  - type: documentation
+    value: docs/operations/video-hlg-preview.md
 - id: WI-0152
   title: Add safe browser video serving and viewer playback
   milestone: M30
