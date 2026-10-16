@@ -1,0 +1,126 @@
+@page "/videos"
+@inject HttpClient Http
+
+<PageTitle>Videos · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Opt-in catalogue</p>
+        <h1>Videos</h1>
+        <p>Still posters and technical details for indexed videos. Playback, photo search and slideshow inclusion are not enabled here.</p>
+    </div>
+    <button class="button secondary" @onclick="RefreshAsync" disabled="@Loading">Refresh</button>
+</section>
+
+@if (Loading && Items.Count == 0)
+{
+    <section class="empty-state" aria-live="polite"><p>Loading indexed videos…</p></section>
+}
+else if (Error is not null)
+{
+    <section class="empty-state" role="status">
+        <h2>Video library unavailable</h2>
+        <p>@Error</p>
+    </section>
+}
+else if (Items.Count == 0)
+{
+    <section class="empty-state" role="status">
+        <h2>No videos indexed yet</h2>
+        <p>This library only displays videos registered through the opt-in local video workflow.</p>
+    </section>
+}
+else
+{
+    <section class="video-library-grid" aria-label="Indexed videos">
+        @foreach (VideoLibraryItemResponse video in Items)
+        {
+            <article class="video-library-card" @key="video.RevisionId">
+                <div class="video-library-poster">
+                    @if (video.HasPoster)
+                    {
+                        <img loading="lazy" alt="Video still poster" src="@($"/api/videos/{video.RevisionId}/poster")" />
+                    }
+                    else
+                    {
+                        <span class="video-library-placeholder" aria-label="No verified still poster">Video</span>
+                    }
+                    <span class="video-library-duration">@FormatDuration(video.DurationSeconds)</span>
+                </div>
+                <div class="video-library-card-body">
+                    <strong>@(video.CaptureAtUtc is DateTimeOffset date ? date.ToString("yyyy-MM-dd") : "Date unknown")</strong>
+                    <span>@FormatResolution(video.Width, video.Height, video.RotationDegrees)</span>
+                    <span>@(video.InspectionStatus ?? "Not inspected")</span>
+                </div>
+            </article>
+        }
+    </section>
+    @if (HasMore)
+    {
+        <div class="video-library-more">
+            <button class="button secondary" @onclick="LoadMoreAsync" disabled="@Loading">@(Loading ? "Loading…" : "Load more videos")</button>
+        </div>
+    }
+}
+
+@code {
+    private readonly List<VideoLibraryItemResponse> Items = [];
+    private bool Loading;
+    private bool HasMore;
+    private string? Error;
+    private const int PageSize = 24;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        Items.Clear();
+        HasMore = false;
+        Error = null;
+        await LoadMoreAsync();
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (Loading) return;
+        Loading = true;
+        try
+        {
+            using HttpResponseMessage response = await Http.GetAsync(
+                $"/api/videos?offset={Items.Count}&limit={PageSize}");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Error = "Enable PhotoIdentity:VideoLibraryEnabled on the local server after completing video ingestion and poster verification.";
+                return;
+            }
+            response.EnsureSuccessStatusCode();
+            VideoLibraryResponse? page =
+                await response.Content.ReadFromJsonAsync<VideoLibraryResponse>();
+            if (page is null)
+                throw new InvalidDataException("The video catalogue returned no page.");
+            Items.AddRange(page.Items);
+            HasMore = page.HasMore;
+            Error = null;
+        }
+        catch (Exception error) when (error is HttpRequestException or
+                                     InvalidDataException or System.Text.Json.JsonException)
+        {
+            Error = "The video catalogue could not be loaded. No originals or photo data were changed.";
+        }
+        finally { Loading = false; }
+    }
+
+    private static string FormatDuration(decimal? seconds)
+    {
+        if (seconds is null || seconds < 0 || seconds > 86400)
+            return "Duration unknown";
+        TimeSpan duration = TimeSpan.FromSeconds((double)seconds.Value);
+        return duration.TotalHours >= 1 ? duration.ToString(@"h\:mm\:ss") :
+            duration.ToString(@"m\:ss");
+    }
+
+    private static string FormatResolution(int? width, int? height, int? rotation) =>
+        width is int w && height is int h
+            ? $"{w} × {h}" + (rotation is null or 0 ? "" : $" · {rotation}° rotation")
+            : "Resolution unknown";
+}
