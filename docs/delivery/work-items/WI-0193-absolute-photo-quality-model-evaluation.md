@@ -61,13 +61,13 @@ The first implementation checkpoint establishes the reusable evaluation boundary
 Example baseline and calibration commands:
 
 ~~~powershell
-dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline \
-  --input private/photo-quality-benchmark.json \
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline `
+  --input private/photo-quality-benchmark.json `
   --output private/wi0182-quality-scores.json
 
-dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report \
-  --input private/photo-quality-benchmark.json \
-  --scores private/wi0182-quality-scores.json \
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report `
+  --input private/photo-quality-benchmark.json `
+  --scores private/wi0182-quality-scores.json `
   --output private/wi0182-quality-calibration.json
 ~~~
 
