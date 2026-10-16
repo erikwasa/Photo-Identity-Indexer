@@ -4,12 +4,14 @@ The video library is separate from existing photo search, face review, Smart/Cre
 
 ## Default-off activation (deferred maintainer acceptance)
 
-Nothing in the default launcher enables this route. After completing the remaining WI-0151 checkpoints, the operator's real-file acceptance, and confirming that the source-copy exclusion/purge root matches the poster generator, configure the **maintained local API**:
+The default launcher keeps this route disabled. For WI-0151's **consolidated real-file acceptance**, first verify that source-copy exclusion/purge uses the exact same poster root as the operator's poster generator, then configure the maintained local API:
 
 - PhotoIdentity:VideoLibraryEnabled = true (environment: PhotoIdentity__VideoLibraryEnabled=true)
 - PhotoIdentity:VideoPosterRoot = <absolute approved derivative root> (environment: PhotoIdentity__VideoPosterRoot=<path>)
 
 The default poster root is LOCALAPPDATA/PhotoIdentity/video-derivatives, matching the operator command. A nondefault root must match the configured source-copy purge root exactly. Never point derivatives into the archive originals. Restart the API after configuration changes.
+
+The maintained Windows launcher now accepts these settings under the `settings` object of your private `PhotoIdentity.launcher.json`: `PhotoIdentity__VideoLibraryEnabled` (explicit Boolean string) and `PhotoIdentity__VideoPosterRoot` (existing absolute local directory, no symlinks or junctions). When enabling the library, the launcher **requires** the explicit root; it validates the configuration before the API starts. Sample launcher JSON intentionally leaves videos disabled. For exact backup, dry-run, write, browser validation and post-review shutdown steps, use the [consolidated WI-0151 acceptance procedure](video-wi0151-consolidated-acceptance.md).
 
 The opt-in advanced navigation entry is Advanced → Archive operations → Videos (opt-in). The page shows a disabled-state message when the server feature is not enabled.
 
