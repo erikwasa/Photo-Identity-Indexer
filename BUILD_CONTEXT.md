@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: supported opt-in local video ingestion and v33 metadata, exclusion-safe bounded Rec.709 posters, separate default-off read-only video gallery, and private HLG evaluation previews exist. Checkpoints 12 and 14 hardened photo search/collection/archive read paths and photo processing/proxy/quality queues. Checkpoint 15 closes another gap by restricting manual photo annotation and photo metadata backfill/read/write adapters to photo asset/revision kinds. Remaining: final mixed-media/privacy audit and operator's consolidated local test, including visual assessment of HLG colour before any governed HDR poster is activated; unsupported or unvalidated HDR stays visible without a poster. No automatic video worker.
+WI-0151: engineering implementation of the initial opt-in local MOV/MP4 metadata and revision catalogue, exclusion-safe revision-owned Rec.709 SDR still posters, default-off read-only Videos page and mixed-media photo-only isolation is complete; PR #557 CI passed. The final checkpoint adds validated opt-in Windows launcher support and a consolidated maintained-machine acceptance runbook. **Next is the maintainer's requested one-time local test** (read-only baseline, verified backup, bounded video ingest/poster writes, opt-in video UI, photo regressions, privacy/nonhydration review). Keep WI-0151 in_review until evidence is recorded; do not call private HLG candidate images production-ready or enable any automatic video jobs. Only explicitly signalled bt709 input is accepted for durable posters; other HDR/unknown profiles remain deferred.
 
 ## Relevant pointers
 

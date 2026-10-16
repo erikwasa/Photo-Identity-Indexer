@@ -28,7 +28,9 @@ $SupportedSettings = @(
     "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds",
     "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds",
     "PhotoIdentity__RepositoryRoot",
-    "PhotoIdentity__ModelDirectory"
+    "PhotoIdentity__ModelDirectory",
+    "PhotoIdentity__VideoLibraryEnabled",
+    "PhotoIdentity__VideoPosterRoot"
 )
 
 function Get-LauncherEnvironmentValue {
@@ -57,6 +59,31 @@ function Assert-LauncherSettingValue {
     )
 
     switch ($Name) {
+        "PhotoIdentity__VideoLibraryEnabled" {
+            [bool]$parsed = $false
+            if (-not [bool]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be true or false."
+            }
+        }
+        "PhotoIdentity__VideoPosterRoot" {
+            # This root is used by the video poster renderer, browser and
+            # privacy purge. Do not silently resolve relative or UNC paths.
+            if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+                -not (Test-Path -LiteralPath $Value -PathType Container)) {
+                throw "$Name must point to an existing absolute local directory."
+            }
+            $fullPath = [IO.Path]::GetFullPath($Value)
+            $cursor = $fullPath
+            while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+                $directory = Get-Item -LiteralPath $cursor -Force
+                if (($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "$Name must not use junctions or symbolic links."
+                }
+                $parent = Split-Path -Parent $cursor
+                if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+                $cursor = $parent
+            }
+        }
         "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
             [bool]$parsed = $false
             if (-not [bool]::TryParse($Value, [ref]$parsed)) {
@@ -324,6 +351,11 @@ function Read-LauncherConfiguration {
                 Assert-LauncherSettingValue -Name $property.Name -Value $value
                 $settings[$property.Name] = $value
             }
+        }
+        if ($settings.ContainsKey("PhotoIdentity__VideoLibraryEnabled") -and
+            $settings["PhotoIdentity__VideoLibraryEnabled"] -eq "true" -and
+            -not $settings.ContainsKey("PhotoIdentity__VideoPosterRoot")) {
+            throw "PhotoIdentity__VideoLibraryEnabled=true requires an explicit PhotoIdentity__VideoPosterRoot for exclusion-safe serving."
         }
     }
     else {
