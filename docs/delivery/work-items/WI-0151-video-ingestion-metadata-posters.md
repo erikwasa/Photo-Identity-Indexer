@@ -88,6 +88,14 @@ Source, metadata, persistence and representative real-file verification.
 - PostgreSQL integration tests use a disposable database and synthetic video/photo rows to verify round trips, idempotence, source-copy exclusion, photo rejection and path validation. Next checkpoints must provide **opt-in** source/video revision insertion, explicit local availability/hash verification, deletion/exclusion-driven durable poster cleanup and server-side photo-only gating before exposing video rows to normal app queries. HDR tone mapping and gallery presentation remain open.
 - The adapter does **not** imply WI-0151 completion or authorization for mass video ingestion.
 
+## Checkpoint 4 — verified-local video asset and revision registration (2026-10-16)
+
+- Adds a dedicated PostgreSQL video asset/revision repository, **not called by any UI/API/worker or default photo scanner**. The caller must explicitly provide a locally available MOV/MP4 observation plus independently verified SHA-256; online-only/downloading placeholders and oversized sources are rejected before SQL.
+- Reuses the same stable local-folder source identity; creates or revives *video-only* assets transactionally, rejects photo-owned source-key collisions, checks durable source-copy tombstones under a source lock, and preserves immutable (asset, hash) revision IDs. A new content hash creates a new revision. Repeated/reverted content refreshes observed time so latest-content selection follows the currently verified revision; an older poster must not be selected for an edited video.
+- Explicit photo revision lookup now excludes media_kind video for both asset and revision. Disposable PostgreSQL tests cover unchanged hash, new content, reversion, photo-only exclusion, online-only refusal, private source tombstones, and photo-owned collision safety.
+- **No actual video files are read or ingested by this PR**, no production records inserted and no automatic video functionality enabled. This is only the revision registration seam. Upcoming checkpoints must wire opt-in hash verification, broader photo-only query protections, video metadata/poster generation, revision invalidation and safe library presentation before maintained review.
+- The maintainer requested **one end-to-end review only after the full WI-0151 scope is developed**. Keep the work item in progress until then.
+
 ## Completion notes
 
 - Files changed:
