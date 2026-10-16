@@ -44,6 +44,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "posters" =>
+                    await VideoPosterCommandRunner.RunAsync(
+                        VideoPosterOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "ingest" =>
                     await VideoIngestCommandRunner.RunAsync(
                         VideoIngestOptions.Parse(args.Skip(2).ToArray()),
@@ -133,6 +137,14 @@ public static class Program
                            [--postgres-connection-env NAME --database DB --apply]
                            (dry-run by default; --apply writes only bounded local video
                             revisions and technical metadata; no posters or photo analysis)
+
+              video posters --enable-video --source DIR --derivatives DIR
+                            --ffmpeg ABSOLUTE_EXE
+                            --postgres-connection-env NAME --database DB
+                            [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
+                            [--apply]
+                            (dry-run by default; only creates bounded revision-bound
+                             SDR JPEG posters for previously indexed local videos)
 
               video pilot --enable-video --source DIR --derivatives DIR
                           --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
