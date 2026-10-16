@@ -217,54 +217,60 @@ public static class VideoPosterCommandRunner
                 }
                 if (!options.Apply) continue;
 
-                string directory = Path.GetDirectoryName(destination)!;
-                // A symlink or junction beneath the derivative root must not redirect
-                // output into a different volume/archive.
-                string profileRoot = Path.Combine(derivativeRoot, "video-posters");
-                string policyRoot = Path.Combine(profileRoot, Profile);
-                foreach (string segment in new[] { profileRoot, policyRoot, directory })
-                {
-                    if (Directory.Exists(segment) &&
-                        (File.GetAttributes(segment) & FileAttributes.ReparsePoint) != 0)
-                        throw new InvalidDataException("Unsafe poster output directory.");
-                }
-                Directory.CreateDirectory(directory);
-                string temp = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp.jpg");
-                try
-                {
-                    if (!File.Exists(destination))
+                bool published = await evidence.PublishCurrentPosterAsync(
+                    source.SourceId, asset.Reference.ItemKey, revision,
+                    new Sha256Digest(hash), Profile, ffmpegHash,
+                    async leaseToken =>
                     {
-                        await tools.RenderPosterAsync(sourcePath, temp, token);
-                        // A changed source must not publish a poster under the earlier hash.
-                        if (await original.GetAvailabilityAsync(asset.Reference, token) != AssetAvailability.Local ||
-                            !VideoIngestCommandRunner.MatchesObservation(asset, new FileInfo(sourcePath)) ||
-                            await HashSourceAsync(original, asset.Reference, token) != hash)
-                        { changed++; continue; }
-                        _ = ReadJpegDimensions(temp);
-                        // Concurrent output with the same revision/tool may only be reused,
-                        // never overwritten. Recovery from a prior crash is possible.
-                        File.Move(temp, destination, overwrite: false);
-                    }
+                        // The source-row lock is held throughout rendering and the
+                        // eventual poster SQL commit. No exclusion can inventory
+                        // artifacts in the intermediate file-only state.
+                        string directory = Path.GetDirectoryName(destination)!;
+                        string profileRoot = Path.Combine(derivativeRoot, "video-posters");
+                        string policyRoot = Path.Combine(profileRoot, Profile);
+                        foreach (string segment in new[] { profileRoot, policyRoot, directory })
+                        {
+                            if (Directory.Exists(segment) &&
+                                (File.GetAttributes(segment) & FileAttributes.ReparsePoint) != 0)
+                                throw new InvalidDataException("Unsafe poster output directory.");
+                        }
+                        Directory.CreateDirectory(directory);
+                        string temp = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp.jpg");
+                        try
+                        {
+                            if (!File.Exists(destination))
+                            {
+                                await tools.RenderPosterAsync(sourcePath, temp, leaseToken);
+                                if (await original.GetAvailabilityAsync(asset.Reference, leaseToken)
+                                        != AssetAvailability.Local ||
+                                    !VideoIngestCommandRunner.MatchesObservation(
+                                        asset, new FileInfo(sourcePath)) ||
+                                    await HashSourceAsync(original, asset.Reference, leaseToken) != hash)
+                                    return null;
 
-                    (int width, int height) = ReadJpegDimensions(destination);
-                    long bytes = new FileInfo(destination).Length;
-                    string posterHash = await FileHashAsync(destination, token);
+                                _ = ReadJpegDimensions(temp);
+                                File.Move(temp, destination, overwrite: false);
+                            }
+                            (int width, int height) = ReadJpegDimensions(destination);
+                            long bytes = new FileInfo(destination).Length;
+                            string posterHash = await FileHashAsync(destination, leaseToken);
+                            if (await original.GetAvailabilityAsync(asset.Reference, leaseToken)
+                                    != AssetAvailability.Local ||
+                                !VideoIngestCommandRunner.MatchesObservation(
+                                    asset, new FileInfo(sourcePath)))
+                                return null;
 
-                    // Exclusion or supersession that occurs during rendering must not
-                    // result in a newly registered, visible stale poster.
-                    if (await videos.GetCurrentVisibleRevisionForHashAsync(
-                            source.SourceId, asset.Reference.ItemKey,
-                            new Sha256Digest(hash), token) != revision)
-                    { changed++; continue; }
-                    VideoStillPoster poster = new(revision, Profile, ffmpegHash,
-                        posterHash, relativePath, bytes, width, height, DateTimeOffset.UtcNow);
-                    await evidence.SavePosterAsync(poster, token);
-                    created++;
-                }
-                finally
-                {
-                    if (File.Exists(temp)) File.Delete(temp);
-                }
+                            return new VideoStillPoster(
+                                revision, Profile, ffmpegHash, posterHash, relativePath,
+                                bytes, width, height, DateTimeOffset.UtcNow);
+                        }
+                        finally
+                        {
+                            if (File.Exists(temp)) File.Delete(temp);
+                        }
+                    }, token);
+                if (published) created++;
+                else changed++;
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or

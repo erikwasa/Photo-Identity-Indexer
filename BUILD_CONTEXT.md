@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: opt-in video discovery/metadata and durable Rec.709 posters are merged. The current checkpoint captures video poster artifacts in the ADR-0008 durable source-copy exclusion manifest BEFORE catalogue cascade, with configured root and deletion-time path safety; photo purge stays unchanged. Next: test concurrent poster/exclusion races, add safe poster/library browsing with photo-only isolation, then HDR validation and maintainer's consolidated real-file/photo regression review. No automatic video ingest worker.
+WI-0151: opt-in video discovery, metadata, strict Rec.709 posters, bounded cleanup and manifest-integrated exclusions are merged. Current checkpoint serializes FFmpeg poster file creation and poster SQL insertion under the source lock, prevents source exclusion races, and hides superseded poster reads; no automatic video worker. Next: safe library/API video card and poster delivery with photo-only query isolation, followed by HDR handling and consolidated real-video/photo acceptance.
 
 ## Relevant pointers
 

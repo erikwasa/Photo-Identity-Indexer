@@ -137,6 +137,13 @@ Source, metadata, persistence and representative real-file verification.
 - Disposable PostgreSQL regression checks missing-root refusal, known video poster plus interrupted-render orphan capture, same-source/revision scope, persistent manifest replay, non-excluded-video survival and catalogue deletion order. No schema migration or video browser route.
 - Legacy exclusions already completed before this integration may have untracked orphan files lacking source identity; this checkpoint cannot safely identify them retroactively. Video browsing and final privacy/regression acceptance remain pending.
 
+## Checkpoint 10 — atomic video poster publication vs exclusion (2026-10-16)
+
+- The explicit `video posters --apply` command now enters a source-locked PostgreSQL publication scope **before FFmpeg writes a temporary JPEG** and keeps that lock through JPEG promotion and immutable poster row commit. Source-copy exclusions cannot insert their tombstones (and therefore cannot prepare a manifest) between file publication and row visibility. An already-excluded source refuses rendering before FFmpeg starts.
+- Binds the publication to the exact source key, current video revision and SHA-256 content hash; rejects superseded revisions, unsupported metadata and non-Rec.709 transfer for the initial SDR profile. Direct poster saves also refuse superseded revisions, and poster reads return no stale historic revision as the current poster.
+- A disposable PostgreSQL concurrency regression holds a poster publication callback open, requests concurrent source-copy exclusion, checks exclusion waits until the callback/row finishes, then confirms read suppression and refusal of any post-exclusion render callback. A stalled FFmpeg run intentionally delays exclusion only up to the existing bounded operator timeout.
+- The previous durable manifest and source-root safety checks remain in force; no schema migration, photo pipeline changes or automatic video work. Safe browsing, full photo-query isolation, HDR review and final real-file acceptance remain pending.
+
 ## Completion notes
 
 - Files changed:
