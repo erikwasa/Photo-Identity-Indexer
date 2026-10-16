@@ -181,8 +181,8 @@ work_items:
 - id: WI-0193
   title: Evaluate and calibrate absolute per-photo quality models
   milestone: M37
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0193-absolute-photo-quality-model-evaluation.md
   blockers: []
   blocker_notes: []
