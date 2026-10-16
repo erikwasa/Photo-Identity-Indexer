@@ -92,6 +92,19 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.Equal(initial.RevisionId,
                 await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
 
+            // The photo scanner must neither discover a video baseline nor
+            // soft-delete it when only photos were enumerated.
+            PostgresArchiveSourceScanBatchRepository photoScanner = new(database);
+            IReadOnlyDictionary<string, ArchiveSourceScanBaseline> baselines =
+                await photoScanner.GetBaselinesAsync(source.SourceId, null);
+            Assert.DoesNotContain("holiday/clip.mov", baselines.Keys);
+            Assert.Equal(0, await photoScanner.MarkMissingAssetsAsync(
+                source.SourceId, null, now.AddMinutes(12), CancellationToken.None));
+            Assert.Equal(0, await photoScanner.MarkMissingAssetsAsync(
+                source.SourceId, null, Array.Empty<string>(), now.AddMinutes(13)));
+            Assert.Equal(initial.RevisionId,
+                await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
+
             // The normal photo table contract is never changed by a video write.
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand inspect = connection.CreateCommand())
