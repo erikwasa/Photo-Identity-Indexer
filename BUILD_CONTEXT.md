@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: maintained PostgreSQL v33 accepted, and PR #540 merged opt-in dry-run-first MOV/MP4 local ingestion. Current checkpoint implements conservative embedded capture/GPS/camera extraction with explicit timestamp timezone/provenance, strict ISO-6709 coordinates and pilot-report privacy. Next: revision-safe durable poster files and exclusion/deletion cleanup, then safe browsing, full photo-only regression and final maintainer real-file acceptance. No automatic video worker; the maintainer prefers one final review after the entire work item is built.
+WI-0151: maintained v33 accepted, and the opt-in video ingest plus capture/GPS/camera metadata checkpoints merged. The current checkpoint adds operator-only revision-bound SDR still-poster materialization with current SHA-256 source verification, bounded external FFmpeg and immutable PostgreSQL evidence. HLG/PQ remain deferred. Next: dry-run-first orphan/supersession/exclusion physical cleanup and safe poster/library browsing, then final maintained photo/video real-file regression review. No automatic worker. Maintainer wants one end-to-end acceptance at completion.
 
 ## Relevant pointers
 
