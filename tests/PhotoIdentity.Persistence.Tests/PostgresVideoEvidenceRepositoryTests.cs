@@ -102,13 +102,13 @@ public sealed class PostgresVideoEvidenceRepositoryTests
             PostgresVideoPosterCleanupRepository cleanup = new(database);
             IReadOnlyList<VideoPosterCleanupRow> current =
                 await cleanup.SnapshotAsync(SourceId.From(sourceId));
-            VideoPosterCleanupRow row = Assert.Single(current, value => value.RelativePath == poster.PosterRelativePath);
-            Assert.True(row.IsCurrent);
-            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), row));
+            VideoPosterCleanupRow cleanupRow = Assert.Single(current, value => value.RelativePath == poster.PosterRelativePath);
+            Assert.True(cleanupRow.IsCurrent);
+            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), cleanupRow));
             Assert.False(await cleanup.MayRemoveUnreferencedAsync(
                 SourceId.From(sourceId), poster.RevisionId, poster.PosterProfileId, poster.ToolSha256));
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                cleanup.RetireStalePosterAsync(SourceId.New(), row));
+                cleanup.RetireStalePosterAsync(SourceId.New(), cleanupRow));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.SavePosterAsync(poster with { PosterSha256 = new string('f', 64) }));
@@ -135,10 +135,10 @@ public sealed class PostgresVideoEvidenceRepositoryTests
             // an exact row match. No other revision metadata or photo rows change.
             IReadOnlyList<VideoPosterCleanupRow> excluded =
                 await cleanup.SnapshotAsync(SourceId.From(sourceId));
-            row = Assert.Single(excluded, value => value.RelativePath == poster.PosterRelativePath);
-            Assert.False(row.IsCurrent);
-            Assert.True(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), row));
-            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), row));
+            cleanupRow = Assert.Single(excluded, value => value.RelativePath == poster.PosterRelativePath);
+            Assert.False(cleanupRow.IsCurrent);
+            Assert.True(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), cleanupRow));
+            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), cleanupRow));
             Assert.True(await cleanup.MayRemoveUnreferencedAsync(
                 SourceId.From(sourceId), poster.RevisionId, poster.PosterProfileId, poster.ToolSha256));
 
