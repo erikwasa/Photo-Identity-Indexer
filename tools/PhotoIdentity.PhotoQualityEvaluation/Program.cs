@@ -31,9 +31,21 @@ internal static class Program
             }
 
             if (args.Length > 1 &&
+                string.Equals(args[1], "generate-challenges", StringComparison.OrdinalIgnoreCase))
+            {
+                return await PhotoQualityBenchmarkChallengeGeneratorCommand.RunAsync(args[2..]);
+            }
+
+            if (args.Length > 1 &&
                 string.Equals(args[1], "add-challenges", StringComparison.OrdinalIgnoreCase))
             {
                 return await PhotoQualityBenchmarkChallengeCommand.RunAsync(args[2..]);
+            }
+
+            if (args.Length > 1 &&
+                string.Equals(args[1], "report", StringComparison.OrdinalIgnoreCase))
+            {
+                return await PhotoQualityBenchmarkReportCommand.RunAsync(args[2..]);
             }
 
             return await PhotoQualityBenchmarkCommand.RunAsync(args[1..]);
@@ -298,7 +310,11 @@ internal static class Program
         Console.WriteLine(
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark --output private/photo-quality-benchmark.json [--representative-count 400] [--challenge-reserve 200] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
         Console.WriteLine(
+            "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark generate-challenges --input private/photo-quality-benchmark.json --output private/photo-quality-challenges.json [--count 180] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
+        Console.WriteLine(
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark add-challenges --input private/photo-quality-benchmark.json --candidates private/photo-quality-challenges.json");
+        Console.WriteLine(
+            "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark report --input private/photo-quality-benchmark.json");
         Console.WriteLine(
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark review --input private/photo-quality-benchmark.json [--proxy-root <path>] [--port 5182] [--no-open]");
         Console.WriteLine();

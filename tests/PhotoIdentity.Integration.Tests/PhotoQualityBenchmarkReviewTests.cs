@@ -185,6 +185,79 @@ public sealed class PhotoQualityBenchmarkReviewTests
         Assert.Contains("overlap", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+
+    [Fact]
+    public void Challenge_selector_is_deterministic_and_round_robins_reason_buckets()
+    {
+        PhotoQualityChallengeAnalyzedCandidate[] candidates =
+        [
+            Candidate("a", ["candidate-low-sharpness"]),
+            Candidate("b", ["candidate-low-sharpness"]),
+            Candidate("c", ["rare-media-family"]),
+            Candidate("d", ["unknown-camera"]),
+        ];
+
+        string[] first = PhotoQualityBenchmarkChallengeSelector
+            .Select(candidates, 3)
+            .Select(candidate => candidate.Photo.RevisionId)
+            .ToArray();
+        string[] second = PhotoQualityBenchmarkChallengeSelector
+            .Select(candidates.Reverse(), 3)
+            .Select(candidate => candidate.Photo.RevisionId)
+            .ToArray();
+
+        Assert.Equal(first, second);
+        Assert.Contains(
+            first,
+            revisionId => revisionId == "c");
+        Assert.Contains(
+            first,
+            revisionId => revisionId == "d");
+    }
+
+    [Fact]
+    public void Full_size_proxy_percentile_does_not_mark_every_photo_low_resolution()
+    {
+        TechnicalPhotoQualityEvidence evidence = Evidence(
+            sharpness: 100d,
+            luminance: 120d,
+            shadow: 0.01d,
+            highlight: 0.01d,
+            contrast: 180,
+            proxyFraction: 1d);
+        PhotoQualityChallengeThresholds thresholds = new(
+            SharpnessLow: 10d,
+            SharpnessHigh: 1000d,
+            LuminanceLow: 20d,
+            LuminanceHigh: 230d,
+            ShadowClippingHigh: 0.5d,
+            HighlightClippingHigh: 0.5d,
+            ContrastLow: 20d,
+            ProxyResolutionLow: 1d);
+        PhotoQualityChallengeRarity rarity = new(
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal));
+
+        IReadOnlyList<string> reasons =
+            PhotoQualityBenchmarkChallengeSelector.BuildReasons(
+                evidence,
+                new PhotoQualityBenchmarkStratum(
+                    "2020s",
+                    "camera:test/camera",
+                    "jpeg",
+                    "12-24mp",
+                    "landscape",
+                    "one"),
+                thresholds,
+                rarity);
+
+        Assert.DoesNotContain(
+            "extreme-proxy-resolution-low",
+            reasons);
+    }
+
     private static PhotoQualityBenchmarkExport Manifest(
         string benchmarkId,
         params PhotoQualityBenchmarkPhoto[] photos)
@@ -217,6 +290,55 @@ public sealed class PhotoQualityBenchmarkReviewTests
             "test",
             photos);
     }
+
+
+    private static PhotoQualityChallengeAnalyzedCandidate Candidate(
+        string revisionId,
+        IReadOnlyList<string> reasons)
+    {
+        PhotoQualityBenchmarkPhoto photo = Photo(
+            revisionId,
+            $"{revisionId}.jpg",
+            [1, 2, 3]);
+        TechnicalPhotoQualityEvidence evidence = Evidence(
+            sharpness: 100d,
+            luminance: 120d,
+            shadow: 0.01d,
+            highlight: 0.01d,
+            contrast: 180,
+            proxyFraction: 1d);
+        return new PhotoQualityChallengeAnalyzedCandidate(
+            photo,
+            evidence,
+            reasons,
+            PhotoQualityBenchmarkChallengeSelector.StableOrderKey(
+                "bench-selector",
+                revisionId));
+    }
+
+    private static TechnicalPhotoQualityEvidence Evidence(
+        double sharpness,
+        double luminance,
+        double shadow,
+        double highlight,
+        int contrast,
+        double proxyFraction) =>
+        new(
+            TechnicalPhotoQualityProtocol.AlgorithmVersion,
+            TechnicalPhotoQualityProtocol.CalibratedProfileVersion,
+            "jpeg-1600-q78",
+            1600,
+            1200,
+            1_920_000,
+            sharpness,
+            luminance,
+            shadow,
+            highlight,
+            20,
+            20 + contrast,
+            contrast,
+            proxyFraction,
+            []);
 
     private static PhotoQualityBenchmarkPhoto Photo(
         string revisionId,

@@ -122,3 +122,66 @@ The command rejects benchmark-ID mismatches, duplicate/overlapping revisions, an
 Challenge photos are diagnostic. They can improve coverage of hard/model-disagreement cases without contaminating the primary representative held-out result.
 
 The final WI-0192 checkpoint will generate the initial maintained-archive challenge candidate file and run the private coverage/pilot acceptance. Later model-disagreement candidates from WI-0193 can use the same import contract without replacing the representative core.
+
+
+## Checkpoint 3: generate the initial maintained-archive challenge tranche
+
+The first challenge tranche deliberately reuses only explainable evidence already available before WI-0193. It scans current non-core photos with durable review proxies and selects across:
+
+- WI-0182 candidate technical reasons;
+- bottom/top 2% whole-proxy sharpness;
+- bottom/top 2% mean luminance;
+- top 2% shadow/highlight clipping;
+- bottom 2% luminance contrast;
+- genuinely reduced proxy resolution when that percentile is below full-size;
+- rare capture-era/media/resolution/device strata; and
+- missing capture-era/camera metadata.
+
+These are **challenge-selection heuristics**, not quality labels. They are hidden during human review and must not be interpreted as evidence that a selected photo is bad.
+
+Generate the initial private challenge file:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark generate-challenges `
+  --input private/photo-quality-benchmark.json `
+  --output private/photo-quality-challenges.json `
+  --count 180
+~~~
+
+The command analyzes the non-core durable proxies, prints progress every 500 photos, excludes revisions and exact content hashes already present in the benchmark, and uses deterministic round-robin selection across challenge-reason buckets.
+
+The default is **180**, not the full 200-slot reserve. This produces an initial benchmark of about 580 photos while retaining 20 diagnostic slots for later WI-0193 model-disagreement cases. That is an intentional documented exception to the approximate 600-photo target rather than silently consuming all challenge capacity before candidate learned models exist.
+
+Append the generated tranche:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark add-challenges `
+  --input private/photo-quality-benchmark.json `
+  --candidates private/photo-quality-challenges.json
+~~~
+
+## Privacy-safe aggregate report
+
+Inspect benchmark composition and review progress without printing source keys or proxy paths:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark report `
+  --input private/photo-quality-benchmark.json
+~~~
+
+The report includes representative/challenge counts, calibration/held-out counts, broad capture/media/resolution/orientation/face coverage, camera-metadata coverage, review-level counts and challenge-reason counts. It intentionally reports only the number of distinct camera models rather than their names.
+
+## Maintainer acceptance sequence
+
+After checkpoint 3 is merged into `features/m37`:
+
+1. Generate a fresh 400-photo representative benchmark with a 200-photo challenge reserve.
+2. Run `benchmark report` and inspect whether the representative coverage looks plausible for the maintained archive.
+3. Generate and append the default 180-photo challenge tranche.
+4. Run `benchmark report` again and confirm the final initial benchmark is about 580 photos and the challenge reasons are diverse rather than dominated by one degenerate signal.
+5. Start the blinded reviewer and review approximately **30 photos** as a pilot. Stop with Ctrl+C; all labels are already saved.
+6. Re-run `benchmark report` and confirm review progress/resume behavior.
+7. If the sample visibly still misses a major archive class, do not complete WI-0192: record the gap and adjust the sampling/challenge policy first.
+8. If coverage and the blinded pilot are acceptable, continue the remaining human review when useful for WI-0193 and record WI-0192 maintainer acceptance. The 20 reserved challenge slots remain available for later model-disagreement additions.
+
+WI-0192 can close after this maintained-archive coverage/pilot acceptance. Completing all ~580 human ratings is not required merely to close the benchmark/tooling work item; WI-0193 consumes and extends the benchmark as its model comparison proceeds.
