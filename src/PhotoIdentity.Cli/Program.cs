@@ -160,7 +160,9 @@ public static class Program
               video pilot --enable-video --source DIR --derivatives DIR
                           --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
                           [--max-videos COUNT (1..50)] [--timeout-seconds SECONDS (1..120)]
-                          (metadata/poster pilot only; no catalogue or OneDrive hydration)
+                          [--preview-hlg]
+                          (HLG previews require explicit BT.2020 HLG stream evidence;
+                           evaluation-only, no catalogue or OneDrive hydration)
 
               archive proxy measure --source DIR --output DIR
                                     --profile ID:MAX_LONG_EDGE:JPEG_QUALITY

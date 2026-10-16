@@ -13,17 +13,25 @@ public sealed record VideoPilotOptions(
     string FfprobePath,
     string FfmpegPath,
     int MaximumVideos,
-    int TimeoutSeconds)
+    int TimeoutSeconds,
+    bool PreviewHlg = false)
 {
     public static VideoPilotOptions Parse(string[] args)
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
         bool enabled = false;
+        bool previewHlg = false;
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--enable-video")
             {
                 enabled = true;
+                continue;
+            }
+
+            if (args[i] == "--preview-hlg" && !previewHlg)
+            {
+                previewHlg = true;
                 continue;
             }
 
@@ -50,7 +58,8 @@ public sealed record VideoPilotOptions(
             Required("--source"), Required("--derivatives"),
             Required("--ffprobe"), Required("--ffmpeg"),
             Limit("--max-videos", 8, 1, 50),
-            Limit("--timeout-seconds", 20, 1, 120));
+            Limit("--timeout-seconds", 20, 1, 120),
+            previewHlg);
     }
 }
 
@@ -83,6 +92,7 @@ public static class VideoPilotCommandRunner
 {
     private const long MaximumSourceBytes = 1024L * 1024 * 1024;
     private const string PilotProfile = "pilot-poster-v1";
+    private const string HlgPreviewProfile = "pilot-hlg-tone-map-v1";
 
     public static async Task<int> RunAsync(
         VideoPilotOptions options, TextWriter output, CancellationToken cancellationToken = default)
@@ -98,8 +108,14 @@ public static class VideoPilotCommandRunner
         VideoPilotMediaTools tools = new(options.FfprobePath, options.FfmpegPath,
             TimeSpan.FromSeconds(options.TimeoutSeconds));
         Directory.CreateDirectory(derivatives);
-        string posterRoot = Path.Combine(derivatives, "video-posters", PilotProfile);
-        Directory.CreateDirectory(posterRoot);
+        VideoPosterCommandRunner.ValidateRoots(sourceRoot, derivatives);
+        string posterParent = Path.Combine(derivatives, "video-posters");
+        EnsureRealDirectory(posterParent);
+        string posterRoot = Path.Combine(posterParent, PilotProfile);
+        EnsureRealDirectory(posterRoot);
+        string hlgPreviewRoot = Path.Combine(posterParent, HlgPreviewProfile);
+        if (options.PreviewHlg)
+            EnsureRealDirectory(hlgPreviewRoot);
 
         // Pilot-only ephemeral source reference. Catalogue IDs are not created by this command.
         OneDriveVideoAssetSource videos = new(SourceId.New(), sourceRoot);
@@ -138,8 +154,43 @@ public static class VideoPilotCommandRunner
                 }
                 else if (metadata.ColorTransfer is "arib-std-b67" or "smpte2084")
                 {
-                    // HLG/PQ -> SDR tone mapping needs validated colour pipeline (WI-0151).
-                    outcome = "hdr_poster_needs_tone_mapping";
+                    // An HLG preview is explicitly opt-in and remains outside the
+                    // catalogue, durable poster profile, cleanup and browser-serving API.
+                    // PQ and incomplete/mismatched HLG signalling are always deferred.
+                    if (options.PreviewHlg && IsHlgPreviewCandidate(metadata))
+                    {
+                        string relativeHlg = Path.Combine(
+                            "video-posters", HlgPreviewProfile, keyHash + ".jpg");
+                        string hlgDestination = Path.Combine(derivatives, relativeHlg);
+                        string tmp = Path.Combine(
+                            hlgPreviewRoot, Guid.NewGuid().ToString("N") + ".jpg");
+                        try
+                        {
+                            if (!VideoIngestCommandRunner.MatchesObservation(
+                                    asset, new FileInfo(path)))
+                                throw new InvalidDataException(
+                                    "HLG pilot source changed before rendering.");
+                            await tools.RenderHlgPreviewAsync(path, tmp, cancellationToken);
+                            if (await videos.GetAvailabilityAsync(asset.Reference, cancellationToken)
+                                    != AssetAvailability.Local ||
+                                !VideoIngestCommandRunner.MatchesObservation(
+                                    asset, new FileInfo(path)))
+                                throw new InvalidDataException(
+                                    "HLG pilot source changed while rendering.");
+                            _ = VideoPosterCommandRunner.ReadJpegDimensions(tmp);
+                            File.Move(tmp, hlgDestination, overwrite: true);
+                            poster = relativeHlg.Replace('\\', '/');
+                            outcome = "hlg_preview_created";
+                        }
+                        finally
+                        {
+                            if (File.Exists(tmp)) File.Delete(tmp);
+                        }
+                    }
+                    else
+                    {
+                        outcome = "hdr_poster_needs_tone_mapping";
+                    }
                 }
                 else
                 {
@@ -175,7 +226,7 @@ public static class VideoPilotCommandRunner
         }
 
         VideoPilotReport report = new(
-            1, DateTimeOffset.UtcNow, enumerated, online, downloading, unavailable,
+            2, DateTimeOffset.UtcNow, enumerated, online, downloading, unavailable,
             local, oversized, beyondLimit, results,
             "Operator-only video pilot. This is not catalogue ingestion; source IDs/revisions, exclusions, capture dates and browser visibility are not persisted. Do not upload the manifest without review.");
         string reportPath = Path.Combine(derivatives, "video-pilot-report.json");
@@ -193,16 +244,32 @@ public static class VideoPilotCommandRunner
         }
 
         output.WriteLine($"Video pilot: found {enumerated}, local {local}, online-only {online}, downloading {downloading}, unavailable {unavailable}.");
-        output.WriteLine($"Probed {results.Count} local videos; posters {results.Count(row => row.Outcome == "poster_created")}; HDR deferred {results.Count(row => row.Outcome == "hdr_poster_needs_tone_mapping")}.");
+        output.WriteLine($"Probed {results.Count} local videos; SDR posters {results.Count(row => row.Outcome == "poster_created")}; HLG evaluation previews {results.Count(row => row.Outcome == "hlg_preview_created")}; HDR deferred {results.Count(row => row.Outcome == "hdr_poster_needs_tone_mapping")}.");
         output.WriteLine("Private pilot report written beneath the configured derivative root. No catalogue changes or OneDrive hydration were requested.");
         return 0;
     }
+
+    public static bool IsHlgPreviewCandidate(VideoPilotMetadata m) =>
+        IsSupported(m) &&
+        m.VideoCodec == "hevc" && m.Profile == "Main 10" &&
+        m.PixelFormat == "yuv420p10le" &&
+        m.ColorTransfer == "arib-std-b67" &&
+        m.ColorPrimaries == "bt2020" &&
+        m.ColorSpace == "bt2020nc";
 
     public static bool IsSupported(VideoPilotMetadata m) =>
         (m.VideoCodec == "h264" && m.Profile is ("Main" or "High") ||
          m.VideoCodec == "hevc" && m.Profile is ("Main" or "Main 10")) &&
         m.Width is > 0 and <= 8192 && m.Height is > 0 and <= 8192 &&
         m.DurationSeconds is >= 0 and <= 600;
+
+    private static void EnsureRealDirectory(string path)
+    {
+        if (Directory.Exists(path) &&
+            (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new ArgumentException("Video pilot derivative directory is a reparse point.");
+        Directory.CreateDirectory(path);
+    }
 
     private static bool IsWithin(string candidate, string root)
     {
