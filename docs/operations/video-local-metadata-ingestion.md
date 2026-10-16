@@ -6,7 +6,7 @@ This command connects the accepted PostgreSQL schema v33, video asset/revision r
 
 ## Safety contract
 
-- Explicit opt-in is required: --enable-video. Without --apply, the command is a **dry run** and writes nothing to PostgreSQL. --apply additionally requires --postgres-connection-env NAME with an explicitly named localhost PostgreSQL database.
+- Explicit opt-in is required: --enable-video. Without --apply, the command is a **dry run** and writes nothing to PostgreSQL. --apply additionally requires --postgres-connection-env NAME and --database NAME, naming the exact intended localhost PostgreSQL catalogue. The launcher connection string can omit Database; the operator's explicit target overrides it only for this CLI process.
 - The --source directory is the existing stable archive root, not a single file. The command reuses its canonical local-folder source ID and original source-relative keys.
 - Enumeration reads only filesystem attributes. OneDrive online-only, downloading, unavailable or error states are never probed, hashed or hydrated. In apply mode, source-copy exclusions are checked before reading bytes and again during transactional registration.
 - Processing is sequential, limited to 8 local files by default, at most 25 with --max-videos, and 1 GiB per video. The separately installed FFprobe executable must be selected by an absolute trusted path, has a bounded execution timeout, and is invoked using a file-only protocol whitelist. The executable SHA-256 is recorded with inspection evidence.
@@ -32,8 +32,10 @@ After reviewing this report and taking an ordinary PostgreSQL backup, an explici
 ~~~powershell
 $launcher = Get-Content "$env:LOCALAPPDATA\PhotoIdentity\launcher.json" -Raw | ConvertFrom-Json
 $connectionVariableName = [string]$launcher.postgresConnectionEnvironmentVariable
-dotnet run --project src/PhotoIdentity.Cli -c Release -- video ingest --enable-video --apply --postgres-connection-env $connectionVariableName --source $sourceRoot --ffprobe $ffprobe --max-videos 3 --timeout-seconds 20
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video ingest --enable-video --apply --postgres-connection-env $connectionVariableName --database photoidentity_rehearsal_20260910_214641_a808bde --source $sourceRoot --ffprobe $ffprobe --max-videos 3 --timeout-seconds 20
 ~~~
+
+Replace the example database name with the **confirmed authoritative database**, never assume a dated rehearsal name is production. Check the launcher and database activity before running --apply.
 
 The command outputs aggregate counts only, never source paths, capture metadata, tool stderr or connection strings. Explicit --apply writes locally verified revisions and metadata, not photo analysis, poster images or slideshow records.
 
