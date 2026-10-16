@@ -297,6 +297,10 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
         return value is bool result && result;
     }
 
+    /// <summary>Ensures the exclusion/tombstone table exists before media evidence is read or written.</summary>
+    public Task EnsureReadyAsync(CancellationToken cancellationToken = default) =>
+        EnsureSchemaAsync(cancellationToken);
+
     private async Task EnsureSchemaAsync(CancellationToken cancellationToken) =>
         await _schema.Value.WaitAsync(cancellationToken);
 
