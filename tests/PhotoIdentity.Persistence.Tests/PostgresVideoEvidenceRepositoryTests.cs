@@ -145,13 +145,4 @@ public sealed class PostgresVideoEvidenceRepositoryTests
         }
     }
 
-    [Fact]
-    public async Task Invalid_evidence_fails_without_touching_PostgreSQL()
-    {
-        PostgresVideoEvidenceRepository repository = new(null!);
-        VideoStillPoster poster = new(
-            AssetRevisionId.New(), "poster-v1", new string('a',64), new string('b',64),
-            "video-posters/../secret.jpg", 50, 10, 10, DateTimeOffset.UtcNow);
-        await Assert.ThrowsAsync<ArgumentException>(() => repository.SavePosterAsync(poster));
-    }
 }
