@@ -23,6 +23,10 @@ $legacyProviderConfigurationPath = Join-Path $artifactRoot "launcher-legacy-prov
 $missingPostgresEnvironmentConfigurationPath = Join-Path $artifactRoot "launcher-missing-postgres-env.json"
 $directPostgresSecretConfigurationPath = Join-Path $artifactRoot "launcher-direct-postgres-secret.json"
 $validPostgresValidationConfigurationPath = Join-Path $artifactRoot "launcher-valid-postgres-reference.json"
+$invalidVideoBooleanPath = Join-Path $artifactRoot "launcher-invalid-video-boolean.json"
+$missingVideoRootPath = Join-Path $artifactRoot "launcher-missing-video-root.json"
+$invalidVideoRootPath = Join-Path $artifactRoot "launcher-invalid-video-root.json"
+$validVideoSettingsPath = Join-Path $artifactRoot "launcher-valid-video-opt-in.json"
 $launcherPath = Join-Path $repositoryRoot "Start-PhotoIdentity.ps1"
 $analysisPath = Join-Path $artifactRoot "analysis"
 $reviewProxyPath = Join-Path $artifactRoot "review-proxies"
@@ -146,6 +150,58 @@ function Assert-PostgresLauncherConfiguration {
         }
         if (@(Get-LauncherServerProcesses).Count -ne 0) {
             throw "ValidateConfigurationOnly unexpectedly started Photo Identity."
+        }
+
+        # Keep the opt-in feature OFF by default. Reject invalid values,
+        # missing derivative roots and unsafe relative roots before process start.
+        $invalidVideoBoolean = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{ PhotoIdentity__VideoLibraryEnabled = "sometimes" }
+        }
+        $invalidVideoBoolean | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidVideoBooleanPath -Encoding UTF8
+        Invoke-LauncherExpectFailure -Path $invalidVideoBooleanPath -ExpectedPattern "VideoLibraryEnabled must be true or false" -Description "invalid video feature flag"
+
+        $missingVideoRoot = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{ PhotoIdentity__VideoLibraryEnabled = "true" }
+        }
+        $missingVideoRoot | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $missingVideoRootPath -Encoding UTF8
+        Invoke-LauncherExpectFailure -Path $missingVideoRootPath -ExpectedPattern "requires an explicit PhotoIdentity__VideoPosterRoot" -Description "video enabled without derivative root"
+
+        $invalidVideoRoot = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__VideoLibraryEnabled = "true"
+                PhotoIdentity__VideoPosterRoot = "relative\\video-derivatives"
+            }
+        }
+        $invalidVideoRoot | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidVideoRootPath -Encoding UTF8
+        Invoke-LauncherExpectFailure -Path $invalidVideoRootPath -ExpectedPattern "existing absolute local directory" -Description "relative video derivative root"
+
+        $videoRoot = Join-Path $artifactRoot "video-derivatives"
+        New-Item -ItemType Directory -Path $videoRoot -Force | Out-Null
+        $validVideoSettings = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__VideoLibraryEnabled = "true"
+                PhotoIdentity__VideoPosterRoot = $videoRoot
+            }
+        }
+        $validVideoSettings | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $validVideoSettingsPath -Encoding UTF8
+        $videoOutput = @(& powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $validVideoSettingsPath -ValidateConfigurationOnly 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Launcher rejected a valid explicit video-library opt-in. Output: $($videoOutput -join [Environment]::NewLine)"
+        }
+        if (@(Get-LauncherServerProcesses).Count -ne 0) {
+            throw "Video settings validation started a server."
         }
     }
     finally {
