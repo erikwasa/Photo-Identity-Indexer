@@ -130,7 +130,7 @@ public static class Program
 
               video ingest --enable-video --source DIR --ffprobe ABSOLUTE_EXE
                            [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
-                           [--postgres-connection-env NAME --apply]
+                           [--postgres-connection-env NAME --database DB --apply]
                            (dry-run by default; --apply writes only bounded local video
                             revisions and technical metadata; no posters or photo analysis)
 
