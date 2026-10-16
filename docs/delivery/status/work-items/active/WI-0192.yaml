@@ -1,0 +1,11 @@
+id: WI-0192
+title: Build a representative archive benchmark and blinded quality review workflow
+milestone: M37
+status: ready
+owner: unassigned
+document: ../work-items/WI-0192-representative-photo-quality-benchmark.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/535

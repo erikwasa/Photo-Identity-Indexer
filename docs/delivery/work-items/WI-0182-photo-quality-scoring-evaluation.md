@@ -71,7 +71,7 @@ Do not retain as a product signal at this stage:
 
 Noise estimation is deferred from the first calibration because low-light texture, JPEG artifacts, scans and intentional grain make a simple proxy-only noise scalar especially easy to misinterpret. Private review can determine whether it merits a separately versioned experiment.
 
-## Representative private-archive result (2026-10-14)
+## Deterministic private-archive result (2026-10-14)
 
 The maintainer reviewed the full deterministic 300-photo private sample produced by the evaluation harness. The private JSON remains uncommitted; only aggregate evidence is recorded here.
 
@@ -101,7 +101,7 @@ The WI-0182 result is therefore **further experiment / no adoption of the curren
 
 ## Alternative quality-rating approaches to evaluate next
 
-The existing 300 human-labelled proxies can be reused as a benchmark, so the next experiment does not require another broad manual review before comparing alternatives.
+The 300 reviewed proxies are useful diagnostic evidence for the failure modes of `proxy-technical-quality-v1`, but the maintainer subsequently judged this deterministic sample insufficiently representative of the archive for selecting a replacement model. M37 therefore creates a new stratified archive benchmark and does not treat these 300 labels as the primary ground truth for future quality-model selection.
 
 1. **Classical no-reference IQA baseline (BRISQUE).** OpenCV exposes BRISQUE as a blind/referenceless image-quality estimator with a scalar score. This is cheap to test and gives a useful non-neural baseline, but it is still a global natural-scene statistic and is not expected to solve subject-focus failures by itself.
 2. **Learned no-reference IQA.** Benchmark modern pretrained models such as MUSIQ, TOPIQ and MANIQA. MUSIQ processes multi-scale/native-resolution image representations; TOPIQ explicitly uses high-level semantics to guide attention toward locally important distortions. These models are more promising for an overall perceptual-quality score than hand-written thresholds, but their scores are learned from external opinion-score datasets and must be calibrated against the private archive before product use.
@@ -109,12 +109,12 @@ The existing 300 human-labelled proxies can be reused as a benchmark, so the nex
 4. **Relative ranking inside similar-photo groups.** For near-duplicates, bursts or visually similar images, compare which image is technically better rather than forcing a globally meaningful absolute score. Pairwise IQA/ranking models can be evaluated here, and Photo Identity can combine relative quality with existing similarity/identity evidence. Relative ranking is likely to be more actionable for slideshow and collection curation than a universal absolute percentage.
 5. **Opt-in personalized ranking as a later experiment.** Pairwise user choices among similar photos could train a lightweight ranker over visual embeddings plus technical features. This could model the maintainer's own notion of a better photograph, but it deliberately mixes technical quality with preference and therefore should remain separate from the first follow-up experiment.
 
-Recommended sequence: first benchmark BRISQUE plus two learned NR-IQA models (MUSIQ and TOPIQ) on the same 300 reviewed proxies, then add subject/face-aware scoring for blur/focus misses, and finally test pairwise ranking on near-duplicate groups. Do not introduce a production 0-100 score until one or more approaches show useful discrimination on the existing human labels. If a single number is later exposed, retain the underlying subscores/reasons and algorithm/calibration version so the number remains inspectable.
+Follow-up evaluation is tracked by M37. It separates absolute per-photo quality from archive-wide visual redundancy, builds a new representative blinded benchmark, evaluates modern no-reference IQA candidates on frozen calibration/held-out partitions, and combines accepted signals only in a later collection simulation. Do not introduce a production 0-100 score, exclusion tier or similarity suppression policy until M37 provides acceptance evidence. If a single quality number is later exposed, retain the underlying model/calibration provenance so it remains inspectable.
 
 ## Acceptance criteria
 
 - The evaluation defines which technical-quality signals are reliable enough to retain and documents rejected/unreliable candidates.
-- Representative private-photo review compares automatic evidence with human judgement across common archive failure modes.
+- Private-photo review compares automatic evidence with human judgement across common archive failure modes; later model selection requires the broader representative benchmark defined by M37.
 - Proxy-profile effects and limitations are documented.
 - A versioned, inspectable result shape is proposed if evidence is useful.
 - Runtime and storage cost are measured well enough to choose on-demand/cache/persisted handling.
@@ -123,4 +123,4 @@ Recommended sequence: first benchmark BRISQUE plus two learned NR-IQA models (MU
 
 ## Remaining acceptance evidence
 
-The automated/synthetic layer can establish deterministic metric behavior, profile gating and proxy-only execution, but it cannot establish usefulness on the maintainer's private archive. Before completion, run the documented evaluator against a representative private sample, fill the human-review fields, record maintained-machine runtime/storage measurements, and decide whether the candidate signals are sufficiently reliable for any product use.
+The WI-0182 private run established useful negative evidence about the hand-written candidate rules and maintained-machine cost, but the maintainer later judged its deterministic sample insufficiently representative for selecting a replacement model. M37 carries the broader representative benchmark and successor-model evaluation. WI-0182 should close on its documented no-adoption decision for `proxy-technical-quality-v1`, not by claiming the 300-photo sample is archive-representative.

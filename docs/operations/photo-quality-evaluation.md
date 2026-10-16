@@ -62,7 +62,7 @@ The generated JSON contains a `review` object for every sampled photo. Review a 
 
 Fill `review.category`, `review.verdict` (`acceptable`, `technical-failure`, or `uncertain`), `review.personallyImportant`, and `review.notes`. Compare human judgement with each individual signal/reason, paying particular attention to false positives on personally important or intentionally imperfect images and to failures that receive no candidate reason.
 
-## Private-archive result (2026-10-14)
+## Deterministic private-archive result (2026-10-14)
 
 The maintainer reviewed all 300 photos in the deterministic private sample. The private review export is not committed.
 
@@ -82,7 +82,7 @@ The evaluation result is **further experiment / no adoption of the current candi
 
 ## Follow-up methods worth evaluating
 
-Reuse the same reviewed 300-photo sample as the first benchmark for alternative estimators:
+The 300-photo review remains useful diagnostic evidence for the first rule-based experiment, but maintainer feedback found it insufficiently representative of the archive for selecting a successor model. M37 therefore builds a new stratified blinded benchmark. Candidate methods worth carrying into that evaluation include:
 
 - **BRISQUE** as a low-cost classical no-reference IQA baseline. OpenCV documents BRISQUE as a blind/referenceless quality estimator whose score ranges from best to worst quality.
 - **MUSIQ / TOPIQ / MANIQA** as learned no-reference perceptual-quality estimators. These can provide an overall scalar and are trained to correlate with human quality judgements; TOPIQ is especially interesting because it uses semantic information to focus on locally important distortions.
@@ -90,6 +90,6 @@ Reuse the same reviewed 300-photo sample as the first benchmark for alternative 
 - **Relative quality ranking for near-duplicates/bursts**: rank similar photos against each other instead of assuming one absolute global quality scale. This is likely to be useful when selecting among multiple photos of the same moment.
 - **Personalized pairwise ranking** can be considered later as an opt-in feature, but it should be treated as preference modelling rather than pure technical quality.
 
-A follow-up experiment should benchmark at least BRISQUE, MUSIQ and TOPIQ against the existing human verdicts, add a subject-aware blur/focus experiment, and measure runtime/deployment cost. Any resulting 0-100 presentation score should be a calibrated view over versioned underlying evidence, not an unexplained replacement for it.
+M37 owns the follow-up evaluation. It benchmarks multiple absolute no-reference IQA candidates against a new representative five-level human-labelled sample, separately evaluates archive-wide visual redundancy, and combines accepted signals only in a collection simulation. The old 300 labels may be used for regression/diagnostic comparison, but not as the primary benchmark. Any resulting 0-100 presentation score should be a calibrated view over versioned model evidence, not an unexplained replacement for it.
 
 If a later evaluation supports a bounded product use, create a separately scoped work item for the semantic change. Persisting technical evidence also requires an explicit storage/versioning design rather than silently treating an experimental result shape as canonical archive metadata.
