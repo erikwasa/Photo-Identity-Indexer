@@ -35,8 +35,11 @@ The file is created in the derivative root with an unpredictable temporary basen
 
 PostgreSQL and the filesystem cannot commit atomically. A crash between file creation and poster record insertion may leave an unreferenced JPEG. An idempotent retry on the same CURRENT revision can recover it after validation. If a source is excluded, deleted, or superseded, its old poster must not be selected by the revision-bound read interface even if the file remains on disk.
 
-**Physical deletion is not implemented in this checkpoint.** The next WI-0151 slice must add explicit bounded dry-run/audited cleanup of unreferenced, excluded, deleted and superseded poster files within the app-owned derivative root, and test it before any browser-serving API is enabled. Never delete based only on a source file name.
+**Physical deletion is handled by later WI-0151 checkpoints.** The next WI-0151 slice must add explicit bounded dry-run/audited cleanup of unreferenced, excluded, deleted and superseded poster files within the app-owned derivative root, and test it before any browser-serving API is enabled. Never delete based only on a source file name.
 
 Poster serving, safe video browsing and representative maintained-file quality verification are also still pending. Previous isolated-pilot evidence for SDR appearance is not a substitute for end-to-end maintainer review.
 
 WI-0151 remains in progress until the requested final consolidated acceptance.
+
+
+For future source-copy exclusions, configure `PhotoIdentity:VideoPosterRoot` to the **same absolute derivative root** used by this command (default: `LocalApplicationData/PhotoIdentity/video-derivatives`). The exclusion purge manifests revision-owned JPEGs before deleting catalogue identity. An inaccurate configured root can leave unrelated files untouched; verify configuration before enabling video browsing.
