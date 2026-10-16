@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: v33 accepted; opt-in local metadata ingest, capture/GPS provenance, and durable Rec.709 still posters merged. This checkpoint adds bounded dry-run-first cleanup of provably owned stale/revision-bound posters. Crucial remaining privacy gate: source-copy purge must capture video derivatives in its durable manifest BEFORE cascading away revision identity. Then video poster serving/library browsing and final maintained photo/video regression acceptance. No automatic video background work; operator wants one consolidated final review.
+WI-0151: opt-in video discovery/metadata and durable Rec.709 posters are merged. The current checkpoint captures video poster artifacts in the ADR-0008 durable source-copy exclusion manifest BEFORE catalogue cascade, with configured root and deletion-time path safety; photo purge stays unchanged. Next: test concurrent poster/exclusion races, add safe poster/library browsing with photo-only isolation, then HDR validation and maintainer's consolidated real-file/photo regression review. No automatic video ingest worker.
 
 ## Relevant pointers
 

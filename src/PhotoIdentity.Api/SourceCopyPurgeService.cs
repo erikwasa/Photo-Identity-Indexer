@@ -185,6 +185,11 @@ public sealed class SourceCopyPurgeService
 
     private void DeleteAndVerify(SourceCopyPurgeArtifact artifact)
     {
+        // Manifest paths are durable, including across a service restart. Check
+        // the configured poster root and any reparse-point escape at deletion
+        // time, not just at manifest construction time.
+        if (!artifact.IsDirectory)
+            ValidateVideoPosterPathForDeletion(artifact.AbsolutePath);
         if (artifact.IsDirectory)
         {
             _fileSystem.DeleteDirectory(artifact.AbsolutePath);
@@ -194,6 +199,50 @@ public sealed class SourceCopyPurgeService
             _fileSystem.DeleteFile(artifact.AbsolutePath);
         }
         VerifyMissing(artifact);
+    }
+
+    private void ValidateVideoPosterPathForDeletion(string path)
+    {
+        string normalized = Path.GetFullPath(path);
+        string fragment = Path.DirectorySeparatorChar + "video-posters" +
+            Path.DirectorySeparatorChar;
+        if (!normalized.Contains(fragment, OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            return;
+
+        string root = _roots.NormalizedVideoPosterRoot ??
+            throw new InvalidOperationException("Video poster purge root is not configured.");
+        string basePath = Path.GetFullPath(root);
+        string prefix = basePath.TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        StringComparison cmp = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!normalized.StartsWith(prefix, cmp))
+            throw new InvalidOperationException("Video poster purge path is outside its configured root.");
+        string relative = Path.GetRelativePath(basePath, normalized).Replace('\\', '/');
+        string[] parts = relative.Split('/');
+        if (parts.Length != 4 || parts[0] != "video-posters" ||
+            parts[1] != "wi0151-sdr-still-v1" ||
+            !Guid.TryParseExact(parts[2], "D", out Guid revision) ||
+            parts[2] != revision.ToString("D") ||
+            !System.Text.RegularExpressions.Regex.IsMatch(parts[3],
+                @"^(?:[0-9a-f]{64}\.jpg|[0-9a-f]{32}\.tmp\.jpg)$"))
+            throw new InvalidOperationException("Noncanonical video poster purge manifest path.");
+
+        // Verify every existing path component, including parents of the
+        // derivative root, to refuse reparse redirections introduced after
+        // durable manifest creation.
+        for (string? current = Path.GetDirectoryName(normalized);
+             current is not null; current = Path.GetDirectoryName(current))
+        {
+            if (Directory.Exists(current) &&
+                (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Unsafe video poster purge directory.");
+            if (Path.GetPathRoot(current) == current) break;
+        }
+        if (File.Exists(normalized) &&
+            (File.GetAttributes(normalized) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Unsafe video poster purge file.");
     }
 
     private void VerifyMissing(SourceCopyPurgeArtifact artifact)
