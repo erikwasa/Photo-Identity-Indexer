@@ -43,6 +43,9 @@ public sealed class PostgresVideoAssetRepositoryTests
             ArchiveCatalogueSource source = await sources.GetOrCreateLocalFolderSourceAsync(root, now);
             ArchiveCatalogueSource again = await sources.GetOrCreateLocalFolderSourceAsync(root, now.AddMinutes(1));
             Assert.Equal(source.SourceId, again.SourceId);
+            Assert.Equal(source.SourceId,
+                (await sources.FindLocalFolderSourceAsync(root))?.SourceId);
+            Assert.Null(await sources.FindLocalFolderSourceAsync(root + "-unregistered"));
 
             PostgresVideoAssetRepository videos = new(database);
             SourceAsset local = new(new SourceAssetReference(source.SourceId, "holiday/clip.mov"),
@@ -54,6 +57,11 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.True(initial.NewRevision);
             Assert.Equal(initial.RevisionId,
                 await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
+            Assert.Equal(initial.RevisionId,
+                await videos.GetCurrentVisibleRevisionForHashAsync(
+                    source.SourceId, "holiday/clip.mov", new Sha256Digest(new string('a', 64))));
+            Assert.Null(await videos.GetCurrentVisibleRevisionForHashAsync(
+                source.SourceId, "holiday/clip.mov", new Sha256Digest(new string('b', 64))));
 
             RegisteredVideoRevision duplicate = await videos.RegisterVerifiedAsync(
                 first with { VerifiedAtUtc = now.AddSeconds(1) });
@@ -74,6 +82,11 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.NotEqual(initial.RevisionId, edited.RevisionId);
             Assert.Equal(edited.RevisionId,
                 await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
+            Assert.Null(await videos.GetCurrentVisibleRevisionForHashAsync(
+                source.SourceId, "holiday/clip.mov", new Sha256Digest(new string('a', 64))));
+            Assert.Equal(edited.RevisionId,
+                await videos.GetCurrentVisibleRevisionForHashAsync(
+                    source.SourceId, "holiday/clip.mov", new Sha256Digest(new string('b', 64))));
 
             // Photo-processing lookups must never resolve video content even when
             // the SHA-256 and exact source key are known.
