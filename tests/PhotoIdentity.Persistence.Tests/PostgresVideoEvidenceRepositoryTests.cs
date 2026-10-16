@@ -107,7 +107,8 @@ public sealed class PostgresVideoEvidenceRepositoryTests
             Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), row));
             Assert.False(await cleanup.MayRemoveUnreferencedAsync(
                 SourceId.From(sourceId), poster.RevisionId, poster.PosterProfileId, poster.ToolSha256));
-            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.New(), row));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                cleanup.RetireStalePosterAsync(SourceId.New(), row));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.SavePosterAsync(poster with { PosterSha256 = new string('f', 64) }));
