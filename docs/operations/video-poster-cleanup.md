@@ -52,7 +52,43 @@ derivative root** should a limited write be considered:
 
 No cleanup is automatically launched by the API, normal photo scans or workers.
 
-## Remaining exclusion/privacy gate before browsing
+## Source-copy exclusion and durable poster manifest
+
+The source-copy purge now discovers all canonical video posters **before**
+cascading away asset/revision identity, and records their paths in the existing
+durable exclusion manifest. It discovers both PostgreSQL-recorded JPEGs and
+canonical revision-owned JPEGs or temporary JPEGs left by interrupted rendering.
+The purge service deletes those exact recorded paths before deleting database
+rows, then verifies their absence, clears the manifest, and retains the
+source-copy exclusion tombstone. Existing manifests are augmented with video
+artifacts while revision ownership still exists. This path is independent of
+the operator-only aged cleanup command above.
+
+**Root configuration is essential.** The API's default poster root is
+the LocalApplicationData/PhotoIdentity/video-derivatives directory, matching
+the documented operator CLI default. If the \`video posters\` command was run
+against any other derivative directory, configure
+\`PhotoIdentity:VideoPosterRoot\` in the maintained API configuration to exactly
+that directory **before** running exclusion. Otherwise the purge cannot find
+those poster files. Keep this setting stable across a partially completed purge
+because persisted manifests contain absolute paths; a changed root is rejected
+by the deletion-time safety check. The root must be outside the originals
+archive, and junction/symlink components are refused.
+
+Unknown profiles and unsafe paths cause the exclusion purge to fail closed
+rather than mark a private source as successfully purged. Photo-only purge
+behavior is unchanged.
+
+An operator-run orphan cleanup still cannot prove the owner of a file whose
+revision was already deleted by older code; it deliberately leaves those files
+alone for separate recovery investigation. This manifest integration prevents
+that class of orphan for future exclusions **when the authoritative poster
+root is configured correctly**. It is not a retroactive cleanup of old
+untracked files.
+
+Video browser serving and end-to-end privacy validation are still pending
+in WI-0151; no new poster URL is enabled by this checkpoint.
+
 
 **Do not enable serving yet.** Under ADR-0008, the existing source-copy purge
 may cascade-delete its asset/revision rows. If that happened before this cleanup
