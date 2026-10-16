@@ -47,6 +47,16 @@ The benchmark schema now distinguishes representative versus challenge photos wi
 
 The initial maintained-archive challenge candidate generator and coverage/pilot acceptance remain the final WI-0192 checkpoint.
 
+## Checkpoint 3 implementation — maintained-archive challenge generator and report
+
+Checkpoint 3 adds the initial challenge generator and a privacy-safe aggregate benchmark report. The generator scans current non-core durable review proxies with the existing explainable technical evidence and selects deterministically across candidate-reason, raw-signal-extreme, rare-stratum and missing-metadata buckets. These reasons are selection heuristics only and remain hidden by the blinded reviewer.
+
+The initial default challenge count is 180. Combined with the frozen 400-photo representative core this yields about 580 initial review photos while intentionally preserving 20 of the 200 reserved challenge slots for later WI-0193 learned-model disagreement cases. The generator excludes revisions and exact content hashes already represented in the benchmark and will not turn a full-size-proxy percentile of 1.0 into a degenerate low-resolution bucket.
+
+The `benchmark report` command prints aggregate representative/challenge composition, broad archive coverage, human-review progress and challenge-reason coverage without private source keys, proxy paths or camera-model names. This provides the evidence surface for the required maintainer coverage inspection and short blinded pilot.
+
+After this checkpoint merges, WI-0192 requires a maintained-archive run: generate the 400-photo core, append the 180-photo challenge tranche, inspect the aggregate report, review roughly 30 blinded pilot photos, and re-run the report. WI-0192 remains in progress until that maintainer acceptance evidence is recorded.
+
 ## Out of scope
 
 - Selecting a production quality model.
@@ -71,5 +81,5 @@ Automated sampling/export/resume tests plus maintainer inspection of stratum cov
 
 - Files changed: Core benchmark selection/split policy, PostgreSQL benchmark population query, photo-quality evaluation `benchmark` command, Core/Persistence tests and benchmark runbook.
 - Trade-offs: checkpoint 1 freezes the representative core and split before adding challenge cases/review UX. Strict dHash is used only as a leakage guard, not as a claim that those photos are production visual duplicates.
-- Deferred work: initial maintained-archive challenge candidate generation plus maintainer coverage/pilot acceptance remain in WI-0192. The blinded/resumable reviewer and challenge-import contract are implemented in checkpoint 2.
-- Commands run: repository CI for checkpoint PRs; maintained private benchmark generation/review follows after the challenge-generator checkpoint.
+- Deferred work: only the maintained-archive generation/coverage inspection and approximately 30-photo blinded pilot remain before WI-0192 acceptance. Later WI-0193 model-disagreement cases may consume the 20 challenge slots intentionally left reserved.
+- Commands run: repository CI for all three checkpoints; after checkpoint 3 merges, run the documented private benchmark/challenge/report/pilot commands on the maintained archive.
