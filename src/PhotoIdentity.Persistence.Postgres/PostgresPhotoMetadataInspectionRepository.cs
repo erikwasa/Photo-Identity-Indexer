@@ -24,7 +24,13 @@ public sealed class PostgresPhotoMetadataInspectionRepository :
         command.CommandText = """
             SELECT extraction_contract_version, inspected_at_utc
             FROM photo_metadata_inspections
-            WHERE asset_revision_id = @revision_id;
+            WHERE asset_revision_id = @revision_id
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id = revision.asset_id
+                  WHERE revision.id = @revision_id
+                    AND revision.media_kind = 'photo'
+                    AND asset.media_kind = 'photo');
             """;
         command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -65,7 +71,13 @@ public sealed class PostgresPhotoMetadataInspectionRepository :
         command.CommandText = """
             INSERT INTO photo_metadata_inspections (
                 asset_revision_id, extraction_contract_version, inspected_at_utc)
-            VALUES (@revision_id, @version, @inspected_at_utc)
+            SELECT@revision_id, @version, @inspected_at_utc
+            WHERE EXISTS (
+                SELECT 1 FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                WHERE revision.id = @revision_id
+                  AND revision.media_kind = 'photo'
+                  AND asset.media_kind = 'photo')
             ON CONFLICT (asset_revision_id) DO UPDATE SET
                 extraction_contract_version = excluded.extraction_contract_version,
                 inspected_at_utc = excluded.inspected_at_utc;
@@ -73,6 +85,7 @@ public sealed class PostgresPhotoMetadataInspectionRepository :
         command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));
         command.Parameters.AddWithValue("version", extractionContractVersion);
         command.Parameters.AddWithValue("inspected_at_utc", inspectedAtUtc.ToUniversalTime());
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new KeyNotFoundException("Photo metadata requires an existing photo revision.");
     }
 }
