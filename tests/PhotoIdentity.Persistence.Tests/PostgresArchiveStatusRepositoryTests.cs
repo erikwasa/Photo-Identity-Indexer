@@ -76,9 +76,6 @@ public sealed class PostgresArchiveStatusRepositoryTests
                 video.Parameters.AddWithValue("source", sourceId.Value);
                 video.Parameters.AddWithValue("revision", Guid.NewGuid());
                 video.Parameters.AddWithValue("now", DateTimeOffset.UtcNow);
-                // Referenced asset ID must stay identical across the two statements.
-                Guid videoAsset = Guid.NewGuid();
-                video.Parameters["asset"].Value = videoAsset;
                 await video.ExecuteNonQueryAsync();
             }
 
