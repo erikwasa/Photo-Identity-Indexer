@@ -79,3 +79,17 @@ The next checkpoints add justified learned IQA candidates, candidate-disagreemen
 - Trade-offs: the baseline score is intentionally simple and tie-heavy; it preserves WI-0182 as a fixed technical comparison without pretending its hand-written reasons are a calibrated aesthetic score.
 - Deferred work: TOPIQ/MUSIQ/ARNIQA-or-equivalent execution, model-disagreement challenge import, original-pixel comparison, frozen calibration mapping and held-out evaluation.
 - Commands run: repository CI after pull request creation; maintained private benchmark commands are deferred until the checkpoint merges.
+
+## Checkpoint 2: learned candidate score generation
+
+Added an explicitly opted-in, evaluation-only Python runner for `pyiqa`
+TOPIQ NR, MUSIQ, and ARNIQA on frozen `jpeg-1600-q78` benchmark proxies.
+It emits the checkpoint-1 versioned score contract and is compatible with
+calibration-only reports. A standard-library test suite covers export privacy,
+SHA checks, path traversal, inference failures, and no-overwrite semantics.
+
+This provides **implementation plumbing**, not results from the maintained
+archive. No model has yet been accepted or calibrated; third-party weight
+licenses, pinned model hashes/size, proxy-versus-original evidence and one-shot
+held-out results remain required. Documentation includes Windows/PowerShell
+setup and commands. Python/PyTorch remain outside the production package.
