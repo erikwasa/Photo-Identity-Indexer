@@ -44,6 +44,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "ingest" =>
+                    await VideoIngestCommandRunner.RunAsync(
+                        VideoIngestOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "pilot" =>
                     await VideoPilotCommandRunner.RunAsync(
                         VideoPilotOptions.Parse(args.Skip(2).ToArray()),
@@ -123,6 +127,12 @@ public static class Program
                                      --restore-report PATH
                           (requires successful isolated restore-verification report;
                            applies v33 ONLY to its matched local photoidentity_restore_* database)
+
+              video ingest --enable-video --source DIR --ffprobe ABSOLUTE_EXE
+                           [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
+                           [--postgres-connection-env NAME --apply]
+                           (dry-run by default; --apply writes only bounded local video
+                            revisions and technical metadata; no posters or photo analysis)
 
               video pilot --enable-video --source DIR --derivatives DIR
                           --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
