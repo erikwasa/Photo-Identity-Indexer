@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: maintained PostgreSQL v33 deployment was accepted on 2026-10-16 after a verified backup/restore and real-catalogue v32→v33 rehearsal (76 existing tables unchanged, repeated initialization passed). Next PR supplies persistence-only revision-bound video inspection/poster evidence with exclusion-aware reads/writes and throwaway PostgreSQL tests; there are still NO video catalogue writes from the app, CLI, API or worker. Next implement opt-in local-source revision insertion + verification and photo-only query guards before activating ingest; poster cleanup/browsing/HDR remain open.
+WI-0151: maintained PostgreSQL v33 deployment accepted on 2026-10-16 following verified real-catalogue backup/rehearsal. The video inspection/poster repository is merged; the next checkpoint adds a guarded and still-unwired verified-local MOV/MP4 source→asset→content-revision repository, preserves SHA-256 identity and source-copy tombstones, and excludes video revisions from the photo lookup boundary. No automatic video ingest or photo workflow changes are activated. The maintainer prefers reviewing the whole work item after full implementation.
 
 ## Relevant pointers
 
