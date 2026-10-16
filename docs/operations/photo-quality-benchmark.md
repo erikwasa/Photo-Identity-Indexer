@@ -196,8 +196,8 @@ Generate the fixed WI-0182 technical baseline over the complete benchmark:
 ~~~powershell
 $env:PhotoIdentity__ReviewProxyRoot = "<review proxy root>"
 
-dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline \
-  --input private/photo-quality-benchmark.json \
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline `
+  --input private/photo-quality-benchmark.json `
   --output private/wi0182-quality-scores.json
 ~~~
 
@@ -206,9 +206,9 @@ The baseline verifies each proxy SHA-256 before analysis and records `proxy-tech
 Run the calibration-only report:
 
 ~~~powershell
-dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report \
-  --input private/photo-quality-benchmark.json \
-  --scores private/wi0182-quality-scores.json \
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report `
+  --input private/photo-quality-benchmark.json `
+  --scores private/wi0182-quality-scores.json `
   --output private/wi0182-quality-calibration.json
 ~~~
 
