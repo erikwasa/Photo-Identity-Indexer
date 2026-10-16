@@ -93,3 +93,13 @@ archive. No model has yet been accepted or calibrated; third-party weight
 licenses, pinned model hashes/size, proxy-versus-original evidence and one-shot
 held-out results remain required. Documentation includes Windows/PowerShell
 setup and commands. Python/PyTorch remain outside the production package.
+
+
+## Checkpoint 3: calibration-only learned-candidate audit
+
+Added a standard-library Python audit for comparing complete private candidate score exports.
+It checks exact benchmark coverage, per-revision score/error validity, candidate identity,
+calibration Spearman rank correlation, calibration-only pairwise candidate correlation,
+inference failures and runtime/provenance completeness. Held-out/challenge human labels
+are explicitly excluded. Unit tests exercise label leakage, missing entries, failures
+and candidate disagreement. No maintained-archive model outcomes are claimed.

@@ -288,3 +288,22 @@ run the bounded proxy-vs-original comparison. Then freeze calibration and
 evaluate held-out exactly once. No production score persistence or automatic
 exclusion is added here.
 
+
+
+## WI-0193 checkpoint 3: compare scored candidates without consulting held-out labels
+
+Once the three complete private score exports exist (and optionally the WI-0182 baseline), compare them using the standalone, standard-library-only candidate audit:
+
+~~~powershell
+python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_candidate_audit.py
+
+python tools/PhotoIdentity.PhotoQualityEvaluation/candidate_audit.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/wi0182-quality-scores.json private/topiq_nr-scores.json private/musiq-scores.json private/arniqa-scores.json
+~~~
+
+The command prints an **aggregate-only** JSON report. It validates that every score file belongs to the same frozen benchmark and contains one finite score or explicit error for every revision. It reports reviewed representative-calibration coverage, within-calibration Spearman agreement to human labels, inter-candidate rank agreement over shared reviewed calibration photos, candidate failures, runtime and whether the current version/model-size metadata is complete.
+
+**No held-out or challenge human label is accessed.** In particular, do not use the output to select a final threshold using held-out evidence; the model/calibration decision still needs its formal freeze. Strong inter-model agreement is not proof of good quality. The audit does not compute archive-wide model disagreement or fill the remaining 20 private challenge slots; that requires candidates scored on previously unselected archive photos.
+
+The resulting JSON output contains aggregate metrics and candidate identifiers only. Keep private input score exports and any per-photo analysis outside Git. A meaningful model comparison also requires enough calibration photos to be labelled and successful inference for each candidate.
