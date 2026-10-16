@@ -6,6 +6,10 @@
     <PackageReference Include="OpenCvSharp4.runtime.win" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <InternalsVisibleTo Include="PhotoIdentity.Integration.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />

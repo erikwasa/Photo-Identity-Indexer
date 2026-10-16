@@ -25,6 +25,12 @@ internal static class Program
             string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase))
         {
             if (args.Length > 1 &&
+                string.Equals(args[1], "review", StringComparison.OrdinalIgnoreCase))
+            {
+                return await PhotoQualityBenchmarkReviewCommand.RunAsync(args[2..]);
+            }
+
+            if (args.Length > 1 &&
                 string.Equals(args[1], "add-challenges", StringComparison.OrdinalIgnoreCase))
             {
                 return await PhotoQualityBenchmarkChallengeCommand.RunAsync(args[2..]);
@@ -293,6 +299,8 @@ internal static class Program
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark --output private/photo-quality-benchmark.json [--representative-count 400] [--challenge-reserve 200] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
         Console.WriteLine(
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark add-challenges --input private/photo-quality-benchmark.json --candidates private/photo-quality-challenges.json");
+        Console.WriteLine(
+            "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark review --input private/photo-quality-benchmark.json [--proxy-root <path>] [--port 5182] [--no-open]");
         Console.WriteLine();
         Console.WriteLine($"Defaults can come from {ConnectionStringEnvironmentVariable}, {ProxyRootEnvironmentVariable}, and {ProxyProfileEnvironmentVariable}.");
     }
