@@ -129,6 +129,14 @@ Source, metadata, persistence and representative real-file verification.
 - **Important open privacy gate:** If source-copy purge has already deleted an excluded video's revision, remaining poster files no longer have provable source ownership. This command intentionally skips them. A future checkpoint must integrate these files into ADR-0008's durable source-copy purge manifest *before* activating any poster-serving endpoint or library UI. See [poster cleanup operations](../../operations/video-poster-cleanup.md).
 - WI-0151 stays in progress pending complete deletion/exclusion integration, safe video browsing, HDR color review and the maintainer's consolidated real-file acceptance.
 
+## Checkpoint 9 — video source-copy exclusion purge manifest integration (2026-10-16)
+
+- Extends ADR-0008's existing durable pre-deletion source-copy purge manifest to include canonical `wi0151-sdr-still-v1` video JPEGs and temporary JPEGs still attributable to the selected video revision. Database poster rows and revision-specific orphan files are inventoried *before* any cascade deletes the video catalogue ownership link.
+- Adds an optional video-poster derivative root to `SourceCopyPurgeRoots`; the maintained host defaults it to `LocalApplicationData/PhotoIdentity/video-derivatives` and allows override via `PhotoIdentity:VideoPosterRoot`. Operator-run `video posters` must use the same real root. A video source with revisions but no root fails closed; unrelated photo-only exclusion remains unchanged.
+- Existing durable manifests are augmented with canonical video artifacts when source identity still exists, and cleanup after a crash/restart is idempotent. The service validates exact profile/revision/tool paths and any reparse points again at deletion time; it never deletes directories or originals based on database content.
+- Disposable PostgreSQL regression checks missing-root refusal, known video poster plus interrupted-render orphan capture, same-source/revision scope, persistent manifest replay, non-excluded-video survival and catalogue deletion order. No schema migration or video browser route.
+- Legacy exclusions already completed before this integration may have untracked orphan files lacking source identity; this checkpoint cannot safely identify them retroactively. Video browsing and final privacy/regression acceptance remain pending.
+
 ## Completion notes
 
 - Files changed:
