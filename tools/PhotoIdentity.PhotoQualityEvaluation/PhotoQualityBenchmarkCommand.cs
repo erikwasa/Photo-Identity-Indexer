@@ -129,6 +129,8 @@ internal static class PhotoQualityBenchmarkCommand
                         partition == PhotoQualityBenchmarkPartition.Calibration
                             ? "calibration"
                             : "held-out",
+                        "representative",
+                        null,
                         new PhotoQualityBenchmarkHumanReview(null, null, null));
                 })
                 .ToArray();
@@ -138,7 +140,7 @@ internal static class PhotoQualityBenchmarkCommand
                 .Distinct(StringComparer.Ordinal)
                 .Count();
             PhotoQualityBenchmarkExport export = new(
-                SchemaVersion: 1,
+                SchemaVersion: 2,
                 BenchmarkId: benchmarkId,
                 GeneratedAtUtc: DateTimeOffset.UtcNow,
                 ProxyProfile: profile.ToCanonicalText(),
@@ -158,8 +160,10 @@ internal static class PhotoQualityBenchmarkCommand
                     nearDuplicateGroups.Count),
                 PopulationCoverage: Coverage(descriptors),
                 RepresentativeCoverage: Coverage(selected.Select(item => item.Photo)),
+                ChallengeSelectionPolicies: [],
+                ChallengeCoverage: null,
                 ReviewInstructions:
-                    "This checkpoint contains the blinded representative core only. Do not add model scores/reasons to human review. The review surface added by the next checkpoint will use Very Low / Low / Normal / High / Very High / Unsure plus personallyImportant and notes.",
+                    "Review is blinded: do not expose model scores, candidate reasons, strata, partitions, source paths or representative/challenge membership in the review UI. Use Very Low / Low / Normal / High / Very High / Unsure plus personallyImportant and notes.",
                 Photos: photos);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
@@ -510,6 +514,8 @@ internal sealed record PhotoQualityBenchmarkExport(
     PhotoQualityBenchmarkLeakageSummary LeakageControl,
     PhotoQualityBenchmarkCoverage PopulationCoverage,
     PhotoQualityBenchmarkCoverage RepresentativeCoverage,
+    IReadOnlyList<string>? ChallengeSelectionPolicies,
+    PhotoQualityBenchmarkCoverage? ChallengeCoverage,
     string ReviewInstructions,
     IReadOnlyList<PhotoQualityBenchmarkPhoto> Photos);
 
@@ -547,6 +553,8 @@ internal sealed record PhotoQualityBenchmarkPhoto(
     int FaceCount,
     PhotoQualityBenchmarkStratum Stratum,
     string Partition,
+    string? SampleKind,
+    IReadOnlyList<string>? ChallengeReasons,
     PhotoQualityBenchmarkHumanReview Review);
 
 internal sealed record PhotoQualityBenchmarkHumanReview(

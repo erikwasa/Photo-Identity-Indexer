@@ -37,6 +37,10 @@ The deterministic 300-photo WI-0182 run remains useful evidence that the first h
 - [WI-0194](../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md) - benchmark archive-wide visual redundancy embeddings and conservative suppression thresholds.
 - [WI-0195](../work-items/WI-0195-quality-aware-collection-simulation.md) - simulate collection creation with quality preference and visual redundancy suppression, then record adoption decisions.
 
+## Integration branch
+
+M37 development is integrated through `features/m37`. Work-item/checkpoint pull requests target that feature branch rather than `main`; the milestone feature branch is reviewed toward `main` as a separate integration decision.
+
 ## Delivery sequence
 
 1. WI-0192 establishes the representative human-labelled benchmark and reusable review/export foundation.

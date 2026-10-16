@@ -4,7 +4,7 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0192 / issue #535 is in progress on `agent/WI-0192-representative-benchmark`. Checkpoint 1 implements deterministic marginally stratified current-photo/proxy selection, privacy-safe benchmark export, selected-proxy verification, strict-dHash/exact-content leakage grouping, frozen 60/40 calibration/held-out assignment and coverage reporting. The 200-photo challenge reserve and blinded resumable review surface remain subsequent WI-0192 checkpoints. The WI-0182 300-photo sample remains diagnostic only.
+WI-0192 / issue #535 is in progress under the M37 integration branch `features/m37`. Checkpoint 1 (merged by PR #544) implements the frozen 400-photo representative core and 60/40 split. Checkpoint 2 adds the blinded/resumable local browser reviewer plus a challenge-import contract that keeps challenge cases diagnostic and outside the frozen representative split. M37 work-item/checkpoint PRs target `features/m37`, not `main`. The WI-0182 300-photo sample remains diagnostic only.
 
 
 WI-0182 / issue #490: PR #509 implements the evaluation-only technical-quality harness over durable review proxies. It adds versioned raw sharpness/exposure/clipping/contrast/resolution evidence, q78 profile-gated candidate reasons, deterministic PostgreSQL proxy sampling, private JSON review export, timing/storage measurements and synthetic analyzer coverage. No collection semantics or catalogue quality persistence are introduced. Keep WI-0182 in review until representative private-archive review/runtime evidence is recorded.
@@ -29,7 +29,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0192: merge checkpoint 1 after CI, then add challenge-case selection and the blinded resumable quality review surface without replacing the frozen representative core.
+WI-0192: merge checkpoint 2 into `features/m37`, then generate the initial maintained-archive challenge candidate tranche and run the private coverage/pilot review needed to accept the benchmark.
 
 WI-0151: maintained PostgreSQL v33 accepted, and PR #540 merged opt-in dry-run-first MOV/MP4 local ingestion. Current checkpoint implements conservative embedded capture/GPS/camera extraction with explicit timestamp timezone/provenance, strict ISO-6709 coordinates and pilot-report privacy. Next: revision-safe durable poster files and exclusion/deletion cleanup, then safe browsing, full photo-only regression and final maintainer real-file acceptance. No automatic video worker; the maintainer prefers one final review after the entire work item is built.
 
