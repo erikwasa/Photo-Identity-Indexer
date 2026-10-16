@@ -201,6 +201,26 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
             await stage.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // The photo scanner may not observe, update, or reclassify a source key
+        // already owned by the explicit video lane. Fail the entire batch before
+        // touching asset availability or revision state.
+        using (NpgsqlCommand kindGuard = connection.CreateCommand())
+        {
+            kindGuard.Transaction = transaction;
+            kindGuard.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM archive_source_scan_stage stage
+                    JOIN assets asset
+                      ON asset.source_id = @source_id
+                     AND asset.source_key = stage.source_key
+                    WHERE asset.media_kind <> 'photo');
+                """;
+            kindGuard.Parameters.AddWithValue("source_id", source.SourceId.Value);
+            if (await kindGuard.ExecuteScalarAsync(cancellationToken) is true)
+                throw new InvalidOperationException(
+                    "Photo scan cannot update a source locator already owned by a video.");
+        }
+
         // Snapshot the authoritative state before clearing deletion markers. This refreshes the
         // scanner's earlier baseline read inside the serializable write transaction.
         using (NpgsqlCommand capture = connection.CreateCommand())
