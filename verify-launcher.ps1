@@ -378,9 +378,11 @@ try {
                 if ($videoResponse.StatusCode -ne [System.Net.HttpStatusCode]::NotFound) {
                     throw "Default-off video route unexpectedly returned $($videoResponse.StatusCode)."
                 }
-                $values = [System.Collections.Generic.IEnumerable[string]]$null
-                if (-not $videoResponse.Headers.TryGetValues("Cache-Control", [ref]$values) -or
-                    (($values -join ",") -notmatch "(^|[, ])no-store([, ]|$)")) {
+                $cacheHeader = if ($videoResponse.Headers.Contains("Cache-Control")) {
+                    @($videoResponse.Headers.GetValues("Cache-Control")) -join ","
+                }
+                else { "" }
+                if ($cacheHeader -notmatch "(^|[, ])no-store([, ]|$)") {
                     throw "Default-off private video route did not return Cache-Control: no-store."
                 }
             }
