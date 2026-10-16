@@ -173,6 +173,13 @@ Source, metadata, persistence and representative real-file verification.
 - Disposable PostgreSQL mixed-media regression seeds both photo and video revisions sharing one source, including video legacy analysis/review-proxy rows, and checks photo-only candidates/completed totals, writer refusal and the photo-quality sample. See [isolation runbook](../../operations/video-photo-query-isolation.md). Existing snapshot UI/collection regressions and final maintainer acceptance remain necessary.
 - No PostgreSQL migration, no new ingestion/worker, no OneDrive hydration, no change to original files and no HLG video promotion. WI-0151 stays **in_progress** until the HDR policy and one consolidated local acceptance are resolved.
 
+## Checkpoint 15 — photo annotations and metadata backfill isolation (2026-10-16)
+
+- Audited the next layer of photo-only repository APIs after checkpoint 14 and found manual photo person/tag/place/capture-date adapters that checked revision existence but not media-kind, together with photo metadata backfill that scanned all local revisions. Hardened both asset and revision `media_kind='photo'` guards on those photo-specific boundaries, preserving the manual capture-date revision lock.
+- Photo capture/extended metadata and extraction-inspection writes now refuse video revision IDs at the SQL gate; their reads hide legacy video companion rows. Forced photo metadata backfill excludes videos. The opt-in video CLI retains its own video-specific metadata and does not gain photo annotation semantics (those belong to WI-0153).
+- Disposable PostgreSQL tests seed a photo and a video in the **same source**, assert all affected photo-only reads/writes refuse the video and photo metadata backfill still processes the photo normally. See [query and write isolation](../../operations/video-photo-query-isolation.md).
+- No schema migration, no automatic video analysis or OneDrive hydration, no new UI, and no originals modified. Remaining: assess any final photo/video privacy regressions, decide an explicitly conservative HDR/HLG treatment based on real-file quality review, and perform the maintainer's one consolidated acceptance before completing WI-0151.
+
 ## Completion notes
 
 - Files changed:
