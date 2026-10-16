@@ -177,7 +177,8 @@ work_items:
   blockers:
   - WI-0190
   blocker_notes: []
-  evidence: []- id: WI-0192
+  evidence: []
+- id: WI-0192
   title: Build a representative archive benchmark and blinded quality review workflow
   milestone: M37
   status: ready
