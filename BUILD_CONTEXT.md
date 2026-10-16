@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: the operator's 2026-10-15 local PostgreSQL acceptance passed (56 persistence + 7 integration tests; Podman and Compose recovered). A guarded CLI migration-only rehearsal is now prepared: it requires the successful restored PostgreSQL report and applies v32→v33 only to the matching isolated photoidentity_restore_* database. Next: operator backup/restore rehearsal on the actual maintained catalogue, then opt-in video revision persistence, exclusions/invalidation, photo-only query isolation, browsing and colour-verified HLG poster generation.
+WI-0151: maintained PostgreSQL v33 deployment was accepted on 2026-10-16 after a verified backup/restore and real-catalogue v32→v33 rehearsal (76 existing tables unchanged, repeated initialization passed). Next PR supplies persistence-only revision-bound video inspection/poster evidence with exclusion-aware reads/writes and throwaway PostgreSQL tests; there are still NO video catalogue writes from the app, CLI, API or worker. Next implement opt-in local-source revision insertion + verification and photo-only query guards before activating ingest; poster cleanup/browsing/HDR remain open.
 
 ## Relevant pointers
 
