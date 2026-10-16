@@ -73,7 +73,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
             connection, transaction, inspection.RevisionId, cancellationToken);
         // A second observation of the same immutable revision may have a later inspection
         // time. Changes to content/profile/tool/metadata need explicit invalidation policy.
-        if (stored is null || stored with { InspectedAtUtc = inspection.InspectedAtUtc } != inspection)
+        if (stored is null || (stored with { InspectedAtUtc = inspection.InspectedAtUtc }) != inspection)
             throw new InvalidOperationException(
                 "Video inspection evidence differs for an existing revision; explicit invalidation is required.");
 
@@ -137,7 +137,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
         VideoStillPoster? stored = await ReadPosterAsync(
             connection, transaction, poster.RevisionId, poster.PosterProfileId,
             poster.ToolSha256, cancellationToken);
-        if (stored is null || stored with { GeneratedAtUtc = poster.GeneratedAtUtc } != poster)
+        if (stored is null || (stored with { GeneratedAtUtc = poster.GeneratedAtUtc }) != poster)
             throw new InvalidOperationException(
                 "Video poster evidence differs for an existing revision/profile/tool; explicit invalidation is required.");
 
@@ -221,7 +221,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
         return new VideoRevisionInspection(
             revisionId, r.GetString(0), Text(r, 1), Text(r, 2), Text(r, 3),
             Text(r, 4), Text(r, 5), Text(r, 6), Text(r, 7),
-            Nullable<int>(r, 8), Nullable<int>(r, 9), Nullable<int>(r, 10),
+            NullableInt(r, 8), NullableInt(r, 9), NullableInt(r, 10),
             r.IsDBNull(11) ? null : r.GetDecimal(11), Text(r, 12),
             r.IsDBNull(13) ? null : r.GetFieldValue<DateTimeOffset>(13),
             Text(r, 14), Text(r, 15), Text(r, 16),
@@ -260,7 +260,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
     }
 
     private static string? Text(NpgsqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
-    private static int? Nullable<int>(NpgsqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
+    private static int? NullableInt(NpgsqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
 
     private static void Add(NpgsqlCommand command, string name, NpgsqlDbType type, object? value) =>
         command.Parameters.Add(new NpgsqlParameter(name, type) { Value = value ?? DBNull.Value });
