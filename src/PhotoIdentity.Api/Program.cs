@@ -109,6 +109,7 @@ public partial class Program
             CataloguePersistenceComposition.GetRequiredPostgresConnectionString(builder.Configuration));
         builder.Services.AddSingleton<ISimilarFaceRepository, PostgresSimilarFaceRepository>();
         builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
+        builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
         builder.Services.AddSingleton<IPhotoSearchRepository>(
             services => services.GetRequiredService<PostgresPhotoSearchRepository>());
 
@@ -260,7 +261,8 @@ public partial class Program
                 context.Request.Path.StartsWithSegments("/api/photos") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
-                context.Request.Path.StartsWithSegments("/api/archive"))
+                context.Request.Path.StartsWithSegments("/api/archive") ||
+                context.Request.Path.StartsWithSegments("/api/videos"))
             {
                 context.Response.OnStarting(() =>
                 {
@@ -312,6 +314,7 @@ public partial class Program
         app.MapArchiveEndpoints();
         app.MapArchiveItemFilterEndpoints();
         app.MapArchiveStorageEndpoints();
+        app.MapVideoLibraryEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();

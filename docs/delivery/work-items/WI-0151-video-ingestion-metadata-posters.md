@@ -144,6 +144,14 @@ Source, metadata, persistence and representative real-file verification.
 - A disposable PostgreSQL concurrency regression holds a poster publication callback open, requests concurrent source-copy exclusion, checks exclusion waits until the callback/row finishes, then confirms read suppression and refusal of any post-exclusion render callback. A stalled FFmpeg run intentionally delays exclusion only up to the existing bounded operator timeout.
 - The previous durable manifest and source-root safety checks remain in force; no schema migration, photo pipeline changes or automatic video work. Safe browsing, full photo-query isolation, HDR review and final real-file acceptance remain pending.
 
+## Checkpoint 11 — read-only video library and verified SDR poster serving (2026-10-16)
+
+- Introduces a separate `/videos` page and minimal Advanced → Archive operations entry. The API `GET /api/videos` and `GET /api/videos/{revisionId}/poster` are **disabled by default**; enable only by configuring `PhotoIdentity:VideoLibraryEnabled=true`. No photo gallery, search, collection or slideshow routes are altered.
+- Server-side PostgreSQL video-only projection lists current nonexcluded, nondeleted video revisions with bounded paging and their inspection status, captured UTC date, duration, dimensions and rotation. No source paths/source IDs, GPS, camera tags or sensitive local filesystem details reach the browser. Unsupported/uninspected videos remain visible with explicit unknowns and no invented poster.
+- Poster serving requires current media_kind=video revision, supported inspection, explicit bt709 color transfer, canonical revision/profile/tool path, independent configured derivative root, safe path components, bounded JPEG bytes/signature and exact SHA-256 match. The source row remains locked through authorization and file verification so a concurrent exclusion cannot commit in the middle of a read. Errors fail closed with a generic not-found result and no private paths.
+- Tests on disposable PostgreSQL cover photo-video isolation, superseded/other revision exclusion, tombstones, valid poster bytes, checksum tampering and pagination. No schema migration, no background video queue, no OneDrive hydration or original video serving.
+- See [operator video library runbook](../../operations/video-library-readonly.md). Remaining gates are HDR color profile/real-file verification, photo-only query audit and maintainer's consolidated acceptance. WI-0151 stays in progress.
+
 ## Completion notes
 
 - Files changed:

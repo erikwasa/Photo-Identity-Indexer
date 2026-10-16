@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: opt-in video discovery, metadata, strict Rec.709 posters, bounded cleanup and manifest-integrated exclusions are merged. Current checkpoint serializes FFmpeg poster file creation and poster SQL insertion under the source lock, prevents source exclusion races, and hides superseded poster reads; no automatic video worker. Next: safe library/API video card and poster delivery with photo-only query isolation, followed by HDR handling and consolidated real-video/photo acceptance.
+WI-0151: opt-in video metadata, revision-bound Rec.709 posters, exclusion-safe publication, poster cleanup and purge manifest are merged. The current checkpoint adds a default-off, separate read-only video library and checksum-verified poster delivery, with source-row authorization locks and current-revision/exclusion gating. Next: HDR policy/quality tests, remaining photo-only query isolation audit and consolidated maintained-photo/video manual acceptance. No automatic video worker, playback proxy, photo search or slideshow video inclusion.
 
 ## Relevant pointers
 
