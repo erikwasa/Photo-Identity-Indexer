@@ -96,6 +96,14 @@ Source, metadata, persistence and representative real-file verification.
 - **No actual video files are read or ingested by this PR**, no production records inserted and no automatic video functionality enabled. This is only the revision registration seam. Upcoming checkpoints must wire opt-in hash verification, broader photo-only query protections, video metadata/poster generation, revision invalidation and safe library presentation before maintained review.
 - The maintainer requested **one end-to-end review only after the full WI-0151 scope is developed**. Keep the work item in progress until then.
 
+## Checkpoint 5 — explicit local-only MOV/MP4 ingestion CLI (2026-10-16)
+
+- Introduces a command-line-only, opt-in video metadata ingestion path. Dry-run by default; database writes require both --enable-video and --apply, a localhost database selected by the named private connection variable, and an explicit archive root. No app UI, normal photo scanner, background worker or automatic scheduling invokes it.
+- Reuses stable local-folder source identity and OneDrive-aware video enumeration: skip online-only/downloading placeholders, check exclusions before reads, probe bounded FFprobe technical metadata, SHA-256 stream-hash only confirmed local originals, verify observed size/write time and availability before/after reading, and then create/reuse video revisions and persist supported/unsupported video inspection evidence. Tool checksum is recorded; only aggregate diagnostics printed.
+- Technical capture/GPS/camera values intentionally remain unknown: the pilot detects tag presence but has not resolved documented capture/timezone/GPS provenance. No posters or browser cards are enabled; HLG is retained as HDR technical evidence, not incorrectly tone-mapped. See [operator-only local ingestion runbook](../../operations/video-local-metadata-ingestion.md).
+- The CLI command is capped at 25 selected local files (8 default), at most 1 GiB per file, with bounded FFprobe process duration and no OneDrive hydration. Source-copy and photo-only guards from earlier checkpoints remain mandatory. Added option-gating, unknown-metadata, and observed-file-stability tests.
+- **Not WI-0151 completion:** still requires verified capture/GPS precedence, poster file lifecycle and deletion/exclusion cleanup, safe browsing, and full maintained real-file validation after all checkpoints are developed.
+
 ## Completion notes
 
 - Files changed:
