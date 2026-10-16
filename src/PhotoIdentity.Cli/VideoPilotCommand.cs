@@ -108,11 +108,14 @@ public static class VideoPilotCommandRunner
         VideoPilotMediaTools tools = new(options.FfprobePath, options.FfmpegPath,
             TimeSpan.FromSeconds(options.TimeoutSeconds));
         Directory.CreateDirectory(derivatives);
-        string posterRoot = Path.Combine(derivatives, "video-posters", PilotProfile);
-        Directory.CreateDirectory(posterRoot);
-        string hlgPreviewRoot = Path.Combine(derivatives, "video-posters", HlgPreviewProfile);
+        VideoPosterCommandRunner.ValidateRoots(sourceRoot, derivatives);
+        string posterParent = Path.Combine(derivatives, "video-posters");
+        EnsureRealDirectory(posterParent);
+        string posterRoot = Path.Combine(posterParent, PilotProfile);
+        EnsureRealDirectory(posterRoot);
+        string hlgPreviewRoot = Path.Combine(posterParent, HlgPreviewProfile);
         if (options.PreviewHlg)
-            Directory.CreateDirectory(hlgPreviewRoot);
+            EnsureRealDirectory(hlgPreviewRoot);
 
         // Pilot-only ephemeral source reference. Catalogue IDs are not created by this command.
         OneDriveVideoAssetSource videos = new(SourceId.New(), sourceRoot);
@@ -259,6 +262,14 @@ public static class VideoPilotCommandRunner
          m.VideoCodec == "hevc" && m.Profile is ("Main" or "Main 10")) &&
         m.Width is > 0 and <= 8192 && m.Height is > 0 and <= 8192 &&
         m.DurationSeconds is >= 0 and <= 600;
+
+    private static void EnsureRealDirectory(string path)
+    {
+        if (Directory.Exists(path) &&
+            (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new ArgumentException("Video pilot derivative directory is a reparse point.");
+        Directory.CreateDirectory(path);
+    }
 
     private static bool IsWithin(string candidate, string root)
     {
