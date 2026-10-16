@@ -83,6 +83,15 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.Null(await photoLookup.FindRevisionAsync(
                 "holiday/clip.mov", new Sha256Digest(new string('b', 64))));
 
+            // Reverting to a previously verified hash must select the old stable
+            // revision, not a stale poster from the now-superseded newer hash.
+            RegisteredVideoRevision reverted = await videos.RegisterVerifiedAsync(
+                first with { VerifiedAtUtc = now.AddMinutes(10) });
+            Assert.False(reverted.NewRevision);
+            Assert.Equal(initial.RevisionId, reverted.RevisionId);
+            Assert.Equal(initial.RevisionId,
+                await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
+
             // The normal photo table contract is never changed by a video write.
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand inspect = connection.CreateCommand())
