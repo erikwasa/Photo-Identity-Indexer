@@ -81,6 +81,13 @@ Source, metadata, persistence and representative real-file verification.
 - To remove the launcher-database-alias ambiguity safely, the CLI now selects the target database **exclusively from the successful restore verification report**, enforces the exact generated photoidentity_restore_YYYYMMDDHHMMSS_xxxxxx format, rejects the source name and non-local host, and still checks real schema v32 plus all pre-migration row counts before applying migration 33. Only localhost credentials are read from the private launcher environment. The operator no longer constructs or rewrites a connection string in PowerShell.
 - CI regression tests cover production-name environment variables, missing/forged reports, remote hosts, and the v32 preflight. The maintainer must still run the actual rehearsal on the retained restored catalogue; WI-0151 remains **in_progress**.
 
+## Maintained schema v33 accepted; next adapter checkpoint — 2026-10-16
+
+- The maintainer verified the real catalogue's v32-to-v33 migration on an isolated restored copy: 76 existing catalogue table row counts unchanged, video metadata/poster tables empty, all existing assets/revisions remained photos and a second initialization was idempotent. The maintained application then reported /health status ok, catalogueProvider postgresql, PostgreSQL ready and schemaVersion 33; existing app operations were reported normal. This closes the WI-0151 **schema/deployment gate**, not full video-ingestion acceptance.
+- This PR adds **persistence-only**, revision-bound video inspection and poster save/read contracts. They require an existing immutable video revision; no new scanner, API route, worker or automatic video writes are enabled. Saves reject photo/deleted revisions and excluded source copies, and reads suppress excluded source copies. Identical retries are idempotent; conflicting tool/profile/metadata or poster bytes refuse silent replacement. Poster paths are restricted to a safe durable relative video-posters location, and unsupported inspections cannot save posters.
+- PostgreSQL integration tests use a disposable database and synthetic video/photo rows to verify round trips, idempotence, source-copy exclusion, photo rejection and path validation. Next checkpoints must provide **opt-in** source/video revision insertion, explicit local availability/hash verification, deletion/exclusion-driven durable poster cleanup and server-side photo-only gating before exposing video rows to normal app queries. HDR tone mapping and gallery presentation remain open.
+- The adapter does **not** imply WI-0151 completion or authorization for mass video ingestion.
+
 ## Completion notes
 
 - Files changed:
