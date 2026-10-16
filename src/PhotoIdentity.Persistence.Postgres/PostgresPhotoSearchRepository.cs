@@ -75,7 +75,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             INNER JOIN LATERAL (
                 SELECT candidate.id
                 FROM asset_revisions AS candidate
-                WHERE candidate.asset_id = asset.id
+                WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                 ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                 LIMIT 1
             ) AS revision ON TRUE
@@ -88,7 +88,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                AND embedding.model_sha256 = @model_sha256
                AND embedding.preprocessing_version = @preprocessing_version
                AND embedding.vector_encoding = @vector_encoding
-            WHERE asset.deleted_at_utc IS NULL
+            WHERE asset.deleted_at_utc IS NULL AND asset.media_kind = 'photo'
               AND embedding.asset_revision_id IS NULL
             ORDER BY asset.source_key, revision.id
             LIMIT @limit;
@@ -203,7 +203,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             INNER JOIN LATERAL (
                 SELECT candidate.id
                 FROM asset_revisions AS candidate
-                WHERE candidate.asset_id = asset.id
+                WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                 ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                 LIMIT 1
             ) AS revision ON TRUE
@@ -213,7 +213,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                AND embedding.model_sha256 = @model_sha256
                AND embedding.preprocessing_version = @preprocessing_version
                AND embedding.vector_encoding = @vector_encoding
-            WHERE asset.deleted_at_utc IS NULL
+            WHERE asset.deleted_at_utc IS NULL AND asset.media_kind = 'photo'
             ORDER BY revision.id;
             """;
         AddFingerprintParameters(command, modelId, modelSha256, preprocessingVersion, vectorEncoding);
@@ -279,11 +279,11 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 INNER JOIN LATERAL (
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
-                    WHERE candidate.asset_id = asset.id
+                    WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1
                 ) AS revision ON TRUE
-                WHERE asset.deleted_at_utc IS NULL
+                WHERE asset.deleted_at_utc IS NULL AND asset.media_kind = 'photo'
             ),
             latest AS (
                 SELECT DISTINCT ON (caption.asset_revision_id, caption.language)
@@ -379,11 +379,11 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 INNER JOIN LATERAL (
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
-                    WHERE candidate.asset_id = asset.id
+                    WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1
                 ) AS revision ON TRUE
-                WHERE asset.deleted_at_utc IS NULL
+                WHERE asset.deleted_at_utc IS NULL AND asset.media_kind = 'photo'
             ),
             latest_captions AS (
                 SELECT DISTINCT ON (caption.asset_revision_id, caption.language)
@@ -439,11 +439,11 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 INNER JOIN LATERAL (
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
-                    WHERE candidate.asset_id = asset.id
+                    WHERE candidate.asset_id = asset.id AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1
                 ) AS revision ON TRUE
-                WHERE asset.deleted_at_utc IS NULL
+                WHERE asset.deleted_at_utc IS NULL AND asset.media_kind = 'photo'
             ),
             matching_embeddings AS (
                 SELECT embedding.*
