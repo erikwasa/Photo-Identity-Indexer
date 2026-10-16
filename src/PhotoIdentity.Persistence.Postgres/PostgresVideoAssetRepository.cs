@@ -211,6 +211,44 @@ public sealed class PostgresVideoAssetRepository(PostgresCatalogueDatabase datab
         return result is Guid id ? AssetRevisionId.From(id) : null;
     }
 
+    /// <summary>
+    /// Returns the active visible revision only when its current verified content
+    /// hash exactly matches the source bytes being considered for a poster.
+    /// This never selects a historic revision merely because it shares a file name.
+    /// </summary>
+    public async Task<AssetRevisionId?> GetCurrentVisibleRevisionForHashAsync(
+        SourceId sourceId, string sourceKey, Sha256Digest contentHash,
+        CancellationToken cancellationToken = default)
+    {
+        string key = SourceCopyLocator.NormalizeSourceKey(sourceKey);
+        await database.InitializeAsync(cancellationToken);
+        await _exclusions.EnsureReadyAsync(cancellationToken);
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT newest.id
+            FROM assets asset
+            JOIN LATERAL (
+                SELECT revision.id, revision.content_sha256
+                FROM asset_revisions revision
+                WHERE revision.asset_id = asset.id AND revision.media_kind = 'video'
+                ORDER BY revision.observed_at_utc DESC, revision.id DESC
+                LIMIT 1
+            ) newest ON TRUE
+            WHERE asset.source_id = @source_id AND asset.source_key = @key
+              AND asset.media_kind = 'video' AND asset.deleted_at_utc IS NULL
+              AND newest.content_sha256 = @hash
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_copy_exclusions x
+                  WHERE x.source_id = asset.source_id AND x.source_key = asset.source_key);
+            """;
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
+        command.Parameters.AddWithValue("key", key);
+        command.Parameters.AddWithValue("hash", contentHash.ToString());
+        object? result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is Guid id ? AssetRevisionId.From(id) : null;
+    }
+
     private static void Validate(VerifiedLocalVideo value)
     {
         if (value.Source.SourceId.IsEmpty ||
