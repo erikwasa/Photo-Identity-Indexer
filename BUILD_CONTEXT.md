@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: opt-in video metadata, revision-bound Rec.709 posters, exclusion-safe publication, poster cleanup and purge manifest are merged. The current checkpoint adds a default-off, separate read-only video library and checksum-verified poster delivery, with source-row authorization locks and current-revision/exclusion gating. Next: HDR policy/quality tests, remaining photo-only query isolation audit and consolidated maintained-photo/video manual acceptance. No automatic video worker, playback proxy, photo search or slideshow video inclusion.
+WI-0151: opt-in video ingest/metadata, source-locked revision-bound Rec.709 posters, purge cleanup and default-off read-only video library are merged. Current checkpoint hardens the primary legacy photo-only PostgreSQL queries (photo search/captions/Smart/Creative/manual collections/review/details/archive status) and introduces mixed-media regression fixtures. Remaining: HDR/HLG rendering policy and representative test, additional photo-query audits and consolidated maintained-photo/video privacy and visual acceptance. No automatic video worker.
 
 ## Relevant pointers
 
