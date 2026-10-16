@@ -52,3 +52,9 @@ benchmark proxies and schema-compatible scored exports. The runner has offline
 contract tests but no maintained-archive scores, frozen weight hashes, original
 comparison or held-out decision yet. Do not confuse candidate support with
 model acceptance.
+
+WI-0193 checkpoint 3 adds `candidate_audit.py` and offline tests for exact full-score
+coverage and calibration-only comparative metrics. Maintained learned-model runs, weight
+hash/license validation, original-vs-proxy checks, disagreement challenge sampling and
+one-shot held-out evaluation are still outstanding. Do not choose a production model based
+on a framework's model name or on an unverified score export.
