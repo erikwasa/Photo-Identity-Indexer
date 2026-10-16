@@ -120,6 +120,15 @@ Source, metadata, persistence and representative real-file verification.
 - This checkpoint intentionally does not delete orphaned, superseded or excluded poster files: **a bounded dry-run-first physical cleanup and safe-serving/read policy must ship before the UI is enabled**. JSON and console outputs reveal only aggregate counts; original media remains read-only. See [durable poster runbook](../../operations/video-durable-posters.md).
 - Automated tests cover explicit opt-in, exact current revision hash, SDR/HLG/PQ gating, path and JPEG size/dimension guards, and independent derivative roots. The maintainer's hands-on validation is deferred until the complete WI-0151 workflow exists. WI-0151 remains in progress.
 
+## Checkpoint 8 — bounded source-proven poster cleanup (2026-10-16)
+
+- Adds a separate dry-run-first `video posters-cleanup --enable-video` CLI command with explicit existing source root, derivative root, credentials environment variable and database selection. Requires `--apply` for deletion; a 24-hour minimum age and 25-file cap prevent recent or unbounded cleanup. No background jobs are enabled.
+- PostgreSQL cleanup repository inventories revision-bound posters (including excluded and deleted assets) and marks each source revision active/stale. Conditional deletion locks the stable source and rechecks deleted/excluded/superseded status, exact profile/tool/revision/path/checksum and source ownership. It never retires a currently visible poster; repeat deletes are idempotent.
+- Filesystem deletion is restricted to canonical `video-posters/wi0151-sdr-still-v1/<revision-id>/<tool-sha256>.jpg` files inside an independent application-owned derivative root, rejecting symlinks, suspicious names and wrong checksums. Aged unreferenced JPEGs can only be removed when the revision is still present in the selected source's PostgreSQL catalogue and provably noncurrent; no filename-only deletion.
+- Disposable PostgreSQL and command-level tests cover current-versus-excluded poster retirement, source mismatch, immutable paths, minimum age and dry-run flags.
+- **Important open privacy gate:** If source-copy purge has already deleted an excluded video's revision, remaining poster files no longer have provable source ownership. This command intentionally skips them. A future checkpoint must integrate these files into ADR-0008's durable source-copy purge manifest *before* activating any poster-serving endpoint or library UI. See [poster cleanup operations](../../operations/video-poster-cleanup.md).
+- WI-0151 stays in progress pending complete deletion/exclusion integration, safe video browsing, HDR color review and the maintainer's consolidated real-file acceptance.
+
 ## Completion notes
 
 - Files changed:
