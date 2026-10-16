@@ -59,6 +59,8 @@ public sealed class PostgresAssetRevisionLookupRepository : IAssetRevisionLookup
         FROM asset_revisions AS revision
         INNER JOIN assets AS asset ON asset.id = revision.asset_id
         INNER JOIN sources AS source ON source.id = asset.source_id
+            AND asset.media_kind = 'photo'
+            AND revision.media_kind = 'photo'
         """;
 
     private static async Task<AssetRevisionLookup?> ReadAssetRevisionAsync(
