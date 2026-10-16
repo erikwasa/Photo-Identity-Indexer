@@ -50,7 +50,11 @@ public sealed class VideoPosterCommandTests
 
     [Theory]
     [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("unknown", false)]
     [InlineData("bt709", true)]
+    [InlineData("bt470bg", false)]
+    [InlineData("smpte170m", false)]
     [InlineData("arib-std-b67", false)]
     [InlineData("smpte2084", false)]
     public void Sdr_only_policy_defer_HLG_and_PQ_poster_generation(string? transfer, bool eligible)
