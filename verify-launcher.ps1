@@ -364,6 +364,35 @@ try {
         throw "PostgreSQL-only launcher verification expected catalogueProvider=postgresql."
     }
 
+    # The video library is opt-in and disabled in the normal launcher. Even
+    # 404 results for private video metadata and poster routes must not be cached.
+    Add-Type -AssemblyName System.Net.Http
+    $videoClient = [System.Net.Http.HttpClient]::new()
+    try {
+        foreach ($relative in @(
+            "/api/videos?offset=0&limit=1",
+            "/api/videos/00000000-0000-0000-0000-000000000001/poster"
+        )) {
+            $videoResponse = $videoClient.GetAsync("$url$relative").GetAwaiter().GetResult()
+            try {
+                if ($videoResponse.StatusCode -ne [System.Net.HttpStatusCode]::NotFound) {
+                    throw "Default-off video route unexpectedly returned $($videoResponse.StatusCode)."
+                }
+                $values = [System.Collections.Generic.IEnumerable[string]]$null
+                if (-not $videoResponse.Headers.TryGetValues("Cache-Control", [ref]$values) -or
+                    (($values -join ",") -notmatch "(^|[, ])no-store([, ]|$)")) {
+                    throw "Default-off private video route did not return Cache-Control: no-store."
+                }
+            }
+            finally {
+                $videoResponse.Dispose()
+            }
+        }
+    }
+    finally {
+        $videoClient.Dispose()
+    }
+
     $geoNamesStatus = Invoke-RestMethod -Method Get -Uri "$url/api/place-enrichment/status" -TimeoutSec 5
     if ([bool]$geoNamesStatus.automaticEnrichmentEnabled) {
         throw "Launcher GeoNames verification expected automatic enrichment to be disabled for the external-provider-safe test run."
