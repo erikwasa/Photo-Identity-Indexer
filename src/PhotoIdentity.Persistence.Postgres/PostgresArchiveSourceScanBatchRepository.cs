@@ -57,7 +57,8 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                   ) AS latest_revision_id, observation.verified_last_write_ticks
               FROM assets AS asset
               LEFT JOIN archive_source_observations AS observation ON observation.asset_id = asset.id
-              WHERE asset.source_id = @source_id;
+              WHERE asset.source_id = @source_id
+                AND asset.media_kind = 'photo';
               """
             : """
               SELECT
@@ -79,6 +80,7 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               FROM assets AS asset
               LEFT JOIN archive_source_observations AS observation ON observation.asset_id = asset.id
               WHERE asset.source_id = @source_id
+                AND asset.media_kind = 'photo'
                 AND substr(asset.source_key, 1, length(@scope_prefix)) = @scope_prefix;
               """;
         if (keys is not null)
@@ -199,6 +201,26 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
             await stage.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // The photo scanner may not observe, update, or reclassify a source key
+        // already owned by the explicit video lane. Fail the entire batch before
+        // touching asset availability or revision state.
+        using (NpgsqlCommand kindGuard = connection.CreateCommand())
+        {
+            kindGuard.Transaction = transaction;
+            kindGuard.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM archive_source_scan_stage stage
+                    JOIN assets asset
+                      ON asset.source_id = @source_id
+                     AND asset.source_key = stage.source_key
+                    WHERE asset.media_kind <> 'photo');
+                """;
+            kindGuard.Parameters.AddWithValue("source_id", source.SourceId.Value);
+            if (await kindGuard.ExecuteScalarAsync(cancellationToken) is true)
+                throw new InvalidOperationException(
+                    "Photo scan cannot update a source locator already owned by a video.");
+        }
+
         // Snapshot the authoritative state before clearing deletion markers. This refreshes the
         // scanner's earlier baseline read inside the serializable write transaction.
         using (NpgsqlCommand capture = connection.CreateCommand())
@@ -255,7 +277,8 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                 FROM archive_source_scan_stage AS stage
                 ON CONFLICT(source_id, source_key) DO UPDATE SET
                     last_seen_at_utc = excluded.last_seen_at_utc,
-                    deleted_at_utc = NULL;
+                    deleted_at_utc = NULL
+                WHERE assets.media_kind = 'photo';
                 """;
             assets.Parameters.AddWithValue("source_id", source.SourceId.Value);
             assets.Parameters.AddWithValue("scanned_at_utc", scannedAt);
@@ -497,6 +520,7 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               UPDATE assets
               SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
               WHERE source_id = @source_id
+                AND media_kind = 'photo'
                 AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> @scanned_at_utc)
                 AND deleted_at_utc IS NULL;
               """
@@ -504,6 +528,7 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               UPDATE assets
               SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
               WHERE source_id = @source_id
+                AND media_kind = 'photo'
                 AND substr(source_key, 1, length(@scope_prefix)) = @scope_prefix
                 AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> @scanned_at_utc)
                 AND deleted_at_utc IS NULL;
@@ -542,6 +567,7 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               UPDATE assets
               SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
               WHERE source_id = @source_id
+                AND media_kind = 'photo'
                 AND NOT (source_key = ANY(@observed_source_keys))
                 AND deleted_at_utc IS NULL;
               """
@@ -549,6 +575,7 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               UPDATE assets
               SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
               WHERE source_id = @source_id
+                AND media_kind = 'photo'
                 AND substr(source_key, 1, length(@scope_prefix)) = @scope_prefix
                 AND NOT (source_key = ANY(@observed_source_keys))
                 AND deleted_at_utc IS NULL;
