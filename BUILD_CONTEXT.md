@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: maintained v33 accepted, and the opt-in video ingest plus capture/GPS/camera metadata checkpoints merged. The current checkpoint adds operator-only revision-bound SDR still-poster materialization with current SHA-256 source verification, bounded external FFmpeg and immutable PostgreSQL evidence. HLG/PQ remain deferred. Next: dry-run-first orphan/supersession/exclusion physical cleanup and safe poster/library browsing, then final maintained photo/video real-file regression review. No automatic worker. Maintainer wants one end-to-end acceptance at completion.
+WI-0151: v33 accepted; opt-in local metadata ingest, capture/GPS provenance, and durable Rec.709 still posters merged. This checkpoint adds bounded dry-run-first cleanup of provably owned stale/revision-bound posters. Crucial remaining privacy gate: source-copy purge must capture video derivatives in its durable manifest BEFORE cascading away revision identity. Then video poster serving/library browsing and final maintained photo/video regression acceptance. No automatic video background work; operator wants one consolidated final review.
 
 ## Relevant pointers
 
