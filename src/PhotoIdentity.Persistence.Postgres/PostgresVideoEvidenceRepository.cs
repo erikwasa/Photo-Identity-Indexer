@@ -13,11 +13,14 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase database)
 {
+    private readonly PostgresSourceCopyExclusionRepository _exclusions = new(database);
+
     public async Task SaveInspectionAsync(
         VideoRevisionInspection inspection, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inspection);
         ValidateInspection(inspection);
+        await _exclusions.EnsureReadyAsync(cancellationToken);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
         await RequireEligibleAsync(connection, transaction, inspection.RevisionId, cancellationToken);
@@ -83,6 +86,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
     public async Task<VideoRevisionInspection?> GetInspectionAsync(
         AssetRevisionId revisionId, CancellationToken cancellationToken = default)
     {
+        await _exclusions.EnsureReadyAsync(cancellationToken);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
         return await ReadInspectionAsync(connection, null, revisionId, cancellationToken);
     }
@@ -92,6 +96,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
     {
         ArgumentNullException.ThrowIfNull(poster);
         ValidatePoster(poster);
+        await _exclusions.EnsureReadyAsync(cancellationToken);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
         await RequireEligibleAsync(connection, transaction, poster.RevisionId, cancellationToken);
@@ -148,6 +153,7 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
         AssetRevisionId revisionId, string posterProfileId, string toolSha256,
         CancellationToken cancellationToken = default)
     {
+        await _exclusions.EnsureReadyAsync(cancellationToken);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
         return await ReadPosterAsync(connection, null, revisionId, posterProfileId, toolSha256, cancellationToken);
     }
