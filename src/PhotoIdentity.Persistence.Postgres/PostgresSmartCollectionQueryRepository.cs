@@ -274,6 +274,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 LEFT JOIN effective_capture_dates
                     ON effective_capture_dates.revision_id = asset_revisions.id
                 WHERE assets.deleted_at_utc IS NULL
+                  AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
                   {where};
                 """;
             AddFilterParameters(count, filter);
@@ -313,6 +314,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             LEFT JOIN effective_revision_places
                 ON effective_revision_places.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
+                  AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
               {where}
             ORDER BY
                 effective_capture_dates.date_from DESC NULLS LAST,
@@ -385,6 +387,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             LEFT JOIN effective_revision_places
                 ON effective_revision_places.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
+                  AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
               {where}
             ORDER BY
                 effective_capture_dates.date_from DESC NULLS LAST,
@@ -431,6 +434,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             LEFT JOIN effective_capture_dates
                 ON effective_capture_dates.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
+                  AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
               {where};
             """;
         AddFilterParameters(command, filter);
@@ -477,6 +481,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             LEFT JOIN effective_capture_dates
                 ON effective_capture_dates.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
+                  AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
               {where};
             """;
         AddFilterParameters(command, definition.Filter);
