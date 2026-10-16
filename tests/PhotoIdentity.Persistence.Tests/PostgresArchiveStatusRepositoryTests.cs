@@ -59,11 +59,39 @@ public sealed class PostgresArchiveStatusRepositoryTests
                 onlineOnlyRevisionId,
                 failedRevisionId);
 
+            // Video is a real current asset in the SAME source/folder, but it
+            // must not appear in any photo archive count or photo-only item page.
+            await using (NpgsqlConnection videoConnection = new(testBuilder.ConnectionString))
+            await using (NpgsqlCommand video = videoConnection.CreateCommand())
+            {
+                await videoConnection.OpenAsync();
+                video.CommandText = """
+                    INSERT INTO assets(id, source_id, source_key, media_kind, created_at_utc)
+                    VALUES (@asset, @source, '1970/camera.mov', 'video', @now);
+                    INSERT INTO asset_revisions(id, asset_id, content_sha256,
+                        size_bytes, observed_at_utc, media_type, media_kind)
+                    VALUES (@revision, @asset, repeat('f',64), 100, @now, 'video/quicktime', 'video');
+                    """;
+                video.Parameters.AddWithValue("asset", Guid.NewGuid());
+                video.Parameters.AddWithValue("source", sourceId.Value);
+                video.Parameters.AddWithValue("revision", Guid.NewGuid());
+                video.Parameters.AddWithValue("now", DateTimeOffset.UtcNow);
+                // Referenced asset ID must stay identical across the two statements.
+                Guid videoAsset = Guid.NewGuid();
+                video.Parameters["asset"].Value = videoAsset;
+                await video.ExecuteNonQueryAsync();
+            }
+
             PostgresArchiveStatusRepository repository = new(database);
             CatalogueArchiveFolderStatus status = await repository.GetStatusAsync(
                 sourceId,
                 "1970",
                 profileHash);
+
+            CatalogueArchiveItemPage photoItems = await repository.GetItemsAsync(
+                sourceId, "1970", profileHash, "all", 0, 50);
+            Assert.DoesNotContain(photoItems.Items,
+                item => item.RelativePath.EndsWith(".mov", StringComparison.OrdinalIgnoreCase));
 
             Assert.Equal("1970", status.RelativeFolder);
             Assert.Equal(4, status.CurrentImages);
