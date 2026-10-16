@@ -26,7 +26,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 ## Next concrete step
 
-WI-0151: maintained PostgreSQL v33 deployment accepted on 2026-10-16 following verified real-catalogue backup/rehearsal. The video inspection/poster repository is merged; the next checkpoint adds a guarded and still-unwired verified-local MOV/MP4 source→asset→content-revision repository, preserves SHA-256 identity and source-copy tombstones, and excludes videos from photo revision lookup, photo scan baselines, photo-only missing reconciliation, and colliding photo batch writes. No automatic video ingest or photo workflow changes are activated. The maintainer prefers reviewing the whole work item after full implementation.
+WI-0151: maintained PostgreSQL v33 accepted on 2026-10-16 after backup/restore rehearsal. Checkpoints 3 and 4 provide exclusion-safe video evidence persistence and guarded video revision identity plus photo-scan isolation. The current checkpoint adds an **explicit operator-only** dry-run-first video ingest CLI: confirmed-local MOV/MP4 selection (no online-only hydration), FFprobe metadata, source SHA-256 and stable revision registration with supported/unsupported evidence. No automatic worker/UI or poster file exists. Still needed: capture/GPS precedence, revision-safe durable posters/cleanup, browsing and end-to-end maintained real-file verification. The maintainer prefers one final review after complete WI-0151 development.
 
 ## Relevant pointers
 
