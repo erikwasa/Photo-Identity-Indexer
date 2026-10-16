@@ -19,7 +19,7 @@ Current work items: **16**. Archived terminal items: **177**.
 | [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) Generate and retain bounded local low-resolution video proxies | M30 | proposed | unassigned | [YAML](work-items/active/WI-0189.yaml) |
 | [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) Extract timestamped video-frame captions and visual embeddings | M30 | proposed | unassigned | [YAML](work-items/active/WI-0190.yaml) |
 | [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) Offer opt-in semantic and caption search over indexed videos | M30 | proposed | unassigned | [YAML](work-items/active/WI-0191.yaml) |
-| [WI-0193](../work-items/WI-0193-absolute-photo-quality-model-evaluation.md) Evaluate and calibrate absolute per-photo quality models | M37 | ready | unassigned | [YAML](work-items/active/WI-0193.yaml) |
+| [WI-0193](../work-items/WI-0193-absolute-photo-quality-model-evaluation.md) Evaluate and calibrate absolute per-photo quality models | M37 | in_progress | ai-agent | [YAML](work-items/active/WI-0193.yaml) |
 | [WI-0194](../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md) Evaluate archive-wide visual redundancy embeddings and suppression thresholds | M37 | ready | unassigned | [YAML](work-items/active/WI-0194.yaml) |
 | [WI-0195](../work-items/WI-0195-quality-aware-collection-simulation.md) Simulate quality-aware visual redundancy during collection creation | M37 | proposed | unassigned | [YAML](work-items/active/WI-0195.yaml) |
 

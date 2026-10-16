@@ -48,6 +48,12 @@ internal static class Program
                 return await PhotoQualityBenchmarkReportCommand.RunAsync(args[2..]);
             }
 
+            if (args.Length > 1 &&
+                string.Equals(args[1], "quality-eval", StringComparison.OrdinalIgnoreCase))
+            {
+                return await PhotoQualityModelEvaluationCommand.RunAsync(args[2..]);
+            }
+
             return await PhotoQualityBenchmarkCommand.RunAsync(args[1..]);
         }
 
@@ -317,6 +323,10 @@ internal static class Program
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark report --input private/photo-quality-benchmark.json");
         Console.WriteLine(
             "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark review --input private/photo-quality-benchmark.json [--proxy-root <path>] [--port 5182] [--no-open]");
+        Console.WriteLine(
+            "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline --input private/photo-quality-benchmark.json --output private/wi0182-quality-scores.json [--proxy-root <path>] [--force]");
+        Console.WriteLine(
+            "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report --input private/photo-quality-benchmark.json --scores private/<candidate>-scores.json [--output private/<candidate>-calibration.json] [--force]");
         Console.WriteLine();
         Console.WriteLine($"Defaults can come from {ConnectionStringEnvironmentVariable}, {ProxyRootEnvironmentVariable}, and {ProxyProfileEnvironmentVariable}.");
     }

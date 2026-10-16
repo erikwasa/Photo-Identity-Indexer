@@ -41,7 +41,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M34 | Review queue reliability | completed |
 | M35 | Identity assignment audit and calibration | completed |
 | M36 | Semantic collection composition | in_progress |
-| M37 | Photo quality and visual redundancy evaluation | ready |
+| M37 | Photo quality and visual redundancy evaluation | in_progress |
 
 Expected evolution:
 

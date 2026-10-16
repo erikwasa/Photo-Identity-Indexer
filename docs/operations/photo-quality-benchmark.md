@@ -185,3 +185,43 @@ After checkpoint 3 is merged into `features/m37`:
 8. If coverage and the blinded pilot are acceptable, continue the remaining human review when useful for WI-0193 and record WI-0192 maintainer acceptance. The 20 reserved challenge slots remain available for later model-disagreement additions.
 
 WI-0192 can close after this maintained-archive coverage/pilot acceptance. Completing all ~580 human ratings is not required merely to close the benchmark/tooling work item; WI-0193 consumes and extends the benchmark as its model comparison proceeds.
+
+
+## WI-0193 checkpoint 1: score candidates without opening the held-out labels
+
+WI-0193 reuses the frozen WI-0192 benchmark but separates **candidate inference** from **human-label evaluation**. Candidate score files are private working artifacts and must stay under `private/`, `data/`, `staging/` or outside the repository.
+
+Generate the fixed WI-0182 technical baseline over the complete benchmark:
+
+~~~powershell
+$env:PhotoIdentity__ReviewProxyRoot = "<review proxy root>"
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline `
+  --input private/photo-quality-benchmark.json `
+  --output private/wi0182-quality-scores.json
+~~~
+
+The baseline verifies each proxy SHA-256 before analysis and records `proxy-technical-quality-v1` reason evidence, per-photo runtime, median/p95 runtime and exact benchmark identity. Its score is deliberately simple: `100 - 10 * candidate reason count`. It exists to make WI-0182 measurable beside learned candidates; it is not a proposed production rating.
+
+Run the calibration-only report:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval calibration-report `
+  --input private/photo-quality-benchmark.json `
+  --scores private/wi0182-quality-scores.json `
+  --output private/wi0182-quality-calibration.json
+~~~
+
+The report uses only representative photos whose frozen partition is `calibration` and whose blinded label is one of Very Low / Low / Normal / High / Very High. It excludes challenge photos, `Unsure` labels and every held-out human label.
+
+Candidate score JSON schema version 1 is shared by later learned-model runners. Each file must:
+
+- match the benchmark ID and contain exactly one row for every benchmark revision;
+- state candidate/model version, framework, license/source, preprocessing, score semantics, model size and execution provider;
+- declare whether a higher raw score means better quality;
+- record per-photo inference milliseconds;
+- record a finite raw score or an explicit bounded error code, never silently omit failed photos.
+
+Calibration reports include Spearman rank correlation, pairwise ordering for human labels separated by at least two tiers, inference failures and a diagnostic Very Low threshold scan. The threshold scan reports observed precision plus a 95% Wilson lower bound. A result such as 1/1 or 2/2 at 100% observed precision is therefore visible as weak evidence rather than being mistaken for a safe automatic-exclusion policy.
+
+There is intentionally **no held-out report command yet**. Add that only after candidate selection and the ordinal/Very-Low calibration policy are frozen from calibration evidence. This keeps the final held-out result a one-shot decision rather than an iterative tuning surface.

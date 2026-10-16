@@ -376,7 +376,7 @@ milestones:
   - WI-0187
 - id: M37
   title: Photo quality and visual redundancy evaluation
-  status: ready
+  status: in_progress
   document: ../milestones/M37-photo-quality-visual-redundancy-evaluation.md
   work_items:
   - WI-0192
