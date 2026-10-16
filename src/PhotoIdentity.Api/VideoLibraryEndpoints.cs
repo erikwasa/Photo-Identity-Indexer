@@ -28,8 +28,9 @@ public static class VideoLibraryEndpoints
     private static async Task<IResult> ListAsync(
         int? offset, int? limit,
         PostgresVideoLibraryRepository videos, IConfiguration settings,
-        CancellationToken token)
+        HttpContext context, CancellationToken token)
     {
+        DisableCaching(context);
         if (!Enabled(settings)) return Results.NotFound();
         int start = offset ?? 0;
         int count = limit ?? 24;
@@ -45,11 +46,21 @@ public static class VideoLibraryEndpoints
             page.Offset, page.Limit, page.HasMore));
     }
 
+    private static void DisableCaching(HttpContext context)
+    {
+        // Video metadata and private revision-bound posters must not persist in
+        // client or intermediary HTTP caches, even when a route returns 404.
+        context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
+        context.Response.Headers["Pragma"] = "no-cache";
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+
     private static async Task<IResult> GetPosterAsync(
         string revisionId,
         PostgresVideoLibraryRepository videos, IConfiguration settings,
-        CancellationToken token)
+        HttpContext context, CancellationToken token)
     {
+        DisableCaching(context);
         if (!Enabled(settings)) return Results.NotFound();
         if (!Guid.TryParseExact(revisionId, "D", out Guid guid))
             return Results.NotFound();
