@@ -36,6 +36,7 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
                     WHERE candidate.asset_id = asset.id
+                      AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1)
             LEFT JOIN archive_asset_availability AS availability
@@ -46,6 +47,7 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
                 ON analysis.asset_revision_id = revision.id
                AND analysis.profile_hash = @profile_hash
             WHERE asset.source_id = @source_id
+              AND asset.media_kind = 'photo' AND revision.media_kind = 'photo'
               AND asset.deleted_at_utc IS NULL
               AND COALESCE(source_observation.verification_state, 'verified') = 'verified'
               AND (
@@ -87,6 +89,7 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
                     SELECT candidate.id
                     FROM asset_revisions AS candidate
                     WHERE candidate.asset_id = asset.id
+                      AND candidate.media_kind = 'photo'
                     ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                     LIMIT 1)
             INNER JOIN asset_revision_analysis AS analysis
@@ -95,6 +98,7 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
             LEFT JOIN archive_source_observations AS source_observation
                 ON source_observation.asset_id = asset.id
             WHERE asset.source_id = @source_id
+              AND asset.media_kind = 'photo' AND revision.media_kind = 'photo'
               AND asset.deleted_at_utc IS NULL
               AND COALESCE(source_observation.verification_state, 'verified') = 'verified';
             """;
