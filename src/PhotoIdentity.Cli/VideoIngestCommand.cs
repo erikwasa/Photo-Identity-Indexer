@@ -13,7 +13,7 @@ namespace PhotoIdentity.Cli;
 /// <summary>Opt-in, bounded, dry-run-first MOV/MP4 revision and metadata ingestion.</summary>
 public sealed record VideoIngestOptions(
     string SourceRoot, string FfprobePath, int MaximumVideos, int TimeoutSeconds,
-    string? ConnectionEnvironmentVariable, bool Apply)
+    string? ConnectionEnvironmentVariable, string? DatabaseName, bool Apply)
 {
     public static VideoIngestOptions Parse(string[] arguments)
     {
@@ -25,7 +25,7 @@ public sealed record VideoIngestOptions(
             if (key == "--enable-video" && !enabled) { enabled = true; continue; }
             if (key == "--apply" && !apply) { apply = true; continue; }
             if (key is not ("--source" or "--ffprobe" or "--max-videos" or
-                           "--timeout-seconds" or "--postgres-connection-env") ||
+                           "--timeout-seconds" or "--postgres-connection-env" or "--database") ||
                 i + 1 == arguments.Length || arguments[i + 1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(key, arguments[++i]))
                 throw new ArgumentException("Unknown, repeated or incomplete video ingest option.");
@@ -41,10 +41,17 @@ public sealed record VideoIngestOptions(
         string? env = values.GetValueOrDefault("--postgres-connection-env");
         if (apply && string.IsNullOrWhiteSpace(env))
             throw new ArgumentException("--apply requires --postgres-connection-env NAME.");
+        string? databaseName = values.GetValueOrDefault("--database");
+        if (apply && string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("--apply requires an explicit --database NAME.");
+        if (databaseName is not null &&
+            !Regex.IsMatch(databaseName, @"^[a-z][a-z0-9_]{0,62}$", RegexOptions.CultureInvariant))
+            throw new ArgumentException("Database must be a simple, explicit PostgreSQL database name.");
         if (env is not null && !Regex.IsMatch(env, @"^[A-Za-z_][A-Za-z0-9_]*$"))
             throw new ArgumentException("Provide an environment variable NAME, not a connection string.");
         return new(Required("--source"), Required("--ffprobe"),
-            Bounded("--max-videos", 8, 25), Bounded("--timeout-seconds", 20, 120), env, apply);
+            Bounded("--max-videos", 8, 25), Bounded("--timeout-seconds", 20, 120),
+            env, databaseName, apply);
     }
 }
 
@@ -98,9 +105,12 @@ public static class VideoIngestCommandRunner
             if (string.IsNullOrWhiteSpace(raw))
                 throw new ArgumentException("PostgreSQL environment variable is not set.");
             NpgsqlConnectionStringBuilder connection = new(raw);
-            if (connection.Host is not ("127.0.0.1" or "localhost" or "::1") ||
-                string.IsNullOrWhiteSpace(connection.Database))
-                throw new ArgumentException("--apply requires an explicit local PostgreSQL database.");
+            if (connection.Host is not ("127.0.0.1" or "localhost" or "::1"))
+                throw new ArgumentException("--apply requires a localhost PostgreSQL host.");
+            // The maintained Windows launcher may intentionally omit Database.
+            // The operator must name the target explicitly; no implicit default or
+            // forgotten process environment can choose the catalogue for a write.
+            connection.Database = options.DatabaseName!;
             db = new PostgresCatalogueDatabase(connection.ConnectionString);
         }
 
