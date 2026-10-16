@@ -12,12 +12,12 @@ work_items:
 - id: WI-0151
   title: Ingest supported videos and extract metadata plus poster proxies
   milestone: M30
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0151-video-ingestion-metadata-posters.md
   started_at: 2026-10-14
   last_updated_at: 2026-10-16
-  branch: agent/WI-0151-photo-annotation-metadata-isolation
+  branch: agent/WI-0151-final-local-acceptance-gate
   blockers: []
   blocker_notes: []
   evidence:
@@ -39,6 +39,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/555
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/557
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/559
+  - type: documentation
+    value: docs/operations/video-wi0151-consolidated-acceptance.md
 - id: WI-0152
   title: Add safe browser video serving and viewer playback
   milestone: M30
