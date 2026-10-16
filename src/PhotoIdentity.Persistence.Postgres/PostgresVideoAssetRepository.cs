@@ -154,6 +154,25 @@ public sealed class PostgresVideoAssetRepository(PostgresCatalogueDatabase datab
             revisionId = reader.GetGuid(0);
         }
 
+        // If an earlier hash becomes current again (for example an edit was
+        // reverted), move its observation timestamp forward without inventing a
+        // duplicate revision. The immutable revision ID/content hash remain stable,
+        // and latest-visible selection therefore follows the currently verified file.
+        if (!newRevision)
+        {
+            await using NpgsqlCommand observed = connection.CreateCommand();
+            observed.Transaction = transaction;
+            observed.CommandText = """
+                UPDATE asset_revisions
+                SET observed_at_utc = @observed
+                WHERE id = @revision AND media_kind = 'video';
+                """;
+            observed.Parameters.AddWithValue("observed", timestamp);
+            observed.Parameters.AddWithValue("revision", revisionId);
+            if (await observed.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new InvalidOperationException("Video revision observation could not be refreshed.");
+        }
+
         await transaction.CommitAsync(cancellationToken);
         return new RegisteredVideoRevision(
             AssetId.From(assetId), AssetRevisionId.From(revisionId),
