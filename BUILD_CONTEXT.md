@@ -4,7 +4,7 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0192 / issue #535 is now in progress on `agent/WI-0192-representative-benchmark`. The first checkpoint builds deterministic stratified current-photo/proxy population selection, privacy-safe benchmark export, frozen calibration/held-out assignment and coverage reporting before adding the blinded review surface. The WI-0182 300-photo sample remains diagnostic only and is not reused as the M37 representative benchmark.
+WI-0192 / issue #535 is in progress on `agent/WI-0192-representative-benchmark`. Checkpoint 1 implements deterministic marginally stratified current-photo/proxy selection, privacy-safe benchmark export, selected-proxy verification, strict-dHash/exact-content leakage grouping, frozen 60/40 calibration/held-out assignment and coverage reporting. The 200-photo challenge reserve and blinded resumable review surface remain subsequent WI-0192 checkpoints. The WI-0182 300-photo sample remains diagnostic only.
 
 
 WI-0182 / issue #490: PR #509 implements the evaluation-only technical-quality harness over durable review proxies. It adds versioned raw sharpness/exposure/clipping/contrast/resolution evidence, q78 profile-gated candidate reasons, deterministic PostgreSQL proxy sampling, private JSON review export, timing/storage measurements and synthetic analyzer coverage. No collection semantics or catalogue quality persistence are introduced. Keep WI-0182 in review until representative private-archive review/runtime evidence is recorded.

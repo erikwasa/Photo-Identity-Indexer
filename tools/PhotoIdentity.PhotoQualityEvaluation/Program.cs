@@ -21,6 +21,12 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        if (args.Length > 0 &&
+            string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase))
+        {
+            return await PhotoQualityBenchmarkCommand.RunAsync(args[1..]);
+        }
+
         try
         {
             Options options = Parse(args);
@@ -277,6 +283,8 @@ internal static class Program
     {
         Console.WriteLine(
             "Usage: dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- --output private/photo-quality-evaluation.json [--limit 250] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
+        Console.WriteLine(
+            "       dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark --output private/photo-quality-benchmark.json [--representative-count 400] [--challenge-reserve 200] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
         Console.WriteLine();
         Console.WriteLine($"Defaults can come from {ConnectionStringEnvironmentVariable}, {ProxyRootEnvironmentVariable}, and {ProxyProfileEnvironmentVariable}.");
     }
