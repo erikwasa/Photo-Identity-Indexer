@@ -133,9 +133,19 @@ public sealed class DetectorRolloutCommandTests
         int exit = await Program.RunAsync(["help"], output, error);
 
         Assert.Equal(0, exit);
-        Assert.Contains("rollout start --postgres-connection-env NAME", output.ToString(), StringComparison.Ordinal);
-        Assert.Contains("rollout apply --postgres-connection-env NAME", output.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("--database", output.ToString(), StringComparison.Ordinal);
+        string help = output.ToString();
+        int rolloutStart = help.IndexOf(
+            "rollout start --postgres-connection-env NAME", StringComparison.Ordinal);
+        int rolloutEnd = help.IndexOf("bundle process", rolloutStart, StringComparison.Ordinal);
+        Assert.True(rolloutStart >= 0 && rolloutEnd > rolloutStart,
+            "The CLI help must contain a bounded rollout command section.");
+        string rolloutHelp = help[rolloutStart..rolloutEnd];
+
+        Assert.Contains("rollout start --postgres-connection-env NAME", rolloutHelp, StringComparison.Ordinal);
+        Assert.Contains("rollout apply --postgres-connection-env NAME", rolloutHelp, StringComparison.Ordinal);
+        // Video ingest legitimately requires --database to select a write target.
+        // The detector rollout subcommands must remain database-name-free.
+        Assert.DoesNotContain("--database", rolloutHelp, StringComparison.Ordinal);
         Assert.Equal(string.Empty, error.ToString());
     }
 }

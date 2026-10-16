@@ -110,13 +110,19 @@ public static class VideoPilotMetadataParser
 public sealed class VideoPilotMediaTools
 {
     private readonly string _ffprobe;
-    private readonly string _ffmpeg;
+    private readonly string? _ffmpeg;
     private readonly TimeSpan _timeout;
 
     public VideoPilotMediaTools(string ffprobe, string ffmpeg, TimeSpan timeout)
+        : this(ffprobe, timeout)
+    {
+        _ffmpeg = ValidateExecutable(ffmpeg);
+    }
+
+    // Metadata-only opt-in ingest needs ffprobe, never ffmpeg/poster rendering.
+    public VideoPilotMediaTools(string ffprobe, TimeSpan timeout)
     {
         _ffprobe = ValidateExecutable(ffprobe);
-        _ffmpeg = ValidateExecutable(ffmpeg);
         if (timeout < TimeSpan.FromSeconds(1) || timeout > TimeSpan.FromMinutes(2))
             throw new ArgumentOutOfRangeException(nameof(timeout));
         _timeout = timeout;
@@ -147,6 +153,8 @@ public sealed class VideoPilotMediaTools
 
     public async Task RenderPosterAsync(string sourcePath, string temporaryJpegPath, CancellationToken cancellationToken)
     {
+        if (_ffmpeg is null)
+            throw new InvalidOperationException("Poster rendering requires a separately configured ffmpeg executable.");
         await RunAsync(_ffmpeg, [
             "-nostdin", "-hide_banner", "-loglevel", "error",
             "-protocol_whitelist", "file", "-autorotate", "-i", sourcePath,
