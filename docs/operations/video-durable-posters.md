@@ -43,3 +43,9 @@ WI-0151 remains in progress until the requested final consolidated acceptance.
 
 
 For future source-copy exclusions, configure `PhotoIdentity:VideoPosterRoot` to the **same absolute derivative root** used by this command (default: `LocalApplicationData/PhotoIdentity/video-derivatives`). The exclusion purge manifests revision-owned JPEGs before deleting catalogue identity. An inaccurate configured root can leave unrelated files untouched; verify configuration before enabling video browsing.
+
+## Checkpoint 10: publication/exclusion serialization
+
+The poster command now acquires and holds the **PostgreSQL source row lock before launching FFmpeg**, keeping it until the bounded JPEG has been published and the immutable `video_still_posters` evidence is committed. A concurrent source-copy exclusion requires a conflicting source foreign-key lock, so exclusion cannot prepare a purge inventory between JPEG creation and row registration. If exclusion has already committed, the publisher refuses the source before launching the renderer. An interrupted filesystem/DB publish still leaves only a revision-owned file that the pre-deletion purge manifest can discover. Direct poster evidence writes and reads are also limited to the current revision; the first SDR profile additionally requires explicit `bt709` metadata.
+
+The source lock can delay exclusion for one bounded FFmpeg invocation (up to the configured timeout). This is deliberate: preserving exclusion privacy takes priority over concurrent poster throughput. No video worker, URL, or automatic import was enabled. The maintainer's real-file review remains pending.
