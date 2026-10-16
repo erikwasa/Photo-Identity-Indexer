@@ -75,6 +75,14 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.Equal(edited.RevisionId,
                 await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
 
+            // Photo-processing lookups must never resolve video content even when
+            // the SHA-256 and exact source key are known.
+            PostgresAssetRevisionLookupRepository photoLookup = new(database);
+            Assert.Null(await photoLookup.GetRevisionAsync(initial.RevisionId));
+            Assert.Null(await photoLookup.GetRevisionAsync(edited.RevisionId));
+            Assert.Null(await photoLookup.FindRevisionAsync(
+                "holiday/clip.mov", new Sha256Digest(new string('b', 64))));
+
             // The normal photo table contract is never changed by a video write.
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand inspect = connection.CreateCommand())
