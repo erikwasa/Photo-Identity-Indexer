@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/PhotoIdentity.Api/PhotoIdentity.Api.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj" />
+    <ProjectReference Include="../../tools/PhotoIdentity.PhotoQualityEvaluation/PhotoIdentity.PhotoQualityEvaluation.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />
