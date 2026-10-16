@@ -1,5 +1,6 @@
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
@@ -51,6 +52,8 @@ public sealed class PostgresArchiveStatusRepositoryTests
             Guid analysedRevisionId = Guid.NewGuid();
             Guid onlineOnlyRevisionId = Guid.NewGuid();
             Guid failedRevisionId = Guid.NewGuid();
+            Guid analysedVideoRevisionId = Guid.NewGuid();
+            Guid pendingVideoRevisionId = Guid.NewGuid();
             await SeedArchiveAsync(
                 testBuilder.ConnectionString,
                 Guid.Parse(sourceId.ToString()),
@@ -67,14 +70,20 @@ public sealed class PostgresArchiveStatusRepositoryTests
                 await videoConnection.OpenAsync();
                 video.CommandText = """
                     INSERT INTO assets(id, source_id, source_key, media_kind, created_at_utc)
-                    VALUES (@asset, @source, '1970/camera.mov', 'video', @now);
+                    VALUES
+                        (@asset, @source, '1970/000-analysed-video.mov', 'video', @now),
+                        (@pending_asset, @source, '1970/001-pending-video.mov', 'video', @now);
                     INSERT INTO asset_revisions(id, asset_id, content_sha256,
                         size_bytes, observed_at_utc, media_type, media_kind)
-                    VALUES (@revision, @asset, repeat('f',64), 100, @now, 'video/quicktime', 'video');
+                    VALUES
+                        (@revision, @asset, repeat('f',64), 100, @now, 'video/quicktime', 'video'),
+                        (@pending_revision, @pending_asset, repeat('e',64), 100, @now, 'video/quicktime', 'video');
                     """;
                 video.Parameters.AddWithValue("asset", Guid.NewGuid());
+                video.Parameters.AddWithValue("pending_asset", Guid.NewGuid());
                 video.Parameters.AddWithValue("source", sourceId.Value);
-                video.Parameters.AddWithValue("revision", Guid.NewGuid());
+                video.Parameters.AddWithValue("revision", analysedVideoRevisionId);
+                video.Parameters.AddWithValue("pending_revision", pendingVideoRevisionId);
                 video.Parameters.AddWithValue("now", DateTimeOffset.UtcNow);
                 await video.ExecuteNonQueryAsync();
             }
@@ -146,6 +155,123 @@ public sealed class PostgresArchiveStatusRepositoryTests
             Assert.Equal(2, latest.TotalJobs);
             Assert.Equal(1, latest.FailedJobs);
             Assert.Equal(1, latest.SucceededJobs);
+
+            // Video rows share the SAME archive source. Existing photo queues
+            // must never schedule the unanalysed video or count a misleading
+            // legacy video analysis as photo processing.
+            PostgresArchiveAnalysisStateRepository analysis = new(database);
+            IReadOnlyList<AssetRevisionId> pendingAnalysis =
+                await analysis.GetPendingCurrentRevisionIdsAsync(sourceId, profileHash);
+            Assert.Contains(AssetRevisionId.From(failedRevisionId), pendingAnalysis);
+            Assert.DoesNotContain(AssetRevisionId.From(pendingVideoRevisionId), pendingAnalysis);
+            Assert.DoesNotContain(AssetRevisionId.From(analysedVideoRevisionId), pendingAnalysis);
+            Assert.Equal(1, await analysis.CountCompletedCurrentRevisionsAsync(sourceId, profileHash));
+
+            PostgresArchiveReviewProxyRepository proxies = new(database);
+            const string photoProxyProfile = "mixed-media-photo-proxy";
+            IReadOnlyList<AssetRevisionId> pendingProxies =
+                await proxies.GetPendingCurrentRevisionIdsAsync(sourceId, photoProxyProfile);
+            Assert.Contains(AssetRevisionId.From(analysedRevisionId), pendingProxies);
+            Assert.DoesNotContain(AssetRevisionId.From(pendingVideoRevisionId), pendingProxies);
+            Assert.DoesNotContain(AssetRevisionId.From(analysedVideoRevisionId), pendingProxies);
+
+            // Both the photo analysis writer and proxy writer must reject a
+            // genuine video revision even if an existing processing run exists.
+            Guid registeredRunId;
+            await using (NpgsqlConnection lookUp = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand readRun = lookUp.CreateCommand())
+            {
+                readRun.CommandText = """
+                    SELECT processing_run_id
+                    FROM archive_analysis_runs
+                    WHERE profile_hash = @profile LIMIT 1;
+                    """;
+                readRun.Parameters.AddWithValue("profile", profileHash.ToString());
+                registeredRunId = (Guid)(await readRun.ExecuteScalarAsync())!;
+            }
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                analysis.RecordCompletionAsync(
+                    ProcessingRunId.From(registeredRunId),
+                    AssetRevisionId.From(analysedVideoRevisionId),
+                    profileHash, DateTimeOffset.UtcNow));
+
+            ArchiveReviewProxyMetadata forgedVideoProxy = new(
+                AssetRevisionId.From(analysedVideoRevisionId),
+                photoProxyProfile, 256, new Sha256Digest(new string('b', 64)),
+                128, 72, DateTimeOffset.UtcNow, "review/video-legacy.jpg");
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                proxies.RecordCompletionAsync(forgedVideoProxy));
+
+            // Simulate historical/corrupt photo companion evidence attached to
+            // a video. Selectors must still preserve the photo-only boundary.
+            await using (NpgsqlConnection mixed = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand addLegacy = mixed.CreateCommand())
+            {
+                addLegacy.CommandText = """
+                    INSERT INTO archive_configuration(id, source_id, configured_at_utc)
+                    VALUES (1, @source, @now);
+
+                    INSERT INTO archive_review_proxy_profiles (
+                        profile_id, protocol_version, encoder, format, jpeg_quality,
+                        maximum_long_edge, resize_policy, canonical_definition, recorded_at_utc)
+                    VALUES (@proxy_profile, 'v1', 'test', 'jpeg', 78, 1600,
+                        'fit', 'synthetic mixed-media regression', @now);
+
+                    INSERT INTO asset_revision_analysis(
+                        asset_revision_id, profile_hash, processing_run_id, completed_at_utc)
+                    VALUES (@video_revision, @profile_hash, @run, @now);
+
+                    INSERT INTO asset_revision_review_proxies(
+                        asset_revision_id, profile_id, encoded_byte_length, content_sha256,
+                        width, height, generated_at_utc, relative_path)
+                    VALUES
+                        (@photo_revision, @proxy_profile, 256, repeat('c', 64),
+                            128, 72, @now, 'review/photo-legacy.jpg'),
+                        (@video_revision, @proxy_profile, 256, repeat('d', 64),
+                            128, 72, @now, 'review/video-legacy.jpg');
+                    """;
+                addLegacy.Parameters.AddWithValue("source", sourceId.Value);
+                addLegacy.Parameters.AddWithValue("now", DateTimeOffset.UtcNow);
+                addLegacy.Parameters.AddWithValue("proxy_profile", photoProxyProfile);
+                addLegacy.Parameters.AddWithValue("video_revision", analysedVideoRevisionId);
+                addLegacy.Parameters.AddWithValue("photo_revision", analysedRevisionId);
+                addLegacy.Parameters.AddWithValue("profile_hash", profileHash.ToString());
+                addLegacy.Parameters.AddWithValue("run", registeredRunId);
+                await addLegacy.ExecuteNonQueryAsync();
+            }
+
+            Assert.False(await analysis.IsCompletedAsync(
+                AssetRevisionId.From(analysedVideoRevisionId), profileHash));
+            Assert.True(await analysis.IsCompletedAsync(
+                AssetRevisionId.From(analysedRevisionId), profileHash));
+            Assert.Equal(1, await analysis.CountCompletedCurrentRevisionsAsync(sourceId, profileHash));
+            Assert.DoesNotContain(AssetRevisionId.From(pendingVideoRevisionId),
+                await analysis.GetPendingCurrentRevisionIdsAsync(
+                    sourceId, profileHash, includeHydratable: true));
+
+            Assert.Null(await proxies.GetAsync(
+                AssetRevisionId.From(analysedVideoRevisionId), photoProxyProfile));
+            IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata> visible =
+                await proxies.GetManyAsync(
+                    [AssetRevisionId.From(analysedRevisionId),
+                     AssetRevisionId.From(analysedVideoRevisionId)], photoProxyProfile);
+            Assert.Single(visible);
+            Assert.Contains(AssetRevisionId.From(analysedRevisionId), visible.Keys);
+
+            // A completed video with NO legacy proxy sorts before the photo,
+            // so it must never win the photo post-analysis work queue.
+            PostgresArchivePostAnalysisRepository postAnalysis = new(database);
+            AssetRevisionId? missingProxy = await postAnalysis.GetNextMissingProxyRevisionAsync(
+                sourceId, profileHash, "profile-not-yet-generated");
+            Assert.Equal(AssetRevisionId.From(analysedRevisionId), missingProxy);
+
+            // Photo quality scoring similarly ignores misleading video proxies.
+            PostgresPhotoQualityEvaluationRepository quality = new(database);
+            IReadOnlyList<PhotoQualityEvaluationCandidate> sample =
+                await quality.ReadCurrentProxySampleAsync(photoProxyProfile, 10);
+            PhotoQualityEvaluationCandidate photoCandidate = Assert.Single(sample);
+            Assert.Equal(AssetRevisionId.From(analysedRevisionId), photoCandidate.AssetRevisionId);
+
         }
         finally
         {
