@@ -73,13 +73,15 @@ function Assert-LauncherSettingValue {
                 throw "$Name must point to an existing absolute local directory."
             }
             $fullPath = [IO.Path]::GetFullPath($Value)
-            for ($cursor = $fullPath; -not [string]::IsNullOrWhiteSpace($cursor); $cursor = Split-Path -Parent $cursor) {
+            $cursor = $fullPath
+            while (-not [string]::IsNullOrWhiteSpace($cursor)) {
                 $directory = Get-Item -LiteralPath $cursor -Force
                 if (($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
                     throw "$Name must not use junctions or symbolic links."
                 }
                 $parent = Split-Path -Parent $cursor
                 if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+                $cursor = $parent
             }
         }
         "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
