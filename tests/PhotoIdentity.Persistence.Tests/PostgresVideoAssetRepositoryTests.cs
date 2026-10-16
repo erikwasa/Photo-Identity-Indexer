@@ -105,6 +105,21 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.Equal(initial.RevisionId,
                 await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
 
+            // Even a malformed/legacy photo batch must not reclassify or update
+            // a video-owned source locator, and must roll back completely.
+            SourceAsset conflictingPhoto = new(
+                new SourceAssetReference(source.SourceId, "holiday/clip.mov"),
+                "holiday/clip.mov", "image/jpeg", 5000, now, AssetAvailability.Local);
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                photoScanner.RecordBatchAsync(
+                    source,
+                    [new ArchiveSourceScanWrite(conflictingPhoto,
+                        new Sha256Digest(new string('e', 64)))],
+                    new Dictionary<string, ArchiveSourceScanBaseline>(),
+                    now.AddMinutes(14)));
+            Assert.Equal(initial.RevisionId,
+                await videos.GetLatestVisibleRevisionAsync(source.SourceId, "holiday/clip.mov"));
+
             // The normal photo table contract is never changed by a video write.
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand inspect = connection.CreateCommand())
