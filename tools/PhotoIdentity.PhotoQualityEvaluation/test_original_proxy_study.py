@@ -184,6 +184,62 @@ class StudyTests(unittest.TestCase):
         self.assertFalse(summary["complete"])
         self.assertNotIn("a private path", str(result))
 
+    def test_legacy_export_can_report_failed_media_without_rerun(self):
+        legacy = {
+            "protocol": PROTOCOL,
+            "modelName": "topiq_nr",
+            "photos": [
+                {"revisionId": "a", "mediaFamily": "raw",
+                 "originalScore": None, "proxyScore": None,
+                 "errorCode": "decode-or-inference-failed"},
+                {"revisionId": "b", "mediaFamily": "raw",
+                 "originalScore": None, "proxyScore": None,
+                 "errorCode": "decode-or-inference-failed"},
+                {"revisionId": "c", "mediaFamily": "heic",
+                 "originalScore": 0.2, "proxyScore": 0.3, "errorCode": None},
+                {"revisionId": "d", "mediaFamily": "jpeg",
+                 "originalScore": 0.4, "proxyScore": 0.5, "errorCode": None},
+            ]
+        }
+        report = summarize(legacy)
+        self.assertEqual(report["failures"], 2)
+        self.assertEqual(report["failuresByMediaFamily"],
+                         {"heic": 0, "jpeg": 0, "raw": 2})
+        self.assertEqual(report["attemptsByMediaFamily"],
+                         {"heic": 1, "jpeg": 1, "raw": 2})
+        self.assertEqual(report["failuresByStage"],
+                         {"decode-or-inference-failed": 2})
+        self.assertFalse(report["complete"])
+        self.assertNotIn("revisionId", str(report))
+
+    def test_new_failures_distinguish_decode_and_model_stages(self):
+        selection = select_pairs(self.benchmark)
+        call_count = [0]
+
+        def decoder(_original, _family, dest):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("do not show private path")
+            dest.write_bytes(b"synthetic")
+
+        def model(_name, _device):
+            def infer(path):
+                if "decoded-original" in path:
+                    raise ValueError("do not show original path")
+                return Scalar(0.5)
+            return infer
+
+        result = score_pairs(
+            self.benchmark, selection, self.original, self.proxy,
+            "topiq_nr", "cpu", str(self.root / "private" / "staged.json"),
+            metric_factory=model, decode_factory=decoder, probe_pairs=2)
+        stages = [row["errorCode"] for row in result["photos"]]
+        self.assertEqual(stages, ["decode-failed", "original-inference-failed"])
+        report = summarize(result)
+        self.assertEqual(report["failuresByStage"],
+                         {"decode-failed": 1, "original-inference-failed": 1})
+        self.assertNotIn("do not show", str(result) + str(report))
+
     def test_select_only_supported_count_and_families(self):
         with self.assertRaisesRegex(ValueError, "50 to 100"):
             select_pairs(self.benchmark, 20)

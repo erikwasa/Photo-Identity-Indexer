@@ -336,3 +336,34 @@ possible Windows paging makes throughput poor. PR #565's local
 2-pair progress/capped-input probe remains the lowest-risk next
 experiment. A remote pyIQA job is a separately scoped potential
 follow-up, **not implemented or approved** by WI-0193 checkpoint 7.
+
+## Checkpoint 8: initial full-original experiment yielded incomplete results
+
+Maintainer completed the TOPIQ NR full-original 80-photo loop after
+approximately three hours under very high memory/disk pressure.
+Only **63** original/proxy pairs succeeded, **17** failed with the
+legacy generic decode-or-inference error. Among the successful pairs:
+17 JPEG, 20 HEIC, 20 PNG, 6 RAW. TOPIQ original-vs-proxy
+Spearman **0.62356**, median signed proxy-minus-original shift
+**+0.10410**, absolute median shift **0.10410**, and top-quartile
+overlap **0.25**. These are incomplete/nonrandom-missing and decoder-
+confounded diagnostics, not calibration or held-out acceptance.
+The operator stopped MUSIQ full-original transformer inference with
+Ctrl+C before its score file was written. The Hugging Face auth warning
+and resource-tracker shutdown message are not proof of inference failure.
+
+A subsequent file-presence check was run from the user profile instead
+of the repository root: TOPIQ's scoring function **wrote its output before
+printing the summary**. First recover that private output by checking the
+original repository-root `private` directory.
+
+This follow-up changes `original_proxy_study.py report` to show
+attempts and failures by media family **on old exports**, with
+stage-coded privacy-preserving failures on *new* runs. The old generic
+errors cannot be retroactively disambiguated. No retry of the
+resource-intensive unbounded study is requested. The 600-photo
+proxy-based calibration results remain valid and unchanged, no
+production model/exclusion is approved, and no held-out human labels
+have been consulted. The GPU caption container is a distinct
+Ollama/Azure service requiring a new pyIQA workload and separate
+privacy authorization for original pixels.
