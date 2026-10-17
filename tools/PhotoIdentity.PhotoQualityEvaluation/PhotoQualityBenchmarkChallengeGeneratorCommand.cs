@@ -37,7 +37,14 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
                     "The benchmark has no remaining challenge capacity.");
             }
 
-            int requestedCount = Math.Min(options.Count, available);
+            if (options.PoolOnly && options.Count > 500)
+            {
+                throw new ArgumentException(
+                    "Disagreement candidate pool is capped at 500 photos to bound model scoring.");
+            }
+            int requestedCount = options.PoolOnly
+                ? options.Count
+                : Math.Min(options.Count, available);
             string connectionString = RequiredSetting(
                 options.ConnectionString,
                 ConnectionStringEnvironmentVariable,
@@ -154,12 +161,16 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
                     "Challenge heuristics did not produce any candidates.");
             }
 
+            // Pool-only artifacts are intentionally too large for the remaining
+            // challenge reserve. They must be scored and filtered first; never
+            // pass them directly to benchmark add-challenges.
             PhotoQualityBenchmarkChallengeFile output =
                 new(
                     SchemaVersion: 1,
                     BenchmarkId: benchmark.BenchmarkId,
-                    SelectionPolicy:
-                        PhotoQualityBenchmarkChallengeSelector.SelectionPolicyVersion,
+                    SelectionPolicy: options.PoolOnly
+                        ? "m37-disagreement-screening-pool-v1"
+                        : PhotoQualityBenchmarkChallengeSelector.SelectionPolicyVersion,
                     Photos: selected
                         .Select(candidate => candidate.Photo)
                         .ToArray());
@@ -181,8 +192,18 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
             Console.WriteLine();
             Console.WriteLine(
                 $"Selected {selected.Count} challenge candidates from {eligible.Length} non-core current photos.");
-            Console.WriteLine(
-                $"Requested {requestedCount}; remaining benchmark challenge capacity after import would be {available - selected.Count}.");
+            if (options.PoolOnly)
+            {
+                Console.WriteLine(
+                    $"Disagreement screening pool only: selected {selected.Count} non-benchmark photos. Do not import this unfiltered pool.");
+                Console.WriteLine(
+                    $"Reserved challenge slots remain {available}; use score-disagreement-pool and select-disagreements first.");
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"Requested {requestedCount}; remaining benchmark challenge capacity after import would be {available - selected.Count}.");
+            }
             Console.WriteLine("Challenge reason counts:");
             foreach (IGrouping<string, PhotoQualityChallengeAnalyzedCandidate> group in
                      selected
@@ -319,6 +340,7 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
         string? connectionString = null;
         int count = 180;
         bool force = false;
+        bool poolOnly = false;
 
         for (int index = 0; index < args.Length; index++)
         {
@@ -350,6 +372,9 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
                             "--count must be an integer between 1 and 5000.");
                     }
                     break;
+                case "--pool-only":
+                    poolOnly = true;
+                    break;
                 case "--force":
                     force = true;
                     break;
@@ -375,7 +400,8 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
             profile,
             connectionString,
             count,
-            force);
+            force,
+            poolOnly);
     }
 
     private static string NextValue(
@@ -394,7 +420,7 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
     private static void PrintUsage()
     {
         Console.WriteLine(
-            "Usage: dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark generate-challenges --input private/photo-quality-benchmark.json --output private/photo-quality-challenges.json [--count 180] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
+            "Usage: dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark generate-challenges --input private/photo-quality-benchmark.json --output private/photo-quality-challenges.json [--count 180] [--pool-only] [--profile <id>] [--proxy-root <path>] [--connection-string <value>] [--force]");
     }
 
     private sealed record Options(
@@ -404,7 +430,8 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
         string? ProfileId,
         string? ConnectionString,
         int Count,
-        bool Force);
+        bool Force,
+        bool PoolOnly);
 
     private sealed record AnalyzedRow(
         PhotoQualityBenchmarkPopulationRow Row,
