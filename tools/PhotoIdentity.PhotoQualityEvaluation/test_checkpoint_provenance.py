@@ -103,6 +103,20 @@ class CheckpointProvenanceTests(unittest.TestCase):
         data = discover(self.path.parent, [nested])
         self.assertEqual(data["artifactCount"], 2)
 
+    def test_more_specific_cache_owns_file_regardless_of_root_order(self):
+        nested = self.path.parent / "nested-reordered"
+        nested.mkdir()
+        (nested / "ARNIQA.pth").write_bytes(b"synthetic encoder")
+        for first, second, expected in (
+                (self.path.parent, nested, 2),
+                (nested, self.path.parent, 1)):
+            report = discover(first, [second])
+            encoder = next(item for item in report["artifacts"]
+                           if item["artifactName"] == "ARNIQA.pth")
+            self.assertEqual(encoder["sourceCacheIndex"], expected)
+            self.assertEqual(sum(item["artifactName"] == "ARNIQA.pth"
+                                 for item in report["artifacts"]), 1)
+
     def test_duplicate_cache_roots_rejected(self):
         with self.assertRaisesRegex(ValueError, "Duplicate cache"):
             discover(self.path.parent, [self.path.parent])
