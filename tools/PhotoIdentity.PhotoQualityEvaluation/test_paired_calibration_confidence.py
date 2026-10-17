@@ -27,7 +27,7 @@ class ConfidenceTests(unittest.TestCase):
         values = [1, 2, 3, 4, 5] * 3 + [9, 9]
         self.exports = [
             self.score("perfect", values),
-            self.score("noisy", [1, 3, 2, 5, 4] * 3 + [0, 0])
+            self.score("noisy", [3, 2, 1, 5, 4] * 3 + [0, 0])
         ]
 
     def score(self, name, values):
@@ -68,7 +68,7 @@ class ConfidenceTests(unittest.TestCase):
         b = confidence(self.benchmark, self.exports, "noisy", "perfect", 100)
         self.assertEqual(a, b)
         self.assertGreater(a["rightMinusLeft"]["spearman"], 0)
-        self.assertGreater(a["rightMinusLeft"]["pairwiseAccuracy"], 0)
+        self.assertGreater(a["rightMinusLeft"]["pairwiseAccuracy"], 0)  # Swap low/normal? 1 and 3 are two tiers apart.
 
     def test_rejects_partial_exports(self):
         self.exports[0]["scores"].pop()
