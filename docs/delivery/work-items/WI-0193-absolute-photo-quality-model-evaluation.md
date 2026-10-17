@@ -467,3 +467,43 @@ must be checked independently. Do not bundle research-only framework
 code or weights into Photo Identity for general production use before
 reviewing permission for the intended use/distribution. Experimental
 benchmarking is not production deployment approval.
+
+## Checkpoint 12: corroborated TOPIQ/MUSIQ cache identities and incomplete ARNIQA provenance
+
+The maintainer ran the checkpoint 11 local cache inventory:
+`pyiqa 0.1.16`, `torch 2.14.1`, `torchvision 0.29.1`,
+Pillow `13.0.0`, rawpy `0.27.1`, pillow-heif `1.8.1`.
+Three cached artifacts were reported under PyIQA's local cache:
+TOPIQ `cfanet_nr_koniq_res50-9a73138b.pth`
+(SHA-256 `9a73138beb3748dd6a83365610ac88fa1cd53225342c77fc9ed44a3be461354c`,
+181196009 bytes); MUSIQ `musiq_koniq_ckpt-e95806b9.pth`
+(SHA-256 `e95806b9eae5f3814c410f574ba8e552362bd5bc63d758ed5b97860f5d6185aa`,
+108610983 bytes); and `regressor_koniq10k.pth`
+(SHA-256 `af8f127aca38a8e1082e066b5ee93e533bf5f33aaf9c76b3c31526ef901919e1`,
+19560 bytes).
+
+TOPIQ/MUSIQ filenames agree with published PyIQA default model
+configurations and with earlier local console loading messages,
+but the weight-to-model mapping remains **inferred, not
+independently proven from the running environment**. ARNIQA additionally
+uses a learned encoder `ARNIQA.pth` and may use a torchvision
+ResNet50 pretrained backbone; its small cached KonIQ regressor is
+not a complete model. To avoid misleading provenance completeness,
+extend offline cache discovery with optional extra explicit
+Torch checkpoint roots and unverified encoder/regressor/backbone
+role hints. Do not load models or consult any photos/ratings.
+
+Neither the package's published noncommercial license expression
+nor ARNIQA's own repository Apache-2.0 designation alone determines
+the rights for all specific pretrained weight files. Licensing
+remains **unverified** for deployment and must be resolved before
+any production go decision. No private file paths, benchmark or
+score rows were committed.
+
+The next maintainer task is to run `calibration_policy_draft.py`
+independently for TOPIQ and MUSIQ using the existing complete
+600-photo immutable proxy scores. This is a fast **calibration-only,
+no-inference** operation: the produced three-band drafts are explicitly
+not frozen, do not authorize held-out label evaluation and do not
+enable Very Low exclusion. The policy freeze and final one-time
+held-out evaluation remain separate subsequent checkpoints.
