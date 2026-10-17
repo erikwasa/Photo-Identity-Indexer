@@ -4,6 +4,28 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+
+WI-0193 checkpoint 13 calibration-draft evidence: Maintainer ran
+existing 600-proxy-score TOPIQ/MUSIQ 3-band drafts on 238 reviewed
+representative calibration photos. Low/Normal/High anchor n=38/154/42;
+true three-band n=41/154/43. TOPIQ midpoint thresholds
+0.4976193383/0.5708234310 yielded 89/238=37.39% correct,
+MUSIQ 63.07654476/69.06219482 yielded 90/238=37.82%.
+The trivial constant-Normal reference yields 154/238=64.71%.
+Thus these **specific proposed midpoint absolute-classification maps**
+should not be frozen. This does not negate moderate ranking
+evidence (~83% two-tier separated pairwise ordering; rho ~0.36).
+Added `three_band_calibration_diagnostic.py` to compare the
+**already saved private draft confusion matrices only**, reporting
+class balance, precision, recall, balanced accuracy, and macro F1.
+No model inference, private benchmark/per-photo rows or held-out
+human labels are read; guards reject any approval status.
+Next decision: ranking-only/no absolute-tier recommendation vs
+more conservative, predeclared calibration/abstention strategy vs
+explicit model no-go. No automatic Very Low exclusion. Deployment
+rights remain unverified.
+
+
 **WI-0193 checkpoint 12 pending review (2026-10-18).** PR #577
 merged. Maintainer-provided local checkpoint cache inventory confirms
 pyiqa 0.1.16, torch 2.14.1, TOPIQ CFANet KonIQ SHA 9a73138b...
