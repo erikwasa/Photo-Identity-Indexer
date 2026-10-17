@@ -4,6 +4,24 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 original/proxy field evidence (2026-10-17):** the initial
+unbounded 80-photo TOPIQ CPU run finished the loop but had **63 successes /
+17 generic decode-or-inference failures** under ~3 hours of severe RAM
+and disk pressure; among successes JPEG=17, HEIC=20, PNG=20, RAW=6.
+Original-vs-proxy Spearman 0.624, median shift +0.104, top-quartile
+overlap 0.25. These are incomplete/confounded results, **not** a final
+evaluation. MUSIQ was interrupted during transformer inference with
+no completed export. The TOPIQ private result was written relative to
+the repo-root working directory, while later file checking used the
+Windows profile working directory. The follow-up report now provides
+per-format failures on existing JSON and stage-coded failures in new
+runs. No unbounded retry requested. Azure T4 caption Ollama is not an
+IQA service and original-pixel upload is not authorized under
+caption-only ADR-0011. Preserve 600-photo private benchmark, calibrated
+exports and untouched held-out labels. No production model or exclusion
+decision.
+
+
 **WI-0193 checkpoint 7 pending review (2026-10-17):** The maintainer
 completed blinded reviews of the frozen 600-photo benchmark and successfully
 reconciled the four full candidate exports (all with zero inference
