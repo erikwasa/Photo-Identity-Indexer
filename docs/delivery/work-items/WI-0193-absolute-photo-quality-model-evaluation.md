@@ -507,3 +507,51 @@ no-inference** operation: the produced three-band drafts are explicitly
 not frozen, do not authorize held-out label evaluation and do not
 enable Very Low exclusion. The policy freeze and final one-time
 held-out evaluation remain separate subsequent checkpoints.
+
+## Checkpoint 13: midpoint three-band drafts fail naive absolute-accuracy baseline
+
+Maintainer completed both **calibration-only** drafts from the existing
+600-photo frozen proxy score exports, with 238 rated representative
+calibration photos. Low/Normal/High median-anchor sample counts
+were 38/154/42 for each. The three-band truth counts are
+Low-or-below=41 (3 Very Low + 38 Low), Normal=154,
+High-or-above=43 (42 High + 1 Very High).
+
+| Draft candidate | Fixed oriented thresholds | Correct / 238 | Apparent calibration accuracy |
+| --- | --- | ---: | ---: |
+| TOPIQ NR 0.1.16 | 0.4976193383336067, 0.5708234310150146 | 89 | 37.39% |
+| MUSIQ 0.1.16 | 63.076544761657715, 69.06219482421875 | 90 | 37.82% |
+| Constant Normal reference | no score thresholds | 154 | 64.71% |
+
+The constant-majority classifier **cannot distinguish images**;
+nevertheless, the median-midpoint three-band proposals have very poor
+apparent absolute accuracy *on their own calibration data*. The one
+photo (0.42-point) advantage for MUSIQ is not candidate-selection
+evidence, especially because these drafts lack a paired prediction
+comparison. Neither proposal should be frozen/deployed. These
+findings do **not** overturn separate candidate ranking evidence:
+TOPIQ 83.8% / MUSIQ 82.8% pairwise ordering for human ratings
+separated by at least two tiers, with calibration-only Spearman
+rho 0.359 / 0.370. Different endpoints answer different questions.
+
+Checkpoint 13 introduces `three_band_calibration_diagnostic.py`,
+which reads **only the aggregate 3x3 confusion matrices** already
+present in the two saved private calibration drafts. It validates
+same benchmark/calibration-label fingerprints, three-band coverage,
+consistent actual counts, and all model/held-out/exclusion permissions
+still false. It reports class prediction counts, precision, recall,
+macro F1, balanced accuracy, extreme-cross-band errors and a
+constant-majority accuracy baseline. It neither reads the benchmark
+manifest or per-photo score rows nor accesses **any** held-out or
+challenge human labels. Its aggregate report is descriptive,
+in-sample, and **not** cross-validated.
+
+Do not automatically optimize thresholds against all 238 calibration
+photos and misrepresent the resulting accuracy as unbiased. The
+classification failure motivates examining calibration confusion
+and then choosing between (a) a documented ranking-only/no
+absolute-classification recommendation, (b) a separately defined
+and validated conservative abstaining quality preference, or
+(c) an explicit WI-0193 model no-go. Every production/deployment
+choice still needs licensed weights and a frozen analysis policy.
+Automatic Very Low exclusion remains **no-go**.
