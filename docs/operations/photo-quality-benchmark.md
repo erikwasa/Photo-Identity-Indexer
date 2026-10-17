@@ -503,3 +503,126 @@ calibration policy after inspecting the blinded challenge ratings.
 As everywhere in WI-0193: no quality scores are persisted to production,
 no normal photos are automatically excluded, and no held-out human labels
 are read during candidate screening/selection.
+
+## WI-0193 checkpoint 6: extend the four private candidate exports after challenge import
+
+This supersedes checkpoint 5's warning that the newly imported 20 cases cannot
+be reconciled. The `reconcile_quality_scores.py` tool now strictly extends
+the original 580-photo TOPIQ/MUSIQ exports from their already-scored 160-photo
+**screening pool**, with no redundant 580-photo model run. ARNIQA can score
+**only the selected 20**; the cheap WI-0182 baseline is re-run on all 600.
+The resulting four 600-photo exports again satisfy the benchmark-bound
+`calibration-report`/`candidate_audit.py` coverage contract.
+
+**Sequence matters.** Pool generation and both pool scoring runs (checkpoint 5
+steps 1–3) **must happen before import**. The pool scorer rejects importing
+an overlapping pool. The frozen representative core must not be regenerated.
+
+### Step 4 (revised): preserve the 580-photo private benchmark and import 20
+
+From PowerShell in the repo root, after generating
+`private/wi0193-disagreement-challenges.json` in checkpoint 5:
+
+~~~powershell
+$before = "private/photo-quality-benchmark-before-disagreement.json"
+if (Test-Path $before) {
+    throw "Snapshot already exists: verify it is the PRE-IMPORT 580-photo benchmark"
+}
+Copy-Item -LiteralPath "private/photo-quality-benchmark.json" -Destination $before
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark add-challenges `
+  --input private/photo-quality-benchmark.json `
+  --candidates private/wi0193-disagreement-challenges.json
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark report `
+  --input private/photo-quality-benchmark.json
+~~~
+
+Confirm the report says **600 total**, **400 representative**,
+**240 calibration**, **160 held-out**, and **200 challenges**. Do not use
+`photo-quality-benchmark.json.before-challenge.bak` as your pre-import snapshot:
+a previous challenge import may already have created that one-time backup.
+The explicit `$before` snapshot above is mandatory.
+
+### Step 5: score ARNIQA on only the 20 newly imported proxies
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/reconcile_quality_scores.py score-selected `
+  --original-benchmark private/photo-quality-benchmark-before-disagreement.json `
+  --benchmark private/photo-quality-benchmark.json `
+  --selected private/wi0193-disagreement-challenges.json `
+  --proxy-root "$env:PhotoIdentity__ReviewProxyRoot" `
+  --metric arniqa --device cpu `
+  --output private/wi0193-selected-arniqa-scores.json `
+  --accept-third-party-weights
+~~~
+
+`score-selected` verifies the two benchmark snapshots and imported challenge
+file before model loading, hashes the selected proxy bytes, and uses the
+existing optional `pyiqa` runner. The result is a private selected-only score
+export, **not** a complete candidate export.
+
+### Step 6: extend TOPIQ/MUSIQ/ARNIQA into new 600-photo exports
+
+~~~powershell
+foreach ($metric in @("topiq_nr", "musiq")) {
+    & $python tools/PhotoIdentity.PhotoQualityEvaluation/reconcile_quality_scores.py extend `
+      --original-benchmark private/photo-quality-benchmark-before-disagreement.json `
+      --benchmark private/photo-quality-benchmark.json `
+      --selected private/wi0193-disagreement-challenges.json `
+      --pool private/wi0193-disagreement-pool.json `
+      --scores "private/$metric-scores.json" `
+      --supplement "private/wi0193-pool-$($metric -replace '_nr', '')-scores.json" `
+      --output "private/$metric-scores-600.json"
+}
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/reconcile_quality_scores.py extend `
+  --original-benchmark private/photo-quality-benchmark-before-disagreement.json `
+  --benchmark private/photo-quality-benchmark.json `
+  --selected private/wi0193-disagreement-challenges.json `
+  --scores private/arniqa-scores.json `
+  --supplement private/wi0193-selected-arniqa-scores.json `
+  --output private/arniqa-scores-600.json
+~~~
+
+The original candidate files remain untouched; the new exports retain the
+same candidate/version/provider descriptors. If Python/pyiqa or the model
+checkpoint changed between the initial 580 and supplemental 20 scores, the
+reconciliation correctly refuses to combine them: restore the compatible
+environment or re-score with a documented version instead.
+
+The reconciled `runtime.totalElapsedMilliseconds` is **the sum of per-photo
+latencies**, not measured model-loading-inclusive wall time. The median and
+p95 inference values are recomputed over the complete 600-photo sequence.
+
+### Step 7: refresh the inexpensive technical baseline
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark quality-eval baseline `
+  --input private/photo-quality-benchmark.json `
+  --output private/wi0182-quality-scores-600.json
+~~~
+
+### Step 8: validate all four full score exports
+
+~~~powershell
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_reconcile_quality_scores.py"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/candidate_audit.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/wi0182-quality-scores-600.json private/topiq_nr-scores-600.json private/musiq-scores-600.json private/arniqa-scores-600.json
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark review `
+  --input private/photo-quality-benchmark.json
+~~~
+
+Only the final **aggregate** audit and benchmark reports should be shared
+externally; keep the original and expanded private manifest, screening pool,
+challenge import, all per-photo score exports and checkpoint files outside Git.
+Review the 20 newly imported challenges blindly; their labels are diagnostic
+and **must not** tune a model or threshold using held-out or challenge ratings.
+The challenge reserve is fully used after import; a separate selection policy
+must be justified before altering it again.
+
+No production quality evidence, collection ranking, exclusion or held-out
+decision is changed by this checkpoint.
