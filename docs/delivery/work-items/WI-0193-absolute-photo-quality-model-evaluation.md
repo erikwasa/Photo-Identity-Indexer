@@ -200,3 +200,49 @@ extend three learned score exports, rerun baseline and inspect aggregate
 audit results. Weight-license provenance and proxy/original assessment are
 still outstanding; no model is selected and automatic exclusion remains
 unsupported.
+
+## Checkpoint 7: completed private blinded review and original-pixel sensitivity tooling
+
+On 2026-10-17 the maintainer completed the blind benchmark review after
+adding the 20 reserved non-benchmark TOPIQ/MUSIQ disagreement challenges.
+The supplied **private** version-2 manifest confirms the 600-photo frozen
+benchmark, 400 representatives (240 calibration, 160 held-out), all 200
+challenge slots used, and unchanged representative core. Reviewing only
+**non-held-out** human labels confirmed all 240 calibration and all 200
+challenge cases have review values (including Unsure). There are 238
+known-tier calibration reviews, matching the prior frozen model comparison.
+All 20 new model-disagreement examples were reviewed: 7 Normal, 7 High,
+6 Unsure. These challenge human labels are descriptive diagnostics only
+and do not choose or tune models. Held-out human rating values have
+**not** been read, audited or scored against model predictions.
+
+All four full 600-photo score exports were successfully reconciled locally:
+TOPIQ, MUSIQ, ARNIQA and the WI-0182 technical baseline each have zero
+inference failures; aggregate calibration Spearman values remain
+TOPIQ 0.3591, MUSIQ 0.3702, ARNIQA 0.2741, baseline 0.2343.
+The maintainer's private source/score/photo JSON files **must not** be
+committed. No new threshold or deployment model is justified by this result.
+
+This checkpoint adds `original_proxy_study.py`: an explicitly opt-in,
+standard-library-driven selection/report wrapper and optional local
+Pillow/`pillow-heif`/`rawpy` decoder for **50–100** original-image vs
+stored review-proxy pairs. Selection is deterministically balanced across
+available JPEG/HEIC/PNG/RAW media families, drawn only from calibration
+and challenge, without reading any human labels or held-out photos.
+Full original-file bytes and proxy SHA-256 values are verified before
+model loading. Selected originals are rendered to short-lived lossless
+RGB PNGs for `pyiqa` and removed after scoring; per-photo scores remain
+private, and only aggregate rank stability, absolute/signed shifts,
+quartile overlap and decoder failure counts should be shared. Offline
+tests cover blind selection, no held-out leakage, SHA verification,
+path traversal rejection, failure accounting and paired scoring.
+
+**Important limit:** production decoder and proxy creator can render
+HEIC/RAW colors/tone/orientation differently from these independent
+experimental decoders. No result may be described as pure downscale
+sensitivity or assumed to reflect production originals exactly.
+Maintainer original/proxy run is pending. Candidate checkpoint
+identity/license review, explicit pre-registration of model/calibration
+policy (including a likely automatic-exclusion no-go) and one-shot
+held-out evaluation remain separate gates. No production code or quality
+filtering changes in checkpoint 7.

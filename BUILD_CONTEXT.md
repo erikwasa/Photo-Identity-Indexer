@@ -4,6 +4,27 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 7 pending review (2026-10-17):** The maintainer
+completed blinded reviews of the frozen 600-photo benchmark and successfully
+reconciled the four full candidate exports (all with zero inference
+failures). Private-manifest inspection confirmed 240/240 calibration and
+200/200 challenge ratings recorded, including the 20 TOPIQ/MUSIQ
+disagreement cases; **no held-out quality-rating values were inspected**.
+Only 238 calibration ratings are known-tier. The candidate audit retains
+MUSIQ rho=0.370, TOPIQ rho=0.359, ARNIQA rho=0.274, WI-0182 rho=0.234.
+Automatic Very Low exclusion remains unsupported and no model is chosen.
+
+The new `original_proxy_study.py` supports private deterministic
+50–100 image paired original-decode vs immutable proxy scoring using the
+TOPIQ/MUSIQ runner, SHA verification, format-balanced selection from
+**non-held-out** partitions, and aggregate report. Optional `pillow-heif`
+and `rawpy` dependencies are local only. Document codec/color/rendering
+differences from production and *do not* equate the study with pure
+downscale effects. Maintainer run and checkpoint provenance/license audit
+pending. Next freeze an explicit policy before a one-shot held-out analysis.
+M37 PRs target `features/m37`, not main.
+
+
 **WI-0193 checkpoint 6 pending review:** `reconcile_quality_scores.py` now
 extends the frozen 580-photo learned-IQA score exports to 600 **only after**
 the extra 20 rank-disagreement challenge photos are imported. It requires an
