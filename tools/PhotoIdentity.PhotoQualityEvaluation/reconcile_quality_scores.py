@@ -117,7 +117,7 @@ def rows_for(export, benchmark_id, valid_ids, expected_kind):
             export.get("benchmarkId") != benchmark_id or
             export.get("inputKind") != expected_kind or
             not isinstance(export.get("candidate"), dict) or
-            export.get("higherIsBetter") not in (True, False) or
+            type(export.get("higherIsBetter")) is not bool or
             not isinstance(export.get("scores"), list) or
             export.get("photoCount") != len(valid_ids) or
             len(export["scores"]) != len(valid_ids)):
