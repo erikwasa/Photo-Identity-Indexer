@@ -626,3 +626,130 @@ must be justified before altering it again.
 
 No production quality evidence, collection ranking, exclusion or held-out
 decision is changed by this checkpoint.
+
+## WI-0193 checkpoint 7: original-versus-review-proxy paired study
+
+The maintainer reports the 600-photo blinded benchmark review completed.
+Private review-state inspection of **calibration and challenge only** confirms
+240/240 calibration and 200/200 challenge ratings recorded, including all 20
+new model-disagreement cases. The 20 new cases have 7 Normal, 7 High and
+6 Unsure ratings. **Do not use these challenge ratings to select models or
+thresholds.** The representative held-out review values have deliberately
+not been read as part of this checkpoint.
+
+Before any final candidate/threshold freeze, test whether the learned quality
+scores change when the same photo is supplied at its original decoded pixel
+size rather than through its fixed `jpeg-1600-q78` review proxy. The
+new `original_proxy_study.py` selects 50–100 photos **only** from the
+calibration and challenge partitions. It is a diagnostic
+**format-balanced sample, not a population-representative estimate**. The
+selection algorithm never accesses human review labels and rejects held-out
+photos.
+
+### Step 1: select an immutable 80-photo sample
+
+From PowerShell in the repository root on `features/m37`:
+
+~~~powershell
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_original_proxy_study.py"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/original_proxy_study.py select `
+  --input private/photo-quality-benchmark.json `
+  --count 80 `
+  --output private/wi0193-original-proxy-selection.json
+~~~
+
+This is deterministic, with approximately even representation across
+JPEG/HEIC/PNG/RAW as available, and yields a private manifest containing
+source keys/IDs and SHA-256 fingerprints. **Do not commit it**. Do not choose
+a different sample after viewing its model-score results.
+
+### Step 2: prepare optional ORIGINAL decoding dependencies
+
+Use the same Python/pyiqa virtual environment as for scoring the benchmark,
+and an **explicitly configured** path to your actual photo-original source
+tree. `sourceKey` is resolved relative to this tree, for example
+`2025/02/filename.jpg`. It must point to the original image bytes,
+**not** a separate proxy/thumbnail root. The study refuses missing,
+repointed, symlink/junction-redirected, oversized or SHA-mismatched original
+files. It does not modify originals.
+
+~~~powershell
+$env:PhotoIdentity__OriginalPhotoRoot = "C:\YOUR\PHOTO\ORIGINALS\ROOT"
+Test-Path $env:PhotoIdentity__OriginalPhotoRoot
+Test-Path $env:PhotoIdentity__ReviewProxyRoot
+
+& $python -m pip install pillow-heif rawpy
+~~~
+
+Installing `pillow-heif` and `rawpy` is optional third-party code with
+codec, native-library and licensing considerations; inspect and accept their
+licenses before installation. You can instead select a JPEG/PNG-only study
+with `--families jpeg png` if local HEIC/RAW decoding is unavailable, but
+that **must** be labelled JPEG/PNG-only and cannot establish HEIC/RAW
+stability. The initial 80-photo default intends to cover all four families.
+
+The original decoder renders a lossless temporary RGB PNG for model input.
+JPEG/PNG/HEIC use Pillow with EXIF orientation handling; `pillow-heif`
+enables HEIC 8-bit decoding. RAW/DNG uses `rawpy` 8-bit demosaicing with
+camera white balance and no automatic brightening. These policies may
+**differ from Photo Identity's production decoding**, tone mapping, embedded
+HEIC color handling, or the review proxy encoder, and these differences
+must be interpreted as an evaluation confounder—not as a clean measure of
+downscaling alone. Temporary RGB renders are removed after scoring each pair.
+
+### Step 3: score the SAME 80 original/proxy pairs with both leaders
+
+~~~powershell
+foreach ($metric in @("topiq_nr", "musiq")) {
+    & $python tools/PhotoIdentity.PhotoQualityEvaluation/original_proxy_study.py score `
+      --input private/photo-quality-benchmark.json `
+      --selection private/wi0193-original-proxy-selection.json `
+      --original-root "$env:PhotoIdentity__OriginalPhotoRoot" `
+      --proxy-root "$env:PhotoIdentity__ReviewProxyRoot" `
+      --metric $metric --device cpu `
+      --output "private/wi0193-original-proxy-$metric.json" `
+      --accept-third-party-weights
+
+    if ($LASTEXITCODE -ne 0) { throw "Original/proxy scoring failed: $metric" }
+}
+~~~
+
+Both source and review proxy bytes are hash-checked **before** model loading.
+Per-photo errors are recorded by a generic error code without exception
+messages/paths; they are never silently counted as successful comparisons.
+The source/original score is computed on losslessly rendered full-size
+decoded pixels; proxy inference uses the already stored `jpeg-1600-q78`.
+These scores are a **new paired experiment**, not replacements for the
+600-photo benchmark candidate exports.
+
+### Step 4: print aggregate stability reports
+
+~~~powershell
+foreach ($metric in @("topiq_nr", "musiq")) {
+    & $python tools/PhotoIdentity.PhotoQualityEvaluation/original_proxy_study.py report `
+      --scores "private/wi0193-original-proxy-$metric.json"
+}
+~~~
+
+Check both reports have **sampleCount=80, scoredPairs=80,
+failures=0, complete=true** before interpreting them. The aggregate includes
+overall and per-media-family original/proxy score rank correlation, median
+absolute score shift, median signed proxy-minus-original shift and top
+quartile overlap. Larger rank shifts may signal risk in transferring a model
+measured on proxies to normal original-resolution photos, but neither
+correlation nor small shifts alone establishes safe deployment or exclusion.
+
+If either model has missing/unsupported original files or a decoding
+failure, do not substitute photos after seeing scores to get a favorable
+result. Preserve the private error export and report only the generic
+failure count. Additional codec or source-root development may be required.
+
+**Privacy and evaluation gates:** Only share aggregate console JSON results.
+Do not share/commit the private 600-photo benchmark, review fields, source
+keys, original images, temporary renders or paired per-photo score JSONs.
+No challenge/held-out labels are used for model/threshold selection. This
+experiment does not freeze calibration, endorse an exclusion policy, or
+authorize the final one-shot held-out comparison.
