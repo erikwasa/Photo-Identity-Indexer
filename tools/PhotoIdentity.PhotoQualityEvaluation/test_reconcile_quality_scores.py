@@ -147,7 +147,8 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(run["inputKind"], SELECTED_INPUT_KIND)
         self.assertEqual(run["photoCount"], 2)
         raw = Path(output).read_text()
-        self.assertNotIn("qualityLevel", raw)\n        self.assertNotIn("sourceKey", raw)
+        self.assertNotIn("qualityLevel", raw)
+        self.assertNotIn("sourceKey", raw)
         self.assertNotIn(str(self.proxy_root), raw)
         base = self.base("arniqa")
         # The dependency-free fake model has an intentionally different
