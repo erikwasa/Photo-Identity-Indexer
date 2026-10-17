@@ -112,6 +112,13 @@ def calibration_draft(benchmark, score_export, checkpoint=None):
                 and p.get("sampleKind") == "representative"
             ),
         }),
+        "calibrationReviewSha256": fingerprint([
+            {"revisionId": p["revisionId"],
+             "qualityLevel": p.get("review", {}).get("qualityLevel")}
+            for p in benchmark["photos"]
+            if p.get("partition") == "calibration"
+            and p.get("sampleKind") == "representative"
+        ]),
         "candidateId": candidate_id,
         "candidateModel": model_name,
         "candidateDescriptor": descriptor,
