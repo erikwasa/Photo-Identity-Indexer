@@ -280,3 +280,25 @@ maintainer-observed context, not a separately verified content classification.
 The immediate next evidence remains the 50–100 paired original-versus-proxy
 run, then checkpoint weight provenance and a frozen explicit acceptance or
 no-go policy before evaluating held-out ratings.
+
+## Checkpoint 7 resource-pressure follow-up (2026-10-17)
+
+On maintainer Windows hardware, the initial TOPIQ/MUSIQ
+full-resolution original-vs-proxy CPU run lasted nearly one hour
+with RAM at ~99% and disk saturated. It did not expose any progress
+after pyiqa model-loading because the per-photo loop had no logging.
+The user was advised to cancel if sustained paging persisted.
+The script is read-only for originals/benchmark and creates final
+private per-model output only after all pairs finish.
+
+Add a per-pair privacy-preserving progress log, optional 1–10 pair
+probe mode and optional source-original 1601–12000px long-edge cap
+(e.g. 2560) to make re-evaluation bounded and observable.
+Probe exports explicitly report `isProbe=true` and cannot pass
+`complete` acceptance. Capped originals are **not** full-resolution
+model inputs; RAW/HEIC decoding still has some temporary
+original-size memory cost. Comparisons must explicitly distinguish
+capped studies from full-resolution studies and not silently replace
+the original 80-photo protocol. Run a two-pair cap probe first and
+evaluate memory/throughput before any second full 80-pair attempt.
+No production filtering, calibration or held-out evaluation changes.
