@@ -4,7 +4,20 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-WI-0193 / issue #536 is in progress on the M37 integration branch `features/m37`. Checkpoint 1 establishes a benchmark-bound candidate score schema, a fixed WI-0182 technical-reason-count baseline and calibration-only rank/pairwise/Very-Low safety metrics with Wilson uncertainty. Held-out human labels remain excluded from evaluation until a candidate and calibration policy are frozen. WI-0192 is maintainer-accepted: 400 representative photos (240 calibration / 160 held-out) plus 180 challenge photos from 27,052 durable-proxy candidates, with 20 slots reserved for WI-0193 model-disagreement cases; 255 blinded ratings were completed and the sample was judged representative. Legacy original width/height remain a documented limitation. M37 checkpoint PRs target `features/m37`, not `main`.
+**2026-10-17 evidence:** WI-0193 now has full private-archive benchmark score exports
+for WI-0182, TOPIQ NR, MUSIQ and ARNIQA (580/580 each, zero failures), with 238
+known-tier representative calibration reviews. MUSIQ rho=0.370/pairwise=82.8%;
+TOPIQ rho=0.359/pairwise=83.8%; bootstrap differences include zero. Very Low
+precision is unproven (only 3 calibration Very Low labels); automatic exclusion
+remains **no-go**. The aggregate-only evidence is documented in
+`docs/operations/photo-quality-model-evidence-2026-10-17.md`. The added
+`paired_calibration_confidence.py` produces uncertainty estimates without
+consulting held-out labels. Next gates: weight hashes/licenses, 20 new
+non-benchmark disagreements, original-versus-proxy comparison, frozen
+calibration, one-shot held-out. No production model selected. M37 PRs target
+`features/m37`, not main.
+
+WI-0193 / issue #536 is in progress on the M37 integration branch `features/m37`. Checkpoint 1 establishes a benchmark-bound candidate score schema, a fixed WI-0182 technical-reason-count baseline and calibration-only rank/pairwise/Very-Low safety metrics with Wilson uncertainty. Held-out human labels remain excluded from evaluation until a candidate and calibration policy are frozen. WI-0192 is maintainer-accepted: 400 representative photos (240 calibration / 160 held-out) plus 180 challenge photos from 27,052 durable-proxy candidates, with 20 slots reserved for WI-0193 model-disagreement cases; 255 blinded ratings were completed at WI-0192 acceptance and the sample was judged representative. Legacy original width/height remain a documented limitation. M37 checkpoint PRs target `features/m37`, not `main`.
 
 
 WI-0182 / issue #490: PR #509 implements the evaluation-only technical-quality harness over durable review proxies. It adds versioned raw sharpness/exposure/clipping/contrast/resolution evidence, q78 profile-gated candidate reasons, deterministic PostgreSQL proxy sampling, private JSON review export, timing/storage measurements and synthetic analyzer coverage. No collection semantics or catalogue quality persistence are introduced. Keep WI-0182 in review until representative private-archive review/runtime evidence is recorded.
@@ -49,12 +62,13 @@ WI-0151: maintained PostgreSQL v33 accepted, and PR #540 merged opt-in dry-run-f
 \nWI-0193 checkpoint 2 adds the private, explicit opt-in Python `pyiqa`
 runner for `topiq_nr`, `musiq`, and `arniqa` with SHA-verified
 benchmark proxies and schema-compatible scored exports. The runner has offline
-contract tests but no maintained-archive scores, frozen weight hashes, original
-comparison or held-out decision yet. Do not confuse candidate support with
+contract tests and the maintainer has now run the full private 580-photo benchmark;
+exact model checkpoint hashes/licenses, original comparison and held-out decision
+remain outstanding. Do not confuse candidate support with
 model acceptance.
 
 WI-0193 checkpoint 3 adds `candidate_audit.py` and offline tests for exact full-score
-coverage and calibration-only comparative metrics. Maintained learned-model runs, weight
-hash/license validation, original-vs-proxy checks, disagreement challenge sampling and
-one-shot held-out evaluation are still outstanding. Do not choose a production model based
+coverage and calibration-only comparative metrics. Full learned-model runs are complete;
+weight hash/license validation, original-vs-proxy checks, disagreement challenge sampling
+and one-shot held-out evaluation are still outstanding. Do not choose a production model based
 on a framework's model name or on an unverified score export.

@@ -307,3 +307,88 @@ The command prints an **aggregate-only** JSON report. It validates that every sc
 **No held-out or challenge human label is accessed.** In particular, do not use the output to select a final threshold using held-out evidence; the model/calibration decision still needs its formal freeze. Strong inter-model agreement is not proof of good quality. The audit does not compute archive-wide model disagreement or fill the remaining 20 private challenge slots; that requires candidates scored on previously unselected archive photos.
 
 The resulting JSON output contains aggregate metrics and candidate identifiers only. Keep private input score exports and any per-photo analysis outside Git. A meaningful model comparison also requires enough calibration photos to be labelled and successful inference for each candidate.
+
+## WI-0193 checkpoint 4: maintained-archive evidence and paired uncertainty
+
+The maintainer has now scored the frozen 580-photo benchmark with all four
+candidates; every candidate completed without an inference failure. There are
+238 usable **calibration representative** ratings, including just 3 Very Low
+examples. Aggregate findings and the conservative **no automatic exclusion**
+assessment are recorded in
+[`photo-quality-model-evidence-2026-10-17.md`](photo-quality-model-evidence-2026-10-17.md).
+Do **not** commit the private benchmark or per-photo score JSONs.
+
+Run the new standard-library-only paired bootstrap on the two leading
+calibration candidates (PowerShell, from the repository root):
+
+~~~powershell
+python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_paired_calibration_confidence.py
+
+python tools/PhotoIdentity.PhotoQualityEvaluation/paired_calibration_confidence.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores.json private/musiq-scores.json `
+  --left pyiqa-topiq_nr-0.1.16 `
+  --right pyiqa-musiq-0.1.16 `
+  --repetitions 1000 `
+  --seed 20261017
+~~~
+
+Bootstrap resampling is at the **photo level**, not at the pair level:
+multiple comparison pairs share images and must not be treated as independent.
+It emits no source keys or per-photo details and never reads held-out/challenge
+human labels. In this maintained-archive calibration, the 95% interval for
+MUSIQ-minus-TOPIQ Spearman is approximately [-0.055, +0.081], and for pairwise
+accuracy [-5.9, +3.7] percentage points. Both include zero; the difference
+is not a defensible deployment choice.
+
+Remaining work: checkpoint hashes and licenses, local image/model setup
+provenance, 20 **new non-benchmark** disagreement-challenge candidates,
+paired original-vs-proxy inference, frozen calibration decision, and one-shot
+held-out evaluation. The scored 580-photo benchmark alone cannot fill new
+challenge slots because all its revisions are already selected.
+
+## WI-0193 checkpoint 4: capture local checkpoint provenance
+
+The maintainer's initial learned-model exports explicitly report
+`weights-not-yet-pinned`, and model size/license information remains unknown.
+The new **standard-library-only** tool records SHA-256 and byte sizes for
+**explicitly supplied** downloaded checkpoint files; it does not connect to
+Hugging Face or load models.
+
+Locate candidate weight files on Windows. Some checkpoints are in the torch
+cache; others may be in the Hugging Face cache:
+
+~~~powershell
+$torchCache = Join-Path $env:USERPROFILE ".cache\torch\hub\pyiqa"
+$hfCache = Join-Path $env:USERPROFILE ".cache\huggingface\hub"
+
+foreach ($dir in @($torchCache, $hfCache)) {
+    if (Test-Path $dir) {
+        Get-ChildItem -LiteralPath $dir -Recurse -File |
+          Where-Object { $_.Extension -in @(".pth", ".pt", ".safetensors", ".bin") } |
+          Select-Object FullName, Length
+    }
+}
+~~~
+
+Locate the **actual** three files loaded by `pyiqa` and replace the paths
+below, using your existing Python venv. A downloaded file is *not* proof
+that a particular candidate loaded that file: use the model load logs
+and third-party model configuration to verify the mapping.
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/checkpoint_provenance.py `
+  --checkpoint "topiq_nr=C:\actual\cache\topiq-weights.pth" `
+  --checkpoint "musiq=C:\actual\cache\musiq-weights.pth" `
+  --checkpoint "arniqa=C:\actual\cache\arniqa-weights.pth" `
+  --output private/iqa-checkpoint-provenance.json
+
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_checkpoint_provenance.py
+~~~
+
+Keep the private inventory and the checkpoint bytes outside Git. The inventory
+contains checkpoint file **names**, hashes and sizes, without the parent
+filesystem paths. It records the local Python and installed `pyiqa` package
+versions, but does not determine independent third-party weight licenses or
+whether a specific model actually used that checkpoint. Resolve these
+questions separately before any production deployment decision.

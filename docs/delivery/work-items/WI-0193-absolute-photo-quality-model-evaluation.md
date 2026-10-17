@@ -103,3 +103,35 @@ calibration Spearman rank correlation, calibration-only pairwise candidate corre
 inference failures and runtime/provenance completeness. Held-out/challenge human labels
 are explicitly excluded. Unit tests exercise label leakage, missing entries, failures
 and candidate disagreement. No maintained-archive model outcomes are claimed.
+
+## Checkpoint 4: maintained private-calibration evidence (2026-10-17)
+
+The maintainer completed benchmark-bound private scoring for **all 580 photos**
+with WI-0182 technical baseline, TOPIQ NR, MUSIQ and ARNIQA, with **0 inference
+failures** in each export. The review reference includes 238 known-tier
+representative calibration ratings (2 calibration Unsure), of which 3 are Very
+Low. Public-safe results are in
+`docs/operations/photo-quality-model-evidence-2026-10-17.md`; no private
+per-photo benchmark/score rows have been committed.
+
+MUSIQ: Spearman 0.370 and >=2-tier ordering 82.8% on calibration. TOPIQ NR:
+Spearman 0.359 and >=2-tier ordering 83.8%. ARNIQA: 0.274 / 76.8%.
+The WI-0182 technical baseline: 0.234 / 39.6%, with numerous tied scores.
+A 1,000-resample paired photo bootstrap shows MUSIQ-minus-TOPIQ Spearman
++0.0111, percentile 95% interval approximately [-0.0546, +0.0806], and
+pairwise accuracy -1.01 percentage points, interval [-5.90, +3.68] points.
+Both intervals span zero. **No production candidate or mapping is selected.**
+
+The current Very Low diagnostic is **no-go for automatic exclusion**:
+TOPIQ's 1/1 correct predicted Very Low has a Wilson 95% lower bound of
+20.7% and recall 1/3. Other candidates have no observed threshold meeting
+98% calibration precision. Three calibration Very Low labels do not provide
+strong evidence about false exclusions.
+
+Next: weight SHA-256/size and third-party license vetting, 20 newly selected
+archive-external-to-benchmark disagreement challenges with blinded review,
+50-100 photo proxy-versus-original inference comparison, then freeze a
+pre-registered candidate/policy **before** one-time held-out analysis.
+The benchmark's held-out and challenge human labels are not part of this
+calibration analysis and must not be consulted for tuning. No archive or
+production behavior changes are authorized by this checkpoint.
