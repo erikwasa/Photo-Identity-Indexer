@@ -4,6 +4,22 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 9 (2026-10-17) pending review:** the first TOPIQ
+original/proxy CPU experiment had 17/80 failures, notably RAW=13/19
+and JPEG=4/21, versus HEIC=0/20 and PNG=0/20. Legacy generic errors
+cannot attribute stage, so do not claim RAW decoder failure without
+isolating cause. Original/proxy rho=0.624 and top-quartile overlap=25%
+are based on 63 successes and are not production acceptance.
+The new `original_proxy_metadata_triage.py` verifies the original
+SHA and full frozen selection/score manifest before checking metadata
+headers of **only the 17 prior failures** (opt-in all 80). It prints
+aggregate image-family sizes/header availability without full decoding,
+IQA inference, human labels or held-out photos. Local run pending.
+No unbounded CPU retry or premature production model selection;
+ADR-0011 caption thumbnail authorization does not permit remote IQA
+original-pixel uploads. M37 PRs target `features/m37`.
+
+
 **WI-0193 original/proxy field evidence (2026-10-17):** the initial
 unbounded 80-photo TOPIQ CPU run finished the loop but had **63 successes /
 17 generic decode-or-inference failures** under ~3 hours of severe RAM
