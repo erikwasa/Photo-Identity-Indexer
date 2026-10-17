@@ -118,6 +118,17 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
+      - name: Install Python for offline image-quality evaluation tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test offline image-quality evaluation tools
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_*.py" -v
+          exit $LASTEXITCODE
+
       - name: Run quarantined integration diagnostics
         id: flaky-integration-diagnostics
         continue-on-error: true
