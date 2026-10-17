@@ -555,3 +555,62 @@ and validated conservative abstaining quality preference, or
 (c) an explicit WI-0193 model no-go. Every production/deployment
 choice still needs licensed weights and a frozen analysis policy.
 Automatic Very Low exclusion remains **no-go**.
+
+## Checkpoint 14: reject midpoint absolute tiers; bound the remaining ranking-only question
+
+The maintainer completed the confusion diagnostic using saved private
+calibration-only drafts, with **238** reviewed representative
+calibration photos. **No held-out/challenge ratings were accessed.**
+
+| Metric | TOPIQ NR | MUSIQ |
+| --- | ---: | ---: |
+| Three-band correct | 89 / 238 (37.4%) | 90 / 238 (37.8%) |
+| Balanced accuracy | 49.9% | 48.5% |
+| Macro F1 | 38.4% | 38.9% |
+| Normal recall | 36/154 (23.4%) | 40/154 (26.0%) |
+| Predicted High-or-above | 102 | 102 |
+| High-or-above precision | 25/102 (24.5%) | 21/102 (20.6%) |
+| Low-or-below precision | 28/79 (35.4%) | 29/73 (39.7%) |
+| Extreme Low/High cross-band mistakes | 10 | 11 |
+
+The all-Normal baseline correctly labels **154/238 (64.7%)**,
+but does not distinguish photographs. Both current fixed median-midpoint
+mappings fail at *absolute* quality-band classification, including on
+their own calibration set. **Do not freeze either mapping**, use these
+scores to exclude images, or imply the tiny one-photo delta is meaningful.
+The earlier >80% two-tier-separated *pairwise ordering* evidence
+measures a different objective and leaves one narrower possibility:
+bounded, optional quality **preference** based on large candidate
+score differences. Changing Search/Smart/Creative/Slideshow production
+ranking remains **outside WI-0193 implementation scope**.
+
+Checkpoint 14 adds a research-only `calibration_selective_ranking.py`
+diagnostic. It uses the two already-complete 600-photo proxy score exports,
+but reads human labels **only** on 238 known-tier representative
+calibration photos. It deterministically divides calibration images
+into five disjoint photo groups (exact content-SHA duplicates stay
+together) and predeclares score-gap quantile rules `0/50/75/90%`.
+For each fold, only **training-fold raw-score pair gaps** determine
+the cutoff; on validation-fold *within-fold* pairs, it counts how
+often score-implied ordering matches human ordering among different
+human tiers, including a separate >=2-tier subset. It reports
+decision coverage among all pairs plus ordering accuracy on
+comparable subsets; abstaining at higher score gaps may or may
+not improve reliability. No raw-score-to-class threshold is
+optimized and no mapping is frozen.
+
+**Caveats:** the five folds are internal calibration diagnostic
+partitions, not the sealed 160-photo held-out partition. Pair samples
+share photos and are not independent; near-duplicates can survive
+the exact-content grouping. A predeclared quantile sweep performed
+on one small calibration dataset is exploratory; choosing the best
+quantile afterward does not prove deployment benefit. No GPU,
+IQA model inference, photo originals, proxy pixels, held-out/challenge
+human labels or production behavior are accessed. Very Low auto
+exclusion remains no-go and weight licenses remain unresolved.
+
+Next: use the calibration-only aggregate output to decide whether
+this question merits one **explicitly frozen** ranking-only
+research hypothesis for one-shot held-out testing, or record a
+conservative **no-go** and close WI-0193 without unsealing held-out
+labels. Do not introduce a new production ranker in this checkpoint.
