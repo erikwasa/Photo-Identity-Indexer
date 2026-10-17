@@ -346,3 +346,49 @@ provenance, 20 **new non-benchmark** disagreement-challenge candidates,
 paired original-vs-proxy inference, frozen calibration decision, and one-shot
 held-out evaluation. The scored 580-photo benchmark alone cannot fill new
 challenge slots because all its revisions are already selected.
+
+## WI-0193 checkpoint 4: capture local checkpoint provenance
+
+The maintainer's initial learned-model exports explicitly report
+`weights-not-yet-pinned`, and model size/license information remains unknown.
+The new **standard-library-only** tool records SHA-256 and byte sizes for
+**explicitly supplied** downloaded checkpoint files; it does not connect to
+Hugging Face or load models.
+
+Locate candidate weight files on Windows. Some checkpoints are in the torch
+cache; others may be in the Hugging Face cache:
+
+~~~powershell
+$torchCache = Join-Path $env:USERPROFILE ".cache\torch\hub\pyiqa"
+$hfCache = Join-Path $env:USERPROFILE ".cache\huggingface\hub"
+
+foreach ($dir in @($torchCache, $hfCache)) {
+    if (Test-Path $dir) {
+        Get-ChildItem -LiteralPath $dir -Recurse -File |
+          Where-Object { $_.Extension -in @(".pth", ".pt", ".safetensors", ".bin") } |
+          Select-Object FullName, Length
+    }
+}
+~~~
+
+Locate the **actual** three files loaded by `pyiqa` and replace the paths
+below, using your existing Python venv. A downloaded file is *not* proof
+that a particular candidate loaded that file: use the model load logs
+and third-party model configuration to verify the mapping.
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/checkpoint_provenance.py `
+  --checkpoint "topiq_nr=C:\actual\cache\topiq-weights.pth" `
+  --checkpoint "musiq=C:\actual\cache\musiq-weights.pth" `
+  --checkpoint "arniqa=C:\actual\cache\arniqa-weights.pth" `
+  --output private/iqa-checkpoint-provenance.json
+
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_checkpoint_provenance.py
+~~~
+
+Keep the private inventory and the checkpoint bytes outside Git. The inventory
+contains checkpoint file **names**, hashes and sizes, without the parent
+filesystem paths. It records the local Python and installed `pyiqa` package
+versions, but does not determine independent third-party weight licenses or
+whether a specific model actually used that checkpoint. Resolve these
+questions separately before any production deployment decision.
