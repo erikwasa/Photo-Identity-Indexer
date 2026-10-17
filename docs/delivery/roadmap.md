@@ -42,6 +42,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M35 | Identity assignment audit and calibration | completed |
 | M36 | Semantic collection composition | in_progress |
 | M37 | Photo quality and visual redundancy evaluation | ready |
+| M38 | TV-friendly portrait slideshow presentation | ready |
 
 Expected evolution:
 

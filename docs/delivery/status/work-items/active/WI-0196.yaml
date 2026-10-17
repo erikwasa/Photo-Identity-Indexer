@@ -1,0 +1,11 @@
+id: WI-0196
+title: Define TV portrait-viewing benchmark and safe-framing rules
+milestone: M38
+status: ready
+owner: unassigned
+document: ../work-items/WI-0196-tv-portrait-benchmark-framing.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/571

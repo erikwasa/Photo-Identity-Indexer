@@ -243,3 +243,76 @@ work_items:
   evidence:
   - type: issue
     value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/538
+- id: WI-0196
+  title: Define TV portrait-viewing benchmark and safe-framing rules
+  milestone: M38
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0196-tv-portrait-benchmark-framing.md
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/571
+- id: WI-0197
+  title: Prototype automatic subject-aware portrait enlargement
+  milestone: M38
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0197-subject-aware-portrait-zoom.md
+  blockers:
+  - WI-0196
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/566
+- id: WI-0198
+  title: Integrate opt-in TV-focus slideshow mode with quality and performance safeguards
+  milestone: M38
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0198-opt-in-tv-focus-playback.md
+  blockers:
+  - WI-0197
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/567
+- id: WI-0199
+  title: Prototype full-photo then subject-detail sequence
+  milestone: M38
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0199-portrait-context-to-detail.md
+  blockers:
+  - WI-0198
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/568
+- id: WI-0200
+  title: Prototype simultaneous context-and-detail layout
+  milestone: M38
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0200-portrait-context-detail-layout.md
+  blockers:
+  - WI-0198
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/569
+- id: WI-0201
+  title: Compare TV portrait presentation variants and decide adoption
+  milestone: M38
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0201-tv-portrait-acceptance.md
+  blockers:
+  - WI-0198
+  - WI-0199
+  - WI-0200
+  blocker_notes: []
+  evidence:
+  - type: issue
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/570

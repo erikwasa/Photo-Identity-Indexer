@@ -1,0 +1,12 @@
+id: WI-0197
+title: Prototype automatic subject-aware portrait enlargement
+milestone: M38
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0197-subject-aware-portrait-zoom.md
+blockers: 
+- WI-0196
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/566

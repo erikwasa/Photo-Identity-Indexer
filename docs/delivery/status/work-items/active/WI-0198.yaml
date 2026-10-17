@@ -1,0 +1,12 @@
+id: WI-0198
+title: Integrate opt-in TV-focus slideshow mode with quality and performance safeguards
+milestone: M38
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0198-opt-in-tv-focus-playback.md
+blockers: 
+- WI-0197
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/567
