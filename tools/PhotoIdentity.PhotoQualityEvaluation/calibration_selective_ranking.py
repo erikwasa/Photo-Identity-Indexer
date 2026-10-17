@@ -221,8 +221,14 @@ def main():
     parser.add_argument("--input", required=True, help="Private frozen benchmark")
     parser.add_argument("--scores", nargs=2, required=True,
                         help="Two complete private proxy score exports")
+    parser.add_argument("--fold-details", action="store_true",
+                        help="Also print fold-size/threshold diagnostics")
     args = parser.parse_args()
     result = evaluate(load(args.input), [load(path) for path in args.scores])
+    if not args.fold_details:
+        for candidate in result["candidateReports"]:
+            for row in candidate["quantiles"].values():
+                row.pop("foldDiagnostics", None)
     print(json.dumps(result, indent=2, allow_nan=False))
     print("Calibration aggregates only; keep photo identities, raw scores and "
           "held-out labels private.")
