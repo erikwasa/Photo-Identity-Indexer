@@ -134,8 +134,15 @@ def discover(cache_root, additional_cache_roots=()):
             resolved = path.resolve()
             if not resolved.is_relative_to(root):
                 raise ValueError("Candidate weight path outside cache")
+            # An explicitly configured nested cache owns its files, even
+            # when the parent cache is scanned first. Skip them at the
+            # parent level so sourceCacheIndex identifies the *specific*
+            # root and duplicates are never emitted.
+            if any(other != root
+                   and other.is_relative_to(root)
+                   and resolved.is_relative_to(other) for other in roots):
+                continue
             if resolved in seen:
-                # Nested explicit roots must not count the same artifact twice.
                 continue
             if path.is_file():
                 seen.add(resolved)
