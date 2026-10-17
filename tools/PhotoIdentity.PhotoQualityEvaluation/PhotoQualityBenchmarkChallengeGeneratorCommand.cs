@@ -151,9 +151,19 @@ internal static class PhotoQualityBenchmarkChallengeGeneratorCommand
                 .Where(candidate => candidate.Reasons.Count > 0)
                 .ToArray();
 
+            // A screening pool must not contain the same original content twice.
+            // Keep the deterministically earliest member of each content group.
+            IEnumerable<PhotoQualityChallengeAnalyzedCandidate> selectionInput =
+                options.PoolOnly
+                    ? candidates
+                        .GroupBy(candidate => candidate.Photo.ContentSha256,
+                            StringComparer.OrdinalIgnoreCase)
+                        .Select(group => group.OrderBy(candidate => candidate.StableOrderKey,
+                            StringComparer.Ordinal).First())
+                    : candidates;
             IReadOnlyList<PhotoQualityChallengeAnalyzedCandidate> selected =
                 PhotoQualityBenchmarkChallengeSelector.Select(
-                    candidates,
+                    selectionInput,
                     requestedCount);
             if (selected.Count == 0)
             {
