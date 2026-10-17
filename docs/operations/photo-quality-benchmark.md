@@ -1262,3 +1262,62 @@ Do not unseal the 160 held-out ratings, claim safe Very Low exclusion,
 tune by trying many threshold variants on the same 238 photos,
 or select a production model until an explicit next-stage decision
 is reviewed.
+
+## WI-0193 checkpoint 14: test whether score-gap abstention improves ranking
+
+The maintainer's aggregate **three-band confusion** results rejected
+both current absolute median-midpoint mappings: TOPIQ 37.4%
+three-band accuracy, balanced accuracy 49.9%, Normal recall
+36/154; MUSIQ 37.8%, balanced accuracy 48.5%, Normal recall
+40/154. Both label **102/238** photos High-or-above, but only
+25 TOPIQ / 21 MUSIQ predictions match the human High-or-above
+band. These are poor absolute classifiers. The majority all-Normal
+reference achieves 154/238 = 64.7% accuracy, but does not rank
+photos.
+
+A final, narrower research question remains: whether large learned
+IQA score gaps distinguish **relative ordering** more reliably
+than small gaps, while declining to express a preference on
+ambiguous comparisons. This is not a per-photo absolute rating,
+a production selection rule, or an exclusion policy.
+
+After merging the checkpoint-14 PR, run once from the repo root:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/calibration_selective_ranking.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores-600.json private/musiq-scores-600.json
+~~~
+
+This command uses **only the existing benchmark and two complete
+600-photo candidate score exports**. It does not import PyTorch,
+perform inference, decode photos or touch the 160 held-out human
+ratings. For each of five deterministic photo-disjoint folds,
+score-gap cutoffs are learned *without human labels* from the
+other four folds' raw scores, using predeclared **0%, 50%, 75%
+and 90%** difference quantiles. On validation-fold pairs only,
+it reports the fraction of **all potential comparisons** where
+the candidate expresses an ordering (coverage), plus correct
+ordering among **different human tiers** and specifically those
+separated by **at least two tiers**. The latter conditional subset
+is an evaluation metric, not a deployable label-dependent gate.
+
+For review, the default CLI prints **aggregate candidate results**
+and omits individual fold thresholds. Add `--fold-details` only
+if checking fold variability; these are still aggregated without
+photo IDs. Share only the resulting console JSON. The validator
+fails closed on incomplete candidate benchmark coverage, unexpected
+proxy profile, insufficient calibration samples or broken score
+direction. Exact SHA duplicates remain in one fold, but near
+duplicates can still cross folds. Pairs share underlying photos,
+so counting them as independent observations exaggerates certainty.
+
+**Do not** choose a candidate or cutoff purely from the best row,
+imply these results are held-out validation, make a deployment
+decision before independently verifying pretrained weights and
+license terms, or reintroduce automatic Very Low exclusion.
+An explicit pre-registration/no-go decision is required before
+any one-time sealed held-out evaluation.
