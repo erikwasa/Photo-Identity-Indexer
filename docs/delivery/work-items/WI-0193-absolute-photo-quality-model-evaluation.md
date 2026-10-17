@@ -367,3 +367,32 @@ production model/exclusion is approved, and no held-out human labels
 have been consulted. The GPU caption container is a distinct
 Ollama/Azure service requiring a new pyIQA workload and separate
 privacy authorization for original pixels.
+
+## Checkpoint 9: isolate high RAW/JPEG failure rates without another IQA run
+
+The updated maintainer aggregate report for the 80-pair unbounded TOPIQ
+study is: **13/19 RAW**, **4/21 JPEG**, **0/20 HEIC**, **0/20 PNG**
+failed (17 total). All failed rows still have a historical combined
+`decode-or-inference-failed` code; stage attribution is impossible from
+those existing exports. Among the 63 successes original/proxy Spearman
+rho=0.62356, median proxy-minus-original=+0.10410 and top-quartile
+overlap=0.25. This unweighted, incomplete decoder-confounded experiment
+must not select a production model or override the complete 600-photo
+proxy calibration evidence.
+
+Add `original_proxy_metadata_triage.py`: a **no-model, header-only,
+read-only** offline tool that verifies original content SHA and frozen
+selection/score coverage and reports aggregate header readability,
+megapixels and source file byte sizes for the 17 failed photos, with an
+explicit opt-in for all 80 to compare failed/successful size distribution.
+No human labels or held-out photos are read. Failures/exception text and
+paths are not leaked. RAW header opening itself can allocate some memory;
+pixel demosaicing and model inference are not performed. This identifies
+possible size pressure but cannot distinguish the prior actual decode and
+model inference stage. Local maintainer aggregate header triage pending.
+
+Azure NVIDIA T4 previously used by the caption burst is *not* a pyIQA
+endpoint. Any remote original/proxy scoring still requires a separately
+authorized, secure pixel transport and pinned CUDA model workload,
+not reuse of the existing Ollama thumbnail exception. Defer additional
+full-res CPU runs and keep automatic exclusion at no-go.
