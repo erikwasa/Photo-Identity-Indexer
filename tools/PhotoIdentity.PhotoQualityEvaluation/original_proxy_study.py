@@ -18,6 +18,7 @@ import math
 from pathlib import Path
 import statistics
 import tempfile
+import time
 
 from candidate_audit import spearman
 from learned_iqa import CANDIDATES, private_output, verified_proxy
@@ -161,7 +162,7 @@ def safe_original(root, relative, expected_hash):
     return target
 
 
-def decode_lossless(original, family, dest):
+def decode_lossless(original, family, dest, max_original_long_edge=None):
     # Imports are local and opt-in. There is no image dependency in offline CI.
     from PIL import Image, ImageOps
     if family == "raw":
@@ -196,14 +197,29 @@ def decode_lossless(original, family, dest):
     if image.width * image.height > MAX_PIXELS:
         raise ValueError("Decoded original pixel limit exceeded")
     try:
+        if max_original_long_edge is not None and max(image.size) > max_original_long_edge:
+            scale = max_original_long_edge / max(image.size)
+            target = (max(1, round(image.width * scale)),
+                      max(1, round(image.height * scale)))
+            bounded = image.resize(target, Image.Resampling.LANCZOS)
+            image.close()
+            image = bounded
         image.save(dest, "PNG")
     finally:
         image.close()
 
 
 def score_pairs(benchmark, selection, original_root, proxy_root, metric, device,
-                output, metric_factory=None, decode_factory=None):
+                output, metric_factory=None, decode_factory=None,
+                max_original_long_edge=None, probe_pairs=None):
     photos = validate_selection(benchmark, selection)
+    if max_original_long_edge is not None and not 1601 <= max_original_long_edge <= 12000:
+        raise ValueError("Original long-edge cap must be between 1601 and 12000 px")
+    if probe_pairs is not None and not 1 <= probe_pairs <= 10:
+        raise ValueError("Probe size must be between 1 and 10 pairs")
+    planned_pairs = len(photos)
+    if probe_pairs is not None:
+        photos = photos[:probe_pairs]
     if metric not in CANDIDATES or (device != "cpu" and not device.startswith("cuda")):
         raise ValueError("Unsupported metric or device")
     original_root = Path(original_root).resolve(strict=True)
@@ -218,6 +234,9 @@ def score_pairs(benchmark, selection, original_root, proxy_root, metric, device,
         proxy = verified_proxy(
             proxy_root, photo["proxyRelativePath"], photo["proxySha256"])
         verified.append((photo, original, proxy))
+    print(f"{metric}: verified {len(verified)}/{planned_pairs} pairs; "
+          f"source input={'full decoded' if max_original_long_edge is None else str(max_original_long_edge) + 'px capped'}; "
+          "initializing model...", flush=True)
     if metric_factory is None:
         import pyiqa
         model = pyiqa.create_metric(metric, device=device)
@@ -227,11 +246,16 @@ def score_pairs(benchmark, selection, original_root, proxy_root, metric, device,
         version = "test-double"
     decoder = decode_lossless if decode_factory is None else decode_factory
     rows = []
-    for photo, original, proxy in verified:
+    print(f"{metric}: model initialized; scoring {len(verified)} pairs", flush=True)
+    for index, (photo, original, proxy) in enumerate(verified, 1):
+        pair_started = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="wi0193-paired-") as temp:
             png = Path(temp) / "decoded-original.png"
             try:
-                decoder(original, photo["mediaFamily"], png)
+                if max_original_long_edge is None:
+                    decoder(original, photo["mediaFamily"], png)
+                else:
+                    decoder(original, photo["mediaFamily"], png, max_original_long_edge)
                 source_score = float(model(str(png)).item())
                 proxy_score = float(model(str(proxy)).item())
                 if not all(map(math.isfinite, (source_score, proxy_score))):
@@ -248,6 +272,9 @@ def score_pairs(benchmark, selection, original_root, proxy_root, metric, device,
             "proxyScore": proxy_score,
             "errorCode": failure,
         })
+        print(f"{metric}: pair {index}/{len(verified)} "
+              f"{'ok' if failure is None else 'failed'}; "
+              f"{time.perf_counter() - pair_started:.1f}s", flush=True)
     result = {
         "schemaVersion": 1, "protocol": PROTOCOL,
         "benchmarkId": benchmark["benchmarkId"],
@@ -259,6 +286,9 @@ def score_pairs(benchmark, selection, original_root, proxy_root, metric, device,
             "8-bit decode; RAW via optional rawpy camera-WB/no-auto-bright 8-bit "
             "demosaic; different renderers/color handling from app are possible"),
         "sampleIsPopulationWeighted": False,
+        "plannedPairs": planned_pairs,
+        "maxOriginalLongEdge": max_original_long_edge,
+        "isProbe": probe_pairs is not None,
         "photos": rows,
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -298,8 +328,12 @@ def summarize(result):
         top_quartile_overlap = len(a & b) / top_n
     return {
         "protocol": PROTOCOL, "candidate": result.get("modelName"),
-        "sampleCount": len(photos), "scoredPairs": n, "failures": len(photos)-n,
-        "complete": n == len(photos) and n >= 50,
+        "sampleCount": len(photos), "plannedPairs": result.get("plannedPairs", len(photos)),
+        "maxOriginalLongEdge": result.get("maxOriginalLongEdge"),
+        "isProbe": result.get("isProbe", False),
+        "scoredPairs": n, "failures": len(photos)-n,
+        "complete": (not result.get("isProbe", False)
+                     and n == len(photos) and n >= 50),
         "spearmanOriginalVsProxy": spearman(original, proxy) if n > 2 else None,
         "medianProxyMinusOriginal": statistics.median(diffs) if diffs else None,
         "medianAbsoluteScoreShift": statistics.median(map(abs, diffs)) if diffs else None,
@@ -327,6 +361,12 @@ def main():
     q.add_argument("--proxy-root", required=True)
     q.add_argument("--metric", required=True, choices=CANDIDATES)
     q.add_argument("--device", default="cpu")
+    q.add_argument("--max-original-long-edge", type=int,
+                   help="Bound decoded original input to this long edge (e.g. 2560). "
+                        "Not a true full-resolution study.")
+    q.add_argument("--probe-pairs", type=int,
+                   help="Run only the first 1–10 sample pairs as a diagnostic; "
+                        "output is never complete evaluation.")
     q.add_argument("--output", required=True)
     q.add_argument("--accept-third-party-weights", action="store_true")
     r = sub.add_parser("report")
@@ -344,7 +384,9 @@ def main():
             parser.error("Explicit third-party weight consent required")
         result = score_pairs(load(args.input), load(args.selection),
                              args.original_root, args.proxy_root,
-                             args.metric, args.device, args.output)
+                             args.metric, args.device, args.output,
+                             max_original_long_edge=args.max_original_long_edge,
+                             probe_pairs=args.probe_pairs)
         report = summarize(result)
         print(json.dumps(report, indent=2, allow_nan=False))
     else:
