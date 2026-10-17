@@ -4,6 +4,25 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 11 pending review (2026-10-17).** Following merged
+PR #575, the fixed evaluation input is `jpeg-1600-q78` proxy, not
+full-resolution originals. The four 600-photo proxy exports remain
+complete, none requires re-inference. The current PR upgrades
+`checkpoint_provenance.py` with local, no-inference checkpoint cache
+inventory (basename/hash/bytes, Python/PyTorch/pyIQA versions) and
+adds `calibration_policy_draft.py`, a **calibration-only, unsealed,
+coarse three-band** numeric score-mapping proposal. Both have offline
+privacy/contract tests. The maintainer must verify model-to-file mapping
+and individual checkpoint licensing; framework licenses are not
+automatic checkpoint licenses. Every draft marks held-out
+evaluation, production deployment and Very Low automatic exclusion
+as **disallowed**. Next: collect local provenance and draft aggregates;
+explicitly review/freeze or reject a candidate and policy before
+one-time held-out human-label evaluation. No held-out/challenge ratings
+are read; do not commit private manifest, score exports or paths.
+M37 PRs target `features/m37`.
+
+
 **WI-0193 checkpoint 10: proxy evaluation input decision (2026-10-17).**
 The completed metadata-only triage checked all 80 selected originals:
 all 17 failures were approximately 49–50 MP (13 RAW, 4 JPEG), whereas
