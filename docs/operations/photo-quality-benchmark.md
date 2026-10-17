@@ -996,3 +996,123 @@ The very low automatic exclusion criterion remains a separate no-go.
 The `--max-original-long-edge` option resizes after original decoding,
 so it may reduce inference memory but cannot guarantee RAW decoding
 will stay below a memory limit.
+
+## WI-0193 checkpoint 11: locally inventory model weights and prepare calibration-only draft
+
+The completed 80-photo original-pixel study identified a strong
+resolution-related processing limitation; the project now retains the
+immutable `jpeg-1600-q78` proxy as the WI-0193 candidate/held-out input.
+**Do not repeat full-original CPU inference.** Model selection still
+requires independent weight licensing, model-to-weight identity,
+calibration mapping and held-out evidence.
+
+The next utilities run entirely locally and **do not import PyTorch,
+load weights, score pixels, or inspect held-out/challenge human labels**.
+
+### Step 1: inventory cached model weights without choosing a model
+
+From PowerShell in the checked-out `features/m37` repository:
+
+~~~powershell
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+$cache = Join-Path $env:USERPROFILE ".cache\torch\hub\pyiqa"
+
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_checkpoint_provenance.py"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/checkpoint_provenance.py `
+  --cache-root "$cache" `
+  --output private/wi0193-cache-checkpoints.json
+~~~
+
+The scan hashes local `.pth`, `.pt`, `.ckpt` and `.safetensors`
+artifacts and records PyTorch/pyIQA versions. It never contacts Hugging
+Face or other services. The private output contains **basename-only**
+checkpoint file names, sizes, SHA-256 digests and **unverified name
+hints** (e.g. `cfanet` for `topiq_nr` and `musiq` for MUSIQ).
+A cache scan can include other model weights. It does **not** establish
+what `pyiqa.create_metric()` actually loaded. Retain the full local
+report under `private/`; only share model names, hashes, sizes and
+aggregate version counts, never absolute private paths.
+
+To inspect the candidate hints without disclosing your cache directory:
+
+~~~powershell
+$inventory = Get-Content private/wi0193-cache-checkpoints.json -Raw |
+  ConvertFrom-Json
+$inventory.artifacts |
+  Select-Object artifactName,candidateHints,sha256,sizeBytes |
+  Format-Table -AutoSize
+$inventory.packageVersions | Format-List
+~~~
+
+### Step 2: explicitly identify checkpoint files (manual verification)
+
+After verifying the actual TOPIQ/MUSIQ/ARNIQA file-to-model mapping
+from the local `pyiqa` output/configuration and recording each model
+weight's **independent license**, create an explicit inventory. A
+suggested filename based only on the cache hint is not sufficient
+proof. For instance, only if your local model-loading evidence
+confirms the paths:
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/checkpoint_provenance.py `
+  --checkpoint "topiq_nr=$(Join-Path $cache 'cfanet_nr_koniq_res50-9a73138b.pth')" `
+  --checkpoint "musiq=$(Join-Path $cache 'musiq_koniq_ckpt-e95806b9.pth')" `
+  --output private/wi0193-explicit-checkpoints.json
+~~~
+
+These particular filenames appeared in prior maintained-machine logs;
+they must be matched to the **model that actually loaded them**, rather
+than accepted because the names resemble a candidate. Add ARNIQA
+using an explicit third `--checkpoint` only when its actual path is
+confirmed. This command hashes the files but **does not mark
+checkpoint licensing or mapping as verified**.
+
+### Step 3: produce exploratory calibration-only score mappings
+
+Choose one **existing full 600-photo proxy candidate export** at a time;
+no new inference is performed:
+
+~~~powershell
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_calibration_policy_draft.py"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/calibration_policy_draft.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/musiq-scores-600.json `
+  --checkpoint-evidence private/wi0193-explicit-checkpoints.json `
+  --output private/wi0193-musiq-policy-draft.json
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/calibration_policy_draft.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores-600.json `
+  --checkpoint-evidence private/wi0193-explicit-checkpoints.json `
+  --output private/wi0193-topiq-policy-draft.json
+~~~
+
+The tool validates full score-export coverage, candidate identity and
+immutable proxy input, and then accesses **only** known-tier representative
+**calibration** human labels. Using calibration Low, Normal and High
+median scores, it proposes two **fixed numeric raw-score** threshold
+midpoints yielding a coarse **three-band** map:
+`low-or-below`, `normal` and `high-or-above`.
+It requires at least 10 reviewed images in each anchor tier and strict
+monotone medians. If this fails, that candidate is not suitable for
+this proposed mapping; **do not manually massage labels** or search
+held-out data for thresholds.
+
+The draft deliberately **does not** claim a five-tier ordinal model,
+approve any candidate, certify a third-party license, establish
+out-of-sample accuracy, or enable Very Low automatic exclusion.
+Its `status=research-draft-not-frozen`,
+`heldOutEvaluationAllowed=false`,
+`productionModelApproved=false` and
+`automaticVeryLowExclusionApproved=false` are mandatory guards.
+
+Only share the **aggregate console JSON** from each candidate draft
+and the checkpoint basename/hash/size/version inventory (plus any
+independently verifiable license URL/text). Never upload/commit the
+private full manifest, checkpoint file bytes or per-photo score export.
+The proposed mapping and model must be reviewed and **explicitly
+frozen in a separate checkpoint** before any one-time held-out
+quality-label evaluation. An output under `private/` is not a sealed
+or preregistered policy simply because it has fixed thresholds.
