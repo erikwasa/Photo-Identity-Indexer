@@ -246,3 +246,37 @@ identity/license review, explicit pre-registration of model/calibration
 policy (including a likely automatic-exclusion no-go) and one-shot
 held-out evaluation remain separate gates. No production code or quality
 filtering changes in checkpoint 7.
+
+## Maintainer follow-up: screenshots and digitally created images (2026-10-17)
+
+The maintainer reports that photos labelled **Unsure** in the completed blind
+review were screenshots or digitally created images, rather than ordinary
+camera photographs of ambiguous technical quality. This is a **domain
+eligibility** finding, not evidence that the quality model has failed. It is
+maintainer-observed context, not a separately verified content classification.
+
+- Keep existing `Unsure` review values and the frozen manifest intact. Do
+  not relabel these as Very Low, infer a numerical quality tier, or interpret
+  them as a reason to reject otherwise usable photographic images.
+- Design future **non-photographic-content eligibility** (screenshots,
+  illustrations, UI/graphics and digital artwork) as a separate, explicit,
+  conservative filtering decision *before* any learned photographic quality
+  preference. File extension alone is insufficient: screenshots can be JPEG,
+  and photos can be PNG. Do not enable such an exclusion without a separate
+  verified policy, override and false-exclusion review.
+- Do not retrospectively identify/filter the held-out subset or inspect its
+  human labels. Out-of-domain handling for held-out evaluation must be
+  predeclared before its one-time use; keep any unreviewed domain class
+  undecided rather than looking at held-out labels to decide.
+- The checkpoint 7 original-vs-proxy study evaluates score sensitivity to
+  pixel input, *not* quality-rating accuracy or content-type classification.
+  Its deterministic media-family-balanced selection does not establish that
+  the selected images are all photographic content. Interpret the aggregate
+  in this light.
+- No new quality calibration threshold, production media-type exclusion or
+  model acceptance is implied. Treat a separate non-photographic eligibility
+  workitem as potential follow-up scope, not as an already-implemented feature.
+
+The immediate next evidence remains the 50–100 paired original-versus-proxy
+run, then checkpoint weight provenance and a frozen explicit acceptance or
+no-go policy before evaluating held-out ratings.
