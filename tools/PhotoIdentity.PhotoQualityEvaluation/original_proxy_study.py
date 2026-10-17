@@ -251,20 +251,25 @@ def score_pairs(benchmark, selection, original_root, proxy_root, metric, device,
         pair_started = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="wi0193-paired-") as temp:
             png = Path(temp) / "decoded-original.png"
+            stage = "decode"
             try:
                 if max_original_long_edge is None:
                     decoder(original, photo["mediaFamily"], png)
                 else:
                     decoder(original, photo["mediaFamily"], png, max_original_long_edge)
+                stage = "original-inference"
                 source_score = float(model(str(png)).item())
+                stage = "proxy-inference"
                 proxy_score = float(model(str(proxy)).item())
+                stage = "nonfinite-score"
                 if not all(map(math.isfinite, (source_score, proxy_score))):
                     raise ArithmeticError("Non-finite model output")
                 failure = None
             except Exception:
-                # No file paths, source keys or exception messages in exports.
+                # Stage only: do not leak exception text, paths, or revisions.
+                # Existing exports retain the legacy generic error code.
                 source_score = proxy_score = None
-                failure = "decode-or-inference-failed"
+                failure = stage + "-failed"
         rows.append({
             "revisionId": photo["revisionId"],
             "mediaFamily": photo["mediaFamily"],
@@ -320,6 +325,15 @@ def summarize(result):
                                      [p["proxyScore"] for p in rows])
             }
     n = len(valid)
+    attempts_by_family = Counter(p.get("mediaFamily", "unknown") for p in photos)
+    success_by_family = Counter(p.get("mediaFamily", "unknown") for p in valid)
+    failure_by_family = {family: attempts_by_family[family] - success_by_family[family]
+                         for family in sorted(attempts_by_family)}
+    failure_by_stage = dict(sorted(Counter(
+        p.get("errorCode") or "invalid-score-without-error-code"
+        for p in photos
+        if p not in valid
+    ).items()))
     top_quartile_overlap = None
     if n >= 4:
         top_n = max(1, math.ceil(n / 4))
@@ -332,6 +346,9 @@ def summarize(result):
         "maxOriginalLongEdge": result.get("maxOriginalLongEdge"),
         "isProbe": result.get("isProbe", False),
         "scoredPairs": n, "failures": len(photos)-n,
+        "attemptsByMediaFamily": dict(sorted(attempts_by_family.items())),
+        "failuresByMediaFamily": failure_by_family,
+        "failuresByStage": failure_by_stage,
         "complete": (not result.get("isProbe", False)
                      and n == len(photos) and n >= 50),
         "spearmanOriginalVsProxy": spearman(original, proxy) if n > 2 else None,
