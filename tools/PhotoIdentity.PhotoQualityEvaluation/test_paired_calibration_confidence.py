@@ -68,7 +68,7 @@ class ConfidenceTests(unittest.TestCase):
         b = confidence(self.benchmark, self.exports, "noisy", "perfect", 100)
         self.assertEqual(a, b)
         self.assertGreater(a["rightMinusLeft"]["spearman"], 0)
-        self.assertGreater(a["rightMinusLeft"]["pairwiseAccuracy"], 0)  # Swap low/normal? 1 and 3 are two tiers apart.
+        self.assertGreater(a["rightMinusLeft"]["pairwiseAccuracy"], 0)  # Synthetic inversion spans two human tiers.
 
     def test_rejects_partial_exports(self):
         self.exports[0]["scores"].pop()
