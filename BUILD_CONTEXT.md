@@ -4,6 +4,23 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 10: proxy evaluation input decision (2026-10-17).**
+The completed metadata-only triage checked all 80 selected originals:
+all 17 failures were approximately 49–50 MP (13 RAW, 4 JPEG), whereas
+all 63 successful original-pixel pairs were at most 24.47 MP.
+No sample exists between 24.47 and 48.77 MP, and the legacy error
+code cannot distinguish decoding from inference. The incomplete 63/80,
+3-hour high-memory original study is therefore not acceptance evidence.
+For M37, use only immutable `jpeg-1600-q78` review proxies as model
+inputs (including one-shot held-out); the four existing 600-photo
+candidate exports have zero failures. No original CPU rerun or remote
+Azure T4 deployment is required. A 2560px post-decode input cap does
+not guarantee low RAW decode memory. Next: model weight SHA/size,
+license and checkpoint-to-model binding, frozen calibration-only mapping
+or no-go, one-time held-out evaluation. Very Low auto exclusion remains
+no-go. Keep existing private files and held-out human labels untouched.
+
+
 **WI-0193 checkpoint 9 (2026-10-17) pending review:** the first TOPIQ
 original/proxy CPU experiment had 17/80 failures, notably RAW=13/19
 and JPEG=4/21, versus HEIC=0/20 and PNG=0/20. Legacy generic errors
