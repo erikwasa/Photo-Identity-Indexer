@@ -4,6 +4,19 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**Checkpoint 5 pending review:** The existing catalogue-backed challenge generator now
+supports bounded `--pool-only` screening of fresh, non-benchmark images, excluding
+benchmark content SHA and deduplicating pool content. `disagreement_challenges.py`
+scores this pool (distinct input kind) with TOPIQ/MUSIQ and selects up to 20
+private, blinded candidate imports by within-pool normalized-rank disagreement,
+with deterministic tie-breaking. No maintained-archive disagreement candidates
+have yet been run/imported/reviewed. Importing 20 expands the benchmark to
+600: the four existing 580-photo candidate exports will need explicit
+reconciliation against that new benchmark before the final held-out decision.
+No automatic exclusion, production scoring, or model selection is enabled.
+M37 checkpoint PRs target `features/m37`, not `main`.
+
+
 **2026-10-17 evidence:** WI-0193 now has full private-archive benchmark score exports
 for WI-0182, TOPIQ NR, MUSIQ and ARNIQA (580/580 each, zero failures), with 238
 known-tier representative calibration reviews. MUSIQ rho=0.370/pairwise=82.8%;

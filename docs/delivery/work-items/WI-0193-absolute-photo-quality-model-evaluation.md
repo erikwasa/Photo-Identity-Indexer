@@ -135,3 +135,34 @@ pre-registered candidate/policy **before** one-time held-out analysis.
 The benchmark's held-out and challenge human labels are not part of this
 calibration analysis and must not be consulted for tuning. No archive or
 production behavior changes are authorized by this checkpoint.
+
+## Checkpoint 5: non-benchmark TOPIQ/MUSIQ disagreement challenges
+
+Added an explicit `--pool-only` mode to the existing catalogue-driven
+challenge generator. It selects a bounded technical/rarity-diverse screening
+pool of **new** current photos outside the 580-photo benchmark, without using
+the remaining 20 reserved challenge slots. The generator excludes benchmark
+revisions/content hashes and deduplicates the pool by original content SHA.
+
+The Python `disagreement_challenges.py` command scores the new candidate
+pool separately with TOPIQ NR and MUSIQ, using the same verified immutable
+review proxies and in-memory manifest. It rejects incomplete, nonfinite or
+incorrectly bound results. The private 20-photo selection uses rank
+disagreement *within that unlabeled pool*, not any representative calibration,
+held-out or challenge human rating. The output matches the existing private
+`benchmark add-challenges` interchange format and clears all human labels.
+Standard-library offline tests cover overlap, duplicate content, blind
+selection, complete score validation, SHA-checked inference and reserved-slot
+limits. See `docs/operations/photo-quality-benchmark.md` for commands.
+
+This checkpoint has **not** run the maintained-archive screening/scoring; no
+new challenge photos are claimed or reviewed. The current 580-photo candidate
+exports will require an explicit extension/reconciliation after importing
+20 new photos, so import may reasonably wait until that tooling is in place.
+The technical/rarity-diverse pool is a bounded sample, not a claim to the
+largest model disagreements in all 27k archive photos.
+
+Outstanding acceptance gates remain model-weight/license provenance,
+50–100 original-versus-proxy pairs, model/ordinal calibration freeze and
+one-shot representative held-out evaluation. No production ranking or
+automatic Very Low exclusion is added.
