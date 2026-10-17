@@ -1216,3 +1216,49 @@ for review. Keep private draft JSONs, benchmark and per-photo score
 files private. Workitem WI-0193 remains open pending an explicit
 pre-registered candidate/mapping decision and a one-time held-out
 analysis.
+
+## WI-0193 checkpoint 13: compare the unapproved three-band calibration drafts
+
+The maintainer produced two complete calibration-only drafts on
+2026-10-18 using frozen `jpeg-1600-q78` proxy scores:
+
+- TOPIQ: raw-score boundaries **0.4976193383336067** and
+  **0.5708234310150146**, **89/238** correct three-band predictions
+  (**37.39%** apparent accuracy).
+- MUSIQ: boundaries **63.076544761657715** and
+  **69.06219482421875**, **90/238** (**37.82%**).
+- Always predicting **Normal** would score **154/238 = 64.71%**
+  in-sample accuracy, but has zero ranking ability.
+
+The Low-or-below/Normal/High-or-above true group sizes are
+**41 / 154 / 43**. This imbalance makes raw accuracy alone
+misleading: additionally inspect recall/precision and balanced
+accuracy before interpreting results. The draft midpoints themselves
+should **not** be frozen; don't tune to held-out ratings.
+
+After this PR merges, compare the existing **private drafts only**:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/three_band_calibration_diagnostic.py `
+  --left private/wi0193-topiq-calibration-draft.json `
+  --right private/wi0193-musiq-calibration-draft.json
+~~~
+
+The command prints **only aggregate diagnostics**, including the
+two candidate confusion matrices, actual versus predicted band
+counts, per-class recall/precision/F1, balanced accuracy and
+constant-majority baseline. The run **does not load PyTorch,
+run inference, open image files, consult benchmark manifests,
+or access held-out/challenge labels**. If the private drafts
+were moved or renamed, supply their existing full paths.
+It is safe to share the aggregate console JSON; keep both full
+policy drafts under `private/` and never commit photo/source
+identifiers or full scored exports.
+
+The output is still **calibration-only descriptive evidence**.
+Do not unseal the 160 held-out ratings, claim safe Very Low exclusion,
+tune by trying many threshold variants on the same 238 photos,
+or select a production model until an explicit next-stage decision
+is reviewed.
