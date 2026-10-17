@@ -905,3 +905,60 @@ Using the existing Azure T4 caption GPU would require a dedicated
 pyIQA/CUDA container and privacy/architecture authorization beyond
 the 480×320-thumbnail captioning exception; it is not yet an approved
 drop-in replacement. The final held-out labels remain untouched.
+
+## WI-0193 checkpoint 9: diagnose 17 failed original pairs without inference
+
+The aggregate TOPIQ report from the completed unbounded 80-photo run confirms:
+**JPEG 4/21 failed**, **RAW 13/19 failed**, and **HEIC 0/20** and
+**PNG 0/20** failed. Only 63/80 original/proxy comparisons succeeded.
+The old score file has `decode-or-inference-failed` for all 17 and
+**cannot distinguish decoding problems from CPU-memory/model failures**.
+Retain this evidence; do not rerun the three-hour unbounded models.
+
+The opt-in `original_proxy_metadata_triage.py` script examines **original
+file metadata only** for these 17 failed pairs. It verifies the complete
+frozen selected benchmark/score ordering without touching held-out or
+human-review labels, and validates each original's source SHA-256 before
+opening its header. It then obtains JPEG/HEIC/PNG dimensions via Pillow,
+and RAW dimensions via `rawpy`, **without pixel rendering or quality
+model inference**. This remains much lighter than full-resolution scoring,
+but reading RAW file metadata can still require some memory.
+
+From the repository root on the latest `features/m37`, with your original
+root environment variable set:
+
+~~~powershell
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_original_proxy_metadata_triage.py"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/original_proxy_metadata_triage.py `
+  --input private/photo-quality-benchmark.json `
+  --selection private/wi0193-original-proxy-selection.json `
+  --scores private/wi0193-original-proxy-topiq_nr.json `
+  --original-root "$env:PhotoIdentity__OriginalPhotoRoot" `
+  --scope failed
+~~~
+
+Expect `selectedPairs=80`, `previousFailures=17`, and
+`metadataChecked=17` if source integrity is intact. The report contains
+**only aggregate counts and megapixel/file-size statistics grouped by
+media family and previous success/failure status**. No filenames, source
+keys, revisions, scores or human labels are printed. A missing/modified
+original is an integrity hard stop, not an inferred quality-model failure.
+Individual header-readability errors are counted as `headerUnavailable`
+without exposing exception strings or per-file information.
+
+If necessary for size comparisons, opt into `--scope all` to examine
+**all 80 original headers**, comparing successful and failed photo size
+distributions under the same immutable selection. Do **not** include or
+export per-photo identities with the aggregate report.
+
+**Interpretation:** a readable image header does not demonstrate
+successful full RAW/JPEG pixel decoding; an original whose metadata is
+large may stress both decoder and model inference. This tool cannot
+retrospectively recover the precise stage of the prior 17 failures.
+Do not replace/swap images, relabel `Unsure` or consult held-out data
+to improve the result. Avoid initiating further full-resolution CPU
+inference until a safe bounded pilot or separately approved GPU
+evaluation is justified.
