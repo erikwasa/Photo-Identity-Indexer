@@ -166,3 +166,37 @@ Outstanding acceptance gates remain model-weight/license provenance,
 50–100 original-versus-proxy pairs, model/ordinal calibration freeze and
 one-shot representative held-out evaluation. No production ranking or
 automatic Very Low exclusion is added.
+
+## Checkpoint 6: strict reconciliation after importing 20 disagreement challenges
+
+Added `reconcile_quality_scores.py`, a private, offline reconciliation
+utility that validates the explicit **pre-import 580-photo benchmark snapshot**,
+the **post-import 600-photo benchmark** and the exact **20-photo selected
+challenge file**. It rejects changed frozen core pixels/metadata/ordering,
+mismatched benchmark IDs, altered representative partition counts, content
+overlap, unexpected challenge provenance and incomplete/duplicate candidate
+score exports.
+
+For TOPIQ NR and MUSIQ, the script extracts only the selected 20 score rows
+from the previously scored non-benchmark screening pool and combines them
+with the original full 580. For ARNIQA, it offers a verified selected-only
+inference runner over just the 20 new proxies. WI-0182 remains fast enough to
+rerun over all 600. This avoids paying for another 580-photo learned-model
+pass while preserving the complete score coverage required by the existing
+calibration tools. Supplemental candidate identity/direction/device/version
+metadata must match the original score export exactly.
+
+The original 580-photo benchmark snapshot and four score exports are
+preserved, not overwritten. The resulting new 600-photo score exports have
+a reconciliation protocol and explicitly identify `totalElapsedMilliseconds`
+as the sum of per-image runtimes rather than end-to-end wall time. Neither
+the new tool nor its synthetic tests reads held-out or challenge human
+labels for calibration/selection. The existing blinded reviewer handles
+diagnostic labels for imported cases. See the updated operational runbook.
+
+**Maintainer execution still pending:** generate/score the distinct pool,
+select 20, explicitly back up the benchmark before importing, import 20,
+extend three learned score exports, rerun baseline and inspect aggregate
+audit results. Weight-license provenance and proxy/original assessment are
+still outstanding; no model is selected and automatic exclusion remains
+unsupported.
