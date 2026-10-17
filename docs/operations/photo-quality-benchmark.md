@@ -962,3 +962,37 @@ Do not replace/swap images, relabel `Unsure` or consult held-out data
 to improve the result. Avoid initiating further full-resolution CPU
 inference until a safe bounded pilot or separately approved GPU
 evaluation is justified.
+
+## WI-0193 checkpoint 10: settle the original/proxy processing path
+
+The final `--scope all` metadata-only diagnostic inspected headers for
+all **80/80** original photos with **zero unreadable headers**. Exactly
+**17/17** originals at roughly 49–50 megapixels failed in the earlier
+uncapped original-versus-proxy TOPIQ experiment (RAW 13, JPEG 4).
+Exactly **63/63** lower-resolution originals scored successfully (up to
+24.47 MP, across JPEG, HEIC, PNG and RAW). There were no tested originals
+between 24.47 and 48.77 MP. The old errors combine decoding and
+inference, so this is not evidence of a specific codec defect or a
+precise safe megapixel threshold. The 63-success rank correlation
+and 25% top-quartile overlap are incomplete/decoder-confounded.
+
+**Operator decision:** stop full-original CPU quality-model evaluation
+for WI-0193 and preserve the `jpeg-1600-q78` proxy as the sole input to
+model calibration and eventual one-shot held-out assessment. The
+existing 600-photo proxy exports are complete and require **no
+rescoring**. There is no action required from the maintainer for
+original-image analysis. Keep all exports and the frozen benchmark
+unchanged; do not rerun the 80-image originals study on CPU or
+upload originals to the Azure caption bridge.
+
+Proceed instead to weight-checkpoint provenance from checkpoint 4:
+verify downloaded weight file SHA-256 and byte size, candidate-to-file
+mapping, license for the **checkpoint itself**, plus PyTorch/pyIQA
+versions. Never assume the pyiqa package license extends to the model
+weight file. Then pre-register a calibration-only ordinal policy or
+explicit model no-go before looking at held-out human ratings.
+The very low automatic exclusion criterion remains a separate no-go.
+
+The `--max-original-long-edge` option resizes after original decoding,
+so it may reduce inference memory but cannot guarantee RAW decoding
+will stay below a memory limit.

@@ -396,3 +396,11 @@ endpoint. Any remote original/proxy scoring still requires a separately
 authorized, secure pixel transport and pinned CUDA model workload,
 not reuse of the existing Ollama thumbnail exception. Defer additional
 full-res CPU runs and keep automatic exclusion at no-go.
+
+## Checkpoint 10: original-resolution diagnostic and selected evaluation input
+
+The maintainer's complete 80-photo header-only comparison found all **17/17** original-pixel TOPIQ failures were images over 40 megapixels (JPEG 4/4 failed around 50 MP; RAW 13/13 failed around 49 MP). All **63/63** originals that had scored successfully were at most 24.47 MP (JPEG 17, HEIC 20, PNG 20, RAW 6). All 80 source headers were readable and passed frozen original SHA verification. No photos between 24.47 and 48.77 MP were represented, so this does not prove a numerical failure cutoff or whether decode or model inference caused the failures. The high-resolution result is incomplete (63/80 pairs), decoder-confounded, costly and unsuitable as acceptance evidence.
+
+**Evaluation input decision:** retain the frozen `jpeg-1600-q78` review proxy as the WI-0193 model input, including for the one-shot future held-out evaluation. Four existing proxy candidate exports cover all 600 benchmark photos with zero inference failures. No full-resolution CPU retry or new Azure GPU work is justified as a prerequisite to the proxy-based model assessment. An optional long-edge cap currently applies after decoding and does not guarantee low memory use for full-resolution RAW decoding. Remote original-image inference remains outside the caption-only Azure authorization.
+
+Next: capture model checkpoint hashes, mapping and third-party licensing; freeze a versioned calibration-only ordinal map and either a candidate choice or explicit no-go before consulting held-out human ratings; evaluate the held-out set once. The calibration sample has only three Very Low ratings and automatic exclusion remains **no-go**. This checkpoint does not select or deploy a production model, change any held-out labels, or commit private image/score data.
