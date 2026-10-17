@@ -280,3 +280,59 @@ maintainer-observed context, not a separately verified content classification.
 The immediate next evidence remains the 50–100 paired original-versus-proxy
 run, then checkpoint weight provenance and a frozen explicit acceptance or
 no-go policy before evaluating held-out ratings.
+
+## Checkpoint 7 resource-pressure follow-up (2026-10-17)
+
+On maintainer Windows hardware, the initial TOPIQ/MUSIQ
+full-resolution original-vs-proxy CPU run lasted nearly one hour
+with RAM at ~99% and disk saturated. It did not expose any progress
+after pyiqa model-loading because the per-photo loop had no logging.
+The user was advised to cancel if sustained paging persisted.
+The script is read-only for originals/benchmark and creates final
+private per-model output only after all pairs finish.
+
+Add a per-pair privacy-preserving progress log, optional 1–10 pair
+probe mode and optional source-original 1601–12000px long-edge cap
+(e.g. 2560) to make re-evaluation bounded and observable.
+Probe exports explicitly report `isProbe=true` and cannot pass
+`complete` acceptance. Capped originals are **not** full-resolution
+model inputs; RAW/HEIC decoding still has some temporary
+original-size memory cost. Comparisons must explicitly distinguish
+capped studies from full-resolution studies and not silently replace
+the original 80-photo protocol. Run a two-pair cap probe first and
+evaluate memory/throughput before any second full 80-pair attempt.
+No production filtering, calibration or held-out evaluation changes.
+
+## GPU option: reuse Azure Container Apps capacity, not caption inference service
+
+The maintainer confirmed retained GPU infrastructure from the caption
+burst. The proven configuration in
+`docs/operations/azure-caption-burst-bridge.md` used **Azure Container Apps
+with one NVIDIA T4**, hosting an **Ollama `qwen2.5vl:3b` caption server**.
+This is not an IQA endpoint and cannot score TOPIQ/MUSIQ by changing
+`original_proxy_study.py --device` or pointing it at the Ollama bridge.
+The Azure workload profile/registry may be reusable, but an independently
+built, pinned Python/PyTorch/`pyiqa` CUDA workload and an authenticated
+bounded input/output channel would be needed. GPU VRAM is not unlimited
+(standard NVIDIA T4: 16 GiB); true full-resolution photos can exhaust it.
+GPU use must be proven with a 1–2 image resource-limited smoke test.
+
+**Architecture/privacy gate:** ADR-0011 authorizes only explicitly
+operator-triggered remote **480×320 caption thumbnails**. It expressly
+does *not* authorize sending original photos, original pixel renders,
+review proxies for IQA, source paths/identifiers, or other archive data
+to the Azure service. Before any remote original/proxy comparison,
+require an explicit operator privacy decision and a new/updated
+architecture authorization defining exactly which image bytes may
+leave the PC, minimization, retention, transport security and access
+restrictions. Keep PostgreSQL, identity metadata, local review labels,
+paths and per-photo evaluation scores off the remote inference service.
+Do not modify or endanger the working caption deployment merely
+to run this experiment. Account for T4 costs and restore scale-to-zero.
+
+**Current priority:** Observe the already-running CPU batch while
+temporary per-image folders are changing; it is progressing, though
+possible Windows paging makes throughput poor. PR #565's local
+2-pair progress/capped-input probe remains the lowest-risk next
+experiment. A remote pyIQA job is a separately scoped potential
+follow-up, **not implemented or approved** by WI-0193 checkpoint 7.

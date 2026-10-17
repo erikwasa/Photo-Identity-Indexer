@@ -121,6 +121,44 @@ class StudyTests(unittest.TestCase):
         self.assertNotIn(str(self.root), raw)
         self.assertNotIn("revision-80", raw)
 
+    def test_probe_and_resolution_cap_are_explicit_and_incomplete(self):
+        selection = select_pairs(self.benchmark)
+        caps = []
+
+        def decoder(_original, _family, dest, cap):
+            caps.append(cap)
+            dest.write_bytes(b"simulated-bounded-pixels")
+
+        result = score_pairs(
+            self.benchmark, selection, self.original, self.proxy,
+            "musiq", "cpu", str(self.root / "private" / "bounded-probe.json"),
+            metric_factory=lambda _name, _device:
+                lambda path: Scalar(0.8 if "decoded-original" in path else 0.4),
+            decode_factory=decoder,
+            max_original_long_edge=2560,
+            probe_pairs=2)
+        report = summarize(result)
+        self.assertEqual(caps, [2560, 2560])
+        self.assertEqual(report["sampleCount"], 2)
+        self.assertEqual(report["plannedPairs"], 80)
+        self.assertEqual(report["maxOriginalLongEdge"], 2560)
+        self.assertTrue(report["isProbe"])
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["failures"], 0)
+        self.assertEqual(len(result["photos"]), 2)
+
+    def test_probe_and_resolution_cap_validation(self):
+        selection = select_pairs(self.benchmark)
+        for kwargs in ({"probe_pairs": 0}, {"probe_pairs": 11},
+                       {"max_original_long_edge": 1600},
+                       {"max_original_long_edge": 12001}):
+            with self.assertRaises(ValueError):
+                score_pairs(
+                    self.benchmark, selection, self.original, self.proxy,
+                    "musiq", "cpu", str(self.root / "private" / "never.json"),
+                    **kwargs)
+        self.assertFalse((self.root / "private" / "never.json").exists())
+
     def test_original_path_traversal_rejected(self):
         with self.assertRaisesRegex(ValueError, "source key"):
             safe_original(self.original, "../secret.jpg", "x" * 64)

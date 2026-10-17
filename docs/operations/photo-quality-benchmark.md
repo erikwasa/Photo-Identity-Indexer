@@ -753,3 +753,84 @@ keys, original images, temporary renders or paired per-photo score JSONs.
 No challenge/held-out labels are used for model/threshold selection. This
 experiment does not freeze calibration, endorse an exclusion policy, or
 authorize the final one-shot held-out comparison.
+
+## WI-0193 checkpoint 7 safety follow-up: progress and memory-bounded original scoring
+
+A maintainer Windows run of the initial full-resolution TOPIQ/MUSIQ
+`original_proxy_study.py score` consumed nearly all RAM and saturated
+disk paging for approximately one hour. The previous runner printed no
+per-photo progress and saved its private result **only after an entire
+model's batch completed**. At that utilization, cancelling with Ctrl+C
+is reasonable; originals and the 600-photo benchmark are read-only.
+Completed per-model export files are preserved, while unfinished
+per-model work needs restarting. Do not blindly repeat the same
+unbounded two-model command.
+
+The runner now reports model initialization and *each completed pair*
+with status and elapsed seconds, without private paths or photo IDs.
+It additionally supports these **explicit opt-in safeguards**:
+
+- `--probe-pairs N` for **1–10** first-pair diagnostic inference runs.
+  A probe writes its own **new private file** and reports
+  `isProbe=true`, `complete=false`. A probe cannot be used as a
+  50–100 photo acceptance result.
+- `--max-original-long-edge 2560` bounds the RGB original **model
+  input** to at most 2560 pixels on the long edge, while the review
+  proxy remains 1600 pixels. This is *not full-resolution inference*:
+  explicitly report the cap and interpret the results as
+  2560px-original-render-versus-proxy sensitivity. The original
+  decode (especially RAW demosaicing) may still temporarily use
+  considerable memory. Omit the option only on adequately provisioned
+  hardware or in a separate constrained experiment.
+
+### Recommended Windows restart after cancelling the resource-heavy run
+
+Verify which complete model exports already exist, **without reading their
+private per-photo rows into chat**:
+
+~~~powershell
+foreach ($metric in @("topiq_nr", "musiq")) {
+    $file = "private/wi0193-original-proxy-$metric.json"
+    if (Test-Path -LiteralPath $file) {
+        $report = & $python tools/PhotoIdentity.PhotoQualityEvaluation/original_proxy_study.py report `
+          --scores $file
+        "Completed result present for $metric (review aggregate report above)"
+    } else {
+        "No completed result for $metric"
+    }
+}
+~~~
+
+First, run a two-pair **bounded diagnostic** with a distinct private
+output filename:
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/original_proxy_study.py score `
+  --input private/photo-quality-benchmark.json `
+  --selection private/wi0193-original-proxy-selection.json `
+  --original-root "$env:PhotoIdentity__OriginalPhotoRoot" `
+  --proxy-root "$env:PhotoIdentity__ReviewProxyRoot" `
+  --metric topiq_nr --device cpu `
+  --probe-pairs 2 `
+  --max-original-long-edge 2560 `
+  --output private/wi0193-original-proxy-topiq-probe-2560.json `
+  --accept-third-party-weights
+~~~
+
+Expect two `pair N/2` console updates. The report must say
+`isProbe=true`, `sampleCount=2`, `plannedPairs=80`,
+`maxOriginalLongEdge=2560`, `complete=false`. Inspect RAM and disk
+usage during the probe. Only if that remains tolerable should you
+attempt an 80-photo **2560px-bounded** run for TOPIQ and then MUSIQ
+separately. Use distinct filenames
+`private/wi0193-original-proxy-topiq_nr-2560.json` and
+`private/wi0193-original-proxy-musiq-2560.json`; original export files
+are never overwritten. The script prints each pair's progress, but
+results still commit only at completion of the per-model batch.
+
+A completed full-resolution result and a capped-resolution result are
+**different experimental conditions** and should never be compared
+as if they were the same. Record memory, score throughput, decoder
+failures and the explicit input cap. If the probe itself pushes RAM
+near 100% and causes sustained paging, stop and reconsider the
+experiment rather than increasing the number of photos.
