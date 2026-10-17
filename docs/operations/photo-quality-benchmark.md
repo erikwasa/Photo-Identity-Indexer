@@ -1116,3 +1116,16 @@ The proposed mapping and model must be reviewed and **explicitly
 frozen in a separate checkpoint** before any one-time held-out
 quality-label evaluation. An output under `private/` is not a sealed
 or preregistered policy simply because it has fixed thresholds.
+
+### Separate framework and model-weight licensing gate
+
+The official `pyiqa 0.1.16` PyPI metadata declares
+`PolyForm-Noncommercial-1.0.0`:
+https://pypi.org/project/pyiqa/0.1.16/.
+The upstream repository also mentions component-specific NTU S-Lab
+terms: https://github.com/chaofengc/IQA-PyTorch.
+Neither statement determines rights to deploy or redistribute any
+specific TOPIQ, MUSIQ or ARNIQA pretrained **weight checkpoint**.
+A hash and filename are proof of file identity, not license
+permission. Independently record each checkpoint's rights and the
+intended application use before any production model decision.
