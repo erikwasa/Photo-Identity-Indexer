@@ -392,3 +392,114 @@ filesystem paths. It records the local Python and installed `pyiqa` package
 versions, but does not determine independent third-party weight licenses or
 whether a specific model actually used that checkpoint. Resolve these
 questions separately before any production deployment decision.
+
+## WI-0193 checkpoint 5: select remaining 20 new disagreement challenges
+
+This evaluation-only workflow finds **new photos outside the frozen benchmark**
+before comparing TOPIQ and MUSIQ. The original 580 photo candidate scores
+cannot populate the remaining 20 slots because their revisions are already
+in the benchmark. We first generate a **bounded, technical/rarity-diverse**
+non-benchmark screening pool. The final 20 are selected by model *rank
+disagreement within that pool*, **not** by their human labels. This is a
+diagnostic pool-screening procedure, not proof that these are the 20 most
+disputed photos across the entire archive.
+
+### Step 1: generate a non-benchmark candidate pool
+
+From the repository root, with maintained PostgreSQL connection, review proxy
+root and profile already configured as for WI-0192:
+
+~~~powershell
+$env:PhotoIdentity__ReviewProxyProfileId = "jpeg-1600-q78"
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark generate-challenges `
+  --input private/photo-quality-benchmark.json `
+  --output private/wi0193-disagreement-pool.json `
+  --count 160 `
+  --pool-only
+~~~
+
+**Do not import this file** with `benchmark add-challenges`: it contains
+up to 160 screened candidates, while the benchmark reserve has only 20
+remaining slots. The generator verifies proxy bytes, excludes existing
+benchmark revision IDs and content hashes, and selects deterministically
+across technical-extreme/rarity buckets. It also deduplicates pool candidates
+by original content hash.
+
+### Step 2: score the new screening pool
+
+Use the existing optional Python/pyiqa virtual environment from checkpoint 2.
+Scoring is CPU-capable, explicitly consents to third-party weights, verifies
+each frozen proxy SHA-256, and writes **new private** score exports.
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/disagreement_challenges.py score `
+  --input private/photo-quality-benchmark.json `
+  --pool private/wi0193-disagreement-pool.json `
+  --proxy-root "$env:PhotoIdentity__ReviewProxyRoot" `
+  --metric topiq_nr --device cpu `
+  --output private/wi0193-pool-topiq-scores.json `
+  --accept-third-party-weights
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/disagreement_challenges.py score `
+  --input private/photo-quality-benchmark.json `
+  --pool private/wi0193-disagreement-pool.json `
+  --proxy-root "$env:PhotoIdentity__ReviewProxyRoot" `
+  --metric musiq --device cpu `
+  --output private/wi0193-pool-musiq-scores.json `
+  --accept-third-party-weights
+~~~
+
+The pool scoring export uses `inputKind=review-proxy-disagreement-pool` and
+is **not** a regular full-benchmark score export. Do not feed it to the
+calibration audit as a replacement for the original 580-photo export.
+
+### Step 3: select the 20 most disputed pool items
+
+~~~powershell
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_disagreement_challenges.py"
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/disagreement_challenges.py select `
+  --input private/photo-quality-benchmark.json `
+  --pool private/wi0193-disagreement-pool.json `
+  --topiq-scores private/wi0193-pool-topiq-scores.json `
+  --musiq-scores private/wi0193-pool-musiq-scores.json `
+  --count 20 `
+  --output private/wi0193-disagreement-challenges.json
+~~~
+
+The selector validates the matching benchmark IDs, expected model names,
+pool score input kinds and full finite-score coverage. It rejects any
+inference failure rather than silently steering selection toward scored
+items. Selection uses the *absolute difference of within-pool percentile
+ranks*, with a stable SHA-256 tie-breaker, and never reads human labels from
+any benchmark partition. It leaves all selected human review fields blank.
+Outputs contain private source/proxy metadata and must not be committed.
+
+### Step 4: import only when ready to extend score exports
+
+The challenge importer is already implemented:
+
+~~~powershell
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark add-challenges `
+  --input private/photo-quality-benchmark.json `
+  --candidates private/wi0193-disagreement-challenges.json
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- benchmark review `
+  --input private/photo-quality-benchmark.json
+~~~
+
+**IMPORTANT:** Once 20 cases are imported, the benchmark will contain 600
+photos. The four original candidate score exports cover **580** photos and
+will no longer pass the full-benchmark coverage check against the extended
+manifest. Keep a private backup of the 580-photo manifest/exports and do not
+mistake the resulting validation rejection for a model failure. A follow-up
+checkpoint will provide score-export extension/reconciliation for the 20
+new photos before final held-out evaluation. It is reasonable to postpone
+this import until that checkpoint. The 240 calibration and 160 held-out
+representative photos remain frozen in either case. Do not change the
+calibration policy after inspecting the blinded challenge ratings.
+
+As everywhere in WI-0193: no quality scores are persisted to production,
+no normal photos are automatically excluded, and no held-out human labels
+are read during candidate screening/selection.
