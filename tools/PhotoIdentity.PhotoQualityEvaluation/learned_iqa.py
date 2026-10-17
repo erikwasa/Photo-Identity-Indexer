@@ -60,8 +60,10 @@ def p95(values: list[float], fraction: float) -> float:
     return values[max(0, math.ceil(fraction * len(values)) - 1)]
 
 
-def run(args: argparse.Namespace, metric_factory=None) -> dict:
-    manifest = json.loads(Path(args.input).read_text(encoding="utf-8"))
+def run(args: argparse.Namespace, metric_factory=None, manifest_override=None,
+        input_kind="review-proxy") -> dict:
+    manifest = (json.loads(Path(args.input).read_text(encoding="utf-8"))
+                if manifest_override is None else manifest_override)
     if manifest.get("schemaVersion") not in (1, 2):
         raise ValueError("Unsupported benchmark schema.")
     photos = manifest.get("photos")
@@ -140,7 +142,7 @@ def run(args: argparse.Namespace, metric_factory=None) -> dict:
             "modelSizeBytes": None,
             "executionProvider": args.device
         },
-        "inputKind": "review-proxy",
+        "inputKind": input_kind,
         "higherIsBetter": True,
         "photoCount": len(scores),
         "runtime": {
