@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from checkpoint_provenance import inventory
+from checkpoint_provenance import discover, inventory, candidate_hint
 
 
 class CheckpointProvenanceTests(unittest.TestCase):
@@ -31,6 +31,48 @@ class CheckpointProvenanceTests(unittest.TestCase):
             inventory(["not-a-model=" + str(self.path)])
         with self.assertRaises(ValueError):
             inventory(["topiq_nr=" + str(self.path.with_name("absent.pth"))])
+
+    def test_cache_scan_returns_hashes_without_paths_or_false_licensing(self):
+        for name in (
+            "cfanet_nr_koniq_res50-9a73138b.pth",
+            "musiq_koniq_ckpt-e95806b9.pth",
+            "arniqa_candidate.safetensors"):
+            (self.path.parent / name).write_bytes(name.encode("ascii"))
+        result = discover(self.path.parent)
+        self.assertEqual(result["mode"], "cache-discovery-unverified")
+        self.assertEqual(result["artifactCount"], 4)
+        by_name = {row["artifactName"]: row for row in result["artifacts"]}
+        self.assertEqual(
+            by_name["cfanet_nr_koniq_res50-9a73138b.pth"]["candidateHints"],
+            ["topiq_nr"])
+        self.assertEqual(
+            by_name["musiq_koniq_ckpt-e95806b9.pth"]["candidateHints"],
+            ["musiq"])
+        for row in result["artifacts"]:
+            self.assertEqual(row["licenseStatus"], "not-verified")
+            self.assertFalse(row["mappingVerified"])
+            self.assertEqual(len(row["sha256"]), 64)
+        self.assertNotIn(str(self.path.parent), str(result))
+        self.assertIn("packageVersions", result)
+
+    def test_cache_scan_requires_checkpoint_artifacts(self):
+        empty = self.path.parent / "empty"
+        empty.mkdir()
+        with self.assertRaisesRegex(ValueError, "No checkpoint artifacts"):
+            discover(empty)
+
+    def test_unknown_filename_is_not_misidentified_as_candidate(self):
+        self.assertEqual(candidate_hint("some_generic_model.pth"), [])
+
+    def test_symlinks_not_included_if_os_supports_them(self):
+        link = self.path.parent / "linked.pth"
+        try:
+            link.symlink_to(self.path)
+        except (OSError, NotImplementedError):
+            self.skipTest("Symlinks unavailable for this test environment")
+        result = discover(self.path.parent)
+        self.assertNotIn("linked.pth",
+                         [row["artifactName"] for row in result["artifacts"]])
 
     def test_empty_checkpoint_rejected(self):
         self.path.write_bytes(b"")

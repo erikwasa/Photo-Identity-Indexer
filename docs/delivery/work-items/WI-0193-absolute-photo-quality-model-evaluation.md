@@ -404,3 +404,50 @@ The maintainer's complete 80-photo header-only comparison found all **17/17** or
 **Evaluation input decision:** retain the frozen `jpeg-1600-q78` review proxy as the WI-0193 model input, including for the one-shot future held-out evaluation. Four existing proxy candidate exports cover all 600 benchmark photos with zero inference failures. No full-resolution CPU retry or new Azure GPU work is justified as a prerequisite to the proxy-based model assessment. An optional long-edge cap currently applies after decoding and does not guarantee low memory use for full-resolution RAW decoding. Remote original-image inference remains outside the caption-only Azure authorization.
 
 Next: capture model checkpoint hashes, mapping and third-party licensing; freeze a versioned calibration-only ordinal map and either a candidate choice or explicit no-go before consulting held-out human ratings; evaluate the held-out set once. The calibration sample has only three Very Low ratings and automatic exclusion remains **no-go**. This checkpoint does not select or deploy a production model, change any held-out labels, or commit private image/score data.
+
+## Checkpoint 11: checkpoint provenance and calibration-only draft preparation
+
+Following acceptance of the `jpeg-1600-q78` proxy as the fixed M37
+evaluation input, introduce a *non-inference*, fully local provenance
+preflight and an explicitly unapproved calibration-only mapping
+proposal. This checkpoint has **not** selected a candidate or
+unblinded the held-out benchmark.
+
+- `checkpoint_provenance.py --cache-root` inventories downloaded
+  PyTorch/pyIQA weight artifact basenames, file hashes and byte sizes,
+  plus local Python, pyIQA, torch, torchvision, Pillow, rawpy and
+  pillow-heif versions. File-name-derived TOPIQ/MUSIQ/ARNIQA hints
+  are **not** a verified model-to-artifact mapping. The older explicit
+  `--checkpoint name=path` form remains available and records
+  **not-verified** license/mapping status. Neither mode loads weights,
+  downloads from the network, reads private photos or grants
+  deployment rights. Third-party checkpoint licenses must be checked
+  independently; package license is insufficient.
+- `calibration_policy_draft.py` checks exact benchmark/score coverage
+  and immutable proxy input, then examines **only** reviewed, known-tier
+  representative calibration labels. For a manually supplied candidate
+  export, it calculates monotone Low/Normal/High median anchors and
+  their two absolute raw-score midpoint thresholds. The resulting
+  coarse **three-band** ordinal proposal is a diagnostic starting
+  point, not the full five-tier acceptance target. It rejects missing
+  or non-monotone anchor evidence and reports in-sample confusion
+  without per-photo rows. No held-out or challenge ratings are
+  accessed. Tests deliberately mutate held-out/challenge ratings to
+  verify invariance.
+- Every draft is marked `research-draft-not-frozen` and hardcodes
+  `heldOutEvaluationAllowed=false`,
+  `productionModelApproved=false`, and
+  `automaticVeryLowExclusionApproved=false`. It does **not**
+  select between MUSIQ/TOPIQ, assert a valid weight license, freeze
+  any policy, permit final held-out evaluation or enable automatic
+  exclusion.
+- The maintainer should run local cache inventory and separate
+  candidate drafts with the existing 600-photo score exports, then
+  share **aggregate-only** console evidence and independent weight
+  licensing verification. Only in the *next* checkpoint, after
+  independent mapping/licensing review, should a candidate/mapping
+  decision be explicitly sealed or rejected **before** the one-time
+  held-out evaluation. The held-out labels remain untouched.
+
+No production code, archive data, score exports, photo rating labels,
+or app collection/search/exclusion behavior changes in checkpoint 11.
