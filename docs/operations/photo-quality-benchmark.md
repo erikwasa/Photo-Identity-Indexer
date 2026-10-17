@@ -834,3 +834,74 @@ as if they were the same. Record memory, score throughput, decoder
 failures and the explicit input cap. If the probe itself pushes RAM
 near 100% and causes sustained paging, stop and reconsider the
 experiment rather than increasing the number of photos.
+
+## WI-0193 checkpoint 8: diagnostic follow-up to resource-heavy original study
+
+The maintainer's 2026-10-17 **uncapped original-pixel** study ran for
+approximately three hours with high CPU, saturated RAM/disk and paging.
+The first model, TOPIQ NR, **finished the entire 80-photo loop** and wrote
+its result; however only **63/80** paired photo scores succeeded, and
+**17/80** reported the legacy generic `decode-or-inference-failed` error.
+The second model, MUSIQ, was explicitly interrupted during its transformer
+inference and wrote **no completed per-model result**.
+
+TOPIQ's *successful-only* summary was: original/proxy Spearman **0.62356**,
+median proxy-minus-original score **+0.10410**, median absolute shift
+**0.10410**, and top-quartile overlap **0.25**. Valid pairs by format were
+JPEG 17, HEIC 20, PNG 20 and RAW 6. These figures are **not a complete
+or population-representative result**; missingness is concentrated in
+JPEG/RAW, and independent source decoders may change color/tone/orientation.
+The 600-photo calibration results and no-automatic-exclusion policy are
+unchanged. This observation does not establish any model's accuracy on
+originals, nor a need to re-run an unbounded MUSIQ comparison.
+
+### Find the completed TOPIQ export from the correct working directory
+
+The old scoring run started from the repository root, but the later file
+presence check ran from the operator's Windows user-profile directory.
+The output path `private/wi0193-original-proxy-topiq_nr.json` is relative
+to **the working directory of the scoring process**, not the directory
+holding `original_proxy_study.py`. The successfully printed JSON
+summary proves TOPIQ returned from its scoring function, which writes
+its output before reporting.
+
+~~~powershell
+$repo = "C:\Kod\codex\Photo Identity Indexer"
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+$path = Join-Path $repo "private\wi0193-original-proxy-topiq_nr.json"
+
+Test-Path -LiteralPath $path
+if (Test-Path -LiteralPath $path) {
+    & $python (Join-Path $repo "tools\PhotoIdentity.PhotoQualityEvaluation\original_proxy_study.py") report `
+      --scores $path
+}
+~~~
+
+**Do not re-run TOPIQ** just to recover the aggregate from its existing
+output. The revised `report` command now also displays
+`attemptsByMediaFamily`, `failuresByMediaFamily`, and
+`failuresByStage`. It can reconstruct **format-level failure counts**
+from the *existing* TOPIQ private JSON, without decoding anything or
+running any model. Old generic `decode-or-inference-failed` codes cannot
+retrospectively reveal the exact failing processing stage. New runs
+distinguish `decode-failed`, `original-inference-failed`,
+`proxy-inference-failed`, and `nonfinite-score-failed`
+**without including any error message, source filename or path**.
+
+The unauthenticated Hugging Face warning is nonfatal when the checkpoint
+loads from cache; a `multiprocess.resource_tracker` shutdown warning
+does not explain the earlier 17 paired failures. The MUSIQ traceback
+ends with the operator's `KeyboardInterrupt`, not evidence that
+MUSIQ's quality metrics failed.
+
+### Decision
+
+Do not initiate another unbounded three-hour CPU run. The 600-photo
+proxy inference exports still have zero failures; this is a **separate
+full-resolution/decoder stress test**. Inspect the aggregate failure
+breakdown, retain all private exports and consider a bounded 2-pair
+probe from PR #565 before selecting a different local study protocol.
+Using the existing Azure T4 caption GPU would require a dedicated
+pyIQA/CUDA container and privacy/architecture authorization beyond
+the 480×320-thumbnail captioning exception; it is not yet an approved
+drop-in replacement. The final held-out labels remain untouched.
