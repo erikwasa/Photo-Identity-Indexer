@@ -92,6 +92,14 @@ class CalibrationPolicyDraftTests(unittest.TestCase):
         b = calibration_draft(self.benchmark, self.export)
         self.assertEqual(a, b)
 
+    def test_calibration_label_fingerprint_changes_only_for_calibration(self):
+        first = calibration_draft(self.benchmark, self.export)
+        self.benchmark["photos"][0]["review"]["qualityLevel"] = "normal"
+        second = calibration_draft(self.benchmark, self.export)
+        self.assertNotEqual(first["calibrationReviewSha256"],
+                            second["calibrationReviewSha256"])
+        self.assertEqual(first["scoreExportSha256"], second["scoreExportSha256"])
+
     def test_rejects_incomplete_candidate_export(self):
         self.export["scores"].pop()
         with self.assertRaises(ValueError):
