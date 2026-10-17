@@ -92,45 +92,82 @@ def candidate_hint(name):
         hints.append("topiq_nr")
     if "musiq" in stem:
         hints.append("musiq")
-    if "arniqa" in stem:
+    if "arniqa" in stem or stem == "regressor_koniq10k.pth":
         hints.append("arniqa")
     return hints
 
 
-def discover(cache_root):
-    """Inventory cache artifacts locally, with no network or model import."""
-    root = Path(cache_root).expanduser().resolve(strict=True)
-    if not root.is_dir():
-        raise ValueError("Checkpoint cache root must be a directory")
+def role_hint(name):
+    stem = name.casefold()
+    if stem == "arniqa.pth":
+        return "possible-arniqa-encoder"
+    if stem == "regressor_koniq10k.pth":
+        return "possible-arniqa-koniq-regressor"
+    if stem.startswith("resnet50-"):
+        return "possible-torchvision-backbone-not-arniqa-proof"
+    return "unverified-weight-artifact"
+
+
+def discover(cache_root, additional_cache_roots=()):
+    """Inventory multiple explicit cache roots without model import or network."""
+    root_inputs = (cache_root, *additional_cache_roots)
+    if not root_inputs:
+        raise ValueError("Supply a primary local cache root")
+    roots = []
+    for item in root_inputs:
+        root = Path(item).expanduser().resolve(strict=True)
+        if not root.is_dir():
+            raise ValueError("Checkpoint cache root must be a directory")
+        if root in roots:
+            raise ValueError("Duplicate cache directory")
+        roots.append(root)
+
+    # Aggregate only basenames/size/hash/hints, never filesystem root paths.
     paths = []
-    for path in root.rglob("*"):
-        if path.is_symlink() or path.is_junction():
-            continue
-        if path.suffix.casefold() not in SUFFIXES:
-            continue
-        if not path.resolve().is_relative_to(root):
-            raise ValueError("Candidate weight path outside cache")
-        if path.is_file():
-            paths.append(path)
+    seen = set()
+    for index, root in enumerate(roots):
+        for path in root.rglob("*"):
+            if path.is_symlink() or path.is_junction():
+                continue
+            if path.suffix.casefold() not in SUFFIXES:
+                continue
+            resolved = path.resolve()
+            if not resolved.is_relative_to(root):
+                raise ValueError("Candidate weight path outside cache")
+            # An explicitly configured nested cache owns its files, even
+            # when the parent cache is scanned first. Skip them at the
+            # parent level so sourceCacheIndex identifies the *specific*
+            # root and duplicates are never emitted.
+            if any(other != root
+                   and other.is_relative_to(root)
+                   and resolved.is_relative_to(other) for other in roots):
+                continue
+            if resolved in seen:
+                continue
+            if path.is_file():
+                seen.add(resolved)
+                paths.append((index, root, path))
     if not paths:
         raise ValueError("No checkpoint artifacts found in cache")
     candidates = []
-    names_seen = set()
-    for path in sorted(paths, key=lambda p: p.relative_to(root).as_posix().casefold()):
-        # Basenames can collide in nested caches; identify them distinctly
-        # using SHA but never print source filesystem paths.
+    for index, root, path in sorted(
+        paths, key=lambda triple: (
+            triple[0], triple[2].relative_to(triple[1]).as_posix().casefold())):
         evidence = digest_checkpoint(path)
         evidence["candidateHints"] = candidate_hint(path.name)
+        evidence["roleHint"] = role_hint(path.name)
+        evidence["sourceCacheIndex"] = index + 1
         evidence["mappingVerified"] = False
-        names_seen.add(path.name.casefold())
         candidates.append(evidence)
     result = envelope()
     result["mode"] = "cache-discovery-unverified"
+    result["cacheRootCount"] = len(roots)
     result["artifactCount"] = len(candidates)
     result["artifacts"] = candidates
     result["warning"] += (
-        " Cache discovery is not a model-to-file mapping; pick the actual "
-        "loaded files explicitly and inspect their independent license terms.")
+        " Cache filename/role hints are not proof of loaded model-to-file "
+        "mapping or weight license. ARNIQA's KonIQ regressor alone is not "
+        "a complete model: locate encoder/backbone dependencies separately.")
     return result
 
 
@@ -141,6 +178,9 @@ def main():
                        help="Exact selected metric=full-file-path; may repeat")
     group.add_argument("--cache-root",
                        help="Read-only scan of downloaded local pyIQA weights")
+    parser.add_argument("--additional-cache-root", action="append", default=[],
+                        help="Extra explicit local cache to scan (e.g. torch/hub/checkpoints); "
+                             "requires --cache-root; may repeat")
     parser.add_argument("--output", required=True, help="Private JSON; must not exist")
     args = parser.parse_args()
     dest = Path(args.output)
@@ -149,14 +189,17 @@ def main():
         parser.error("Relative outputs must be under private/, staging/, or data/")
     if dest.exists():
         parser.error("Refusing to overwrite existing private checkpoint inventory")
+    if args.checkpoint and args.additional_cache_root:
+        parser.error("--additional-cache-root requires --cache-root")
     result = (inventory(args.checkpoint) if args.checkpoint
-              else discover(args.cache_root))
+              else discover(args.cache_root, args.additional_cache_root))
     dest.parent.mkdir(parents=True, exist_ok=True)
     with dest.open("x", encoding="utf-8") as handle:
         json.dump(result, handle, indent=2, allow_nan=False)
     print(json.dumps({
         "protocol": result["protocol"], "mode": result["mode"],
         "artifactCount": result.get("artifactCount", len(result.get("checkpoints", {}))),
+        "cacheRootCount": result.get("cacheRootCount"),
         "packageVersions": result["packageVersions"],
         "warning": result["warning"]
     }, indent=2))

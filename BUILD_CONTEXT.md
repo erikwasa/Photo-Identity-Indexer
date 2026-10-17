@@ -4,6 +4,26 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 12 pending review (2026-10-18).** PR #577
+merged. Maintainer-provided local checkpoint cache inventory confirms
+pyiqa 0.1.16, torch 2.14.1, TOPIQ CFANet KonIQ SHA 9a73138b...
+181196009 B, MUSIQ KonIQ SHA e95806b9... 108610983 B, and
+ARNIQA KonIQ **regressor only** SHA af8f127a... 19560 B. Default
+TOPIQ/MUSIQ model-source filenames corroborate earlier load logs,
+not yet a weight/license attestation. ARNIQA additionally loads a
+learned encoder (and may load torchvision ResNet backbone) from
+another Torch cache; its small regressor is not complete provenance.
+The new checkpoint scanner supports multiple explicitly listed local
+cache roots with privacy-preserving unverified role hints. No model
+inference. Next user action: run calibration-only
+`calibration_policy_draft.py` on TOPIQ and MUSIQ **existing 600-score**
+exports, without `--checkpoint-evidence` until mapping is attested;
+share aggregate-only output. Drafts do not freeze policy, approve
+production or unseal held-out human ratings. Model weight licensing
+remains a separate deployment gate. Automatic Very Low exclusion
+still no-go. M37 PRs target `features/m37`.
+
+
 **WI-0193 checkpoint 11 pending review (2026-10-17).** Following merged
 PR #575, the fixed evaluation input is `jpeg-1600-q78` proxy, not
 full-resolution originals. The four 600-photo proxy exports remain

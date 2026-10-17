@@ -1129,3 +1129,90 @@ specific TOPIQ, MUSIQ or ARNIQA pretrained **weight checkpoint**.
 A hash and filename are proof of file identity, not license
 permission. Independently record each checkpoint's rights and the
 intended application use before any production model decision.
+
+## WI-0193 checkpoint 12: cached model file roles and immediate draft commands
+
+The maintainer's `wi0193-checkpoint-provenance-v2` **local-only**
+inventory confirmed `pyiqa 0.1.16`, `torch 2.14.1`,
+`torchvision 0.29.1`, `Pillow 13.0.0`, `rawpy 0.27.1`
+and `pillow-heif 1.8.1`. The following SHA-256 values and byte
+lengths identify cached artifacts without exposing local paths:
+
+| Possible role | Cached filename | SHA-256 | Bytes |
+| --- | --- | --- | ---: |
+| TOPIQ NR KonIQ model | `cfanet_nr_koniq_res50-9a73138b.pth` | `9a73138beb3748dd6a83365610ac88fa1cd53225342c77fc9ed44a3be461354c` | 181196009 |
+| MUSIQ KonIQ model | `musiq_koniq_ckpt-e95806b9.pth` | `e95806b9eae5f3814c410f574ba8e552362bd5bc63d758ed5b97860f5d6185aa` | 108610983 |
+| ARNIQA KonIQ regressor only | `regressor_koniq10k.pth` | `af8f127aca38a8e1082e066b5ee93e533bf5f33aaf9c76b3c31526ef901919e1` | 19560 |
+
+Model configuration/source references:
+- TOPIQ NR uses `CFANet` with default KonIQ model
+  `cfanet_nr_koniq_res50`;
+- MUSIQ uses the `koniq10k` variant and default cached
+  `musiq_koniq_ckpt-e95806b9.pth`;
+- ARNIQA uses a separate learned encoder, KonIQ regressor and may
+  initialize a torchvision ResNet50 pretrained backbone. The tiny
+  regressor alone is **not full ARNIQA provenance**.
+
+These upstream configuration/filename matches corroborate earlier
+private model-load console messages but do not prove what each run
+actually loaded or what pretrained weight use/distribution is
+licensed to do. References:
+https://iqa-pytorch.readthedocs.io/en/stable/_modules/pyiqa/default_model_configs.html ,
+https://iqa-pytorch.readthedocs.io/en/stable/_modules/pyiqa/archs/arniqa_arch.html ,
+https://github.com/miccunifi/ARNIQA .
+
+### Optional: check PyTorch's second weight cache (no inference)
+
+After this PR merges, from the repository root:
+
+~~~powershell
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+$pyiqaCache = Join-Path $env:USERPROFILE ".cache\torch\hub\pyiqa"
+$torchCache = Join-Path $env:USERPROFILE ".cache\torch\hub\checkpoints"
+
+$inputs = @(
+  "--cache-root", $pyiqaCache,
+  "--output", "private/wi0193-all-torch-caches.json"
+)
+if (Test-Path -LiteralPath $torchCache) {
+  $inputs += @("--additional-cache-root", $torchCache)
+}
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/checkpoint_provenance.py @inputs
+~~~
+
+The new scan distinguishes possible ARNIQA **encoder** checkpoint
+`ARNIQA.pth`, possible KonIQ **regressor** `regressor_koniq10k.pth`,
+and generic possible ResNet50 backbone files, marking all roles as
+unverified. It hashes local bytes without loading any models or
+uploading images. No checkpoint found is not proof that a dependency
+was absent when historical scoring happened; other Torch cache roots
+and versions may be involved. Avoid concluding that the one regressor
+is the whole deployed ARNIQA model.
+
+### Now: create calibration-only TOPIQ/MUSIQ proposals (no inference)
+
+The next step **does not require this optional additional scan**.
+Using the already existing 600-photo scored exports, issue each
+candidate's independent draft **once**, from the repository root:
+
+~~~powershell
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/calibration_policy_draft.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores-600.json `
+  --output private/wi0193-topiq-calibration-draft.json
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/calibration_policy_draft.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/musiq-scores-600.json `
+  --output private/wi0193-musiq-calibration-draft.json
+~~~
+
+The optional `--checkpoint-evidence` is omitted because a
+cache-discovery inventory is **not** explicit actual-loaded-weight
+evidence. The research drafts cannot and do not freeze a model,
+authorize held-out inspection, enable automatic exclusion, or
+establish weight licensing. Share only their **aggregate console JSON**
+for review. Keep private draft JSONs, benchmark and per-photo score
+files private. Workitem WI-0193 remains open pending an explicit
+pre-registered candidate/mapping decision and a one-time held-out
+analysis.

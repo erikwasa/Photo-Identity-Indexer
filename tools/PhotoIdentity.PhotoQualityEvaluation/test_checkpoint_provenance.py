@@ -74,6 +74,53 @@ class CheckpointProvenanceTests(unittest.TestCase):
         self.assertNotIn("linked.pth",
                          [row["artifactName"] for row in result["artifacts"]])
 
+    def test_extra_cache_root_discovers_arniqa_encoder_without_loading_model(self):
+        extra = self.path.parent / "checkpoints"
+        extra.mkdir()
+        (extra / "ARNIQA.pth").write_bytes(b"mock pretrained encoder")
+        (extra / "resnet50-0676ba61.pth").write_bytes(b"mock resnet backbone")
+        (self.path.parent / "regressor_koniq10k.pth").write_bytes(b"mock regressor")
+        result = discover(self.path.parent, [extra])
+        self.assertEqual(result["cacheRootCount"], 2)
+        self.assertEqual(result["artifactCount"], 4)
+        rows = {a["artifactName"]: a for a in result["artifacts"]}
+        self.assertEqual(rows["regressor_koniq10k.pth"]["candidateHints"],
+                         ["arniqa"])
+        self.assertEqual(rows["regressor_koniq10k.pth"]["roleHint"],
+                         "possible-arniqa-koniq-regressor")
+        self.assertEqual(rows["ARNIQA.pth"]["roleHint"],
+                         "possible-arniqa-encoder")
+        self.assertEqual(rows["resnet50-0676ba61.pth"]["roleHint"],
+                         "possible-torchvision-backbone-not-arniqa-proof")
+        self.assertEqual(rows["ARNIQA.pth"]["sourceCacheIndex"], 2)
+        self.assertFalse(rows["ARNIQA.pth"]["mappingVerified"])
+        self.assertNotIn(str(extra), str(result))
+
+    def test_nested_cache_root_deduplicates_same_file(self):
+        nested = self.path.parent / "nested"
+        nested.mkdir()
+        (nested / "ARNIQA.pth").write_bytes(b"encoder")
+        data = discover(self.path.parent, [nested])
+        self.assertEqual(data["artifactCount"], 2)
+
+    def test_more_specific_cache_owns_file_regardless_of_root_order(self):
+        nested = self.path.parent / "nested-reordered"
+        nested.mkdir()
+        (nested / "ARNIQA.pth").write_bytes(b"synthetic encoder")
+        for first, second, expected in (
+                (self.path.parent, nested, 2),
+                (nested, self.path.parent, 1)):
+            report = discover(first, [second])
+            encoder = next(item for item in report["artifacts"]
+                           if item["artifactName"] == "ARNIQA.pth")
+            self.assertEqual(encoder["sourceCacheIndex"], expected)
+            self.assertEqual(sum(item["artifactName"] == "ARNIQA.pth"
+                                 for item in report["artifacts"]), 1)
+
+    def test_duplicate_cache_roots_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Duplicate cache"):
+            discover(self.path.parent, [self.path.parent])
+
     def test_empty_checkpoint_rejected(self):
         self.path.write_bytes(b"")
         with self.assertRaisesRegex(ValueError, "size"):
