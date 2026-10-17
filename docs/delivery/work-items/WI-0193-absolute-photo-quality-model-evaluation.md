@@ -451,3 +451,22 @@ unblinded the held-out benchmark.
 
 No production code, archive data, score exports, photo rating labels,
 or app collection/search/exclusion behavior changes in checkpoint 11.
+
+### Upstream framework license research checkpoint (2026-10-18)
+
+The official PyPI release metadata for the locally reported
+`pyiqa 0.1.16` lists license expression
+`PolyForm-Noncommercial-1.0.0`
+(https://pypi.org/project/pyiqa/0.1.16/). The current upstream
+IQA-PyTorch README also references applicable NTU S-Lab licensing
+(https://github.com/chaofengc/IQA-PyTorch). These are **distribution
+metadata and upstream statements**, not an independent legal
+evaluation or evidence that individual downloaded TOPIQ, MUSIQ and
+ARNIQA pretrained checkpoint files have identical license terms.
+Keep framework and each checkpoint's provenance/rights as separate
+deployment gates; do not ship the research Python dependency,
+bundled checkpoints or trained derivatives in the application until
+the intended use is confirmed to be permitted. An alternative
+commercially deployable implementation may be necessary. Local
+offline benchmarking does not imply permission for unrestricted
+production redistribution or service use.
