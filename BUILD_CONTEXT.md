@@ -4,6 +4,22 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 6 pending review:** `reconcile_quality_scores.py` now
+extends the frozen 580-photo learned-IQA score exports to 600 **only after**
+the extra 20 rank-disagreement challenge photos are imported. It requires an
+explicit 580-photo pre-import snapshot, validates unchanged frozen
+representatives, benchmark identity and exact imported candidates. TOPIQ/MUSIQ
+reuse the earlier separately scored screening-pool rows; ARNIQA can score only
+the 20 selected proxies; the WI-0182 baseline is cheap to rerun on 600.
+All old score exports remain unchanged and new private 600-photo exports have
+strict model version/provider/coverage checks. See
+`docs/operations/photo-quality-benchmark.md` checkpoint 6 for the ordered
+PowerShell procedure, especially the mandatory separate pre-import backup:
+the legacy `.before-challenge.bak` may already exist from WI-0192.
+Maintainer archive screening/import and score reconciliation are **not yet run**.
+No held-out metrics or model/threshold policy freeze. No production changes.
+
+
 **Checkpoint 5 pending review:** The existing catalogue-backed challenge generator now
 supports bounded `--pool-only` screening of fresh, non-benchmark images, excluding
 benchmark content SHA and deduplicating pool content. `disagreement_challenges.py`
