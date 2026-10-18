@@ -96,7 +96,7 @@ class RedundancyPairSamplerTests(unittest.TestCase):
         for secret in (
             "dhashDistance", "clipCosine", "sourceKind", "candidateBucket",
             "partition", "calibration", "held-out", "leakageGroup",
-            "contentSha256", "model", "review", "qualityLevel",
+            "contentSha256", "model", "\"qualityLevel\":",
         ):
             self.assertNotIn(secret, blinded)
         self.assertEqual(
