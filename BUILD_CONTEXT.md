@@ -4,6 +4,21 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 1 (2026-10-18):** PR #585 integrated the completed
+WI-0192 benchmark and WI-0193 research into `main`; PR #586 removed
+accidentally tracked local helper files. WI-0193 has a bounded
+research-go for selective TOPIQ comparisons (frozen cutoff
+0.16755089163780212; held-out consumed once), no-go for absolute
+quality classification/Very Low exclusion and no production model
+approval. Archive its canonical workitem and close issue #536 after
+closeout PR merges. M37 remains in progress: begin WI-0194
+archive-wide visual redundancy study with an offline deterministic
+photo-disjoint blinded-pair sampling foundation (dHash/CLIP inputs and
+review labels only later); follow with WI-0195 non-production
+collection scenarios if independent redundancy evidence supports it.
+M37 PRs now target `main`, not `features/m37`.
+Do not access or retune against WI-0193 held-out labels.
+
 **WI-0193 checkpoint 18 (2026-10-18): ONE-TIME HELD-OUT RESEARCH
 EVALUATION CONSUMED.** Maintainer separately authorized and ran
 `heldout_ranking_one_shot.py --mode evaluate` once after merged

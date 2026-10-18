@@ -37,15 +37,19 @@ The deterministic 300-photo WI-0182 run remains useful evidence that the first h
 - [WI-0194](../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md) - benchmark archive-wide visual redundancy embeddings and conservative suppression thresholds.
 - [WI-0195](../work-items/WI-0195-quality-aware-collection-simulation.md) - simulate collection creation with quality preference and visual redundancy suppression, then record adoption decisions.
 
-## Integration branch
+## Integration
 
-M37 development is integrated through `features/m37`. Work-item/checkpoint pull requests target that feature branch rather than `main`; the milestone feature branch is reviewed toward `main` as a separate integration decision.
+M37's benchmark and frozen WI-0193 research results were integrated into `main` in PR #585. The local-file tracking cleanup followed in PR #586. All subsequent M37 workitem pull requests target `main`; WI-0194 and WI-0195 remain open, so M37 is not complete. The WI-0193 held-out photo-quality study is consumed and must not be rerun or tuned.
 
 ## Delivery sequence
 
 1. WI-0192 establishes the representative human-labelled benchmark and reusable review/export foundation.
 2. WI-0193 and WI-0194 may proceed independently once WI-0192 is complete.
 3. WI-0195 combines only accepted evaluation outputs in a non-production collection simulation and decides whether production follow-up work is justified.
+
+## Progress through 2026-10-18
+
+WI-0192 benchmark accepted and WI-0193 quality research concluded: frozen TOPIQ selective pairwise preferences passed 80%/20%/80% held-out *point-estimate* criteria, with overall ordering 95% photo-bootstrap interval extending below 80%. **No absolute quality classifier, automatic Very Low exclusion, or production model was approved.** WI-0194 archive-wide redundancy evidence and WI-0195 collection simulation remain pending. Never reuse the consumed WI-0193 held-out labels for alternative model or threshold selection.
 
 ## Exit criteria
 

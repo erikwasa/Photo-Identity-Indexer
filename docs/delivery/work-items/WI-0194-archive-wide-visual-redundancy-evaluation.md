@@ -44,6 +44,42 @@ Determine whether Photo Identity can identify photos that look redundant enough 
 - [ ] The result identifies whether one model is sufficient or whether separate near-copy and broader-redundancy evidence is justified.
 - [ ] No production collection/search semantics change in this item.
 
+## Checkpoint 1 — offline blinded pair-set foundation (2026-10-18)
+
+Prepare an **offline, local private** deterministic review-pair sampler that
+accepts a photo inventory plus existing candidate similarities supplied
+later by archive-scale dHash/CLIP extraction. It must not pretend to be
+a nearest-neighbour retriever itself or measure model performance.
+
+- Distinguish exact content-copy controls, near-copy dHash candidates,
+  high/medium/borderline similarity, dHash/CLIP disagreements, and
+  explicit random-negative controls. Scores are **candidate sampling
+  heuristics**, not human redundancy labels, model selection thresholds,
+  or production suppressions.
+- Keep same-content revisions, supplied near-copy family keys, and linked
+  very-low-dHash candidates in the same deterministic **photo-disjoint**
+  calibration/held-out partition. Cross-partition pairs are never
+  evaluated, and the public aggregate stdout never prints photo
+  identifiers, labels, paths or similarity values.
+- Create two new private exclusive-write JSON outputs: a **blind
+  review list** with only pseudonymous pair IDs and the two local revision
+  keys needed by a future reviewer; and a separate **private audit** with
+  partition, candidate evidence and sampling buckets for later protocol
+  review. The blind list must not reveal buckets, scores, group,
+  calibration/held-out status or model origins.
+- Reject any supplied human pair labels, invalid identifiers, duplicate
+  reversed pairs or malformed/nonfinite distances; never read the private
+  quality study's consumed held-out human reviews.
+- No actual human review, new model downloads/inference, model
+  cutoff calibration, suppression, writes to the app catalogue or
+  production collection changes in this checkpoint.
+
+Next after merge: create private candidate-neighbour exports from the
+maintained archive with bounded runtime/storage measurements and
+real model/version/license provenance. Review the aggregate sampler
+coverage before any blind human pair-label collection. No review-pair
+held-out access is authorized yet.
+
 ## Verification requirements
 
 Reproducible neighbour generation, deterministic review-set export, maintainer pair/group review and privacy-safe aggregate threshold/model evidence.
