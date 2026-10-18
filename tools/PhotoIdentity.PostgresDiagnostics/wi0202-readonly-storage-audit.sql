@@ -82,8 +82,8 @@ ORDER BY status;
 SELECT COALESCE(r.status, 'missing-run') AS status,
        COUNT(*) AS current_scope_count,
        COALESCE(SUM(r.target_count), 0)::bigint AS current_scope_declared_targets
-FROM public.provisional_face_cluster_current AS current
-LEFT JOIN public.provisional_face_cluster_runs AS r ON r.id = current.run_id
+FROM public.provisional_face_cluster_current AS scope
+LEFT JOIN public.provisional_face_cluster_runs AS r ON r.id = scope.run_id
 GROUP BY COALESCE(r.status, 'missing-run')
 ORDER BY status;
 
