@@ -142,6 +142,12 @@ class RedundancyPairSamplerTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "no human labels or paths"):
                     make_pair_sets(modified)
 
+    def test_paths_cannot_masquerade_as_revision_ids(self):
+        modified = copy.deepcopy(self.data)
+        modified["photos"][0]["revisionId"] = "private/source/path.jpg"
+        with self.assertRaisesRegex(ValueError, "Invalid revisionId"):
+            prepare_inventory(modified)
+
     def test_malformed_or_duplicate_pairs_are_rejected(self):
         modifications = [
             {"dhashDistance": -1},
