@@ -153,6 +153,27 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             Assert.Empty(pastEnd.Items);
             Assert.Equal(1, pastEnd.Total);
 
+            // Two-result relationship scope verifies ordering/tie-break and
+            // nonzero offsets, not just a single slideshow cover.
+            SmartCollectionFilter twoPageFilter = new(
+                people: [alice],
+                relationship: new SmartCollectionRelationshipCriterion(carol, ["child"]));
+            SmartCollectionPhoto[] twoPageBaseline =
+                (await query.QueryAllAsync(twoPageFilter)).ToArray();
+            Assert.Equal(2, twoPageBaseline.Length);
+            SmartCollectionPhotoPage firstPage = await query.QueryAsync(
+                twoPageFilter, offset: 0, limit: 1);
+            SmartCollectionPhotoPage secondPage = await query.QueryAsync(
+                twoPageFilter, offset: 1, limit: 1);
+            SmartCollectionPhotoPage beyond = await query.QueryAsync(
+                twoPageFilter, offset: 2, limit: 1);
+            Assert.Equal(2, firstPage.Total);
+            Assert.Equal(2, secondPage.Total);
+            Assert.Equal(2, beyond.Total);
+            Assert.Equal(twoPageBaseline[0].RevisionId, Assert.Single(firstPage.Items).RevisionId);
+            Assert.Equal(twoPageBaseline[1].RevisionId, Assert.Single(secondPage.Items).RevisionId);
+            Assert.Empty(beyond.Items);
+
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Alice with child around age five",
                 new SmartCollectionFilter(
