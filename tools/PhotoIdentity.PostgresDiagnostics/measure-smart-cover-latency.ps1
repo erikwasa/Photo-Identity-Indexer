@@ -15,8 +15,23 @@ if ($root -notmatch '^https?://(127\.0\.0\.1|localhost)(:\d+)?$') {
     throw "Only a loopback Photo Identity API URL is permitted."
 }
 
-$definitions = @(Invoke-RestMethod -Uri "$root/api/smart-collections" -TimeoutSec $TimeoutSeconds)
-$definitions = @($definitions | Sort-Object { [string]$_.id })
+# Invoke-RestMethod can output a JSON array as one array-valued pipeline object.
+# Wrapping that command directly in @() can accidentally create an array of arrays;
+# the wrapper has no per-collection Id. Materialize the response first, then explicitly
+# enumerate its entries so a one-item, many-item and empty response behave equally.
+$definitionPayload = Invoke-RestMethod -Uri "$root/api/smart-collections" -TimeoutSec $TimeoutSeconds
+if ($null -eq $definitionPayload) {
+    throw "Saved Smart Collection endpoint returned no JSON payload."
+}
+
+$definitionItems = [System.Collections.Generic.List[object]]::new()
+foreach ($definition in $definitionPayload) {
+    if ($null -eq $definition -or $null -eq $definition.PSObject.Properties['Id']) {
+        throw "Saved Smart Collection endpoint returned an unexpected JSON item shape."
+    }
+    $definitionItems.Add($definition)
+}
+$definitions = @($definitionItems | Sort-Object -Property Id)
 
 if ($definitions.Count -eq 0) {
     Write-Host "No saved Smart Collections available for evaluation."
@@ -26,10 +41,12 @@ if ($definitions.Count -eq 0) {
 $results = [System.Collections.Generic.List[object]]::new()
 for ($trial = 1; $trial -le $Repetitions; $trial++) {
     for ($i = 0; $i -lt $definitions.Count; $i++) {
-        $id = [string]$definitions[$i].id
-        if ($id -notmatch '^[0-9a-fA-F-]{36}$') {
-            throw "A saved Smart Collection has an invalid identifier; aborting."
+        $rawId = [string]$definitions[$i].Id
+        $parsedId = [Guid]::Empty
+        if (-not [Guid]::TryParse($rawId, [ref]$parsedId)) {
+            throw "Saved Smart Collection ordinal $($i + 1) has an invalid GUID; aborting."
         }
+        $id = $parsedId.ToString('D')
 
         $uri = "$root/api/smart-collections/$id/query?offset=0&limit=1"
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
