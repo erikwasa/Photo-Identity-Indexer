@@ -1,0 +1,27 @@
+id: WI-0192
+title: Build a representative archive benchmark and blinded quality review workflow
+milestone: M37
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0192-representative-photo-quality-benchmark.md
+started_at: 2026-10-16
+completed_at: 2026-10-16
+verified_at: 2026-10-16
+verified_by: erikwasa
+last_updated_at: 2026-10-16
+branch: features/m37
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/535
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/544
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/546
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/547
+- type: documentation
+  value: docs/operations/photo-quality-benchmark.md
+- type: maintainer-acceptance
+  value: '2026-10-16 Europe/Stockholm: erikwasa generated the maintained 400+180 benchmark from 27,052 durable-proxy photos, completed 255 blinded reviews, verified save/resume and label usability, and judged the sample representative with no major photo type missing; legacy original dimensions remain a documented limitation.'

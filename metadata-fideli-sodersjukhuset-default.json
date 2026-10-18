@@ -1,0 +1,28 @@
+{
+  "inferDateFromFilename": false,
+  "inferDateFromDirectory": false,
+  "excludedDateDirectories": ["1970"],
+  "placeRules": [
+    {
+      "name": "fideli-default-soders-2024-03-27-to-2024-05-10",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-27",
+      "to": "2024-05-10",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-default-soders-2024-05-12-to-2024-05-24",
+      "sourcePrefix": "fideli/",
+      "from": "2024-05-12",
+      "to": "2024-05-24",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-default-soders-2024-05-26-to-2024-06-09",
+      "sourcePrefix": "fideli/",
+      "from": "2024-05-26",
+      "to": "2024-06-09",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    }
+  ]
+}

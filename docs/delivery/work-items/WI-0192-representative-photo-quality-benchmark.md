@@ -5,7 +5,7 @@ milestone: M37
 status_source: PhotoIdentity.Docs
 depends_on: []
 related_adrs: []
-affected_modules: [PhotoIdentity.Persistence.Postgres, tools, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Imaging.OpenCv, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Core.Tests, PhotoIdentity.Persistence.Tests, tools, docs]
 ---
 
 # WI-0192: Build a representative archive benchmark and blinded quality review workflow
@@ -27,6 +27,36 @@ Create a reusable, privacy-safe evaluation benchmark that represents the maintai
 - Export private labels/source keys only under private/data/staging or an external path. Commit only tooling, aggregate counts and privacy-safe protocol documentation.
 - Make the benchmark/review format reusable by WI-0193 and the review infrastructure reusable by WI-0194 where practical.
 
+## Checkpoint 1 implementation — representative core
+
+The first implementation checkpoint introduces a provider-independent deterministic selector plus PostgreSQL population reader and a `benchmark` mode on the existing photo-quality evaluation tool.
+
+The representative core defaults to 400 photos. It balances the marginal maintained-archive distribution across capture decade, camera/device family, media family, resolution bucket, orientation and detected-face count rather than taking one stable pseudo-random slice. Capture year uses extracted capture metadata first and can fall back to a year-prefixed source segment when metadata is absent.
+
+The benchmark command reads only current `photo` revisions with the requested durable review-proxy profile. It records private source/proxy information only in an ignored private export. Selected proxy bytes are length/SHA-256 verified and receive the existing strict 64-bit dHash. Exact-content duplicates and selected dHash neighbors at Hamming <= 4 are forced into the same deterministic 60/40 calibration/held-out partition to reduce obvious leakage.
+
+The JSON records population and selected coverage, the frozen policy/version identifiers and blank human-review fields. It deliberately reserves (by default) 200 challenge slots but does **not** populate them yet; the next checkpoint will add challenge selection and the blinded resumable review surface without replacing the representative core.
+
+## Checkpoint 2 implementation — blinded review and challenge extension
+
+Checkpoint 2 adds a local loopback browser reviewer to the evaluation tool. The UI intentionally exposes only the review proxy, progress, the six quality labels, personally-important toggle and notes. Source paths, strata, calibration/held-out membership, candidate/model reasons and representative/challenge membership are not returned by the review-state API. Review order is a deterministic benchmark-specific shuffle rather than manifest order.
+
+Every review save is atomic and resumable. The first mutation creates a one-time `.before-review.bak`; restarting the reviewer reloads completed labels. Keyboard shortcuts 1–6 map to Very Low / Low / Normal / High / Very High / Unsure, `P` toggles personally-important, Left/Right navigate, and `Ctrl+Enter` re-saves notes for an already-labelled photo.
+
+The benchmark schema now distinguishes representative versus challenge photos without changing the frozen representative split. A generic `benchmark add-challenges` command can append a versioned private candidate file, but forcibly marks imported cases as diagnostic `partition=challenge`, clears supplied human labels, rejects overlap with the representative core and preserves representative calibration/held-out membership and counts.
+
+The initial maintained-archive challenge candidate generator and coverage/pilot acceptance remain the final WI-0192 checkpoint.
+
+## Checkpoint 3 implementation — maintained-archive challenge generator and report
+
+Checkpoint 3 adds the initial challenge generator and a privacy-safe aggregate benchmark report. The generator scans current non-core durable review proxies with the existing explainable technical evidence and selects deterministically across candidate-reason, raw-signal-extreme, rare-stratum and missing-metadata buckets. These reasons are selection heuristics only and remain hidden by the blinded reviewer.
+
+The initial default challenge count is 180. Combined with the frozen 400-photo representative core this yields about 580 initial review photos while intentionally preserving 20 of the 200 reserved challenge slots for later WI-0193 learned-model disagreement cases. The generator excludes revisions and exact content hashes already represented in the benchmark and will not turn a full-size-proxy percentile of 1.0 into a degenerate low-resolution bucket.
+
+The `benchmark report` command prints aggregate representative/challenge composition, broad archive coverage, human-review progress and challenge-reason coverage without private source keys, proxy paths or camera-model names. This provides the evidence surface for the required maintainer coverage inspection and short blinded pilot.
+
+After this checkpoint merges, WI-0192 requires a maintained-archive run: generate the 400-photo core, append the 180-photo challenge tranche, inspect the aggregate report, review roughly 30 blinded pilot photos, and re-run the report. WI-0192 remains in progress until that maintainer acceptance evidence is recorded.
+
 ## Out of scope
 
 - Selecting a production quality model.
@@ -36,20 +66,32 @@ Create a reusable, privacy-safe evaluation benchmark that represents the maintai
 
 ## Acceptance criteria
 
-- [ ] The benchmark selection reports coverage across the defined archive strata and is visibly more representative than the WI-0182 300-photo deterministic sample.
-- [ ] Approximately 600 photos can be reviewed without exposing model predictions during labelling; a smaller final count is acceptable only with documented coverage evidence and rationale.
-- [ ] Quality labels and `personallyImportant` are saved safely and resumably without modifying originals or production catalogue metadata.
-- [ ] Calibration and held-out membership are deterministic/frozen before WI-0193 tuning, with duplicate/near-identical leakage controls.
-- [ ] Private review material is excluded from Git and privacy-safe aggregate evidence can be reproduced.
-- [ ] Documentation explains the label semantics, sampling method and how WI-0193/0194 consume the benchmark.
+- [x] The benchmark selection reports coverage across the available archive strata and is visibly more representative than the WI-0182 300-photo deterministic sample. Maintainer acceptance is based on 255 blinded reviews with no major archive class judged missing. Legacy catalogue revisions have null original width/height, so true original-resolution/orientation strata could not be reported; this limitation is explicitly carried forward rather than inferred from proxy pixels.
+- [x] Approximately 600 photos can be reviewed without exposing model predictions during labelling. The accepted initial benchmark contains 580 photos: 400 representative plus 180 challenge cases, with 20 challenge slots intentionally reserved for WI-0193 model-disagreement cases.
+- [x] Quality labels and `personallyImportant` are saved safely and resumably without modifying originals or production catalogue metadata.
+- [x] Calibration and held-out membership are deterministic/frozen before WI-0193 tuning, with duplicate/near-identical leakage controls.
+- [x] Private review material is excluded from Git and privacy-safe aggregate evidence can be reproduced.
+- [x] Documentation explains the label semantics, sampling method and how WI-0193/0194 consume the benchmark.
 
 ## Verification requirements
 
 Automated sampling/export/resume tests plus maintainer inspection of stratum coverage and a short pilot review before the full benchmark is accepted.
 
+## Maintainer acceptance — 2026-10-16
+
+The maintained archive contained 27,052 current photos with durable `jpeg-1600-q78` review proxies. The accepted benchmark has 400 representative photos split 240 calibration / 160 held-out, plus 180 challenge photos and 20 challenge slots left reserved for WI-0193 model-disagreement cases.
+
+The representative set covered 1970s, 2010s, 2020s and unknown capture eras; HEIC/JPEG/PNG/raw media; no/one/multiple-face buckets; 33 distinct camera models; and 378/400 photos with capture-time metadata. The challenge tranche broadened rare/unknown eras, media families, face-count mixes and technical/raw-signal edge cases. Challenge reasons were distributed across sharpness, luminance, clipping, contrast, low effective proxy resolution, rare eras/devices and missing camera/capture metadata rather than collapsing into one degenerate bucket.
+
+The maintained catalogue's historical photo revisions have null original `width`/`height`, so the benchmark report showed original resolution and orientation as unknown for all 580 photos. Existing Photo Identity behavior already treats this as a legacy-catalogue shape and uses durable review-proxy geometry only where an aspect-ratio surrogate is explicitly safe. WI-0192 does not rewrite proxy dimensions as original dimensions. The limitation is accepted because the maintainer visually reviewed 255/580 blinded photos and judged the sample representative, with no major photo type noticeably missing. WI-0193 must still perform its planned bounded proxy-versus-original comparison before choosing a production quality-analysis input.
+
+Human review progress at acceptance was 255/580: high 30, normal 158, low 53, very-low 4 and unsure 10; 40 reviewed photos were marked personally important. The reviewer saved/resumed correctly, and the maintainer found all six quality levels understandable and useful. No `very-high` labels had been assigned at the acceptance checkpoint; that is observed label distribution, not a schema or UI failure.
+
+WI-0192 is accepted and complete. The private benchmark manifest remains outside Git and becomes the M37 human-labelled benchmark input for WI-0193. WI-0194 may reuse the review infrastructure but defines separate redundancy labels.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core benchmark selection/split policy, PostgreSQL benchmark population query, evaluation commands for benchmark generation/challenge generation/report/review, Core/Persistence/Integration tests and benchmark runbook.
+- Trade-offs: the 400-photo representative core is frozen before model tuning; 180 initial challenge cases broaden hard/rare coverage while retaining 20 slots for learned-model disagreement. Original-resolution/orientation stratification is unavailable for the legacy maintained catalogue because revision dimensions are null; this is documented rather than silently replaced with proxy geometry.
+- Deferred work: WI-0193 owns quality-model comparison/calibration and may append up to 20 model-disagreement challenge cases. WI-0194 owns archive-wide visual-redundancy evaluation.
+- Commands run: all three checkpoint PR CI suites plus maintained private 400-core generation, 180-challenge generation/import, aggregate reporting and 255 blinded human reviews.
