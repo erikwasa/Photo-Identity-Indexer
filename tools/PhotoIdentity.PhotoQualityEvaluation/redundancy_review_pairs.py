@@ -51,7 +51,7 @@ def digest(text):
 
 def _identifier(value, field):
     if (not isinstance(value, str) or not value or len(value) > 256
-            or value.strip() != value or any(ord(c) < 32 for c in value)):
+            or value.strip() != value or any(ord(c) < 32 or c in "/\\:" for c in value)):
         raise ValueError(f"Invalid {field}")
     return value.casefold()
 
