@@ -1,12 +1,12 @@
 id: WI-0202
 title: Restore photo catalogue query performance after schema-v33 acceptance regression
 milestone: M30
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0202-photo-catalogue-query-performance-regression.md
 started_at: 2026-10-18
-last_updated_at: 2026-10-18
-branch: agent/WI-0202-fix-smart-cover-probe-and-retention-evidence
+last_updated_at: 2026-10-19
+branch: agent/WI-0202-query-optimization-acceptance-checkpoint
 blockers: []
 blocker_notes: []
 evidence:
@@ -14,3 +14,5 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/589
 - type: documentation
   value: docs/operations/postgres-photo-query-regression-wi0202.md
+review_notes:
+- 'Post-PR-596 local 28/28 saved covers HTTP 200; final Archive/Slideshow UI and verified backup evidence pending.'
