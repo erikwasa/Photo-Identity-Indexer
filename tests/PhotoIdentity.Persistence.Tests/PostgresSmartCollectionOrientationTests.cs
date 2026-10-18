@@ -167,6 +167,39 @@ public sealed class PostgresSmartCollectionOrientationTests
             SmartCollectionPhotoPage afterClear = await query.QueryAsync(locatedLandscape);
             Assert.Equal(1, afterClear.Total);
             Assert.Equal(catalogueLandscape, Assert.Single(afterClear.Items).RevisionId);
+
+            // When multiple review profiles exist, the newest generated proxy
+            // must win for the specialized count (not the catalogue dimensions).
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            {
+                await using NpgsqlCommand newerProxy = connection.CreateCommand();
+                newerProxy.CommandText = """
+                    INSERT INTO archive_review_proxy_profiles (
+                        profile_id, protocol_version, encoder, format, jpeg_quality,
+                        maximum_long_edge, resize_policy, canonical_definition, recorded_at_utc)
+                    VALUES (
+                        'orientation-newer', 'v1', 'test', 'jpeg', 85,
+                        1600, 'fit', 'newest orientation override', @newer);
+
+                    INSERT INTO asset_revision_review_proxies (
+                        asset_revision_id, profile_id, encoded_byte_length, content_sha256,
+                        width, height, generated_at_utc, relative_path)
+                    VALUES (
+                        @revision, 'orientation-newer', 100, @hash,
+                        1200, 675, @newer, 'review/orientation/proxy-newer.jpg');
+                    """;
+                newerProxy.Parameters.AddWithValue(
+                    "newer", NpgsqlDbType.TimestampTz,
+                    new DateTimeOffset(2026, 10, 4, 1, 0, 0, TimeSpan.Zero));
+                newerProxy.Parameters.AddWithValue(
+                    "revision", NpgsqlDbType.Uuid, proxyPortrait.Value);
+                newerProxy.Parameters.AddWithValue(
+                    "hash", NpgsqlDbType.Text, new string('c', 64));
+                await newerProxy.ExecuteNonQueryAsync();
+            }
+
+            Assert.Equal(0, (await query.QueryAsync(locatedPortrait)).Total);
+            Assert.Equal(2, (await query.QueryAsync(locatedLandscape)).Total);
         }
         finally
         {
