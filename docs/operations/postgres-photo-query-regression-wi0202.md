@@ -19,12 +19,6 @@ Maintained schema-v33 application: Archive status does not reliably complete (HT
 Read-only identity/connection check:
 
 ```powershell
-podman exec $container sh -lc 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "<VERIFIED_DB>" -c "SELECT current_database(), current_setting($$server_version$$) AS server_version;"'
-```
-
-For maximum shell portability, if the `$$`-quoted `current_setting` argument is expanded by your shell, use this simpler alternative:
-
-```powershell
 podman exec $container sh -lc 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "<VERIFIED_DB>" -c "SELECT current_database(), version();"'
 ```
 
@@ -43,10 +37,10 @@ podman exec $container sh -lc 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d
 Observe only activity *metadata* during a single problematic request; do not expose SQL text or query parameters:
 
 ```powershell
-podman exec $container sh -lc 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "<VERIFIED_DB>" -c "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS duration FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND state = $$active$$ ORDER BY query_start;"'
+podman exec $container sh -lc 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "<VERIFIED_DB>" -c "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS duration FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() ORDER BY query_start;"'
 ```
 
-If shell expansion of `$$` causes problems, omit the `state` predicate and inspect the `state` column manually. Blank `wait_event` is *not* proof that all CPU or I/O time has been explained.
+Blank `wait_event` is *not* proof that all CPU or I/O time has been explained.
 
 ## B. Record baseline
 
