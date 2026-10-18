@@ -193,3 +193,9 @@ Source, metadata, persistence and representative real-file verification.
 - Trade-offs:
 - Deferred work:
 - Commands run:
+
+## Maintained photo-only regression discovered — 2026-10-18
+
+During schema-v33 WI-0151 Windows acceptance the operator verified video metadata/posters but encountered long-running Archive status, partial Slideshow library and person-filtered Smart Collection failures. Sanitized logs showed repeat ~30-second `PostgresSmartCollectionQueryRepository.QueryAsync` timeouts and cancelled Archive status requests; PostgreSQL activity samples showed parallel active queries. Representative photo-table planner statistics had no recorded `ANALYZE` and unreliable very-low row estimates.
+
+The separate high-priority [WI-0202](WI-0202-photo-catalogue-query-performance-regression.md) / [issue #589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589) tracks read-only diagnosis, controlled statistics refresh and any needed query correction. The [runbook](../../operations/postgres-photo-query-regression-wi0202.md) explicitly prohibits destructive recovery. **WI-0151 remains in_review and must not be marked complete until Archive, saved/ad hoc Smart Collections and the full Slideshow library pass maintained photo-only regression checks.** Existing video checks do not override those failed photo checks.
