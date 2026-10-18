@@ -303,7 +303,9 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         Stopwatch pageTimer = Stopwatch.StartNew();
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = filter.Relationship is not null
-            ? BuildRelationshipPageSql(where)
+            ? filter.People.Count > 0
+                ? BuildPeopleRelationshipPageSql(filter)
+                : BuildRelationshipPageSql(where)
             : $"""
             {CommonCtes}
             SELECT
@@ -583,11 +585,59 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 reader.GetFieldValue<DateOnly>(fromOrdinal),
                 reader.GetFieldValue<DateOnly>(toOrdinal));
 
+    // For the combined people + relationship shape, perform both membership
+    // tests in one scan of the authoritative revision_people set. This also
+    // avoids repeatedly correlating the relationship EXISTS for each candidate
+    // asset revision during the ordered page selection.
+    private static string BuildPeopleRelationshipPageSql(SmartCollectionFilter filter)
+    {
+        string people = string.Join(", ",
+            Enumerable.Range(0, filter.People.Count)
+                .Select(index => $"@person_{index}"));
+        string kinds = string.Join(", ",
+            Enumerable.Range(0, filter.Relationship!.Kinds.Count)
+                .Select(index => $"@relationship_kind_{index}"));
+        string peopleHaving = filter.PeopleMatch == SmartCollectionMatchModes.All
+            ? "= @person_count"
+            : ">= 1";
+
+        string eligibility = $"""
+            relationship_people AS MATERIALIZED (
+                SELECT DISTINCT related_person_id AS person_id
+                FROM person_relationship_view
+                WHERE person_id = @relationship_person_id
+                  AND relationship_kind IN ({kinds})
+            ),
+            matched_people_revisions AS MATERIALIZED (
+                SELECT revision_people.revision_id
+                FROM revision_people
+                LEFT JOIN relationship_people
+                    ON relationship_people.person_id = revision_people.person_id
+                WHERE revision_people.person_id IN ({people})
+                   OR relationship_people.person_id IS NOT NULL
+                GROUP BY revision_people.revision_id
+                HAVING COUNT(DISTINCT revision_people.person_id)
+                           FILTER (WHERE revision_people.person_id IN ({people})) {peopleHaving}
+                   AND COUNT(relationship_people.person_id) > 0
+            ),
+            """;
+
+        string otherFilters = BuildWhere(filter, omitPeopleRelationship: true);
+        return BuildRelationshipPageSql(
+            otherFilters,
+            eligibility,
+            "INNER JOIN matched_people_revisions AS matched ON matched.revision_id = asset_revisions.id");
+    }
+
     // First pick the exact relationship-filtered page before projecting the
     // full people array and effective place. This preserves pagination order,
     // exact counts and photo-only scope, while bounding enrichment to LIMIT.
-    private static string BuildRelationshipPageSql(string where) => $"""
+    private static string BuildRelationshipPageSql(
+        string where,
+        string eligibilityCtes = "",
+        string eligibilityJoin = "") => $"""
         {CommonCtes},
+        {eligibilityCtes}
         page_matches AS MATERIALIZED (
             SELECT
                 asset_revisions.id,
@@ -604,6 +654,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 effective_capture_dates.source
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
+            {eligibilityJoin}
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
             LEFT JOIN effective_capture_dates
@@ -714,11 +765,14 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             filter.Orientation != SmartCollectionOrientations.Any);
     }
 
-    private static string BuildWhere(SmartCollectionFilter filter, bool scopedOrientationCount = false)
+    private static string BuildWhere(
+        SmartCollectionFilter filter,
+        bool scopedOrientationCount = false,
+        bool omitPeopleRelationship = false)
     {
         List<string> predicates = [];
 
-        if (filter.People.Count > 0)
+        if (!omitPeopleRelationship && filter.People.Count > 0)
         {
             string people = string.Join(", ", Enumerable.Range(0, filter.People.Count).Select(index => $"@person_{index}"));
             string having = filter.PeopleMatch == SmartCollectionMatchModes.All
@@ -829,7 +883,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 """);
         }
 
-        if (filter.Relationship is not null)
+        if (!omitPeopleRelationship && filter.Relationship is not null)
         {
             string relationshipKinds = string.Join(
                 ", ",

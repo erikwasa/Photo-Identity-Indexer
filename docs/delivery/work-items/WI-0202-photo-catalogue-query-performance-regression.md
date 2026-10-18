@@ -149,3 +149,19 @@ A post-PR-#594 packaged application trial completed 28/28 Smart Collection reque
 **Next scoped SQL trial:** only relationship-filtered QueryAsync pages use an explicitly MATERIALIZED page-selection CTE, ordered and limited *before* person-array/effective-place hydration; all other page SQL remains unchanged. Only the COUNT for combined named-place + orientation filters uses an indexed, per-revision LATERAL latest-review-proxy lookup, matching the previous latest generated-at / profile tie-break, and compares the same proxy-first dimensions with catalogue fallback. All other counts and all other CTE semantics remain unchanged. The latest effective place continues to use the original authoritative CTE. No new index, schema version, cleanup, persistence mutation or approximate count is introduced.
 
 Disposable PostgreSQL correctness tests compare a relationship+people paged result, metadata and total against QueryAllAsync; place+orientation tests assert portrait/landscape exact totals, proxy override, limit=1 and latest-place clear behavior. Only the operator's two-pass measurement after merge will establish whether this SQL plan performs better. If it does not, collect sanitized estimated plans locally on an isolated representative restored DB and revise; do not assert a speedup from SQL shape alone.
+
+
+## Post-PR #595 cover latency: geo/orientation recovered, relationship still slow — 2026-10-19
+
+The maintainer merged PR #595, repackaged Photo Identity and reran the local anonymous Smart Collection cover probe twice (14 saved collections, **28/28 HTTP 200**). Results:
+
+- **#7 people + relationship:** 5,967 / 6,132 ms, average 6,050 ms. This is effectively unchanged from the pre-#595 5,965 / 6,061 ms. The prior API phase log identified ~5 seconds in **page SQL**, not the count. Staging the page before projection alone therefore did not solve the costly eligibility/sort path.
+- **#13 named place + orientation:** 130 / 147 ms (average 139 ms), versus 2,096 / 2,090 ms pre-#595: **~93% faster**.
+- **#14 named place + orientation:** 135 / 133 ms (average 134 ms), versus 2,262 / 2,150 ms pre-#595: **~94% faster**.
+- Remaining 11 definitions continue around 111–270 ms. All statuses remain HTTP 200.
+
+The name-place + orientation count optimization is validated for these maintained workloads; do not rewrite it or the unrelated face-cluster indexes while addressing #7.
+
+**Next scoped performance hypothesis:** Only QueryAsync pages having *both* an explicit people filter and a relationship filter now calculate eligible revision IDs via a **single grouped pass** over the canonical revision_people CTE, joining a deduplicated set of related people with the requested people. The grouped HAVING preserves peopleMatch ALL/ANY and the independent relationship EXISTS requirement, then joins eligible IDs to the same photo-only, exact-date-ordered, offset/limit page CTE. Count SQL, QueryAllAsync, page projection, sort/tie-break, other filter shapes, saved collection definitions and media isolation are unchanged. Tests compare paginated results against the established full-query SQL including matching people, relationship kinds, empty matches, ANY/ALL and past-end offsets.
+
+There is **no claimed speedup until post-merge maintainer timing**. If #7 remains slow, plan diagnostics against a controlled restored catalogue are required before further speculative SQL changes; do not keep churning the working path blindly.

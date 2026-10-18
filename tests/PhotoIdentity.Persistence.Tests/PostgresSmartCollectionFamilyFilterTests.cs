@@ -174,6 +174,57 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             Assert.Equal(twoPageBaseline[1].RevisionId, Assert.Single(secondPage.Items).RevisionId);
             Assert.Empty(beyond.Items);
 
+            // Compare the specialized single-pass people + relationship page
+            // with the independent full-result SQL, including ANY/ALL, distinct
+            // people, empty intersection and offsets beyond the last result.
+            PersonId absentPerson = PersonId.New();
+            SmartCollectionFilter[] combinedFilters =
+            [
+                new SmartCollectionFilter(
+                    people: [alice, carol],
+                    peopleMatch: SmartCollectionMatchModes.All,
+                    relationship: new SmartCollectionRelationshipCriterion(carol, ["child"])),
+                new SmartCollectionFilter(
+                    people: [alice, absentPerson],
+                    peopleMatch: SmartCollectionMatchModes.Any,
+                    relationship: new SmartCollectionRelationshipCriterion(carol, ["child"])),
+                new SmartCollectionFilter(
+                    people: [alice, absentPerson],
+                    peopleMatch: SmartCollectionMatchModes.All,
+                    relationship: new SmartCollectionRelationshipCriterion(carol, ["child"])),
+                new SmartCollectionFilter(
+                    people: [alice],
+                    relationship: new SmartCollectionRelationshipCriterion(carol, ["parent"])),
+                new SmartCollectionFilter(
+                    people: [alice, carol],
+                    peopleMatch: SmartCollectionMatchModes.Any,
+                    relationship: new SmartCollectionRelationshipCriterion(alice, ["cousin", "parent"])),
+            ];
+
+            foreach (SmartCollectionFilter combined in combinedFilters)
+            {
+                SmartCollectionPhoto[] all =
+                    (await query.QueryAllAsync(combined)).ToArray();
+                SmartCollectionPhotoPage first = await query.QueryAsync(combined, limit: 1);
+                Assert.Equal(all.Length, first.Total);
+                if (all.Length > 0)
+                {
+                    SmartCollectionPhoto actual = Assert.Single(first.Items);
+                    Assert.Equal(all[0].RevisionId, actual.RevisionId);
+                    Assert.Equal(all[0].PeopleKeys, actual.PeopleKeys);
+                    Assert.Equal(all[0].EffectiveCaptureDate, actual.EffectiveCaptureDate);
+                }
+                else
+                {
+                    Assert.Empty(first.Items);
+                }
+
+                SmartCollectionPhotoPage afterLast = await query.QueryAsync(
+                    combined, offset: all.Length, limit: 1);
+                Assert.Equal(all.Length, afterLast.Total);
+                Assert.Empty(afterLast.Items);
+            }
+
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Alice with child around age five",
                 new SmartCollectionFilter(

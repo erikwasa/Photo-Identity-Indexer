@@ -124,3 +124,21 @@ git pull --ff-only
 ~~~
 
 Compare **#7/#13/#14** against both baselines and share only the sanitized probe table and any new "WI-0202 slow Smart Collection" phase lines. No maintenance on the unrelated ~10 GB historical face-clustering indexes is needed for this SQL experiment.
+
+
+## Post-PR #595 acceptance and narrow people+relationship experiment — 2026-10-19
+
+A two-trial maintained Windows run returned all **28/28 HTTP 200**. #13/#14 named-place+orientation covers dropped from approximately 2.1–2.2 seconds to **130–147 ms** (a ~93–94% improvement). #7 people+relationship remained **5,967/6,132 ms**, essentially unchanged from its earlier ~6-second result; all other covers remained responsive.
+
+The next branch touches only the remaining slow shape: pages having both selected people and relationship constraints. It computes the set of related people first and intersects that eligibility with the requested person match in a single grouped revision_people pass; results are then passed through the unchanged ordered photo-only page selection and unchanged projection. It maintains exact count, any/all person membership, relationship kinds/direction, photo-only guards, stable date order, and pagination. No SQL migration, DDL, new indexes or destructive retention action is involved.
+
+After CI passes and the PR merges, repackage, restart the normal Photo Identity launcher and repeat:
+
+~~~powershell
+git pull --ff-only
+.\Package-PhotoIdentity.ps1 -Configuration Release
+# Start Photo Identity normally, then:
+.\tools\PhotoIdentity.PostgresDiagnostics\measure-smart-cover-latency.ps1 -BaseUrl 'http://127.0.0.1:5080' -Repetitions 2 -TimeoutSeconds 35
+~~~
+
+Share only anonymous ordinal, filter-dimensions, elapsed-ms table and any sanitized WI-0202 slow count/page warnings. If #7 remains near six seconds, use the existing phase timings plus a **controlled representative restore** to capture a safe, parameterized PostgreSQL plan; avoid further unmeasured index/SQL changes.
