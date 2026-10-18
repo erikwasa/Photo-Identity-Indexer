@@ -1,0 +1,24 @@
+id: WI-0193
+title: Evaluate and calibrate absolute per-photo quality models
+milestone: M37
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0193-absolute-photo-quality-model-evaluation.md
+started_at: 2026-10-16
+completed_at: 2026-10-18
+verified_at: 2026-10-18
+verified_by: erikwasa
+last_updated_at: 2026-10-18
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/536
+- type: documentation
+  value: docs/operations/photo-quality-model-evidence-2026-10-17.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/584
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/585
+- type: maintainer-acceptance
+  value: '2026-10-18 Europe/Stockholm: maintainer explicitly approved and ran exactly one sealed representative held-out TOPIQ selective-pairwise ranking research test; frozen point-estimate criteria all passed, but the different-tier ordering photo-bootstrap lower bound was below 80%. Research-only success; absolute quality mapping, Very Low exclusion and production deployment not approved. The held-out evaluation is consumed.'
