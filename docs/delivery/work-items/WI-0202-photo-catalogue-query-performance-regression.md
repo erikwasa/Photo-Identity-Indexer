@@ -104,3 +104,14 @@ A separate maintained-host size report identified a PostgreSQL catalogue of appr
 **Next diagnostic checkpoint:** execute [read-only storage/retention and cover-timing runbook](../../operations/postgres-wi0202-query-and-index-audit.md). It adds a bounded, read-only SQL metadata audit and a sequential, privacy-safe HTTP cover probe, both operator-run. Collect **aggregate** index sizes, per-status run counts/target totals, dead/live estimates and two passes of saved-cover latency, including after a cold start if possible. Only then choose a safe scoped optimization/retention proposal. No production DDL, SQL index rebuild, run pruning, startup maintenance or data migration is included in this checkpoint.
 
 WI-0202 stays in review with symptoms restored; the new work is investigative, not a claim that the 10 GB index growth caused Smart Collection timeouts.
+
+
+## Historical clustering run accumulation and diagnostic bug — 2026-10-18
+
+The maintainer ran the read-only WI-0202 storage audit against the actual app-connected PostgreSQL 18.6 catalogue. Aggregate findings: **90,160,544 estimated provisional cluster member rows**, ~**16 GB** including ~**10.5 billion index bytes**; **4,406,195 estimated regeneration target rows** and ~**1.14 billion bytes** total. Of **13,802** provisional clustering runs, **12,212** are superseded, **1,561** stale, **27** failed and just **2** completed/current. The superseded runs alone declare **95,461,882 target rows** across many historical runs, while the two current pinned runs declare **10,913**. These are declared totals and planner estimates, not exact historical member counts.
+
+The growth is **consistent with retained derived run history**, not proof of B-tree index bloat. Main-vs-restore database byte differences remain inconclusive without equal table row populations/backup timing. Observed zero index scans and insert counters in PostgreSQL cumulative views are *not* enough to remove indexes or infer inactivity.
+
+Repository audit also found provisional_face_not_same_constraints.source_run_id has **ON DELETE SET NULL** behavior. Wholesale deletion of historical cluster runs would remove some provenances even if the persisted not-same-person constraints remain. Future retention must explicitly preserve auditability and current run linkage, be dry-run-first, and be tested on a restored database. No deletion, index rebuild, schema change or maintenance is authorized by this checkpoint.
+
+The first local Smart cover probe failed because the API was stopped; a second run exposed a **diagnostic PowerShell JSON-array enumeration bug**, not an invalid saved collection. This PR fixes probe parsing; post-fix cover timing results are pending from the maintainer. Continue investigating SQL count/page phase latency separately from face-work table growth.
