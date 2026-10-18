@@ -5,6 +5,33 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 ## Current focus
 
 
+**WI-0193 checkpoint 15 (2026-10-18):** Maintainer ran five-fold
+within-calibration selective TOPIQ/MUSIQ comparison on 238 photo
+ratings, 5635 within-fold pairs. At 75th-percentile score gap,
+TOPIQ orders **90.27%** of *different-human-tier selected pairs*
+correctly, expressing a preference on **25.57% of all pairs**;
+MUSIQ **89.75%** at ~25.08% all-pair coverage. For >=2-tier
+human differences: TOPIQ **92.71%** of 247 selected pairs, MUSIQ
+**89.49%** of 276. At 90th percentile TOPIQ ~97.4% correct
+among different-tier comparisons with only 10.65% all-pair
+coverage. Pairs share photos and near-duplicates may cross folds;
+this is NOT independent held-out acceptance or absolute-tier
+accuracy. Both earlier midpoint absolute classifiers rejected.
+
+Prepare one **TOPIQ NR p75 ranking-only freeze PROPOSAL** using
+`ranking_freeze_proposal.py` on existing complete 600-proxy
+export. It derives one fixed score-gap threshold from all 238
+known-tier calibration photos without looking at held-out labels.
+The candidate choice is post hoc to calibration exploration,
+not preregistered independent model selection. Proposal explicitly
+marks research freeze/held-out permission/production model/Very
+Low exclusion all FALSE. Operator runs it locally and shares
+aggregate proposal; explicit next-stage review is required before
+any one-time held-out evaluation. PyIQA framework and checkpoint
+licensing remain unverified; no app ranking changes.
+
+
+
 **WI-0193 checkpoint 14 (2026-10-18) calibration diagnostic:** PR #579
 merged; maintainer three-band confusion results show TOPIQ NR
 37.4% accuracy/49.9% balanced accuracy/23.4% Normal recall;
