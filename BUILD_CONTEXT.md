@@ -4,6 +4,37 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 18 (2026-10-18): ONE-TIME HELD-OUT RESEARCH
+EVALUATION CONSUMED.** Maintainer separately authorized and ran
+`heldout_ranking_one_shot.py --mode evaluate` once after merged
+PR #583, using TOPIQ NR `pyiqa-topiq_nr-0.1.16`,
+`jpeg-1600-q78` proxy and frozen gap
+`0.16755089163780212`. 160 representative held-out
+photos; 157 known-tier, three unsure; zero score failures.
+All three PREDECLARED **point-estimate** research checks passed:
+selected different-tier ordering **2236/2581=86.63%** (photo
+bootstrap 95% **75.07–93.69%**); all-pair coverage
+**4157/12720=32.68%** (CI **26.50–37.85%**);
+selected >=2-tier ordering **740/760=97.37%** (CI
+**89.92–99.81%**). 8,563 abstentions; 1,438 same-tier
+selected; 3 unsure ratings. **Overall ordering interval
+crosses BELOW the 80% target**: descriptive held-out pass is
+not high-confidence evidence of generalizable >=80%. 1,000
+seeded photo-level bootstrap resamples; pairs not independent.
+
+Bounded research **GO** for optional selective pairwise preference
+concept only; **NO-GO** for previous absolute three-band maps,
+automatic Very Low exclusions, and production ranking/inference
+deployment. No model weight/license approval. This held-out
+cohort has been used ONCE: **NEVER rerun**, remove the
+private one-shot claim, fit thresholds, test additional
+candidates on these labels, or change decision post-hoc.
+Retain private evidence locally. Next: merge documentation-only
+checkpoint-18 outcome PR; conclude WI-0193 with precise
+research-go / absolute-classification-no-go decision, and
+plan any further optional product/rights evaluation via
+separate workitems and independent evidence.
+
 **WI-0193 checkpoint 17 (2026-10-18):** Maintainer completed
 private checkpoint-16 TOPIQ p75 freeze attestation. Aggregate local
 output confirms exact fixed gap `0.16755089163780212`,
