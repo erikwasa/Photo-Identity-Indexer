@@ -124,3 +124,14 @@ Follow-up evaluation is tracked by M37. It separates absolute per-photo quality 
 ## Remaining acceptance evidence
 
 The WI-0182 private run established useful negative evidence about the hand-written candidate rules and maintained-machine cost, but the maintainer later judged its deterministic sample insufficiently representative for selecting a replacement model. M37 carries the broader representative benchmark and successor-model evaluation. WI-0182 should close on its documented no-adoption decision for `proxy-technical-quality-v1`, not by claiming the 300-photo sample is archive-representative.
+
+
+## Formal WI-0182 closeout — 2026-10-18
+
+**Completed as research, with a clear decision to NOT ADOPT `proxy-technical-quality-v1` automatic defect flags as product selection behavior.** This closes the original evaluation scope while retaining its useful technical evidence harness.
+
+The 300-photo maintainer-reviewed deterministic diagnostics found 4 true technical failures among 29 definitively reviewed flagged photos (13.8% precision) and detected 4 of 11 human-assessed technical failures (36.4% recall). Whole-image Laplacian variance was especially unreliable for subject/face focus; 3 of the 11 failures were personally important. Runtime was inexpensive (25.65 ms median per proxy) but speed does not repair unsafe classification.
+
+The maintainer explicitly judged the 300-photo deterministic set insufficiently representative for accepting a new model. M37 WI-0192 created and accepted a wider 600-photo benchmark (400 representative photos and 200 challenge slots), and WI-0193 compared the WI-0182 reason-count baseline with modern IQA. The WI-0182 baseline had calibration Spearman rho 0.234 and only 943/2379 (39.6%) correct ordering among pairs separated by 2+ human quality tiers. The successor TOPIQ selective score-gap research hypothesis passed the three prespecified *point-estimate* held-out criteria but was **not approved for production**; see WI-0193's consumed one-time held-out report and caveats.
+
+**Operational disposition:** retain `PhotoIdentity.PhotoQualityEvaluation` for versioned, inspectable *offline diagnostics* of sharpness, luminance, clipping, contrast and proxy dimensions; do not expose the original candidate reasons as a quality label, percentage, Creative preference, Smart filter, automatic Very Low exclusion or deletion rule. Existing production behavior remains unchanged. Future subject-aware technical scoring or opt-in preferences require **new bounded workitems**, new independently sourced evidence and model/privacy/licensing checks. The WI-0193 held-out human labels must not be reused to optimize anything.
