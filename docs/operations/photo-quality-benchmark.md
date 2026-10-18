@@ -1553,3 +1553,58 @@ and invoking evaluation. There is no silent promotion from
   for selection or re-run on a better-looking held-out result.
   Pass/fail is **research-only** and does not approve model licensing,
   exclusion, a slideshow ranker, or archive mutations.
+
+## WI-0193 checkpoint 18: held-out evaluation consumed — do NOT rerun
+
+The maintainer separately authorized and performed the **one-time**
+WI-0193 TOPIQ held-out study on 2026-10-18. The sealed preflight
+completed first; the evaluation created its private exclusive
+one-shot claim and then reported
+`status=held-out-research-evaluated-once`.
+**Do not run `--mode preflight` or `--mode evaluate` again** to
+overwrite/recreate records, regardless of apparent test outcomes.
+Retain the local private authorization, preflight, frozen proposal,
+score export, report and `wi0193-heldout-once-claim.json` intact.
+
+The frozen candidate remained `pyiqa-topiq_nr-0.1.16`, with
+`jpeg-1600-q78` review proxies and positive absolute score-gap
+threshold **`0.16755089163780212`**. The 160 held-out
+representative photos included 157 known-tier reviews and
+3 unsure/unrated. There were zero candidate score failures.
+
+| One-time held-out research metric | Raw count | Observed result | 95% photo-bootstrap interval |
+| --- | ---: | ---: | ---: |
+| All-pair preference coverage | 4157/12720 | **32.68%**, pass >=20% | **26.50–37.85%** |
+| Selected different-tier correct ordering | 2236/2581 | **86.63%**, pass >=80% | **75.07–93.69%** |
+| Selected >=2-tier correct ordering | 740/760 | **97.37%**, pass >=80% | **89.92–99.81%** |
+
+Additional accounting: 8,563 abstained pairs, 12,246 known-tier
+pairs, 474 unknown-tier pairs, 6,185 same-tier pairs with 1,438
+selected (23.25% same-tier decision rate), 6,061 different-tier
+pairs with 2,581 selected (42.58% conditional coverage), and
+1,111 >=2-tier pairs with 760 selected (68.41% conditional
+coverage). The bootstrap used 1,000 deterministic photo-level
+resamples (seed 20261018), not pairwise independent sampling.
+The accuracy percentages apply to **selected comparison subsets**,
+not the full archive or universal ranking of photographs.
+
+**Interpretation:** all three predeclared checks passed on their
+point estimates, hence bounded **research-only** selective
+pairwise ranking success. The overall different-tier ordering
+95% interval has a lower endpoint **75.07%**, below the
+80% target; this is not a 95%-confidence guarantee of
+80%+ performance in new samples. The >=2-tier accuracy
+interval is above 80%. The model/quantile emerged from
+exploratory calibration screening, which also limits inference.
+
+No absolute Low/Normal/High or Very Low per-photo classification
+is approved, and the existing midpoint maps remain rejected.
+Model framework/checkpoint identity, licenses, input-domain
+effects and deployment cost remain unresolved. **No production
+go, automatic image exclusion or slideshow/collection/search
+reranking** is authorized. For future work, design distinct
+product experiments with independently acquired validation
+evidence; do not tune or retest on this consumed held-out set.
+
+See WI-0193 checkpoint 18 and GitHub issue #536 for the
+aggregate research conclusion.
