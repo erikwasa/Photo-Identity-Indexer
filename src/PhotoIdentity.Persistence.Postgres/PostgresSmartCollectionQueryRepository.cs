@@ -262,7 +262,12 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         }
 
         await EnsureFamilySchemaAsync(cancellationToken);
+        bool scopedOrientationCount = filter.LocationPlaces.Count > 0 &&
+            filter.Orientation != SmartCollectionOrientations.Any;
         string where = BuildWhere(filter);
+        string countWhere = scopedOrientationCount
+            ? BuildWhere(filter, scopedOrientationCount: true)
+            : where;
         string countJoins = BuildCountJoins(filter);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
@@ -279,7 +284,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 {countJoins}
                 WHERE assets.deleted_at_utc IS NULL
                   AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
-                  {where};
+                  {countWhere};
                 """;
             AddFilterParameters(count, filter);
             try
@@ -297,7 +302,9 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
 
         Stopwatch pageTimer = Stopwatch.StartNew();
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = $"""
+        command.CommandText = filter.Relationship is not null
+            ? BuildRelationshipPageSql(where)
+            : $"""
             {CommonCtes}
             SELECT
                 asset_revisions.id,
@@ -599,6 +606,20 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 """);
         }
 
+        if (filter.LocationPlaces.Count > 0 &&
+            filter.Orientation != SmartCollectionOrientations.Any)
+        {
+            joins.Add("""
+                LEFT JOIN LATERAL (
+                    SELECT proxy.width, proxy.height
+                    FROM asset_revision_review_proxies AS proxy
+                    WHERE proxy.asset_revision_id = asset_revisions.id
+                    ORDER BY proxy.generated_at_utc DESC, proxy.profile_id
+                    LIMIT 1
+                ) AS count_review_proxy ON TRUE
+                """);
+        }
+
         return string.Join(Environment.NewLine, joins);
     }
 
@@ -627,7 +648,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             filter.Orientation != SmartCollectionOrientations.Any);
     }
 
-    private static string BuildWhere(SmartCollectionFilter filter)
+    private static string BuildWhere(SmartCollectionFilter filter, bool scopedOrientationCount = false)
     {
         List<string> predicates = [];
 
@@ -695,13 +716,25 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         if (filter.Orientation != SmartCollectionOrientations.Any)
         {
             string comparison = filter.Orientation == SmartCollectionOrientations.Landscape ? ">" : "<";
-            predicates.Add($"""
-                AND EXISTS (
-                    SELECT 1
-                    FROM effective_visual_geometry
-                    WHERE effective_visual_geometry.revision_id = asset_revisions.id
-                      AND effective_visual_geometry.width {comparison} effective_visual_geometry.height)
-                """);
+            if (scopedOrientationCount)
+            {
+                // Same proxy precedence as the full effective geometry CTE.
+                // Null or square dimensions fail both orientation predicates.
+                predicates.Add($"""
+                    AND COALESCE(count_review_proxy.width, asset_revisions.width)
+                        {comparison} COALESCE(count_review_proxy.height, asset_revisions.height)
+                    """);
+            }
+            else
+            {
+                predicates.Add($"""
+                    AND EXISTS (
+                        SELECT 1
+                        FROM effective_visual_geometry
+                        WHERE effective_visual_geometry.revision_id = asset_revisions.id
+                          AND effective_visual_geometry.width {comparison} effective_visual_geometry.height)
+                    """);
+            }
         }
 
         if (filter.Age is not null)
