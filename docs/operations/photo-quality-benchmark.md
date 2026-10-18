@@ -1321,3 +1321,66 @@ decision before independently verifying pretrained weights and
 license terms, or reintroduce automatic Very Low exclusion.
 An explicit pre-registration/no-go decision is required before
 any one-time sealed held-out evaluation.
+
+## WI-0193 checkpoint 15: create a review-only fixed TOPIQ ranking proposal
+
+Five-fold calibration-only ranking results over 238 known-tier photos:
+with score-gap cutoff at the 75th percentile of training differences,
+TOPIQ expressed an ordering for **1441/5635 = 25.57%** of potential
+within-fold pairs, with **90.27%** correct ordering on selected
+pairs whose **human tiers actually differ**. MUSIQ scored **89.75%**
+at ~25% all-pair coverage. TOPIQ at the 90th percentile reached
+97.4% conditional ordering at only 10.65% coverage. These
+are exploratory calibration results with correlated pairs,
+not held-out or production precision claims.
+
+**The fixed-threshold research hypothesis to review:** TOPIQ NR
+`pyiqa-topiq_nr-0.1.16`, immutable `jpeg-1600-q78` proxy
+input, **75th percentile** of raw-score differences across
+all 238 rated representative calibration photos.
+The five-fold study used distinct fold-specific cutoffs; to
+evaluate on an untouched future cohort, one reproducible
+fixed numeric cutoff must first be calculated **without using
+held-out labels**.
+
+When checkpoint 15 has merged:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch features/m37
+git pull --ff-only origin features/m37
+
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/ranking_freeze_proposal.py `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores-600.json `
+  --output private/wi0193-topiq-p75-ranking-freeze-proposal.json
+~~~
+
+This is offline and lightweight: **no PyTorch/model inference,
+photo decoding, network activity or archive changes**. It reads
+only representative *calibration* human ratings to establish the
+238-photo eligibility group; it never looks at sealed held-out
+human reviews. It verifies complete 600-photo candidate coverage,
+zero inference failures, score direction and frozen proxy profile.
+The output is an **exclusively created, private draft** with score
+export/calibration fingerprints, fixed numeric score-gap threshold,
+and the explicit abstention/pairwise-order rule. It will refuse
+to overwrite an existing file.
+
+The console prints only the candidate, gap quantile, calibration
+cohort size, number of pairs, numeric threshold and always-false
+approval flags. Please share this **aggregate console JSON**, not
+the private full draft, benchmark, per-photo scores or photo paths.
+
+This stage does **not freeze or authorize** the candidate:
+`researchHypothesisFrozen=false`,
+`heldOutEvaluationAllowed=false`,
+`productionModelApproved=false`,
+`automaticVeryLowExclusionApproved=false`.
+An explicit next-stage review is required before the one-time
+held-out evaluation. We must preserve the distinction between
+selective pairwise score ordering and an absolute photo-quality
+tier or universal slideshow ranking algorithm. The preliminary
+mapping-based Low/Normal/High classifiers are rejected, and
+automatic Very Low exclusion remains no-go.
