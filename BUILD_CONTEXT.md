@@ -4,6 +4,30 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 16 (2026-10-18):** Maintainer explicitly approved
+a **research-only TOPIQ NR p75 ranking freeze** after checkpoint 15's
+aggregate-only local proposal: candidate `pyiqa-topiq_nr-0.1.16`,
+`jpeg-1600-q78` review proxies, higher-is-better, exact fixed
+absolute raw-score gap `0.16755089163780212` from 238 calibration
+photos (28,203 pairs). Prefer higher score only at positive gap >=
+that threshold; otherwise abstain. Frozen research pass criteria:
+>=80% correct selected different-tier pairs, >=20% all-pair
+decision coverage, >=80% correct selected >=2-tier pairs; require
+nonzero qualifying denominators and report photo-resampled
+uncertainty and same-tier choices. Candidate/quantile selection
+was exploratory; no held-out tuning or alternative candidates.
+
+The new `ranking_freeze.py` **local-only** attestation verifies the
+unchanged private checkpoint-15 proposal and complete calibration
+score evidence before writing a new private frozen record.
+Maintainer must run it locally after this checkpoint PR merges.
+**No held-out evaluator or access authorized yet**; held-out/challenge
+human reviews remain sealed. No PyTorch inference or production
+model, ranking, automatic exclusion, checkpoint-mapping or license
+approval. Future evaluator requires separate code review and explicit
+maintainer run authorization. See WI-0193 and benchmark runbook.
+M37 PRs target `features/m37`.
+
 
 **WI-0193 checkpoint 15 (2026-10-18):** Maintainer ran five-fold
 within-calibration selective TOPIQ/MUSIQ comparison on 238 photo

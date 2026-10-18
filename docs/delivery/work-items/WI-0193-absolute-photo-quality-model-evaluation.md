@@ -693,3 +693,49 @@ a separate work stage and **never run as part of this PR**.
 No production ranker, archive evidence, rating, automatic exclusion,
 Search/Smart/Creative/Slideshow behavior or licensing status is
 changed in this checkpoint.
+
+## Checkpoint 16: TOPIQ ranking-only research freeze approved; held-out still sealed
+
+On **2026-10-18**, after the maintainer's successful offline checkpoint-15
+proposal, the maintainer explicitly instructed: **freeze TOPIQ with the
+suggested threshold**. The decision and the research success criteria were
+recorded in issue #536. This is not approval to consult held-out human
+ratings, deploy an IQA model or exclude images automatically.
+
+The single frozen hypothesis is `pyiqa-topiq_nr-0.1.16` using
+`jpeg-1600-q78` proxies, with higher score better and exact positive
+absolute score-gap cutoff **`0.16755089163780212`** (75th percentile
+of the 28,203 unordered score gaps from 238 calibration photos).
+When the gap is smaller, or zero, **abstain**; when it meets the
+cutoff, prefer the higher-scoring photo. Never change this number after
+seeing held-out results. No absolute five-tier/three-tier labels, Very
+Low exclusions, production ranking or photo filtering are sanctioned.
+
+Predeclared **held-out research** criteria on the 160 representative
+held-out photos: >=80% correct different-tier ordering on selected
+pairs (and >0 such pairs), >=20% all-pair preference coverage, and
+>=80% correct selected comparisons >=2 human tiers apart (and >0).
+Report counts, abstentions, same-tier decisions and photo-level uncertainty;
+do not treat pairwise comparisons as independent. Candidate and quantile
+came from exploratory calibration screening, so the freeze does not remove
+selection bias. Only one held-out evaluation is permitted after a later,
+**separate explicit** authorization.
+
+`ranking_freeze.py` creates a **private, local** attestation of this
+approval. It verifies the previously saved proposal against the
+complete benchmark/score export, checks private calibration/score
+fingerprints, and insists on the exact cut-off and candidate.
+The original private proposal stays unchanged and correctly reports
+`review-proposal-not-frozen`. The new attestation sets
+`researchHypothesisFrozen=true`, but retains
+`heldOutEvaluationAllowed=false`, `heldOutLabelsAccessed=false`,
+`productionModelApproved=false`,
+`automaticVeryLowExclusionApproved=false`,
+`checkpointLoadedIdentityVerified=false`, and
+`frameworkAndCheckpointLicenseApproved=false`.
+
+The next checkpoint must implement and review a one-shot gated
+held-out evaluator; it is **not** run or authorized in checkpoint 16.
+The maintainer next runs the offline attestation command from the
+operations runbook and shares its aggregate console JSON. Neither
+private calibration evidence nor held-out ratings are committed.
