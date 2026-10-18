@@ -134,6 +134,39 @@ public sealed class PostgresSmartCollectionOrientationTests
             Assert.Equal(2, snapshot.RevisionIds.Count);
             Assert.Contains(cataloguePortrait, snapshot.RevisionIds);
             Assert.Contains(proxyPortrait, snapshot.RevisionIds);
+
+            // The slow maintained workload combines named-place location with
+            // orientation. The exact count must match the existing full query
+            // and prefer review-proxy geometry over catalogue dimensions.
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
+            const string place = "Sweden/Stockholms län/Stockholm";
+            await places.SetManualPlaceAsync(proxyPortrait, place, "test");
+            await places.SetManualPlaceAsync(proxyLandscape, place, "test");
+            await places.SetManualPlaceAsync(catalogueLandscape, place, "test");
+
+            SmartCollectionFilter locatedPortrait = new(
+                locationPlace: "Sweden/Stockholms län",
+                orientation: SmartCollectionOrientations.Portrait);
+            SmartCollectionPhotoPage locatedPortraitPage =
+                await query.QueryAsync(locatedPortrait, limit: 1);
+            Assert.Equal(1, locatedPortraitPage.Total);
+            Assert.Equal(proxyPortrait, Assert.Single(locatedPortraitPage.Items).RevisionId);
+
+            SmartCollectionFilter locatedLandscape = new(
+                locationPlace: "Sweden/Stockholms län",
+                orientation: SmartCollectionOrientations.Landscape);
+            SmartCollectionPhotoPage locatedLandscapePage =
+                await query.QueryAsync(locatedLandscape, limit: 1);
+            Assert.Equal(2, locatedLandscapePage.Total);
+            Assert.Single(locatedLandscapePage.Items);
+            Assert.Equal(2, (await query.QueryAllAsync(locatedLandscape)).Count);
+
+            // Effective-place latest-action semantics remain intact after
+            // clearing a manually chosen place.
+            await places.ClearManualPlaceAsync(proxyLandscape, "test");
+            SmartCollectionPhotoPage afterClear = await query.QueryAsync(locatedLandscape);
+            Assert.Equal(1, afterClear.Total);
+            Assert.Equal(catalogueLandscape, Assert.Single(afterClear.Items).RevisionId);
         }
         finally
         {
