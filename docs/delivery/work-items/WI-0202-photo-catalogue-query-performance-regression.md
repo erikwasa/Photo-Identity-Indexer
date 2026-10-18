@@ -136,3 +136,16 @@ This is a reproducible non-concurrency-specific latency pattern, *not* a persist
 The query's COUNT and page phases now emit separate 1-second-threshold structured warning timings with only filter-dimension presence booleans (no collection, photo, person, place or tag identifiers, GPS bounds, query SQL or parameters). The local sequential cover probe additionally shows safe filter dimension labels by ordinal. PostgreSQL disposable integration assertions verify exact count/page behavior with no filters, person-only, date-only, geo-only, geo+date and existing age/relationship cases.
 
 **Still unverified:** The effect on the real maintainer's #7/#13/#14 is unknown until this PR builds, is packaged and is measured locally; PostgreSQL might already eliminate some unused joins. If timings remain high, compare slow-phase logs and collect locally scoped estimated plans on an isolated restored catalogue, rather than speculating or increasing timeouts. Query semantics and database indexes/retention are unchanged apart from this narrowly conditional count SQL.
+
+
+## Targeted page/count bottlenecks after PR #594 — 2026-10-18
+
+A post-PR-#594 packaged application trial completed 28/28 Smart Collection requests in two sequential cover passes; all were HTTP 200. The anonymous stable ordinals retained:
+- **#7, people + relationship**: 5,965 / 6,061 ms (pre-#594: 9,718 / 9,811 ms). The attached API stdout separately reports **page phases 4,986 / 5,123 ms**. The query still has a repeatable ~5-second page bottleneck; the previous full-request improvement was ~38%, not a complete fix.
+- **#13, named place + orientation**: 2,096 / 2,090 ms. The API stdout reports **count phases 1,982 / 1,980 ms**.
+- **#14, named place + orientation**: 2,262 / 2,150 ms. The API stdout reports **count phases 2,148 / 2,090 ms**.
+- All remaining 11 saved collections: 111–267 ms except within the same low-hundreds range; no HTTP errors observed.
+
+**Next scoped SQL trial:** only relationship-filtered QueryAsync pages use an explicitly MATERIALIZED page-selection CTE, ordered and limited *before* person-array/effective-place hydration; all other page SQL remains unchanged. Only the COUNT for combined named-place + orientation filters uses an indexed, per-revision LATERAL latest-review-proxy lookup, matching the previous latest generated-at / profile tie-break, and compares the same proxy-first dimensions with catalogue fallback. All other counts and all other CTE semantics remain unchanged. The latest effective place continues to use the original authoritative CTE. No new index, schema version, cleanup, persistence mutation or approximate count is introduced.
+
+Disposable PostgreSQL correctness tests compare a relationship+people paged result, metadata and total against QueryAllAsync; place+orientation tests assert portrait/landscape exact totals, proxy override, limit=1 and latest-place clear behavior. Only the operator's two-pass measurement after merge will establish whether this SQL plan performs better. If it does not, collect sanitized estimated plans locally on an isolated representative restored DB and revise; do not assert a speedup from SQL shape alone.

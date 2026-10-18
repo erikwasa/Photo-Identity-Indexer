@@ -262,7 +262,12 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         }
 
         await EnsureFamilySchemaAsync(cancellationToken);
+        bool scopedOrientationCount = filter.LocationPlaces.Count > 0 &&
+            filter.Orientation != SmartCollectionOrientations.Any;
         string where = BuildWhere(filter);
+        string countWhere = scopedOrientationCount
+            ? BuildWhere(filter, scopedOrientationCount: true)
+            : where;
         string countJoins = BuildCountJoins(filter);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
@@ -279,7 +284,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 {countJoins}
                 WHERE assets.deleted_at_utc IS NULL
                   AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
-                  {where};
+                  {countWhere};
                 """;
             AddFilterParameters(count, filter);
             try
@@ -297,7 +302,9 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
 
         Stopwatch pageTimer = Stopwatch.StartNew();
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = $"""
+        command.CommandText = filter.Relationship is not null
+            ? BuildRelationshipPageSql(where)
+            : $"""
             {CommonCtes}
             SELECT
                 asset_revisions.id,
@@ -576,6 +583,72 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 reader.GetFieldValue<DateOnly>(fromOrdinal),
                 reader.GetFieldValue<DateOnly>(toOrdinal));
 
+    // First pick the exact relationship-filtered page before projecting the
+    // full people array and effective place. This preserves pagination order,
+    // exact counts and photo-only scope, while bounding enrichment to LIMIT.
+    private static string BuildRelationshipPageSql(string where) => $"""
+        {CommonCtes},
+        page_matches AS MATERIALIZED (
+            SELECT
+                asset_revisions.id,
+                asset_revisions.asset_id,
+                asset_revisions.observed_at_utc,
+                asset_revisions.media_type,
+                asset_revisions.width,
+                asset_revisions.height,
+                photo_capture_metadata.taken_at_local,
+                photo_capture_metadata.latitude,
+                photo_capture_metadata.longitude,
+                effective_capture_dates.date_from,
+                effective_capture_dates.date_to,
+                effective_capture_dates.source
+            FROM asset_revisions
+            INNER JOIN assets ON assets.id = asset_revisions.asset_id
+            LEFT JOIN photo_capture_metadata
+                ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN effective_capture_dates
+                ON effective_capture_dates.revision_id = asset_revisions.id
+            WHERE assets.deleted_at_utc IS NULL
+              AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
+              {where}
+            ORDER BY
+                effective_capture_dates.date_from DESC NULLS LAST,
+                effective_capture_dates.date_to DESC NULLS LAST,
+                photo_capture_metadata.taken_at_local DESC NULLS LAST,
+                asset_revisions.observed_at_utc DESC,
+                asset_revisions.id
+            LIMIT @limit OFFSET @offset
+        )
+        SELECT
+            page_matches.id,
+            page_matches.asset_id,
+            page_matches.observed_at_utc,
+            page_matches.media_type,
+            page_matches.width,
+            page_matches.height,
+            page_matches.taken_at_local,
+            page_matches.latitude,
+            page_matches.longitude,
+            ARRAY(
+                SELECT revision_people.person_id::text
+                FROM revision_people
+                WHERE revision_people.revision_id = page_matches.id
+                ORDER BY revision_people.person_id::text),
+            page_matches.date_from,
+            page_matches.date_to,
+            page_matches.source,
+            effective_revision_places.display_value
+        FROM page_matches
+        LEFT JOIN effective_revision_places
+            ON effective_revision_places.revision_id = page_matches.id
+        ORDER BY
+            page_matches.date_from DESC NULLS LAST,
+            page_matches.date_to DESC NULLS LAST,
+            page_matches.taken_at_local DESC NULLS LAST,
+            page_matches.observed_at_utc DESC,
+            page_matches.id;
+        """;
+
     // Keep the COUNT path dependent only on the dimensions used by its predicate.
     // The page query still needs metadata and capture dates for sorting/projection.
     // Other filter dimensions use their own CTE-based EXISTS/IN predicates.
@@ -596,6 +669,20 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             joins.Add("""
                 LEFT JOIN effective_capture_dates
                     ON effective_capture_dates.revision_id = asset_revisions.id
+                """);
+        }
+
+        if (filter.LocationPlaces.Count > 0 &&
+            filter.Orientation != SmartCollectionOrientations.Any)
+        {
+            joins.Add("""
+                LEFT JOIN LATERAL (
+                    SELECT proxy.width, proxy.height
+                    FROM asset_revision_review_proxies AS proxy
+                    WHERE proxy.asset_revision_id = asset_revisions.id
+                    ORDER BY proxy.generated_at_utc DESC, proxy.profile_id
+                    LIMIT 1
+                ) AS count_review_proxy ON TRUE
                 """);
         }
 
@@ -627,7 +714,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             filter.Orientation != SmartCollectionOrientations.Any);
     }
 
-    private static string BuildWhere(SmartCollectionFilter filter)
+    private static string BuildWhere(SmartCollectionFilter filter, bool scopedOrientationCount = false)
     {
         List<string> predicates = [];
 
@@ -695,13 +782,25 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         if (filter.Orientation != SmartCollectionOrientations.Any)
         {
             string comparison = filter.Orientation == SmartCollectionOrientations.Landscape ? ">" : "<";
-            predicates.Add($"""
-                AND EXISTS (
-                    SELECT 1
-                    FROM effective_visual_geometry
-                    WHERE effective_visual_geometry.revision_id = asset_revisions.id
-                      AND effective_visual_geometry.width {comparison} effective_visual_geometry.height)
-                """);
+            if (scopedOrientationCount)
+            {
+                // Same proxy precedence as the full effective geometry CTE.
+                // Null or square dimensions fail both orientation predicates.
+                predicates.Add($"""
+                    AND COALESCE(count_review_proxy.width, asset_revisions.width)
+                        {comparison} COALESCE(count_review_proxy.height, asset_revisions.height)
+                    """);
+            }
+            else
+            {
+                predicates.Add($"""
+                    AND EXISTS (
+                        SELECT 1
+                        FROM effective_visual_geometry
+                        WHERE effective_visual_geometry.revision_id = asset_revisions.id
+                          AND effective_visual_geometry.width {comparison} effective_visual_geometry.height)
+                    """);
+            }
         }
 
         if (filter.Age is not null)

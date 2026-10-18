@@ -106,3 +106,21 @@ git pull --ff-only
 The probe now prints safe **FilterDimensions** labels by ordinal without the underlying values. For any slow result, compare the local API console/log entries beginning with "WI-0202 slow Smart Collection count phase" or "WI-0202 slow Smart Collection page phase". These log only per-phase milliseconds and filter presence flags, not identities. Share only those sanitized timing lines and the sanitized two-pass table; keep full logs private.
 
 If the slow time comes mostly from **count**, next isolate that filter's COUNT plan. If mostly **page**, focus on sort/projection and the effective date/person/place CTEs. In either case use a verified isolated restored database for parameterized estimated EXPLAIN, and preserve the exact count/filter/ordering contract.
+
+
+## Post-#594 isolated phases and next selective SQL trial
+
+Maintainer's second two-pass baseline on the packaged PostgreSQL app: #7 people+relationship **5,965/6,061 ms** (logged page phase **4,986/5,123 ms**); #13 named-place+orientation **2,096/2,090 ms** (logged count **1,982/1,980 ms**); #14 named-place+orientation **2,262/2,150 ms** (logged count **2,148/2,090 ms**). Other covers stayed around 111–267 ms. All **28/28** returned HTTP 200.
+
+The next narrow experiment changes only two SQL cases: (a) relationship-filtered paged queries first select the ordered LIMIT/OFFSET revisions in a MATERIALIZED CTE and then hydrate the selected people arrays and place; (b) named-place+orientation exact counts use a LATERAL lookup of the latest review proxy per asset revision and the identical proxy-first-or-catalogue geometry comparison. Existing photo-kind, exclusion, date, ordering, people, place, any/all and null geometry semantics must remain stable. Existing unaffected filters retain their original SQL paths.
+
+After PR merge, rebuild/restart the packaged API, then rerun the same anonymous probe:
+
+~~~powershell
+git pull --ff-only
+.\Package-PhotoIdentity.ps1 -Configuration Release
+# Start the application with your normal launcher, then:
+.\tools\PhotoIdentity.PostgresDiagnostics\measure-smart-cover-latency.ps1 -BaseUrl 'http://127.0.0.1:5080' -Repetitions 2 -TimeoutSeconds 35
+~~~
+
+Compare **#7/#13/#14** against both baselines and share only the sanitized probe table and any new "WI-0202 slow Smart Collection" phase lines. No maintenance on the unrelated ~10 GB historical face-clustering indexes is needed for this SQL experiment.
