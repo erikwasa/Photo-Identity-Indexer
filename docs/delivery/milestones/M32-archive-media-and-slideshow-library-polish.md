@@ -63,7 +63,7 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 - [ ] Smart Collection authoring supports portrait/landscape filtering with correct existing-catalogue behavior and presents optional filters progressively rather than keeping inactive detail fields visible.
 - [ ] Playback/Creative authoring checkboxes and duration controls are clearly aligned, associated and phone-friendly.
 - [ ] Manual collections can be reordered oldest/newest in one action without losing explicit manual ordering semantics.
-- [ ] Technical photo-quality scoring has representative evaluation evidence and a documented adoption/no-adoption decision before it changes selection behavior.
+- [x] Technical photo-quality scoring has representative evaluation evidence and a documented adoption/no-adoption decision before it changes selection behavior.
 - [ ] Maintainer verifies the remaining slideshow/PWA behavior on desktop and phone and the Creative scale case on representative private catalogue data.
 
 ## Maintainer verification update — 2026-10-04
@@ -71,3 +71,10 @@ This milestone remains follow-up work rather than a slideshow redesign. It does 
 Maintained verification accepted WI-0171 (phone slideshow grid artifacts), WI-0175 (slideshow catalogue/reload reliability) and WI-0177 (unified slideshow library). WI-0178 is therefore unblocked and ready for implementation.
 
 WI-0165 remains open: counts are correct and standalone **Prepare originals** shows **Prepared**, but player-triggered preparation still does not establish the library Prepared state and a page reload does not restore a previously visible Prepared state. Issue #499 tracks those remaining acceptance failures. M32 remains in progress.
+
+
+## WI-0182 evaluation closure — 2026-10-18
+
+The maintainer reviewed the 300-photo deterministic `proxy-technical-quality-v1` sample; it was useful to identify unreliable whole-image sharpness/exposure indicators, but was **not** sufficiently representative to select a replacement model. The WI-0182 result is a completed **no-adoption** evaluation, not an implementation failure: the rule-based quality reasons remain an inspectable offline diagnostic only, with **no** Creative/Smart selection, automatic exclusion, deletion, ranking or catalogue persistence.
+
+The successor M37 benchmark (WI-0192) provided broader representative, blinded human quality review. WI-0193 confirmed that absolute photo-quality tiers / Very Low exclusion have no supported production policy; a frozen TOPIQ selective pairwise ordering rule met three *point-estimate* one-time held-out research criteria, but has not cleared model licensing or production release gates. The 95% photo-bootstrap interval for overall selected ordering extends below the 80% threshold. M37 WI-0194/WI-0195 remain separate experimental work and must not reuse the consumed quality held-out labels for tuning. The canonical delivery status marks M32 complete after WI-0182 was archived as its final nonterminal workitem. Other acceptance statements in this document describe earlier verification checkpoints; their historical unchecked boxes should not be mistaken for active WI-0182 obligations.

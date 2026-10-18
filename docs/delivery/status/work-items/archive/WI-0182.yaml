@@ -1,0 +1,27 @@
+id: WI-0182
+title: Evaluate automatic technical photo quality scoring
+milestone: M32
+status: completed
+owner: ai-agent
+branch: agent/WI-0182-photo-quality-evaluation
+started_at: 2026-10-04
+completed_at: 2026-10-18
+verified_at: 2026-10-18
+verified_by: erikwasa
+last_updated_at: 2026-10-18
+document: ../work-items/WI-0182-photo-quality-scoring-evaluation.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/490
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/509
+- type: documentation
+  value: docs/operations/photo-quality-evaluation.md
+- type: documentation
+  value: docs/delivery/work-items/WI-0193-absolute-photo-quality-model-evaluation.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/584
+- type: maintainer-acceptance
+  value: '2026-10-14 Europe/Stockholm: maintainer reviewed all 300 WI-0182 diagnostic sample photos. 2026-10-18: successor M37 work confirmed no adoption of rule-based proxy-technical-quality-v1 for ranking, filtering or exclusion; original sample not representative for selection. Preserve raw evidence harness; no production quality policy approved.'

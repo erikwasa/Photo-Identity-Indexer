@@ -36,7 +36,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M29 | PostgreSQL-only catalogue cleanup | completed |
 | M30 | Video media support | in_progress |
 | M31 | Bulk archive metadata enrichment | completed |
-| M32 | Archive media compatibility and slideshow library polish | in_progress |
+| M32 | Archive media compatibility and slideshow library polish | completed |
 | M33 | Archive synchronization performance | completed |
 | M34 | Review queue reliability | completed |
 | M35 | Identity assignment audit and calibration | completed |
