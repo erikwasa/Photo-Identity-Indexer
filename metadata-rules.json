@@ -1,6 +1,0 @@
-{
-  "inferDateFromFilename": true,
-  "inferDateFromDirectory": true,
-  "excludedDateDirectories": ["1970"],
-  "placeRules": []
-}
