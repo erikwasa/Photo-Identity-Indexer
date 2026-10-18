@@ -7,6 +7,17 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/Dotnet.gitignore
 
+# Python-generated artifacts
+__pycache__/
+*.py[cod]
+
+# Local archive metadata and review helpers
+/metadata-fideli-hospitals-clear.json
+/metadata-fideli-sodersjukhuset-default.json
+/metadata-place-rules-tier1.json
+/metadata-rules.json
+/rate.md
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
