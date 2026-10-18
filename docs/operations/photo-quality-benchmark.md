@@ -1384,3 +1384,79 @@ selective pairwise score ordering and an absolute photo-quality
 tier or universal slideshow ranking algorithm. The preliminary
 mapping-based Low/Normal/High classifiers are rejected, and
 automatic Very Low exclusion remains no-go.
+
+
+## WI-0193 checkpoint 16: maintainer-approved TOPIQ p75 research freeze
+
+On **2026-10-18**, after receiving the private, aggregate-only
+checkpoint-15 proposal output, the maintainer explicitly approved
+freezing **TOPIQ NR** at the single fixed raw-score gap
+**`0.16755089163780212`**. This is a *research hypothesis freeze*,
+not a model deployment, held-out label access, absolute photo rating,
+collection/slideshow preference change or automatic photo exclusion.
+Issue #536 records the decision and the predeclared research endpoints.
+
+Frozen design:
+
+- Candidate `pyiqa-topiq_nr-0.1.16`; score direction **higher is better**;
+  input `jpeg-1600-q78` durable review proxies.
+- 75th percentile of 28,203 unordered raw-score gaps from the 238 already
+  reviewed representative calibration photos; this historical origin
+  explains the threshold but **does not permit recalculation** after freeze.
+- For any two distinct photo scores, express a preference for the
+  higher-scored photo only when their absolute score difference is at least
+  `0.16755089163780212` and strictly positive. Otherwise abstain.
+  Same-tier human labels cannot be used at inference time.
+- Research criteria for the **single representative held-out evaluation**:
+  >=80% correct ordering among selected different-human-tier pairs (nonzero
+  selected denominator), >=20% decision coverage among all unordered pairs,
+  and >=80% correct ordering among selected pairs with >=2-tier human
+  difference (nonzero selected denominator).
+- Report all pair counts and denominators, abstentions, same-tier selected
+  pairs, missing/failed score handling and photo-resampled uncertainty.
+  Do not switch candidates, revise the cutoff, or repeat evaluation based on
+  held-out outcomes. These exploratory-model-selection caveats remain
+  material even if the held-out criteria pass.
+
+The existing private checkpoint-15 proposal still correctly says
+`review-proposal-not-frozen`; **do not edit it manually**. Instead use
+the new *offline, standard-library-only* local attestation command,
+after merging this checkpoint to `features/m37`:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch features/m37
+git pull --ff-only origin features/m37
+
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_ranking_freeze.py
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/ranking_freeze.py `
+  --proposal private/wi0193-topiq-p75-ranking-freeze-proposal.json `
+  --input private/photo-quality-benchmark.json `
+  --scores private/topiq_nr-scores-600.json `
+  --output private/wi0193-topiq-p75-ranking-frozen.json
+~~~
+
+The attestor deterministically regenerates the *calibration-only* proposal
+from the private unchanged benchmark and complete existing TOPIQ score export,
+then requires exact equality with the stored proposal, proposal and evidence
+fingerprints, candidate, score direction, proxy profile and **exact**
+approved cutoff. It fails closed on any drift. The private attestation
+records fingerprinted evidence and the fixed research criteria; its console
+prints **aggregate-only** fields suitable to share with the developer. It
+refuses to overwrite an existing output. No image data, PyTorch models,
+inference or held-out/challenge *human ratings* are accessed.
+
+The private attestation sets `researchHypothesisFrozen=true`, while
+`heldOutEvaluationAllowed=false`, `heldOutLabelsAccessed=false`,
+`productionModelApproved=false` and
+`automaticVeryLowExclusionApproved=false`. It must remain private; never
+commit the full attestation, proposal, score JSON or benchmark manifest.
+
+**Next gate:** developer implements and reviews a separately guarded,
+one-shot held-out evaluator. Running it requires a *later, explicit*
+maintainer authorization. No sealed held-out labels may be accessed by this
+checkpoint. Independently verify model/checkpoint provenance and license
+rights before even considering deployment.
