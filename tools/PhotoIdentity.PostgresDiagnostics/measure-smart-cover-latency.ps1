@@ -19,7 +19,12 @@ if ($root -notmatch '^https?://(127\.0\.0\.1|localhost)(:\d+)?$') {
 # Wrapping that command directly in @() can accidentally create an array of arrays;
 # the wrapper has no per-collection Id. Materialize the response first, then explicitly
 # enumerate its entries so a one-item, many-item and empty response behave equally.
-$definitionPayload = Invoke-RestMethod -Uri "$root/api/smart-collections" -TimeoutSec $TimeoutSeconds
+try {
+    $definitionPayload = Invoke-RestMethod -Uri "$root/api/smart-collections" -TimeoutSec $TimeoutSeconds
+}
+catch {
+    throw "Cannot retrieve saved Smart Collections. Start Photo Identity and confirm $root/health succeeds. $($_.Exception.Message)"
+}
 if ($null -eq $definitionPayload) {
     throw "Saved Smart Collection endpoint returned no JSON payload."
 }
