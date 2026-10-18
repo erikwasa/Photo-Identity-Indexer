@@ -5,6 +5,28 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 ## Current focus
 
 
+**WI-0193 checkpoint 14 (2026-10-18) calibration diagnostic:** PR #579
+merged; maintainer three-band confusion results show TOPIQ NR
+37.4% accuracy/49.9% balanced accuracy/23.4% Normal recall;
+MUSIQ 37.8%/48.5%/26.0%, versus constant Normal 64.7%
+accuracy without ranking. Both predict High-or-above for 102/238
+photos with just 25 (TOPIQ) / 21 (MUSIQ) truly High-or-above;
+reject both median-midpoint **absolute classification** drafts,
+not necessarily the learned model raw-score **ranking** signal.
+The new `calibration_selective_ranking.py` is an offline-only,
+5-fold within-calibration score-gap abstention diagnostic on the
+already-scored TOPIQ/MUSIQ proxy exports. Predeclared 0/50/75/90%
+train-only gap quantile cutoffs, validation within-fold photo
+pairs; reports overall decision coverage, different-tier and
+>=2-tier ordering accuracy. Exact content duplicates in one fold;
+near duplicate and pair-independence limitations noted. NO
+held-out/challenge human labels inspected and no IQA inference,
+production ranker, tier mapping, exclusion or checkpoint licensing
+approved. Next: request aggregate local output and decide on
+ranking-only pre-registration or explicit WI-0193 no-go.
+
+
+
 WI-0193 checkpoint 13 calibration-draft evidence: Maintainer ran
 existing 600-proxy-score TOPIQ/MUSIQ 3-band drafts on 238 reviewed
 representative calibration photos. Low/Normal/High anchor n=38/154/42;
