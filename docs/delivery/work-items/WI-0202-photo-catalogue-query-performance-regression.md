@@ -74,3 +74,20 @@ Focused automated Postgres/API tests and explicit maintained Windows acceptance 
 - Safety gates and commands run:
 - Maintainer acceptance:
 - Deferred work:
+
+## Maintained Windows recovery checkpoint — 2026-10-18
+
+**Operator result: all five photo-only local checks passed after targeted `ANALYZE VERBOSE`.** Archive loads completely, a previously failing person-filtered Smart Collection works, an existing working collection still works, the Slideshow library/covers populate and Archive/Slideshows succeed again on repeat. These are maintainer-reported functional results, not isolated CI measurements.
+
+Sanitized evidence from the operator's private PowerShell transcript and the corresponding packaged API log:
+
+- The same PostgreSQL 18.6 / schema-v33 catalogue reported **27,076 actual assets and 27,076 actual asset revisions**. Before maintenance, `pg_class.reltuples` was about **27,068** for each—already near the true counts—while `pg_stat_user_tables.n_live_tup` was **8**, a cumulative monitoring estimate **not** the planner estimate. Existing `pg_stats` rows were present for most inspected relations; only the tiny `photo_tag_actions` table had no recorded column statistics. `autovacuum` and `track_counts` were both `on`.
+- `ANALYZE VERBOSE` completed successfully for all **11** selected photo-query tables. PostgreSQL reported **27,076 live asset rows** and **27,076 live revision rows** during the refresh. No SQL/DDL application patch or catalogue restore was performed as part of this evidence.
+- Health reported `status=ok`, `catalogueProvider=postgresql`, PostgreSQL `ready`, schema **33**.
+- Archive status: **four HTTP 200** completions in the attached API log, approximately **0.91–1.09 s**; a separate repeated PowerShell request succeeded with HTTP 200 in **1.49 s**. First Archive page: **two HTTP 200** at roughly **188 ms**.
+- Saved Smart slideshow cover filters: **14/14 HTTP 200** in the attached log, including **all seven previously timing-out filter definitions**. Median approximately **246 ms**; three exceeded one second and the slowest took **10.42 s**. An ad hoc person-based Smart Collection query returned HTTP 200 in about **332 ms**.
+- The submitted post-maintenance log contains **no HTTP 499/500 or recorded application exceptions**. The five reported UI verification items all passed, including a second Archive/Slideshow visit.
+
+**Causal inference limits:** the recovery followed `ANALYZE`, and it is the only recorded database maintenance trial in the supplied output, making planner-statistics refresh a strong operational recovery candidate. However, the pre-maintenance `reltuples` estimates were already close and usable `pg_stats` rows existed, so claiming that all tables had missing or grossly stale *planner* estimates would be incorrect. No pre/post SQL plans were saved; the precise plan change and whether the incident was caused by reset activity counters, different filter cardinality or another planner statistic cannot be proven from these logs. The supplied transcript does **not** include the backup/restore-verification result or post-`ANALYZE` stats snapshot; do not claim either was checked.
+
+**Disposition:** restored in the maintained environment; progress to **in_review**, not terminal completion. Preserve this [safe manual recovery procedure](../../operations/postgres-photo-query-regression-wi0202.md) and do not add unconditional startup `ANALYZE` or increase query timeouts on this evidence alone. Review outstanding backup evidence and the intermittent **10.42 s** saved cover latency, and repeat after a future independent cold start or representative restore before deciding final completion or a narrower performance follow-up. WI-0151 photo-only blocker symptoms are cleared by local verification, but that does not certify any unrelated WI-0151 acceptance gates.

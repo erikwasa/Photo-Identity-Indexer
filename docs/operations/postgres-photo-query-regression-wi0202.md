@@ -74,3 +74,11 @@ Use an isolated representative restored DB for further experiments. Investigate:
 Required before WI-0202 and WI-0151 can be accepted: Archive fully loads; saved fast+previously failing Smart Collection filters and ad hoc people-based query return correct photos/counts; full Slideshow library and covers load without the observed timeouts; repeat once after a new app start. Save only privacy-safe timings/counts and test outcomes in the work item.
 
 This runbook **records a hypothesis and trial**, not a completed fix or authorization to modify the production database.
+
+## F. Observed maintained-host outcome (2026-10-18)
+
+The maintainer used the bounded `ANALYZE VERBOSE` trial and reported all five Archive/Smart Collection/Slideshow local checks passing. Post-maintenance API observations: Archive status four HTTP 200 in 0.91–1.09 s, first Archive page two HTTP 200 around 188 ms; fourteen distinct saved slideshow-cover Smart filters HTTP 200 (median 246 ms, maximum 10.42 s) including all seven that formerly timed out; an ad hoc Smart filter HTTP 200 around 332 ms. The health endpoint reported PostgreSQL ready and schema v33. No HTTP 499/500 or exceptions appeared in the supplied new log.
+
+**Important interpretation correction:** Before `ANALYZE`, `n_live_tup=8` for assets/revisions was a misleading cumulative monitoring counter, but `pg_class.reltuples` estimated **27,068** vs **27,076** actual rows, and most examined tables already had `pg_stats` entries. Therefore neither missing table contents nor wholly absent planner statistics are established. The plan change responsible for the improvement is **unproven** without before/after plans. Do not use this incident to justify always running `ANALYZE` on every application startup.
+
+Remaining checks for the WI-0202 review: confirmation of backup/restore verification (not included in the submitted excerpt), post-refresh statistics snapshot, and whether the 10.42-second saved-cover tail recurs after cold restart. If it does, diagnose the count/page SQL and plan shape on an isolated restored catalogue. If it does not, retain this documented **operator-triggered, backed-up** maintenance runbook as the recovery path.
