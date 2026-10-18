@@ -141,7 +141,7 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
                 familyPageFilter, offset: 0, limit: 1);
             SmartCollectionPhoto[] familyAll = (await query.QueryAllAsync(familyPageFilter)).ToArray();
             Assert.Equal(familyAll.Length, familyPage.Total);
-            Assert.Equal(1, familyPage.Items.Count);
+            Assert.Single(familyPage.Items);
             Assert.Equal(familyAll[0].RevisionId, familyPage.Items[0].RevisionId);
             Assert.Equal(
                 familyAll[0].PeopleKeys?.Order(StringComparer.Ordinal),
