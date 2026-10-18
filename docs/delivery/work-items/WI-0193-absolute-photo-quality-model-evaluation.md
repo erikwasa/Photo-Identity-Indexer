@@ -782,3 +782,71 @@ aggregate console result before any separate held-out permission
 is considered. No one-time held-out evaluation is performed in this
 PR. No production inference, score persistence, auto exclusion,
 Search/Smart/Creative/Slideshow changes or licensing approval.
+
+## Checkpoint 18: one-time held-out evaluation finished — selective ranking research success, absolute tiers no-go
+
+On **2026-10-18**, after PR #583 merged and a sealed local preflight
+passed, the maintainer separately authorized the one-time held-out
+TOPIQ evaluation. The maintainer ran `heldout_ranking_one_shot.py
+--mode evaluate` **once**, shared only the aggregate console result,
+and reported `status=held-out-research-evaluated-once`. The evaluation
+used the existing complete `pyiqa-topiq_nr-0.1.16` immutable
+`jpeg-1600-q78` review-proxy scores with **the exact frozen
+absolute raw-score gap `0.16755089163780212`**. No new inference
+or cutoff fitting was performed.
+
+The 160 representative held-out photos included 157 with known
+five-tier human reviews, three unsure/unrated, and zero score failures.
+Of **12,720** unordered photo pairs, **4,157** met the preference
+cutoff (32.68% coverage) and **8,563** were abstained. There were
+12,246 known-tier pairs and 474 pairs with at least one unknown tier.
+Among 6,185 same-tier pairs, 1,438 were selected (23.25%); these
+are **not** counted as correctly ordered.
+
+| Predeclared held-out endpoint | Observed count and rate | 95% photo-bootstrap interval | Point-estimate criterion |
+| --- | --- | --- | --- |
+| Selected different-tier ordering (>=80%) | 2,236/2,581 = **86.63%** (of 6,061 different-tier pairs) | **75.07–93.69%** | PASS |
+| Preference coverage among *all* unordered pairs (>=20%) | 4,157/12,720 = **32.68%** | **26.50–37.85%** | PASS |
+| Selected >=2-tier-separated ordering (>=80%) | 740/760 = **97.37%** (of 1,111 >=2-tier pairs) | **89.92–99.81%** | PASS |
+
+The three accuracy/coverage checks were defined before accessing
+held-out human labels, and each succeeds on its **point estimate**;
+`allResearchCriteriaMet=true`. Uncertainty came from **1,000 seeded
+photo-cluster resamples** (seed 20261018), not independent
+pair-resampling. **Critical qualification:** the 95% interval for
+overall different-tier selected ordering extends **below the
+80% target** (lower bound 75.07%). Consequently, the criterion was
+met descriptively on this held-out cohort, not demonstrated to
+exceed 80% with high confidence across new photo samples.
+The >=2-tier selected accuracy interval clears 80%.
+
+### Bounded model research decision
+
+- **RESEARCH GO:** preserve the frozen TOPIQ p75 **selective pairwise
+  quality preference with abstention** as a validated, research-level
+  finding for clearly different photographs. The 97.37% rate is
+  conditional on large gaps and >=2 human quality tiers, which
+  cannot be known at runtime. It is not 97.37% general photo-ranking
+  accuracy, a guarantee, or evidence of absolute quality tiers.
+- **ABSOLUTE QUALITY CLASSIFICATION NO-GO:** prior coarse three-band
+  median-midpoint TOPIQ and MUSIQ mappings underperformed a trivial
+  all-Normal reference on calibration. Only three calibration reviews
+  fell in Very Low. **No automatic Very Low exclusion** and no usable
+  five-tier single-photo quality classifier were demonstrated.
+- **PRODUCTION NO-GO / DEFER:** checkpoint-weight identity/licensing,
+  proxy-vs-original domain effects and runtime/deployment economics
+  remain separate gates. No archive writes, quality persistency,
+  collection/search/slideshow ranking, auto rejection or production
+  weight redistribution is approved or introduced by WI-0193.
+  Future user-experience experiments require **new workitems and
+  independent data/evidence**, not further cutoff tuning on
+  this already-accessed held-out cohort.
+
+This consumes the **one authorized held-out use**. Do **not** delete
+the private one-time claim, rerun the evaluator, alter the frozen
+rule, switch to MUSIQ for an additional held-out test, or optimize
+against the held-out reviews. Preserve private authorization, claim,
+report and preflight files unchanged. Only aggregate results are
+entered into the repository. WI-0193 may be concluded after this
+decision is merged; follow-on optional preference/rights work
+is outside this evaluation workitem.
