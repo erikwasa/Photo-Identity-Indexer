@@ -131,6 +131,28 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             Assert.Equal(1, cousinOf.Total);
             Assert.Equal(family2015, Assert.Single(cousinOf.Items).RevisionId);
 
+            // Relationship + people exercises the staged page materialization
+            // added for expensive slideshow covers. QueryAll uses the established
+            // non-paged SQL and therefore provides an independent result baseline.
+            SmartCollectionFilter familyPageFilter = new(
+                people: [alice],
+                relationship: new SmartCollectionRelationshipCriterion(alice, ["parent", "cousin"]));
+            SmartCollectionPhotoPage familyPage = await query.QueryAsync(
+                familyPageFilter, offset: 0, limit: 1);
+            SmartCollectionPhoto[] familyAll = (await query.QueryAllAsync(familyPageFilter)).ToArray();
+            Assert.Equal(familyAll.Length, familyPage.Total);
+            Assert.Equal(1, familyPage.Items.Count);
+            Assert.Equal(familyAll[0].RevisionId, familyPage.Items[0].RevisionId);
+            Assert.Equal(
+                familyAll[0].PeopleKeys?.Order(StringComparer.Ordinal),
+                familyPage.Items[0].PeopleKeys?.Order(StringComparer.Ordinal));
+            Assert.Equal(familyAll[0].EffectiveCaptureDate, familyPage.Items[0].EffectiveCaptureDate);
+
+            SmartCollectionPhotoPage pastEnd = await query.QueryAsync(
+                familyPageFilter, offset: 1, limit: 1);
+            Assert.Empty(pastEnd.Items);
+            Assert.Equal(1, pastEnd.Total);
+
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Alice with child around age five",
                 new SmartCollectionFilter(
