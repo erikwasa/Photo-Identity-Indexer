@@ -26,7 +26,7 @@ Current work items: **21**. Archived terminal items: **179**.
 | [WI-0199](../work-items/WI-0199-portrait-context-to-detail.md) Prototype full-photo then subject-detail sequence | M38 | proposed | unassigned | [YAML](work-items/active/WI-0199.yaml) |
 | [WI-0200](../work-items/WI-0200-portrait-context-detail-layout.md) Prototype simultaneous context-and-detail layout | M38 | proposed | unassigned | [YAML](work-items/active/WI-0200.yaml) |
 | [WI-0201](../work-items/WI-0201-tv-portrait-acceptance.md) Compare TV portrait presentation variants and decide adoption | M38 | proposed | unassigned | [YAML](work-items/active/WI-0201.yaml) |
-| [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) Restore photo catalogue query performance after schema-v33 acceptance regression | M30 | in_review | ai-agent | [YAML](work-items/active/WI-0202.yaml) |
+| [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) Restore photo catalogue query performance after schema-v33 acceptance regression | M30 | in_progress | ai-agent | [YAML](work-items/active/WI-0202.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 
