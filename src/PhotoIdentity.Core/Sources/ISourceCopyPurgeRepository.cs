@@ -5,8 +5,18 @@ namespace PhotoIdentity.Core.Sources;
 public sealed record SourceCopyPurgeRoots(
     string ArchiveAnalysisRoot,
     string? ReviewProxyRoot,
-    string DetectorEvaluationRoot)
+    string DetectorEvaluationRoot,
+    string? VideoPosterRoot = null)
 {
+    /// <summary>
+    /// Operator-owned video derivatives root. Null is accepted for photo-only
+    /// sources; a video source with poster/revision evidence cannot be purged
+    /// without an explicitly resolved root.
+    /// </summary>
+    public string? NormalizedVideoPosterRoot => string.IsNullOrWhiteSpace(VideoPosterRoot)
+        ? null
+        : Path.GetFullPath(VideoPosterRoot);
+
     public string NormalizedArchiveAnalysisRoot => Path.GetFullPath(ArchiveAnalysisRoot);
     public string? NormalizedReviewProxyRoot => string.IsNullOrWhiteSpace(ReviewProxyRoot)
         ? null

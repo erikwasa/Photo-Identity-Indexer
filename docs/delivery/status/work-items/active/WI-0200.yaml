@@ -1,0 +1,12 @@
+id: WI-0200
+title: Prototype simultaneous context-and-detail layout
+milestone: M38
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0200-portrait-context-detail-layout.md
+blockers: 
+- WI-0198
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/569

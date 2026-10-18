@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Npgsql;
 using PhotoIdentity.Core.Sources;
 
@@ -54,8 +55,25 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
             cancellationToken);
         if (existing is not null)
         {
+            // Upgrade an in-flight pre-video durable manifest *before* any
+            // catalogue revision data is deleted. Photo artifact state remains
+            // unchanged; discovered video artifacts are added idempotently.
+            HashSet<SourceCopyPurgeArtifact> additional = [];
+            await AddVideoPosterArtifactsAsync(
+                connection, transaction, sourceId, key, roots,
+                additional, cancellationToken);
+            foreach (SourceCopyPurgeArtifact artifact in additional)
+            {
+                await InsertManifestArtifactAsync(
+                    connection, transaction, sourceId, key, artifact, cancellationToken);
+            }
             await transaction.CommitAsync(cancellationToken);
-            return existing;
+            return existing with
+            {
+                Artifacts = existing.Artifacts.Concat(additional)
+                    .Distinct().OrderBy(item => item.AbsolutePath, StringComparer.Ordinal)
+                    .ToArray()
+            };
         }
 
         HashSet<SourceCopyPurgeArtifact> artifacts = [];
@@ -83,6 +101,9 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
             roots.NormalizedDetectorEvaluationRoot,
             artifacts,
             cancellationToken);
+        await AddVideoPosterArtifactsAsync(
+            connection, transaction, sourceId, key, roots,
+            artifacts, cancellationToken);
 
         DateTimeOffset prepared = preparedAtUtc.ToUniversalTime();
         using (NpgsqlCommand header = connection.CreateCommand())
@@ -100,18 +121,8 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
 
         foreach (SourceCopyPurgeArtifact artifact in artifacts.OrderBy(value => value.AbsolutePath, StringComparer.Ordinal))
         {
-            using NpgsqlCommand insert = connection.CreateCommand();
-            insert.Transaction = transaction;
-            insert.CommandText = """
-                INSERT INTO source_copy_purge_manifest_artifacts (
-                    source_id, source_key, absolute_path, is_directory)
-                VALUES (@source_id, @source_key, @absolute_path, @is_directory);
-                """;
-            insert.Parameters.AddWithValue("source_id", sourceId.Value);
-            insert.Parameters.AddWithValue("source_key", key);
-            insert.Parameters.AddWithValue("absolute_path", artifact.AbsolutePath);
-            insert.Parameters.AddWithValue("is_directory", artifact.IsDirectory);
-            await insert.ExecuteNonQueryAsync(cancellationToken);
+            await InsertManifestArtifactAsync(
+                connection, transaction, sourceId, key, artifact, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -325,6 +336,145 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
         }
 
         return new SourceCopyPurgeManifest(sourceId, sourceKey, preparedAt.Value, artifacts);
+    }
+
+    /// <summary>
+    /// Captures video derivatives while revision ownership still exists. This
+    /// method runs in the exclusion-manifest transaction, before any catalogue
+    /// cascade can remove that ownership. It never deletes source originals.
+    /// </summary>
+    private static async Task AddVideoPosterArtifactsAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction,
+        SourceId sourceId, string sourceKey, SourceCopyPurgeRoots roots,
+        HashSet<SourceCopyPurgeArtifact> artifacts, CancellationToken token)
+    {
+        List<Guid> revisions = [];
+        string? originalRoot = null;
+        using (NpgsqlCommand lookup = connection.CreateCommand())
+        {
+            lookup.Transaction = transaction;
+            lookup.CommandText = """
+                SELECT revision.id, source.root_locator
+                FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                JOIN sources source ON source.id = asset.source_id
+                WHERE asset.source_id = @source AND asset.source_key = @key
+                  AND asset.media_kind = 'video' AND revision.media_kind = 'video';
+                """;
+            lookup.Parameters.AddWithValue("source", sourceId.Value);
+            lookup.Parameters.AddWithValue("key", sourceKey);
+            await using NpgsqlDataReader rows = await lookup.ExecuteReaderAsync(token);
+            while (await rows.ReadAsync(token))
+            {
+                revisions.Add(rows.GetGuid(0));
+                originalRoot = rows.GetString(1);
+            }
+        }
+
+        if (revisions.Count == 0) return;
+        string derivativeRoot = roots.NormalizedVideoPosterRoot ??
+            throw new InvalidOperationException(
+                "Video source purge cannot proceed without a configured video poster root.");
+
+        // An accidental root pointing inside the archive would make exclusion
+        // destructive to original media. Treat it as a failed purge.
+        string sourceRoot = Path.GetFullPath(originalRoot!);
+        string root = Path.GetFullPath(derivativeRoot);
+        StringComparison cmp = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        static string WithSeparator(string p) =>
+            p.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        if (root.Equals(sourceRoot, cmp) ||
+            root.StartsWith(WithSeparator(sourceRoot), cmp) ||
+            sourceRoot.StartsWith(WithSeparator(root), cmp))
+            throw new InvalidOperationException("Video derivative root must be independent of originals.");
+
+        const string profile = "wi0151-sdr-still-v1";
+        string videoRoot = Path.Combine(root, "video-posters");
+        string profileRoot = Path.Combine(videoRoot, profile);
+        ValidateVideoDirectories(root, videoRoot, profileRoot);
+
+        foreach (Guid revision in revisions)
+        {
+            string revisionDir = Path.Combine(profileRoot, revision.ToString("D"));
+            ValidateVideoDirectories(revisionDir);
+            // Include database-backed JPEGs even if files have gone missing; the
+            // manifest is the durable authority after a crash and restart.
+            using (NpgsqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = """
+                    SELECT poster_profile_id, tool_sha256, poster_relative_path
+                    FROM video_still_posters WHERE asset_revision_id = @revision;
+                    """;
+                command.Parameters.AddWithValue("revision", revision);
+                await using NpgsqlDataReader rows = await command.ExecuteReaderAsync(token);
+                while (await rows.ReadAsync(token))
+                {
+                    string existingProfile = rows.GetString(0);
+                    string hash = rows.GetString(1);
+                    string relative = rows.GetString(2);
+                    string canonical = $"video-posters/{profile}/{revision:D}/{hash}.jpg";
+                    if (existingProfile != profile ||
+                        !Regex.IsMatch(hash, @"^[0-9a-f]{64}$", RegexOptions.CultureInvariant) ||
+                        !string.Equals(relative, canonical, StringComparison.Ordinal))
+                        throw new InvalidOperationException(
+                            "Unrecognized video poster profile or path; purge denied until explicitly supported.");
+                    artifacts.Add(new SourceCopyPurgeArtifact(
+                        ResolveUnderRoot(root, canonical), false));
+                }
+            }
+            if (!Directory.Exists(revisionDir)) continue;
+            // Recovery for files atomically moved but not yet recorded in SQL,
+            // plus abandoned FFmpeg temporary JPEGs from interrupted rendering.
+            foreach (string path in Directory.EnumerateFiles(revisionDir))
+            {
+                token.ThrowIfCancellationRequested();
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidOperationException("Video poster purge refuses reparse-point files.");
+                string file = Path.GetFileName(path);
+                if (!Regex.IsMatch(file, @"^(?:[0-9a-f]{64}\.jpg|[0-9a-f]{32}\.tmp\.jpg)$",
+                        RegexOptions.CultureInvariant))
+                    throw new InvalidOperationException(
+                        "Unknown derivative under video revision directory; purge denied.");
+                string relative = $"video-posters/{profile}/{revision:D}/{file}";
+                artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(root, relative), false));
+            }
+            // Never recursively delete a revision directory or other profiles.
+            if (Directory.EnumerateDirectories(revisionDir).Any())
+                throw new InvalidOperationException("Unexpected nested video derivative directory.");
+        }
+    }
+
+    private static void ValidateVideoDirectories(params string[] paths)
+    {
+        foreach (string path in paths)
+        {
+            if (Directory.Exists(path) &&
+                (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Video derivative purge cannot cross a reparse-point directory.");
+        }
+    }
+
+    private static async Task InsertManifestArtifactAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction,
+        SourceId sourceId, string sourceKey,
+        SourceCopyPurgeArtifact artifact, CancellationToken token)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO source_copy_purge_manifest_artifacts (
+                source_id, source_key, absolute_path, is_directory)
+            VALUES (@source_id, @source_key, @path, @directory)
+            ON CONFLICT (source_id, source_key, absolute_path) DO NOTHING;
+            """;
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
+        command.Parameters.AddWithValue("source_key", sourceKey);
+        command.Parameters.AddWithValue("path", artifact.AbsolutePath);
+        command.Parameters.AddWithValue("directory", artifact.IsDirectory);
+        await command.ExecuteNonQueryAsync(token);
     }
 
     private static async Task AddReviewProxyArtifactsAsync(

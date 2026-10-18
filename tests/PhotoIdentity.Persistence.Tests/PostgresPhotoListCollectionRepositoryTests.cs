@@ -63,6 +63,27 @@ public sealed class PostgresPhotoListCollectionRepositoryTests
             PostgresPhotoListCollectionRepository repository =
                 new(database, TimeProvider.System);
 
+            AssetRevisionId videoRevision = AssetRevisionId.New();
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand seedVideo = connection.CreateCommand())
+            {
+                seedVideo.CommandText = """
+                    INSERT INTO assets(id, source_id, source_key, media_kind, created_at_utc)
+                    SELECT @asset, source.id, 'video.mov', 'video', @now
+                    FROM sources source LIMIT 1;
+                    INSERT INTO asset_revisions(id, asset_id, content_sha256,
+                        size_bytes, observed_at_utc, media_type, media_kind)
+                    VALUES (@revision, @asset, repeat('e',64), 250, @now, 'video/quicktime', 'video');
+                    """;
+                seedVideo.Parameters.AddWithValue("asset", Guid.NewGuid());
+                seedVideo.Parameters.AddWithValue("revision", videoRevision.Value);
+                seedVideo.Parameters.AddWithValue("now", DateTimeOffset.UtcNow);
+                await seedVideo.ExecuteNonQueryAsync();
+            }
+            await Assert.ThrowsAsync<PhotoListCollectionRevisionUnavailableException>(() =>
+                repository.CreateAsync("Video must not enter photo collections", [videoRevision]));
+
+
             PhotoListCollectionDefinition created = await repository.CreateAsync(
                 "  Family   picks  ",
                 [third, first, second]);
@@ -78,6 +99,9 @@ public sealed class PostgresPhotoListCollectionRepositoryTests
                 await repository.CreateSlideshowSnapshotAsync(created.Id)
                 ?? throw new InvalidOperationException();
             Assert.Equal([third, first, second], initialSnapshot.RevisionIds);
+            await Assert.ThrowsAsync<PhotoListCollectionRevisionUnavailableException>(() =>
+                repository.UpdateAsync(created.Id, created.Name, [first, videoRevision]));
+
 
             await Assert.ThrowsAsync<PhotoListCollectionNameConflictException>(
                 () => repository.CreateAsync("family picks", []));

@@ -6,6 +6,26 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 public sealed class PostgresCatalogueSourceRepository(PostgresCatalogueDatabase database) : ICatalogueSourceRepository
 {
+    /// <summary>Read-only source lookup for opt-in video poster materialization.</summary>
+    public async Task<ArchiveCatalogueSource?> FindLocalFolderSourceAsync(
+        string rootLocator, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootLocator);
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, kind, root_locator, created_at_utc
+            FROM sources
+            WHERE kind = 'local-folder' AND root_locator = @root;
+            """;
+        command.Parameters.AddWithValue("root", Path.GetFullPath(rootLocator));
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new ArchiveCatalogueSource(SourceId.From(reader.GetGuid(0)), reader.GetString(1),
+                reader.GetString(2), reader.GetFieldValue<DateTimeOffset>(3))
+            : null;
+    }
+
     public async Task<ArchiveCatalogueSource> GetOrCreateLocalFolderSourceAsync(
         string rootLocator, DateTimeOffset createdAtUtc, CancellationToken cancellationToken = default)
     {

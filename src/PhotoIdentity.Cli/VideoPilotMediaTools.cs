@@ -40,6 +40,11 @@ public sealed record VideoPilotMetadata(
     public string? CameraMake { get; init; }
     [JsonIgnore]
     public string? CameraModel { get; init; }
+
+    // Only explicit source stream colour signalling qualifies HLG preview.
+    // Never infer BT.2020 from camera, codec or pixel format.
+    public string? ColorPrimaries { get; init; }
+    public string? ColorSpace { get; init; }
 }
 
 public static class VideoPilotMetadataParser
@@ -106,7 +111,9 @@ public static class VideoPilotMetadataParser
             GpsLatitude = latitude,
             GpsLongitude = longitude,
             CameraMake = SelectShortTag(tags, streamTags, "com.apple.quicktime.make", "make"),
-            CameraModel = SelectShortTag(tags, streamTags, "com.apple.quicktime.model", "model")
+            CameraModel = SelectShortTag(tags, streamTags, "com.apple.quicktime.model", "model"),
+            ColorPrimaries = Text(video, "color_primaries"),
+            ColorSpace = Text(video, "color_space")
         };
     }
 
@@ -307,7 +314,7 @@ public sealed class VideoPilotMediaTools
             "-probesize", "1048576", "-analyzeduration", "1500000",
             "-show_format", "-show_streams",
             "-show_entries",
-            "format=format_name,duration:format_tags=creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream=codec_type,codec_name,profile,width,height,pix_fmt,avg_frame_rate,color_transfer:stream_tags=rotate,creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream_side_data=rotation",
+            "format=format_name,duration:format_tags=creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream=codec_type,codec_name,profile,width,height,pix_fmt,avg_frame_rate,color_transfer,color_primaries,color_space:stream_tags=rotate,creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream_side_data=rotation",
             "-of", "json", "-i", sourcePath
         ], cancellationToken);
         if (json.Length > 1024 * 1024)
@@ -315,7 +322,29 @@ public sealed class VideoPilotMediaTools
         return VideoPilotMetadataParser.Parse(json);
     }
 
-    public async Task RenderPosterAsync(string sourcePath, string temporaryJpegPath, CancellationToken cancellationToken)
+    // This is an isolated evaluation filter, NOT the durable SDR poster profile.
+    // zscale operates in linear RGB, then Mobius compresses highlights into
+    // Rec.709 for the bounded JPEG. Requires explicitly signalled BT.2020 HLG.
+    // FFmpeg must have zscale and tonemap filters; missing filters fail closed.
+    public const string HlgPreviewFilter =
+        "setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc," +
+        "zscale=t=linear:npl=100,format=gbrpf32le," +
+        "tonemap=mobius:param=0.3:desat=0," +
+        "zscale=p=709:t=709:m=709:r=limited,format=yuv420p," +
+        "scale=1280:1280:force_original_aspect_ratio=decrease";
+
+    public Task RenderPosterAsync(string sourcePath, string temporaryJpegPath,
+        CancellationToken cancellationToken) =>
+        RenderJpegAsync(sourcePath, temporaryJpegPath,
+            "scale=1280:1280:force_original_aspect_ratio=decrease,format=yuv420p",
+            cancellationToken);
+
+    public Task RenderHlgPreviewAsync(string sourcePath, string temporaryJpegPath,
+        CancellationToken cancellationToken) =>
+        RenderJpegAsync(sourcePath, temporaryJpegPath, HlgPreviewFilter, cancellationToken);
+
+    private async Task RenderJpegAsync(string sourcePath, string temporaryJpegPath,
+        string videoFilter, CancellationToken cancellationToken)
     {
         if (_ffmpeg is null)
             throw new InvalidOperationException("Poster rendering requires a separately configured ffmpeg executable.");
@@ -323,7 +352,7 @@ public sealed class VideoPilotMediaTools
             "-nostdin", "-hide_banner", "-loglevel", "error",
             "-protocol_whitelist", "file", "-autorotate", "-i", sourcePath,
             "-map", "0:v:0", "-frames:v", "1", "-an", "-sn", "-dn",
-            "-vf", "scale=1280:1280:force_original_aspect_ratio=decrease,format=yuv420p",
+            "-vf", videoFilter,
             "-q:v", "4", "-f", "image2", "-y", temporaryJpegPath
         ], cancellationToken);
         FileInfo file = new(temporaryJpegPath);

@@ -17,6 +17,7 @@ public sealed class VideoPilotParserTests
                   "profile":"Main 10",
                   "pix_fmt":"yuv420p10le",
                   "color_transfer":"arib-std-b67",
+                  "color_primaries":"bt2020","color_space":"bt2020nc",
                   "width":1920,"height":1080,
                   "avg_frame_rate":"56600/1887",
                   "side_data_list":[{"rotation":-90}]
@@ -33,9 +34,48 @@ public sealed class VideoPilotParserTests
         Assert.Equal(-90, media.RotationDegrees);
         Assert.Equal(11.25, media.DurationSeconds);
         Assert.Equal("arib-std-b67", media.ColorTransfer);
+        Assert.Equal("bt2020", media.ColorPrimaries);
+        Assert.Equal("bt2020nc", media.ColorSpace);
+        Assert.True(VideoPilotCommandRunner.IsHlgPreviewCandidate(media));
         Assert.False(media.HasCreationTime);
         Assert.False(media.HasLocation);
         Assert.True(VideoPilotCommandRunner.IsSupported(media));
+    }
+
+    [Fact]
+    public void Hlg_preview_requires_all_explicit_colour_evidence_and_never_accepts_pq()
+    {
+        VideoPilotMetadata hlg = new(
+            "mov,mp4", "hevc", "Main 10", "yuv420p10le", "arib-std-b67",
+            "aac", 1920, 1080, -90, 5, "30/1", false, false)
+        {
+            ColorPrimaries = "bt2020",
+            ColorSpace = "bt2020nc"
+        };
+        Assert.True(VideoPilotCommandRunner.IsHlgPreviewCandidate(hlg));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { ColorPrimaries = null }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { ColorSpace = null }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { ColorPrimaries = "bt709" }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { ColorSpace = "bt709" }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { ColorTransfer = "smpte2084" }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { PixelFormat = "yuv420p" }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { Profile = "Main" }));
+        Assert.False(VideoPilotCommandRunner.IsHlgPreviewCandidate(
+            hlg with { DurationSeconds = 601 }));
+
+        string filter = VideoPilotMediaTools.HlgPreviewFilter;
+        Assert.Contains("setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc", filter);
+        Assert.Contains("zscale=t=linear:npl=100,format=gbrpf32le", filter);
+        Assert.Contains("tonemap=mobius:param=0.3:desat=0", filter);
+        Assert.Contains("zscale=p=709:t=709:m=709:r=limited,format=yuv420p", filter);
+        Assert.Contains("scale=1280:1280:force_original_aspect_ratio=decrease", filter);
     }
 
     [Fact]
@@ -187,6 +227,14 @@ public sealed class VideoPilotParserTests
         VideoPilotOptions parsed = VideoPilotOptions.Parse(["--enable-video", .. args]);
         Assert.Equal(8, parsed.MaximumVideos);
         Assert.Equal(20, parsed.TimeoutSeconds);
+        Assert.False(parsed.PreviewHlg);
+        VideoPilotOptions preview = VideoPilotOptions.Parse(
+            ["--enable-video", "--preview-hlg", .. args]);
+        Assert.True(preview.PreviewHlg);
+        Assert.Throws<ArgumentException>(() => VideoPilotOptions.Parse(
+            ["--preview-hlg", .. args]));
+        Assert.Throws<ArgumentException>(() => VideoPilotOptions.Parse(
+            ["--enable-video", "--preview-hlg", "--preview-hlg", .. args]));
         Assert.Throws<ArgumentException>(() => VideoPilotOptions.Parse(
             ["--enable-video", .. args, "--max-videos", "999"]));
         Assert.Throws<ArgumentException>(() => VideoPilotOptions.Parse(

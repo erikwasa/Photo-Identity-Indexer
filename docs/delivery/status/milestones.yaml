@@ -383,3 +383,14 @@ milestones:
   - WI-0193
   - WI-0194
   - WI-0195
+- id: M38
+  title: TV-friendly portrait slideshow presentation
+  status: ready
+  document: ../milestones/M38-tv-friendly-portrait-slideshow.md
+  work_items:
+  - WI-0196
+  - WI-0197
+  - WI-0198
+  - WI-0199
+  - WI-0200
+  - WI-0201

@@ -49,7 +49,7 @@ preflight fingerprint and exclusively writes a one-use claim
 before reading held-out quality labels. Synthetic tests cover
 abstention/same tiers/photo-level bootstrap/claim reuse.
 Research endpoints remain fixed 80%/20%/80%, no held-out
-retuning or new candidate. **Next after PR merge:** run *only*
+retuning or new candidate. **Next after PR merge:** run _only_
 the preflight command documented in the benchmark operations
 runbook and share aggregate output. Do not generate separate
 authorization or run evaluation yet. No production quality/rank
@@ -63,11 +63,12 @@ aggregate-only local proposal: candidate `pyiqa-topiq_nr-0.1.16`,
 absolute raw-score gap `0.16755089163780212` from 238 calibration
 photos (28,203 pairs). Prefer higher score only at positive gap >=
 that threshold; otherwise abstain. Frozen research pass criteria:
->=80% correct selected different-tier pairs, >=20% all-pair
-decision coverage, >=80% correct selected >=2-tier pairs; require
-nonzero qualifying denominators and report photo-resampled
-uncertainty and same-tier choices. Candidate/quantile selection
-was exploratory; no held-out tuning or alternative candidates.
+
+> =80% correct selected different-tier pairs, >=20% all-pair
+> decision coverage, >=80% correct selected >=2-tier pairs; require
+> nonzero qualifying denominators and report photo-resampled
+> uncertainty and same-tier choices. Candidate/quantile selection
+> was exploratory; no held-out tuning or alternative candidates.
 
 The new `ranking_freeze.py` **local-only** attestation verifies the
 unchanged private checkpoint-15 proposal and complete calibration
@@ -80,11 +81,10 @@ approval. Future evaluator requires separate code review and explicit
 maintainer run authorization. See WI-0193 and benchmark runbook.
 M37 PRs target `features/m37`.
 
-
 **WI-0193 checkpoint 15 (2026-10-18):** Maintainer ran five-fold
 within-calibration selective TOPIQ/MUSIQ comparison on 238 photo
 ratings, 5635 within-fold pairs. At 75th-percentile score gap,
-TOPIQ orders **90.27%** of *different-human-tier selected pairs*
+TOPIQ orders **90.27%** of _different-human-tier selected pairs_
 correctly, expressing a preference on **25.57% of all pairs**;
 MUSIQ **89.75%** at ~25.08% all-pair coverage. For >=2-tier
 human differences: TOPIQ **92.71%** of 247 selected pairs, MUSIQ
@@ -106,8 +106,6 @@ aggregate proposal; explicit next-stage review is required before
 any one-time held-out evaluation. PyIQA framework and checkpoint
 licensing remain unverified; no app ranking changes.
 
-
-
 **WI-0193 checkpoint 14 (2026-10-18) calibration diagnostic:** PR #579
 merged; maintainer three-band confusion results show TOPIQ NR
 37.4% accuracy/49.9% balanced accuracy/23.4% Normal recall;
@@ -121,14 +119,13 @@ The new `calibration_selective_ranking.py` is an offline-only,
 already-scored TOPIQ/MUSIQ proxy exports. Predeclared 0/50/75/90%
 train-only gap quantile cutoffs, validation within-fold photo
 pairs; reports overall decision coverage, different-tier and
->=2-tier ordering accuracy. Exact content duplicates in one fold;
-near duplicate and pair-independence limitations noted. NO
-held-out/challenge human labels inspected and no IQA inference,
-production ranker, tier mapping, exclusion or checkpoint licensing
-approved. Next: request aggregate local output and decide on
-ranking-only pre-registration or explicit WI-0193 no-go.
 
-
+> =2-tier ordering accuracy. Exact content duplicates in one fold;
+> near duplicate and pair-independence limitations noted. NO
+> held-out/challenge human labels inspected and no IQA inference,
+> production ranker, tier mapping, exclusion or checkpoint licensing
+> approved. Next: request aggregate local output and decide on
+> ranking-only pre-registration or explicit WI-0193 no-go.
 
 WI-0193 checkpoint 13 calibration-draft evidence: Maintainer ran
 existing 600-proxy-score TOPIQ/MUSIQ 3-band drafts on 238 reviewed
@@ -150,7 +147,6 @@ more conservative, predeclared calibration/abstention strategy vs
 explicit model no-go. No automatic Very Low exclusion. Deployment
 rights remain unverified.
 
-
 **WI-0193 checkpoint 12 pending review (2026-10-18).** PR #577
 merged. Maintainer-provided local checkpoint cache inventory confirms
 pyiqa 0.1.16, torch 2.14.1, TOPIQ CFANet KonIQ SHA 9a73138b...
@@ -170,7 +166,6 @@ production or unseal held-out human ratings. Model weight licensing
 remains a separate deployment gate. Automatic Very Low exclusion
 still no-go. M37 PRs target `features/m37`.
 
-
 **WI-0193 checkpoint 11 pending review (2026-10-17).** Following merged
 PR #575, the fixed evaluation input is `jpeg-1600-q78` proxy, not
 full-resolution originals. The four 600-photo proxy exports remain
@@ -189,7 +184,6 @@ one-time held-out human-label evaluation. No held-out/challenge ratings
 are read; do not commit private manifest, score exports or paths.
 M37 PRs target `features/m37`.
 
-
 **WI-0193 checkpoint 10: proxy evaluation input decision (2026-10-17).**
 The completed metadata-only triage checked all 80 selected originals:
 all 17 failures were approximately 49–50 MP (13 RAW, 4 JPEG), whereas
@@ -206,7 +200,6 @@ license and checkpoint-to-model binding, frozen calibration-only mapping
 or no-go, one-time held-out evaluation. Very Low auto exclusion remains
 no-go. Keep existing private files and held-out human labels untouched.
 
-
 **WI-0193 checkpoint 9 (2026-10-17) pending review:** the first TOPIQ
 original/proxy CPU experiment had 17/80 failures, notably RAW=13/19
 and JPEG=4/21, versus HEIC=0/20 and PNG=0/20. Legacy generic errors
@@ -221,7 +214,6 @@ IQA inference, human labels or held-out photos. Local run pending.
 No unbounded CPU retry or premature production model selection;
 ADR-0011 caption thumbnail authorization does not permit remote IQA
 original-pixel uploads. M37 PRs target `features/m37`.
-
 
 **WI-0193 original/proxy field evidence (2026-10-17):** the initial
 unbounded 80-photo TOPIQ CPU run finished the loop but had **63 successes /
@@ -240,7 +232,6 @@ caption-only ADR-0011. Preserve 600-photo private benchmark, calibrated
 exports and untouched held-out labels. No production model or exclusion
 decision.
 
-
 **WI-0193 checkpoint 7 pending review (2026-10-17):** The maintainer
 completed blinded reviews of the frozen 600-photo benchmark and successfully
 reconciled the four full candidate exports (all with zero inference
@@ -256,11 +247,10 @@ The new `original_proxy_study.py` supports private deterministic
 TOPIQ/MUSIQ runner, SHA verification, format-balanced selection from
 **non-held-out** partitions, and aggregate report. Optional `pillow-heif`
 and `rawpy` dependencies are local only. Document codec/color/rendering
-differences from production and *do not* equate the study with pure
+differences from production and _do not_ equate the study with pure
 downscale effects. Maintainer run and checkpoint provenance/license audit
 pending. Next freeze an explicit policy before a one-shot held-out analysis.
 M37 PRs target `features/m37`, not main.
-
 
 **WI-0193 checkpoint 6 pending review:** `reconcile_quality_scores.py` now
 extends the frozen 580-photo learned-IQA score exports to 600 **only after**
@@ -277,7 +267,6 @@ the legacy `.before-challenge.bak` may already exist from WI-0192.
 Maintainer archive screening/import and score reconciliation are **not yet run**.
 No held-out metrics or model/threshold policy freeze. No production changes.
 
-
 **Checkpoint 5 pending review:** The existing catalogue-backed challenge generator now
 supports bounded `--pool-only` screening of fresh, non-benchmark images, excluding
 benchmark content SHA and deduplicating pool content. `disagreement_challenges.py`
@@ -289,7 +278,6 @@ have yet been run/imported/reviewed. Importing 20 expands the benchmark to
 reconciliation against that new benchmark before the final held-out decision.
 No automatic exclusion, production scoring, or model selection is enabled.
 M37 checkpoint PRs target `features/m37`, not `main`.
-
 
 **2026-10-17 evidence:** WI-0193 now has full private-archive benchmark score exports
 for WI-0182, TOPIQ NR, MUSIQ and ARNIQA (580/580 each, zero failures), with 238
@@ -305,7 +293,6 @@ calibration, one-shot held-out. No production model selected. M37 PRs target
 `features/m37`, not main.
 
 WI-0193 / issue #536 is in progress on the M37 integration branch `features/m37`. Checkpoint 1 establishes a benchmark-bound candidate score schema, a fixed WI-0182 technical-reason-count baseline and calibration-only rank/pairwise/Very-Low safety metrics with Wilson uncertainty. Held-out human labels remain excluded from evaluation until a candidate and calibration policy are frozen. WI-0192 is maintainer-accepted: 400 representative photos (240 calibration / 160 held-out) plus 180 challenge photos from 27,052 durable-proxy candidates, with 20 slots reserved for WI-0193 model-disagreement cases; 255 blinded ratings were completed at WI-0192 acceptance and the sample was judged representative. Legacy original width/height remain a documented limitation. M37 checkpoint PRs target `features/m37`, not `main`.
-
 
 WI-0182 / issue #490: PR #509 implements the evaluation-only technical-quality harness over durable review proxies. It adds versioned raw sharpness/exposure/clipping/contrast/resolution evidence, q78 profile-gated candidate reasons, deterministic PostgreSQL proxy sampling, private JSON review export, timing/storage measurements and synthetic analyzer coverage. No collection semantics or catalogue quality persistence are introduced. Keep WI-0182 in review until representative private-archive review/runtime evidence is recorded.
 
@@ -331,7 +318,7 @@ The maintainer previously accepted WI-0163, WI-0167, WI-0169, WI-0170, WI-0171, 
 
 WI-0193 checkpoint 1 is the current M37 task. After the calibration protocol merges, run the fixed WI-0182 baseline on the private benchmark, then add at least three justified learned no-reference IQA candidates (TOPIQ, MUSIQ, ARNIQA or deployable equivalents), reserve the remaining challenge slots for model disagreements, and compare proxy versus decoded-original input before freezing a calibration policy. WI-0194 remains independently ready.
 
-WI-0151: maintained PostgreSQL v33 accepted, and PR #540 merged opt-in dry-run-first MOV/MP4 local ingestion. Current checkpoint implements conservative embedded capture/GPS/camera extraction with explicit timestamp timezone/provenance, strict ISO-6709 coordinates and pilot-report privacy. Next: revision-safe durable poster files and exclusion/deletion cleanup, then safe browsing, full photo-only regression and final maintainer real-file acceptance. No automatic video worker; the maintainer prefers one final review after the entire work item is built.
+WI-0151: engineering implementation of the initial opt-in local MOV/MP4 metadata and revision catalogue, exclusion-safe revision-owned Rec.709 SDR still posters, default-off read-only Videos page and mixed-media photo-only isolation is complete; PR #557 CI passed. The final checkpoint adds validated opt-in Windows launcher support and a consolidated maintained-machine acceptance runbook. **Next is the maintainer's requested one-time local test** (read-only baseline, verified backup, bounded video ingest/poster writes, opt-in video UI, photo regressions, privacy/nonhydration review). Keep WI-0151 in_review until evidence is recorded; do not call private HLG candidate images production-ready or enable any automatic video jobs. Only explicitly signalled bt709 input is accepted for durable posters; other HDR/unknown profiles remain deferred.
 
 ## Relevant pointers
 

@@ -63,8 +63,10 @@ public sealed class PostgresReviewQueryRepository : IReviewFilterRepository, IRe
         FROM face_occurrences
         INNER JOIN asset_revisions
             ON asset_revisions.id = face_occurrences.asset_revision_id
+           AND asset_revisions.media_kind = 'photo'
         INNER JOIN assets
             ON assets.id = asset_revisions.asset_id
+           AND assets.media_kind = 'photo'
         LEFT JOIN latest_crop
             ON latest_crop.face_occurrence_id = face_occurrences.id
            AND latest_crop.row_number = 1

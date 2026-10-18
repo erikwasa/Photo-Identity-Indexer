@@ -11,7 +11,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// worker instantiates this repository yet. Callers must verify the source bytes and
 /// obtain a video revision before persisting technical inspection evidence.
 /// </summary>
-public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase database)
+public sealed partial class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase database)
 {
     private readonly PostgresSourceCopyExclusionRepository _exclusions = new(database);
 
@@ -100,18 +100,23 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
         await RequireEligibleAsync(connection, transaction, poster.RevisionId, cancellationToken);
+        await RequireCurrentPosterRevisionAsync(connection, transaction, poster.RevisionId, cancellationToken);
 
         // Unsupported/HDR-deferred evidence must not acquire an unverified SDR poster.
         await using (NpgsqlCommand check = connection.CreateCommand())
         {
             check.Transaction = transaction;
             check.CommandText = """
-                SELECT inspection_status
+                SELECT inspection_status, color_transfer
                 FROM video_revision_metadata WHERE asset_revision_id = @revision;
                 """;
             Add(check, "revision", NpgsqlDbType.Uuid, poster.RevisionId.Value);
-            if ((string?)await check.ExecuteScalarAsync(cancellationToken) != "supported")
-                throw new InvalidOperationException("A supported video inspection is required before saving a poster.");
+            await using NpgsqlDataReader reader = await check.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken) ||
+                reader.GetString(0) != "supported" ||
+                (poster.PosterProfileId == "wi0151-sdr-still-v1" &&
+                 (reader.IsDBNull(1) || reader.GetString(1) != "bt709")))
+                throw new InvalidOperationException("This video poster requires a supported, explicitly Rec.709 inspection.");
         }
 
         await using (NpgsqlCommand command = connection.CreateCommand())
@@ -252,6 +257,10 @@ public sealed class PostgresVideoEvidenceRepository(PostgresCatalogueDatabase da
               AND p.poster_profile_id = @profile AND p.tool_sha256 = @tool
               AND asset.media_kind = 'video' AND revision.media_kind = 'video'
               AND asset.deleted_at_utc IS NULL
+              AND revision.id = (
+                  SELECT newest.id FROM asset_revisions newest
+                  WHERE newest.asset_id = asset.id AND newest.media_kind = 'video'
+                  ORDER BY newest.observed_at_utc DESC, newest.id DESC LIMIT 1)
               AND NOT EXISTS (SELECT 1 FROM source_copy_exclusions x
                               WHERE x.source_id = asset.source_id AND x.source_key = asset.source_key);
             """;

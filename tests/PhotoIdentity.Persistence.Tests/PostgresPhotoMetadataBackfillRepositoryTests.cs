@@ -46,7 +46,8 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
             Assert.Null(initialization.Error);
 
             AssetRevisionId revisionId = AssetRevisionId.From(Guid.NewGuid());
-            await SeedRevisionAsync(testBuilder.ConnectionString, Guid.Parse(revisionId.ToString()));
+            AssetRevisionId videoId = AssetRevisionId.New();
+            await SeedRevisionAsync(testBuilder.ConnectionString, revisionId.Value, videoId.Value);
 
             PostgresPhotoMetadataBackfillRepository repository = new(database);
             IReadOnlyList<PhotoMetadataBackfillRefreshCandidate> missing =
@@ -59,8 +60,47 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
             PhotoMetadataBackfillRefreshCandidate candidate = Assert.Single(missing);
             Assert.Equal(revisionId, candidate.RevisionId);
             Assert.True(candidate.IsNew);
+            Assert.NotEqual(videoId, candidate.RevisionId);
 
+            // A video with the same source ID and no photo metadata must not
+            // be selected by photo metadata backfill or photo annotation APIs.
+            PostgresPhotoPersonRepository people = new(database, TimeProvider.System);
+            PostgresPhotoTagRepository tags = new(database, TimeProvider.System);
+            PostgresPhotoPlaceRepository places = new(database, TimeProvider.System);
+            PostgresPhotoCaptureDateRepository dates = new(database, TimeProvider.System);
             PostgresPhotoCaptureMetadataRepository capture = new(database);
+            PostgresExtendedPhotoMetadataRepository extended = new(database);
+            PostgresPhotoMetadataInspectionRepository inspections = new(database);
+            PhotoCaptureMetadata syntheticMetadata = new(
+                takenAtLocal: new DateTime(2026, 9, 9, 14, 30, 0));
+
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => people.GetManualPeopleAsync(videoId));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                people.AddManualPersonAsync(videoId, PersonId.New(), "test"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => tags.GetManualTagsAsync(videoId));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                tags.AddManualTagAsync(videoId, "Video", "test"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => places.GetStateAsync(videoId));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                places.SetManualPlaceAsync(videoId, "Sweden/Stockholm", "test"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => dates.GetStateAsync(videoId));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                dates.SetManualAsync(videoId, new PhotoCaptureDateValue(2026), "test"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                capture.SavePhotoMetadataAsync(videoId, syntheticMetadata, DateTimeOffset.UtcNow));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                extended.SaveAsync(videoId, syntheticMetadata));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                inspections.MarkAsync(videoId, PhotoMetadataExtractionContract.CurrentVersion,
+                    DateTimeOffset.UtcNow));
+            Assert.Null(await capture.GetPhotoMetadataAsync(videoId));
+            Assert.Null(await extended.GetAsync(videoId));
+            Assert.Null(await inspections.GetAsync(videoId));
+            Assert.Empty(await repository.GetRefreshCandidatesAsync(
+                limit: 10, offset: 1, PhotoMetadataExtractionContract.CurrentVersion, force: true));
+
+            // Existing photo behavior remains unchanged.
+
             await capture.SavePhotoMetadataAsync(
                 revisionId,
                 new PhotoCaptureMetadata(
@@ -70,7 +110,6 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
                     longitude: 18.0686),
                 DateTimeOffset.UtcNow);
 
-            PostgresPhotoMetadataInspectionRepository inspections = new(database);
             await inspections.MarkAsync(
                 revisionId,
                 PhotoMetadataExtractionContract.CurrentVersion,
@@ -89,6 +128,9 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
                     PhotoMetadataExtractionContract.CurrentVersion,
                     force: true);
             Assert.False(Assert.Single(forced).IsNew);
+            Assert.Equal(revisionId, forced[0].RevisionId);
+            Assert.Empty(await repository.GetRefreshCandidatesAsync(
+                limit: 10, offset: 1, PhotoMetadataExtractionContract.CurrentVersion, force: true));
         }
         finally
         {
@@ -99,10 +141,12 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
         }
     }
 
-    private static async Task SeedRevisionAsync(string connectionString, Guid revisionId)
+    private static async Task SeedRevisionAsync(
+        string connectionString, Guid revisionId, Guid videoRevisionId)
     {
         Guid sourceId = Guid.NewGuid();
         Guid assetId = Guid.NewGuid();
+        Guid videoAssetId = Guid.NewGuid();
         DateTimeOffset now = new(2026, 9, 9, 12, 0, 0, TimeSpan.Zero);
 
         await using NpgsqlConnection connection = new(connectionString);
@@ -115,6 +159,8 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
 
             INSERT INTO assets (id, source_id, source_key, created_at_utc)
             VALUES (@asset_id, @source_id, 'metadata/photo.jpg', @now);
+            INSERT INTO assets(id, source_id, source_key, media_kind, created_at_utc)
+            VALUES (@video_asset, @source_id, 'metadata/video.mov', 'video', @now);
 
             INSERT INTO asset_revisions (
                 id,
@@ -134,10 +180,18 @@ public sealed class PostgresPhotoMetadataBackfillRepositoryTests
                 'image/jpeg',
                 1024,
                 768);
+            INSERT INTO asset_revisions(
+                id, asset_id, content_sha256, size_bytes,
+                observed_at_utc, media_type, media_kind)
+            VALUES (
+                @video_revision, @video_asset, repeat('c', 64),
+                456, @now, 'video/quicktime', 'video');
             """;
         seed.Parameters.AddWithValue("source_id", sourceId);
         seed.Parameters.AddWithValue("asset_id", assetId);
+        seed.Parameters.AddWithValue("video_asset", videoAssetId);
         seed.Parameters.AddWithValue("revision_id", revisionId);
+        seed.Parameters.AddWithValue("video_revision", videoRevisionId);
         seed.Parameters.AddWithValue("content_sha256", new string('b', 64));
         seed.Parameters.AddWithValue("now", now);
         await seed.ExecuteNonQueryAsync();

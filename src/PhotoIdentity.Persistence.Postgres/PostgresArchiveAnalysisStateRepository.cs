@@ -159,9 +159,14 @@ public sealed partial class PostgresArchiveAnalysisStateRepository : IArchiveAna
             """
             SELECT EXISTS (
                 SELECT 1
-                FROM asset_revision_analysis
-                WHERE asset_revision_id = @asset_revision_id
-                  AND profile_hash = @profile_hash);
+                FROM asset_revision_analysis analysis
+                JOIN asset_revisions revision
+                    ON revision.id = analysis.asset_revision_id
+                JOIN assets asset ON asset.id = revision.asset_id
+                WHERE analysis.asset_revision_id = @asset_revision_id
+                  AND analysis.profile_hash = @profile_hash
+                  AND asset.media_kind = 'photo'
+                  AND revision.media_kind = 'photo');
             """;
         command.Parameters.AddWithValue(
             "asset_revision_id",
@@ -201,6 +206,13 @@ public sealed partial class PostgresArchiveAnalysisStateRepository : IArchiveAna
                 FROM archive_analysis_runs
                 WHERE processing_run_id = @processing_run_id
                   AND profile_hash = @profile_hash)
+              AND EXISTS (
+                SELECT 1
+                FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                WHERE revision.id = @asset_revision_id
+                  AND asset.media_kind = 'photo'
+                  AND revision.media_kind = 'photo')
             ON CONFLICT(asset_revision_id, profile_hash) DO UPDATE SET
                 processing_run_id = excluded.processing_run_id,
                 completed_at_utc = excluded.completed_at_utc;
@@ -222,7 +234,7 @@ public sealed partial class PostgresArchiveAnalysisStateRepository : IArchiveAna
         if (affected != 1)
         {
             throw new InvalidOperationException(
-                $"Processing run {runId} is not registered for analysis profile {profileHash}.");
+                "Photo analysis completion requires a photo revision and matching registered run profile.");
         }
     }
 }

@@ -1,0 +1,115 @@
+{
+  "inferDateFromFilename": false,
+  "inferDateFromDirectory": false,
+  "excludedDateDirectories": ["1970"],
+  "placeRules": [
+    {
+      "name": "2018-07-11-svartso",
+      "from": "2018-07-11",
+      "to": "2018-07-11",
+      "place": "Sverige/Stockholms län/Värmdö Kommun/Svartsö"
+    },
+    {
+      "name": "2018-09-09-hjorthagen",
+      "from": "2018-09-09",
+      "to": "2018-09-09",
+      "place": "Sverige/Stockholms län/Stockholms stad/Hjorthagen"
+    },
+    {
+      "name": "2018-09-29-hjorthagen",
+      "from": "2018-09-29",
+      "to": "2018-09-29",
+      "place": "Sverige/Stockholms län/Stockholms stad/Hjorthagen"
+    },
+    {
+      "name": "2018-10-07-vastra-bodarne",
+      "from": "2018-10-07",
+      "to": "2018-10-07",
+      "place": "Sverige/Västra Götalands län/Alingsås Kommun/Västra Bodarne"
+    },
+    {
+      "name": "2018-12-21-hjorthagen",
+      "from": "2018-12-21",
+      "to": "2018-12-21",
+      "place": "Sverige/Stockholms län/Stockholms stad/Hjorthagen"
+    },
+    {
+      "name": "2018-12-26-hjorthagen",
+      "from": "2018-12-26",
+      "to": "2018-12-26",
+      "place": "Sverige/Stockholms län/Stockholms stad/Hjorthagen"
+    },
+    {
+      "name": "2019-02-08-svartso",
+      "from": "2019-02-08",
+      "to": "2019-02-08",
+      "place": "Sverige/Stockholms län/Värmdö Kommun/Svartsö"
+    },
+    {
+      "name": "2019-03-10-hjorthagen",
+      "from": "2019-03-10",
+      "to": "2019-03-10",
+      "place": "Sverige/Stockholms län/Stockholms stad/Hjorthagen"
+    },
+    {
+      "name": "2019-06-16-hjorthagen",
+      "from": "2019-06-16",
+      "to": "2019-06-16",
+      "place": "Sverige/Stockholms län/Stockholms stad/Hjorthagen"
+    },
+    {
+      "name": "2019-06-29-svartso",
+      "from": "2019-06-29",
+      "to": "2019-06-29",
+      "place": "Sverige/Stockholms län/Värmdö Kommun/Svartsö"
+    },
+    {
+      "name": "2019-09-28-kalvsvik",
+      "from": "2019-09-28",
+      "to": "2019-09-28",
+      "place": "Sverige/Stockholms län/Haninge Kommun/Kalvsvik"
+    },
+    {
+      "name": "2024-03-20-flemingsberg",
+      "from": "2024-03-20",
+      "to": "2024-03-20",
+      "place": "Sverige/Stockholms län/Huddinge Kommun/Flemingsberg"
+    },
+    {
+      "name": "2024-03-23-sodermalm",
+      "from": "2024-03-23",
+      "to": "2024-03-23",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm"
+    },
+    {
+      "name": "2024-03-24-sodermalm",
+      "from": "2024-03-24",
+      "to": "2024-03-24",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm"
+    },
+    {
+      "name": "2024-03-29-sodermalm",
+      "from": "2024-03-29",
+      "to": "2024-03-29",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm"
+    },
+    {
+      "name": "2026-06-11-langbro",
+      "from": "2026-06-11",
+      "to": "2026-06-11",
+      "place": "Sverige/Stockholms län/Stockholms stad/Brännkyrka/Långbro"
+    },
+    {
+      "name": "2026-06-28-langbro",
+      "from": "2026-06-28",
+      "to": "2026-06-28",
+      "place": "Sverige/Stockholms län/Stockholms stad/Brännkyrka/Långbro"
+    },
+    {
+      "name": "2026-08-15-svartso",
+      "from": "2026-08-15",
+      "to": "2026-08-15",
+      "place": "Sverige/Stockholms län/Värmdö Kommun/Svartsö"
+    }
+  ]
+}

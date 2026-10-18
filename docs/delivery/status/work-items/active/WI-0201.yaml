@@ -1,0 +1,14 @@
+id: WI-0201
+title: Compare TV portrait presentation variants and decide adoption
+milestone: M38
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0201-tv-portrait-acceptance.md
+blockers: 
+- WI-0198
+- WI-0199
+- WI-0200
+blocker_notes: []
+evidence:
+- type: issue
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/570

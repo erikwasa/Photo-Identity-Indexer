@@ -1,0 +1,77 @@
+{
+  "inferDateFromFilename": false,
+  "inferDateFromDirectory": false,
+  "excludedDateDirectories": ["1970"],
+  "placeRules": [
+    {
+      "name": "fideli-2024-03-22-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-22",
+      "to": "2024-03-22",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-03-23-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-23",
+      "to": "2024-03-23",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-03-24-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-24",
+      "to": "2024-03-24",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-03-25-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-25",
+      "to": "2024-03-25",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-03-28-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-28",
+      "to": "2024-03-28",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-03-30-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-30",
+      "to": "2024-03-30",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-04-01-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-04-01",
+      "to": "2024-04-01",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-04-13-sodersjukhuset",
+      "sourcePrefix": "fideli/",
+      "from": "2024-04-13",
+      "to": "2024-04-13",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
+    },
+    {
+      "name": "fideli-2024-03-19-huddinge-sjukhus",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-19",
+      "to": "2024-03-19",
+      "place": "Sverige/Stockholms län/Huddinge Kommun/Flemingsberg/Huddinge Sjukhus"
+    },
+    {
+      "name": "fideli-2024-03-20-huddinge-sjukhus",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-20",
+      "to": "2024-03-20",
+      "place": "Sverige/Stockholms län/Huddinge Kommun/Flemingsberg/Huddinge Sjukhus"
+    }
+  ]
+}

@@ -285,14 +285,20 @@ public sealed class PostgresPhotoCaptureDateRepository : IPhotoCaptureDateReposi
         command.CommandText = transaction is null
             ? """
               SELECT 1
-              FROM asset_revisions
-              WHERE id = @revision_id;
+              FROM asset_revisions revision
+              JOIN assets asset ON asset.id = revision.asset_id
+              WHERE revision.id = @revision_id
+                AND revision.media_kind = 'photo'
+                AND asset.media_kind = 'photo';
               """
             : """
               SELECT 1
-              FROM asset_revisions
-              WHERE id = @revision_id
-              FOR UPDATE;
+              FROM asset_revisions revision
+              JOIN assets asset ON asset.id = revision.asset_id
+              WHERE revision.id = @revision_id
+                AND revision.media_kind = 'photo'
+                AND asset.media_kind = 'photo'
+              FOR UPDATE OF revision;
               """;
         command.Parameters.AddWithValue("revision_id", NpgsqlDbType.Uuid, revisionId.Value);
         object? exists = await command.ExecuteScalarAsync(cancellationToken);

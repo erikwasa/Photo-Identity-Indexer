@@ -81,13 +81,20 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         string detectorEvaluationRoot =
             configuration["PhotoIdentity:DetectorEvaluationRoot"]
             ?? Path.Combine(defaultApplicationRoot, "detector-evaluations");
+        // Matches the default operator video poster derivative root. If the
+        // operator selected a custom root for "video posters", configure
+        // PhotoIdentity:VideoPosterRoot to that EXACT root before purging.
+        string videoPosterRoot =
+            configuration["PhotoIdentity:VideoPosterRoot"]
+            ?? Path.Combine(defaultApplicationRoot, "video-derivatives");
         _purges = new SourceCopyPurgeService(
             exclusions,
             purgeRepository,
             new SourceCopyPurgeRoots(
                 operatorConfiguration.OutputRoot,
                 proxyConfiguration.RootPath,
-                detectorEvaluationRoot),
+                detectorEvaluationRoot,
+                videoPosterRoot),
             new SourceCopyPurgeFileSystem(),
             timeProvider);
     }

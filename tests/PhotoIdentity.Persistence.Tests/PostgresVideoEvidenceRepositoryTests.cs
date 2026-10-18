@@ -98,6 +98,18 @@ public sealed class PostgresVideoEvidenceRepositoryTests
             Assert.Equal(poster, await repository.GetPosterAsync(
                 poster.RevisionId, poster.PosterProfileId, poster.ToolSha256));
 
+            // Cleanup is source-scoped and cannot retire a current video poster.
+            PostgresVideoPosterCleanupRepository cleanup = new(database);
+            IReadOnlyList<VideoPosterCleanupRow> current =
+                await cleanup.SnapshotAsync(SourceId.From(sourceId));
+            VideoPosterCleanupRow cleanupRow = Assert.Single(current, value => value.RelativePath == poster.PosterRelativePath);
+            Assert.True(cleanupRow.IsCurrent);
+            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), cleanupRow));
+            Assert.False(await cleanup.MayRemoveUnreferencedAsync(
+                SourceId.From(sourceId), poster.RevisionId, poster.PosterProfileId, poster.ToolSha256));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                cleanup.RetireStalePosterAsync(SourceId.New(), cleanupRow));
+
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.SavePosterAsync(poster with { PosterSha256 = new string('f', 64) }));
             await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -119,6 +131,17 @@ public sealed class PostgresVideoEvidenceRepositoryTests
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.SavePosterAsync(poster));
 
+            // An excluded poster is no longer visible and may be retired with
+            // an exact row match. No other revision metadata or photo rows change.
+            IReadOnlyList<VideoPosterCleanupRow> excluded =
+                await cleanup.SnapshotAsync(SourceId.From(sourceId));
+            cleanupRow = Assert.Single(excluded, value => value.RelativePath == poster.PosterRelativePath);
+            Assert.False(cleanupRow.IsCurrent);
+            Assert.True(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), cleanupRow));
+            Assert.False(await cleanup.RetireStalePosterAsync(SourceId.From(sourceId), cleanupRow));
+            Assert.True(await cleanup.MayRemoveUnreferencedAsync(
+                SourceId.From(sourceId), poster.RevisionId, poster.PosterProfileId, poster.ToolSha256));
+
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand inspect = connection.CreateCommand())
             {
@@ -132,7 +155,7 @@ public sealed class PostgresVideoEvidenceRepositoryTests
                 await using NpgsqlDataReader row = await inspect.ExecuteReaderAsync();
                 Assert.True(await row.ReadAsync());
                 Assert.Equal(1L, row.GetInt64(0));
-                Assert.Equal(1L, row.GetInt64(1));
+                Assert.Equal(0L, row.GetInt64(1));
                 Assert.Equal(1L, row.GetInt64(2));
                 Assert.Equal(1L, row.GetInt64(3));
             }

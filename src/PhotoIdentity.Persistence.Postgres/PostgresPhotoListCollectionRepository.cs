@@ -252,7 +252,9 @@ public sealed class PostgresPhotoListCollectionRepository : IPhotoListCollection
                     ARRAY_AGG(item.asset_revision_id ORDER BY item.position)
                         FILTER (
                             WHERE item.asset_revision_id IS NOT NULL
-                              AND asset.deleted_at_utc IS NULL),
+                              AND asset.deleted_at_utc IS NULL
+                              AND asset.media_kind = 'photo'
+                              AND revision.media_kind = 'photo'),
                     ARRAY[]::uuid[])
             FROM photo_list_collections AS collection
             LEFT JOIN photo_list_collection_items AS item
@@ -345,6 +347,8 @@ public sealed class PostgresPhotoListCollectionRepository : IPhotoListCollection
                 ON asset.id = revision.asset_id
             WHERE revision.id IS NULL
                OR asset.deleted_at_utc IS NOT NULL
+               OR asset.media_kind <> 'photo'
+               OR revision.media_kind <> 'photo'
             ORDER BY requested.position;
             """;
         AddRevisionIdsParameter(command, revisionIds);

@@ -79,6 +79,7 @@ public sealed class PostgresPhotoQualityEvaluationRepository
             WHERE asset.deleted_at_utc IS NULL
               AND asset.media_kind = 'photo'
               AND revision.media_kind = 'photo'
+
             ORDER BY md5(revision.id::text)
             LIMIT @limit;
             """;
