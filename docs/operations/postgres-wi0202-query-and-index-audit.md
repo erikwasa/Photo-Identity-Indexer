@@ -142,3 +142,14 @@ git pull --ff-only
 ~~~
 
 Share only anonymous ordinal, filter-dimensions, elapsed-ms table and any sanitized WI-0202 slow count/page warnings. If #7 remains near six seconds, use the existing phase timings plus a **controlled representative restore** to capture a safe, parameterized PostgreSQL plan; avoid further unmeasured index/SQL changes.
+
+
+## Final post-#596 query performance checkpoint — 2026-10-19
+
+On a refreshed packaged build, the maintainer's two sequential saved-cover passes completed **28/28 HTTP 200**. Ordinal #7 (people+relationship) took **1,029 / 1,078 ms**, mean **1,054 ms**: ~83% faster than pre-#596 and ~89% faster than the original ~9.8-second baseline. Ordinal #13 (named place+orientation) took **137 / 143 ms**; #14 took **145 / 134 ms**. All other eleven saved covers were within **111–279 ms**. The associated #596 CI workflow completed successfully.
+
+These measurements validate a substantial improvement in the maintained workload without schema changes, approximate counts, data cleanup, destructive maintenance, index rebuilds, raised timeouts or new sensitive telemetry. They do not replace UI correctness, concurrency or cold-start tests. Stop changing production SQL without a new reproducible problem and plan evidence; retain the safe sequential probe for future regressions.
+
+**Final WI-0202 operator review:** Check PostgreSQL health ready at schema v33, visit Archive (status and first photo page), open a formerly slow person-filtered Smart Collection, run an ad hoc person query, visit the complete Slideshow library and covers, then repeat Archive and Slideshows. Compare all visible results with the intended photo-only catalogue and exclusions. Confirm a usable verified backup/restore checkpoint for the **currently app-connected** database before closing. Previous ANALYZE recovery was operationally effective but its dominant planner cause remains unproven.
+
+**Separate storage policy:** Approximately 13,802 historical provisional-cluster runs, 12,212 superseded, accompany a ~16 GB derived cluster-membership table. The huge B-tree indexes do not directly enter Smart Collection query SQL. A later retention design must preserve current run pointers, review constraints and evidence; the provisional_face_not_same_constraints.source_run_id foreign key uses ON DELETE SET NULL, so deleting runs can silently erase provenance. Use a dry-run policy and isolated restore rehearsal; do not prune in WI-0202.
