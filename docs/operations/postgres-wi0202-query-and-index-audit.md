@@ -97,9 +97,9 @@ After CI passes and the PR merges, package/start Photo Identity **as usual** (co
 
 ~~~powershell
 git pull --ff-only
-.\tools\PhotoIdentity.PostgresDiagnostics\measure-smart-cover-latency.ps1 \`
-    -BaseUrl 'http://127.0.0.1:5080' \`
-    -Repetitions 2 \`
+.\tools\PhotoIdentity.PostgresDiagnostics\measure-smart-cover-latency.ps1 `
+    -BaseUrl 'http://127.0.0.1:5080' `
+    -Repetitions 2 `
     -TimeoutSeconds 35
 ~~~
 
