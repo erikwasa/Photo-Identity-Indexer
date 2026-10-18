@@ -165,3 +165,29 @@ The name-place + orientation count optimization is validated for these maintaine
 **Next scoped performance hypothesis:** Only QueryAsync pages having *both* an explicit people filter and a relationship filter now calculate eligible revision IDs via a **single grouped pass** over the canonical revision_people CTE, joining a deduplicated set of related people with the requested people. The grouped HAVING preserves peopleMatch ALL/ANY and the independent relationship EXISTS requirement, then joins eligible IDs to the same photo-only, exact-date-ordered, offset/limit page CTE. Count SQL, QueryAllAsync, page projection, sort/tie-break, other filter shapes, saved collection definitions and media isolation are unchanged. Tests compare paginated results against the established full-query SQL including matching people, relationship kinds, empty matches, ANY/ALL and past-end offsets.
 
 There is **no claimed speedup until post-merge maintainer timing**. If #7 remains slow, plan diagnostics against a controlled restored catalogue are required before further speculative SQL changes; do not keep churning the working path blindly.
+
+
+## Post-PR #596 query-performance acceptance and review — 2026-10-19
+
+Maintainer-reported verification after merging PR #596 and repackaging: the read-only sequential saved-cover probe returned **28/28 HTTP 200** (14 saved collections, two repetitions). Two-trial latency comparison:
+
+| Anonymous ordinal | Filter dimensions | Before #596, mean | After #596, mean | Outcome |
+| --- | --- | ---: | ---: | --- |
+| #7 | people + relationship | 6,050 ms | **1,054 ms** (1,029 / 1,078) | ~83% faster; ~89% faster than original 9.8-second baseline |
+| #13 | named place + orientation | 2,093 ms | **140 ms** (137 / 143) | ~93% faster |
+| #14 | named place + orientation | 2,206 ms | **140 ms** (145 / 134) | ~94% faster |
+| Other eleven | people, taken, location+taken | Generally fast | **111–279 ms** | No visible regression |
+
+The earlier isolated ~5-second relationship page phase no longer dominates its request. PR #596's associated Actions run #39174715931 **completed successfully**. Automated disposable-PostgreSQL regression tests compare the specialized people+relationship page results to the original full query for ALL/ANY, relationship direction, zero matches, exact total, pagination, people keys and effective capture dates. The observed latency improvement was recorded without exposing private collection/person/photo IDs, names, filter values or SQL parameters.
+
+**Disposition: move WI-0202 to in_review**, not closed. The original 30-second Smart Collection failures are absent from this 28-request trial, the other photo/UI paths were reported recovered earlier, and no more speculative SQL/index changes are justified for this milestone. Collection #7 is still relatively slow (~1.05 seconds) but is markedly improved; no latency SLO was predeclared. Keep the existing anonymous cover probe and >=1-second warning instrumentation for future regressions.
+
+**Verified history:** On 2026-10-18, after targeted ANALYZE on eleven relevant photo tables, the maintainer reported 5/5 local UI checks passing: Archive load, formerly failing person-filtered collection, known-good collection, Slideshow library/covers, and a repeat visit to Archive/Slideshow. On 2026-10-19, after #596, 28/28 saved cover requests returned 200 and all outlier filter shapes improved. The newer probe does **not** by itself re-verify the full Archive, ad hoc person query, or Slideshow UI after the latest package.
+
+**Outstanding completion gates (reviewer/operator):**
+1. On the latest packaged build, verify Archive status and first page, a formerly failing person-filtered Smart Collection, an ad hoc person query, and the complete Slideshow library/covers; repeat the Archive/Slideshow visit and confirm correct visible results.
+2. Confirm usable, verified backup/restore evidence for the **actual application-connected** PostgreSQL database; no such result is included in the submitted WI-0202 evidence.
+3. Acknowledge that the original targeted-ANALYZE recovery correlation does **not** establish a definitive planner root cause. Pre-maintenance planner row estimates were already close to actual photo counts, and no pre/post SQL plans were saved. This causal limitation must stay documented.
+4. A future independent cold-start verification is helpful for recurrence risk, but has not been supplied as part of the new two-pass warm sequential probe.
+
+Do not mark WI-0151 accepted solely on WI-0202 success; its video-specific acceptance is independent. Do not rebuild the ~10 GB historical derived face-work indexes or delete superseded runs to treat Smart Collection latency. Derived-run retention/provenance is a separate policy follow-up.
