@@ -75,6 +75,37 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             PostgresSmartCollectionQueryRepository query = new(database, definitions, TimeProvider.System);
 
+            // The exact-count path must retain semantics when its date/geo
+            // joins are conditionally omitted or included. Paging still returns
+            // the complete population total, even with limit=1.
+            SmartCollectionPhotoPage unfiltered = await query.QueryAsync(
+                new SmartCollectionFilter(), limit: 1);
+            Assert.Equal(2, unfiltered.Total);
+            Assert.Single(unfiltered.Items);
+
+            SmartCollectionPhotoPage peopleOnly = await query.QueryAsync(
+                new SmartCollectionFilter(people: [alice]), limit: 1);
+            Assert.Equal(2, peopleOnly.Total);
+            Assert.Single(peopleOnly.Items);
+
+            SmartCollectionPhotoPage takenOnly = await query.QueryAsync(
+                new SmartCollectionFilter(taken: SmartCollectionDateRange.Parse("2015")));
+            Assert.Equal(1, takenOnly.Total);
+            Assert.Equal(family2015, Assert.Single(takenOnly.Items).RevisionId);
+
+            SmartCollectionGeoBounds location = new(40, 10, 44, 15);
+            SmartCollectionPhotoPage locationOnly = await query.QueryAsync(
+                new SmartCollectionFilter(location: location));
+            Assert.Equal(1, locationOnly.Total);
+            Assert.Equal(family2015, Assert.Single(locationOnly.Items).RevisionId);
+
+            SmartCollectionPhotoPage locationAndTaken = await query.QueryAsync(
+                new SmartCollectionFilter(
+                    location: location,
+                    taken: SmartCollectionDateRange.Parse("2015")));
+            Assert.Equal(1, locationAndTaken.Total);
+            Assert.Equal(family2015, Assert.Single(locationAndTaken.Items).RevisionId);
+
             SmartCollectionPhotoPage age = await query.QueryAsync(
                 new SmartCollectionFilter(
                     age: new SmartCollectionAgeCriterion(alice, 4, 5)));
@@ -165,7 +196,7 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             INSERT INTO photo_capture_metadata (
                 asset_revision_id, taken_at_local, utc_offset_minutes, latitude, longitude, extracted_at_utc)
             VALUES
-                (@revision2015, @taken2015, NULL, NULL, NULL, @now),
+                (@revision2015, @taken2015, NULL, 41.9028, 12.4964, @now),
                 (@revision2025, @taken2025, NULL, NULL, NULL, @now);
             """;
         command.Parameters.AddWithValue("source", NpgsqlDbType.Uuid, source);

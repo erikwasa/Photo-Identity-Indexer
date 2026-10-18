@@ -53,6 +53,23 @@ for ($trial = 1; $trial -le $Repetitions; $trial++) {
         }
         $id = $parsedId.ToString('D')
 
+        # Only show the presence of filter dimensions, never the underlying
+        # names, IDs, dates, tag values, place paths or GPS bounds.
+        $filter = $definitions[$i].Filter
+        $dimensions = [System.Collections.Generic.List[string]]::new()
+        if ($null -ne $filter.People -and $filter.People.Count -gt 0) { $dimensions.Add('people') }
+        if ($null -ne $filter.Tags -and $filter.Tags.Count -gt 0) { $dimensions.Add('tags') }
+        if ($null -ne $filter.Location) { $dimensions.Add('location') }
+        if ($null -ne $filter.Taken) { $dimensions.Add('taken') }
+        if ($null -ne $filter.Age) { $dimensions.Add('age') }
+        if ($null -ne $filter.Relationship) { $dimensions.Add('relationship') }
+        if ($null -ne $filter.Orientation -and $filter.Orientation -ne 'any') { $dimensions.Add('orientation') }
+        $dimensionLabel = if ($dimensions.Count -gt 0) {
+            [string]::Join('+', $dimensions)
+        } else {
+            'none'
+        }
+
         $uri = "$root/api/smart-collections/$id/query?offset=0&limit=1"
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         $httpStatus = "error"
@@ -74,13 +91,14 @@ for ($trial = 1; $trial -le $Repetitions; $trial++) {
         $results.Add([pscustomobject]@{
             Trial = $trial
             CollectionOrdinal = $i + 1
+            FilterDimensions = $dimensionLabel
             Status = $httpStatus
             ElapsedMs = [math]::Round($stopwatch.Elapsed.TotalMilliseconds)
         })
     }
 }
 
-# Ordinals are stable within this session; expensive requests are sequential.
+# Ordinals and dimension labels are stable within this session; expensive requests are sequential.
 $results | Format-Table -AutoSize
 $failures = @($results | Where-Object Status -ne "200")
 Write-Host ("Saved collections: {0}; trials: {1}; requests: {2}; non-200: {3}" -f $definitions.Count, $Repetitions, $results.Count, $failures.Count)

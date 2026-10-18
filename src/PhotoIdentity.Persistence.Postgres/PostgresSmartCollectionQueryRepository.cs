@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using PhotoIdentity.Core.Collections;
@@ -226,11 +228,13 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
     private readonly ISmartCollectionRepository _definitions;
     private readonly TimeProvider _timeProvider;
     private readonly Lazy<Task> _familySchema;
+    private readonly ILogger<PostgresSmartCollectionQueryRepository>? _logger;
 
     public PostgresSmartCollectionQueryRepository(
         PostgresCatalogueDatabase database,
         ISmartCollectionRepository definitions,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ILogger<PostgresSmartCollectionQueryRepository>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(definitions);
@@ -238,6 +242,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         _database = database;
         _definitions = definitions;
         _timeProvider = timeProvider;
+        _logger = logger;
         _familySchema = new Lazy<Task>(
             () => PostgresPersonFamilyMetadataRepository.EnsureSchemaAsync(_database),
             LazyThreadSafetyMode.ExecutionAndPublication);
@@ -258,9 +263,11 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
 
         await EnsureFamilySchemaAsync(cancellationToken);
         string where = BuildWhere(filter);
+        string countJoins = BuildCountJoins(filter);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
 
+        Stopwatch countTimer = Stopwatch.StartNew();
         int total;
         await using (NpgsqlCommand count = connection.CreateCommand())
         {
@@ -269,20 +276,26 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 SELECT COUNT(*)
                 FROM asset_revisions
                 INNER JOIN assets ON assets.id = asset_revisions.asset_id
-                LEFT JOIN photo_capture_metadata
-                    ON photo_capture_metadata.asset_revision_id = asset_revisions.id
-                LEFT JOIN effective_capture_dates
-                    ON effective_capture_dates.revision_id = asset_revisions.id
+                {countJoins}
                 WHERE assets.deleted_at_utc IS NULL
                   AND assets.media_kind = 'photo' AND asset_revisions.media_kind = 'photo'
                   {where};
                 """;
             AddFilterParameters(count, filter);
-            total = Convert.ToInt32(
-                await count.ExecuteScalarAsync(cancellationToken),
-                CultureInfo.InvariantCulture);
+            try
+            {
+                total = Convert.ToInt32(
+                    await count.ExecuteScalarAsync(cancellationToken),
+                    CultureInfo.InvariantCulture);
+            }
+            finally
+            {
+                countTimer.Stop();
+                LogSlowPhase("count", countTimer, filter);
+            }
         }
 
+        Stopwatch pageTimer = Stopwatch.StartNew();
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             {CommonCtes}
@@ -329,11 +342,19 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         command.Parameters.AddWithValue("offset", NpgsqlDbType.Integer, offset);
 
         List<SmartCollectionPhoto> items = [];
-        await using NpgsqlDataReader reader =
-            await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        try
         {
-            items.Add(ReadPhoto(reader));
+            await using NpgsqlDataReader reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(ReadPhoto(reader));
+            }
+        }
+        finally
+        {
+            pageTimer.Stop();
+            LogSlowPhase("page", pageTimer, filter);
         }
 
         return new SmartCollectionPhotoPage(items, offset, limit, total, filter);
@@ -554,6 +575,57 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             : new PhotoCaptureDateRange(
                 reader.GetFieldValue<DateOnly>(fromOrdinal),
                 reader.GetFieldValue<DateOnly>(toOrdinal));
+
+    // Keep the COUNT path dependent only on the dimensions used by its predicate.
+    // The page query still needs metadata and capture dates for sorting/projection.
+    // Other filter dimensions use their own CTE-based EXISTS/IN predicates.
+    private static string BuildCountJoins(SmartCollectionFilter filter)
+    {
+        List<string> joins = [];
+
+        if (filter.Location is not null)
+        {
+            joins.Add("""
+                LEFT JOIN photo_capture_metadata
+                    ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+                """);
+        }
+
+        if (filter.Taken is not null || filter.Age is not null)
+        {
+            joins.Add("""
+                LEFT JOIN effective_capture_dates
+                    ON effective_capture_dates.revision_id = asset_revisions.id
+                """);
+        }
+
+        return string.Join(Environment.NewLine, joins);
+    }
+
+    private void LogSlowPhase(string phase, Stopwatch timer, SmartCollectionFilter filter)
+    {
+        // Only dimension presence and elapsed time are logged: no IDs, paths,
+        // location bounds, dates, tag values, names, SQL or parameter values.
+        if (_logger is null || timer.ElapsedMilliseconds < 1000)
+        {
+            return;
+        }
+
+        _logger.LogWarning(
+            "WI-0202 slow Smart Collection {Phase} phase: {ElapsedMs} ms; " +
+            "people={People}, tags={Tags}, location={Location}, places={Places}, " +
+            "taken={Taken}, age={Age}, relationship={Relationship}, orientation={Orientation}",
+            phase,
+            timer.ElapsedMilliseconds,
+            filter.People.Count > 0,
+            filter.Tags.Count > 0,
+            filter.Location is not null,
+            filter.LocationPlaces.Count > 0,
+            filter.Taken is not null,
+            filter.Age is not null,
+            filter.Relationship is not null,
+            filter.Orientation != SmartCollectionOrientations.Any);
+    }
 
     private static string BuildWhere(SmartCollectionFilter filter)
     {

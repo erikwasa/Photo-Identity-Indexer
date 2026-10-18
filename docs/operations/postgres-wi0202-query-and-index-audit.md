@@ -85,3 +85,24 @@ Potential optimization **not yet shipped**: for a Smart filter without date or a
 **Probe bug discovered:** One trial failed to connect because the Photo Identity API was not running at localhost:5080; subsequent trial reached the API but the probe misinterpreted an Invoke-RestMethod JSON array as one nested definition, yielding "invalid identifier". The corrected script materializes the response, explicitly enumerates definitions and checks that each ID parses as a GUID. This does **not** indicate bad saved collections.
 
 Next: rerun the corrected probe twice while /health reports 200. Only after seeing whether slow ordinals recur should we instrument Smart Collection count/page phases or propose query-plan changes.
+
+
+## Next query experiment: conditional count joins and slow-phase logging
+
+Maintainer baseline from two sequential passes, **28/28 HTTP 200**: ordinal #7 took 9,718/9,811 ms; #13 took 2,067/2,089 ms; #14 took 2,113/2,141 ms. Other 11 collection cover queries were at most 467 ms. These are stable by ordinal only while collection definitions do not change.
+
+The next PR conditionally omits unused count-only metadata/date joins while keeping exact COUNT(*), unchanged page SELECT, photo media-kind and all filter semantics. It also records private-safe count/page phase warnings if either phase lasts at least one second. **This is a testable optimization hypothesis**, not proof that it accounts for the slow #7 query or that index changes are necessary.
+
+After CI passes and the PR merges, package/start Photo Identity **as usual** (code changes will not affect an already-running packaged binary) and run:
+
+~~~powershell
+git pull --ff-only
+.\tools\PhotoIdentity.PostgresDiagnostics\measure-smart-cover-latency.ps1 `
+    -BaseUrl 'http://127.0.0.1:5080' `
+    -Repetitions 2 `
+    -TimeoutSeconds 35
+~~~
+
+The probe now prints safe **FilterDimensions** labels by ordinal without the underlying values. For any slow result, compare the local API console/log entries beginning with "WI-0202 slow Smart Collection count phase" or "WI-0202 slow Smart Collection page phase". These log only per-phase milliseconds and filter presence flags, not identities. Share only those sanitized timing lines and the sanitized two-pass table; keep full logs private.
+
+If the slow time comes mostly from **count**, next isolate that filter's COUNT plan. If mostly **page**, focus on sort/projection and the effective date/person/place CTEs. In either case use a verified isolated restored database for parameterized estimated EXPLAIN, and preserve the exact count/filter/ordering contract.
