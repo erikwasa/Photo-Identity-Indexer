@@ -739,3 +739,46 @@ held-out evaluator; it is **not** run or authorized in checkpoint 16.
 The maintainer next runs the offline attestation command from the
 operations runbook and shares its aggregate console JSON. Neither
 private calibration evidence nor held-out ratings are committed.
+
+## Checkpoint 17: sealed preflight and reviewable one-shot held-out evaluator
+
+The maintainer completed the checkpoint-16 **private frozen** TOPIQ
+ranking attestation, with exact `0.16755089163780212` positive
+raw-score gap and the previously frozen 80%/20%/80% research criteria.
+The maintainer's aggregate output still says
+`heldOutEvaluationAllowed=false` and
+`heldOutLabelsAccessed=false`. This is correct and must not be
+silently promoted into a held-out run.
+
+Checkpoint 17 prepares `heldout_ranking_one_shot.py` with:
+
+- **Sealed preflight only** as the permitted local next action. Validates
+  the existing calibrated proposal and frozen attestation, exact
+  existing 600-score export, 240/160/200 partition counts and
+  held-out representative cohort identity. Computes binding
+  fingerprints *without reading held-out/challenge human reviews*.
+- **Separately gated evaluate mode** for a *future* authorization.
+  Requires a strict private operator authorization record bound to
+  the sealed preflight fingerprint, and one exclusive durable
+  one-shot claim next to the frozen attestation before any held-out
+  `qualityLevel` is examined. Does not create an authorization
+  artifact or override the frozen `heldOutEvaluationAllowed=false`.
+  Claim reuse is rejected. A post-claim failure must be investigated
+  rather than retried or used to retune.
+- One predeclared report from the 160 representative held-out photos
+  (12,720 all-pair potential comparisons), with ordered/abstained,
+  same-tier, unsure, two-or-more-tier conditional numerator and
+  denominator counts, threshold pass/fail and seeded photo-level
+  cluster bootstrap 95% descriptive intervals (1,000 repeats).
+  Comparisons reuse photos and are not independent observations.
+- Synthetic-only offline tests for sealed review-label invariance,
+  tampered evidence, strict authorization mismatch, selected/abstained
+  ordering, missing tiers, same-tier decisions, bootstrap and
+  single-use claim.
+
+The command in the operations runbook is **preflight only**, safe to
+run after checkpoint 17 PR merges; the maintainer must share its
+aggregate console result before any separate held-out permission
+is considered. No one-time held-out evaluation is performed in this
+PR. No production inference, score persistence, auto exclusion,
+Search/Smart/Creative/Slideshow changes or licensing approval.

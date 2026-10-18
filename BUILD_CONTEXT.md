@@ -4,6 +4,27 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0193 checkpoint 17 (2026-10-18):** Maintainer completed
+private checkpoint-16 TOPIQ p75 freeze attestation. Aggregate local
+output confirms exact fixed gap `0.16755089163780212`,
+`researchHypothesisFrozen=true`, and **held-out evaluation still
+not authorized**. New `heldout_ranking_one_shot.py` implements
+safe **preflight** (calibration/score/freeze fingerprints and frozen
+160 representative held-out membership only; never touches
+held-out/challenge human ratings), plus a separately gated
+one-shot evaluator for a **later** explicit maintainer approval.
+The evaluator checks a strict private authorization tied to
+preflight fingerprint and exclusively writes a one-use claim
+before reading held-out quality labels. Synthetic tests cover
+abstention/same tiers/photo-level bootstrap/claim reuse.
+Research endpoints remain fixed 80%/20%/80%, no held-out
+retuning or new candidate. **Next after PR merge:** run *only*
+the preflight command documented in the benchmark operations
+runbook and share aggregate output. Do not generate separate
+authorization or run evaluation yet. No production quality/rank
+or automatic Very Low exclusion permitted. M37 PRs target
+`features/m37`.
+
 **WI-0193 checkpoint 16 (2026-10-18):** Maintainer explicitly approved
 a **research-only TOPIQ NR p75 ranking freeze** after checkpoint 15's
 aggregate-only local proposal: candidate `pyiqa-topiq_nr-0.1.16`,
