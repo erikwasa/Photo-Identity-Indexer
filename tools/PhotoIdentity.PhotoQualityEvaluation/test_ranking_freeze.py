@@ -1,5 +1,4 @@
 """Synthetic-only tests for the approved, offline TOPIQ research freeze."""
-import copy
 import unittest
 
 from ranking_freeze import CRITERIA, PROTOCOL, THRESHOLD, freeze
@@ -68,7 +67,7 @@ class RankingFreezeTests(unittest.TestCase):
             frozen["researchCriteria"]["minimumAllPairDecisionCoverage"], .20)
         self.assertEqual(
             frozen["researchCriteria"]["minimumTwoOrMoreTierSelectedAccuracy"], .80)
-        self.assertEqual(frozen["proposalSha256"], frozen["proposalSha256"])
+        self.assertEqual(len(frozen["proposalSha256"]), 64)
         self.assertNotIn("sensitive private review", str(frozen))
         self.assertNotIn("private-revision-", str(frozen))
 
