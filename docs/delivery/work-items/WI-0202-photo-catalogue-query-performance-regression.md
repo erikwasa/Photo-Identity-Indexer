@@ -115,3 +115,24 @@ The growth is **consistent with retained derived run history**, not proof of B-t
 Repository audit also found provisional_face_not_same_constraints.source_run_id has **ON DELETE SET NULL** behavior. Wholesale deletion of historical cluster runs would remove some provenances even if the persisted not-same-person constraints remain. Future retention must explicitly preserve auditability and current run linkage, be dry-run-first, and be tested on a restored database. No deletion, index rebuild, schema change or maintenance is authorized by this checkpoint.
 
 The first local Smart cover probe failed because the API was stopped; a second run exposed a **diagnostic PowerShell JSON-array enumeration bug**, not an invalid saved collection. This PR fixes probe parsing; post-fix cover timing results are pending from the maintainer. Continue investigating SQL count/page phase latency separately from face-work table growth.
+
+
+## Reproducible saved Smart Collection query latency and first count-path refinement — 2026-10-18
+
+After the JSON response probe fix, the maintainer measured **14 saved Smart Collections, two sequential passes, 28/28 HTTP 200**. Stable anonymous ordinal times:
+
+- **#7:** 9,718 ms and 9,811 ms (repeatable ~9.8-second outlier).
+- **#13:** 2,067 ms and 2,089 ms.
+- **#14:** 2,113 ms and 2,141 ms.
+- Other 11 collections completed in 107–467 ms over the two trials.
+
+This is a reproducible non-concurrency-specific latency pattern, *not* a persistent HTTP failure. The previously documented large derived face-run tables do not appear in the direct Smart Collection SQL path.
+
+**Focused code hypothesis:** PostgresSmartCollectionQueryRepository.QueryAsync builds its exact COUNT(*) with unconditional photo_capture_metadata and effective_capture_dates LEFT JOINs, even when their columns are not needed by the filter. This PR keeps the exact count, photo-kind filters and existing page SQL but conditionally includes:
+- photo_capture_metadata only for geographic bounding-box filters;
+- effective_capture_dates only for Taken date or Age filters;
+- all other people, tag, place, relationship, orientation subqueries unchanged.
+
+The query's COUNT and page phases now emit separate 1-second-threshold structured warning timings with only filter-dimension presence booleans (no collection, photo, person, place or tag identifiers, GPS bounds, query SQL or parameters). The local sequential cover probe additionally shows safe filter dimension labels by ordinal. PostgreSQL disposable integration assertions verify exact count/page behavior with no filters, person-only, date-only, geo-only, geo+date and existing age/relationship cases.
+
+**Still unverified:** The effect on the real maintainer's #7/#13/#14 is unknown until this PR builds, is packaged and is measured locally; PostgreSQL might already eliminate some unused joins. If timings remain high, compare slow-phase logs and collect locally scoped estimated plans on an isolated restored catalogue, rather than speculating or increasing timeouts. Query semantics and database indexes/retention are unchanged apart from this narrowly conditional count SQL.
