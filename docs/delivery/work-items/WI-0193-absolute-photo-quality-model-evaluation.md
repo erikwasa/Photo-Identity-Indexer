@@ -614,3 +614,82 @@ this question merits one **explicitly frozen** ranking-only
 research hypothesis for one-shot held-out testing, or record a
 conservative **no-go** and close WI-0193 without unsealing held-out
 labels. Do not introduce a new production ranker in this checkpoint.
+
+## Checkpoint 15: five-fold calibration evidence supports a conditional ranking-only research hypothesis
+
+The maintainer completed the checkpoint-14 score-gap study with **238
+representative calibration photos**, divided into deterministic
+five-fold photo-disjoint subsets (39, 49, 49, 57, 44). Thresholds
+were estimated using training-fold raw-score differences only;
+validation evaluated within-fold photo pairs. The study did not
+read held-out/challenge human labels.
+
+| Quantile of score-gap rule | Approx. comparison coverage | TOPIQ ordering when human tiers differ | MUSIQ ordering when human tiers differ |
+| --- | ---: | ---: | ---: |
+| 0% (no abstention) | 100% | 69.87% | 71.24% |
+| 50% | 50% | 80.98% | 82.26% |
+| 75% | 25% | 90.27% | 89.75% |
+| 90% | 11% | 97.41% | 96.86% |
+
+For human ratings separated by at least two tiers, TOPIQ 75%
+selected **247/466** eligible calibration-fold pairs and ordered
+**92.71%** correctly. MUSIQ 75% selected **276/466** and ordered
+**89.49%** correctly. These differences should **not** be treated
+as statistically significant; photo pairs reuse observations,
+and same-tier pairs are excluded from the correctness denominator
+even though the actual decision rule cannot identify their tiers.
+All-pair coverage at TOPIQ 75% was **1441/5635 (25.57%)**,
+and accuracy among human-different-tier selected pairs was
+**~90.27% of 935**.
+
+**Research choice, not deployment approval:** advance a **single
+TOPIQ NR score-gap 75th-percentile** hypothesis to a *review-only
+pre-registration proposal*. TOPIQ exceeds 90% observed ordering
+among different-tier pairs at approximately one-quarter decision
+coverage, and performs modestly better than MUSIQ on the more
+strongly separated 2+-tier comparison at this setting. MUSIQ
+remains a reasonable alternative on runtime grounds (roughly
+2.7 s/photo proxy vs TOPIQ 4.4 s/photo CPU), but testing both
+and choosing afterward would expand selection bias. The chosen
+cutoff was selected after seeing multiple calibration candidates/
+quantiles and must be described as an **exploratory selection**,
+not pre-registered independent validation.
+
+The new `ranking_freeze_proposal.py` computes **one scalar,
+deterministic oriented-score difference threshold** from the
+75th percentile of all unordered raw-score gaps over the original
+238 *known-tier representative calibration* TOPIQ scores (28203
+pairs), **without using rating magnitudes to choose the threshold**.
+The chosen score-export hash and a calibration-review fingerprint
+are stored in a new private, exclusively created draft. Neither
+the study's five fold-specific cutoffs nor a per-photo absolute tier
+is the proposed policy. The proposed pairwise rule prefers a photo
+only when its score exceeds the other's by at least the fixed
+positive gap; otherwise it abstains. **No image is excluded**.
+
+The proposal is explicitly marked
+`status=review-proposal-not-frozen`,
+`researchHypothesisFrozen=false`,
+`heldOutEvaluationAllowed=false`,
+`productionModelApproved=false` and
+`automaticVeryLowExclusionApproved=false`.
+Model-to-weight attestation and checkpoint/framework permissions
+remain separate, unresolved deployment gates. The full private
+benchmark, score exports and held-out reviews remain untouched.
+
+**Next decision:** once the maintainer supplies the aggregate
+threshold proposal, review the fixed rule, absolute score units,
+evidence fingerprints and research success/failure endpoint *before*
+explicitly freezing any one research hypothesis. A possible
+predeclared held-out criterion is correct ordering >=80% among
+human different-tier selected pairs at >=20% all-pair coverage,
+with >=80% ordering of 2+-tier selected pairs. Report both raw
+counts and photo-resampled intervals, same-tier decision rate,
+and failure/abstention. These are research criteria, **not
+automatic production admission**. The one-time sealed 160-photo
+held-out evaluation must only be implemented/authorized in
+a separate work stage and **never run as part of this PR**.
+
+No production ranker, archive evidence, rating, automatic exclusion,
+Search/Smart/Creative/Slideshow behavior or licensing status is
+changed in this checkpoint.
