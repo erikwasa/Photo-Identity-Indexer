@@ -129,6 +129,34 @@ public sealed class VideoToolProcessSupervisorTests
         finally { Directory.Delete(scratch, recursive: true); }
     }
 
+    [Fact]
+    public async Task Opt_in_windows_limits_apply_to_supervised_command_and_clean_scratch()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = MakeScratch();
+        try
+        {
+            string executable = CmdPath();
+            string hash = await HashAsync(executable);
+            var supervisor = new VideoToolProcessSupervisor();
+            using CancellationTokenSource stop = new(TimeSpan.FromMilliseconds(450));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                supervisor.RunAsync(
+                    executable, hash, scratch,
+                    _ => ["/d", "/c", "ping -n 15 127.0.0.1 >NUL"],
+                    SmallBudget with
+                    {
+                        WindowsJobLimits = new WindowsVideoJobLimits(
+                            MaximumJobMemoryMiB: 512,
+                            MaximumProcesses: 2,
+                            MaximumCpuPercent: 25)
+                    },
+                    stop.Token));
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
     private static string MakeScratch()
     {
         string root = Path.Combine(Path.GetTempPath(),
