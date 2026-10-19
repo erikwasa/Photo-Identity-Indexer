@@ -348,7 +348,24 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 leased_until_utc=now()+interval '60 seconds',
                 updated_at_utc=now()
             WHERE id=@id AND lease_token=@lease AND status='running'
-              AND leased_until_utc>now() AND cancellation_requested_at_utc IS NULL;
+              AND leased_until_utc>now() AND cancellation_requested_at_utc IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id=revision.asset_id
+                  JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
+                  WHERE revision.id=video_processing_jobs.asset_revision_id
+                    AND revision.media_kind='video' AND asset.media_kind='video'
+                    AND asset.deleted_at_utc IS NULL
+                    AND metadata.inspection_status='supported'
+                    AND revision.id=(
+                        SELECT latest.id FROM asset_revisions latest
+                        WHERE latest.asset_id=asset.id AND latest.media_kind='video'
+                        ORDER BY latest.observed_at_utc DESC, latest.id DESC LIMIT 1)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM source_copy_exclusions excluded
+                        WHERE excluded.source_id=asset.source_id
+                          AND excluded.source_key=asset.source_key)
+              );
             """;
         command.Parameters.AddWithValue("id", jobId);
         command.Parameters.AddWithValue("lease", leaseToken);
@@ -363,7 +380,36 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
     {
         await _exclusions.EnsureReadyAsync(token);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token);
+
+        // Serialize final acknowledgement against video revision registration
+        // and source-copy exclusion insertion. The latter takes a source FK
+        // KEY SHARE lock, which conflicts with this source row's UPDATE lock.
+        // A lease is not, by itself, proof that an exclusion is still absent.
+        await using (NpgsqlCommand source = connection.CreateCommand())
+        {
+            source.Transaction = transaction;
+            source.CommandText = """
+                SELECT source.id
+                FROM video_processing_jobs job
+                JOIN asset_revisions revision ON revision.id=job.asset_revision_id
+                JOIN assets asset ON asset.id=revision.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE job.id=@id AND job.lease_token=@lease
+                  AND job.status='running' AND source.kind='local-folder'
+                FOR UPDATE OF source;
+                """;
+            source.Parameters.AddWithValue("id", jobId);
+            source.Parameters.AddWithValue("lease", leaseToken);
+            if (await source.ExecuteScalarAsync(token) is not Guid)
+            {
+                await transaction.CommitAsync(token);
+                return false;
+            }
+        }
+
         await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             UPDATE video_processing_jobs job
             SET status=CASE
@@ -405,7 +451,9 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
         command.Parameters.AddWithValue("lease", leaseToken);
         command.Parameters.AddWithValue("success", succeeded);
         command.Parameters.AddWithValue("retryable", retryable);
-        return await command.ExecuteNonQueryAsync(token) == 1;
+        bool updated = await command.ExecuteNonQueryAsync(token) == 1;
+        await transaction.CommitAsync(token);
+        return updated;
     }
 
     public async Task<VideoProcessingJobState?> GetAsync(
