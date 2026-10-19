@@ -106,6 +106,12 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
                         int count = await from.ReadAsync(block.AsMemory(0, 65536), token);
                         if (count == 0) break;
                         copied += count;
+                        // Observe pause, photo priority, cancellation and source
+                        // exclusion during long copies, not only at the edges.
+                        if ((copied / (4 * 1024 * 1024)) !=
+                            ((copied - count) / (4 * 1024 * 1024)) &&
+                            !await authorized(token))
+                            throw new IOException("Video source permission was revoked while staging.");
                         if (copied > expectedBytes)
                             throw new IOException("Video copy exceeded the leased source size.");
                         await to.WriteAsync(block.AsMemory(0, count), token);
