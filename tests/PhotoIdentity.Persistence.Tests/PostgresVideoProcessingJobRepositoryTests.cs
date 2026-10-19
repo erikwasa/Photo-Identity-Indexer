@@ -123,6 +123,86 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.Equal("cancelled", (await queue.GetAsync(cancelledBeforeStart))?.Status);
             Assert.False(await queue.RequestCancellationAsync(cancelledBeforeStart));
 
+            // A false caller-supplied photo activity flag must never override
+            // the authoritative PostgreSQL photo queues and operator intent.
+            var priorityProbe = new PostgresVideoPhotoPriorityProbe(database);
+            Assert.False((await priorityProbe.GetAsync()).PhotoWorkActive);
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand pending = connection.CreateCommand())
+            {
+                pending.CommandText = """
+                    INSERT INTO archive_advancement_control(
+                        source_id,desired_state,runtime_state,sync_required,updated_at_utc)
+                    VALUES (@source,'running','queued',true,@now);
+                    """;
+                pending.Parameters.AddWithValue("source", source);
+                pending.Parameters.AddWithValue("now", now);
+                Assert.Equal(1, await pending.ExecuteNonQueryAsync());
+            }
+            VideoPhotoPrioritySnapshot archiveBusy = await priorityProbe.GetAsync();
+            Assert.True(archiveBusy.ArchiveWorkRequested);
+            Assert.True(archiveBusy.PhotoWorkActive);
+            Assert.Null(await queue.TryClaimNextAsync(budget, photoWorkActive: false));
+            Assert.Equal("queued", (await queue.GetAsync(job))?.Status);
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand resume = connection.CreateCommand())
+            {
+                resume.CommandText = """
+                    UPDATE archive_advancement_control
+                    SET desired_state='paused', runtime_state='paused', sync_required=false
+                    WHERE source_id=@source;
+                    """;
+                resume.Parameters.AddWithValue("source", source);
+                Assert.Equal(1, await resume.ExecuteNonQueryAsync());
+            }
+            Assert.False((await priorityProbe.GetAsync()).PhotoWorkActive);
+
+            Guid photoRun = Guid.NewGuid();
+            Guid photoJob = Guid.NewGuid();
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand pending = connection.CreateCommand())
+            {
+                pending.CommandText = """
+                    INSERT INTO processing_runs(id,status,configuration_json,started_at_utc)
+                    VALUES (@run,'pending','{}'::jsonb,@now);
+                    """;
+                pending.Parameters.AddWithValue("run", photoRun);
+                pending.Parameters.AddWithValue("now", now);
+                Assert.Equal(1, await pending.ExecuteNonQueryAsync());
+            }
+            Assert.True((await priorityProbe.GetAsync()).PhotoRunPendingOrRunning);
+            Assert.Null(await queue.TryClaimNextAsync(budget));
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand running = connection.CreateCommand())
+            {
+                running.CommandText = """
+                    UPDATE processing_runs SET status='running' WHERE id=@run;
+                    INSERT INTO processing_jobs (
+                        id,processing_run_id,asset_revision_id,status,
+                        available_at_utc,idempotency_key)
+                    VALUES (@job,@run,@revision,'queued',@now,'photo-priority-test');
+                    """;
+                running.Parameters.AddWithValue("run", photoRun);
+                running.Parameters.AddWithValue("job", photoJob);
+                running.Parameters.AddWithValue("revision", photoRevision);
+                running.Parameters.AddWithValue("now", now);
+                await running.ExecuteNonQueryAsync();
+            }
+            VideoPhotoPrioritySnapshot photoBusy = await priorityProbe.GetAsync();
+            Assert.True(photoBusy.PhotoRunPendingOrRunning);
+            Assert.True(photoBusy.PhotoJobQueuedOrRunning);
+            Assert.Null(await queue.TryClaimNextAsync(budget, false));
+            // Remove only test-owned photo work; photo queue remains unchanged
+            // by the actual video claim repository throughout these checks.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand cleanup = connection.CreateCommand())
+            {
+                cleanup.CommandText = "DELETE FROM processing_runs WHERE id=@run;";
+                cleanup.Parameters.AddWithValue("run", photoRun);
+                Assert.Equal(1, await cleanup.ExecuteNonQueryAsync());
+            }
+            Assert.False((await priorityProbe.GetAsync()).PhotoWorkActive);
+
             Assert.Null(await queue.TryClaimNextAsync(new VideoProcessingBudget(), false));
             Assert.Null(await queue.TryClaimNextAsync(budget with { Paused = true }, false));
             Assert.Null(await queue.TryClaimNextAsync(budget, true));
