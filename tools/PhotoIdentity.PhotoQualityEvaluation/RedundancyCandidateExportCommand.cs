@@ -270,7 +270,11 @@ internal static class RedundancyCandidateExportCommand
                 schemaVersion = 1,
                 protocol = CandidateProtocol,
                 sampleId = "wi0194-" + Digest(string.Join("|",
-                    photos.Select(x => x.RevisionId)) + "|" + options.ModelSha256)[..24],
+                    photos.Select(x => x.RevisionId)) + "|" + options.ModelSha256 +
+                    (options.BorderlinePerSeed > 0 || options.RandomNegativeControls.HasValue
+                        ? "|borderline=" + options.BorderlinePerSeed +
+                          "|controls=" + controlTarget
+                        : string.Empty))[..24],
                 photos = photos.Select(x => new
                 {
                     revisionId = x.RevisionId,
@@ -297,6 +301,10 @@ internal static class RedundancyCandidateExportCommand
                 strictDhashNearCopyLinks,
                 dhashRetrievedPairs = dhashRetrieved.Count,
                 clipRetrievedPairs = clipRetrieved.Count,
+                clipBorderlinePerSeedRequested = options.BorderlinePerSeed,
+                clipBorderlineCandidateAttempts,
+                clipBorderlinePairsAdded,
+                randomNegativeControlsRequested = controlTarget,
                 clipOnlyRetrievedPairs = clipRetrieved.Count(p => !dhashRetrieved.Contains(p)),
                 dhashClipOverlapPairs = clipRetrieved.Count(dhashRetrieved.Contains),
                 clipModelId = options.ModelId,
@@ -351,6 +359,10 @@ internal static class RedundancyCandidateExportCommand
                 aggregate.strictDhashNearCopyLinks,
                 aggregate.dhashRetrievedPairs,
                 aggregate.clipRetrievedPairs,
+                aggregate.clipBorderlinePerSeedRequested,
+                aggregate.clipBorderlineCandidateAttempts,
+                aggregate.clipBorderlinePairsAdded,
+                aggregate.randomNegativeControlsRequested,
                 aggregate.clipOnlyRetrievedPairs,
                 aggregate.dhashClipOverlapPairs,
                 aggregate.clipIndexedPhotosInSample,
