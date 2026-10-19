@@ -247,6 +247,53 @@ $python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe
 
 Share **only the aggregate JSON stdout**. Stop if tests fail. This runs on existing local JSON: no full archive scan, database/proxy access, model download, originals/cloud hydration, file writes, human labels, split freeze or product change. Do not run `redundancy_review_pairs.py`, solicit any reviewer labels, or open held-out photos as part of a research set. The subsequent review protocol requires an explicit separate decision on privacy, pilot authorization, reviewer workflow, absent exact-copy controls, and the isolation of a truly independent held-out evaluation. WI-0194 remains in progress, WI-0195 blocked.
 
+
+## Bundled WI-0194 calibration-pilot workflow — one local verification round
+
+The archive-wide and candidate-enrichment phases are already complete. In response to operator feedback, the next development release includes the **entire calibration-only pilot toolkit**: deterministic blinded pair selection, read-only durable-proxy mapping, a local side-by-side browser reviewer with autosave/resume, validation tests, and a bound aggregate analysis. There is **no further required one-command research checkpoint between each tool**.
+
+**Prerequisites:** merged integrated-pilot PR on `main`; the existing private `private/wi0194-full-enriched-candidates.json` (27,050 photos / 165,181 pairs), the known working PostgreSQL connection, the local review proxy root/profile `jpeg-1600-q78`, and the existing `%LOCALAPPDATA%\PhotoIdentity\iqa-venv\Scripts\python.exe`. The private source data, human labels and images must remain local/untracked. Do not regenerate or replace either full-archive candidate manifest.
+
+**One-shot preparation and code verification** (safe; this **does not** start human review or access held-out labels):
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch main
+git pull --ff-only origin main
+
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_redundancy_calibration_pilot.ps1
+~~~
+
+The script runs synthetic pilot privacy, deterministic pairing, label-binding, proxy-integrity and resume tests. Then it **only once** creates three new private files, reusing them on later runs:
+
+- `private/wi0194-calibration-pilot-blind-v1.json`: exactly 200 unlabelled calibration-calibration pairs, randomized/blinded order, two revision IDs each, **no scores, strata, model or partition**;
+- `private/wi0194-calibration-pilot-audit-v1.json`: separate private source/stratum evidence and fingerprints, no held-out pairs;
+- `private/wi0194-calibration-pilot-proxies-v1.json`: exact-pilot-bound, verified current review-proxy metadata from a **read-only** PostgreSQL lookup for only the ~382 selected calibration photos. Actual proxy SHA and lengths are checked when images are requested by the reviewer.
+
+The preparation result should report approximately **200 calibration-only pilot pairs / 382 distinct calibration photos / 0 held-out**, provided the same current archive is available. If the CLI reports that proxies have become missing or stale, do not silently substitute or regenerate originals: stop and report the error type. Prepared private files cannot be overwritten; the script refuses partial file pairs, and the reviewer rejects incompatible fingerprints. Files are never uploaded or committed. Preparation **does not** constitute authorization to freeze the held-out study.
+
+**Optional local calibration-only visual pilot** (after deciding to collect human calibration labels; no held-out evaluation):
+
+~~~powershell
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_redundancy_calibration_pilot.ps1 -Review
+~~~
+
+This opens a loopback `127.0.0.1:5184` side-by-side reviewer. You may choose one of four blinded human labels: **Redundant** (normally select one), **Similar but keep both**, **Not similar**, and **Unsure**. Use keys 1–4 or buttons; optional notes; navigate or skip to next unreviewed. The reviewer displays neither source path, dHash, CLIP score, model origin, stratum, calibration/held-out marker nor archive-quality study content. The images are **existing immutable-hash-verified local JPEG proxies only**. The first saved review creates `private/wi0194-calibration-pilot-labels-v1.json`; subsequent reviews use atomic file replacement. Stop with Ctrl+C and rerun the same `-Review` command whenever convenient; prior labels and notes are validated and resumed. The default command without `-Review` never starts labeling.
+
+After reviews, this same script prints a sanitized **calibration-only** report by candidate stratum. It can also be run directly:
+
+~~~powershell
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/redundancy_pilot_package.py report `
+  --blind private/wi0194-calibration-pilot-blind-v1.json `
+  --audit private/wi0194-calibration-pilot-audit-v1.json `
+  --labels private/wi0194-calibration-pilot-labels-v1.json
+~~~
+
+Only **aggregate stdout** may be shared: number reviewed/remaining; bucket counts of redundant, similar-keep-both, not-similar and unsure; descriptive intervals. Never paste/commit private manifests, proxy maps, review labels/notes, photo identities or individual scores. **Calibration does not establish held-out precision/recall, an accepted dedicated redundancy model or a production suppression threshold.** Prior high-CLIP similarity might be semantic, unobserved near duplicates remain unknown, and the baseline dHash<=4 split is *not* frozen as leakage-safe. Genuine exact-copy controls are unavailable; no synthetic duplicates are passed off as real archive controls. The already-consumed WI-0193 held-out quality labels are out of scope.
+
+After this **single bundled operator round**, evaluate the meaningful human redundancy outcomes and decide whether to pursue a separate comprehensive independent held-out/model phase, or document **NO-GO / manual-only / defer** on automatic suppression and move to milestone disposition. WI-0195 remains blocked until an actual accepted policy or explicit milestone no-go decision; no Search/Smart/Creative/Slideshow semantics are changed here.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
