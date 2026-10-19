@@ -140,6 +140,31 @@ acceptance criteria remain unchecked until the complete work item is verified.
 generation, ingestion or video-processing activation is requested for this
 checkpoint. Continue development after CI and PR review.
 
+### Checkpoint 5 — PostgreSQL-backed photo-first video lease admission (2026-10-19)
+
+- Added the read-only `PostgresVideoPhotoPriorityProbe`, which reports
+  archive advancement requested/sync required, photo processing runs pending
+  or running, and queued/running jobs in live photo runs. No changes to
+  existing photo jobs or their lifecycle.
+- All `PostgresVideoProcessingJobRepository.TryClaimNextAsync` calls now
+  recheck the authoritative photo priority state inside the video claim's
+  serialized PostgreSQL transaction. A caller supplying `photoWorkActive:
+  false` cannot bypass photo work. A simpler overload defaults to the
+  authoritative signal.
+- Read-only `video jobs status` now includes the aggregate `photoPriority`
+  flags, without private photo paths, identities or contents.
+- Disposable PostgreSQL tests verify photo archive requests, pending runs,
+  queued photo jobs, resuming video eligibility after the photo work is
+  cleared, and no mutations to pre-existing photo processing tables.
+- **Limits:** this is conservative *claim admission*, not a preemptive
+  OS/process worker controller. A photo job starting immediately after claim
+  may race the snapshot; search and slideshow activity outside the photo
+  queue are not detected. An enabled worker must continuously sense priority
+  and implement safe pause/cancel before WI-0188 activation.
+- No migration, worker registration, video source open, file processing,
+  OneDrive hydration or user configuration change occurs in this PR.
+  [Operator note](../../operations/video-jobs-photo-priority.md).
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -155,3 +180,6 @@ checkpoint. Continue development after CI and PR review.
 - Checkpoint 3: merged PR #605; queue-only operator status/cancel commands.
 - Checkpoint 4: Windows process-supervisor and PostgreSQL lease fencing tests
   run in PR CI; no schema change or runtime processing activation.
+- Checkpoint 4: merged PR #607 after corrected Windows cleanup tests passed.
+- Checkpoint 5: photo-priority claim tests in PR CI; full video worker
+  and Windows mixed-load acceptance still required.
