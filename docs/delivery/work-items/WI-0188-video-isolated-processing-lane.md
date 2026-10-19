@@ -87,11 +87,35 @@ acceptance criterion is considered met solely by checkpoint 1.
   publication, active photo-priority sensing and actual managed hydration remain
   necessary before any runtime enablement.
 
-**Required before WI-0188 review:** maintainer backup/rehearsal and photo
-regression verification, worker execution controls, durable resource accounting,
-safe cancellation of external processes, local derivative cleanup, operator
-pause/visibility and mixed-load measurements. All WI-0188 acceptance criteria
-remain unchecked pending these gates.
+**Checkpoint 2 acceptance (maintainer, 2026-10-19):** PASS: PostgreSQL
+backup, isolated restore, v33 → v34 rehearsal, unchanged catalogue row counts,
+empty video-processing queue, Release package, v34 health, and photo regression
+checks. The optional Videos library check was N/A; no unexpected behavior
+observed. This closes the checkpoint's schema rollout gate only, not WI-0188.
+
+**Remaining before WI-0188 review:** worker execution controls, durable
+resource accounting, safe cancellation of external processes, local derivative
+cleanup, independent pause/visibility and mixed-load measurements. All WI-0188
+acceptance criteria remain unchecked until the complete work item is verified.
+
+### Checkpoint 3 — explicit queue observability and cancellation (implementation in progress)
+
+- Read-only operator queue inspector with bounded 20-job view, aggregate status,
+  expired-lease and reserved-temp metrics, no source paths or private metadata;
+  excluded or deleted source copies remain invisible.
+- Operator-only `video jobs status` and `video jobs cancel` commands; cancellation
+  defaults to a dry run and requires `--apply` and exact job UUID. Both commands
+  require localhost and an explicitly named, already-v34 catalogue, and neither
+  starts workers or modifies originals.
+- Disposable PostgreSQL visibility tests and CLI argument-gate tests. Does not
+  enable automatic queueing or actual video processing.
+- This is **not** a durable pause switch or a resource-enforcing runner. Worker
+  admission, cancellation of an actual child process, kill-tree, safe cleanup,
+  independent pause and photo-priority scheduling remain further checkpoints.
+- Operator procedure: [v34 video jobs status/cancel](../../operations/video-jobs-operator-control.md).
+  Since the maintained database is already verified v34, this checkpoint
+  requires no schema rehearsal or restart solely for these CLI commands.
+
 
 ## Completion notes
 
@@ -102,5 +126,8 @@ remain unchecked pending these gates.
   before any worker/API; no original-file reads, transcode or background video work.
 - Deferred work: process/resource-enforcing video worker, actor controls,
   safe artifact publication/cleanup and maintained-host benchmarks.
-- Commands run: checkpoint 1 build/tests passed in GitHub CI for merged PR #600;
-  checkpoint 2 requires PR CI and maintained Windows backup/isolated rehearsal.
+- Verification: checkpoint 1 CI passed in merged PR #600; checkpoint 2 was
+  locally accepted by maintainer (all mandatory checks PASS, Videos library
+  optional/N/A). No further v34 migration is required solely for checkpoint 3.
+- Checkpoint 3 validation: CI compile, disposable PostgreSQL tests and Docs check
+  before merge; no new schema or runtime processing activation.

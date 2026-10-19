@@ -48,6 +48,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 33),
+                "video" when args.Length > 2 && args[1] == "jobs" =>
+                    await VideoJobsCommandRunner.RunAsync(
+                        VideoJobsCommandOptions.Parse(args[2], args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "posters-cleanup" =>
                     await VideoPosterCleanupCommandRunner.RunAsync(
                         VideoPosterCleanupOptions.Parse(args.Skip(2).ToArray()),
@@ -143,6 +147,14 @@ public static class Program
                           (verified v33 restore only; applies v34 job-queue schema)
                           (both commands require a successful restore report and
                            modify ONLY its matched local photoidentity_restore_* database)
+
+              video jobs status --postgres-connection-env NAME --database DB
+                                 (read-only; bounded sanitized queue summary
+                                  and at most 20 recent opaque job IDs)
+              video jobs cancel --postgres-connection-env NAME --database DB
+                                --job-id UUID [--apply]
+                                (dry-run default; explicit cancellation request;
+                                 does not start video workers)
 
               video ingest --enable-video --source DIR --ffprobe ABSOLUTE_EXE
                            [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
