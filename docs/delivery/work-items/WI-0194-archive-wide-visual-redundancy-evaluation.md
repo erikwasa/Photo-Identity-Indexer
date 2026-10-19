@@ -80,6 +80,19 @@ real model/version/license provenance. Review the aggregate sampler
 coverage before any blind human pair-label collection. No review-pair
 held-out access is authorized yet.
 
+## Checkpoint 2 — existing proxy/dHash/CLIP evidence export (2026-10-19; local acceptance pending)
+
+Add an opt-in read-only CLI to generate real candidate neighbours from a **bounded** current-catalogue photo sample:
+- Reuse only existing durable local review proxies, validating hash and length before computing the established OpenCV 64-bit dHash; do not load originals or trigger OneDrive hydration.
+- Optionally read exact-fingerprint existing semantic CLIP embeddings in a PostgreSQL **READ ONLY** transaction; no new inference or schema initialization. CLIP remains semantic evidence, not an accepted visual-redundancy model.
+- Deterministically select up to 5,000 current proxy-backed revisions (default 500); all-pair dHash scanning and bounded CLIP-seed-to-all-sampled-vector exact retrieval have no date, location, folder, people or moment restrictions.
+- Include all within-subset dHash<=4 leakage links, nearest neighbours from both candidate signals and distinct screened random-negative controls. Never claim these recover near copies outside the sampled corpus.
+- Exclusively create sampler-compatible private candidate JSON plus an aggregate local measurements report below private/. Log only aggregate counts/times; never commit identities, paths, labels, vectors or private results.
+- Measure real population/sample coverage, CLIP indexing coverage, measured comparisons, verified proxy bytes, candidate count and wall clock time. Model licensing, inference runtime/footprint, full archive neighbour recall and threshold precision remain open.
+- Add synthetic helper tests; separately request maintainer's aggregate local report before freezing a redundancy pair cohort.
+
+See docs/operations/visual-redundancy-research.md for commands and the no-review/no-production guardrails. WI-0194 stays in progress; WI-0195 stays proposed. A green CI cannot establish maintained-archive retrieval acceptance.
+
 ## Verification requirements
 
 Reproducible neighbour generation, deterministic review-set export, maintainer pair/group review and privacy-safe aggregate threshold/model evidence.
