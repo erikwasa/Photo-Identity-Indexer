@@ -152,6 +152,40 @@ Share **only the aggregate JSON stdout**; do not share private paths, revision I
 
 **Do not run the blind review sampler, collect human labels, freeze a holdout, choose model thresholds, or modify collection behavior.** If sensitivity grouping forms giant components or cannot support balanced held-out quotas, revise the independent reviewer/cohort protocol in a later checkpoint before authorizing any labeling.
 
+## Checkpoint 6 — opt-in research-candidate enrichment
+
+The 27,050-photo partition sensitivity reported no safe new grouping policy: dHash<=4 largest family 37 and held-out borderline 19/60; dHash<=8 largest family 305 with the same quota gaps; dHash<=12 largest family **3,368** and held-out borderline 15/60. Held-out screened controls were 10/35 and real exact-content-copy controls 0 throughout. These cutoffs were family-linkage *stress tests*, not calibrated redundancy classification or automatic suppression decisions. No-go for freezing the proposed human review cohort.
+
+Two *optional* existing-evidence exporter flags address **candidate supply only**: `--clip-borderline-per-seed 16` seeks at most 16 deterministic extra candidate pairs per CLIP query seed with cosine in [0.62, 0.78) and dHash>24; `--random-negative-controls 800` attempts additional screened control candidates (dHash>=25 and indexed CLIP cosine<0.70). Neither kind is human-confirmed truth. Defaults remain unchanged without flags. CLIP 100-seed coverage is not full-archive CLIP pair recall. Strict dHash<=4 group relationships are unaffected by added dHash>24 candidate pairs.
+
+After merge, run on Windows PowerShell from the repository root with the previously working PostgreSQL connection and review-proxy environment:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --filter FullyQualifiedName~RedundancyCandidateExportTests
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- redundancy export `
+  --output private/wi0194-full-enriched-candidates.json `
+  --report private/wi0194-full-enriched-metrics.json `
+  --full-proxy-population `
+  --neighbors 8 `
+  --clip-model-id "openai/clip-vit-base-patch32" `
+  --clip-model-sha256 "42b5dac8f0a73e45b1626ae7a69b41a4bc111c6fe1edafcceda8c2a5506dc6db" `
+  --clip-preprocessing "clip-rgb-opencv-cubic-shortest-edge-center-crop-224-v1" `
+  --clip-seeds 100 `
+  --clip-borderline-per-seed 16 `
+  --random-negative-controls 800
+
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/redundancy_candidate_preflight.py `
+  --input private/wi0194-full-enriched-candidates.json
+~~~
+
+The full export will again read and validate **every existing local proxy** before exact matching, so do not run when resources are constrained. It preserves current 30k-photo / 450-million-pair / 16-GiB guards, writes new private-only files and never changes photos, search, collections, database, models or cloud hydration. Stop on test or export failures. Share **only both aggregate JSON stdout reports**, not either private manifest, photo IDs, per-pair scores or credentials. Expect no guarantee of quota completion because held-out controls require both endpoints within that partition and the existing 100 CLIP seeds may not discover sufficient borderline pairs.
+
+Even if quotas improve, **do not run the blind sampler, inspect held-out review labels, freeze a cohort or calibrate suppression thresholds**. Genuine exact-copy controls remain absent; never fabricate them. Additional independent leakage and sampling-protocol review is required.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
