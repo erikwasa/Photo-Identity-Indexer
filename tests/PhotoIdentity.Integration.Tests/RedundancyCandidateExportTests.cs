@@ -37,6 +37,23 @@ public sealed class RedundancyCandidateExportTests
     }
 
 
+
+    [Theory]
+    [InlineData(25, 0.62, true)]
+    [InlineData(30, 0.70, true)]
+    [InlineData(64, 0.77999, true)]
+    [InlineData(24, 0.70, false)]
+    [InlineData(25, 0.61999, false)]
+    [InlineData(25, 0.78, false)]
+    [InlineData(4, 0.70, false)]
+    public void Opt_in_borderline_supply_uses_disjoint_near_copy_safe_band(
+        int dhashDistance, double clipCosine, bool expected)
+    {
+        Assert.Equal(expected,
+            RedundancyCandidateExportCommand.IsBorderlineCandidate(
+                dhashDistance, clipCosine));
+    }
+
     [Fact]
     public void Top_k_optimization_matches_exact_stable_sort_over_dense_candidates()
     {
