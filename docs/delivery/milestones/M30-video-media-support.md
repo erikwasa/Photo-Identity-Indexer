@@ -9,7 +9,7 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 remains `in_progress`: subsequent video playback, analysis, retrieval and collection milestones are independent, not automatically accepted by the still-poster slice.
+**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 now derives `ready` because the completed first slice leaves no currently active work items; remaining video playback, analysis, retrieval and collection work items are proposed. The milestone is **not complete** and returns to `in_progress` when the next slice starts.
 
 ## Goal and rollout
 
