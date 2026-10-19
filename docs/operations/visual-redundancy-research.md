@@ -100,6 +100,33 @@ Report back only the aggregate console metrics: current proxy-backed photo count
 
 Leave the private candidate JSON unopened for human review and do not run the blind sampler or calibrate thresholds until the leak-safe cohort protocol is separately reviewed. Even a full dHash scan and 100 CLIP seed searches do not prove visual redundancy or the unseeded CLIP recall of the archive.
 
+
+## Checkpoint 4 — aggregate-only candidate/leakage preflight (after full-proxy evaluation)
+
+The maintainer's current full-proxy-population probe succeeded: 27,050/27,050 current proxy-backed photo revisions, matching exact-fingerprint CLIP vectors on all 27,050, 365,837,725 exact dHash pairs scanned in 25.911 seconds, 2,704,900 exact CLIP seed comparisons in 4.514 seconds, 218.889 seconds proxy verification/hashing and 4.086 seconds PostgreSQL read. The union retrieved **162,829 candidate pairs** (162,092 dHash candidates plus 737 CLIP-only); the 100 CLIP seeds found 799 pairs, 62 overlapping dHash. All 2,495 dHash<=4 links are within the selected proxy-backed population; no claims are made about their human redundancy truth. The 200 random-negative controls are screened samples.
+
+**Technical decision:** offline full-population exact dHash is practical; no ANN dependency currently justified. **Research decision:** neither dHash nor CLIP candidate retrieval has redundancy labels, precision or true copy-recall evaluation. The seed-only CLIP evidence does not prove complete CLIP archive retrieval. Next, inspect leakage families and review-bucket feasibility **without viewing or freezing human reviews**.
+
+After merging checkpoint-4 preflight development, run the synthetic tests and aggregate-only analysis from the Windows PowerShell repository root:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+& $python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p test_redundancy_candidate_preflight.py -v
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/redundancy_candidate_preflight.py `
+  --input private/wi0194-neighbours-full-candidates.json
+~~~
+
+The preflight **reads only the existing private candidate manifest** and writes **no files**. It rejects extra fields such as labels and paths, and prints only aggregate counts:
+- photo-disjoint calibration/held-out candidate inventory sizes, deterministic leakage-family size distribution, exact-content linked families;
+- within/cross-partition candidate counts and warnings for cross-partition dHash distances **5–8**, **9–12**, or CLIP cosine **>=0.90** (sampling risk indicators **not** confirmed near-copy labels or exclusion thresholds);
+- seven candidate sampling buckets per partition and quota shortfalls.
+
+The CLI outputs `candidate-cohort-preflight-only-not-frozen` and explicitly records that human labels were not read, thresholds were not fit, no held-out evaluation was performed and no production rule was approved. Neither the input nor any pair-level scores, identifiers or content paths may be pasted into GitHub or ChatGPT. Share **only the aggregate stdout JSON**. If a command fails, report the sanitized exception type and do not run any other sampler. **Do not run `redundancy_review_pairs.py` or collect any human labels yet.** Preflight can flag linked or plausible near-copy hazards, but absence of hazards does not prove no leakage, as only retrieved pairs are visible. A separate cohort freeze/reviewer authorization remains required.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.

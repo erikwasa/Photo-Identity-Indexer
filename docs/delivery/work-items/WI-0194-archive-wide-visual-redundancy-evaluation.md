@@ -94,7 +94,7 @@ Add an opt-in read-only CLI to generate real candidate neighbours from a **bound
 See docs/operations/visual-redundancy-research.md for commands and the no-review/no-production guardrails. WI-0194 stays in progress; WI-0195 stays proposed. A green CI cannot establish maintained-archive retrieval acceptance.
 
 
-## Checkpoint 3 — guarded full-proxy-population exact retrieval (2026-10-19; local acceptance pending)
+## Checkpoint 3 — guarded full-proxy-population exact retrieval (2026-10-19; local acceptance passed)
 
 The maintainer's read-only archive probes succeeded on deterministic current-catalogue samples:
 - **500 dHash-only:** 27,050 proxy-backed current photos, 500 sampled, 124,750 exact dHash comparisons, 2,664 retrieved pairs, 100 filtered negatives; 47.3782 ms exact scan; 4,423.0172 ms proxy verification/hashing.
@@ -109,6 +109,15 @@ These are *retrieval* counts, not human-confirmed redundancy, held-out precision
 Top-k insertion skips candidates which cannot outrank the existing worst entry (same distance/index tie-break); maintain exact ordering under dense comparisons. Add aggregate counts for all within-population dHash<=4 links, dHash candidates, CLIP candidates, CLIP-only pairs, and overlap. Preserve existing private sampler-compatible schema, deterministic selection, no source/score identifiers in stdout, exclusive private file creation, read-only CLIP transaction, and no original hydration/writes.
 
 **After merge:** Operator first runs synthetic tests, then a single separately named full-proxy-population private export with pinned fingerprint and 100 CLIP seeds; reports only aggregate stdout. Stop if inventory/declared proxy size exceeds caps, if the machine experiences memory/storage pressure, or if proxy verification fails. Source paths, revision identities, scores, per-pair evidence and private exports remain local. Confirm complete proxy-backed cohort and exact timings before deciding whether a distinct broader CLIP candidate strategy, leakage diagnostics, sampling freeze or dedicated licensed model trial is justified. No labels, frozen thresholds, production use, or ANN assumption yet.
+
+
+## Checkpoint 4 — full-proxy technical evidence and independent candidate preflight (2026-10-19; local preflight pending)
+
+**Maintainer accepted checkpoint-3 feasibility:** all **27,050 current proxy-backed photos** scanned with exactly **365,837,725** dHash comparisons (25,910.6866 ms); all 27,050 have the pinned indexed CLIP vector; **100** CLIP seeds scanned against all other vectors (**2,704,900** comparisons, 4,514.1656 ms). Combined candidates: **162,829** (162,092 dHash; 799 seeded CLIP, including 737 CLIP-only and 62 overlapping); **2,495** strict dHash<=4 potential leakage links; 200 screened random negatives. PostgreSQL read 4,086.2912 ms; proxy verification/hashing 218,889.3549 ms. No labels, image hydration, catalogue writes, or threshold approval observed. Exact offline all-pair dHash is practical at this proxy-backed population; **ANN not currently warranted**. This does not validate candidate precision, exact-duplicate recall outside the candidate pool, broader unseeded CLIP recall or near-copy family completeness.
+
+**Next bounded tool:** `redundancy_candidate_preflight.py` reads the saved private full-proxy candidate manifest and reuses the validated photo-disjoint partition logic in `redundancy_review_pairs.py`, without selecting review pairs or creating outputs. Only aggregate counts of exact content families, dHash<=4 leakage families, largest family sizes, cross-partition edges with dHash distances 5–8 or 9–12 or CLIP cosine >=0.90, candidate bucket eligibility and quota shortfalls may be printed. Known exact-copy and dHash<=4 edges must remain co-partitioned by construction. Add synthetic tests for stable aggregation, no labels, no identifiers in output and cross-partition warnings.
+
+**Gate:** the preflight is an independent feasibility diagnostic, not a freeze attestation; the held-out human **review labels** have not been accessed and must remain unviewed. Do not create blind or labeled human redundancy reviews until cohort composition and leakage sensitivity are separately examined and the frozen protocol explicitly approved. Cross-partition similarity indicates *possible* near-copy leakage, not proven redundancy. WI-0195 stays blocked. See `docs/operations/visual-redundancy-research.md`.
 
 ## Verification requirements
 
