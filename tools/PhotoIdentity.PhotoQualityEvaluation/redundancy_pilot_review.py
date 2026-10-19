@@ -22,12 +22,21 @@ from redundancy_pilot_package import (
     private_file, validate_blind, validate_labels,
 )
 
+from redundancy_validation_package import (
+    BLIND_PROTOCOL as HELDOUT_BLIND_PROTOCOL,
+    LABELS_PROTOCOL as HELDOUT_LABELS_PROTOCOL,
+    validate_holdout_blind, validate_review_file,
+)
+
 MAP_PROTOCOL = "wi0194-private-pilot-proxies-v1"
 
 
 def load_session(blind_path, mapping_path, labels_path):
     blind = load_json(blind_path)
-    ids, revisions = validate_blind(blind)
+    heldout = blind.get("protocol") == HELDOUT_BLIND_PROTOCOL
+    ids, revisions = (
+        validate_holdout_blind(blind) if heldout
+        else validate_blind(blind))
     pilot_sha = fingerprint(blind_path.read_bytes())
     mapping = load_json(mapping_path)
     if (not isinstance(mapping, dict) or
@@ -73,7 +82,10 @@ def load_session(blind_path, mapping_path, labels_path):
 
     if labels_path.exists():
         saved = load_json(labels_path)
-        validate_labels(saved, pilot_sha, ids)
+        if heldout:
+            validate_review_file(saved, pilot_sha, ids)
+        else:
+            validate_labels(saved, pilot_sha, ids)
         received = {
             row["pairId"]: {"label": row["label"], "notes": row["notes"]}
             for row in saved["reviews"]
@@ -85,6 +97,8 @@ def load_session(blind_path, mapping_path, labels_path):
         "blind": blind, "photos": photos, "labels": received,
         "pair_ids": pair_ids, "pilot_sha": pilot_sha,
         "labels_path": labels_path, "lock": threading.Lock(),
+        "heldout": heldout,
+        "labels_protocol": HELDOUT_LABELS_PROTOCOL if heldout else LABELS_PROTOCOL,
     }
 
 
@@ -109,7 +123,7 @@ def store_review(session, pair_id, label, notes):
         saved = dict(session["labels"])
         saved[pair_id] = {"label": label, "notes": notes}
         value = {
-            "schemaVersion": 1, "protocol": LABELS_PROTOCOL,
+            "schemaVersion": 1, "protocol": session["labels_protocol"],
             "pilotSha256": session["pilot_sha"],
             "reviews": [{
                 "pairId": pid, "label": saved[pid]["label"],
@@ -120,8 +134,12 @@ def store_review(session, pair_id, label, notes):
         dest_bytes = (json.dumps(value, indent=2, allow_nan=False) + "\n").encode()
         if destination.exists():
             # Ensure a separate existing review file has not been substituted.
-            validate_labels(load_json(destination), session["pilot_sha"],
-                            set(session["pair_ids"]))
+            if session["heldout"]:
+                validate_review_file(load_json(destination), session["pilot_sha"],
+                                     set(session["pair_ids"]))
+            else:
+                validate_labels(load_json(destination), session["pilot_sha"],
+                                set(session["pair_ids"]))
             temporary = destination.with_name(
                 destination.name + ".tmp-" + secrets.token_hex(8))
             try:
@@ -162,7 +180,7 @@ def public_state(session, index):
 REVIEWER_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Photo Identity – Calibration pair review</title>
+<title>Photo Identity – __STAGE__</title>
 <style>
 :root{font-family:system-ui;color-scheme:dark}body{margin:0;background:#111;color:#eee}
 main{max-width:1450px;margin:auto;padding:12px}
@@ -175,8 +193,8 @@ button{padding:12px;border:1px solid #555;border-radius:8px;background:#292929;c
 button.selected{outline:3px solid #ccc}textarea{box-sizing:border-box;width:100%;padding:8px;margin:10px 0;background:#181818;border:1px solid #555;color:#eee;border-radius:6px}
 @media(max-width:700px){#stage{grid-template-columns:1fr}.image{min-height:30vh}.image img{max-height:40vh}.buttons{grid-template-columns:1fr 1fr}}
 </style></head><body><main>
-<header><div><strong>Blinded visual redundancy — calibration pilot</strong>
-<div class="small">Only calibration pairs. No similarity score, model, bucket, partition, or original path is shown.</div></div>
+<header><div><strong>Blinded visual redundancy — __STAGE__</strong>
+<div class="small">__SCOPE__. No similarity score, model, bucket, partition, or original path is shown.</div></div>
 <div id="status">Loading…</div></header>
 <div id="stage"><div class="image"><img id="left" alt="Left review proxy"></div>
 <div class="image"><img id="right" alt="Right review proxy"></div></div>
@@ -259,7 +277,11 @@ def make_handler(session, token):
             parsed = urlsplit(self.path)
             if parsed.path == "/":
                 return self.respond(
-                    REVIEWER_HTML.replace("__TOKEN__", token).encode(),
+                    REVIEWER_HTML.replace("__TOKEN__", token).replace(
+                        "__STAGE__", "Independent held-out validation"
+                        if session["heldout"] else "Calibration pilot").replace(
+                        "__SCOPE__", "Frozen held-out validation pairs"
+                        if session["heldout"] else "Only calibration pairs").encode(),
                     "text/html; charset=utf-8")
             if not self.guarded(parsed, allow_query=parsed.path.startswith("/api/image/")):
                 return self.respond(b"Forbidden", "text/plain", 403)
@@ -309,6 +331,8 @@ def main():
     parser.add_argument("--labels", required=True)
     parser.add_argument("--port", type=int, default=5184)
     parser.add_argument("--no-open", action="store_true")
+    parser.add_argument("--heldout-validation", action="store_true",
+                        help="Explicit authorization for frozen held-out review only")
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         parser.error("Port must be between 1024 and 65535")
@@ -319,11 +343,14 @@ def main():
         if len({blind, proxies, labels}) != 3:
             raise ValueError("All pilot paths must be distinct")
         session = load_session(blind, proxies, labels)
+        if session["heldout"] != args.heldout_validation:
+            raise ValueError("Review stage does not match explicit authorization flag")
         token = secrets.token_urlsafe(32)
         with ThreadingHTTPServer(
             ("127.0.0.1", args.port), make_handler(session, token)) as server:
             url = "http://127.0.0.1:" + str(args.port)
-            print("Local CALIBRATION-only blinded review: " + url)
+            print(("Local HELD-OUT validation" if session["heldout"]
+                   else "Local CALIBRATION-only blinded review") + ": " + url)
             print("Private progress resumes on next launch. Ctrl+C to stop.")
             if not args.no_open:
                 webbrowser.open(url)
