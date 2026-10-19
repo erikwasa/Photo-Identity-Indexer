@@ -36,6 +36,21 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             await using PostgresCatalogueDatabase database = new(settings.ConnectionString);
             await database.InitializeAsync();
             await database.InitializeAsync();
+            var control = new PostgresVideoProcessingControlRepository(database);
+            VideoProcessingControlState initialControl = await control.GetAsync();
+            Assert.False(initialControl.Enabled);
+            Assert.True(initialControl.Paused);
+            // Isolated fixture only: permit claims to exercise the v34 queue
+            // lifecycle. No production API or CLI can enable the lane.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand allowFixture = connection.CreateCommand())
+            {
+                allowFixture.CommandText = """
+                    UPDATE video_processing_control
+                    SET enabled=true, paused=false WHERE singleton_id=1;
+                    """;
+                Assert.Equal(1, await allowFixture.ExecuteNonQueryAsync());
+            }
             Guid source = Guid.NewGuid();
             Guid videoAsset = Guid.NewGuid();
             Guid videoRevision = Guid.NewGuid();
