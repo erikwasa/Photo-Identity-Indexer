@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace PhotoIdentity.Core.Processing;
 
 /// <summary>
@@ -28,6 +26,7 @@ public sealed record VideoGuardedToolExecutionResult(
 public sealed class VideoGuardedToolExecutor(VideoToolProcessSupervisor supervisor)
 {
     private static readonly TimeSpan ShutdownGrace = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ProbeDeadline = TimeSpan.FromSeconds(2);
 
     public async Task<VideoGuardedToolExecutionResult> RunAsync(
         string executablePath,
@@ -105,9 +104,13 @@ public sealed class VideoGuardedToolExecutor(VideoToolProcessSupervisor supervis
         Func<CancellationToken, Task<VideoExecutionPermit>> inspect,
         CancellationToken token)
     {
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(ProbeDeadline);
         try
         {
-            VideoExecutionPermit? permit = await inspect(token);
+            VideoExecutionPermit? permit = await inspect(deadline.Token)
+                .WaitAsync(ProbeDeadline, token);
             return permit ?? throw new InvalidOperationException(
                 "Video safety observation returned no decision.");
         }
