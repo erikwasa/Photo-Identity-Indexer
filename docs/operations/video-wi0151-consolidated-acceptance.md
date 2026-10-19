@@ -1,6 +1,6 @@
 # WI-0151 — consolidated maintained Windows acceptance
 
-**Status:** Engineering implementation is ready for the maintainer's one-time local acceptance. The supported initial poster policy is deliberately **Rec.709 (`bt709`) only**. HLG/PQ remain catalogued as video with technical metadata but without a durable poster. Private HLG previews are an **evaluation**, not production poster evidence. Never enable unreviewed HDR posters. A future versioned HDR profile can follow the visual review.
+**Status: completed / maintainer-accepted on 2026-10-19.** This remains the reproducible operator procedure and is not a request to rerun ingestion, backup, or maintenance merely for work-item closeout. The supported initial poster policy is deliberately **Rec.709 (`bt709`) only**. HLG/PQ remain catalogued as video with technical metadata but without a durable poster. Private HLG previews are an **evaluation**, not production poster evidence. Never enable unreviewed HDR posters. A future versioned HDR profile can follow the visual review.
 
 **Scope:** Verify opt-in local MOV/MP4 video ingestion and revision metadata, durable bounded SDR JPEG posters, default-off read-only video library, mixed-media isolation, safety of OneDrive placeholders and originals, and a sample of HLG preview quality. Video playback, clips in slideshows, general video search, video manual metadata, video analysis jobs and full-HDR production poster serving are **not** WI-0151 acceptance requirements (see WI-0152, WI-0153, WI-0154, WI-0188/0189/0190).
 
@@ -157,4 +157,28 @@ Check private JPEG vs source in a colour-managed viewer for correct rotation, sk
 
 Return the maintained app to the expected posture after checking the gallery: set `PhotoIdentity__VideoLibraryEnabled` back to `"false"` in the launcher (or restore the backed-up JSON), stop and restart normally; confirm `/api/videos` is disabled. Keep any explicitly ingested video rows for review unless you have a separately approved cleanup/rollback plan; restoring the launcher file does **not** delete database records or private pilot files.
 
-**Pass / fail summary to share:** Release build and `verify-postgres.ps1`; health/schema v33; DB-backup verification; aggregate ingest and poster counts; example supported SDR orientation and poster appearance; HLG/unknown poster deferral; correct capture-date/timezone/rotation and unfilled GPS/camera fields where absent; unchanged photo gallery/search/collection/slideshow counts; video-only page behaviour and disabled-state behaviour; no unexpected hydration; originals unchanged; and any generic error messages. Do not mark WI-0151 completed until this evidence is reviewed.
+**Pass / fail summary to share:** Release build and `verify-postgres.ps1`; health/schema v33; DB-backup verification; aggregate ingest and poster counts; example supported SDR orientation and poster appearance; HLG/unknown poster deferral; correct capture-date/timezone/rotation and unfilled GPS/camera fields where absent; unchanged photo gallery/search/collection/slideshow counts; video-only page behaviour and disabled-state behaviour; no unexpected hydration; originals unchanged; and any generic error messages. WI-0151 was completed after the maintainer reviewed and accepted the evidence on 2026-10-19; retain this checklist for future controlled testing.
+
+## I. Accepted maintained Windows results — 2026-10-19
+
+**Decision: WI-0151 completed.** The maintainer explicitly marked all **11/11** local acceptance checklist items PASS after confirming WI-0202's photo-query regression was resolved:
+
+| Gate | Maintainer-reported outcome |
+| --- | --- |
+| PostgreSQL verification, Release package and schema v33 | PASS |
+| Video API disabled by default (404) | PASS |
+| Opt-in video-ingest dry run | PASS |
+| Actual authoritative PostgreSQL backup and isolated restore | PASS |
+| Bounded video-ingest apply and technical metadata persistence | PASS |
+| Durable SDR still poster, visual inspection and idempotent retry | PASS |
+| Explicitly enabled read-only video library and poster/metadata display | PASS |
+| Photo Archive/search/Smart+Creative Collections/slideshows unchanged | PASS |
+| No unwanted OneDrive hydration or original-file change | PASS |
+| Nonexistent poster 404 and dry-run-only poster cleanup | PASS |
+| Disabled video API (404) after restoring launch configuration | PASS |
+
+**Final reported materialization counters:** Enumerated **1,316**, eligible **1**, existing **1**, new posters **0**, HDR deferred **7**, skipped **1,308**, changed **0**, failures **0**. One durable SDR poster had already been created and visually inspected as acceptable. The last run's `new posters = 0` is a correct idempotent retry, not a claim that no poster exists. These are aggregate results for the bounded local run and do not imply that all enumerated videos were read.
+
+Poster reads were reported to remain revision-bound and exclusion-aware; no original videos, photo analysis or cloud hydration were modified. No destructive exclusion or physical deletion was carried out on irreplaceable media. HLG/PQ and unknown-transfer production posters remain deferred by design: **initial Rec.709 SDR acceptance does not approve HDR tone mapping or HDR serving**. The optional private HLG comparison is separate research, not a missing gate for the initial video slice.
+
+Playback, worker scheduling, searchable video captions/embeddings, video manual metadata and slideshow video clips remain separate M30 work. This acceptance records a real-file SDR sample, not universal codec coverage, production HDR quality approval or mass-video throughput.
