@@ -198,6 +198,30 @@ checkpoint. Continue development after CI and PR review.
   Continued acceptance requires source fencing, kill-on-priority worker
   preemption, hard resource controls and maintained Windows mixed-load tests.
 
+### Checkpoint 7 — guarded subprocess preemption (2026-10-19)
+
+- Added the explicit-call `VideoGuardedToolExecutor` to poll a caller-provided
+  fail-closed execution safety signal, link its cancellation to the existing
+  bounded `VideoToolProcessSupervisor`, and require a final safety read before
+  considering a completed tool invocation eligible for review. It does not
+  start a worker itself.
+- Added a read-only `PostgresVideoLeaseSafetyProbe` using one PostgreSQL
+  statement to check exact unexpired job token, current video revision,
+  supported inspection and source exclusion, persisted operator control
+  generation, cancellation, and photo advancement/processing priority.
+- Synthetic Windows process tests cover photo-priority preemption, probe
+  outage, denied start, successful exit and scratch cleanup. Disposable
+  PostgreSQL tests cover mid-lease photo work, pause, stale generations,
+  false lease token and stop.
+- No schema migration beyond already-merged v35. **The maintained v34
+  database still needs the separate v35 backup/restore/rehearsal safety
+  gate before any v35 application startup.** No new local action is
+  requested until subsequent worker checkpoints are complete.
+- **Not a production worker**: live admission sampling has polling gaps;
+  real OS CPU/GPU/memory/disk/IO quotas, source-open authorization, fenced
+  file/database publication and mixed-load measurements remain outstanding.
+  [Preemption boundaries](../../operations/video-execution-preemption.md).
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -215,5 +239,9 @@ checkpoint. Continue development after CI and PR review.
   run in PR CI; no schema change or runtime processing activation.
 - Checkpoint 4: merged PR #607 after corrected Windows cleanup tests passed.
 - Checkpoint 5: merged PR #609 and photo-priority claim tests passed CI.
-- Checkpoint 6: schema v35 durable stop controls with a new isolated rehearsal
-  safety gate before maintained-host adoption. Full WI-0188 remains open.
+- Checkpoint 6: merged PR #611, v35 durable stop controls; the local
+  backup and isolated v34 → v35 rehearsal gate is still pending.
+- Checkpoint 7: explicit execution safety polling / subprocess preemption
+  bridge and PostgreSQL lease probe; no new migration or active worker.
+- WI-0188 still requires a real resource-controlled worker and Windows
+  mixed-photo/video verification before acceptance.
