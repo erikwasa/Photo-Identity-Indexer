@@ -110,6 +110,25 @@ public sealed class VideoToolProcessSupervisorTests
         finally { Directory.Delete(scratch, recursive: true); }
     }
 
+    [Fact]
+    public async Task Timed_out_external_process_is_killed_and_cleans_temporary_data()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = MakeScratch();
+        try
+        {
+            string executable = CmdPath();
+            string hash = await HashAsync(executable);
+            await Assert.ThrowsAsync<TimeoutException>(() =>
+                new VideoToolProcessSupervisor().RunAsync(
+                    executable, hash, scratch,
+                    _ => ["/d", "/c", "ping -n 15 127.0.0.1 >NUL"],
+                    SmallBudget with { MaximumWallTime = TimeSpan.FromMilliseconds(400) }));
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
     private static string MakeScratch()
     {
         string root = Path.Combine(Path.GetTempPath(),
