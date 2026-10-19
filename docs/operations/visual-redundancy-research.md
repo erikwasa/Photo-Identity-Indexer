@@ -127,6 +127,31 @@ The preflight **reads only the existing private candidate manifest** and writes 
 
 The CLI outputs `candidate-cohort-preflight-only-not-frozen` and explicitly records that human labels were not read, thresholds were not fit, no held-out evaluation was performed and no production rule was approved. Neither the input nor any pair-level scores, identifiers or content paths may be pasted into GitHub or ChatGPT. Share **only the aggregate stdout JSON**. If a command fails, report the sanitized exception type and do not run any other sampler. **Do not run `redundancy_review_pairs.py` or collect any human labels yet.** Preflight can flag linked or plausible near-copy hazards, but absence of hazards does not prove no leakage, as only retrieved pairs are visible. A separate cohort freeze/reviewer authorization remains required.
 
+## Checkpoint 5 — leakage-family linkage sensitivity (development checkpoint, local evaluation pending)
+
+The checkpoint-4 maintainer preflight passed all 4 synthetic tests and read the **existing private full-proxy candidate manifest** with 27,050 photos, 162,829 retrieved pairs and 200 screened random negatives. Its deterministic dHash<=4 photo-disjoint split had 20,149 calibration and 6,901 held-out photos, 25,107 leakage families (largest 37), and **0 exact-content or dHash<=4 linked pairs crossing partitions**. However **882 dHash5–8**, **3,867 dHash9–12**, and **1,596 CLIP cosine >=0.90** candidate pairs crossed that split; categories may overlap and are not confirmed near-copy or redundancy labels. The proposed held-out review quotas were short **41 borderline** and **25 random negatives**, while both partitions lacked exact-copy controls (**12 each**). Human review should not start on this basis.
+
+The new `redundancy_partition_sensitivity.py` is an independent, **read-only** comparison of three predeclared photo-disjoint *leakage grouping* scenarios: exact-content/supplied-family plus linked dHash distances **<=4** (current baseline), **<=8**, or **<=12**. It does NOT change the maintained sampler, export new candidate pairs, assign redundancy labels, or select a production cutoff. It validates the entire private input using the existing review-sampler validator, then prints only aggregate group concentration, partition sizes, cross-boundary candidate risk indicators and per-bucket quotas. Because whole families get a deterministic partition assignment, any grouping expansion can move families between calibration and held-out; raw partition counts across scenarios are not unbiased model effectiveness comparisons.
+
+After merging the PR, run from the repository root on Windows PowerShell:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python -m unittest discover `
+  -s tools/PhotoIdentity.PhotoQualityEvaluation `
+  -p test_redundancy_partition_sensitivity.py -v
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/redundancy_partition_sensitivity.py `
+  --input private/wi0194-neighbours-full-candidates.json
+~~~
+
+Share **only the aggregate JSON stdout**; do not share private paths, revision IDs, pair-score rows or the candidate JSON. If any test fails, stop before running the research diagnostic. There are **no output files**, labels, model inference, proxy hashing, originals or database operations. The 4/8/12 distances are partition-isolation **sensitivity bounds**, not suppression thresholds or proof that co-grouped photos are redundant. CLIP>=0.90 is reported as a potential residual boundary risk, but never automatically treated as family identity. Absence of observed cross-boundary edges cannot exclude unobserved near copies; the existing CLIP candidate retrieval still uses only 100 seeds.
+
+**Do not run the blind review sampler, collect human labels, freeze a holdout, choose model thresholds, or modify collection behavior.** If sensitivity grouping forms giant components or cannot support balanced held-out quotas, revise the independent reviewer/cohort protocol in a later checkpoint before authorizing any labeling.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
