@@ -117,6 +117,31 @@ acceptance criteria remain unchecked until the complete work item is verified.
   requires no schema rehearsal or restart solely for these CLI commands.
 
 
+### Checkpoint 5 — PostgreSQL-backed photo-first video lease admission (2026-10-19)
+
+- Added the read-only `PostgresVideoPhotoPriorityProbe`, which reports
+  archive advancement requested/sync required, photo processing runs pending
+  or running, and queued/running jobs in live photo runs. No changes to
+  existing photo jobs or their lifecycle.
+- All `PostgresVideoProcessingJobRepository.TryClaimNextAsync` calls now
+  recheck the authoritative photo priority state inside the video claim's
+  serialized PostgreSQL transaction. A caller supplying `photoWorkActive:
+  false` cannot bypass photo work. A simpler overload defaults to the
+  authoritative signal.
+- Read-only `video jobs status` now includes the aggregate `photoPriority`
+  flags, without private photo paths, identities or contents.
+- Disposable PostgreSQL tests verify photo archive requests, pending runs,
+  queued photo jobs, resuming video eligibility after the photo work is
+  cleared, and no mutations to pre-existing photo processing tables.
+- **Limits:** this is conservative *claim admission*, not a preemptive
+  OS/process worker controller. A photo job starting immediately after claim
+  may race the snapshot; search and slideshow activity outside the photo
+  queue are not detected. An enabled worker must continuously sense priority
+  and implement safe pause/cancel before WI-0188 activation.
+- No migration, worker registration, video source open, file processing,
+  OneDrive hydration or user configuration change occurs in this PR.
+  [Operator note](../../operations/video-jobs-photo-priority.md).
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -129,5 +154,8 @@ acceptance criteria remain unchecked until the complete work item is verified.
 - Verification: checkpoint 1 CI passed in merged PR #600; checkpoint 2 was
   locally accepted by maintainer (all mandatory checks PASS, Videos library
   optional/N/A). No further v34 migration is required solely for checkpoint 3.
-- Checkpoint 3 validation: CI compile, disposable PostgreSQL tests and Docs check
-  before merge; no new schema or runtime processing activation.
+- Checkpoint 3 completed in merged PR #605; queue operator status/cancel
+  remains separate from active worker execution.
+- Checkpoint 4 is in PR #607 pending full CI and merge.
+- Checkpoint 5 admission/priority diagnostics are guarded by disposable
+  PostgreSQL tests and require no new schema or maintained-host action.
