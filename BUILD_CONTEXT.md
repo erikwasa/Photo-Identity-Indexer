@@ -4,6 +4,27 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 8 (2026-10-19):** Maintainer's
+checkpoint-7 observed-risk held-out quarantine sensitivity found
+NO-GO: dHash5-8 quarantine removes 470/6901 held-out photos
+but leaves only 38/50 disagreement candidates; stronger
+dHash5-12 removes 1689 and leaves 7/50; add high CLIP and
+2055 photos (29.8%) are excluded leaving 5/50 disagreements.
+No general family expansion or blanket photo quarantine
+satisfies representative review requirements. The original
+dHash<=4 photo split remains unfrozen research baseline;
+the enriched 165,181-pair archive retains sufficient baseline
+borderline/negative candidates but genuine exact-copy
+controls are absent. New read-only aggregate-only
+`redundancy_calibration_pilot_preflight.py` studies a bounded,
+diversity-capped CALIBRATION-ONLY unlabelled dry run
+(nine heuristic risk strata), never creates review manifests
+or uses held-out-only/cross-partition pairs. After PR merge
+operator runs Python synthetic tests and preflight on existing
+private enriched manifest; shares aggregate stdout only.
+NO human review, split freeze, model/threshold authorization,
+quality-heldout reuse, ANN, or production changes. WI-0195 blocked.
+
 **WI-0194 checkpoint 7 (2026-10-19):** Maintainer accepted
 full-proxy opt-in candidate enrichment: 27,050 photos, 164,381
 retrieved candidate pairs, 800 screened negative candidates,
