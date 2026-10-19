@@ -205,3 +205,10 @@ The separate high-priority [WI-0202](WI-0202-photo-catalogue-query-performance-r
 After targeted PostgreSQL `ANALYZE`, the maintainer reported **5/5** photo-only regression checks passing: Archive and its items load, previously failing people-filtered Smart Collections return photos, previously working collections remain correct, Slideshow library/covers populate, and repeat navigation succeeds. The new API log confirms HTTP 200 for all seven formerly failing saved Smart Collection filters and the ad hoc Smart Collection query, and Archive status now finishes around one second. See [WI-0202 recovery evidence](WI-0202-photo-catalogue-query-performance-regression.md).
 
 This resolves the **observed photo-only acceptance symptoms** that blocked progress. WI-0202 itself remains `in_review` for causal/operational closeout; WI-0151 separately remains `in_review` until the remaining consolidated video-specific acceptance work has been reviewed. The observed recovery is not proof that a particular missing PostgreSQL planner-statistics value caused the issue, nor is it a reason to relax media-kind isolation.
+
+
+## WI-0202 dependency resolved by maintainer acceptance — 2026-10-19
+
+The formerly blocking photo-only Archive/Smart Collection/Slideshow query regression tracked in [WI-0202](WI-0202-photo-catalogue-query-performance-regression.md) is now **completed for functional acceptance**. Following PRs #594–#596, the maintainer's final sequential Smart Collection cover probe returned 28/28 HTTP 200 with severe outliers reduced (~9.8 s to ~1.05 s for people+relationship; ~2.1–2.2 s to ~0.14 s for named-place+orientation), and the maintainer reported the application working as expected.
+
+This releases the **WI-0202 photo-query dependency only**. **WI-0151 remains in_review** until its own video-metadata, poster, isolation and consolidated maintained acceptance gates are signed off. Earlier root-cause and backup-evidence limitations in WI-0202 do not imply newly verified video-specific behavior; the original targeted ANALYZE correlation is still not a proven planner root cause.

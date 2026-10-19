@@ -53,14 +53,14 @@ Only sanitized aggregate counts and timing appear here; the raw application logs
 
 ## Acceptance criteria
 
-- [ ] Actual database identity, catalog scale and initial PostgreSQL statistics state are verified without guessing from its name.
+- [x] Actual database identity, catalog scale and initial PostgreSQL statistics state are verified without guessing from its name.
 - [ ] A controlled before/after diagnosis identifies or excludes missing statistics as the dominant contributor.
-- [ ] Saved failing Smart Collection filters and ad hoc person-based queries return correct photos/counts without 30-second HTTP 500 timeouts, including repeated `limit=1` slideshow-cover requests.
-- [ ] Archive status and first Archive page reliably complete on the maintained dataset without hanging/cancelled 70–100 second attempts; server-side phase timings are documented.
-- [ ] Full Slideshow library shows all expected Smart/manual/Creative collections; no waiting for multiple sequential 30-second failed covers.
-- [ ] Photo-only isolation, exclusions, sort/order and original-byte privacy invariants pass automated regression tests.
-- [ ] Any repair is backed by before/after representative timings, a repeatable test or post-restore maintenance guard, and no destructive catalogue changes.
-- [ ] Maintainer reruns Archive, saved and ad hoc person-filtered Smart Collections and Slideshows after packaging; WI-0151 remains in_review until signed off.
+- [x] Saved failing Smart Collection filters and ad hoc person-based queries return correct photos/counts without 30-second HTTP 500 timeouts, including repeated `limit=1` slideshow-cover requests.
+- [x] Archive status and first Archive page reliably complete on the maintained dataset without hanging/cancelled 70–100 second attempts; server-side phase timings are documented.
+- [x] Full Slideshow library shows all expected Smart/manual/Creative collections; no waiting for multiple sequential 30-second failed covers.
+- [x] Photo-only isolation, exclusions, sort/order and original-byte privacy invariants pass automated regression tests.
+- [x] Any repair is backed by before/after representative timings, a repeatable test or post-restore maintenance guard, and no destructive catalogue changes.
+- [x] Maintainer reruns Archive, saved and ad hoc person-filtered Smart Collections and Slideshows after packaging; WI-0151 remains in_review until signed off.
 
 ## Verification requirements
 
@@ -68,12 +68,14 @@ Focused automated Postgres/API tests and explicit maintained Windows acceptance 
 
 ## Completion notes
 
-- Files changed:
-- Diagnosed cause and ruled-out causes:
-- Before/after evidence:
-- Safety gates and commands run:
-- Maintainer acceptance:
-- Deferred work:
+- **Disposition:** completed following maintainer functional acceptance on 2026-10-19. The final user confirmation was "Everything seems to be working"; specific re-run commands or per-screen timings were not supplied with that statement. Previously submitted detailed Windows/API logs and subsequent two-pass latency probes underpin the acceptance.
+- **Files changed:** PostgreSQL Smart Collection query/pagination implementation, safe phase instrumentation and sequential cover probe, disposable PostgreSQL regression tests, and operational/delivery documentation in PRs #591–#597. No video or schema-v33 model changes were required.
+- **Diagnosed cause and limits:** original photo-query recovery coincided with a scoped PostgreSQL ANALYZE; the exact planner root cause is unproven. Independent slow-tail SQL phases were identified, followed by verified targeted count/page eligibility improvements. Never interpret n_live_tup=8 as eight actual photos or conclude that the historical face-clustering indexes caused these queries.
+- **Before/after evidence:** originally seven saved filters timed out at ~30 seconds and Archive status could cancel around 70–100 seconds. Following statistics refresh, five functional local checks passed and archive status/page completed with HTTP 200. Later 28/28 saved cover requests were HTTP 200. #7 decreased from ~9,765 ms original mean to **1,054 ms** following #596; #13 and #14 each now average ~140 ms versus original ~2.1–2.2 seconds. The other eleven covers stayed ~111–279 ms.
+- **Safety gates and commands:** maintainer-verified active database and schema 33; bounded, approved ANALYZE VERBOSE on 11 photo-query tables; read-only metadata audit, repeated HTTP timing probe and regression tests. No catalogue reset, retention cleanup, destructive index/DDL operations or timeout extension.
+- **Maintainer acceptance:** 2026-10-19 Europe/Stockholm: maintainer reports Archive, Smart Collections and Slideshows appear to be working after the query fixes, and requests delivery documentation updated to reflect the status. This is functional sign-off rather than a formal benchmark SLA.
+- **Deferred evidence (not claimed to have passed):** the original statistical-planner cause was not established through before/after plans; the work-item transcript does **not** contain independently verified backup/restore evidence tied to the currently app-connected database. Those are recorded as operational evidence limitations, not as a claim of lost media or a reason for new maintenance. Cold-start and concurrent-load timing are not covered by the two-pass sequential probe. Any follow-up should be separately scoped.
+- **Separate work:** historical provisional-clustering-run retention/provenance requires its own policy and isolated restore test. WI-0151 can now evaluate its **independent video-specific** acceptance gates; closing WI-0202 does not close WI-0151.
 
 ## Maintained Windows recovery checkpoint — 2026-10-18
 
@@ -191,3 +193,13 @@ The earlier isolated ~5-second relationship page phase no longer dominates its r
 4. A future independent cold-start verification is helpful for recurrence risk, but has not been supplied as part of the new two-pass warm sequential probe.
 
 Do not mark WI-0151 accepted solely on WI-0202 success; its video-specific acceptance is independent. Do not rebuild the ~10 GB historical derived face-work indexes or delete superseded runs to treat Smart Collection latency. Derived-run retention/provenance is a separate policy follow-up.
+
+## Final maintainer functional acceptance and work-item completion — 2026-10-19
+
+**WI-0202 status: completed.** The maintainer's latest statement, "Everything seems to be working," is recorded as final user-facing functional acceptance following merged PR #596 and the earlier successful Archive/Slideshow recovery. PR #597 was merged and its final-review documentation is superseded by this completion checkpoint. The reviewed implementation is not being further changed here.
+
+The final measured sequential probe remained **28/28 HTTP 200**. No saved collection exceeded **1,078 ms** in that run, compared with prior 2–10-second outliers and earlier 30-second timeouts. This is sufficient to stop the performance-regression work while leaving normal future monitoring available; it does not prove every possible private filter or concurrent workload.
+
+**Explicit acceptance exceptions:** the original criterion requiring a definitive statistics-related root cause was not fully met, and a verified current-database backup/restore record was not supplied in the work-item evidence. Neither is silently checked above. Functional completion is based on observed restoration and maintainer acceptance, not a claim that those two evidence gaps were resolved or that a restore is now unnecessary. Any new operational backup confirmation or forensic planner investigation must be separately authorized. The original/source media and large derived face-work retention data were not modified.
+
+**Dependency handoff:** WI-0202's observed photo-only regression no longer blocks WI-0151 technical acceptance; WI-0151 remains `in_review` for its separate video feature criteria.
