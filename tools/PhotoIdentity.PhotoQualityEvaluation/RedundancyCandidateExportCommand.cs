@@ -24,6 +24,9 @@ internal static class RedundancyCandidateExportCommand
     private const string CandidateProtocol = "wi0194-candidate-pairs-v1";
     private const int NearCopyLinkDistance = 4; // Leakage linkage only, not redundancy truth.
     private const int MaximumPairs = 2_000_000; // Downstream sampler input guard.
+    private const int MaximumFullPopulationPhotos = 30_000;
+    private const long MaximumFullProxyBytes = 16L * 1024 * 1024 * 1024;
+    private const long MaximumFullComparisons = 450_000_000;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -33,7 +36,7 @@ internal static class RedundancyCandidateExportCommand
     private sealed record Options(
         string Output, string Report, int Limit, int Neighbors, int ClipSeeds,
         string? ModelId, string? ModelSha256, string? PreprocessingVersion,
-        string? ProxyRoot, string? ProxyProfile);
+        string? ProxyRoot, string? ProxyProfile, bool FullProxyPopulation);
 
     private sealed record Photo(string RevisionId, string ContentSha256,
         ulong PerceptualHash, float[]? ClipVector);
@@ -81,10 +84,13 @@ internal static class RedundancyCandidateExportCommand
 
             // Deterministic archive-spread sample; NOT a representative-stratified cohort
             // and NOT a claim about full-archive retrieval recall.
-            PhotoQualityBenchmarkPopulationRow[] selected = population
-                .OrderBy(x => Digest(x.AssetRevisionId.ToString()), StringComparer.Ordinal)
-                .Take(options.Limit)
-                .ToArray();
+            IEnumerable<PhotoQualityBenchmarkPopulationRow> ordered = population
+                .OrderBy(x => Digest(x.AssetRevisionId.ToString()), StringComparer.Ordinal);
+            PhotoQualityBenchmarkPopulationRow[] selected = options.FullProxyPopulation
+                ? ordered.ToArray()
+                : ordered.Take(options.Limit).ToArray();
+            if (options.FullProxyPopulation)
+                ValidateFullPopulation(selected.Length, selected.Sum(x => (long)x.Proxy.EncodedByteLength));
 
             Dictionary<AssetRevisionId, float[]> vectors = [];
             if (options.ModelId is not null)
@@ -155,6 +161,7 @@ internal static class RedundancyCandidateExportCommand
             List<Neighbor>[] nearest = Enumerable.Range(0, photos.Count)
                 .Select(_ => new List<Neighbor>()).ToArray();
 
+            int strictDhashNearCopyLinks = 0;
             for (int left = 0; left < photos.Count; left++)
             {
                 for (int right = left + 1; right < photos.Count; right++)
@@ -164,7 +171,10 @@ internal static class RedundancyCandidateExportCommand
                     Offer(nearest[left], new Neighbor(right, distance), options.Neighbors);
                     Offer(nearest[right], new Neighbor(left, distance), options.Neighbors);
                     if (distance <= NearCopyLinkDistance)
+                    {
+                        strictDhashNearCopyLinks++;
                         AddRetrieved(pairs, photos, left, right, distance);
+                    }
                 }
             }
 
@@ -172,6 +182,8 @@ internal static class RedundancyCandidateExportCommand
                 foreach (Neighbor hit in nearest[left])
                     AddRetrieved(pairs, photos, left, hit.Index, hit.Distance);
             dhashWatch.Stop();
+            HashSet<(int, int)> dhashRetrieved = pairs.Keys.ToHashSet();
+            HashSet<(int, int)> clipRetrieved = [];
 
             Stopwatch clipWatch = Stopwatch.StartNew();
             int[] seeds = Enumerable.Range(0, photos.Count)
@@ -195,7 +207,10 @@ internal static class RedundancyCandidateExportCommand
                 foreach ((int index, _) in best
                     .OrderByDescending(x => x.Score).ThenBy(x => x.Index)
                     .Take(options.Neighbors))
+                {
+                    clipRetrieved.Add(SortPair(seed, index));
                     AddRetrieved(pairs, photos, seed, index, null);
+                }
             }
             clipWatch.Stop();
 
@@ -253,6 +268,12 @@ internal static class RedundancyCandidateExportCommand
                 currentProxyBackedPhotos = population.Count,
                 sampledPhotos = photos.Count,
                 fullProxyArchiveCovered = photos.Count == population.Count,
+                fullProxyPopulationRequested = options.FullProxyPopulation,
+                strictDhashNearCopyLinks,
+                dhashRetrievedPairs = dhashRetrieved.Count,
+                clipRetrievedPairs = clipRetrieved.Count,
+                clipOnlyRetrievedPairs = clipRetrieved.Count(p => !dhashRetrieved.Contains(p)),
+                dhashClipOverlapPairs = clipRetrieved.Count(dhashRetrieved.Contains),
                 clipModelId = options.ModelId,
                 clipModelSha256 = options.ModelSha256,
                 clipPreprocessingVersion = options.PreprocessingVersion,
@@ -301,6 +322,12 @@ internal static class RedundancyCandidateExportCommand
                 aggregate.currentProxyBackedPhotos,
                 aggregate.sampledPhotos,
                 aggregate.fullProxyArchiveCovered,
+                aggregate.fullProxyPopulationRequested,
+                aggregate.strictDhashNearCopyLinks,
+                aggregate.dhashRetrievedPairs,
+                aggregate.clipRetrievedPairs,
+                aggregate.clipOnlyRetrievedPairs,
+                aggregate.dhashClipOverlapPairs,
                 aggregate.clipIndexedPhotosInSample,
                 aggregate.clipSeedsScanned,
                 aggregate.retrievedPairs,
@@ -348,6 +375,11 @@ internal static class RedundancyCandidateExportCommand
 
     internal static void Offer(List<Neighbor> best, Neighbor candidate, int limit)
     {
+        // Most archive-wide comparisons cannot enter an already full top-k.
+        // The index tie-break matches the original stable ranking policy.
+        if (best.Count == limit && (candidate.Distance > best[^1].Distance ||
+            (candidate.Distance == best[^1].Distance && candidate.Index >= best[^1].Index)))
+            return;
         best.Add(candidate);
         best.Sort((a, b) =>
         {
@@ -355,6 +387,16 @@ internal static class RedundancyCandidateExportCommand
             return comparison == 0 ? a.Index.CompareTo(b.Index) : comparison;
         });
         if (best.Count > limit) best.RemoveAt(best.Count - 1);
+    }
+
+    internal static void ValidateFullPopulation(int photos, long expectedProxyBytes)
+    {
+        long comparisons = (long)photos * (photos - 1) / 2;
+        if (photos < 2 || photos > MaximumFullPopulationPhotos ||
+            comparisons > MaximumFullComparisons ||
+            expectedProxyBytes < 0 || expectedProxyBytes > MaximumFullProxyBytes)
+            throw new InvalidOperationException(
+                "Full proxy-population survey exceeds bounded photo, comparison or proxy-byte limits.");
     }
 
     private static (int, int) SortPair(int a, int b) => a < b ? (a, b) : (b, a);
@@ -391,12 +433,22 @@ internal static class RedundancyCandidateExportCommand
     private static Options Parse(string[] args)
     {
         Dictionary<string, string> arguments = new(StringComparer.Ordinal);
+        bool fullProxyPopulation = false;
         for (int i = 0; i < args.Length; i++)
         {
+            if (args[i] == "--full-proxy-population")
+            {
+                if (fullProxyPopulation)
+                    throw new ArgumentException("Duplicate full-population option.");
+                fullProxyPopulation = true;
+                continue;
+            }
             if (!args[i].StartsWith("--", StringComparison.Ordinal) ||
                 i + 1 >= args.Length || !arguments.TryAdd(args[i], args[++i]))
                 throw new ArgumentException("Invalid or duplicate export option.");
         }
+        if (fullProxyPopulation && arguments.ContainsKey("--max-photos"))
+            throw new ArgumentException("Full-population mode cannot combine with --max-photos.");
         string Arg(string key) => arguments.TryGetValue(key, out string? x) ? x :
             throw new ArgumentException("Required export option missing: " + key);
         int Bound(string key, int fallback, int max) =>
@@ -430,7 +482,7 @@ internal static class RedundancyCandidateExportCommand
             arguments.GetValueOrDefault("--clip-model-id"), sha,
             arguments.GetValueOrDefault("--clip-preprocessing"),
             arguments.GetValueOrDefault("--proxy-root"),
-            arguments.GetValueOrDefault("--proxy-profile"));
+            arguments.GetValueOrDefault("--proxy-profile"), fullProxyPopulation);
     }
 
     private static void Usage()
@@ -438,7 +490,7 @@ internal static class RedundancyCandidateExportCommand
         Console.WriteLine("WI-0194 private evidence export, read-only.");
         Console.WriteLine("redundancy export --output private/wi0194-neighbour-candidates.json " +
             "--report private/wi0194-neighbour-metrics.json " +
-            "[--max-photos 500] [--neighbors 8] [--clip-seeds 100] " +
+            "[--max-photos 500 | --full-proxy-population] [--neighbors 8] [--clip-seeds 100] " +
             "[--clip-model-id ID --clip-model-sha256 SHA --clip-preprocessing VERSION] " +
             "[--proxy-root PATH --proxy-profile ID]");
     }

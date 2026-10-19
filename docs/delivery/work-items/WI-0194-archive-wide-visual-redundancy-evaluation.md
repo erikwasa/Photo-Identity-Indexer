@@ -93,6 +93,23 @@ Add an opt-in read-only CLI to generate real candidate neighbours from a **bound
 
 See docs/operations/visual-redundancy-research.md for commands and the no-review/no-production guardrails. WI-0194 stays in progress; WI-0195 stays proposed. A green CI cannot establish maintained-archive retrieval acceptance.
 
+
+## Checkpoint 3 — guarded full-proxy-population exact retrieval (2026-10-19; local acceptance pending)
+
+The maintainer's read-only archive probes succeeded on deterministic current-catalogue samples:
+- **500 dHash-only:** 27,050 proxy-backed current photos, 500 sampled, 124,750 exact dHash comparisons, 2,664 retrieved pairs, 100 filtered negatives; 47.3782 ms exact scan; 4,423.0172 ms proxy verification/hashing.
+- **500 dHash + exact-fingerprint pinned CLIP:** 500/500 CLIP coverage, 49,900 seed comparisons, 3,409 retrieved pairs (+745 candidates over dHash-only); 52.3362 ms dHash scan and 86.179 ms CLIP scan.
+- **2,000 combined:** 2,000/2,000 CLIP coverage, 1,999,000 dHash pairs in 641.8464 ms, 199,900 CLIP seed comparisons in 309.0918 ms; 11,960 retrieved pairs; proxy verification/hashing 16,073.4845 ms.
+- **5,000 combined:** 5,000/5,000 CLIP coverage, 12,497,500 dHash pairs in 4,801.1025 ms, 499,900 CLIP seed comparisons in 821.0867 ms; 29,635 retrieved pairs; proxy verification/hashing 49,564.4522 ms; database read 1,690.3512 ms; 200 screened random negatives.
+
+These are *retrieval* counts, not human-confirmed redundancy, held-out precision, archive-wide recall or automatic-suppression evidence. Exact vector evidence was **reused**, so the timings do not measure CLIP inference or model deployment. No protected WI-0193 human labels were reused.
+
+**Change:** Explicit `--full-proxy-population` mode for the existing offline CLI, mutually exclusive with `--max-photos`, operates on every current, durable, proxy-backed photo revision. The same exact dHash scan has no date/person/location/folder restrictions. The CLIP scan still covers a *bounded set of deterministic seeds* (default 100) against every indexed vector in the selected population; CLIP recall for unseeded photos is not proved. Before loading private proxy bytes, reject populations exceeding **30,000 photos**, **450 million full-pair dHash comparisons**, or **16 GiB of declared proxy input**. Do not change the bounded default 500 or opt-in subset maximum 5,000.
+
+Top-k insertion skips candidates which cannot outrank the existing worst entry (same distance/index tie-break); maintain exact ordering under dense comparisons. Add aggregate counts for all within-population dHash<=4 links, dHash candidates, CLIP candidates, CLIP-only pairs, and overlap. Preserve existing private sampler-compatible schema, deterministic selection, no source/score identifiers in stdout, exclusive private file creation, read-only CLIP transaction, and no original hydration/writes.
+
+**After merge:** Operator first runs synthetic tests, then a single separately named full-proxy-population private export with pinned fingerprint and 100 CLIP seeds; reports only aggregate stdout. Stop if inventory/declared proxy size exceeds caps, if the machine experiences memory/storage pressure, or if proxy verification fails. Source paths, revision identities, scores, per-pair evidence and private exports remain local. Confirm complete proxy-backed cohort and exact timings before deciding whether a distinct broader CLIP candidate strategy, leakage diagnostics, sampling freeze or dedicated licensed model trial is justified. No labels, frozen thresholds, production use, or ANN assumption yet.
+
 ## Verification requirements
 
 Reproducible neighbour generation, deterministic review-set export, maintainer pair/group review and privacy-safe aggregate threshold/model evidence.

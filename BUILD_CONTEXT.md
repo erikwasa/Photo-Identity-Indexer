@@ -4,6 +4,22 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 3 (2026-10-19):** Maintainer's 500, 2000,
+and 5000-photo exact dHash/CLIP runs passed. The 5000 run found
+27,050 current proxy-backed photos, complete CLIP coverage in the
+sample, 12,497,500 hash comparisons in 4.8 s, 499,900 seeded
+CLIP comparisons in 0.82 s, and 29,635 candidate pairs. This
+checkpoint adds an explicit guarded read-only exact survey of every
+current proxy-backed photo (limit 30k photos, 450m comparisons,
+16 GiB declared local proxy bytes), aggregate signal-overlap counts,
+and fast deterministic top-k. After PR merge maintainer performs
+ONE local all-proxy probe with newly named private outputs, returns
+only aggregate metrics. Existing CLIP indexed vectors are reused,
+not inferred; 100 seeded CLIP searches are not all-pair CLIP recall.
+No review labels, held-out reuse, new model inference, ANN,
+collection selection changes or suppression. WI-0195 blocked.
+All new PRs target main.
+
 **WI-0194 checkpoint 2 (2026-10-19):** PR #587 (checkpoint 1)
 merged to main; WI-0193 is already archived. The current work
 adds a bounded, strictly offline/local-proxy CLI to extract dHash

@@ -37,7 +37,7 @@ The future CLI (NOT an instruction to run it on a real archive before candidate 
 
 Never commit or share private source, pair, score, review or audit exports. Preserve the independent WI-0194 held-out seal and do not tune after viewing held-out pair ratings.
 
-## Checkpoint 2 — bounded current-catalogue candidate export (implementation ready; local run pending)
+## Checkpoint 2 — bounded current-catalogue candidate export (local 500/2,000/5,000 probes passed)
 
 The new .NET command reads **current photo revisions** with existing durable review proxies from PostgreSQL. It verifies local proxy content hashes, computes the existing OpenCV 64-bit dHash, optionally reuses **exact-version** CLIP vectors already indexed for semantic search, and computes exact similarity neighbours without a date, moment, people, location or folder predicate. It never opens originals, triggers cloud hydration, downloads a model, generates new CLIP embeddings, runs a migration or changes the catalogue.
 
@@ -70,6 +70,35 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ~~~
 
 Share back only the aggregate stdout: proxy-backed population, sampled photos, CLIP coverage, scan counts, candidate-pair counts, timings, and whether known near-copies from different dates appear. Do not share paths, photo IDs, SQL credentials, full source manifests or per-pair scores. Real archive results have **not** been obtained in this checkpoint. No thresholds or production suppression authorized.
+
+
+## Checkpoint 3 — guarded full-proxy-population exact feasibility probe
+
+The 5,000-photo local benchmark reported 27,050 current proxy-backed photos, 100% CLIP-vector coverage, 12,497,500 dHash comparisons in 4.801 seconds, 499,900 exact CLIP comparisons in 0.821 seconds, 29,635 retrieved candidate pairs, and 49.564 seconds verifying and hashing proxies. This is enough to justify *one* guarded full-population experiment, not automatic suppression or ANN.
+
+After merging the checkpoint-3 PR and updating main, run from your Windows PowerShell repo root with the same working PostgreSQL/review-proxy environment variables. This is opt-in and **not** part of normal application processing:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --filter FullyQualifiedName~RedundancyCandidateExportTests
+
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- redundancy export `
+  --output private/wi0194-neighbours-full-candidates.json `
+  --report private/wi0194-neighbours-full-metrics.json `
+  --full-proxy-population `
+  --neighbors 8 `
+  --clip-model-id "openai/clip-vit-base-patch32" `
+  --clip-model-sha256 "42b5dac8f0a73e45b1626ae7a69b41a4bc111c6fe1edafcceda8c2a5506dc6db" `
+  --clip-preprocessing "clip-rgb-opencv-cubic-shortest-edge-center-crop-224-v1" `
+  --clip-seeds 100
+~~~
+
+The new mode refuses `--max-photos` in combination with `--full-proxy-population`. It rejects inventory over 30,000 current proxy-backed photos, over 450 million exact dHash comparisons, or 16 GiB total declared proxy bytes **before image loading**. Stop the command if resources are constrained; never bypass these guards without another reviewed checkpoint. The command still reads and verifies every selected local proxy (potentially several GiB), exact-scans all dHash pairs, and scans CLIP for **only 100 deterministic seeds** against every compatible indexed vector. Allow enough disk for **new private output files**; existing exports are never overwritten.
+
+Report back only the aggregate console metrics: current proxy-backed photo count, number sampled, CLIP coverage, total dHash/CLIP comparisons, candidate union/overlap/CLIP-only counts, strict dHash<=4 leakage links, proxy-verification and scan runtimes. If the result exits nonzero, report only the exception type printed (no credentials or private paths). **All-proxy-backed is not the same as all photos** when durable proxy coverage is incomplete.
+
+Leave the private candidate JSON unopened for human review and do not run the blind sampler or calibrate thresholds until the leak-safe cohort protocol is separately reviewed. Even a full dHash scan and 100 CLIP seed searches do not prove visual redundancy or the unseeded CLIP recall of the archive.
 
 ## Next checkpoints
 

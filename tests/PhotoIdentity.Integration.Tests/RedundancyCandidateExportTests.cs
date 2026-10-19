@@ -36,6 +36,41 @@ public sealed class RedundancyCandidateExportTests
             best.Select(x => (x.Index, x.Distance)).ToArray());
     }
 
+
+    [Fact]
+    public void Top_k_optimization_matches_exact_stable_sort_over_dense_candidates()
+    {
+        RedundancyCandidateExportCommand.Neighbor[] hits =
+            Enumerable.Range(0, 512)
+                .Select(i => new RedundancyCandidateExportCommand.Neighbor(
+                    (i * 37) % 512, (i * 13) % 65))
+                .Reverse()
+                .ToArray();
+        List<RedundancyCandidateExportCommand.Neighbor> selected = [];
+        foreach (var hit in hits)
+            RedundancyCandidateExportCommand.Offer(selected, hit, 8);
+
+        Assert.Equal(
+            hits.OrderBy(x => x.Distance).ThenBy(x => x.Index)
+                .Take(8).Select(x => (x.Index, x.Distance)).ToArray(),
+            selected.Select(x => (x.Index, x.Distance)).ToArray());
+    }
+
+    [Fact]
+    public void Full_population_budget_is_strictly_bounded()
+    {
+        RedundancyCandidateExportCommand.ValidateFullPopulation(27_050, 7_500_000_000L);
+        Assert.Throws<InvalidOperationException>(() =>
+            RedundancyCandidateExportCommand.ValidateFullPopulation(1, 100));
+        Assert.Throws<InvalidOperationException>(() =>
+            RedundancyCandidateExportCommand.ValidateFullPopulation(30_001, 100));
+        Assert.Throws<InvalidOperationException>(() =>
+            RedundancyCandidateExportCommand.ValidateFullPopulation(
+                27_050, 17L * 1024 * 1024 * 1024));
+        Assert.Throws<InvalidOperationException>(() =>
+            RedundancyCandidateExportCommand.ValidateFullPopulation(27_050, -1));
+    }
+
     [Theory]
     [InlineData("../secrets.json")]
     [InlineData("docs/unsafe.json")]
