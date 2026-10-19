@@ -2,7 +2,7 @@
 
 The video library is separate from existing photo search, face review, Smart/Creative Collections and slideshows. It displays only current non-excluded video catalogue revisions, their duration/dimensions/capture date and a verified SDR still poster when available. It **does not** play media, hydrate OneDrive files, perform analysis, or expose embedded GPS or camera tags.
 
-## Default-off activation (deferred maintainer acceptance)
+## Default-off activation (maintainer acceptance completed)
 
 The default launcher keeps this route disabled. For WI-0151's **consolidated real-file acceptance**, first verify that source-copy exclusion/purge uses the exact same poster root as the operator's poster generator, then configure the maintained local API:
 
@@ -23,8 +23,8 @@ A poster must be under the configured independent derivative root with a canonic
 
 This checkpoint does not require source original bytes to display a poster and never opens a OneDrive placeholder. Unsupported/unknown video metadata is displayed as an explicit status; no fabricated date or video still is returned.
 
-## Not yet WI-0151 completion
+## Final WI-0151 status — accepted 2026-10-19
 
-The separate page intentionally does not merge video cards into photo galleries or collections, which remain photo-only. Remaining work includes real-file HDR poster validation/explicit color profiles, server-side photo-only query audits, complete end-to-end privacy/photo regression tests and the maintainer's combined acceptance after all implementation checkpoints are merged.
+The maintainer completed the one-time consolidated local acceptance with **11/11 required checks passing**. The enabled read-only video gallery displayed expected metadata/poster behavior; the video API responded HTTP 404 with the feature disabled before and after the test. Exactly one previously created durable SDR poster was visually accepted. The final bounded materialization run reported one existing eligible poster, no new poster, seven HDR candidates deferred and zero changes/failures. Poster reads remained revision-bound and exclusion-aware. The maintained photo Archive, search, collections, slideshows and original files were unchanged.
 
-No automatic background video indexing or general player has been enabled.
+**WI-0151 is completed for its original SDR still-poster and opt-in video-library scope.** This page remains separate from photo galleries and does not provide playable video, automatic video indexing, HDR/PQ production stills, search embeddings, slideshow clips or video frame analysis. Those are separate future work items and must not be inferred from this acceptance. The exact launcher/poster-root consistency and no-hydration safety requirements above still apply to subsequent operator use.
