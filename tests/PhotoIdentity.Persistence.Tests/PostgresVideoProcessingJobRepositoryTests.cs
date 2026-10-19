@@ -464,6 +464,7 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
                 await queue.TryClaimNextAsync(budget));
             Assert.Equal(first, lease.Id);
             Assert.True(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 25));
+            Assert.Equal(1, lease.ControlGeneration);
 
             VideoProcessingControlState paused = await control.PauseAsync();
             Assert.True(paused.Paused);
@@ -478,7 +479,29 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.False(resumed.Paused);
             Assert.True(resumed.Enabled);
             Assert.Equal(paused.Generation + 1, resumed.Generation);
-            Assert.True(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 50));
+            // Even though resume is now permitted, a lease claimed before
+            // the pause generation is invalid forever.
+            Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 50));
+            Assert.False(await queue.TryFinishAttemptAsync(
+                first, lease.LeaseToken, succeeded: true, retryable: false));
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand expireOld = connection.CreateCommand())
+            {
+                expireOld.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET leased_until_utc=now()-interval '1 second'
+                    WHERE id=@job;
+                    """;
+                expireOld.Parameters.AddWithValue("job", first);
+                Assert.Equal(1, await expireOld.ExecuteNonQueryAsync());
+            }
+            VideoProcessingJobLease resumedLease = Assert.IsType<VideoProcessingJobLease>(
+                await queue.TryClaimNextAsync(budget));
+            Assert.Equal(first, resumedLease.Id);
+            Assert.Equal(resumed.Generation, resumedLease.ControlGeneration);
+            Assert.NotEqual(lease.LeaseToken, resumedLease.LeaseToken);
+            Assert.True(await queue.TryHeartbeatAsync(
+                first, resumedLease.LeaseToken, 50));
 
             VideoStopResult stopped = await control.StopAsync();
             Assert.Equal(1, stopped.QueuedCancelled);
@@ -490,9 +513,9 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.Equal(resumed.Generation + 1, after.Generation);
             Assert.Equal("cancelled", (await queue.GetAsync(second))?.Status);
             Assert.True((await queue.GetAsync(first))?.CancellationRequested);
-            Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 60));
+            Assert.False(await queue.TryHeartbeatAsync(first, resumedLease.LeaseToken, 60));
             Assert.False(await queue.TryFinishAttemptAsync(
-                first, lease.LeaseToken, succeeded: true, retryable: false));
+                first, resumedLease.LeaseToken, succeeded: true, retryable: false));
             Assert.Null(await queue.TryClaimNextAsync(budget));
             VideoStopResult repeated = await control.StopAsync();
             Assert.Equal(0, repeated.QueuedCancelled);
