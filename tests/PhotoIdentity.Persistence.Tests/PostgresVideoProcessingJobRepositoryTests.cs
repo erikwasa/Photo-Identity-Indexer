@@ -463,6 +463,10 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             VideoProcessingJobLease lease = Assert.IsType<VideoProcessingJobLease>(
                 await queue.TryClaimNextAsync(budget));
             Assert.Equal(first, lease.Id);
+            var probe = new PostgresVideoLeaseSafetyProbe(database);
+            Assert.True((await probe.CheckAsync(lease)).Allowed);
+            VideoProcessingJobLease bogusToken = lease with { LeaseToken = Guid.NewGuid() };
+            Assert.Equal("lease-invalid", (await probe.CheckAsync(bogusToken)).ReasonCode);
             Assert.True(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 25));
             Assert.Equal(1, lease.ControlGeneration);
 
@@ -470,6 +474,7 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.True(paused.Paused);
             Assert.True(paused.Enabled);
             Assert.Equal("pause", paused.LastAction);
+            Assert.Equal("video-paused", (await probe.CheckAsync(lease)).ReasonCode);
             Assert.Null(await queue.TryClaimNextAsync(budget, photoWorkActive: false));
             Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 40));
             Assert.False(await queue.TryFinishAttemptAsync(
@@ -479,6 +484,8 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.False(resumed.Paused);
             Assert.True(resumed.Enabled);
             Assert.Equal(paused.Generation + 1, resumed.Generation);
+            Assert.Equal("control-generation-changed",
+                (await probe.CheckAsync(lease)).ReasonCode);
             // Even though resume is now permitted, a lease claimed before
             // the pause generation is invalid forever.
             Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 50));
@@ -502,6 +509,31 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.NotEqual(lease.LeaseToken, resumedLease.LeaseToken);
             Assert.True(await queue.TryHeartbeatAsync(
                 first, resumedLease.LeaseToken, 50));
+            Assert.True((await probe.CheckAsync(resumedLease)).Allowed);
+
+            // A photo-processing run starts after the video lease was claimed:
+            // preemption must observe it without touching photo job state.
+            Guid photoRun = Guid.NewGuid();
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand photo = connection.CreateCommand())
+            {
+                photo.CommandText = """
+                    INSERT INTO processing_runs(id,status,configuration_json,started_at_utc)
+                    VALUES (@run,'pending','{}'::jsonb,now());
+                    """;
+                photo.Parameters.AddWithValue("run", photoRun);
+                Assert.Equal(1, await photo.ExecuteNonQueryAsync());
+            }
+            Assert.Equal("photo-priority",
+                (await probe.CheckAsync(resumedLease)).ReasonCode);
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand clearPhoto = connection.CreateCommand())
+            {
+                clearPhoto.CommandText = "DELETE FROM processing_runs WHERE id=@run;";
+                clearPhoto.Parameters.AddWithValue("run", photoRun);
+                Assert.Equal(1, await clearPhoto.ExecuteNonQueryAsync());
+            }
+            Assert.True((await probe.CheckAsync(resumedLease)).Allowed);
 
             VideoStopResult stopped = await control.StopAsync();
             Assert.Equal(1, stopped.QueuedCancelled);
@@ -513,6 +545,8 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.Equal(resumed.Generation + 1, after.Generation);
             Assert.Equal("cancelled", (await queue.GetAsync(second))?.Status);
             Assert.True((await queue.GetAsync(first))?.CancellationRequested);
+            Assert.Equal("video-disabled",
+                (await probe.CheckAsync(resumedLease)).ReasonCode);
             Assert.False(await queue.TryHeartbeatAsync(first, resumedLease.LeaseToken, 60));
             Assert.False(await queue.TryFinishAttemptAsync(
                 first, resumedLease.LeaseToken, succeeded: true, retryable: false));
