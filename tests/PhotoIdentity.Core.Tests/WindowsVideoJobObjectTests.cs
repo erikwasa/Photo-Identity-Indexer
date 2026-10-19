@@ -71,16 +71,19 @@ public sealed class WindowsVideoJobObjectTests
             Assert.True(process.Start());
             job.Assign(process);
             Assert.False(process.HasExited);
+            job.Dispose(); // The test must prove job-close termination, not a fallback Kill.
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(timeout.Token);
+            Assert.True(process.HasExited);
         }
         finally
         {
-            job.Dispose(); // Windows kills this process tree on handle close.
+            job.Dispose();
             if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
+            {
+                try { process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { /* exited concurrently */ }
+            }
         }
-
-        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
-        await process.WaitForExitAsync(timeout.Token);
-        Assert.True(process.HasExited);
     }
 }
