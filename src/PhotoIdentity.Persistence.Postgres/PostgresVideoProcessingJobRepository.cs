@@ -391,7 +391,6 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                   SELECT 1 FROM video_processing_control control
                   WHERE control.singleton_id=1 AND control.enabled
                     AND NOT control.paused
-                    AND control.generation=job.control_generation
                     AND control.generation=video_processing_jobs.control_generation
               )
               AND EXISTS (
@@ -480,6 +479,7 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                   SELECT 1 FROM video_processing_control control
                   WHERE control.singleton_id=1 AND control.enabled
                     AND NOT control.paused
+                    AND control.generation=job.control_generation
               )
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
