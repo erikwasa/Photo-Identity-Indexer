@@ -54,7 +54,7 @@ internal static class RedundancyCandidateExportCommand
             }
 
             Options options = Parse(args);
-            string connection = Environment.GetEnvironmentVariable(ConnectionEnvironment)
+            string connectionString = Environment.GetEnvironmentVariable(ConnectionEnvironment)
                 ?? throw new ArgumentException("PostgreSQL environment variable is missing.");
             string proxyRoot = options.ProxyRoot
                 ?? Environment.GetEnvironmentVariable(ProxyRootEnvironment)
@@ -72,7 +72,7 @@ internal static class RedundancyCandidateExportCommand
                 throw new IOException("Private output paths must be distinct, new files.");
 
             Stopwatch readWatch = Stopwatch.StartNew();
-            await using PostgresCatalogueDatabase database = new(connection);
+            await using PostgresCatalogueDatabase database = new(connectionString);
             PostgresPhotoQualityEvaluationRepository populationRepository = new(database);
             IReadOnlyList<PhotoQualityBenchmarkPopulationRow> population =
                 await populationRepository.ReadCurrentProxyPopulationAsync(profileId);
