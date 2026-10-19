@@ -18,6 +18,8 @@ internal static class WindowsVideoSuspendedLauncher
     private const uint CreateNoWindow = 0x08000000;
     private const uint CreateUnicodeEnvironment = 0x00000400;
     private const uint StartUseStdHandles = 0x00000100;
+    private const uint ExtendedStartupInfoPresent = 0x00080000;
+    private const nuint ProcThreadAttributeHandleList = 0x00020002;
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
     private const uint FileShareRead = 0x00000001;
@@ -39,6 +41,9 @@ internal static class WindowsVideoSuspendedLauncher
         string environmentBlock = string.Concat(environment.OrderBy(pair => pair.Key,
             StringComparer.OrdinalIgnoreCase).Select(pair => pair.Key + "=" + pair.Value + "\0")) + "\0";
         IntPtr nativeEnvironment = Marshal.StringToHGlobalUni(environmentBlock);
+        IntPtr attributes = IntPtr.Zero;
+        IntPtr inheritedList = IntPtr.Zero;
+        bool attributesInitialized = false;
         ProcessInformation native = default;
         Process? owned = null;
         SecurityAttributes inherit = new()
@@ -56,17 +61,44 @@ internal static class WindowsVideoSuspendedLauncher
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Video child I/O sink could not be opened.");
 
-            StartupInfo startup = new()
+            // An unrestricted bInheritHandles=true would leak unrelated
+            // inheritable handles from the parent application. Use a single
+            // explicit HANDLE_LIST containing only the NUL device.
+            nuint bytes = 0;
+            _ = InitializeProcThreadAttributeList(
+                IntPtr.Zero, 1, 0, ref bytes);
+            if (bytes == 0)
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    "Video child handle inheritance could not be bounded.");
+            attributes = Marshal.AllocHGlobal(checked((nint)bytes));
+            if (!InitializeProcThreadAttributeList(attributes, 1, 0, ref bytes))
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    "Video child inheritance list could not be initialized.");
+            attributesInitialized = true;
+            inheritedList = Marshal.AllocHGlobal(IntPtr.Size);
+            Marshal.WriteIntPtr(inheritedList, nullDevice.DangerousGetHandle());
+            if (!UpdateProcThreadAttribute(attributes, 0,
+                    ProcThreadAttributeHandleList, inheritedList,
+                    (nuint)IntPtr.Size, IntPtr.Zero, IntPtr.Zero))
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    "Video child inherited-handle allowlist could not be installed.");
+
+            StartupInfoEx startup = new()
             {
-                Size = (uint)Marshal.SizeOf<StartupInfo>(),
-                Flags = StartUseStdHandles,
-                StdInput = nullDevice.DangerousGetHandle(),
-                StdOutput = nullDevice.DangerousGetHandle(),
-                StdError = nullDevice.DangerousGetHandle()
+                StartupInfo = new StartupInfo
+                {
+                    Size = (uint)Marshal.SizeOf<StartupInfoEx>(),
+                    Flags = StartUseStdHandles,
+                    StdInput = nullDevice.DangerousGetHandle(),
+                    StdOutput = nullDevice.DangerousGetHandle(),
+                    StdError = nullDevice.DangerousGetHandle()
+                },
+                AttributeList = attributes
             };
             if (!CreateProcessW(executable, new StringBuilder(command),
                     IntPtr.Zero, IntPtr.Zero, true,
-                    CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment,
+                    CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment |
+                    ExtendedStartupInfoPresent,
                     nativeEnvironment, directory, ref startup, out native))
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Approved bounded video tool could not be launched suspended.");
@@ -99,6 +131,12 @@ internal static class WindowsVideoSuspendedLauncher
             owned?.Dispose();
             if (native.Thread != IntPtr.Zero) _ = CloseHandle(native.Thread);
             if (native.Process != IntPtr.Zero) _ = CloseHandle(native.Process);
+            if (attributesInitialized)
+                DeleteProcThreadAttributeList(attributes);
+            if (inheritedList != IntPtr.Zero)
+                Marshal.FreeHGlobal(inheritedList);
+            if (attributes != IntPtr.Zero)
+                Marshal.FreeHGlobal(attributes);
             Marshal.FreeHGlobal(nativeEnvironment);
         }
     }
@@ -159,6 +197,13 @@ internal static class WindowsVideoSuspendedLauncher
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct StartupInfoEx
+    {
+        public StartupInfo StartupInfo;
+        public IntPtr AttributeList;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct ProcessInformation
     {
         public IntPtr Process;
@@ -179,8 +224,22 @@ internal static class WindowsVideoSuspendedLauncher
     private static extern bool CreateProcessW(string applicationName,
         StringBuilder commandLine, IntPtr processAttributes, IntPtr threadAttributes,
         [MarshalAs(UnmanagedType.Bool)] bool inheritHandles, uint creationFlags,
-        IntPtr environment, string currentDirectory, ref StartupInfo startupInfo,
+        IntPtr environment, string currentDirectory, ref StartupInfoEx startupInfo,
         out ProcessInformation processInformation);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool InitializeProcThreadAttributeList(
+        IntPtr attributes, int attributeCount, int flags, ref nuint bytes);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UpdateProcThreadAttribute(
+        IntPtr attributes, uint flags, nuint attribute,
+        IntPtr value, nuint size, IntPtr previous, IntPtr returnSize);
+
+    [DllImport("kernel32.dll")]
+    private static extern void DeleteProcThreadAttributeList(IntPtr attributes);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint ResumeThread(IntPtr thread);
