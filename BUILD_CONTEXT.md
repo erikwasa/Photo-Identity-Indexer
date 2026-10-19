@@ -4,6 +4,24 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 7 (2026-10-19):** Maintainer accepted
+full-proxy opt-in candidate enrichment: 27,050 photos, 164,381
+retrieved candidate pairs, 800 screened negative candidates,
+1,552 additional mid-similarity pairs; held-out borderline
+129/60 and screened random negatives 51/35, all non-exact-copy
+quotas now met. Genuine exact-copy controls are absent.
+Strict dHash<=4 families unchanged; observed cross-partition
+dHash5–12 and high CLIP risks persist. No-go for review-set freeze.
+New diagnostic `redundancy_heldout_quarantine_preflight.py`
+quantifies held-out photo/candidate supply remaining after
+four predeclared risk-exposure exclusion sensitivities on
+the same unchanged split. No labels, outputs, model download,
+production changes, ANN or approval; quarantine can bias
+held-out sample and cannot prove missing near-copy absence.
+After PR merge operator runs offline Python synthetic tests,
+then aggregate-only private enriched-manifest preflight.
+WI-0195 remains blocked; all PRs target main.
+
 **WI-0194 checkpoint 6 (2026-10-19):** 27,050-photo full-archive
 dHash/CLIP research proved exact offline retrieval practical.
 Maintainer's private sensitivity study found dHash<=8 family
