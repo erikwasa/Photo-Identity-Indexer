@@ -48,6 +48,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 33),
+                "catalogue" when args.Length > 1 && args[1] == "rehearse-v35" =>
+                    await VideoSchemaRehearsalCommandRunner.RunAsync(
+                        VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken, expectedRestoredSchemaVersion: 34),
                 "video" when args.Length > 2 && args[1] == "jobs" =>
                     await VideoJobsCommandRunner.RunAsync(
                         VideoJobsCommandOptions.Parse(args[2], args.Skip(3).ToArray()),
@@ -148,9 +152,17 @@ public static class Program
                           (both commands require a successful restore report and
                            modify ONLY its matched local photoidentity_restore_* database)
 
+              catalogue rehearse-v35 --postgres-connection-env NAME
+                                     --restore-report ABSOLUTE_REPORT_PATH
+                                     (v34 isolated restore only; video control defaults off)
+
               video jobs status --postgres-connection-env NAME --database DB
                                  (read-only; bounded sanitized queue summary
                                   and at most 20 recent opaque job IDs)
+              video jobs pause|resume|stop --postgres-connection-env NAME --database DB
+                                           [--apply]
+                                           (dry-run default; durable v35 pause/stop;
+                                            resume never enables video processing)
               video jobs cancel --postgres-connection-env NAME --database DB
                                 --job-id UUID [--apply]
                                 (dry-run default; explicit cancellation request;
