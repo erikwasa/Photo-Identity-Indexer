@@ -70,12 +70,15 @@ public sealed partial class PostgresCatalogueDatabase
         // The existing initializer appends runtime-owned schemas to the latest migration.
         // Add the isolated video schema first so fresh and upgraded catalogues both
         // receive version 33 before the append-only extensions are applied.
-        Migrations = [.. Migrations, new Migration(
-            33, "opt-in-video-revision-metadata-and-posters", VideoCatalogueSchemaMigration)];
+        Migrations = [.. Migrations,
+            new Migration(33, "opt-in-video-revision-metadata-and-posters", VideoCatalogueSchemaMigration),
+            new Migration(34, "isolated-video-processing-jobs", VideoProcessingQueueSchemaMigration)];
 
+        // Keep historical runtime-owned extension DDL attached to the exact
+        // v33 migration which originally introduced it; v34 is queue-only.
         int currentMigrationIndex = Array.FindIndex(
             Migrations,
-            migration => migration.Version == CurrentSchemaVersion);
+            migration => migration.Version == 33);
         if (currentMigrationIndex < 0)
         {
             throw new InvalidOperationException(

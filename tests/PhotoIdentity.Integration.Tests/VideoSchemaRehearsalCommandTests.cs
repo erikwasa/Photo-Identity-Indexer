@@ -108,4 +108,51 @@ public sealed class VideoSchemaRehearsalCommandTests
             if (File.Exists(reportPath)) File.Delete(reportPath);
         }
     }
+    [Fact]
+    public async Task V34_rehearsal_requires_a_verified_v33_restore_before_network_access()
+    {
+        const string variable = "PHOTOIDENTITY_WI0188_V34_TEST_CONN";
+        string? original = Environment.GetEnvironmentVariable(variable);
+        string reportPath = Path.Combine(Path.GetTempPath(),
+            "photoidentity-wi0188-restore-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            // The credential string might point to production, but it must
+            // NEVER be the connection target, and a wrong schema fails
+            // before any PostgreSQL network connection is attempted.
+            Environment.SetEnvironmentVariable(variable,
+                "Host=127.0.0.1;Database=production;Username=example;Password=private");
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "production",
+                  "verificationDatabase": "photoidentity_restore_20261019104403_abc123",
+                  "restoredEvidence": { "schemaVersion": 32 }
+                }
+                """);
+            var options = new VideoSchemaRehearsalOptions(variable, reportPath);
+            InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => VideoSchemaRehearsalCommandRunner.RunAsync(
+                    options, TextWriter.Null, expectedRestoredSchemaVersion: 33));
+            Assert.Contains("schema v33", error.Message, StringComparison.Ordinal);
+
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "production",
+                  "verificationDatabase": "production",
+                  "restoredEvidence": { "schemaVersion": 33 }
+                }
+                """);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                VideoSchemaRehearsalCommandRunner.RunAsync(
+                    options, TextWriter.Null, expectedRestoredSchemaVersion: 33));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, original);
+            if (File.Exists(reportPath)) File.Delete(reportPath);
+        }
+    }
+
 }

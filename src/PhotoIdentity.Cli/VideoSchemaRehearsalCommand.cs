@@ -43,10 +43,13 @@ public static class VideoSchemaRehearsalCommandRunner
     public static async Task<int> RunAsync(
         VideoSchemaRehearsalOptions options,
         TextWriter output,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        int expectedRestoredSchemaVersion = 32)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
+        if (expectedRestoredSchemaVersion is not (32 or 33))
+            throw new ArgumentOutOfRangeException(nameof(expectedRestoredSchemaVersion));
 
         string? connectionString = Environment.GetEnvironmentVariable(
             options.PostgresConnectionEnvironmentVariable);
@@ -85,9 +88,9 @@ public static class VideoSchemaRehearsalCommandRunner
                 "The restored database could not be selected unambiguously.");
 
         JsonElement evidence = root.GetProperty("restoredEvidence");
-        if (evidence.GetProperty("schemaVersion").GetInt32() != PostgresCatalogueDatabase.CurrentSchemaVersion - 1)
+        if (evidence.GetProperty("schemaVersion").GetInt32() != expectedRestoredSchemaVersion)
             throw new InvalidOperationException(
-                "The restored source must be schema v32 to verify the v32-to-v33 migration.");
+                $"The restored source must be schema v{expectedRestoredSchemaVersion} for this rehearsal.");
 
         JsonElement tableCountsJson = evidence.GetProperty("tableCounts");
         Dictionary<string, long> expectedCounts = new(StringComparer.Ordinal);
@@ -106,9 +109,9 @@ public static class VideoSchemaRehearsalCommandRunner
         await beforeConnection.OpenAsync(token);
 
         int originalVersion = await SchemaVersionAsync(beforeConnection, token);
-        if (originalVersion != PostgresCatalogueDatabase.CurrentSchemaVersion - 1)
+        if (originalVersion != expectedRestoredSchemaVersion)
             throw new InvalidOperationException(
-                "The selected rehearsal database is not at schema v32; nothing was changed.");
+                $"The selected rehearsal database is not at schema v{expectedRestoredSchemaVersion}; nothing was changed.");
 
         Dictionary<string, long> beforeCounts = await TableCountsAsync(
             beforeConnection, expectedCounts.Keys, token);
@@ -124,16 +127,18 @@ public static class VideoSchemaRehearsalCommandRunner
 
         Dictionary<string, long> afterCounts = await TableCountsAsync(
             beforeConnection, expectedCounts.Keys, token);
-        // The existing migration history gains exactly one row for v33.
+        // Current schema upgrades every intervening migration, including v33
+        // for historic restores made before video acceptance.
         Dictionary<string, long> expectedAfter = new(expectedCounts, StringComparer.Ordinal)
         {
             ["photo_identity_schema_migrations"] =
-                expectedCounts["photo_identity_schema_migrations"] + 1
+                expectedCounts["photo_identity_schema_migrations"] +
+                PostgresCatalogueDatabase.CurrentSchemaVersion - expectedRestoredSchemaVersion
         };
         AssertCounts(expectedAfter, afterCounts, "post-migration preserved tables");
 
         if (await SchemaVersionAsync(beforeConnection, token) != PostgresCatalogueDatabase.CurrentSchemaVersion)
-            throw new InvalidDataException("Rehearsal did not record schema v33.");
+            throw new InvalidDataException("Rehearsal did not record the current schema version.");
 
         await using NpgsqlCommand verify = beforeConnection.CreateCommand();
         verify.CommandText = """
@@ -143,20 +148,26 @@ public static class VideoSchemaRehearsalCommandRunner
                 (SELECT count(*) FROM video_revision_metadata),
                 (SELECT count(*) FROM video_still_posters),
                 (SELECT count(*) FROM photo_identity_schema_migrations
-                    WHERE version = 33 AND name = 'opt-in-video-revision-metadata-and-posters');
+                    WHERE version = 33 AND name = 'opt-in-video-revision-metadata-and-posters'),
+                (SELECT count(*) FROM video_processing_jobs),
+                (SELECT count(*) FROM photo_identity_schema_migrations
+                    WHERE version = 34 AND name = 'isolated-video-processing-jobs');
             """;
         await using NpgsqlDataReader reader = await verify.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token) ||
-            reader.GetInt64(0) != 0 || reader.GetInt64(1) != 0 ||
-            reader.GetInt64(2) != 0 || reader.GetInt64(3) != 0 ||
-            reader.GetInt64(4) != 1)
+            (expectedRestoredSchemaVersion == 32 &&
+             (reader.GetInt64(0) != 0 || reader.GetInt64(1) != 0 ||
+              reader.GetInt64(2) != 0 || reader.GetInt64(3) != 0)) ||
+            reader.GetInt64(4) != 1 || reader.GetInt64(5) != 0 || reader.GetInt64(6) != 1)
             throw new InvalidDataException(
-                "Video/photo isolation or empty video-table verification failed.");
+                "Video isolation or empty v34 queue verification failed.");
 
-        output.WriteLine("Schema v32 -> v33 rehearsal passed on the isolated restored database.");
+        output.WriteLine($"Schema v{expectedRestoredSchemaVersion} -> v{PostgresCatalogueDatabase.CurrentSchemaVersion} rehearsal passed on the isolated restored database.");
         output.WriteLine($"Rehearsal database: {restoredName}");
         output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
-        output.WriteLine("All existing assets/revisions remain photo; video evidence tables are empty.");
+        output.WriteLine(expectedRestoredSchemaVersion == 32
+            ? "Original photo-only catalogue preserved; video tables and new queue empty."
+            : "Original photo/video catalogue preserved; new video job queue empty.");
         output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
         return 0;
     }

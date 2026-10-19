@@ -1,5 +1,13 @@
 # WI-0151 — PostgreSQL v32 to v33 restored-database rehearsal
 
+> **Historical WI-0151 rehearsal note (2026-10-19):** This procedure
+> documented the original v32 → v33 acceptance. From WI-0188 checkpoint 2,
+> the current application targets schema **v34**; the legacy
+> `catalogue rehearse-v33` command on a verified v32 restored database now
+> applies both v33 and v34. For a maintained **v33 → v34** upgrade, use the
+> separate [v34 queue rehearsal](video-processing-job-queue-v34.md), not
+> this historical procedure. The prior v33 acceptance evidence remains valid.
+
 This is an explicit, operator-controlled migration rehearsal, not production rollout. It is required because fresh-database unit tests do not prove schema migration on an actual maintained catalogue.
 
 ## Preconditions

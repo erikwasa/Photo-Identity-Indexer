@@ -64,12 +64,43 @@ operator progress/diagnostics; default-off API wiring; atomic temp cleanup,
 exclusion tests and maintained Windows mixed-load measurements. No existing
 acceptance criterion is considered met solely by checkpoint 1.
 
+### Checkpoint 2 — durable PostgreSQL control queue (2026-10-19)
+
+- Schema v34 adds isolated video_processing_jobs with a video-metadata FK,
+  bounded admission estimates, exact derivative/version/hash identity, unique
+  idempotency key, sanitized states, attempts, cancellation and lease fencing.
+  Existing photo processing_runs/jobs and video metadata/posters are unchanged.
+- Repository exposes explicit enqueue (locked source, current revision, supported
+  inspection, exclusion and source-byte checks), global-serialized bounded
+  lease claims, progress heartbeats, cancellation, retry/restart recovery and
+  fenced acknowledgements; all state transitions are database-only.
+- Disposable PostgreSQL tests exercise no-job default, photo rejection,
+  idempotency, active limits, queued/running cancellation, retry exhaustion,
+  stale leases/revisions and exclusion hiding. No worker or browser endpoint
+  consumes this queue yet; no original bytes are opened or derivatives written.
+- New guarded 'catalogue rehearse-v34' CLI validates the current backup-restore
+  report and only migrates a verified local isolated restored v33 database.
+  See [v34 operator runbook](../../operations/video-processing-job-queue-v34.md)
+  before any maintained-host schema upgrade.
+- Lease ownership is **not** a file-publishing lock, locality attestation or
+  process CPU/GPU/IO budget. Worker revalidation, atomic temp/derivative
+  publication, active photo-priority sensing and actual managed hydration remain
+  necessary before any runtime enablement.
+
+**Required before WI-0188 review:** maintainer backup/rehearsal and photo
+regression verification, worker execution controls, durable resource accounting,
+safe cancellation of external processes, local derivative cleanup, operator
+pause/visibility and mixed-load measurements. All WI-0188 acceptance criteria
+remain unchecked pending these gates.
+
 ## Completion notes
 
-- Files changed: Core policy/identity contracts and unit tests; delivery tracking.
-- Trade-offs: explicit conservative admission contract before persistent state and
-  backend execution; no speculative API, schema upgrade or FFmpeg invocation.
-- Deferred work: durable runner, database migration, media adapters,
-  observability, mixed-load benchmark and maintained-host signoff.
-- Commands run: no local .NET runtime available in the connected execution
-  environment; run targeted Core tests and Docs validation through CI after PR.
+- Files changed: Core admission/identity contracts and tests; v34 schema,
+  isolated PostgreSQL queue repository/tests; guarded restore rehearsal CLI;
+  operator runbook and delivery tracking.
+- Trade-offs: queue-only schema and explicit operator-only control methods
+  before any worker/API; no original-file reads, transcode or background video work.
+- Deferred work: process/resource-enforcing video worker, actor controls,
+  safe artifact publication/cleanup and maintained-host benchmarks.
+- Commands run: checkpoint 1 build/tests passed in GitHub CI for merged PR #600;
+  checkpoint 2 requires PR CI and maintained Windows backup/isolated rehearsal.
