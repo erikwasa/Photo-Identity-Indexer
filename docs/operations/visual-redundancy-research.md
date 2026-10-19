@@ -294,6 +294,42 @@ Only **aggregate stdout** may be shared: number reviewed/remaining; bucket count
 
 After this **single bundled operator round**, evaluate the meaningful human redundancy outcomes and decide whether to pursue a separate comprehensive independent held-out/model phase, or document **NO-GO / manual-only / defer** on automatic suppression and move to milestone disposition. WI-0195 remains blocked until an actual accepted policy or explicit milestone no-go decision; no Search/Smart/Creative/Slideshow semantics are changed here.
 
+
+## Bundled independent validation phase — after 200 calibration reviews
+
+The maintainer finished the complete **200/200** labelled calibration-only pilot from PR #616 (382 distinct calibration photos, 0 held-out photo labels). The *selected* source buckets had 82 Redundant, 17 Similar-keep-both and 101 Not similar overall. In sampled buckets: dHash0–4 **23/24 Redundant**, dHash5–8 **23/24**, dHash9–12 **8/24**, high CLIP other **18/20**, dHash-far/CLIP-high disagreement **9/20**, close-dHash/CLIP-low **0/20** and neither CLIP-mid borderline nor screened negative controls contained any Redundant cases. These are **nonrepresentative, photo-correlated calibration labels**, not a precision/recall estimate and **not** grounds for production suppression. Global dHash<=8 or <=12 *transitive families* were already rejected after 305/3,368-photo components. All original exact-content-copy controls were absent.
+
+This PR bundles the next independent study **without additional single-command development checkpoints**. It establishes a *new frozen-before-labels* held-out candidate list, with strict guard:
+
+- Reuses the exact same private enriched candidate archive and existing `private/wi0194-calibration-pilot-blind-v1.json`. It **never opens calibration labels, notes or private WI-0193 quality-study labels**. The calibration blind contains the 382 already-reviewed photo endpoints.
+- Retains only pairs where both endpoints are in the original dHash<=4 **held-out** membership. A held-out photo is excluded if a *previously retrieved cross-partition edge* connects it to any of those **382 calibration-pilot photos** with dHash distance **5–12** or CLIP cosine **>=0.90**. Those cutoffs are **predeclared guard sensitivities**, not confirmed near-copy labels or classification policies. Stronger unobserved leakage remains possible because dHash neighbour retrieval is bounded and CLIP retrieval used only 100 seeds.
+- Stops **before creating review files** if the observed-risk quarantine exceeds 20% of held-out photos, or if the diversity-capped held-out review pool has fewer than 100 pairs. Sampling is deterministic using a new independent seed with the **nine predeclared candidate categories** and at most two pair appearances per photo. Individual category quotas may be smaller than the 200-pair calibration pilot; report those shortfalls rather than manufacturing cases. No exact-content controls are invented.
+- On a passing gate, writes only **new, exclusive-write private** blind and audit outputs and binds them by SHA-256. A read-only .NET proxy locator **requires the separate frozen held-out audit** before mapping the selected revisions. The loopback browser refuses held-out photos unless invoked with explicit `--heldout-validation` (the local entry point adds this only for the `-Review` switch).
+- Held-out labels live in a **distinct private file** and are resumable. Aggregate-only reporting produces per-bucket Redundant / Similar-keep-both / Not similar / Unsure counts and descriptive Wilson bounds; unlike calibration, it must not be consulted to change the candidate grouping, evaluate another cutoff/model on the same data, or retrospectively replace the held-out cohort. No suppression threshold is frozen and no production policy is approved.
+
+**After CI passes and merging the full bundled PR, verify/prep once** in Windows PowerShell from the repository root:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch main
+git pull --ff-only origin main
+$env:PhotoIdentity__ReviewProxyProfileId = "jpeg-1600-q78"
+
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_redundancy_independent_validation.ps1
+~~~
+
+This runs synthetic regression tests **and** the real candidate-only leakage gate, then resolves current durable local proxies (read-only DB; only selected photos, not a new 27k scan). **No held-out image is opened for review, and no human label is saved by default.** If the guard fails, stop; keep private manifests and share the sanitized failure type only. If it passes, the stdout includes aggregate frozen cohort size, held-out photos quarantined, selected bucket counts, and proxy matches. Share **only that aggregate output** before authorizing the independent review. This is the single planned local verification round for the new phase.
+
+**When ready to label the guarded held-out cohort**, run the same entry point with `-Review`:
+
+~~~powershell
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_redundancy_independent_validation.ps1 -Review
+~~~
+
+This opens a separate loopback reviewer on `http://127.0.0.1:5185`. Four blind labels and notes are identical to the calibration pilot. Ctrl+C stops; re-running resumes. The script prints an aggregate report after the reviewer exits, or can be run without `-Review` to report saved progress. Do not open calibration labels for tuning, upload private held-out manifests/individual scores or manually alter the frozen review population after any held-out labels are collected. No automatic collection/Slideshow changes are made.
+
+**Interpretation gate:** This is still a *stratified, observed-risk-filtered* held-out descriptive experiment, not unbiased whole-archive automatic-suppression precision or a verified production threshold. A 95% point estimate on ~24 correlated examples would be too weak; any final recommendation must explicitly discuss photo-level dependence, selection bias, missed retrieval, dedicated-model/license/runtime uncertainty, and false-positive harm. If evidence remains inadequate, record a clear **no-go/defer** for automatic suppression rather than extending this micro-checkpoint cycle. WI-0195 depends on an accepted or documented no-go disposition and is not automatically unblocked by this experiment.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
