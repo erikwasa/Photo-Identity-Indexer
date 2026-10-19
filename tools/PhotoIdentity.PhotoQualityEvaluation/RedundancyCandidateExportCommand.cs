@@ -192,6 +192,8 @@ internal static class RedundancyCandidateExportCommand
                 .OrderBy(i => Digest("clip-seed|" + photos[i].RevisionId), StringComparer.Ordinal)
                 .Take(options.ClipSeeds)
                 .ToArray();
+            int clipBorderlinePairsAdded = 0;
+            int clipBorderlineCandidateAttempts = 0;
             foreach (int seed in seeds)
             {
                 float[] query = photos[seed].ClipVector!;
@@ -211,6 +213,27 @@ internal static class RedundancyCandidateExportCommand
                 {
                     clipRetrieved.Add(SortPair(seed, index));
                     AddRetrieved(pairs, photos, seed, index, null);
+                }
+
+                // Opt-in unlabelled mid-similarity sampling, not a
+                // calibrated redundancy/suppression threshold.
+                if (options.BorderlinePerSeed > 0)
+                {
+                    foreach ((int index, _) in best
+                        .Where(x => IsBorderlineCandidate(
+                            System.Numerics.BitOperations.PopCount(
+                                photos[seed].PerceptualHash ^
+                                photos[x.Index].PerceptualHash), x.Score))
+                        .OrderBy(x => Digest(
+                            "wi0194-borderline|" + photos[seed].RevisionId +
+                            "|" + photos[x.Index].RevisionId), StringComparer.Ordinal)
+                        .Take(options.BorderlinePerSeed))
+                    {
+                        clipBorderlineCandidateAttempts++;
+                        int before = pairs.Count;
+                        AddRetrieved(pairs, photos, seed, index, null);
+                        clipBorderlinePairsAdded += pairs.Count - before;
+                    }
                 }
             }
             clipWatch.Stop();
@@ -364,6 +387,9 @@ internal static class RedundancyCandidateExportCommand
                 ? DotNormalized(photos[left].ClipVector!, photos[right].ClipVector!) : null;
         pairs.Add((left, right), new Pair(left, right, distance, clip, "retrieved"));
     }
+
+    internal static bool IsBorderlineCandidate(int dhashDistance, double clipCosine) =>
+        dhashDistance > 24 && clipCosine >= 0.62 && clipCosine < 0.78;
 
     internal static double DotNormalized(float[] a, float[] b)
     {
