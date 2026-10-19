@@ -36,12 +36,12 @@ The first useful step is making videos visible/searchable rather than silently u
 
 ## Acceptance criteria
 
-- [ ] Supported videos appear as assets with duration/media kind.
-- [ ] A durable poster supports browsing without replaying the original.
-- [ ] Date, GPS, duration, rotation, stream metadata and unsupported/unknown fields behave predictably.
-- [ ] Default-off video support does not change photo-only ingestion or query results.
-- [ ] Unsupported variants remain visible in reporting.
-- [ ] Original videos remain read-only.
+- [x] Supported videos appear as assets with duration/media kind.
+- [x] A durable poster supports browsing without replaying the original.
+- [x] Date, GPS, duration, rotation, stream metadata and unsupported/unknown fields behave predictably.
+- [x] Default-off video support does not change photo-only ingestion or query results.
+- [x] Unsupported variants remain visible in reporting.
+- [x] Original videos remain read-only.
 
 ## Verification requirements
 
@@ -189,10 +189,15 @@ Source, metadata, persistence and representative real-file verification.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+**WI-0151 completed following maintainer acceptance on 2026-10-19 (Europe/Stockholm).** This is the explicitly opt-in first video slice: catalogue metadata and durable Rec.709 still posters, a read-only video library and unchanged photo-only behavior. The acceptance is based on the maintainer's completed consolidated checklist and reported local outcomes; detailed personal metadata, paths and original files remain private.
+
+- **Implementation and evidence:** merged WI-0151 engineering PRs; schema-v33 isolated rehearsal and maintained PostgreSQL health; opt-in MOV/MP4 ingestion and revision-bound technical metadata; bounded atomic `bt709` SDR JPEG publication/reading and lifecycle/isolation tests; poster cleanup dry-run; default-off video API and optionally enabled Videos page. See consolidated runbook and sanitized video pilot.
+- **Maintainer verification:** all **11/11** consolidated local checks reported PASS: `verify-postgres.ps1`, Release packaging, PostgreSQL schema 33; default-off video API HTTP 404; bounded ingestion dry-run and applied metadata; current authoritative database backup with isolated successful restore; durable SDR poster and idempotent rerun; video library display; unchanged Archive, photo searches, Smart/Creative Collections and slideshows; no unexpected OneDrive hydration or original modifications; invalid poster HTTP 404 and non-destructive cleanup preview; restored default-off configuration and API HTTP 404.
+- **Final poster summary:** enumerated **1,316** video candidates; eligible **1**; existing **1**; newly generated **0** on the final materialization run; HDR deferred **7**; skipped **1,308**; changed **0**; failures **0**. Separately, the maintainer confirmed that **one durable SDR poster had been created previously and visually inspected as acceptable**. Thus zero new posters is expected for the idempotent rerun, not absence of poster evidence. These counters are the operator's bounded run results, not claims that all enumerated video originals were read or tested.
+- **Originals and privacy:** operator reports that poster reads remained current-revision-bound and exclusion-aware, original videos were not changed, video work did not enter photo analysis and no cloud hydration occurred. Full deletion/exclusion race cases rely on disposable PostgreSQL automated tests; no destructive manual test against personal originals was performed.
+- **Scope and trade-offs:** initial durable still posters require explicit SDR `bt709` transfer; HLG, PQ and unknown transfer remain deferred rather than silently converted. Stored video metadata can exist without a poster. Neither the read-only Videos page nor the initial ingest adds playback, automatic video workers, video manual editing, captions/embeddings or video slideshow inclusion.
+- **Deferred work:** versioned HDR-to-SDR production poster policy after separate HLG visual and lifecycle review; playback (WI-0152), manual metadata/collection integration (WI-0153), slideshow clips (WI-0154), isolated processing lane (WI-0188), local playable proxies (WI-0189), video captions/embeddings (WI-0190) and search (WI-0191). No further WI-0151 change is required based on submitted acceptance evidence.
+- **Commands run (maintainer-reported):** PostgreSQL verification and packaging; health; bounded opt-in `video ingest` dry-run/apply; `video posters` preview/apply and idempotence; verified PostgreSQL backup and isolated restore; launcher validation, enabled/disabled video API checks, invalid poster request and `video posters-cleanup` dry-run. Exact private console commands/arguments and source paths were not supplied as a new transcript and are not reconstructed here.
 
 ## Maintained photo-only regression discovered — 2026-10-18
 
@@ -212,3 +217,11 @@ This resolves the **observed photo-only acceptance symptoms** that blocked progr
 The formerly blocking photo-only Archive/Smart Collection/Slideshow query regression tracked in [WI-0202](WI-0202-photo-catalogue-query-performance-regression.md) is now **completed for functional acceptance**. Following PRs #594–#596, the maintainer's final sequential Smart Collection cover probe returned 28/28 HTTP 200 with severe outliers reduced (~9.8 s to ~1.05 s for people+relationship; ~2.1–2.2 s to ~0.14 s for named-place+orientation), and the maintainer reported the application working as expected.
 
 This releases the **WI-0202 photo-query dependency only**. **WI-0151 remains in_review** until its own video-metadata, poster, isolation and consolidated maintained acceptance gates are signed off. Earlier root-cause and backup-evidence limitations in WI-0202 do not imply newly verified video-specific behavior; the original targeted ANALYZE correlation is still not a proven planner root cause.
+
+## Final consolidated Windows real-file acceptance — 2026-10-19
+
+**Decision: completed / maintainer-accepted.** The maintainer submitted all eleven consolidated checks as PASS after WI-0202 was completed and the latest merged application was packaged. The final bounded poster materialization summary was `enumerated=1316, eligible=1, existing=1, newPosters=0, hdrDeferred=7, skipped=1308, changed=0, failures=0`; the one previously created SDR poster was visually checked and approved. The final `0` new poster count confirms rerun idempotence; it does **not** imply lack of a durable poster.
+
+Video metadata and the enabled read-only gallery were accepted with correct reporting/absence for unsupported variants. The PostgreSQL backup with isolated restore was explicitly reported passed before new database writes. Original videos remained read-only, OneDrive did not hydrate unexpectedly and no video entered legacy photo analysis/search/collections/slideshows. Both default-off checks returned HTTP 404, and poster cleanup ran in dry-run mode only.
+
+The seven deferred HDR posters are **expected behavior** for the versioned Rec.709-only production policy and do not block WI-0151. Optional private HLG preview quality or future production HDR render approval is not claimed by this acceptance. Keep the original acceptance runbook as reproducible operational guidance; separate playback/search/HDR/processing work items continue under M30.
