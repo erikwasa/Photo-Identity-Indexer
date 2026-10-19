@@ -37,6 +37,38 @@ public sealed class VideoSchemaRehearsalCommandTests
     }
 
     [Fact]
+    public async Task V35_rehearsal_rejects_wrong_original_schema_without_connecting()
+    {
+        const string variable = "PHOTOIDENTITY_WI0188_V35_TEST_CONN";
+        string? prior = Environment.GetEnvironmentVariable(variable);
+        string reportPath = Path.Combine(Path.GetTempPath(),
+            "photoidentity-v35-restore-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Environment.SetEnvironmentVariable(variable,
+                "Host=127.0.0.1;Database=photoidentity_production;Username=example;Password=private");
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "photoidentity_production",
+                  "verificationDatabase": "photoidentity_restore_20261019225500_abcdef",
+                  "restoredEvidence": { "schemaVersion": 33 }
+                }
+                """);
+            VideoSchemaRehearsalOptions options = new(variable, reportPath);
+            InvalidOperationException mismatch = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null,
+                    expectedRestoredSchemaVersion: 34));
+            Assert.Contains("schema v34", mismatch.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, prior);
+            if (File.Exists(reportPath)) File.Delete(reportPath);
+        }
+    }
+
+    [Fact]
     public async Task Missing_restore_report_and_remote_host_are_rejected_before_opening_connection()
     {
         const string variable = "PHOTOIDENTITY_WI0151_TEST_CONN";
