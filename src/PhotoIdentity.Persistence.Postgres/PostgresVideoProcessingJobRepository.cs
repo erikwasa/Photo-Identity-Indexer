@@ -205,6 +205,15 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
             await serialize.ExecuteNonQueryAsync(token);
         }
 
+        VideoProcessingControlState control =
+            await PostgresVideoProcessingControlRepository.ReadForClaimAsync(
+                connection, transaction, token);
+        if (!control.Enabled || control.Paused)
+        {
+            await transaction.CommitAsync(token);
+            return null;
+        }
+
         // Recover inside the claim lock to prevent competing claim/recovery races.
         await using (NpgsqlCommand recover = connection.CreateCommand())
         {
@@ -375,6 +384,11 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
             WHERE id=@id AND lease_token=@lease AND status='running'
               AND leased_until_utc>now() AND cancellation_requested_at_utc IS NULL
               AND EXISTS (
+                  SELECT 1 FROM video_processing_control control
+                  WHERE control.singleton_id=1 AND control.enabled
+                    AND NOT control.paused
+              )
+              AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
                   JOIN assets asset ON asset.id=revision.asset_id
                   JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
@@ -456,6 +470,11 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 updated_at_utc=now()
             WHERE job.id=@id AND job.lease_token=@lease AND job.status='running'
               AND job.leased_until_utc>now() AND job.cancellation_requested_at_utc IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM video_processing_control control
+                  WHERE control.singleton_id=1 AND control.enabled
+                    AND NOT control.paused
+              )
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
                   JOIN assets asset ON asset.id=revision.asset_id
