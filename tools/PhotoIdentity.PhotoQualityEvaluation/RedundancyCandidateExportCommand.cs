@@ -35,6 +35,7 @@ internal static class RedundancyCandidateExportCommand
 
     private sealed record Options(
         string Output, string Report, int Limit, int Neighbors, int ClipSeeds,
+        int BorderlinePerSeed, int? RandomNegativeControls,
         string? ModelId, string? ModelSha256, string? PreprocessingVersion,
         string? ProxyRoot, string? ProxyProfile, bool FullProxyPopulation);
 
@@ -191,6 +192,8 @@ internal static class RedundancyCandidateExportCommand
                 .OrderBy(i => Digest("clip-seed|" + photos[i].RevisionId), StringComparer.Ordinal)
                 .Take(options.ClipSeeds)
                 .ToArray();
+            int clipBorderlinePairsAdded = 0;
+            int clipBorderlineCandidateAttempts = 0;
             foreach (int seed in seeds)
             {
                 float[] query = photos[seed].ClipVector!;
@@ -211,6 +214,27 @@ internal static class RedundancyCandidateExportCommand
                     clipRetrieved.Add(SortPair(seed, index));
                     AddRetrieved(pairs, photos, seed, index, null);
                 }
+
+                // Opt-in unlabelled mid-similarity sampling, not a
+                // calibrated redundancy/suppression threshold.
+                if (options.BorderlinePerSeed > 0)
+                {
+                    foreach ((int index, _) in best
+                        .Where(x => IsBorderlineCandidate(
+                            System.Numerics.BitOperations.PopCount(
+                                photos[seed].PerceptualHash ^
+                                photos[x.Index].PerceptualHash), x.Score))
+                        .OrderBy(x => Digest(
+                            "wi0194-borderline|" + photos[seed].RevisionId +
+                            "|" + photos[x.Index].RevisionId), StringComparer.Ordinal)
+                        .Take(options.BorderlinePerSeed))
+                    {
+                        clipBorderlineCandidateAttempts++;
+                        int before = pairs.Count;
+                        AddRetrieved(pairs, photos, seed, index, null);
+                        clipBorderlinePairsAdded += pairs.Count - before;
+                    }
+                }
             }
             clipWatch.Stop();
 
@@ -219,7 +243,8 @@ internal static class RedundancyCandidateExportCommand
             Stopwatch negativesWatch = Stopwatch.StartNew();
             int randomControls = 0;
             Random random = new(194);
-            int controlTarget = Math.Min(200, Math.Max(20, photos.Count / 5));
+            int controlTarget = options.RandomNegativeControls ??
+                Math.Min(200, Math.Max(20, photos.Count / 5));
             for (int attempt = 0; attempt < controlTarget * 100 &&
                 randomControls < controlTarget; attempt++)
             {
@@ -245,7 +270,11 @@ internal static class RedundancyCandidateExportCommand
                 schemaVersion = 1,
                 protocol = CandidateProtocol,
                 sampleId = "wi0194-" + Digest(string.Join("|",
-                    photos.Select(x => x.RevisionId)) + "|" + options.ModelSha256)[..24],
+                    photos.Select(x => x.RevisionId)) + "|" + options.ModelSha256 +
+                    (options.BorderlinePerSeed > 0 || options.RandomNegativeControls.HasValue
+                        ? "|borderline=" + options.BorderlinePerSeed +
+                          "|controls=" + controlTarget
+                        : string.Empty))[..24],
                 photos = photos.Select(x => new
                 {
                     revisionId = x.RevisionId,
@@ -272,6 +301,10 @@ internal static class RedundancyCandidateExportCommand
                 strictDhashNearCopyLinks,
                 dhashRetrievedPairs = dhashRetrieved.Count,
                 clipRetrievedPairs = clipRetrieved.Count,
+                clipBorderlinePerSeedRequested = options.BorderlinePerSeed,
+                clipBorderlineCandidateAttempts,
+                clipBorderlinePairsAdded,
+                randomNegativeControlsRequested = controlTarget,
                 clipOnlyRetrievedPairs = clipRetrieved.Count(p => !dhashRetrieved.Contains(p)),
                 dhashClipOverlapPairs = clipRetrieved.Count(dhashRetrieved.Contains),
                 clipModelId = options.ModelId,
@@ -326,6 +359,10 @@ internal static class RedundancyCandidateExportCommand
                 aggregate.strictDhashNearCopyLinks,
                 aggregate.dhashRetrievedPairs,
                 aggregate.clipRetrievedPairs,
+                aggregate.clipBorderlinePerSeedRequested,
+                aggregate.clipBorderlineCandidateAttempts,
+                aggregate.clipBorderlinePairsAdded,
+                aggregate.randomNegativeControlsRequested,
                 aggregate.clipOnlyRetrievedPairs,
                 aggregate.dhashClipOverlapPairs,
                 aggregate.clipIndexedPhotosInSample,
@@ -362,6 +399,9 @@ internal static class RedundancyCandidateExportCommand
                 ? DotNormalized(photos[left].ClipVector!, photos[right].ClipVector!) : null;
         pairs.Add((left, right), new Pair(left, right, distance, clip, "retrieved"));
     }
+
+    internal static bool IsBorderlineCandidate(int dhashDistance, double clipCosine) =>
+        dhashDistance > 24 && clipCosine >= 0.62 && clipCosine < 0.78;
 
     internal static double DotNormalized(float[] a, float[] b)
     {
@@ -456,9 +496,15 @@ internal static class RedundancyCandidateExportCommand
                 int.TryParse(raw, out int n) && n >= 1 && n <= max ? n :
                 throw new ArgumentException("Export option is outside its safe bounds: " + key)
                 : fallback;
+        int NonnegativeBound(string key, int fallback, int max) =>
+            arguments.TryGetValue(key, out string? raw) ?
+                int.TryParse(raw, out int n) && n >= 0 && n <= max ? n :
+                throw new ArgumentException("Export option is outside its safe bounds: " + key)
+                : fallback;
         HashSet<string> allowed = new(StringComparer.Ordinal)
         {
             "--output", "--report", "--max-photos", "--neighbors", "--clip-seeds",
+            "--clip-borderline-per-seed", "--random-negative-controls",
             "--clip-model-id", "--clip-model-sha256", "--clip-preprocessing",
             "--proxy-root", "--proxy-profile"
         };
@@ -471,6 +517,8 @@ internal static class RedundancyCandidateExportCommand
             !arguments.ContainsKey("--clip-model-sha256") ||
             !arguments.ContainsKey("--clip-preprocessing")))
             throw new ArgumentException("All CLIP provenance arguments must be supplied together.");
+        if (!clip && NonnegativeBound("--clip-borderline-per-seed", 0, 16) > 0)
+            throw new ArgumentException("Borderline sampling needs a model fingerprint.");
         string? sha = arguments.GetValueOrDefault("--clip-model-sha256");
         if (sha is not null && (sha.Length != 64 || sha.Any(x => !Uri.IsHexDigit(x))))
             throw new ArgumentException("CLIP model digest must be 64 hexadecimal characters.");
@@ -479,6 +527,9 @@ internal static class RedundancyCandidateExportCommand
             Bound("--max-photos", 500, 5000),
             Bound("--neighbors", 8, 20),
             Bound("--clip-seeds", 100, 500),
+            NonnegativeBound("--clip-borderline-per-seed", 0, 16),
+            arguments.ContainsKey("--random-negative-controls")
+                ? Bound("--random-negative-controls", 200, 1000) : null,
             arguments.GetValueOrDefault("--clip-model-id"), sha,
             arguments.GetValueOrDefault("--clip-preprocessing"),
             arguments.GetValueOrDefault("--proxy-root"),
@@ -491,6 +542,7 @@ internal static class RedundancyCandidateExportCommand
         Console.WriteLine("redundancy export --output private/wi0194-neighbour-candidates.json " +
             "--report private/wi0194-neighbour-metrics.json " +
             "[--max-photos 500 | --full-proxy-population] [--neighbors 8] [--clip-seeds 100] " +
+            "[--clip-borderline-per-seed 0..16] [--random-negative-controls 1..1000] " +
             "[--clip-model-id ID --clip-model-sha256 SHA --clip-preprocessing VERSION] " +
             "[--proxy-root PATH --proxy-profile ID]");
     }
