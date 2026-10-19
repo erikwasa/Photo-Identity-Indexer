@@ -143,6 +143,13 @@ internal static class WindowsVideoSuspendedLauncher
 
     private static string Quote(string argument)
     {
+        // Mirror ProcessStartInfo.ArgumentList: do NOT quote simple switch
+        // arguments (notably /d and /c for cmd.exe). Some Windows programs
+        // parse quoted switches differently even though C argv treats them
+        // as equivalent.
+        if (argument.Length > 0 &&
+            argument.All(c => !char.IsWhiteSpace(c) && c != '"'))
+            return argument;
         // Windows CommandLineToArgv-compatible escaping for literal argv.
         StringBuilder result = new("\"");
         int slashes = 0;
