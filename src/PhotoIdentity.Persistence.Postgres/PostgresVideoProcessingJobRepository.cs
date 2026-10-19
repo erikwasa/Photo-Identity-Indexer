@@ -178,7 +178,7 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
     /// </summary>
     public Task<VideoProcessingJobLease?> TryClaimNextAsync(
         VideoProcessingBudget budget, CancellationToken token = default) =>
-        TryClaimNextAsync(budget, photoWorkActive: false, token);
+        TryClaimNextAsync(budget, photoWorkActive: false, token: token);
 
     /// <summary>
     /// The caller flag is an additional veto, never an override of catalogue
