@@ -235,10 +235,10 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
         }
         long available = budget.MaximumTemporaryBytes - reserved;
 
-        Guid id, revisionId;
-        string kind, policy, preset, hash;
-        long sourceBytes, temporaryBytes;
-        int frames;
+        Guid id = Guid.Empty, revisionId = Guid.Empty;
+        string kind = "", policy = "", preset = "", hash = "";
+        long sourceBytes = 0, temporaryBytes = 0;
+        int frames = 0;
         bool found;
         await using (NpgsqlCommand select = connection.CreateCommand())
         {
