@@ -73,7 +73,8 @@ Share back only the aggregate stdout: proxy-backed population, sampled photos, C
 
 ## Next checkpoints
 
-1. Survey the maintained dHash/CLIP extraction and neighbour retrieval paths; instrument model provenance, exact-search complexity, archive-scale storage/query cost and unrelated-date/person candidate recall before adding third-party models.
-2. Export bounded private candidate-neighbour pairs; inspect archive coverage and near-copy group leakage; freeze pair assignment and create a genuinely blinded private review UI.
-3. Review calibration pairs, predeclare conservative model/threshold precision targets and separately authorize one held-out redundancy evaluation.
-4. Decide whether WI-0195 may proceed with a quality-aware collection simulation; do not add production persistence or suppression in M37.
+1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
+2. Measure full-corpus exact-search practicality, dHash leakage link recall, indexed CLIP coverage and true model/checkpoint provenance/size; assess licensed dedicated near-copy or visual-redundancy candidates.
+3. Freeze and inspect the independent WI-0194 leakage-safe blind pair cohort before any human review; start calibration-only review, separately authorize held-out evaluation only after threshold policy freeze.
+4. Report false-positive suppression errors and conservative precision uncertainty. A >=95% observed-precision point estimate alone does not constitute production approval.
+5. Make a no-go/conditional research decision before considering WI-0195. No production collection/Slideshow changes in M37.
