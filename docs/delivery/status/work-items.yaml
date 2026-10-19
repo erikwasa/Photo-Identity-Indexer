@@ -103,12 +103,13 @@ work_items:
 - id: WI-0188
   title: Introduce an opt-in, isolated video processing lane
   milestone: M30
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0188-video-isolated-processing-lane.md
-  blockers:
-  - WI-0150
-  - WI-0151
+  started_at: 2026-10-19
+  last_updated_at: 2026-10-19
+  branch: agent/WI-0188-video-processing-policy-foundation
+  blockers: []
   blocker_notes: []
   evidence: []
 - id: WI-0189
