@@ -112,6 +112,9 @@ acceptance criteria remain unchecked until the complete work item is verified.
 - This is **not** a durable pause switch or a resource-enforcing runner. Worker
   admission, cancellation of an actual child process, kill-tree, safe cleanup,
   independent pause and photo-priority scheduling remain further checkpoints.
+- Operator procedure: [v34 video jobs status/cancel](../../operations/video-jobs-operator-control.md).
+  Since the maintained database is already verified v34, this checkpoint
+  requires no schema rehearsal or restart solely for these CLI commands.
 
 
 ## Completion notes
