@@ -123,11 +123,11 @@ public static class VideoJobsCommandRunner
         if (options.Action is "pause" or "resume" or "stop")
         {
             var control = new PostgresVideoProcessingControlRepository(database);
-            VideoProcessingControlState current = await control.GetAsync(cancellationToken);
+            VideoProcessingControlState currentControl = await control.GetAsync(cancellationToken);
             if (!options.Apply)
             {
                 output.WriteLine("Dry run: no video lane control was changed. Add --apply to request the action.");
-                output.WriteLine(JsonSerializer.Serialize(current,
+                output.WriteLine(JsonSerializer.Serialize(currentControl,
                     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
                 return 0;
             }
