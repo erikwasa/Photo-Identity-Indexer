@@ -52,6 +52,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
+                "video" when args.Length > 1 && args[1] == "scratch-cleanup" =>
+                    await VideoScratchCleanupCommandRunner.RunAsync(
+                        VideoScratchCleanupOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "jobs" =>
                     await VideoJobsCommandRunner.RunAsync(
                         VideoJobsCommandOptions.Parse(args[2], args.Skip(3).ToArray()),
@@ -155,6 +159,12 @@ public static class Program
               catalogue rehearse-v35 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (v34 isolated restore only; video control defaults off)
+
+              video scratch-cleanup --scratch-root DIR
+                                    [--min-age-hours HOURS (24..720)]
+                                    [--max-directories COUNT (1..256)] [--apply]
+                                    (dry-run default; deletes only old,
+                                     strictly owned video scratch directories)
 
               video jobs status --postgres-connection-env NAME --database DB
                                  (read-only; bounded sanitized queue summary
