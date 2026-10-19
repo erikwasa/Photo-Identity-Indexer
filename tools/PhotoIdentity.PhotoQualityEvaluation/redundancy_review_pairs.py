@@ -95,7 +95,7 @@ def _stratum(row, same_content):
     return "borderline"
 
 
-def prepare_inventory(data):
+def prepare_inventory(data, *, include_family_sizes=False):
     """Validate candidate evidence; never read or accept any review fields."""
     _shape(data, {"schemaVersion", "protocol", "sampleId", "photos", "pairs"},
            {"schemaVersion", "protocol", "sampleId", "photos", "pairs"}, "manifest")
@@ -189,6 +189,9 @@ def prepare_inventory(data):
         for ident in members:
             memberships[ident] = assigned
 
+    if include_family_sizes:
+        return inventory, rows, memberships, len(groups), sorted(
+            (len(members) for members in groups.values()), reverse=True)
     return inventory, rows, memberships, len(groups)
 
 
