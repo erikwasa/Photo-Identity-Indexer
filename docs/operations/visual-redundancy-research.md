@@ -37,6 +37,40 @@ The future CLI (NOT an instruction to run it on a real archive before candidate 
 
 Never commit or share private source, pair, score, review or audit exports. Preserve the independent WI-0194 held-out seal and do not tune after viewing held-out pair ratings.
 
+## Checkpoint 2 — bounded current-catalogue candidate export (implementation ready; local run pending)
+
+The new .NET command reads **current photo revisions** with existing durable review proxies from PostgreSQL. It verifies local proxy content hashes, computes the existing OpenCV 64-bit dHash, optionally reuses **exact-version** CLIP vectors already indexed for semantic search, and computes exact similarity neighbours without a date, moment, people, location or folder predicate. It never opens originals, triggers cloud hydration, downloads a model, generates new CLIP embeddings, runs a migration or changes the catalogue.
+
+**Scope limits:** the safe default is **500** proxy-backed revisions, capped at **5,000**; this is only a deterministic archive-spread subset, not representative or archive-wide neighbour recall. Every within-subset dHash pair is examined, including all links with dHash Hamming distance at most four (for leakage protection only). Exact CLIP comparisons scan the indexed sampled corpus only for a bounded number of deterministic seeds. Neither scan proves accuracy or recall outside the sample. CLIP semantic similarity is not visual redundancy ground truth.
+
+Use Windows PowerShell from the repository root, with the *existing* PhotoIdentity PostgreSQL connection and review-proxy root/profile environment settings used for the quality benchmark:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+dotnet run --project tools/PhotoIdentity.PhotoQualityEvaluation -- redundancy export --output private/wi0194-neighbour-candidates.json --report private/wi0194-neighbour-metrics.json --max-photos 500 --neighbors 8
+~~~
+
+The command above intentionally tests dHash without CLIP. To include CLIP, first inspect the existing model ID, model SHA256 and preprocessing version values in the **authoritative** PostgreSQL photo_semantic_embeddings table; do not guess them or use a historical restore. Append all the following options to the same command:
+
+~~~powershell
+--clip-model-id "INDEXED_MODEL_ID" --clip-model-sha256 "EXACT_64_HEX_SHA256" --clip-preprocessing "INDEXED_PREPROCESSING_VERSION" --clip-seeds 100
+~~~
+
+All three provenance options must be provided together. CLIP indexing coverage in the sampled cohort is reported explicitly; zero coverage is not a model accuracy result. Existing CLIP generation timings and actual checkpoint size/license still require separate evidence before candidate selection.
+
+Two **new, exclusively created** JSON files under private/ are produced: a candidate-pair manifest compatible with the checkpoint-1 blind sampler, and an aggregate measurements report. Outputs never overwrite existing files. The stdout report contains only aggregate counts, scan comparisons and timing, never identifiers or similarity values. The exported private pair evidence is **not** a human-reviewed set and **not** a frozen hold-out; inspect population/coverage and potential near-copy leakage before using the blind sampler. Never commit private exports.
+
+### Local verification
+
+~~~powershell
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --filter FullyQualifiedName~RedundancyCandidateExportTests
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+~~~
+
+Share back only the aggregate stdout: proxy-backed population, sampled photos, CLIP coverage, scan counts, candidate-pair counts, timings, and whether known near-copies from different dates appear. Do not share paths, photo IDs, SQL credentials, full source manifests or per-pair scores. Real archive results have **not** been obtained in this checkpoint. No thresholds or production suppression authorized.
+
 ## Next checkpoints
 
 1. Survey the maintained dHash/CLIP extraction and neighbour retrieval paths; instrument model provenance, exact-search complexity, archive-scale storage/query cost and unrelated-date/person candidate recall before adding third-party models.
