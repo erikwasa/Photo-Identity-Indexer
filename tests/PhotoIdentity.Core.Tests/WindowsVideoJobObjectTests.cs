@@ -43,6 +43,43 @@ public sealed class WindowsVideoJobObjectTests
     }
 
     [Fact]
+    public async Task Suspended_limited_tool_runs_only_after_job_assignment()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = Path.Combine(Path.GetTempPath(),
+            "photoidentity-suspended-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        try
+        {
+            string cmd = Path.Combine(Environment.GetFolderPath(
+                Environment.SpecialFolder.System), "cmd.exe");
+            await using FileStream input = File.OpenRead(cmd);
+            string hash = Convert.ToHexString(
+                await System.Security.Cryptography.SHA256.HashDataAsync(input))
+                .ToLowerInvariant();
+            var supervisor = new VideoToolProcessSupervisor();
+            VideoToolExecutionBudget limit = new(
+                TimeSpan.FromSeconds(7), 1024 * 1024,
+                WindowsJobLimits: new WindowsVideoJobLimits(512, 2, 25),
+                InspectionInterval: TimeSpan.FromMilliseconds(100));
+
+            VideoToolExecutionResult success = await supervisor.RunAsync(
+                cmd, hash, scratch, _ => ["/d", "/c", "exit /b 0"], limit);
+            Assert.Equal(0, success.ExitCode);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+
+            using CancellationTokenSource stop =
+                new(TimeSpan.FromMilliseconds(450));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                supervisor.RunAsync(cmd, hash, scratch,
+                    _ => ["/d", "/c", "ping -n 15 127.0.0.1 >NUL"],
+                    limit, stop.Token));
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
+    [Fact]
     public async Task Windows_job_close_terminates_a_long_running_process()
     {
         if (!OperatingSystem.IsWindows()) return;
