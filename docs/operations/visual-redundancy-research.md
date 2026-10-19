@@ -186,6 +186,37 @@ The full export will again read and validate **every existing local proxy** befo
 
 Even if quotas improve, **do not run the blind sampler, inspect held-out review labels, freeze a cohort or calibrate suppression thresholds**. Genuine exact-copy controls remain absent; never fabricate them. Additional independent leakage and sampling-protocol review is required.
 
+
+## Checkpoint 7 — held-out risk quarantine sensitivity (aggregate-only, no review)
+
+The maintainer's merged checkpoint-6 enriched run succeeded: 27,050/27,050 current proxies and compatible indexed CLIP vectors; 164,381 retrieved pairs, 800 screened random controls, 1,552 new measured borderline pairs. The original strict dHash<=4 photo-disjoint families and candidate leakage warnings are unchanged. The held-out **borderline** category increased **19 to 129** (quota 60), and screened **random-negative** candidates increased **10 to 51** (quota 35). Genuine exact-content copies are absent; **no source-archive exact-copy controls are available**. Candidate counts are not human redundancy labels.
+
+The remaining question is whether keeping a held-out cohort isolated from *observed* cross-partition near-copy risk candidates would leave enough unlabelled review cases. `redundancy_heldout_quarantine_preflight.py` compares four read-only sensitivity scenarios on the **same unchanged existing dHash<=4 split**:
+
+1. No held-out quarantine (baseline).
+2. Exclude held-out photos incident to observed cross-partition dHash5–8 candidate pairs.
+3. Exclude held-out photos incident to observed cross-partition dHash5–12 candidate pairs.
+4. Exclude held-out photos incident to observed dHash5–12 **or CLIP cosine >=0.90** cross-partition candidate pairs.
+
+The tool does **not** write a manifest or alter/approve any review set. Output is aggregate counts: held-out photos excluded/retained, within-held-out candidate pair supply and per-bucket eligibility/shortfalls, and risk-edge counts. No actual cross-boundary photo identities, paths or pair scores are printed. The cutoffs are **research-only exclusion sensitivities**, not proven duplicate cutoffs, a validated leakage-safe protocol, or suppression thresholds. High CLIP cosine often indicates semantic overlap rather than copy identity; selectively removing those photos can create held-out selection bias. Missing candidate edges remain unknown, as 100 CLIP query seeds cannot establish archive recall.
+
+After merging the checkpoint-7 PR, run from repository root with the same private **enriched candidate manifest** (no proxy reads, no database access):
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python -m unittest discover `
+  -s tools/PhotoIdentity.PhotoQualityEvaluation `
+  -p test_redundancy_heldout_quarantine_preflight.py -v
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/redundancy_heldout_quarantine_preflight.py `
+  --input private/wi0194-full-enriched-candidates.json
+~~~
+
+**Share only the aggregate JSON stdout**. Never share private manifests, photo/revision identifiers, scores or archive credentials. Stop if tests fail. This does not freeze a cohort or collect human review; do not run `redundancy_review_pairs.py`, tune a model, assign held-out labels, or change production suppression. Preserve the private earlier manifests for audit/reproducibility. WI-0194 remains in progress, WI-0195 blocked.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
