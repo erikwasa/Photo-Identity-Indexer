@@ -5,13 +5,16 @@ namespace PhotoIdentity.Core.Processing;
 
 /// <summary>
 /// Process supervision budget. This is NOT an OS sandbox or CPU/GPU/memory
-/// quota: the future worker must separately enforce those and authorize media.
+/// quota by default. Explicit WindowsJobLimits opts into native memory/CPU/
+/// process caps; a later worker must still enforce OS startup containment,
+/// disk/IO/GPU limits and independent authorization of source media.
 /// </summary>
 public sealed record VideoToolExecutionBudget(
     TimeSpan MaximumWallTime,
     long MaximumTemporaryBytes,
     int MaximumTemporaryEntries = 1024,
-    TimeSpan? InspectionInterval = null)
+    TimeSpan? InspectionInterval = null,
+    WindowsVideoJobLimits? WindowsJobLimits = null)
 {
     public void Validate()
     {
@@ -23,6 +26,7 @@ public sealed record VideoToolExecutionBudget(
              (interval < TimeSpan.FromMilliseconds(50) || interval > TimeSpan.FromSeconds(1))))
             throw new ArgumentOutOfRangeException(nameof(VideoToolExecutionBudget),
                 "Local video tool execution requires bounded time and scratch-space estimates.");
+        WindowsJobLimits?.Validate();
     }
 }
 
@@ -38,8 +42,11 @@ public sealed record VideoToolExecutionResult(int ExitCode, TimeSpan Elapsed);
 /// or schedule a job. Callers must use a fixed, audited FFmpeg argument profile.
 ///
 /// Scratch polling is best-effort: an OS disk quota is still required to bound
-/// transient allocation. Kill(entireProcessTree:true) is best effort, not a
-/// Windows job-object resource limit.
+/// transient allocation. WindowsJobLimits, when explicitly supplied, configures
+/// a Windows Job Object for memory/CPU/process caps and kill-on-close. Because
+/// Process.Start precedes job assignment, the short startup gap is NOT fully
+/// contained. No production worker may process untrusted media until a
+/// suspended/atomic launch path and disk/IO caps have been reviewed.
 /// </summary>
 public sealed class VideoToolProcessSupervisor
 {
@@ -85,6 +92,8 @@ public sealed class VideoToolProcessSupervisor
         cancellationToken.ThrowIfCancellationRequested();
         string workspace = Path.Combine(scratchRoot, "video-tool-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
+        WindowsVideoJobObject? resourceJob = null;
+        bool resourceJobAssigned = false;
         bool processStopped = true;
         Task? stdoutDrain = null;
         Task? stderrDrain = null;
@@ -131,10 +140,22 @@ public sealed class VideoToolProcessSupervisor
             start.Environment["TMPDIR"] = workspace;
             foreach (string argument in arguments) start.ArgumentList.Add(argument);
 
+            // Resource constraints must be configured successfully before
+            // starting the process. On failure, refuse execution and clean scratch.
+            if (budget.WindowsJobLimits is { } resourceLimits)
+                resourceJob = WindowsVideoJobObject.Create(resourceLimits);
+
             process.StartInfo = start;
             if (!process.Start())
                 throw new InvalidOperationException("Approved video tool could not start.");
             processStopped = false;
+            // Assignment is intentionally fail-closed; future production startup
+            // must launch suspended to eliminate this transient uncontained gap.
+            if (resourceJob is not null)
+            {
+                resourceJob.Assign(process);
+                resourceJobAssigned = true;
+            }
 
             // Streaming discard prevents unbounded metadata, path or stderr
             // accumulation and prevents a child from blocking on full pipes.
@@ -162,9 +183,16 @@ public sealed class VideoToolProcessSupervisor
         }
         finally
         {
+            // Closing the last job handle kills any remaining descendants,
+            // including grandchildren which Process.WaitForExit cannot observe.
+            resourceJob?.Dispose();
             if (!processStopped)
             {
-                if (!process.HasExited)
+                // Closing an assigned Job Object already terminates its
+                // process tree. Calling Kill again can race the kernel's job
+                // teardown; only use the old explicit fallback when no job
+                // successfully contained the started process.
+                if (!process.HasExited && !resourceJobAssigned)
                 {
                     try { process.Kill(entireProcessTree: true); }
                     catch (InvalidOperationException) { /* exited concurrently */ }
