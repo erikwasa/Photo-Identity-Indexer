@@ -213,7 +213,8 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
             await recover.ExecuteNonQueryAsync(token);
         }
 
-        long available;
+        long reserved;
+        int active;
         await using (NpgsqlCommand count = connection.CreateCommand())
         {
             count.Transaction = transaction;
@@ -223,18 +224,22 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 """;
             await using NpgsqlDataReader reader = await count.ExecuteReaderAsync(token);
             await reader.ReadAsync(token);
-            int active = reader.GetInt32(0);
-            long reserved = reader.GetInt64(1);
-            if (active >= budget.MaximumConcurrentJobs ||
-                reserved >= budget.MaximumTemporaryBytes)
-                return null;
-            available = budget.MaximumTemporaryBytes - reserved;
+            active = reader.GetInt32(0);
+            reserved = reader.GetInt64(1);
         }
+        if (active >= budget.MaximumConcurrentJobs ||
+            reserved >= budget.MaximumTemporaryBytes)
+        {
+            await transaction.CommitAsync(token);
+            return null;
+        }
+        long available = budget.MaximumTemporaryBytes - reserved;
 
         Guid id, revisionId;
         string kind, policy, preset, hash;
         long sourceBytes, temporaryBytes;
         int frames;
+        bool found;
         await using (NpgsqlCommand select = connection.CreateCommand())
         {
             select.Transaction = transaction;
@@ -271,16 +276,24 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
             select.Parameters.AddWithValue("remaining", available);
             select.Parameters.AddWithValue("max_frames", budget.MaximumExtractedFrames);
             await using NpgsqlDataReader reader = await select.ExecuteReaderAsync(token);
-            if (!await reader.ReadAsync(token)) return null;
-            id = reader.GetGuid(0);
-            revisionId = reader.GetGuid(1);
-            kind = reader.GetString(2);
-            policy = reader.GetString(3);
-            preset = reader.GetString(4);
-            hash = reader.GetString(5);
-            sourceBytes = reader.GetInt64(6);
-            temporaryBytes = reader.GetInt64(7);
-            frames = reader.GetInt32(8);
+            found = await reader.ReadAsync(token);
+            if (found)
+            {
+                id = reader.GetGuid(0);
+                revisionId = reader.GetGuid(1);
+                kind = reader.GetString(2);
+                policy = reader.GetString(3);
+                preset = reader.GetString(4);
+                hash = reader.GetString(5);
+                sourceBytes = reader.GetInt64(6);
+                temporaryBytes = reader.GetInt64(7);
+                frames = reader.GetInt32(8);
+            }
+        }
+        if (!found)
+        {
+            await transaction.CommitAsync(token);
+            return null;
         }
 
         Guid lease = Guid.NewGuid();
