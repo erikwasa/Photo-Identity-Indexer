@@ -72,7 +72,12 @@ def load_session(blind_path, mapping_path, labels_path):
         raise ValueError("Proxy mapping does not cover exactly the blind-pilot photos")
 
     if labels_path.exists():
-        received = validate_labels(load_json(labels_path), pilot_sha, ids)
+        saved = load_json(labels_path)
+        validate_labels(saved, pilot_sha, ids)
+        received = {
+            row["pairId"]: {"label": row["label"], "notes": row["notes"]}
+            for row in saved["reviews"]
+        }
     else:
         received = {}
     pair_ids = [x["pairId"] for x in blind["pairs"]]
@@ -139,9 +144,10 @@ def public_state(session, index):
     pair_id = pairs[index]["pairId"]
     known = session["labels"].get(pair_id)
     next_unrated = next(
-        (pos for offset in range(1, len(pairs)+1)
-         if (pos := (index+offset) % len(pairs)) is not None
-         and pairs[pos]["pairId"] not in session["labels"]), None)
+        ((index + offset) % len(pairs)
+         for offset in range(1, len(pairs) + 1)
+         if pairs[(index + offset) % len(pairs)]["pairId"]
+         not in session["labels"]), None)
     return {
         "index": index, "total": len(pairs),
         "reviewed": len(session["labels"]),
