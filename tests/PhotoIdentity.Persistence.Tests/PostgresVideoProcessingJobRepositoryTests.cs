@@ -207,6 +207,7 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
 
             // New revision is higher-priority than queued historical work.
             Guid staleJob = await queue.EnqueueAsync(Identity("stale"), budget, candidate);
+            Guid newestRevision = Guid.NewGuid();
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand revised = connection.CreateCommand())
             {
@@ -215,7 +216,7 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
                                                 observed_at_utc,media_type,media_kind)
                     VALUES (@id,@asset,repeat('d',64),5000,@new_time,'video/quicktime','video');
                     """;
-                revised.Parameters.AddWithValue("id", Guid.NewGuid());
+                revised.Parameters.AddWithValue("id", newestRevision);
                 revised.Parameters.AddWithValue("asset", videoAsset);
                 revised.Parameters.AddWithValue("new_time", now.AddMinutes(1));
                 await revised.ExecuteNonQueryAsync();
@@ -225,8 +226,31 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 queue.EnqueueAsync(Identity("another"), budget, candidate));
 
+            // A running lease must cease to be usable immediately when its
+            // source copy is excluded, even if the lease has not expired.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand supported = connection.CreateCommand())
+            {
+                supported.CommandText = """
+                    INSERT INTO video_revision_metadata(asset_revision_id,inspection_status,
+                        duration_seconds,inspected_at_utc,tool_sha256,inspection_profile_id)
+                    VALUES (@revision,'supported',6,@now,repeat('c',64),'fixture-video-v1');
+                    """;
+                supported.Parameters.AddWithValue("revision", newestRevision);
+                supported.Parameters.AddWithValue("now", now.AddMinutes(1));
+                await supported.ExecuteNonQueryAsync();
+            }
+            Guid newestJob = await queue.EnqueueAsync(
+                Identity("exclusion-race", AssetRevisionId.From(newestRevision)), budget, candidate);
+            VideoProcessingJobLease excludedLease = Assert.IsType<VideoProcessingJobLease>(
+                await queue.TryClaimNextAsync(budget, false));
+            Assert.Equal(newestJob, excludedLease.Id);
+
             var exclusions = new PostgresSourceCopyExclusionRepository(database);
             await exclusions.ExcludeAsync(SourceId.From(source), "clip.mov", now.AddMinutes(2));
+            Assert.False(await queue.TryHeartbeatAsync(newestJob, excludedLease.LeaseToken, 25));
+            Assert.False(await queue.TryFinishAttemptAsync(
+                newestJob, excludedLease.LeaseToken, succeeded: true, retryable: false));
             Assert.Null(await queue.GetAsync(staleJob));
             Assert.Null(await queue.TryClaimNextAsync(budget, false));
             Assert.Empty(await inspector.ListRecentAsync());
