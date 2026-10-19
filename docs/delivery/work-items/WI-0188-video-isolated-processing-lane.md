@@ -222,6 +222,30 @@ checkpoint. Continue development after CI and PR review.
   file/database publication and mixed-load measurements remain outstanding.
   [Preemption boundaries](../../operations/video-execution-preemption.md).
 
+### Checkpoint 8 — native Windows resource-envelope foundations (2026-10-19)
+
+- Added the explicitly opt-in `WindowsVideoJobObject` controller with
+  kernel-enforced job memory (128–4096 MiB), active-process (1–8), CPU-rate
+  hard-cap (1–50%) and kill-on-close. A `WindowsVideoJobLimits` profile
+  validates the requested envelope and fails closed when native setup or
+  assignment is unsupported.
+- The existing `VideoToolExecutionBudget` accepts optional `WindowsJobLimits`;
+  when specified, the supervisor configures the OS job before process launch,
+  assigns the child, and closes the job on every exit/cancellation path.
+  Existing callers without an explicit profile remain unchanged, and no
+  background worker, FFmpeg or video job execution is enabled.
+- Windows Core tests cover profile bounds, native job-close termination and
+  opt-in supervised cancellation/cleanup; non-Windows rejects a Windows-only
+  job profile rather than silently relaxing it.
+- **Safety limitation:** `Process.Start` currently runs before job assignment.
+  This short uncontrolled interval **blocks production activation** until an
+  atomically job-assigned or suspended launch is implemented and verified.
+  Hard disk/IO, GPU, low-privilege/source-access isolation, publication and
+  mixed-load performance tests are still required. See
+  [Windows resource envelope](../../operations/video-worker-windows-resource-envelope.md).
+- No schema changes; previously merged v35 still requires an isolated
+  v34 → v35 rehearsal before the maintainer starts v35 code.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -241,7 +265,8 @@ checkpoint. Continue development after CI and PR review.
 - Checkpoint 5: merged PR #609 and photo-priority claim tests passed CI.
 - Checkpoint 6: merged PR #611, v35 durable stop controls; the local
   backup and isolated v34 → v35 rehearsal gate is still pending.
-- Checkpoint 7: explicit execution safety polling / subprocess preemption
-  bridge and PostgreSQL lease probe; no new migration or active worker.
+- Checkpoint 7: merged PR #613; fail-closed execution preemption bridge.
+- Checkpoint 8: optional native Windows resource limits with production
+  activation blocked on the suspended process launch boundary.
 - WI-0188 still requires a real resource-controlled worker and Windows
   mixed-photo/video verification before acceptance.
