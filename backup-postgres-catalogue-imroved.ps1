@@ -13,7 +13,7 @@
 
 .EXAMPLE
     .\backup-postgres-catalogue-improved.ps1 `
-        -DatabaseName 'photoidentity_rehearsal_20260910_214641_a808bde' `
+        -DatabaseName 'photoidentity_main' `
         -CopyToOneDrive
 
 .EXAMPLE
@@ -21,7 +21,7 @@
 
 .EXAMPLE
     .\backup-postgres-catalogue-improved.ps1 `
-        -DatabaseName 'photoidentity_rehearsal_20260910_214641_a808bde' `
+        -DatabaseName 'photoidentity_main' `
         -OutputPath 'D:\Backups\photoidentity.dump' -CopyToOneDrive
 #>
 [CmdletBinding()]
