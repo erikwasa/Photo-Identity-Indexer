@@ -47,7 +47,7 @@ public sealed class PostgresVideoProcessingQueueInspector(PostgresCatalogueDatab
                                  AND job.leased_until_utc <= now()),
                 COALESCE(sum(job.reserved_temporary_bytes)
                     FILTER (WHERE job.status = 'running'), 0)::bigint
-            """ + VisibleVideoJobs;
+            """ + "\n" + VisibleVideoJobs;
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
             throw new InvalidOperationException("Video queue summary query did not return a row.");
@@ -67,7 +67,7 @@ public sealed class PostgresVideoProcessingQueueInspector(PostgresCatalogueDatab
         command.CommandText = """
             SELECT job.id, job.status, job.attempt_count, job.progress_percent,
                    job.cancellation_requested_at_utc IS NOT NULL
-            """ + VisibleVideoJobs + """
+            """ + "\n" + VisibleVideoJobs + "\n" + """
             ORDER BY job.requested_at_utc DESC, job.id DESC
             LIMIT @maximum;
             """;
