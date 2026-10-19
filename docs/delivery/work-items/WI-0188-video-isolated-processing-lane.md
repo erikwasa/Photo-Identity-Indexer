@@ -165,6 +165,37 @@ checkpoint. Continue development after CI and PR review.
   OneDrive hydration or user configuration change occurs in this PR.
   [Operator note](../../operations/video-jobs-photo-priority.md).
 
+### Checkpoint 6 — durable video pause/stop intent, schema v35 (2026-10-19)
+
+- New append-only schema v35 adds a **single independent video control row**
+  `video_processing_control`, with `enabled=false`, `paused=true` and a
+  monotonically increasing generation from installation. Existing photo tables,
+  video jobs and other catalogue tables remain untouched by the migration.
+- `PostgresVideoProcessingControlRepository` provides read-only state,
+  explicit pause/resume intent, and a single-transaction stop that disables
+  and pauses the lane, cancels queued video jobs, and marks running jobs for
+  cancellation. Resume **never enables processing**; no worker/enable command
+  is registered. All operator control writes are dry runs unless `--apply`.
+- Video claim acquires a shared control-row lock inside its existing serialized
+  transaction so stop/pause and lease admission cannot overtake each other.
+  Lease heartbeat and completion also reject disabled/paused control state.
+  Operator status includes sanitized control state and generation.
+- Disposable PostgreSQL tests assert default-off, stop/pause/resume/lease
+  behavior, expired-cancel recovery and photo-table isolation. CLI tests
+  cover dry-run/application and required options. Guarded `rehearse-v35`
+  requires a verified local isolated v34 restore, checks unchanged original
+  table counts, exactly one v35 migration and control disabled/paused.
+- **NEW MAINTAINED DATABASE SAFETY GATE:** Do not start the newer v35 app
+  against the currently accepted maintained v34 catalogue before a NEW
+  authoritative backup and isolated restored v34 → v35 rehearsal succeed.
+  The maintainer may defer this work until subsequent WI-0188 development
+  checkpoints, but **not past the first v35 app startup**. Runbook:
+  [v35 operator control and rehearsal](../../operations/video-processing-control-v35.md).
+- No heavy background video worker, FFmpeg adapter, filesystem publication,
+  automatic queueing, OneDrive hydration or hard process quotas are enabled.
+  Continued acceptance requires source fencing, kill-on-priority worker
+  preemption, hard resource controls and maintained Windows mixed-load tests.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -181,5 +212,6 @@ checkpoint. Continue development after CI and PR review.
 - Checkpoint 4: Windows process-supervisor and PostgreSQL lease fencing tests
   run in PR CI; no schema change or runtime processing activation.
 - Checkpoint 4: merged PR #607 after corrected Windows cleanup tests passed.
-- Checkpoint 5: photo-priority claim tests in PR CI; full video worker
-  and Windows mixed-load acceptance still required.
+- Checkpoint 5: merged PR #609 and photo-priority claim tests passed CI.
+- Checkpoint 6: schema v35 durable stop controls with a new isolated rehearsal
+  safety gate before maintained-host adoption. Full WI-0188 remains open.
