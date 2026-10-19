@@ -27,7 +27,7 @@ internal static class WindowsVideoSuspendedLauncher
 
     public static Process Start(
         WindowsVideoJobObject job, string executable, string directory,
-        IReadOnlyList<string> arguments, IReadOnlyDictionary<string, string> environment,
+        IReadOnlyList<string> arguments, IDictionary<string, string?> environment,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(job);
@@ -41,7 +41,6 @@ internal static class WindowsVideoSuspendedLauncher
         IntPtr nativeEnvironment = Marshal.StringToHGlobalUni(environmentBlock);
         ProcessInformation native = default;
         Process? owned = null;
-        bool resumed = false;
         SecurityAttributes inherit = new()
         {
             Length = (uint)Marshal.SizeOf<SecurityAttributes>(),
@@ -81,7 +80,6 @@ internal static class WindowsVideoSuspendedLauncher
             if (ResumeThread(native.Thread) == uint.MaxValue)
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Bounded video tool could not resume.");
-            resumed = true;
             Process result = owned;
             owned = null;
             return result;
