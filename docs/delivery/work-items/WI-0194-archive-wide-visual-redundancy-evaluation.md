@@ -127,6 +127,14 @@ Add `redundancy_partition_sensitivity.py`, an offline **aggregate-only read-only
 
 **Gate:** Operator runs only the synthetic tests and private aggregate diagnostic; preserve the untouched private candidate manifest, and independently decide how to handle exact-copy controls, held-out borderline/negative shortages and unlinked potential near copies before any review freeze. No held-out redundancy labels have been read. WI-0195 remains blocked; production semantics unchanged. See the WI-0194 operations runbook.
 
+## Checkpoint 6 — opt-in mid-similarity candidate supply (2026-10-19; local pending)
+
+Maintainer checkpoint-5 sensitivity demonstrated **NO-GO for freeze**: dHash<=4 baseline largest linked family 37, <=8 created a 305-photo component, and <=12 created a 3,368-photo component (12.45% of current proxy-backed photos). Neither broader family isolation rule fixes missing true exact-copy controls (0), held-out borderline (19/60 under <=4 or <=8; 15/60 under <=12), or held-out screened random controls (10/35). Cross-partition risk links remain potential leakage indicators, not human redundancy labels. Keep <=4 only as an unfrozen research baseline; reject <=12 as a grouping strategy.
+
+Extend the opt-in research-only evidence exporter with two strictly bounded controls. `--clip-borderline-per-seed` (default 0, max 16) additionally retrieves deterministic candidates from existing CLIP vectors in the exploratory cosine [0.62,0.78) range with exact existing dHash>24; these are mid-similarity *review candidates*, not ground truth, and cannot add dHash<=4 group edges. `--random-negative-controls` (default previous rule, max 1,000) expands screened potential negative controls without treating them as validated negatives; local trial requests 800. No prior private manifests are overwritten. Existing CLI defaults, exact model provenance, current-proxy-only reads, full-population guards, no originals/cloud hydration/catalogue mutation or production changes remain intact.
+
+After PR merge, operator runs synthetic tests, one explicitly opted-in full-proxy candidate export to *new* private files, then the existing aggregate-only `redundancy_candidate_preflight.py` on the new candidate manifest. Only share aggregate stdout; do not inspect pair-level labels, freeze the cohort, infer precision or rerun consumed WI-0193 human-quality labels. True exact-copy controls are absent; never invent them. This is candidate-supply investigation, not human-review authorization. WI-0195 stays blocked.
+
 ## Verification requirements
 
 Reproducible neighbour generation, deterministic review-set export, maintainer pair/group review and privacy-safe aggregate threshold/model evidence.
