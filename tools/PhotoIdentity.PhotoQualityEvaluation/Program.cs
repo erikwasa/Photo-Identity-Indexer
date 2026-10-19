@@ -59,6 +59,13 @@ internal static class Program
 
         if (args.Length > 1 &&
             string.Equals(args[0], "redundancy", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(args[1], "pilot-proxies", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RedundancyPilotProxyMapCommand.RunAsync(args[2..]);
+        }
+
+        if (args.Length > 1 &&
+            string.Equals(args[0], "redundancy", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(args[1], "export", StringComparison.OrdinalIgnoreCase))
         {
             return await RedundancyCandidateExportCommand.RunAsync(args[2..]);
