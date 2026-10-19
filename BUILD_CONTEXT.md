@@ -4,6 +4,22 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 6 (2026-10-19):** 27,050-photo full-archive
+dHash/CLIP research proved exact offline retrieval practical.
+Maintainer's private sensitivity study found dHash<=8 family
+of 305 photos and <=12 family of 3,368, with held-out
+borderline 19/60 or 15/60 and screened controls 10/35.
+Both partitions have zero genuine exact-copy controls.
+No-go for leakage-family expansion or human cohort freeze.
+Opt-in local CLI candidate supply adds 16 deterministic
+measured CLIP borderline candidates per seed (dHash>24,
+cosine [.62,.78)) and up to 800 screened random controls;
+defaults and private schema unchanged. After PR merge
+operator runs synthetic .NET tests, private *new* full-proxy
+enriched manifest export, then aggregate-only preflight.
+No held-out label access, new models, ANN, collection
+changes or production suppression. WI-0195 blocked.
+
 **WI-0194 checkpoint 5 (2026-10-19):** full-proxy archive exact
 dHash is technically viable offline. Maintainer ran the private
 candidate preflight with 4/4 synthetic tests passing: 27,050
