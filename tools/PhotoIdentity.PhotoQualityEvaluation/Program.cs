@@ -57,6 +57,13 @@ internal static class Program
             return await PhotoQualityBenchmarkCommand.RunAsync(args[1..]);
         }
 
+        if (args.Length > 1 &&
+            string.Equals(args[0], "redundancy", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(args[1], "export", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RedundancyCandidateExportCommand.RunAsync(args[2..]);
+        }
+
         try
         {
             Options options = Parse(args);
