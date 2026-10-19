@@ -16,5 +16,12 @@ public sealed partial class PostgresCatalogueDatabase
 
         INSERT INTO video_processing_control(singleton_id, enabled, paused)
         VALUES (1, false, true);
+
+        -- A running lease belongs to the exact operator generation in
+        -- which it was claimed. Pause/resume/stop must invalidate it even
+        -- if a later resume makes admission possible again.
+        ALTER TABLE video_processing_jobs
+        ADD COLUMN control_generation bigint NOT NULL DEFAULT 0
+            CHECK (control_generation >= 0);
         """;
 }
