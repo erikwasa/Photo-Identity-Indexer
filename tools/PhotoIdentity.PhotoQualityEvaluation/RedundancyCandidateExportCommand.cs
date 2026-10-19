@@ -35,6 +35,7 @@ internal static class RedundancyCandidateExportCommand
 
     private sealed record Options(
         string Output, string Report, int Limit, int Neighbors, int ClipSeeds,
+        int BorderlinePerSeed, int? RandomNegativeControls,
         string? ModelId, string? ModelSha256, string? PreprocessingVersion,
         string? ProxyRoot, string? ProxyProfile, bool FullProxyPopulation);
 
@@ -219,7 +220,8 @@ internal static class RedundancyCandidateExportCommand
             Stopwatch negativesWatch = Stopwatch.StartNew();
             int randomControls = 0;
             Random random = new(194);
-            int controlTarget = Math.Min(200, Math.Max(20, photos.Count / 5));
+            int controlTarget = options.RandomNegativeControls ??
+                Math.Min(200, Math.Max(20, photos.Count / 5));
             for (int attempt = 0; attempt < controlTarget * 100 &&
                 randomControls < controlTarget; attempt++)
             {
@@ -456,9 +458,15 @@ internal static class RedundancyCandidateExportCommand
                 int.TryParse(raw, out int n) && n >= 1 && n <= max ? n :
                 throw new ArgumentException("Export option is outside its safe bounds: " + key)
                 : fallback;
+        int NonnegativeBound(string key, int fallback, int max) =>
+            arguments.TryGetValue(key, out string? raw) ?
+                int.TryParse(raw, out int n) && n >= 0 && n <= max ? n :
+                throw new ArgumentException("Export option is outside its safe bounds: " + key)
+                : fallback;
         HashSet<string> allowed = new(StringComparer.Ordinal)
         {
             "--output", "--report", "--max-photos", "--neighbors", "--clip-seeds",
+            "--clip-borderline-per-seed", "--random-negative-controls",
             "--clip-model-id", "--clip-model-sha256", "--clip-preprocessing",
             "--proxy-root", "--proxy-profile"
         };
@@ -471,6 +479,8 @@ internal static class RedundancyCandidateExportCommand
             !arguments.ContainsKey("--clip-model-sha256") ||
             !arguments.ContainsKey("--clip-preprocessing")))
             throw new ArgumentException("All CLIP provenance arguments must be supplied together.");
+        if (!clip && NonnegativeBound("--clip-borderline-per-seed", 0, 16) > 0)
+            throw new ArgumentException("Borderline sampling needs a model fingerprint.");
         string? sha = arguments.GetValueOrDefault("--clip-model-sha256");
         if (sha is not null && (sha.Length != 64 || sha.Any(x => !Uri.IsHexDigit(x))))
             throw new ArgumentException("CLIP model digest must be 64 hexadecimal characters.");
@@ -479,6 +489,9 @@ internal static class RedundancyCandidateExportCommand
             Bound("--max-photos", 500, 5000),
             Bound("--neighbors", 8, 20),
             Bound("--clip-seeds", 100, 500),
+            NonnegativeBound("--clip-borderline-per-seed", 0, 16),
+            arguments.ContainsKey("--random-negative-controls")
+                ? Bound("--random-negative-controls", 200, 1000) : null,
             arguments.GetValueOrDefault("--clip-model-id"), sha,
             arguments.GetValueOrDefault("--clip-preprocessing"),
             arguments.GetValueOrDefault("--proxy-root"),
@@ -491,6 +504,7 @@ internal static class RedundancyCandidateExportCommand
         Console.WriteLine("redundancy export --output private/wi0194-neighbour-candidates.json " +
             "--report private/wi0194-neighbour-metrics.json " +
             "[--max-photos 500 | --full-proxy-population] [--neighbors 8] [--clip-seeds 100] " +
+            "[--clip-borderline-per-seed 0..16] [--random-negative-controls 1..1000] " +
             "[--clip-model-id ID --clip-model-sha256 SHA --clip-preprocessing VERSION] " +
             "[--proxy-root PATH --proxy-profile ID]");
     }
