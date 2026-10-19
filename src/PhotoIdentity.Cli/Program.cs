@@ -43,7 +43,11 @@ public static class Program
                 "catalogue" when args.Length > 1 && args[1] == "rehearse-v33" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
-                        output, cancellationToken),
+                        output, cancellationToken, expectedRestoredSchemaVersion: 32),
+                "catalogue" when args.Length > 1 && args[1] == "rehearse-v34" =>
+                    await VideoSchemaRehearsalCommandRunner.RunAsync(
+                        VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken, expectedRestoredSchemaVersion: 33),
                 "video" when args.Length > 1 && args[1] == "posters-cleanup" =>
                     await VideoPosterCleanupCommandRunner.RunAsync(
                         VideoPosterCleanupOptions.Parse(args.Skip(2).ToArray()),
@@ -133,8 +137,12 @@ public static class Program
 
               catalogue rehearse-v33 --postgres-connection-env NAME
                                      --restore-report PATH
-                          (requires successful isolated restore-verification report;
-                           applies v33 ONLY to its matched local photoidentity_restore_* database)
+                          (legacy v32 restore; applies v33 and the current v34)
+              catalogue rehearse-v34 --postgres-connection-env NAME
+                                     --restore-report PATH
+                          (verified v33 restore only; applies v34 job-queue schema)
+                          (both commands require a successful restore report and
+                           modify ONLY its matched local photoidentity_restore_* database)
 
               video ingest --enable-video --source DIR --ffprobe ABSOLUTE_EXE
                            [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
