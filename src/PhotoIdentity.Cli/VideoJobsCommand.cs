@@ -96,11 +96,15 @@ public static class VideoJobsCommandRunner
                 await inspector.GetOverviewAsync(cancellationToken);
             IReadOnlyList<VideoProcessingJobOperatorRow> recent =
                 await inspector.ListRecentAsync(20, cancellationToken);
+            VideoPhotoPrioritySnapshot photoPriority =
+                await new PostgresVideoPhotoPriorityProbe(database)
+                    .GetAsync(cancellationToken);
             output.WriteLine(JsonSerializer.Serialize(new
             {
                 protocol = "wi0188-video-jobs-operator-status-v1",
                 schemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion,
                 executionEnabled = false, // no background worker is registered
+                photoPriority,
                 overview, recent
             }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
             return 0;
