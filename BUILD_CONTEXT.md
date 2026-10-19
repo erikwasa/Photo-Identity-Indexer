@@ -4,6 +4,28 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**M37 WI-0194 bundled phase (2026-10-19):** Maintainer
+requested an end to repeated tiny-PR + one-command verification
+cycles. M37 WI-0192/0193 are complete; WI-0195 depends on an
+accepted WI-0194 visual-redundancy result and is blocked.
+Checkpoint-8 dry-run has 200 calibration-only candidate pairs,
+382 distinct calibration photos, 0 held-out; 9/9 proposed
+candidate buckets met, without human labels. Prior full
+27,050-proxy archive dHash/seeded CLIP feasibility and candidate
+supply accepted. Held-out blanket similarity quarantine and
+dHash<=8/12 global linkage rejected as biased/giant-family.
+This integrated WI-0194 branch implements full CALIBRATION-ONLY
+pilot: deterministic blinded 200-pair private bundle, read-only
+current local proxy resolver, loopback two-photo human reviewer
+with hash validation/notes/resume, bound descriptive aggregate
+report, synthetic safeguards, and ONE PowerShell local runner.
+Preparation is safe/no labeling by default; -Review is explicit.
+No held-out review access/freeze, no model deployment/selection,
+quality-heldout reuse, automatic suppression, collection
+semantics, original hydration or ANN. WI-0195 blocked until a
+separate accepted policy or explicit milestone no-go.
+All PRs target main.
+
 **WI-0194 checkpoint 8 (2026-10-19):** Maintainer's
 checkpoint-7 observed-risk held-out quarantine sensitivity found
 NO-GO: dHash5-8 quarantine removes 470/6901 held-out photos
