@@ -4,6 +4,22 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 4 (2026-10-19):** Maintainer accepted the
+full 27,050-proxy technical feasibility run: 365,837,725 dHash
+comparisons in 25.91s, CLIP 100 seeded scans across indexed
+27,050 vectors in 4.51s, verification/hash 218.89s. 162,829
+retrieved candidates, 2,495 strict dHash<=4 links, 737
+CLIP-only candidate pairs. No ANN needed to study exact offline
+dHash at this size, but CLIP has only 100 seeds. This checkpoint
+adds aggregate-only no-output `redundancy_candidate_preflight.py`
+to assess leakage-family sizes, cross-partition near-copy warnings
+and proposed sampler quota feasibility on the existing private
+full-proxy candidate JSON. Operator runs synthetic tests and
+the preflight *after merge*, shares only aggregate stdout.
+No frozen review set, labels, threshold, quality held-out reuse,
+model inference, production collection changes. WI-0195 blocked.
+All new PRs target main.
+
 **WI-0194 checkpoint 3 (2026-10-19):** Maintainer's 500, 2000,
 and 5000-photo exact dHash/CLIP runs passed. The 5000 run found
 27,050 current proxy-backed photos, complete CLIP coverage in the
