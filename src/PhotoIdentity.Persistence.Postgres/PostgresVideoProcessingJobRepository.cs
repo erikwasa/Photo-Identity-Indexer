@@ -252,7 +252,7 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 JOIN assets asset ON asset.id = revision.asset_id
                 JOIN video_revision_metadata metadata ON metadata.asset_revision_id = revision.id
                 WHERE job.status = 'queued' AND job.cancellation_requested_at_utc IS NULL
-                  AND job.available_at_utc <= now()
+                  AND job.attempt_count < 3 AND job.available_at_utc <= now()
                   AND job.source_bytes <= @max_source
                   AND job.reserved_temporary_bytes <= @remaining
                   AND job.requested_frames <= @max_frames
