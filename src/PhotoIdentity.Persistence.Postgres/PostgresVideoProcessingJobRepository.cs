@@ -171,6 +171,20 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
     /// temporary reservations. No source is opened or hydrated. Photo-priority
     /// must be supplied by the separate runtime coordinator and checked again.
     /// </summary>
+    /// <summary>
+    /// Prefer this overload for future video workers: the photo-work gate is
+    /// read from the authoritative catalogue and cannot be supplied as "idle"
+    /// by a caller.
+    /// </summary>
+    public Task<VideoProcessingJobLease?> TryClaimNextAsync(
+        VideoProcessingBudget budget, CancellationToken token = default) =>
+        TryClaimNextAsync(budget, photoWorkActive: false, token: token);
+
+    /// <summary>
+    /// The caller flag is an additional veto, never an override of catalogue
+    /// photo priority. PostgreSQL photo activity is always checked before
+    /// any video lease is granted.
+    /// </summary>
     public async Task<VideoProcessingJobLease?> TryClaimNextAsync(
         VideoProcessingBudget budget, bool photoWorkActive,
         CancellationToken token = default)
@@ -211,6 +225,17 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 WHERE status = 'running' AND leased_until_utc <= now();
                 """;
             await recover.ExecuteNonQueryAsync(token);
+        }
+
+        // The caller's photoWorkActive flag is only an additional veto:
+        // no future video worker may bypass live photo work by passing false.
+        // This snapshot is taken inside the serialized claim transaction.
+        VideoPhotoPrioritySnapshot priority = await PostgresVideoPhotoPriorityProbe
+            .ReadAsync(connection, transaction, token);
+        if (priority.PhotoWorkActive)
+        {
+            await transaction.CommitAsync(token); // preserve expired-lease recovery
+            return null;
         }
 
         long reserved;
