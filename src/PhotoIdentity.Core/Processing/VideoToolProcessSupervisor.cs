@@ -86,6 +86,8 @@ public sealed class VideoToolProcessSupervisor
         string workspace = Path.Combine(scratchRoot, "video-tool-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
         bool processStopped = true;
+        Task? stdoutDrain = null;
+        Task? stderrDrain = null;
         using Process process = new();
         Stopwatch timer = Stopwatch.StartNew();
         using CancellationTokenSource timeout = new(budget.MaximumWallTime);
@@ -136,8 +138,8 @@ public sealed class VideoToolProcessSupervisor
 
             // Streaming discard prevents unbounded metadata, path or stderr
             // accumulation and prevents a child from blocking on full pipes.
-            Task stdout = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
-            Task stderr = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
+            stdoutDrain = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
+            stderrDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
 
             while (!process.HasExited)
             {
@@ -149,7 +151,7 @@ public sealed class VideoToolProcessSupervisor
             }
 
             await process.WaitForExitAsync(linked.Token);
-            await Task.WhenAll(stdout, stderr).WaitAsync(TimeSpan.FromSeconds(5), linked.Token);
+            await Task.WhenAll(stdoutDrain, stderrDrain).WaitAsync(TimeSpan.FromSeconds(5), linked.Token);
             CheckWorkspace(workspace, budget);
             return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed);
         }
@@ -168,17 +170,61 @@ public sealed class VideoToolProcessSupervisor
                     catch (InvalidOperationException) { /* exited concurrently */ }
                 }
                 using CancellationTokenSource shutdown = new(TimeSpan.FromSeconds(10));
-                try { await process.WaitForExitAsync(shutdown.Token); }
+                try
+                {
+                    await process.WaitForExitAsync(shutdown.Token);
+                    // WaitForExitAsync only waits for the parent process. On
+                    // Windows, killed descendants may still hold inherited
+                    // output pipes and the workspace for a short period.
+                    // Drain to EOF before attempting to remove the directory.
+                    if (stdoutDrain is not null && stderrDrain is not null)
+                    {
+                        await Task.WhenAll(stdoutDrain, stderrDrain)
+                            .WaitAsync(shutdown.Token);
+                    }
+                }
                 catch (OperationCanceledException)
                 {
                     throw new InvalidOperationException(
-                        "Video tool did not terminate; preserve scratch for controlled cleanup.");
+                        "Video process tree or its inherited pipes did not terminate; " +
+                        "preserve scratch for controlled cleanup.");
                 }
             }
 
             // Delete only our newly created scratch folder after the process
-            // has exited, not any caller-owned source or derivative directory.
-            Directory.Delete(workspace, recursive: true);
+            // tree has released its handles. Windows may briefly report a
+            // directory-in-use error after Kill(entireProcessTree: true) and
+            // the root process's exit. Use a bounded, uncancellable retry;
+            // never treat the caller's cancellation as permission to leave
+            // temporary files behind.
+            await DeleteWorkspaceAfterExitAsync(workspace);
+        }
+    }
+
+    private static async Task DeleteWorkspaceAfterExitAsync(string workspace)
+    {
+        Stopwatch cleanup = Stopwatch.StartNew();
+        while (true)
+        {
+            try
+            {
+                Directory.Delete(workspace, recursive: true);
+                return;
+            }
+            catch (IOException) when (cleanup.Elapsed < TimeSpan.FromSeconds(8))
+            {
+                // Descendant working-directory handles can outlive their
+                // parent Process.WaitForExitAsync on Windows.
+            }
+            catch (UnauthorizedAccessException) when (
+                OperatingSystem.IsWindows() &&
+                cleanup.Elapsed < TimeSpan.FromSeconds(8))
+            {
+                // Windows may temporarily deny removal of recently closed
+                // child handles. Other errors remain terminal.
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(125));
         }
     }
 
