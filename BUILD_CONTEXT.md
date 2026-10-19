@@ -4,6 +4,26 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**M37 WI-0194 independent validation bundle (2026-10-19):**
+Maintainer finished all 200 calibration labels with 82 Redundant,
+17 Similar-keep-both, 101 Not-similar, 0 Unsure. dHash0-4 and
+dHash5-8 sampled buckets each 23/24 Redundant; dHash9-12 only
+8/24; high-CLIP-other 18/20; far-dHash/high-CLIP 9/20.
+These are correlated, intentionally stratified CALIBRATION
+observations, not held-out production precision. No suppression
+threshold approved. Next single substantive PR bundles a
+frozen-before-labels held-out pair study, with exclusions only
+for observed cross-split dHash5-12 or CLIP>=.90 links whose
+calibration endpoint belongs to the 382 *reviewed calibration*
+photos, guard against >20% heldout quarantined or <100 selected
+heldout candidate pairs, distinct blinded/audit/review files,
+read-only current-proxy map requiring frozen validation audit,
+explicit local heldout reviewer authorization, synthetic tests
+and one PowerShell runner for preparation and optional review.
+No labels in gate, no changed production behavior/ANN/new
+model or access to WI-0193 consumed quality heldout labels.
+WI-0195 blocked pending explicit decision. All PRs target main.
+
 **M37 WI-0194 bundled phase (2026-10-19):** Maintainer
 requested an end to repeated tiny-PR + one-command verification
 cycles. M37 WI-0192/0193 are complete; WI-0195 depends on an
