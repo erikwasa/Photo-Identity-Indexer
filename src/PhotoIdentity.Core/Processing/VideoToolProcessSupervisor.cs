@@ -117,6 +117,13 @@ public sealed class VideoToolProcessSupervisor
                 string? value = Environment.GetEnvironmentVariable(name);
                 if (!string.IsNullOrEmpty(value)) start.Environment[name] = value;
             }
+            if (OperatingSystem.IsWindows())
+            {
+                // Tools such as cmd.exe may need standard system utilities, but
+                // never search inherited/current/user PATH entries.
+                start.Environment["PATH"] =
+                    Environment.GetFolderPath(Environment.SpecialFolder.System);
+            }
             start.Environment["TEMP"] = workspace;
             start.Environment["TMP"] = workspace;
             start.Environment["TMPDIR"] = workspace;
