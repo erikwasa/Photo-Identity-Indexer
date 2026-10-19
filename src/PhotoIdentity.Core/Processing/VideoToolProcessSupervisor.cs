@@ -89,8 +89,7 @@ public sealed class VideoToolProcessSupervisor
             throw new InvalidOperationException("Video executable digest is not approved.");
 
         cancellationToken.ThrowIfCancellationRequested();
-        string workspace = Path.Combine(scratchRoot, "video-tool-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workspace);
+        string workspace = VideoScratchOwnership.Create(scratchRoot, "video-tool");
         WindowsVideoJobObject? resourceJob = null;
         bool resourceJobAssigned = false;
         bool processStopped = true;
