@@ -17,7 +17,8 @@ Only a future explicitly authorized worker may call this component, passing:
 
 The bridge checks the safety probe **before starting** a child process,
 periodically every 100 ms to 1 second while it runs, and again after the
-child exits. A negative decision cancels the linked tool token, asking the
+child exits. Each safety observation has a two-second deadline, so a stalled
+database read cannot silently leave an external process running indefinitely. A negative decision cancels the linked tool token, asking the
 existing supervisor to kill the process tree and clean its private scratch
 directory. An unexpected database/probe exception also stops execution
 rather than assuming permission. The result contains only an outcome code
