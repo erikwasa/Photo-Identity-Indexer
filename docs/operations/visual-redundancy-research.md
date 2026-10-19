@@ -217,6 +217,36 @@ $python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe
 
 **Share only the aggregate JSON stdout**. Never share private manifests, photo/revision identifiers, scores or archive credentials. Stop if tests fail. This does not freeze a cohort or collect human review; do not run `redundancy_review_pairs.py`, tune a model, assign held-out labels, or change production suppression. Preserve the private earlier manifests for audit/reproducibility. WI-0194 remains in progress, WI-0195 blocked.
 
+
+## Checkpoint 8 — calibration-only similarity-risk pilot feasibility (no review)
+
+The maintainer's private **enriched** 27,050-photo/165,181-pair cohort quarantine preflight found:
+- Unmodified dHash<=4 split: 6,901 held-out photos; 11,843 within-held-out candidate pairs; 332 disagreement cases.
+- Removing held-out photos incident to cross-partition dHash5–8 risks removes 470 photos but leaves only **38** disagreement candidates (quota 50).
+- Removing dHash5–12 exposed photos removes 1,689 photos and leaves **7** disagreements.
+- Removing dHash5–12 OR high-CLIP exposed photos removes 2,055 photos (29.8%) and leaves only **5** disagreements, 51 borderline (need 60) and 23 screened negatives (need 35).
+
+Thus **blanket quarantine fails** quota/representativeness safeguards. This is not evidence of actual near-copy identity, and full CLIP neighbour recall remains unmeasured. Earlier <=8/12 global family grouping also formed giant components of 305/3,368 photos. No human-review cohort may be frozen yet.
+
+**Next isolated diagnostic:** The new `redundancy_calibration_pilot_preflight.py` reuses the existing private enriched candidate manifest and strict baseline membership, but counts/chooses hypothetical pilot candidates **only where both photo endpoints are in calibration**. It reports aggregate eligibility in nine mutually exclusive measured-similarity categories, with fixed bounded illustrative quotas and a maximum of two pair occurrences per calibration photo. No blind review manifest is created; no photos, pair IDs or individual scores appear in output. Real exact-content-copy candidates, if any, have a proposed pilot quota of **zero** rather than fabricated duplicates. This diagnostic is *not* authority to view or label any photos.
+
+After merging the PR, run from Windows PowerShell repository root:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+
+& $python -m unittest discover `
+  -s tools/PhotoIdentity.PhotoQualityEvaluation `
+  -p test_redundancy_calibration_pilot_preflight.py -v
+
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/redundancy_calibration_pilot_preflight.py `
+  --input private/wi0194-full-enriched-candidates.json
+~~~
+
+Share **only the aggregate JSON stdout**. Stop if tests fail. This runs on existing local JSON: no full archive scan, database/proxy access, model download, originals/cloud hydration, file writes, human labels, split freeze or product change. Do not run `redundancy_review_pairs.py`, solicit any reviewer labels, or open held-out photos as part of a research set. The subsequent review protocol requires an explicit separate decision on privacy, pilot authorization, reviewer workflow, absent exact-copy controls, and the isolation of a truly independent held-out evaluation. WI-0194 remains in progress, WI-0195 blocked.
+
 ## Next checkpoints
 
 1. Run the bounded catalogue export; inspect aggregate coverage, proxy bytes, comparison timings and known cross-date candidates. Do not infer archive-wide recall from a 500-photo sample. Expand only after measured resource review.
