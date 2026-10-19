@@ -256,9 +256,29 @@ checkpoint. Continue development after CI and PR review.
   private stderr and launcher secrets are not logged or inherited.
 - Existing legacy uncapped calls remain supported for prior tests, but
   production video workers must require an OS-capped suspended profile.
-- Windows tests exercise successful native launch, timeout/cancellation and
-  the bounded scratch teardown. No video worker or source-open path is enabled.
+- Windows tests exercise successful native launch, cancellation, and
+  bounded scratch teardown. The native child inherits only an explicitly
+  allowlisted NUL device handle and a sanitized environment, never arbitrary
+  photo-application handles.
   [Updated resource envelope](../../operations/video-worker-windows-resource-envelope.md).
+- Added private `PostgresVideoLocalSourceLocator` and
+  `VideoLeasedInputPreparer` to bind the actual source root/key/hash to
+  the fenced PostgreSQL video job, check photo/operator safety, and stage
+  only already-local MOV/MP4 into bounded, stream-hashed private scratch.
+  Windows source opening requests `FILE_FLAG_OPEN_NO_RECALL`, avoiding
+  intentional OneDrive hydration; maintained-host provider behavior still
+  needs local verification. [Source staging](../../operations/video-worker-local-staging-and-cleanup.md).
+- Added a deliberately unregistered `VideoUnpublishedToolAttempt` bridge
+  with 15-second lease heartbeats, staged-only external input, required
+  Windows Job Object limits and ongoing photo-priority preemption.
+  **It does not acknowledge job success or publish derivatives**:
+  versioned, revision-fenced atomic publication belongs to later media
+  adapters; the video lane remains disabled by default.
+- Added app-owned markers for tool/input scratch directories, a bounded
+  conservative 24h+ `VideoScratchJanitor`, and dry-run-first
+  `video scratch-cleanup` operator CLI. Tests cover unowned/recent folder
+  preservation, verified source hash, lease revocation, and scratch cleanup.
+  No photo archive or original media delete command is introduced.
 - Native Job Object limits still do not enforce GPU, filesystem sandboxing,
   full disk/IO quotas, or safe source-content authorization. Those remain
   separate activation gates. No schema change; the already merged v35
@@ -285,7 +305,9 @@ checkpoint. Continue development after CI and PR review.
   backup and isolated v34 → v35 rehearsal gate is still pending.
 - Checkpoint 7: merged PR #613; fail-closed execution preemption bridge.
 - Checkpoint 8: merged PR #615; opt-in native Windows resource bounds.
-- Checkpoint 9: suspended Windows launch removes the pre-job execution race,
-  preserving explicit activation gates for source authorization and disk I/O.
+- Checkpoint 9: bounded, handle-allowlisted suspended Windows launch,
+  hash-verified no-recall source staging, fenced source lookup, aborted-work
+  cleanup and dry-run-only default scratch janitor. Actual artifact publishing,
+  activation and OS disk/IO/GPU isolation remain further work.
 - WI-0188 still requires a real resource-controlled worker and Windows
   mixed-photo/video verification before acceptance.
