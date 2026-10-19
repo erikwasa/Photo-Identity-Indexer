@@ -1,5 +1,11 @@
 # WI-0188 — isolated PostgreSQL video queue v34
 
+> Historical checkpoint 2 rollout procedure for schema v34. The latest
+> implementation now targets **schema v35**. If your maintained catalogue is
+> already v34, follow [the v35 backup/rehearsal gate](video-processing-control-v35.md)
+> instead; `catalogue rehearse-v34` is only for a verified isolated v33
+> restore and now applies all later migrations too.
+
 **Development checkpoint:** v34 adds only the control table video_processing_jobs. It does not enable API endpoints, background video workers, OneDrive hydration, FFmpeg, proxy generation, or automatic enqueue. The accepted v33 photo/video data remains unchanged.
 
 ## Safety and backup before app startup
