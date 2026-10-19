@@ -44,7 +44,7 @@ public sealed class VideoScratchJanitorTests
         string scratchRoot = TempRoot();
         try
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Assert.Throws<ArgumentException>(() =>
                 VideoScratchOwnership.Create(scratchRoot, "photo-source"));
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
                 VideoScratchJanitor.SweepAsync(
