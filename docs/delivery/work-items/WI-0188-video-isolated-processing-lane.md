@@ -169,8 +169,9 @@ checkpoint. Continue development after CI and PR review.
 
 - New append-only schema v35 adds a **single independent video control row**
   `video_processing_control`, with `enabled=false`, `paused=true` and a
-  monotonically increasing generation from installation. Existing photo tables,
-  video jobs and other catalogue tables remain untouched by the migration.
+  monotonically increasing generation from installation. It also adds the
+  `control_generation` fence to video jobs; existing photo tables and all
+  pre-existing catalogue row counts remain untouched by the migration.
 - `PostgresVideoProcessingControlRepository` provides read-only state,
   explicit pause/resume intent, and a single-transaction stop that disables
   and pauses the lane, cancels queued video jobs, and marks running jobs for
@@ -178,7 +179,8 @@ checkpoint. Continue development after CI and PR review.
   is registered. All operator control writes are dry runs unless `--apply`.
 - Video claim acquires a shared control-row lock inside its existing serialized
   transaction so stop/pause and lease admission cannot overtake each other.
-  Lease heartbeat and completion also reject disabled/paused control state.
+  Lease heartbeat and completion also reject disabled/paused control state or
+  a lease from an earlier pause/resume/stop generation.
   Operator status includes sanitized control state and generation.
 - Disposable PostgreSQL tests assert default-off, stop/pause/resume/lease
   behavior, expired-cancel recovery and photo-table isolation. CLI tests
