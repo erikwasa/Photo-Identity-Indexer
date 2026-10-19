@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Microsoft.Win32.SafeHandles;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Source.OneDriveSync;
@@ -84,9 +85,7 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
             throw new IOException("Video source size differs from the leased revision.");
         DateTime beforeUtc = observation.LastWriteTimeUtc;
 
-        string staging = Path.Combine(scratchRoot,
-            "video-input-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(staging);
+        string staging = VideoScratchOwnership.Create(scratchRoot, "video-input");
         string destination = Path.Combine(staging, "input" +
             Path.GetExtension(local).ToLowerInvariant());
         try
