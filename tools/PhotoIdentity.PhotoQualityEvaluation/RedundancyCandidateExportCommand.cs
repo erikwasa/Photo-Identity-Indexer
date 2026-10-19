@@ -1,3 +1,5 @@
+using Npgsql;
+using NpgsqlTypes;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -39,7 +41,7 @@ internal static class RedundancyCandidateExportCommand
     private sealed record Pair(int Left, int Right, int? DhashDistance,
         double? ClipCosine, string SourceKind);
 
-    private sealed record Neighbor(int Index, int Distance);
+    internal sealed record Neighbor(int Index, int Distance);
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -87,19 +89,41 @@ internal static class RedundancyCandidateExportCommand
             Dictionary<AssetRevisionId, float[]> vectors = [];
             if (options.ModelId is not null)
             {
-                PostgresPhotoSearchRepository searchRepository = new(database);
-                IReadOnlyList<PhotoSearchEmbeddingRecord> indexed =
-                    await searchRepository.GetCurrentEmbeddingsAsync(
-                        options.ModelId, options.ModelSha256!,
-                        options.PreprocessingVersion!,
-                        PhotoEmbeddingEvidence.Float32L2NormalizedEncoding);
-                HashSet<AssetRevisionId> selectedIds = selected
-                    .Select(x => x.AssetRevisionId).ToHashSet();
-                foreach (PhotoSearchEmbeddingRecord record in indexed)
+                Guid[] selectedIds = selected.Select(x => x.AssetRevisionId.Value).ToArray();
+                await using NpgsqlConnection connection = await database.OpenConnectionAsync();
+                await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync();
+                await using (NpgsqlCommand readOnly = new("SET TRANSACTION READ ONLY", connection, transaction))
+                    await readOnly.ExecuteNonQueryAsync();
+                await using NpgsqlCommand command = new("""
+                    SELECT asset_revision_id, vector_values
+                    FROM photo_semantic_embeddings
+                    WHERE asset_revision_id = ANY(@revision_ids)
+                      AND model_id = @model_id
+                      AND model_sha256 = @model_sha256
+                      AND preprocessing_version = @preprocessing
+                      AND vector_encoding = @encoding
+                    ORDER BY asset_revision_id;
+                    """, connection, transaction);
+                command.Parameters.AddWithValue("revision_ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid, selectedIds);
+                command.Parameters.AddWithValue("model_id", NpgsqlDbType.Text, options.ModelId);
+                command.Parameters.AddWithValue("model_sha256", NpgsqlDbType.Text, options.ModelSha256!);
+                command.Parameters.AddWithValue("preprocessing", NpgsqlDbType.Text, options.PreprocessingVersion!);
+                command.Parameters.AddWithValue("encoding", NpgsqlDbType.Text,
+                    PhotoEmbeddingEvidence.Float32L2NormalizedEncoding);
+                await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync())
                 {
-                    if (selectedIds.Contains(record.Evidence.RevisionId))
-                        vectors.Add(record.Evidence.RevisionId, record.Evidence.Values.ToArray());
+                    while (await reader.ReadAsync())
+                    {
+                        AssetRevisionId id = AssetRevisionId.From(reader.GetGuid(0));
+                        float[] values = reader.GetFieldValue<float[]>(1);
+                        // Reject corrupt/stale evidence rather than silently ranking it.
+                        PhotoEmbeddingEvidence checkedEvidence = new(
+                            id, options.ModelId, options.ModelSha256!,
+                            options.PreprocessingVersion!, values);
+                        vectors.Add(id, checkedEvidence.Values.ToArray());
+                    }
                 }
+                await transaction.CommitAsync();
             }
             readWatch.Stop();
 
@@ -312,7 +336,7 @@ internal static class RedundancyCandidateExportCommand
         pairs.Add((left, right), new Pair(left, right, distance, clip, "retrieved"));
     }
 
-    private static double DotNormalized(float[] a, float[] b)
+    internal static double DotNormalized(float[] a, float[] b)
     {
         if (a.Length != b.Length || a.Length == 0)
             throw new InvalidDataException("Incompatible embedding dimensions.");
@@ -322,7 +346,7 @@ internal static class RedundancyCandidateExportCommand
         return Math.Clamp(score, -1d, 1d);
     }
 
-    private static void Offer(List<Neighbor> best, Neighbor candidate, int limit)
+    internal static void Offer(List<Neighbor> best, Neighbor candidate, int limit)
     {
         best.Add(candidate);
         best.Sort((a, b) =>
@@ -349,7 +373,7 @@ internal static class RedundancyCandidateExportCommand
         return path;
     }
 
-    private static string PrivatePath(string raw)
+    internal static string PrivatePath(string raw)
     {
         if (Path.IsPathRooted(raw) || string.IsNullOrWhiteSpace(raw))
             throw new ArgumentException("Exports must be relative paths inside private/.");
