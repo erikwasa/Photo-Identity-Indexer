@@ -93,6 +93,7 @@ public sealed class VideoToolProcessSupervisor
         string workspace = Path.Combine(scratchRoot, "video-tool-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
         WindowsVideoJobObject? resourceJob = null;
+        bool resourceJobAssigned = false;
         bool processStopped = true;
         Task? stdoutDrain = null;
         Task? stderrDrain = null;
@@ -150,7 +151,11 @@ public sealed class VideoToolProcessSupervisor
             processStopped = false;
             // Assignment is intentionally fail-closed; future production startup
             // must launch suspended to eliminate this transient uncontained gap.
-            resourceJob?.Assign(process);
+            if (resourceJob is not null)
+            {
+                resourceJob.Assign(process);
+                resourceJobAssigned = true;
+            }
 
             // Streaming discard prevents unbounded metadata, path or stderr
             // accumulation and prevents a child from blocking on full pipes.
@@ -183,7 +188,11 @@ public sealed class VideoToolProcessSupervisor
             resourceJob?.Dispose();
             if (!processStopped)
             {
-                if (!process.HasExited)
+                // Closing an assigned Job Object already terminates its
+                // process tree. Calling Kill again can race the kernel's job
+                // teardown; only use the old explicit fallback when no job
+                // successfully contained the started process.
+                if (!process.HasExited && !resourceJobAssigned)
                 {
                     try { process.Kill(entireProcessTree: true); }
                     catch (InvalidOperationException) { /* exited concurrently */ }
