@@ -106,6 +106,18 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.Equal(job, await queue.EnqueueAsync(Identity("p1"), budget, candidate));
             Assert.Equal("queued", (await queue.GetAsync(job))?.Status);
 
+            var inspector = new PostgresVideoProcessingQueueInspector(database);
+            VideoProcessingQueueOverview initialSummary = await inspector.GetOverviewAsync();
+            Assert.Equal(1, initialSummary.Queued);
+            Assert.Equal(0, initialSummary.Running);
+            Assert.Equal(0, initialSummary.ReservedTemporaryBytes);
+            VideoProcessingJobOperatorRow listed = Assert.Single(
+                await inspector.ListRecentAsync());
+            Assert.Equal(job, listed.JobId);
+            Assert.Equal("queued", listed.Status);
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                inspector.ListRecentAsync(51));
+
             Guid cancelledBeforeStart = await queue.EnqueueAsync(Identity("cancelled"), budget, candidate);
             Assert.True(await queue.RequestCancellationAsync(cancelledBeforeStart));
             Assert.Equal("cancelled", (await queue.GetAsync(cancelledBeforeStart))?.Status);
@@ -125,6 +137,9 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.True(await queue.TryHeartbeatAsync(job, first.LeaseToken, 45));
             Assert.Equal(45, (await queue.GetAsync(job))?.ProgressPercent);
             Assert.Null(await queue.TryClaimNextAsync(budget, false)); // one active job
+            VideoProcessingQueueOverview runningSummary = await inspector.GetOverviewAsync();
+            Assert.Equal(1, runningSummary.Running);
+            Assert.Equal(10000, runningSummary.ReservedTemporaryBytes);
 
             Assert.True(await queue.TryFinishAttemptAsync(job, first.LeaseToken,
                 succeeded: false, retryable: true));
@@ -214,6 +229,10 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             await exclusions.ExcludeAsync(SourceId.From(source), "clip.mov", now.AddMinutes(2));
             Assert.Null(await queue.GetAsync(staleJob));
             Assert.Null(await queue.TryClaimNextAsync(budget, false));
+            Assert.Empty(await inspector.ListRecentAsync());
+            VideoProcessingQueueOverview hidden = await inspector.GetOverviewAsync();
+            Assert.Equal(0, hidden.Queued + hidden.Running + hidden.Succeeded +
+                            hidden.Failed + hidden.Cancelled);
 
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             await using (NpgsqlCommand inspect = connection.CreateCommand())
