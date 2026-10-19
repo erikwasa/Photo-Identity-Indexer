@@ -269,8 +269,7 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                       WHERE excluded.source_id = asset.source_id
                         AND excluded.source_key = asset.source_key)
                 ORDER BY job.requested_at_utc, job.id
-                FOR UPDATE OF job SKIP LOCKED
-                LIMIT 1;
+                LIMIT 1 FOR UPDATE OF job SKIP LOCKED;
                 """;
             select.Parameters.AddWithValue("max_source", budget.MaximumSourceBytes);
             select.Parameters.AddWithValue("remaining", available);
