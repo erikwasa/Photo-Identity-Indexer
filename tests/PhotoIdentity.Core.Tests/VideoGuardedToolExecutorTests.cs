@@ -75,11 +75,12 @@ public sealed class VideoGuardedToolExecutorTests
         try
         {
             string executable = CmdPath();
+            string hash = await HashAsync(executable);
             int observations = 0;
             var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
             InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => executor.RunAsync(
-                    executable, await HashAsync(executable), scratch,
+                    executable, hash, scratch,
                     _ => ["/d", "/c", "ping -n 15 127.0.0.1 >NUL"],
                     Budget,
                     _ => Interlocked.Increment(ref observations) == 1
