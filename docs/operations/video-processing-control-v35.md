@@ -7,7 +7,8 @@ You may defer that local work until other WI-0188 development checkpoints
 are ready, but do not launch or package-deploy updated v35 code against the
 maintained database in the meantime.
 
-Checkpoint 6 adds only the `video_processing_control` singleton. It is
+Checkpoint 6 adds the `video_processing_control` singleton and a
+`control_generation` fence on existing video job records. The control is
 **disabled and paused by default**. No worker is registered and none can be
 enabled by the new CLI. There is no automatic enqueue, FFmpeg, hydration or
 derivative publication.
@@ -77,7 +78,9 @@ finally {
 Expected: `Schema v34 -> v35 rehearsal passed`, unchanged original
 catalogue/photo/video/queue row counts, **exactly one new migration**,
 video control row `enabled=false`, `paused=true`, `generation=0`,
-and repeated schema initialization passed. The CLI selects ONLY the verified
+and repeated schema initialization passed. Existing video job rows are
+retained, and any lease from an earlier control generation cannot heartbeat
+or acknowledge completion after a pause/resume cycle. The CLI selects ONLY the verified
 local `photoidentity_restore_*` database from the report, never the launcher
 database.
 
