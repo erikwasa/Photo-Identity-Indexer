@@ -65,6 +65,32 @@ public sealed class VideoJobsCommandTests
     }
 
     [Fact]
+    public void Lane_control_requires_explicit_database_and_apply_and_never_accepts_a_job_id()
+    {
+        string[] args = [
+            "--postgres-connection-env", "PHOTOIDENTITY_TEST",
+            "--database", "photoidentity_catalogue"
+        ];
+        foreach (string action in new[] { "pause", "resume", "stop" })
+        {
+            VideoJobsCommandOptions preview = VideoJobsCommandOptions.Parse(action, args);
+            Assert.False(preview.Apply);
+            Assert.Null(preview.JobId);
+            Assert.Equal(action, preview.Action);
+            VideoJobsCommandOptions applied = VideoJobsCommandOptions.Parse(
+                action, [.. args, "--apply"]);
+            Assert.True(applied.Apply);
+            Assert.Throws<ArgumentException>(() => VideoJobsCommandOptions.Parse(
+                action, [.. args, "--job-id", Guid.NewGuid().ToString()]));
+            Assert.Throws<ArgumentException>(() => VideoJobsCommandOptions.Parse(
+                action, [.. args, "--apply", "--apply"]));
+        }
+        Assert.Throws<ArgumentException>(() =>
+            VideoJobsCommandOptions.Parse("stop",
+                ["--postgres-connection-env", "PHOTOIDENTITY_TEST"]));
+    }
+
+    [Fact]
     public async Task Command_rejects_missing_credentials_without_opening_a_connection()
     {
         const string variable = "PHOTOIDENTITY_WI0188_MISSING_JOBS_TEST_CONNECTION";

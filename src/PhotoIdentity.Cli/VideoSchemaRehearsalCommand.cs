@@ -48,7 +48,7 @@ public static class VideoSchemaRehearsalCommandRunner
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
-        if (expectedRestoredSchemaVersion is not (32 or 33))
+        if (expectedRestoredSchemaVersion is not (32 or 33 or 34))
             throw new ArgumentOutOfRangeException(nameof(expectedRestoredSchemaVersion));
 
         string? connectionString = Environment.GetEnvironmentVariable(
@@ -151,14 +151,24 @@ public static class VideoSchemaRehearsalCommandRunner
                     WHERE version = 33 AND name = 'opt-in-video-revision-metadata-and-posters'),
                 (SELECT count(*) FROM video_processing_jobs),
                 (SELECT count(*) FROM photo_identity_schema_migrations
-                    WHERE version = 34 AND name = 'isolated-video-processing-jobs');
+                    WHERE version = 34 AND name = 'isolated-video-processing-jobs'),
+                (SELECT count(*) FROM video_processing_control
+                    WHERE singleton_id=1 AND NOT enabled AND paused
+                      AND generation=0 AND last_action='initial'),
+                (SELECT count(*) FROM photo_identity_schema_migrations
+                    WHERE version=35 AND name='isolated-video-processing-operator-control');
             """;
         await using NpgsqlDataReader reader = await verify.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token) ||
             (expectedRestoredSchemaVersion == 32 &&
              (reader.GetInt64(0) != 0 || reader.GetInt64(1) != 0 ||
               reader.GetInt64(2) != 0 || reader.GetInt64(3) != 0)) ||
-            reader.GetInt64(4) != 1 || reader.GetInt64(5) != 0 || reader.GetInt64(6) != 1)
+            reader.GetInt64(4) != 1 ||
+            (expectedRestoredSchemaVersion < 34 && reader.GetInt64(5) != 0) ||
+            (expectedRestoredSchemaVersion == 34 &&
+             reader.GetInt64(5) != expectedCounts["video_processing_jobs"]) ||
+            reader.GetInt64(6) != 1 || reader.GetInt64(7) != 1 ||
+            reader.GetInt64(8) != 1)
             throw new InvalidDataException(
                 "Video isolation or empty v34 queue verification failed.");
 
@@ -167,7 +177,9 @@ public static class VideoSchemaRehearsalCommandRunner
         output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
         output.WriteLine(expectedRestoredSchemaVersion == 32
             ? "Original photo-only catalogue preserved; video tables and new queue empty."
-            : "Original photo/video catalogue preserved; new video job queue empty.");
+            : expectedRestoredSchemaVersion == 33
+                ? "Original photo/video catalogue preserved; new video job queue empty; video control disabled and paused."
+                : "Original photo/video catalogue and queued job counts preserved; video control disabled and paused.");
         output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
         return 0;
     }

@@ -17,7 +17,8 @@ public sealed record VideoProcessingJobState(
 public sealed record VideoProcessingJobLease(
     Guid Id, AssetRevisionId RevisionId, Guid LeaseToken,
     string DerivativeKind, string PolicyVersion, string PresetVersion,
-    string ToolSha256, long SourceBytes, long TemporaryBytes, int RequestedFrames);
+    string ToolSha256, long SourceBytes, long TemporaryBytes, int RequestedFrames,
+    long ControlGeneration);
 
 /// <summary>
 /// WI-0188 durable job control. No hosted worker, public endpoint, file I/O,
@@ -205,6 +206,15 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
             await serialize.ExecuteNonQueryAsync(token);
         }
 
+        VideoProcessingControlState control =
+            await PostgresVideoProcessingControlRepository.ReadForClaimAsync(
+                connection, transaction, token);
+        if (!control.Enabled || control.Paused)
+        {
+            await transaction.CommitAsync(token);
+            return null;
+        }
+
         // Recover inside the claim lock to prevent competing claim/recovery races.
         await using (NpgsqlCommand recover = connection.CreateCommand())
         {
@@ -328,17 +338,20 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 UPDATE video_processing_jobs
                 SET status='running', attempt_count=attempt_count+1,
                     lease_token=@lease, leased_until_utc=now()+interval '60 seconds',
-                    updated_at_utc=now(), progress_percent=0
+                    updated_at_utc=now(), progress_percent=0,
+                    control_generation=@control_generation
                 WHERE id=@id AND status='queued';
                 """;
             update.Parameters.AddWithValue("id", id);
             update.Parameters.AddWithValue("lease", lease);
+            update.Parameters.AddWithValue("control_generation", control.Generation);
             if (await update.ExecuteNonQueryAsync(token) != 1)
                 throw new InvalidOperationException("Video job lease changed during claim.");
         }
         await transaction.CommitAsync(token);
         return new VideoProcessingJobLease(id, AssetRevisionId.From(revisionId),
-            lease, kind, policy, preset, hash, sourceBytes, temporaryBytes, frames);
+            lease, kind, policy, preset, hash, sourceBytes, temporaryBytes, frames,
+            control.Generation);
     }
 
     public async Task<bool> RequestCancellationAsync(Guid jobId, CancellationToken token = default)
@@ -374,6 +387,12 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 updated_at_utc=now()
             WHERE id=@id AND lease_token=@lease AND status='running'
               AND leased_until_utc>now() AND cancellation_requested_at_utc IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM video_processing_control control
+                  WHERE control.singleton_id=1 AND control.enabled
+                    AND NOT control.paused
+                    AND control.generation=video_processing_jobs.control_generation
+              )
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
                   JOIN assets asset ON asset.id=revision.asset_id
@@ -456,6 +475,12 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 updated_at_utc=now()
             WHERE job.id=@id AND job.lease_token=@lease AND job.status='running'
               AND job.leased_until_utc>now() AND job.cancellation_requested_at_utc IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM video_processing_control control
+                  WHERE control.singleton_id=1 AND control.enabled
+                    AND NOT control.paused
+                    AND control.generation=job.control_generation
+              )
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
                   JOIN assets asset ON asset.id=revision.asset_id

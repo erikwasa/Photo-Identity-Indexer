@@ -72,7 +72,8 @@ public sealed partial class PostgresCatalogueDatabase
         // receive version 33 before the append-only extensions are applied.
         Migrations = [.. Migrations,
             new Migration(33, "opt-in-video-revision-metadata-and-posters", VideoCatalogueSchemaMigration),
-            new Migration(34, "isolated-video-processing-jobs", VideoProcessingQueueSchemaMigration)];
+            new Migration(34, "isolated-video-processing-jobs", VideoProcessingQueueSchemaMigration),
+            new Migration(35, "isolated-video-processing-operator-control", VideoProcessingControlSchemaMigration)];
 
         // Keep historical runtime-owned extension DDL attached to the exact
         // v33 migration which originally introduced it; v34 is queue-only.

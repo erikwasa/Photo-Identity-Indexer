@@ -16,7 +16,7 @@ public sealed record VideoJobsCommandOptions(
 {
     public static VideoJobsCommandOptions Parse(string action, string[] args)
     {
-        if (action is not ("status" or "cancel"))
+        if (action is not ("status" or "cancel" or "pause" or "resume" or "stop"))
             throw new ArgumentException("Unknown video jobs action.");
 
         Dictionary<string, string> values = new(StringComparer.Ordinal);
@@ -49,6 +49,13 @@ public sealed record VideoJobsCommandOptions(
             if (apply || values.ContainsKey("--job-id"))
                 throw new ArgumentException("Video jobs status is read-only; --apply and --job-id are not allowed.");
             return new(action, variable, database, null, false);
+        }
+
+        if (action is "pause" or "resume" or "stop")
+        {
+            if (values.ContainsKey("--job-id"))
+                throw new ArgumentException("Video lane control is global and does not accept --job-id.");
+            return new(action, variable, database, null, apply);
         }
 
         if (!Guid.TryParse(Required("--job-id"), out Guid job) || job == Guid.Empty)
@@ -99,14 +106,45 @@ public static class VideoJobsCommandRunner
             VideoPhotoPrioritySnapshot photoPriority =
                 await new PostgresVideoPhotoPriorityProbe(database)
                     .GetAsync(cancellationToken);
+            VideoProcessingControlState control =
+                await new PostgresVideoProcessingControlRepository(database)
+                    .GetAsync(cancellationToken);
             output.WriteLine(JsonSerializer.Serialize(new
             {
                 protocol = "wi0188-video-jobs-operator-status-v1",
                 schemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion,
                 executionEnabled = false, // no background worker is registered
                 photoPriority,
-                overview, recent
+                control, overview, recent
             }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+            return 0;
+        }
+
+        if (options.Action is "pause" or "resume" or "stop")
+        {
+            var control = new PostgresVideoProcessingControlRepository(database);
+            VideoProcessingControlState currentControl = await control.GetAsync(cancellationToken);
+            if (!options.Apply)
+            {
+                output.WriteLine("Dry run: no video lane control was changed. Add --apply to request the action.");
+                output.WriteLine(JsonSerializer.Serialize(currentControl,
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+                return 0;
+            }
+
+            if (options.Action == "stop")
+            {
+                VideoStopResult stopped = await control.StopAsync(cancellationToken);
+                output.WriteLine(JsonSerializer.Serialize(stopped,
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+                return 0;
+            }
+
+            VideoProcessingControlState updated = options.Action == "pause"
+                ? await control.PauseAsync(cancellationToken)
+                : await control.ResumeAsync(cancellationToken);
+            output.WriteLine(JsonSerializer.Serialize(updated,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
             return 0;
         }
 

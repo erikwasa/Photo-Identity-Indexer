@@ -36,6 +36,21 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             await using PostgresCatalogueDatabase database = new(settings.ConnectionString);
             await database.InitializeAsync();
             await database.InitializeAsync();
+            var control = new PostgresVideoProcessingControlRepository(database);
+            VideoProcessingControlState initialControl = await control.GetAsync();
+            Assert.False(initialControl.Enabled);
+            Assert.True(initialControl.Paused);
+            // Isolated fixture only: permit claims to exercise the v34 queue
+            // lifecycle. No production API or CLI can enable the lane.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand allowFixture = connection.CreateCommand())
+            {
+                allowFixture.CommandText = """
+                    UPDATE video_processing_control
+                    SET enabled=true, paused=false WHERE singleton_id=1;
+                    """;
+                Assert.Equal(1, await allowFixture.ExecuteNonQueryAsync());
+            }
             Guid source = Guid.NewGuid();
             Guid videoAsset = Guid.NewGuid();
             Guid videoRevision = Guid.NewGuid();
@@ -352,6 +367,186 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
                 Assert.Equal(0L, reader.GetInt64(0));
                 Assert.Equal(0L, reader.GetInt64(1));
                 Assert.Equal(1L, reader.GetInt64(2));
+            }
+        }
+        finally
+        {
+            await using NpgsqlCommand drop = adminConnection.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE);";
+            await drop.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Durable_pause_resume_and_stop_are_video_only_and_fail_closed()
+    {
+        string? admin = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(admin)) return;
+        string name = "photoidentity_video_control_" + Guid.NewGuid().ToString("N");
+        await using NpgsqlConnection adminConnection = new(
+            new NpgsqlConnectionStringBuilder(admin) { Pooling = false }.ConnectionString);
+        await adminConnection.OpenAsync();
+        await using (NpgsqlCommand create = adminConnection.CreateCommand())
+        {
+            create.CommandText = $"CREATE DATABASE \"{name}\";";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            var settings = new NpgsqlConnectionStringBuilder(admin)
+            {
+                Database = name, Pooling = false
+            };
+            await using PostgresCatalogueDatabase database = new(settings.ConnectionString);
+            await database.InitializeAsync();
+            await database.InitializeAsync();
+            var control = new PostgresVideoProcessingControlRepository(database);
+            var queue = new PostgresVideoProcessingJobRepository(database);
+
+            VideoProcessingControlState start = await control.GetAsync();
+            Assert.False(start.Enabled);
+            Assert.True(start.Paused);
+            Assert.Equal("initial", start.LastAction);
+            Assert.Equal(0, start.Generation);
+
+            VideoProcessingControlState resumedOff = await control.ResumeAsync();
+            Assert.False(resumedOff.Enabled); // resume is NOT enablement
+            Assert.False(resumedOff.Paused);
+            Assert.Equal(1, resumedOff.Generation);
+            Assert.Null(await queue.TryClaimNextAsync(new VideoProcessingBudget(
+                Enabled: true, Paused: false)));
+
+            Guid source = Guid.NewGuid();
+            Guid asset = Guid.NewGuid();
+            Guid revision = Guid.NewGuid();
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand seed = connection.CreateCommand())
+            {
+                seed.CommandText = """
+                    INSERT INTO sources(id,kind,root_locator,created_at_utc)
+                    VALUES (@source,'local-folder','fixture-video-control',@now);
+                    INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
+                    VALUES (@asset,@source,'clip.mov',@now,'video');
+                    INSERT INTO asset_revisions(id,asset_id,content_sha256,size_bytes,
+                                                 observed_at_utc,media_type,media_kind)
+                    VALUES (@revision,@asset,repeat('a',64),5000,@now,
+                            'video/quicktime','video');
+                    INSERT INTO video_revision_metadata(asset_revision_id,
+                          inspection_status,duration_seconds,inspected_at_utc,
+                          tool_sha256,inspection_profile_id)
+                    VALUES (@revision,'supported',6,@now,repeat('c',64),'fixture-video-v1');
+                    -- Only the isolated test fixture enables a processing lane.
+                    UPDATE video_processing_control
+                    SET enabled=true, paused=false WHERE singleton_id=1;
+                    """;
+                seed.Parameters.AddWithValue("source", source);
+                seed.Parameters.AddWithValue("asset", asset);
+                seed.Parameters.AddWithValue("revision", revision);
+                seed.Parameters.AddWithValue("now", now);
+                await seed.ExecuteNonQueryAsync();
+            }
+
+            VideoProcessingBudget budget = new(
+                Enabled: true, Paused: false, MaximumConcurrentJobs: 1,
+                MaximumSourceBytes: 6000, MaximumTemporaryBytes: 20000,
+                MaximumExtractedFrames: 8);
+            VideoProcessingCandidate candidate = new(true, false, true, true, 5000, 10000, 4);
+            VideoDerivativeJobIdentity Identity(string preset) => new(
+                AssetRevisionId.From(revision), VideoDerivativeKind.PlayableProxy,
+                "wi0188-v1", preset, new string('d', 64));
+
+            Guid first = await queue.EnqueueAsync(Identity("first"), budget, candidate);
+            Guid second = await queue.EnqueueAsync(Identity("second"), budget, candidate);
+            VideoProcessingJobLease lease = Assert.IsType<VideoProcessingJobLease>(
+                await queue.TryClaimNextAsync(budget));
+            Assert.Equal(first, lease.Id);
+            Assert.True(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 25));
+            Assert.Equal(1, lease.ControlGeneration);
+
+            VideoProcessingControlState paused = await control.PauseAsync();
+            Assert.True(paused.Paused);
+            Assert.True(paused.Enabled);
+            Assert.Equal("pause", paused.LastAction);
+            Assert.Null(await queue.TryClaimNextAsync(budget, photoWorkActive: false));
+            Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 40));
+            Assert.False(await queue.TryFinishAttemptAsync(
+                first, lease.LeaseToken, succeeded: true, retryable: false));
+
+            VideoProcessingControlState resumed = await control.ResumeAsync();
+            Assert.False(resumed.Paused);
+            Assert.True(resumed.Enabled);
+            Assert.Equal(paused.Generation + 1, resumed.Generation);
+            // Even though resume is now permitted, a lease claimed before
+            // the pause generation is invalid forever.
+            Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 50));
+            Assert.False(await queue.TryFinishAttemptAsync(
+                first, lease.LeaseToken, succeeded: true, retryable: false));
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand expireOld = connection.CreateCommand())
+            {
+                expireOld.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET leased_until_utc=now()-interval '1 second'
+                    WHERE id=@job;
+                    """;
+                expireOld.Parameters.AddWithValue("job", first);
+                Assert.Equal(1, await expireOld.ExecuteNonQueryAsync());
+            }
+            VideoProcessingJobLease resumedLease = Assert.IsType<VideoProcessingJobLease>(
+                await queue.TryClaimNextAsync(budget));
+            Assert.Equal(first, resumedLease.Id);
+            Assert.Equal(resumed.Generation, resumedLease.ControlGeneration);
+            Assert.NotEqual(lease.LeaseToken, resumedLease.LeaseToken);
+            Assert.True(await queue.TryHeartbeatAsync(
+                first, resumedLease.LeaseToken, 50));
+
+            VideoStopResult stopped = await control.StopAsync();
+            Assert.Equal(1, stopped.QueuedCancelled);
+            Assert.Equal(1, stopped.RunningCancellationRequested);
+            VideoProcessingControlState after = await control.GetAsync();
+            Assert.False(after.Enabled);
+            Assert.True(after.Paused);
+            Assert.Equal("stop", after.LastAction);
+            Assert.Equal(resumed.Generation + 1, after.Generation);
+            Assert.Equal("cancelled", (await queue.GetAsync(second))?.Status);
+            Assert.True((await queue.GetAsync(first))?.CancellationRequested);
+            Assert.False(await queue.TryHeartbeatAsync(first, resumedLease.LeaseToken, 60));
+            Assert.False(await queue.TryFinishAttemptAsync(
+                first, resumedLease.LeaseToken, succeeded: true, retryable: false));
+            Assert.Null(await queue.TryClaimNextAsync(budget));
+            VideoStopResult repeated = await control.StopAsync();
+            Assert.Equal(0, repeated.QueuedCancelled);
+            Assert.Equal(1, repeated.RunningCancellationRequested);
+
+            // Crash recovery of the cancelled running lease remains safe,
+            // and no photo processing tables receive new records.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand expire = connection.CreateCommand())
+            {
+                expire.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET leased_until_utc=now()-interval '1 second'
+                    WHERE id=@job;
+                    """;
+                expire.Parameters.AddWithValue("job", first);
+                Assert.Equal(1, await expire.ExecuteNonQueryAsync());
+            }
+            Assert.Equal(1, await queue.RecoverExpiredAsync());
+            Assert.Equal("cancelled", (await queue.GetAsync(first))?.Status);
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand count = connection.CreateCommand())
+            {
+                count.CommandText = """
+                    SELECT (SELECT count(*) FROM processing_jobs),
+                           (SELECT count(*) FROM processing_runs);
+                    """;
+                await using NpgsqlDataReader reader = await count.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(0, reader.GetInt64(0));
+                Assert.Equal(0, reader.GetInt64(1));
             }
         }
         finally
