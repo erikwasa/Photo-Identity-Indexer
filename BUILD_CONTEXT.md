@@ -4,6 +4,23 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**WI-0194 checkpoint 5 (2026-10-19):** full-proxy archive exact
+dHash is technically viable offline. Maintainer ran the private
+candidate preflight with 4/4 synthetic tests passing: 27,050
+photos, 163,029 candidate/control pairs, 25,107 strict
+leakage families. The current dHash<=4 split safely groups known
+strict links (zero crossings) but has 882 dHash5–8, 3,867
+dHash9–12 and 1,596 high-CLIP candidate links crossing split.
+Both partitions lack exact-copy controls; held-out is short
+41 borderline and 25 screened negative cases. No-go for
+review freeze. This checkpoint adds an aggregate-only, read-only
+dHash<=4/8/12 family-partition sensitivity analysis to assess
+unlinked risk and sample quota viability. It does not alter the
+existing reviewer sampler, fit cutoffs, access held-out
+review labels, or modify collection behavior. After merge,
+operator runs synthetic tests and locally returns only aggregate
+stdout. WI-0195 blocked. All new PRs target main.
+
 **WI-0194 checkpoint 4 (2026-10-19):** Maintainer accepted the
 full 27,050-proxy technical feasibility run: 365,837,725 dHash
 comparisons in 25.91s, CLIP 100 seeded scans across indexed
