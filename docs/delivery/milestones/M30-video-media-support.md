@@ -9,7 +9,7 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is formally completed on the PR branch; **WI-0151 must not start until PR #523 merges**. M30's derived lifecycle status is `ready` until implementation starts; no binaries or runtime behavior are introduced by this documentation phase.
+**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 remains `in_progress`: subsequent video playback, analysis, retrieval and collection milestones are independent, not automatically accepted by the still-poster slice.
 
 ## Goal and rollout
 
@@ -40,7 +40,7 @@ Support private family videos on local hardware without modifying originals, exp
 
 - [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) — design and explicit activation.
 - [WI-0151](../work-items/WI-0151-video-ingestion-metadata-posters.md) — metadata and still posters.
-- [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — high-priority photo-only PostgreSQL query regression blocking WI-0151 maintained acceptance; [issue #589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589).
+- [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [issue #589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — isolated scheduling/limits.
 - [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — local playable proxies.
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
@@ -51,9 +51,16 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) — optional mixed playback.
 - [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) — Live Photo evaluation.
 
+## Completed first video slice — WI-0151 local acceptance (2026-10-19)
+
+The maintainer completed all **11/11** consolidated PostgreSQL/schema, opt-in ingest, real-file SDR still-poster, default-off library, photo-isolation and cleanup-preview checks. On the final bounded poster materialization pass, 1,316 candidates were enumerated, one eligible poster was **already present**, zero new posters were needed, seven HDR transfers were deferred and zero changes/failures occurred. The previously generated SDR poster was visually accepted. The backup with isolated restore passed, and no original media or OneDrive placeholder was modified. The severe WI-0202 Archive/Smart Collection regression was independently completed before this final acceptance.
+
+**Scope boundary:** WI-0151 establishes durable, revision-bound, exclusion-aware **Rec.709 SDR still posters and read-only metadata browsing** only. No playable proxy, new video analysis worker, mixed slideshow, manual video annotation, caption/frame embeddings, video search or HDR production posters are approved by this result. The rest of M30's milestone exit criteria remain unchecked until their own work items are implemented and verified.
+
 ## Exit criteria
 
-- [x] WI-0150 architecture complete: ADR-0012 accepted and maintained-archive codec/build/hash evidence recorded; WI-0151 is next after PR #523 merge.
+- [x] WI-0150 architecture complete: ADR-0012 accepted, codec/build/hash evidence recorded, and PR #523 merged.
+- [x] WI-0151 initial video kind/metadata, revision-bound durable Rec.709 SDR still posters and read-only opt-in Videos library: consolidated maintainer real-file acceptance on 2026-10-19.
 - [ ] Metadata/poster, bounded local playback proxy, timestamped captions and embeddings work for a documented codec subset and do not mutate originals.
 - [ ] Video processing is opt-in, resource-limited, resumable and does not materially regress photo throughput or interactive behavior under measured local load.
 - [ ] Video retrieval is useful and has explicit photo-only compatibility defaults.
