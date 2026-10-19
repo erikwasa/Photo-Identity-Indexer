@@ -1,5 +1,10 @@
 # WI-0188 checkpoint 3 — inspect and cancel video queue jobs
 
+> Checkpoint 6 adds persisted video-lane control and advances the supported
+> PostgreSQL schema to **v35**. The status/cancel commands require the current
+> version, so complete [the v34 → v35 isolated migration gate](video-processing-control-v35.md)
+> before using them against an upgraded maintained catalogue.
+
 The maintained Windows catalogue has been verified at **PostgreSQL schema v34**
 (accepted 2026-10-19). This checkpoint changes **no schema** and introduces
 **no scheduled video processing**, no cloud hydration, and no FFmpeg worker.
