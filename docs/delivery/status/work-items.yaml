@@ -108,7 +108,7 @@ work_items:
   document: ../work-items/WI-0188-video-isolated-processing-lane.md
   started_at: 2026-10-19
   last_updated_at: 2026-10-19
-  branch: agent/WI-0188-video-execution-preemption
+  branch: agent/WI-0188-windows-job-resource-limits
   blockers: []
   blocker_notes: []
   evidence:
@@ -124,6 +124,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/609
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/611
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/613
   - type: documentation
     value: docs/operations/video-processing-job-queue-v34.md
 - id: WI-0189
