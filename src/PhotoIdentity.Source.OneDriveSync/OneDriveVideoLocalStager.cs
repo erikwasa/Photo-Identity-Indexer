@@ -69,8 +69,9 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
         string local = source.GetLocalPath(reference); // refuses online-only sources
         if (!File.Exists(local) || new FileInfo(local).LinkTarget is not null)
             throw new IOException("Source video is missing or linked.");
-        AssertSafeAncestors(local);
-        AssertSafeAncestors(scratchRoot);
+        AssertSafeAncestors(local, directory: false);
+        AssertSafeAncestors(source.RootPath, directory: true);
+        AssertSafeAncestors(scratchRoot, directory: true);
         if (Overlaps(source.RootPath, scratchRoot))
             throw new ArgumentException("Scratch cannot overlap the source archive.");
         if (!await authorized(token))
@@ -165,9 +166,10 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
             b.StartsWith(a + Path.DirectorySeparatorChar, cmp);
     }
 
-    private static void AssertSafeAncestors(string path)
+    private static void AssertSafeAncestors(string path, bool directory)
     {
-        string? cursor = Path.GetFullPath(Path.GetDirectoryName(path) ?? path);
+        string? cursor = Path.GetFullPath(directory
+            ? path : Path.GetDirectoryName(path) ?? path);
         while (cursor is not null)
         {
             if (new DirectoryInfo(cursor).LinkTarget is not null)
