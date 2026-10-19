@@ -117,6 +117,29 @@ acceptance criteria remain unchecked until the complete work item is verified.
   requires no schema rehearsal or restart solely for these CLI commands.
 
 
+### Checkpoint 4 — subprocess supervision and exclusion race fences (2026-10-19)
+
+- Added unregistered `VideoToolProcessSupervisor` with explicit SHA-256 executable
+  approval, absolute local non-junction scratch root, per-call private work area,
+  sanitized stdout/stderr discard, timeout, cancellation, process-tree
+  termination, bounded scratch monitoring and post-exit cleanup.
+- Hardened queue heartbeats to reject superseded, deleted, unsupported or
+  source-copy-excluded revisions. Final job acknowledgements now lock the
+  source row in a transaction before making the revision/exclusion decision,
+  preventing an exclusion insertion from crossing the acknowledgement check.
+- Windows Core tests cover digest mismatch, success/nonzero exit, scratch
+  overage, cancellation and cleanup. PostgreSQL tests cover an excluded
+  *running* job refusing both heartbeat and successful completion.
+- The tool supervisor is deliberately **not connected** to API, CLI job commands,
+  video-job scheduler, original-file access or FFmpeg. OS CPU/GPU/memory and
+  disk quotas, audited FFmpeg arguments, durable pause, source authorization,
+  atomic publication, and Windows mixed-load acceptance remain incomplete.
+- [Process safety limitations](../../operations/video-worker-process-safety.md).
+
+**Operator action:** no new maintained-database migration, backup, poster
+generation, ingestion or video-processing activation is requested for this
+checkpoint. Continue development after CI and PR review.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -129,5 +152,6 @@ acceptance criteria remain unchecked until the complete work item is verified.
 - Verification: checkpoint 1 CI passed in merged PR #600; checkpoint 2 was
   locally accepted by maintainer (all mandatory checks PASS, Videos library
   optional/N/A). No further v34 migration is required solely for checkpoint 3.
-- Checkpoint 3 validation: CI compile, disposable PostgreSQL tests and Docs check
-  before merge; no new schema or runtime processing activation.
+- Checkpoint 3: merged PR #605; queue-only operator status/cancel commands.
+- Checkpoint 4: Windows process-supervisor and PostgreSQL lease fencing tests
+  run in PR CI; no schema change or runtime processing activation.
