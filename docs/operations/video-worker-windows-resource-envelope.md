@@ -25,7 +25,9 @@ The supervisor sets all required Windows limits before launching its
 subprocess. For capped profiles it now uses native `CreateProcessW` with
 `CREATE_SUSPENDED`, assigns the suspended process to the job, opens a durable
 wait handle, and only then calls `ResumeThread`. Standard handles are
-inheritable Windows NUL devices: child output is never collected or logged.
+the inherited Windows NUL device only, through a
+`PROC_THREAD_ATTRIBUTE_HANDLE_LIST` allowlist: child output is never
+collected or logged, and unrelated parent handles are not inherited.
 If the platform cannot create/configure or assign the job, execution fails
 closed; it does not silently continue without limits. The job handle is
 closed during all exit paths, terminating surviving members. This is
