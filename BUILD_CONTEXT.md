@@ -4,20 +4,21 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**WI-0194 checkpoint 1 (2026-10-18):** PR #585 integrated the completed
-WI-0192 benchmark and WI-0193 research into `main`; PR #586 removed
-accidentally tracked local helper files. WI-0193 has a bounded
-research-go for selective TOPIQ comparisons (frozen cutoff
-0.16755089163780212; held-out consumed once), no-go for absolute
-quality classification/Very Low exclusion and no production model
-approval. Archive its canonical workitem and close issue #536 after
-closeout PR merges. M37 remains in progress: begin WI-0194
-archive-wide visual redundancy study with an offline deterministic
-photo-disjoint blinded-pair sampling foundation (dHash/CLIP inputs and
-review labels only later); follow with WI-0195 non-production
-collection scenarios if independent redundancy evidence supports it.
-M37 PRs now target `main`, not `features/m37`.
-Do not access or retune against WI-0193 held-out labels.
+**WI-0194 checkpoint 2 (2026-10-19):** PR #587 (checkpoint 1)
+merged to main; WI-0193 is already archived. The current work
+adds a bounded, strictly offline/local-proxy CLI to extract dHash
+candidate neighbours and optionally reuse exact-version CLIP
+semantic-search vectors from the existing PostgreSQL catalogue,
+via a read-only transaction. The default deterministic subset
+is 500 current proxy-backed photos, with an explicit cap of 5000.
+It measures exact within-subset hash pairs and seeded CLIP-to-sample
+comparisons, exports private candidate pairs plus aggregate metrics,
+and makes no archive-wide retrieval or suppression claim. Operator
+must run the local probe and return aggregate-only numbers before
+scaling, model comparisons, or blinded redundancy review. No
+WI-0193 held-out reuse; no private review exports or app changes.
+M37 remains in progress; WI-0195 stays proposed. All new PRs
+target main.
 
 **WI-0193 checkpoint 18 (2026-10-18): ONE-TIME HELD-OUT RESEARCH
 EVALUATION CONSUMED.** Maintainer separately authorized and ran
