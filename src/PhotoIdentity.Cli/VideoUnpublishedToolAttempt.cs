@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Postgres;
+using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Cli;
 
@@ -64,7 +65,7 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
                 workspace => approvedArguments(staged.FilePath, workspace),
                 limits, checkToken => safety.CheckAsync(lease, checkToken),
                 inspectionInterval: TimeSpan.FromMilliseconds(200),
-                workToken.Token);
+                cancellationToken: workToken.Token);
 
             // This deliberately remains an uncommitted execution receipt.
             // Do not call TryFinishAttemptAsync(success:true) from here:
