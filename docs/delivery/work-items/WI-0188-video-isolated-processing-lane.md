@@ -37,9 +37,39 @@ Proxy format implementation, caption/embedding inference, face assignment, cloud
 
 Deterministic job lifecycle tests, plus real mixed-load CPU/GPU/IO and photo regression measurements.
 
+## Implementation checkpoints
+
+### Checkpoint 1 — admission/identity contracts (2026-10-19, implementation in progress)
+
+- Added `VideoDerivativeJobIdentity` in Core: stable SHA-256 job key binds exact
+  asset revision, derivative kind, policy version, output preset and operator-supplied
+  local executable SHA-256. There are no private source names or paths in the key.
+- Added `VideoProcessingBudget`, `VideoProcessingCandidate`,
+  `VideoProcessingActivity` and the fail-closed, deterministic
+  `VideoProcessingAdmissionPolicy`. Defaults are **disabled and paused**.
+  Admission refuses stale/excluded/unsupported/online-only material, photo-busy
+  periods, or resource estimates outside frame/source/temp/concurrency limits.
+- Unit tests cover all denial reasons, safe default, budgets, validation and
+  derivative idempotency/invalidation dimensions. No worker is connected and
+  no queue or media processing runs because of this change.
+- This is policy **preflight only**, not a security lease or resource-enforcing
+  process supervisor. A caller must re-check revision, exclusion and source
+  availability under authoritative repository locks and protect original bytes
+  before execution. Maximum job lifetime still needs enforcement by the worker.
+
+**Remaining work before WI-0188 review:** durable PostgreSQL job and control
+records, atomic lease/restart/retry with cancellation and stale-output fencing;
+strict local-process and hydration budgets; worker photo-priority/pause and
+operator progress/diagnostics; default-off API wiring; atomic temp cleanup,
+exclusion tests and maintained Windows mixed-load measurements. No existing
+acceptance criterion is considered met solely by checkpoint 1.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core policy/identity contracts and unit tests; delivery tracking.
+- Trade-offs: explicit conservative admission contract before persistent state and
+  backend execution; no speculative API, schema upgrade or FFmpeg invocation.
+- Deferred work: durable runner, database migration, media adapters,
+  observability, mixed-load benchmark and maintained-host signoff.
+- Commands run: no local .NET runtime available in the connected execution
+  environment; run targeted Core tests and Docs validation through CI after PR.
