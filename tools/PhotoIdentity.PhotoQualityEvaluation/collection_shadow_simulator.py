@@ -391,6 +391,10 @@ def main():
     report = group.add_parser("report")
     report.add_argument("--blind", required=True)
     report.add_argument("--audit", required=True)
+    ratings = group.add_parser("review-report")
+    ratings.add_argument("--blind", required=True)
+    ratings.add_argument("--audit", required=True)
+    ratings.add_argument("--reviews", required=True)
     args = parser.parse_args()
     try:
         if args.action == "import-creative-preview":
@@ -433,6 +437,11 @@ def main():
             audit = load(private_path(args.audit, required=True))
             if sha(blind) != audit.get("blindSha256"):
                 raise ValueError("Private blind/audit hash mismatch")
+            if args.action == "review-report":
+                reviews = load(private_path(args.reviews, required=True))
+                print(json.dumps(review_summary(blind, audit, reviews),
+                                 indent=2, allow_nan=False))
+                return
         print(json.dumps(summarize(audit), indent=2, allow_nan=False))
     except (OSError, ValueError, TypeError, KeyError, OverflowError) as err:
         raise SystemExit("WI-0195 shadow simulation failed (" +
