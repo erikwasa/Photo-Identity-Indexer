@@ -4,7 +4,8 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>Only sanitized, persisted video-lane controls; no photo state.</summary>
 public sealed record VideoProcessingControlState(
-    bool Enabled, bool Paused, long Generation, string LastAction);
+    bool Enabled, bool Paused, long Generation, string LastAction,
+    Guid? SelectedJobId = null, DateTimeOffset? AuthorizationExpiresAtUtc = null);
 
 public sealed record VideoStopResult(int QueuedCancelled, int RunningCancellationRequested);
 
@@ -20,14 +21,18 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            SELECT enabled, paused, generation, last_action
+            SELECT enabled, paused, generation, last_action,
+                   selected_job_id, authorization_expires_at_utc
             FROM video_processing_control WHERE singleton_id = 1;
             """;
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token))
             throw new InvalidOperationException("Video lane control row is missing: fail closed.");
         return new(reader.GetBoolean(0), reader.GetBoolean(1),
-            reader.GetInt64(2), reader.GetString(3));
+            reader.GetInt64(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetGuid(4),
+            reader.IsDBNull(5) ? null :
+                reader.GetFieldValue<DateTimeOffset>(5));
     }
 
     /// <summary>Pause new video claims; the future worker must also observe
@@ -50,7 +55,8 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
             SET paused=@paused, last_action=@action, updated_at_utc=now(),
                 generation=generation+1
             WHERE singleton_id=1
-            RETURNING enabled, paused, generation, last_action;
+            RETURNING enabled, paused, generation, last_action,
+                      selected_job_id, authorization_expires_at_utc;
             """;
         command.Parameters.AddWithValue("paused", paused);
         command.Parameters.AddWithValue("action", action);
@@ -58,7 +64,10 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
         if (!await reader.ReadAsync(token))
             throw new InvalidOperationException("Video lane control row is missing: fail closed.");
         return new(reader.GetBoolean(0), reader.GetBoolean(1),
-            reader.GetInt64(2), reader.GetString(3));
+            reader.GetInt64(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetGuid(4),
+            reader.IsDBNull(5) ? null :
+                reader.GetFieldValue<DateTimeOffset>(5));
     }
 
     /// <summary>Atomically disable+pause admission and cancel all queued jobs.
@@ -123,7 +132,8 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
         await using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            SELECT enabled, paused, generation, last_action
+            SELECT enabled, paused, generation, last_action,
+                   selected_job_id, authorization_expires_at_utc
             FROM video_processing_control
             WHERE singleton_id=1 FOR SHARE;
             """;
@@ -131,6 +141,9 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
         if (!await reader.ReadAsync(token))
             throw new InvalidOperationException("Video lane control row is missing: fail closed.");
         return new(reader.GetBoolean(0), reader.GetBoolean(1),
-            reader.GetInt64(2), reader.GetString(3));
+            reader.GetInt64(2), reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetGuid(4),
+            reader.IsDBNull(5) ? null :
+                reader.GetFieldValue<DateTimeOffset>(5));
     }
 }
