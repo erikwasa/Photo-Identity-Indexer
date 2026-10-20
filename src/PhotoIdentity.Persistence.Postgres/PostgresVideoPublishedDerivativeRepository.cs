@@ -155,7 +155,9 @@ public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogue
             JOIN video_processing_jobs job ON job.id=record.job_id
             JOIN asset_revisions revision ON revision.id=record.asset_revision_id
             JOIN assets asset ON asset.id=revision.asset_id
+            JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
             WHERE record.job_id=@id AND job.status='succeeded'
+              AND metadata.inspection_status='supported'
               AND job.asset_revision_id=record.asset_revision_id
               AND revision.media_kind='video' AND asset.media_kind='video'
               AND asset.deleted_at_utc IS NULL
