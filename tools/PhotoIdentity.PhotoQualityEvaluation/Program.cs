@@ -21,6 +21,13 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        if (args.Length > 1 &&
+            string.Equals(args[0], "collection-shadow", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(args[1], "proxies", StringComparison.OrdinalIgnoreCase))
+        {
+            return await CollectionShadowProxyMapCommand.RunAsync(args[2..]);
+        }
+
         if (args.Length > 0 &&
             string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase))
         {
