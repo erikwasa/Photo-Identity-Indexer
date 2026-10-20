@@ -1,0 +1,157 @@
+# WI-0188 — explicitly selected one-shot video trial, schema v37
+
+**Experimental, no unattended worker.** This is an opt-in single-attempt
+development path for already-local, previously ingested and technically
+inspected Rec.709 MOV/MP4 revisions. There is no automatic video scanner,
+hydration, hosted video service, web video endpoint, photo job change,
+arbitrary archive path argument or general-purpose FFmpeg command runner.
+
+## Why v37 is necessary
+
+The v34 queue normally takes the oldest eligible video job when a
+persisted lane is enabled. An opt-in trial must never accidentally process
+*another* queued job. The additive v37 migration introduces a nullable
+`selected_job_id` and `authorization_expires_at_utc` on the **video-only**
+operator control singleton, leaving both NULL and video enabled=false /
+paused=true on upgrade. A scoped arm sets both under a control lock and
+increments the generation. Queue selection checks the exact job ID,
+authorization deadline and ordinary source/revision/exclusion/photo priority
+gates. Heartbeats, staged-source locators, live photo-first safety probes,
+retry acknowledgement and final receipt publication all recheck the
+selected ID, absolute PostgreSQL deadline and generation.
+
+The fixed authorization window is **13 minutes**. The selected tool's
+wall time is capped at 9 minutes and the coordinator attempt at 11 minutes,
+leaving time for bounded input staging and independent FFprobe verification.
+A stopped or crashed CLI cannot keep the selected job authorized after
+its deadline. If the process crashes before disarming, operators must use
+the existing `video jobs stop --apply` after inspecting the queue; do not
+manually bypass the scope. **No polling or automatic retries are started.**
+
+## Two deliberate operator actions
+
+1. `video one-shot enqueue` accepts only a previously catalogued
+   `--revision-id UUID`, explicit PostgreSQL environment variable,
+   exact database, and approved FFmpeg SHA-256. The operation is **dry
+   run by default**; it checks current/supported/SDR inspection, bounded
+   source size, the OneDrive availability attribute and local file length.
+   It does NOT open original video bytes or ask OneDrive to hydrate. With
+   `--apply`, it atomically rechecks source/exclusion/currentness under
+   the source lock and records an idempotent `PlayableProxy` queued
+   job with exact tool/preset version. The returned UUID is the only
+   accepted input to the later processing command. Creating a job does
+   not grant any tool execution.
+2. `video one-shot run` requires the exact previously queued UUID, an
+   already-created **application-owned marked private cache** not
+   overlapping sources, absolute local FFmpeg/FFprobe files and
+   independently approved SHA-256 digests for both binaries. It rejects
+   remote PostgreSQL, wrong schema, unknown flags and unapproved tool
+   changes **before** permitting processing. Dry run does not arm,
+   claim, open media, or execute FFmpeg. With both `--apply` and
+   `--acknowledge-isolated-v37-rehearsal`, it locks the source and
+   video control, refuses photo work / active video leases, verifies
+   the queued job matches the exact codec preset and executable hash,
+   and arms only that UUID for 13 minutes. The coordinator claims at most
+   one job; the bounded Windows Job Object encoder stages only a verified
+   no-recall local copy, independently validates H.264/Rec.709/MP4
+   output via a second pinned guarded FFprobe, and commits the v36
+   private receipt under the existing lease/source/control fences.
+   **Finally it disarms** only the matching grant and leaves every
+   unrelated queued job untouched.
+
+The attempt uses only one video process at a time, a conservative
+768 MiB Job Object RAM ceiling, 15% CPU hard cap, maximum input 256 MiB,
+maximum registered reservation 512 MiB (source plus 256 MiB temporary
+output), a fixed 9-minute encoder wall limit and one-process FFprobe
+with its own 15-second budget. Live photo activity and operator pause,
+stop, exclusion or lost lease preempt execution. These are **not**
+comprehensive disk quota, I/O bandwidth, GPU or network sandboxes.
+They do not imply the experiment is production-safe unattended.
+
+## Maintained Windows safety gate — not requested by this PR
+
+The maintained PostgreSQL database was last accepted at **v34**, while
+repo code now targets **v37**. The user must not start ANY newer
+database-connected application or CLI against the maintained database
+until an authoritative **fresh PostgreSQL backup** and the documented
+**isolated restored v34→v37 schema rehearsal** have succeeded. Use
+`catalogue rehearse-v37` on the *isolated restored database only*;
+legacy `rehearse-v35`/`rehearse-v36` aliases also apply through current
+v37, but v37 is the descriptive name. Ensure the rehearsal verifies:
+
+- unchanged restored photo/video catalogue table counts;
+- existing v34 jobs preserved; newly added v35 control initialized
+  disabled and paused;
+- v36 private receipt registry initially empty;
+- v37 migration applied exactly once with NULL selected/deadline fields,
+  and repeated initialization idempotent;
+- original authoritative catalogue **never opened** by rehearsal.
+
+See the existing
+[PostgreSQL backup/rehearsal runbook](video-publication-and-v36-rehearsal.md).
+Do not infer a database name from a past rehearsal. Never print
+PostgreSQL credentials.
+
+Only **after** the independent migration and worker containment gates
+are approved should a maintainer exercise the dry-run commands from
+PowerShell, substituting explicitly confirmed values:
+
+~~~powershell
+$db = 'REPLACE_WITH_VERIFIED_V37_DATABASE'
+$connectionVariable = 'REPLACE_WITH_EXISTING_POSTGRES_CONNECTION_ENV_NAME'
+$revisionId = 'REPLACE_WITH_SELECTED_ALREADY_LOCAL_VIDEO_REVISION_UUID'
+$privateRoot = 'C:\REPLACE_WITH_MARKED_PRIVATE_VIDEO_CACHE'
+
+# Operator-approved, separately installed binaries (never download via CLI)
+$ffmpeg = (Get-Command ffmpeg.exe -ErrorAction Stop).Source
+$ffprobe = (Get-Command ffprobe.exe -ErrorAction Stop).Source
+$ffmpegHash = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+$ffprobeHash = (Get-FileHash -LiteralPath $ffprobe -Algorithm SHA256).Hash.ToLowerInvariant()
+# Independently compare both hashes to accepted tool approvals before use.
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot enqueue `
+  --postgres-connection-env $connectionVariable --database $db `
+  --revision-id $revisionId --ffmpeg-sha256 $ffmpegHash
+
+# Only after this preview indicates eligible, add --apply to enqueue
+# exactly the selected revision, and copy the returned opaque jobId.
+$jobId = 'REPLACE_WITH_RETURNED_QUEUED_JOB_UUID'
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot run `
+  --postgres-connection-env $connectionVariable --database $db `
+  --job-id $jobId --cache-root $privateRoot `
+  --ffmpeg $ffmpeg --ffmpeg-sha256 $ffmpegHash `
+  --ffprobe $ffprobe --ffprobe-sha256 $ffprobeHash
+
+# Explicit full trial requires BOTH flags appended after approved rehearsal:
+# --apply --acknowledge-isolated-v37-rehearsal
+~~~
+
+The first successful one-shot requires representative **already-local**
+SDR H.264/AAC, portrait/landscape and optional HEVC/PCM trials,
+independent original SHA-256 pre/post, no-hydration evidence,
+seeking/audio/quality checks and photo-only versus mixed throughput
+and slideshow/search latency comparisons. **No local video processing
+is requested now.**
+
+## Failure and crash behavior
+
+- No available local bytes, unexpected hash, active photo work, wrong
+  preset, missing source revision, excluded video or unapproved tool:
+  no selected-job arm.
+- A claim/retry always passes the scoped selection, expiration and
+  generation checks. Wrong, stale or unrelated jobs are never claimed
+  while this grant is live.
+- Tool failure can leave the selected job queued for a separately
+  requested retry; no retry loop runs automatically.
+- On cancellation, try/finally disarms using a bounded independent token.
+  A lost database connection can prevent disarm; the PostgreSQL
+  authorization deadline still prevents further source reading and
+  publication. Recover/disarm the stale lane explicitly after inspection.
+- A v36 receipt is not a public player URL and is invalidated by source
+  exclusion/revision changes; privacy maintenance and quota/eviction
+  remain separate operator commands.
+
+This trial is not production activation. Hard filesystem and I/O quota,
+network isolation, a reviewed real-video profile, source-copy privacy
+purge integration, video playback APIs and 24/7 worker/scheduling are
+still unfulfilled WI-0188/WI-0189/WI-0152 tasks.
