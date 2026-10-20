@@ -62,7 +62,10 @@ public sealed class PostgresVideoLeaseSafetyProbe(PostgresCatalogueDatabase data
                             SELECT 1 FROM source_copy_exclusions excluded
                             WHERE excluded.source_id=asset.source_id
                               AND excluded.source_key=asset.source_key)
-                   ) AS current_lease
+                   ) AS current_lease,
+                   (control.selected_job_id IS NULL OR
+                    (control.selected_job_id=@job
+                     AND control.authorization_expires_at_utc>now())) AS scope_valid
             FROM video_processing_control control
             WHERE control.singleton_id=1;
             """;
@@ -82,6 +85,8 @@ public sealed class PostgresVideoLeaseSafetyProbe(PostgresCatalogueDatabase data
             return VideoExecutionPermit.Deny("photo-priority");
         if (!reader.GetBoolean(4))
             return VideoExecutionPermit.Deny("lease-invalid");
+        if (!reader.GetBoolean(5))
+            return VideoExecutionPermit.Deny("selected-authorization-expired");
         return VideoExecutionPermit.Ready;
     }
 }
