@@ -180,6 +180,37 @@ public sealed class VideoGuardedToolExecutorTests
         finally { Directory.Delete(scratch, recursive: true); }
     }
 
+    [Fact]
+    public async Task Publishing_refuses_uncapped_or_multi_process_tool_profiles()
+    {
+        var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
+        string scratch = MakeScratch();
+        try
+        {
+            foreach (VideoToolExecutionBudget budget in new[]
+            {
+                Budget, PublicationBudget with
+                {
+                    WindowsJobLimits = new WindowsVideoJobLimits(512, 2, 25)
+                }
+            })
+            {
+                InvalidOperationException failure =
+                    await Assert.ThrowsAsync<InvalidOperationException>(
+                        () => executor.RunAsync(
+                            "never-open", new string('0', 64), scratch,
+                            _ => [], budget,
+                            _ => Task.FromResult(VideoExecutionPermit.Ready),
+                            TimeSpan.FromMilliseconds(100),
+                            onValidatedSuccessfulExit: (_, _) => Task.CompletedTask));
+                Assert.Contains("single-process", failure.Message,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+            }
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
     private static string MakeScratch()
     {
         string path = Path.Combine(Path.GetTempPath(),
