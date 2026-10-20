@@ -297,8 +297,14 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             VideoProcessingJobLease successful = Assert.IsType<VideoProcessingJobLease>(
                 await queue.TryClaimNextAsync(budget, false));
             Assert.Equal(successId, successful.Id);
-            Assert.True(await queue.TryFinishAttemptAsync(successId, successful.LeaseToken, true, false));
-            Assert.Equal("succeeded", (await queue.GetAsync(successId))?.Status);
+            // A tool exit is NOT proof of a durable derivative. The generic
+            // queue method must refuse uncommitted success acknowledgement.
+            Assert.False(await queue.TryFinishAttemptAsync(
+                successId, successful.LeaseToken, succeeded: true, retryable: false));
+            Assert.Equal("running", (await queue.GetAsync(successId))?.Status);
+            Assert.True(await queue.TryFinishAttemptAsync(
+                successId, successful.LeaseToken, succeeded: false, retryable: false));
+            Assert.Equal("failed", (await queue.GetAsync(successId))?.Status);
 
             // New revision is higher-priority than queued historical work.
             Guid staleJob = await queue.EnqueueAsync(Identity("stale"), budget, candidate);
