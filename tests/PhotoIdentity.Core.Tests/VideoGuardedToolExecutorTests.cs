@@ -117,6 +117,65 @@ public sealed class VideoGuardedToolExecutorTests
         finally { Directory.Delete(scratch, recursive: true); }
     }
 
+    [Fact]
+    public async Task Guarded_completion_callback_runs_before_owned_workspace_cleanup()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = MakeScratch();
+        try
+        {
+            string executable = CmdPath();
+            int called = 0;
+            var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
+            VideoGuardedToolExecutionResult completed = await executor.RunAsync(
+                executable, await HashAsync(executable), scratch,
+                _ => ["/d", "/c", "exit /b 0"], Budget,
+                _ => Task.FromResult(VideoExecutionPermit.Ready),
+                TimeSpan.FromMilliseconds(100),
+                onValidatedSuccessfulExit: (workspace, _) =>
+                {
+                    Assert.True(Directory.Exists(workspace));
+                    Assert.True(File.Exists(Path.Combine(workspace,
+                        VideoScratchOwnership.MarkerName)));
+                    File.WriteAllText(Path.Combine(workspace, "output.mp4"), "synthetic");
+                    Interlocked.Increment(ref called);
+                    return Task.CompletedTask;
+                });
+            Assert.True(completed.Completed);
+            Assert.Equal(1, called);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Revoked_final_safety_vetoes_callback_and_cleans_workspace()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = MakeScratch();
+        try
+        {
+            int inspected = 0, called = 0;
+            string executable = CmdPath();
+            var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => executor.RunAsync(
+                executable, HashAsync(executable).GetAwaiter().GetResult(), scratch,
+                _ => ["/d", "/c", "exit /b 0"], Budget,
+                _ => Task.FromResult(Interlocked.Increment(ref inspected) == 1
+                    ? VideoExecutionPermit.Ready
+                    : VideoExecutionPermit.Deny("photo-priority")),
+                TimeSpan.FromMilliseconds(100),
+                onValidatedSuccessfulExit: (_, _) =>
+                {
+                    Interlocked.Increment(ref called);
+                    return Task.CompletedTask;
+                }));
+            Assert.Equal(0, called);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
     private static string MakeScratch()
     {
         string path = Path.Combine(Path.GetTempPath(),
