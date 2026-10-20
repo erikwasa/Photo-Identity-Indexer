@@ -135,6 +135,9 @@ public static class VideoSyntheticProxyPilotCommandRunner
                             EncodeBudget, generatedToken,
                             afterSuccessfulExit: async (encodeWorkspace, encodeToken) =>
                             {
+                                // The encoder has exited. Do not include the
+                                // independent FFprobe pass in encode duration.
+                                clock.Stop();
                                 string candidate = Path.Combine(encodeWorkspace, "output.mp4");
                                 VideoProxyInspection valid = await validator.ValidateAsync(
                                     candidate,
