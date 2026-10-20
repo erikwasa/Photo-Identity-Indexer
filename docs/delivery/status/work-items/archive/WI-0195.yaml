@@ -1,10 +1,11 @@
 id: WI-0195
 title: Simulate quality-aware visual redundancy during collection creation
 milestone: M37
-status: cancelled
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0195-quality-aware-collection-simulation.md
 started_at: 2026-10-20
+completed_at: 2026-10-21
 last_updated_at: 2026-10-21
 blockers: []
 blocker_notes:
@@ -15,4 +16,4 @@ evidence:
 - type: issue
   value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/538
 - type: research-disposition
-  value: 'Original four-arm automatic-policy acceptance CANCELLED/NOT DEMONSTRATED (quality selective pairwise research-only with 0/80 live score overlap; Very Low automatic exclusion NO-GO; redundancy suppression NO-GO; combined NO-GO). Safe offline shadow tests and 80/80 no-inference proxy plan passed. Manual suggestion experience accepted separately in issue #629; do not call this work item a passed four-arm product experiment.'
+  value: 'Evaluation/disposition completed; original four-arm automatic-policy acceptance NOT DEMONSTRATED (quality selective pairwise research-only with 0/80 live score overlap; Very Low automatic exclusion NO-GO; redundancy suppression NO-GO; combined NO-GO). Safe offline shadow tests and 80/80 no-inference proxy plan passed. Manual suggestion experience accepted separately in issue #629; do not call this work item a passed four-arm product experiment.'
