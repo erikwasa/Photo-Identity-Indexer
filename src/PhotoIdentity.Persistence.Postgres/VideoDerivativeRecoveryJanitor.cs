@@ -77,9 +77,12 @@ public sealed class VideoDerivativeRecoveryJanitor(PostgresCatalogueDatabase dat
         int considered = 0, eligible = 0, deleted = 0, protectedCount = 0, refused = 0;
         int invalidatedRegistered = 0;
         DateTime cutoff = DateTime.UtcNow - minimumAge;
-        // Limit every enumerated entry, including unknown names. A malicious
-        // directory tree can never trigger an unbounded walk or bulk deletion.
+
+        // Discover the entire bounded top-level candidate set BEFORE any
+        // filesystem mutation. Exceeding an operator limit must not cause
+        // a partial apply, where earlier files have already been removed.
         int examinedEntries = 0;
+        List<(string File, Guid JobId)> candidates = [];
         foreach (string jobDir in Directory.EnumerateFileSystemEntries(derivativeRoot))
         {
             token.ThrowIfCancellationRequested();
@@ -98,52 +101,53 @@ public sealed class VideoDerivativeRecoveryJanitor(PostgresCatalogueDatabase dat
                 token.ThrowIfCancellationRequested();
                 if (++examinedEntries > 256 || ++considered > maximumFiles)
                     throw new InvalidOperationException(
-                        "Derivative scan budget exceeded; reduce the operator scope.");
-                string filename = Path.GetFileName(file);
-                if (!File.Exists(file) ||
-                    (File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0 ||
-                    filename.Length != 36 || !filename.EndsWith(".mp4", StringComparison.Ordinal) ||
-                    !TryOpaqueGuid(filename[..32], out Guid leaseToken))
-                {
-                    refused++;
-                    continue;
-                }
-
-                string relative = "video-derivatives/" + Path.GetFileName(jobDir) +
-                    "/" + filename;
-                if (!VideoDerivativeArtifactPath.IsCanonical(relative, jobId, leaseToken) ||
-                    File.GetLastWriteTimeUtc(file) > cutoff)
-                {
-                    protectedCount++;
-                    continue;
-                }
-
-                // This result is authoritative even for excluded/deleted
-                // source copies: unlike GetCurrentAsync, it does NOT hide
-                // receipts. A live/current receipt is never deletable.
-                (bool known, string status, bool registered, bool current) =
-                    await InspectAsync(connection, transaction, jobId, relative, token);
-                // Registered evidence (even if currently excluded or
-                // superseded) is NOT an orphan. Never delete an existing
-                // receipt behind the application's back: restoration/
-                // re-enqueue and explicit privacy purge need a separate
-                // lifecycle with a revision-aware regeneration policy.
-                if (!known || status is "running" or "queued" || registered)
-                {
-                    protectedCount++;
-                    if (registered && !current) invalidatedRegistered++;
-                    continue;
-                }
-
-                eligible++;
-                if (!apply) continue;
-
-                // Check once more after DB work: refuse a replaced symlink.
-                if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
-                    throw new IOException("Video output changed during cleanup.");
-                File.Delete(file);
-                deleted++;
+                        "Derivative scan budget exceeded; nothing was deleted.");
+                candidates.Add((file, jobId));
             }
+        }
+
+        foreach ((string file, Guid jobId) in candidates)
+        {
+            token.ThrowIfCancellationRequested();
+            string filename = Path.GetFileName(file);
+            if (!File.Exists(file) ||
+                (File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0 ||
+                filename.Length != 36 ||
+                !filename.EndsWith(".mp4", StringComparison.Ordinal) ||
+                !TryOpaqueGuid(filename[..32], out Guid leaseToken))
+            {
+                refused++;
+                continue;
+            }
+
+            string relative = "video-derivatives/" +
+                jobId.ToString("N") + "/" + filename;
+            if (!VideoDerivativeArtifactPath.IsCanonical(relative, jobId, leaseToken) ||
+                File.GetLastWriteTimeUtc(file) > cutoff)
+            {
+                protectedCount++;
+                continue;
+            }
+
+            // This observation includes excluded/deleted source receipts.
+            // Never delete any registered evidence via orphan recovery.
+            (bool known, string status, bool registered, bool current) =
+                await InspectAsync(connection, transaction, jobId, relative, token);
+            if (!known || status is "running" or "queued" || registered)
+            {
+                protectedCount++;
+                if (registered && !current) invalidatedRegistered++;
+                continue;
+            }
+
+            eligible++;
+            if (!apply) continue;
+
+            // Check once more after DB work: refuse a replaced link.
+            if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Video output changed during cleanup.");
+            File.Delete(file);
+            deleted++;
         }
 
         await transaction.CommitAsync(token);
