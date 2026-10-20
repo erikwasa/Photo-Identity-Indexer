@@ -39,7 +39,9 @@ public sealed record VideoToolExecutionResult(int ExitCode, TimeSpan Elapsed);
 /// discards stdout/stderr without retaining media names, checks scratch usage,
 /// and kills the process tree on cancel/time limit/over-budget. Does NOT take
 /// a source path or open/authorize video originals, publish artifacts, hydrate,
-/// or schedule a job. Callers must use a fixed, audited FFmpeg argument profile.
+/// or schedule a job itself. An optional post-exit callback can publish a
+/// validated output before owned workspace teardown; this remains unregistered.
+/// Callers must use a fixed, audited FFmpeg argument profile before activation.
 ///
 /// Scratch polling is best-effort: an OS disk quota is still required to bound
 /// transient allocation. WindowsJobLimits, when explicitly supplied, configures
