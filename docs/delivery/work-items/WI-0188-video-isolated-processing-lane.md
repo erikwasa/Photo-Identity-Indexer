@@ -349,6 +349,8 @@ checkpoint. Continue development after CI and PR review.
   successful status and an independently read authorized publication receipt.
 - Added an optional guarded successful-tool-exit callback, with live
   lease/priority observation, **before** supervised workspace cleanup.
+  Publication strictly requires a **single-process native Windows Job Object**;
+  uncapped/multi-process tool profiles fail closed before launch.
   An unregistered `VideoPublishedToolAdapter` integrates the previously
   separate staged input, Windows-capped process, optional callback and
   `VideoDerivativeFilePublisher` for a bounded same-volume private rename.
