@@ -52,6 +52,11 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
+                "video" when args.Length > 2 &&
+                    args[1] == "derivatives" && args[2] == "recover" =>
+                    await VideoDerivativeRecoveryCommandRunner.RunAsync(
+                        VideoDerivativeRecoveryOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "scratch-cleanup" =>
                     await VideoScratchCleanupCommandRunner.RunAsync(
                         VideoScratchCleanupOptions.Parse(args.Skip(2).ToArray()),
@@ -160,6 +165,15 @@ public static class Program
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (v34 isolated restore; verifies v35 control and v36 empty artifact registry)
               catalogue rehearse-v35 (legacy alias; also applies through v36)
+
+              video derivatives recover --postgres-connection-env NAME --database DB
+                                        --cache-root ABSOLUTE_PRIVATE_ROOT
+                                        [--min-age-hours HOURS (48..720)]
+                                        [--max-files COUNT (1..64)] [--apply]
+                                        (dry-run default; requires v36, disabled+paused
+                                         video lane, zero running jobs; deletes only aged,
+                                         unregistered opaque private output files;
+                                         preserves every registered derivative)
 
               video scratch-cleanup --scratch-root DIR
                                     [--min-age-hours HOURS (24..720)]
