@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed record VideoDerivativeRecoveryReport(
     int Considered, int Eligible, int Deleted, int Protected, int Refused,
-    bool DryRun);
+    int InvalidatedRegistered, bool DryRun);
 
 /// <summary>
 /// Opt-in, bounded, DB-aware reconciler for private v36 video outputs.
@@ -71,10 +71,11 @@ public sealed class VideoDerivativeRecoveryJanitor(PostgresCatalogueDatabase dat
         if (!Directory.Exists(derivativeRoot))
         {
             await transaction.CommitAsync(token);
-            return new(0, 0, 0, 0, 0, !apply);
+            return new(0, 0, 0, 0, 0, 0, !apply);
         }
 
         int considered = 0, eligible = 0, deleted = 0, protectedCount = 0, refused = 0;
+        int invalidatedRegistered = 0;
         DateTime cutoff = DateTime.UtcNow - minimumAge;
         // Limit every enumerated entry, including unknown names. A malicious
         // directory tree can never trigger an unbounded walk or bulk deletion.
@@ -122,35 +123,20 @@ public sealed class VideoDerivativeRecoveryJanitor(PostgresCatalogueDatabase dat
                 // receipts. A live/current receipt is never deletable.
                 (bool known, string status, bool registered, bool current) =
                     await InspectAsync(connection, transaction, jobId, relative, token);
-                if (!known || status == "running" || status == "queued" ||
-                    (registered && current))
+                // Registered evidence (even if currently excluded or
+                // superseded) is NOT an orphan. Never delete an existing
+                // receipt behind the application's back: restoration/
+                // re-enqueue and explicit privacy purge need a separate
+                // lifecycle with a revision-aware regeneration policy.
+                if (!known || status is "running" or "queued" || registered)
                 {
                     protectedCount++;
+                    if (registered && !current) invalidatedRegistered++;
                     continue;
                 }
 
                 eligible++;
                 if (!apply) continue;
-
-                // Deleted or superseded outputs: unlink the receipt inside
-                // the transaction, then delete precisely one already-proven
-                // private owned file. On filesystem failure, rollback receipt
-                // removal. DB commit can still fail after deletion; no public
-                // file consumer is enabled, so a stale row cannot serve data.
-                if (registered)
-                {
-                    await using NpgsqlCommand remove = connection.CreateCommand();
-                    remove.Transaction = transaction;
-                    remove.CommandText = """
-                        DELETE FROM video_published_derivatives
-                        WHERE job_id=@job AND artifact_relative_path=@path;
-                        """;
-                    remove.Parameters.AddWithValue("job", jobId);
-                    remove.Parameters.AddWithValue("path", relative);
-                    if (await remove.ExecuteNonQueryAsync(token) != 1)
-                        throw new InvalidOperationException(
-                            "Video receipt changed during controlled cleanup.");
-                }
 
                 // Check once more after DB work: refuse a replaced symlink.
                 if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
@@ -161,7 +147,8 @@ public sealed class VideoDerivativeRecoveryJanitor(PostgresCatalogueDatabase dat
         }
 
         await transaction.CommitAsync(token);
-        return new(considered, eligible, deleted, protectedCount, refused, !apply);
+        return new(considered, eligible, deleted, protectedCount, refused,
+            invalidatedRegistered, !apply);
     }
 
     private static async Task<(bool Known, string Status, bool Registered, bool Current)>
@@ -203,8 +190,11 @@ public sealed class VideoDerivativeRecoveryJanitor(PostgresCatalogueDatabase dat
         return (true, reader.GetString(0), reader.GetBoolean(1), reader.GetBoolean(2));
     }
 
-    private static bool TryOpaqueGuid(string value, out Guid id) =>
-        value.Length == 32 && value.All(c =>
+    private static bool TryOpaqueGuid(string value, out Guid id)
+    {
+        id = Guid.Empty;
+        return value.Length == 32 && value.All(c =>
             c is >= '0' and <= '9' or >= 'a' and <= 'f') &&
-        Guid.TryParseExact(value, "N", out id);
+            Guid.TryParseExact(value, "N", out id);
+    }
 }
