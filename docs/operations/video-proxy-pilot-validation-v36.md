@@ -68,6 +68,24 @@ photo-only and mixed workload plus search/slideshow latency and stop,
 cancel, exclusion, restart and cleanup semantics. Do not upload media,
 source paths or private tool logs to GitHub.
 
+The experimental libx264 argument profile now explicitly emits Rec.709
+color primaries, transfer and matrix in the H.264 VUI bitstream, in
+addition to MP4 encoder metadata. This was tested against an installed
+FFmpeg/FFprobe pair after the independent validator rejected missing
+transfer/primaries fields. No relaxation of the fail-closed color
+validator was needed.
+
+## Source-free end-to-end codec smoke path
+
+A complementary development command now offers a real **synthetic-only**
+FFmpeg → experimental 720p fixed encoder → independently verified FFprobe
+pipeline, exercised on two short landscape/portrait generated fixtures
+without reading an archive, database or OneDrive. It leaves no video
+artifacts, cannot publish durable receipts, and is dry-run by default.
+See [the synthetic pilot runbook](video-synthetic-proxy-pilot.md).
+This does not replace private camera-media quality, audio, browser and
+no-hydration acceptance.
+
 ## Maintained schema protection
 
 The accepted maintained database is v34; this PR retains v36 and adds

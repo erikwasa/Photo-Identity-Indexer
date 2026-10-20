@@ -58,6 +58,8 @@ public sealed class VideoProxyCandidateProfileTests
         Assert.Contains("-threads", args);
         Assert.Equal("1", args[Array.IndexOf(args, "-threads") + 1]);
         Assert.Equal("libx264", args[Array.IndexOf(args, "-c:v") + 1]);
+        Assert.Equal("colorprim=bt709:transfer=bt709:colormatrix=bt709",
+            args[Array.IndexOf(args, "-x264-params") + 1]);
         Assert.Equal("aac", args[Array.IndexOf(args, "-c:a") + 1]);
         Assert.Contains("-sn", args);
         Assert.Contains("-dn", args);
