@@ -202,9 +202,9 @@ public sealed class VideoProxyCandidateProfileTests
     private static byte[] Boxes(params string[] types)
     {
         using MemoryStream file = new();
+        Span<byte> header = stackalloc byte[8];
         foreach (string type in types)
         {
-            Span<byte> header = stackalloc byte[8];
             BinaryPrimitives.WriteUInt32BigEndian(header[..4], 48);
             Encoding.ASCII.GetBytes(type, header[4..]);
             file.Write(header);
