@@ -154,6 +154,6 @@ and has no automatic exclusion or collection/slideshow filtering.
 
 **M37 marked completed as a decision-oriented research milestone**;
 WI-0194 completed with **suppression NO-GO**, WI-0195
-cancelled with the original four-arm acceptance explicitly
+closed as a research disposition with the original four-arm acceptance explicitly
 unmet. This is the final boundary between research and
 operator-facing product work.
