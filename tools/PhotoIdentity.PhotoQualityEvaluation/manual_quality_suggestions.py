@@ -237,7 +237,13 @@ def atomic_state(path, state, manifest):
 def read_proxy(root, row):
     # Reject symlink escapes and verify current bytes every request.
     prefix = root.resolve(strict=True)
-    path = (prefix / row["proxyRelativePath"]).resolve(strict=True)
+    relative = row["proxyRelativePath"]
+    if (not isinstance(relative, str) or not relative
+            or Path(relative).is_absolute()
+            or ".." in relative.replace("\\\\", "/").split("/")
+            or ":" in relative or "\\x00" in relative):
+        raise ValueError("Unsafe or outside-root review proxy path")
+    path = (prefix / relative).resolve(strict=True)
     if not path.is_relative_to(prefix) or not path.is_file():
         raise ValueError("Review proxy outside configured root")
     data = path.read_bytes()
