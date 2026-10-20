@@ -10,7 +10,7 @@ WI-0193 completed; WI-0194 COMPLETED as archive-wide
 visual-redundancy candidate discovery + 200 calibration /
 180 guarded heldout human-pair evaluation, with **NO-GO**
 to unattended similarity suppression. WI-0195
-CANCELLED/NOT DEMONSTRATED in its original FOUR-ARM automatic
+CLOSED as research disposition, original four-arm NOT DEMONSTRATED in its original FOUR-ARM automatic
 policy acceptance: bounded 80-photo live Creative shadow
 and 6+8 synthetic tests passed and 80/80 proxy plan
 worked, but 0/80 prior TOPIQ score overlap and no
