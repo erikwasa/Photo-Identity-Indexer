@@ -20,8 +20,11 @@ public sealed class VideoProxyOutputValidator(
             MaximumCpuPercent: 25));
 
     public async Task<VideoProxyInspection> ValidateAsync(
-        string candidateFile, CancellationToken token = default)
+        string candidateFile,
+        Func<CancellationToken, Task<VideoExecutionPermit>> inspect,
+        CancellationToken token = default)
     {
+        ArgumentNullException.ThrowIfNull(inspect);
         if (!OperatingSystem.IsWindows() ||
             !Path.IsPathFullyQualified(candidateFile) ||
             !File.Exists(candidateFile) ||
@@ -33,7 +36,8 @@ public sealed class VideoProxyOutputValidator(
         VideoProxyCandidateProfile.ValidateFastStart(candidateFile);
         long length = new FileInfo(candidateFile).Length;
         VideoProxyInspection? inspection = null;
-        VideoToolExecutionResult result = await new VideoToolProcessSupervisor().RunAsync(
+        VideoGuardedToolExecutionResult result =
+            await new VideoGuardedToolExecutor(new VideoToolProcessSupervisor()).RunAsync(
             ffprobePath, ffprobeSha256, scratchRoot,
             workspace =>
             [
@@ -47,8 +51,10 @@ public sealed class VideoProxyOutputValidator(
                 "-o", Path.Combine(workspace, "probe.json"),
                 "-i", candidateFile
             ],
-            ProbeBudget, token,
-            afterSuccessfulExit: async (workspace, checkToken) =>
+            ProbeBudget, inspect,
+            inspectionInterval: TimeSpan.FromMilliseconds(200),
+            cancellationToken: token,
+            onValidatedSuccessfulExit: async (workspace, checkToken) =>
             {
                 string json = Path.Combine(workspace, "probe.json");
                 if (!File.Exists(json) ||
@@ -58,7 +64,7 @@ public sealed class VideoProxyOutputValidator(
                 byte[] data = await File.ReadAllBytesAsync(json, checkToken);
                 inspection = VideoProxyCandidateProfile.ValidateOutputJson(data, length);
             });
-        if (result.ExitCode != 0 || inspection is null)
+        if (!result.Completed || result.ExitCode != 0 || inspection is null)
             throw new InvalidDataException("Video proxy inspection could not verify the candidate.");
         // The encoder's finished file must remain unchanged between probe
         // and publication. The final publisher opens/rehashes under its own
