@@ -36,6 +36,10 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
             throw new InvalidOperationException(
                 "Video execution exceeds its leased source/scratch reservation.");
 
+        // Reserve headroom for the *combined* staged original plus tool
+        // output, rather than checking the copy and encoder independently.
+        VideoScratchCapacityGuard.EnsureCapacity(scratchRoot, lease.TemporaryBytes);
+
         var queue = new PostgresVideoProcessingJobRepository(database);
         var safety = new PostgresVideoLeaseSafetyProbe(database);
         using CancellationTokenSource workToken =
