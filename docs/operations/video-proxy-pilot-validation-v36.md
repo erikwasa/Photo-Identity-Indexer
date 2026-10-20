@@ -37,7 +37,10 @@ MP4 top-level boxes: ftyp first; valid box boundaries; complete layout;
 moov *before* mdat. A separate SHA-256-approved FFprobe runs with its own
 15-second, single-process, CPU-limited native Windows Job Object and file-only
 protocol whitelist. Its JSON is written only to a marked scratch workspace,
-never stdout/logs, and is capped at 64KiB.
+never stdout/logs, and is capped at 64KiB. The probe also runs through
+live lease/control and photo-priority checks before launch, periodically
+during execution and once more after completion; any loss of permission
+stops it and refuses publication.
 
 The validator requires exactly one H.264 yuv420p Rec.709 video stream,
 max 720x720, even dimensions, at most 30.1fps, zero remaining display
