@@ -113,6 +113,17 @@ require health `schemaVersion: 36`, unchanged photo features and no active
 video worker. Do not use an operator resume action as an enable switch;
 the lane still has **no** production enable command.
 
+## Conservative v36 output recovery
+
+Checkpoint 13 adds a **separate, dry-run-first** DB-aware orphan reconciler
+that may remove only old **unregistered** files belonging to known terminal
+video jobs, under a stopped video lane and exclusive control lock.
+Registered but invalidated outputs remain protected and are reported
+separately for WI-0189's reviewed privacy/retention lifecycle.
+See [operator recovery](video-derivative-recovery-v36.md).
+This introduces **no new migration** and does not replace the existing
+v34→v36 isolated rehearsal safety gate.
+
 ## CI and remaining Windows proof
 
 Tests cover canonical job/lease path names, unowned-output rejection,
