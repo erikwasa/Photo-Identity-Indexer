@@ -65,6 +65,15 @@ public sealed class VideoToolProcessSupervisor
         ArgumentNullException.ThrowIfNull(buildArguments);
         ArgumentNullException.ThrowIfNull(budget);
         budget.Validate();
+        // Publication may only happen after the complete constrained process
+        // tree has ended. With a one-process Job Object, an exited parent
+        // cannot have left a live media-writing descendant. Uncapped and
+        // multi-process profiles remain execution-only, never publishers.
+        if (afterSuccessfulExit is not null &&
+            (!OperatingSystem.IsWindows() ||
+             budget.WindowsJobLimits?.MaximumProcesses != 1))
+            throw new InvalidOperationException(
+                "Video publication requires a single-process Windows Job Object.");
         if (!Path.IsPathFullyQualified(executablePath) || !File.Exists(executablePath))
             throw new ArgumentException("Video executable must be an existing absolute local file.", nameof(executablePath));
         if (!Path.IsPathFullyQualified(scratchRoot) || !Directory.Exists(scratchRoot))
