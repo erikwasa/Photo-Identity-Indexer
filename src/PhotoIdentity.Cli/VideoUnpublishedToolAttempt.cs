@@ -20,7 +20,8 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
         string scratchRoot,
         VideoToolExecutionBudget limits,
         Func<string, string, IReadOnlyList<string>> approvedArguments,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        Func<string, CancellationToken, Task>? onValidatedSuccessfulExit = null)
     {
         ArgumentNullException.ThrowIfNull(lease);
         ArgumentNullException.ThrowIfNull(limits);
@@ -69,7 +70,8 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
                 workspace => approvedArguments(staged.FilePath, workspace),
                 limits, checkToken => safety.CheckAsync(lease, checkToken),
                 inspectionInterval: TimeSpan.FromMilliseconds(200),
-                cancellationToken: workToken.Token);
+                cancellationToken: workToken.Token,
+                onValidatedSuccessfulExit: onValidatedSuccessfulExit);
 
             // This deliberately remains an uncommitted execution receipt.
             // Do not call TryFinishAttemptAsync(success:true) from here:
