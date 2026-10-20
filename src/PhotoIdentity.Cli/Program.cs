@@ -57,6 +57,10 @@ public static class Program
                     await VideoDerivativeRecoveryCommandRunner.RunAsync(
                         VideoDerivativeRecoveryOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "synthetic-proxy-pilot" =>
+                    await VideoSyntheticProxyPilotCommandRunner.RunAsync(
+                        VideoSyntheticProxyPilotOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "scratch-cleanup" =>
                     await VideoScratchCleanupCommandRunner.RunAsync(
                         VideoScratchCleanupOptions.Parse(args.Skip(2).ToArray()),
@@ -174,6 +178,15 @@ public static class Program
                                          video lane, zero running jobs; deletes only aged,
                                          unregistered opaque private output files;
                                          preserves every registered derivative)
+
+              video synthetic-proxy-pilot --scratch-root TEMP_CHILD_ROOT
+                                          --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
+                                          --ffprobe ABSOLUTE_EXE --ffprobe-sha256 HASH
+                                          [--apply]
+                                          (synthetic-only, database-free, dry-run
+                                           default; makes two transient test clips,
+                                           validates MP4 and deletes outputs;
+                                           requires an empty marked temp child)
 
               video scratch-cleanup --scratch-root DIR
                                     [--min-age-hours HOURS (24..720)]
