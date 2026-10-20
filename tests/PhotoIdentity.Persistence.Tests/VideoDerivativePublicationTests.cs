@@ -121,6 +121,20 @@ public sealed class VideoDerivativePublicationTests
             VideoProcessingJobLease lease = Assert.IsType<VideoProcessingJobLease>(
                 await queue.TryClaimNextAsync(budget));
 
+            // A forged in-memory reservation cannot bypass the immutable
+            // source/scratch estimates saved when the job was admitted.
+            string forgedStage = VideoScratchOwnership.Create(root, "video-tool");
+            string forgedOutput = Path.Combine(forgedStage, "output.mp4");
+            await File.WriteAllBytesAsync(forgedOutput, new byte[] { 1, 2, 3, 4 });
+            Assert.False(await filePublisher.PublishAsync(
+                lease with { TemporaryBytes = lease.TemporaryBytes + 1000 },
+                root, forgedOutput));
+            Assert.Equal("running", (await queue.GetAsync(jobId))?.Status);
+            Assert.Null(await published.GetCurrentAsync(jobId));
+            Assert.False(File.Exists(Path.Combine(root,
+                VideoDerivativeArtifactPath.ForLease(lease)
+                    .Replace('/', Path.DirectorySeparatorChar))));
+
             string stage = VideoScratchOwnership.Create(root, "video-tool");
             string output = Path.Combine(stage, "output.mp4");
             await File.WriteAllBytesAsync(output, new byte[] { 0, 0, 0, 12, 102, 116, 121, 112, 105, 115, 111, 109 });
