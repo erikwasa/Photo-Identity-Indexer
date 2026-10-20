@@ -45,6 +45,8 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
             await File.ReadAllTextAsync(marker, token) != CacheMarkerContents)
             throw new InvalidOperationException("An approved private video cache marker is required.");
 
+        if (!Path.IsPathFullyQualified(completedToolOutput))
+            throw new ArgumentException("Video output must be an absolute owned path.");
         string file = Path.GetFullPath(completedToolOutput);
         string parent = Path.GetDirectoryName(file)
             ?? throw new IOException("Video tool output parent is missing.");
@@ -137,8 +139,8 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
     private static bool IsToolWorkspace(string name) =>
         name.StartsWith("video-tool-", StringComparison.Ordinal) &&
         name.Length == "video-tool-".Length + 32 &&
-        name.AsSpan("video-tool-".Length).IndexOfAnyExcept(
-            "0123456789abcdef".AsSpan()) < 0;
+        name.Skip("video-tool-".Length).All(
+            c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static void EnsureNoReparse(string path)
     {
