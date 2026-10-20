@@ -112,6 +112,41 @@ absolute classification or suppressor policy belongs in new future
 work outside this milestone. Runbook:
 `docs/operations/collection-shadow-simulation.md`.
 
+## Operator-controlled manual suggestion direction (2026-10-20)
+
+**The maintainer's desired outcome is an automatically generated shortlist of
+photos that may be low quality, with the final decision to keep, dismiss or
+exclude always made manually.** Suggestion precision need not satisfy the
+98%+ safety bar for *unattended* Very Low exclusion. The same applies to
+potential visual redundancy: semantic/near-copy candidates may be displayed
+for review without automatically suppressing meaningful photos.
+
+The current WI-0195 offline shadow simulator answers a narrower *quality
+preference among otherwise equivalent collection candidates* question.
+It does not yet provide a Photo Identity-wide low-quality suggestion queue.
+Do not treat that as failure of manual suggestion usefulness or infer that
+any approved production review UI exists. Explicitly evaluate use cases
+**separately and under the operator's control**: Archive-wide suggestion
+review, per-collection/creative selection, slideshow curation, and
+global Photo Identity exclusion. The operator may opt in/out for each use
+case; no single threshold should silently change them all.
+
+**Critical safety difference:** Existing source-copy 'Exclude from Photo
+Identity' action permanently purges local retained Photo Identity data
+while leaving original OneDrive bytes untouched (ADR-0008, WI-0091).
+A suggested candidate must never trigger that action on its own.
+Manual keep/dismiss/skip and an explicitly confirmed exclusion are
+distinct steps. A reversible per-use-case hide needs a separate
+implementation, not the destructive exclusion API.
+
+Carry the substantial implementation into
+[operator-controlled low-quality suggestions #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629);
+M37 should record a separate manual suggestion feasibility decision based on
+accepted/rejected candidates, false-alarm burden and usefulness in real
+scenarios. Automatic Very Low exclusion and automatic redundancy suppression
+remain NO-GO on the original research evidence. Preserve the originally unmet
+four-variant WI-0195 acceptance instead of claiming it passed.
+
 ## Verification requirements
 
 Automated simulator determinism tests plus blinded maintainer review of representative real collection outputs and privacy-safe aggregate comparison evidence.

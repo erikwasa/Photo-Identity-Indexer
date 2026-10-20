@@ -56,6 +56,20 @@ That option invokes the read-only PostgreSQL proxy mapper only for the locally c
 
 The original WI-0195 full four-arm acceptance criteria are **not satisfied** by this narrower probe and must not be marked complete. The only allowed end decision from this research phase is whether a **separate, fully licensed/covered and independently evaluated quality-preference product experiment** merits work, versus a no-go/defer. Very Low exclusion and automatic redundancy/combined suppression remain **NO-GO** unless their separate evidence gates are satisfied. No saved collection changes, Archive/Search/Smart/Creative APIs, slideshow snapshots, derived quality catalogue persistence, source originals, or OneDrive hydration occur.
 
+## Runner parser fix after PR #627 (2026-10-20)
+
+The first merged version of `run_bounded_collection_shadow.ps1`
+contained a corrupted `ValidatePattern` declaration and a duplicated
+script body, so PowerShell failed with `ParserError: missing terminator`
+**before executing any tests or accessing photos**. This is a delivery
+bug, not failed model evidence. The follow-up fixes the script as one
+complete source file with correctly declared `-Scenarios`, `-BatchId`,
+`-Score`, `-AcceptResearchOnlyThirdPartyWeights`, `-Review`,
+`-NoOpen` and `-Port` switches. GitHub Actions now parses the runner
+and asserts these parameters on Windows; code tests alone did not
+previously exercise PowerShell grammar. Use the corrected `main`
+script after that PR merges. No inference starts by default.
+
 ## Bounded score-covered collections: final M37 research phase (2026-10-20)
 
 The maintainer's first merged WI-0195 simulation on an 80-photo Creative
