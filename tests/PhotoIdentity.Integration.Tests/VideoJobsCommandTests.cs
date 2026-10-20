@@ -71,7 +71,7 @@ public sealed class VideoJobsCommandTests
             "--postgres-connection-env", "PHOTOIDENTITY_TEST",
             "--database", "photoidentity_catalogue"
         ];
-        foreach (string action in new[] { "pause", "resume", "stop" })
+        foreach (string action in new[] { "pause", "resume", "stop", "recover" })
         {
             VideoJobsCommandOptions preview = VideoJobsCommandOptions.Parse(action, args);
             Assert.False(preview.Apply);
