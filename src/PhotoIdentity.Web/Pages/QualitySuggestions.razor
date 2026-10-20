@@ -137,15 +137,15 @@ else if (Page is not null)
                             }
                             <div class="quality-review-actions">
                                 <button class="button secondary" disabled="@Busy"
-                                        @onclick="() => DecideAsync(item.RevisionId, &quot;keep&quot;)">
+                                        @onclick="() => KeepAsync(item)">
                                     Keep
                                 </button>
                                 <button class="button secondary" disabled="@Busy"
-                                        @onclick="() => DecideAsync(item.RevisionId, &quot;dismiss&quot;)">
+                                        @onclick="() => DismissAsync(item)">
                                     Dismiss
                                 </button>
                                 <button class="button secondary" disabled="@Busy"
-                                        @onclick="() => DecideAsync(item.RevisionId, &quot;consider-exclusion&quot;)">
+                                        @onclick="() => ConsiderAsync(item)">
                                     Consider exclusion
                                 </button>
                             </div>
@@ -284,6 +284,13 @@ else if (Page is not null)
         }
         finally { Busy = false; Refreshing = false; }
     }
+
+    private Task KeepAsync(QualitySuggestionItem item) =>
+        DecideAsync(item.RevisionId, "keep");
+    private Task DismissAsync(QualitySuggestionItem item) =>
+        DecideAsync(item.RevisionId, "dismiss");
+    private Task ConsiderAsync(QualitySuggestionItem item) =>
+        DecideAsync(item.RevisionId, "consider-exclusion");
 
     private async Task DecideAsync(string revisionId, string choice)
     {
