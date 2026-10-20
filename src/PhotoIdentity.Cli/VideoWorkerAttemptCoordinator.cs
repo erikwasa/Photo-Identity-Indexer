@@ -136,7 +136,10 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
 
         if (state?.Status == "succeeded" && state.ProgressPercent == 100 &&
-            !state.CancellationRequested)
+            !state.CancellationRequested &&
+            await new PostgresVideoPublishedDerivativeRepository(database)
+                .GetCurrentAsync(lease.Id, token) is { } receipt &&
+            receipt.RevisionId == lease.RevisionId.Value)
             return new(true, true, "published");
 
         // Never grant a successful result to an adapter that forgot or
