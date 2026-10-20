@@ -45,7 +45,7 @@ a.action{text-decoration:none;display:inline-block}
 .warn{border-color:#cc9952;background:#322718}
 </style></head><body><main>
 <header><div><h1>Possible low-quality photos</h1>
-<p>Automatic suggestions. Every decision is yours. Nothing is automatically removed.</p>
+<p>Automatic suggestions. Every decision is yours. No photo is removed without a separate explicit confirmation in Photo Identity.</p>
 </div><div id="status">Loading…</div></header>
 <section>
 <strong>Where would suggestions help you?</strong>
