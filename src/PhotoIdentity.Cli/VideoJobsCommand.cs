@@ -139,12 +139,12 @@ public static class VideoJobsCommandRunner
                 return 0;
             }
 
-            int changed = await new PostgresVideoProcessingJobRepository(database)
+            int recoveredCount = await new PostgresVideoProcessingJobRepository(database)
                 .RecoverExpiredAsync(cancellationToken);
             output.WriteLine(JsonSerializer.Serialize(new
             {
                 protocol = "wi0188-video-lease-recovery-v1",
-                dryRun = false, recovered = changed
+                dryRun = false, recovered = recoveredCount
             }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
             return 0;
         }
