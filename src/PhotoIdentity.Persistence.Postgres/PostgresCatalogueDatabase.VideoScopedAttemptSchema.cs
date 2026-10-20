@@ -9,7 +9,7 @@ public sealed partial class PostgresCatalogueDatabase
         ADD COLUMN authorization_expires_at_utc timestamptz NULL;
 
         ALTER TABLE video_processing_control
-        DROP CONSTRAINT video_processing_control_last_action_check;
+        DROP CONSTRAINT IF EXISTS video_processing_control_last_action_check;
         ALTER TABLE video_processing_control
         ADD CONSTRAINT ck_video_control_last_action
         CHECK (last_action IN ('initial','pause','resume','stop',
@@ -19,9 +19,5 @@ public sealed partial class PostgresCatalogueDatabase
         ADD CONSTRAINT ck_video_control_selected_pair
         CHECK ((selected_job_id IS NULL) = (authorization_expires_at_utc IS NULL));
 
-        ALTER TABLE video_processing_control
-        ADD CONSTRAINT ck_video_control_scoped_enablement
-        CHECK (NOT enabled OR (selected_job_id IS NOT NULL
-             AND authorization_expires_at_utc IS NOT NULL));
         """;
 }
