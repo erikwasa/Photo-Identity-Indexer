@@ -21,7 +21,7 @@ public sealed record VideoPublishedDerivativeReceipt(
 /// </summary>
 public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogueDatabase database)
 {
-    public async Task<bool> TryCommitAsync(
+    internal async Task<bool> TryCommitAsync(
         VideoProcessingJobLease lease, string artifactRelativePath,
         string sha256, long encodedBytes, CancellationToken token = default)
     {
