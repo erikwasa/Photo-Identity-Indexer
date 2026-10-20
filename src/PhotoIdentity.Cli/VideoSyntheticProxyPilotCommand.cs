@@ -102,7 +102,6 @@ public static class VideoSyntheticProxyPilotCommandRunner
             throw new InvalidOperationException(
                 "Synthetic video execution requires Windows Job Object containment.");
 
-        VideoScratchCapacityGuard.EnsureCapacity(root, 128L * 1024 * 1024);
         var encoder = new VideoToolProcessSupervisor();
         var validator = new VideoProxyOutputValidator(
             options.Ffprobe, options.FfprobeSha256, root);
@@ -110,11 +109,12 @@ public static class VideoSyntheticProxyPilotCommandRunner
         // Only predetermined, public phase identifiers are reported. Tool
         // stderr, executable locations and private workspace names are never
         // emitted even if a binary or probe fails.
-        string stage = "fixture-generation";
+        string stage = "scratch-preflight";
         string orientationForReport = "landscape";
         int? toolExitCode = null;
         try
         {
+            VideoScratchCapacityGuard.EnsureCapacity(root, 128L * 1024 * 1024);
             foreach ((string orientation, int width, int height, bool audio)
                      in new[] { ("landscape", 1280, 720, true),
                                 ("portrait", 720, 1280, false) })
