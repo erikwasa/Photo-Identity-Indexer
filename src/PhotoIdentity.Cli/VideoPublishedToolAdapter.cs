@@ -13,7 +13,8 @@ namespace PhotoIdentity.Cli;
 public sealed class VideoPublishedToolAdapter(
     PostgresCatalogueDatabase database, string executablePath, string scratchRoot,
     VideoToolExecutionBudget budget,
-    Func<string, string, IReadOnlyList<string>> approvedArguments)
+    Func<string, string, IReadOnlyList<string>> approvedArguments,
+    Func<string, CancellationToken, Task>? validateBeforePublish = null)
     : IVideoPublishedDerivativeAdapter
 {
     public async Task<VideoDerivativeAttemptReport> ProcessAsync(
@@ -36,9 +37,11 @@ public sealed class VideoPublishedToolAdapter(
                     // just rechecked photo priority and lease permission.
                     // PostgreSQL publication re-locks source, control and
                     // job before committing the receipt and succeeded state.
+                    string output = Path.Combine(workspace, "output.mp4");
+                    if (validateBeforePublish is not null)
+                        await validateBeforePublish(output, publicationToken);
                     committed = await new VideoDerivativeFilePublisher(database)
-                        .PublishAsync(lease, scratchRoot,
-                            Path.Combine(workspace, "output.mp4"), publicationToken);
+                        .PublishAsync(lease, scratchRoot, output, publicationToken);
                 });
 
         // Even if a post-publication sampling tick observes a new photo job,

@@ -124,6 +124,17 @@ See [operator recovery](video-derivative-recovery-v36.md).
 This introduces **no new migration** and does not replace the existing
 v34→v36 isolated rehearsal safety gate.
 
+## Experimental format-validation handoff
+
+Checkpoint 14 adds an **unregistered** fixed SDR H.264/AAC 720p candidate
+adapter and a separately constrained hash-pinned FFprobe verification step
+before the existing v36 durable publisher. It is not a production activation,
+and no executable is bundled. See
+[the codec validation handoff](video-proxy-pilot-validation-v36.md).
+The actual proxy profile, browser/seek/audio acceptance and quotas remain
+WI-0189 responsibilities, while resource isolation and controlled activation
+remain WI-0188 requirements.
+
 ## CI and remaining Windows proof
 
 Tests cover canonical job/lease path names, unowned-output rejection,
