@@ -297,10 +297,16 @@ checkpoint. Continue development after CI and PR review.
   video processing or new path that can turn it on.
 - Adapter failures and unpublished results are handled through existing
   lease-fenced retry/terminal failure transitions, with sanitized outcome
-  codes. An in-memory `Published=true` report is not enough: the coordinator
-  reads and checks durable success state. **Durable job status alone is
+  codes. The generic `TryFinishAttemptAsync(succeeded: true)` queue method
+  now explicitly **refuses to mark uncommitted video jobs successful**.
+  An in-memory `Published=true` report is not enough: the coordinator
+  also reads durable success state. **Durable job status alone is
   not proof of a valid derivative file**; the concrete adapter must
   atomically commit and fence that artifact before activation.
+- New dry-run-first `video jobs recover` operator command allows safe,
+  bounded-scope recovery of expired video job leases when the lane is
+  stopped and no hosted worker is present. It cannot touch photo jobs,
+  source bytes or otherwise change video enablement.
 - Disposable PostgreSQL tests cover default-off persisted control,
   one-job claim, fake published results, retryable failures with no
   private exception contents, pause veto and no photo job mutations.
