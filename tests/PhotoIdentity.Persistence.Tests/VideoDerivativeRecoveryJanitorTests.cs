@@ -107,6 +107,14 @@ public sealed class VideoDerivativeRecoveryJanitorTests
             Assert.True(File.Exists(kept));
             Assert.True(File.Exists(recent));
 
+            // A too-small apply budget must abort *before* deleting an
+            // earlier eligible file. There are three known candidate files.
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                janitor.SweepAsync(root, TimeSpan.FromHours(48),
+                    maximumFiles: 2, apply: true));
+            Assert.True(File.Exists(orphan));
+            Assert.True(File.Exists(kept));
+
             VideoDerivativeRecoveryReport applied = await janitor.SweepAsync(
                 root, TimeSpan.FromHours(48), apply: true);
             Assert.Equal(1, applied.Deleted);
