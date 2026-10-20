@@ -99,8 +99,13 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
         catch (OperationCanceledException) when (attempt.IsCancellationRequested)
         {
+            // Use a separate, bounded acknowledgement deadline; the
+            // per-attempt token has expired, but an unbounded database call
+            // must not hang a worker that is supposed to be stopping.
+            using CancellationTokenSource acknowledgment =
+                new(TimeSpan.FromSeconds(5));
             return await RecordFailureAsync(
-                queue, lease, retryable: true, CancellationToken.None);
+                queue, lease, retryable: true, acknowledgment.Token);
         }
         catch
         {
