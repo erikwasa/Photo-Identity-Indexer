@@ -284,6 +284,37 @@ checkpoint. Continue development after CI and PR review.
   separate activation gates. No schema change; the already merged v35
   migration still requires maintained-machine rehearsal before startup.
 
+### Checkpoint 10 — bounded unregistered worker-dispatch contract (2026-10-20)
+
+- Added `VideoWorkerAttemptCoordinator`: one deterministic job per explicit
+  invocation, requiring a caller budget with concurrency exactly one and
+  authoritative v35 enablement/paused-state admission from PostgreSQL.
+  Claims remain photo-priority-aware; the coordinator rechecks the exact
+  lease before processing and bounds adapter lifetime.
+- Introduced `IVideoPublishedDerivativeAdapter` as an **unimplemented**
+  downstream artifact publisher boundary, intentionally not connected to
+  any hosted service, API or operator command. There is no automatic
+  video processing or new path that can turn it on.
+- Adapter failures and unpublished results are handled through existing
+  lease-fenced retry/terminal failure transitions, with sanitized outcome
+  codes. The generic `TryFinishAttemptAsync(succeeded: true)` queue method
+  now explicitly **refuses to mark uncommitted video jobs successful**.
+  An in-memory `Published=true` report is not enough: the coordinator
+  also reads durable success state. **Durable job status alone is
+  not proof of a valid derivative file**; the concrete adapter must
+  atomically commit and fence that artifact before activation.
+- New dry-run-first `video jobs recover` operator command allows safe,
+  bounded-scope recovery of expired video job leases when the lane is
+  stopped and no hosted worker is present. It cannot touch photo jobs,
+  source bytes or otherwise change video enablement.
+- Disposable PostgreSQL tests cover default-off persisted control,
+  one-job claim, fake published results, retryable failures with no
+  private exception contents, pause veto and no photo job mutations.
+- No schema migration; source and process containment from PR #617 remain
+  unchanged. General [worker dispatch contract](../../operations/video-worker-dispatch-contract.md)
+  describes the still-required production publisher and local acceptance.
+  Schema v35 remains locally unverified against the maintained v34 database.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -305,9 +336,10 @@ checkpoint. Continue development after CI and PR review.
   backup and isolated v34 → v35 rehearsal gate is still pending.
 - Checkpoint 7: merged PR #613; fail-closed execution preemption bridge.
 - Checkpoint 8: merged PR #615; opt-in native Windows resource bounds.
-- Checkpoint 9: bounded, handle-allowlisted suspended Windows launch,
-  hash-verified no-recall source staging, fenced source lookup, aborted-work
-  cleanup and dry-run-only default scratch janitor. Actual artifact publishing,
-  activation and OS disk/IO/GPU isolation remain further work.
+- Checkpoint 9: merged PR #617; bounded suspended native Windows launch,
+  lease-verified staged video input and conservative abandoned-scratch cleanup.
+- Checkpoint 10: unregistered one-attempt dispatch and durable-only success
+  report gate; derivative publisher, activation, OS disk/I/O isolation
+  and mixed-load local acceptance remain before closing WI-0188.
 - WI-0188 still requires a real resource-controlled worker and Windows
   mixed-photo/video verification before acceptance.

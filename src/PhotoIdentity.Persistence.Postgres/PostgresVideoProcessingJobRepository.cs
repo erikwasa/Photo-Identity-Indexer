@@ -417,11 +417,19 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
         return await command.ExecuteNonQueryAsync(token) == 1;
     }
 
-    /// <summary>Fenced state acknowledgement only; NOT atomic derivative publication.</summary>
+    /// <summary>
+    /// Failure/retry acknowledgement only. Success is blocked until a
+    /// future artifact publisher has a single transaction which verifies
+    /// both the durable derivative identity and this exact lease. A source
+    /// fence alone does NOT mean an artifact has been created.
+    /// </summary>
     public async Task<bool> TryFinishAttemptAsync(
         Guid jobId, Guid leaseToken, bool succeeded, bool retryable,
         CancellationToken token = default)
     {
+        // Do not allow any caller to turn an uncommitted tool result into
+        // durable success. WI-0188 has no general artifact registry yet.
+        if (succeeded) return false;
         await _exclusions.EnsureReadyAsync(token);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token);
@@ -457,20 +465,18 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
         command.CommandText = """
             UPDATE video_processing_jobs job
             SET status=CASE
-                    WHEN @success THEN 'succeeded'
                     WHEN @retryable AND attempt_count<3 THEN 'queued'
                     ELSE 'failed' END,
-                progress_percent=CASE WHEN @success THEN 100
-                    WHEN @retryable AND attempt_count<3 THEN 0
-                    ELSE progress_percent END,
+                progress_percent=CASE WHEN @retryable AND attempt_count<3
+                    THEN 0 ELSE progress_percent END,
                 failure_code=CASE
-                    WHEN @success OR (@retryable AND attempt_count<3) THEN NULL
+                    WHEN @retryable AND attempt_count<3 THEN NULL
                     WHEN attempt_count>=3 THEN 'attempt-limit'
                     ELSE 'worker-error' END,
-                available_at_utc=CASE WHEN @retryable AND NOT @success AND attempt_count<3
+                available_at_utc=CASE WHEN @retryable AND attempt_count<3
                     THEN now()+interval '5 seconds' ELSE available_at_utc END,
                 lease_token=NULL, leased_until_utc=NULL,
-                completed_at_utc=CASE WHEN @success OR NOT @retryable OR attempt_count>=3
+                completed_at_utc=CASE WHEN NOT @retryable OR attempt_count>=3
                     THEN now() ELSE NULL END,
                 updated_at_utc=now()
             WHERE job.id=@id AND job.lease_token=@lease AND job.status='running'
@@ -499,7 +505,6 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
             """;
         command.Parameters.AddWithValue("id", jobId);
         command.Parameters.AddWithValue("lease", leaseToken);
-        command.Parameters.AddWithValue("success", succeeded);
         command.Parameters.AddWithValue("retryable", retryable);
         bool updated = await command.ExecuteNonQueryAsync(token) == 1;
         await transaction.CommitAsync(token);
