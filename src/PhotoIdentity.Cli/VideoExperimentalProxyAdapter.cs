@@ -45,7 +45,10 @@ public sealed class VideoExperimentalProxyAdapter(
             VideoProxyCandidateProfile.BuildArguments,
             async (output, checkToken) =>
             {
-                _ = await validator.ValidateAsync(output, checkToken);
+                var liveSafety = new PostgresVideoLeaseSafetyProbe(database);
+                _ = await validator.ValidateAsync(output,
+                    inspectToken => liveSafety.CheckAsync(lease, inspectToken),
+                    checkToken);
             });
         return await worker.ProcessAsync(lease, token);
     }
