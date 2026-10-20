@@ -169,10 +169,11 @@ public static class Program
               video jobs status --postgres-connection-env NAME --database DB
                                  (read-only; bounded sanitized queue summary
                                   and at most 20 recent opaque job IDs)
-              video jobs pause|resume|stop --postgres-connection-env NAME --database DB
+              video jobs pause|resume|stop|recover --postgres-connection-env NAME --database DB
                                            [--apply]
-                                           (dry-run default; durable v35 pause/stop;
-                                            resume never enables video processing)
+                                           (dry-run default; durable v35 pause/stop,
+                                            expired-lease recovery; resume never
+                                            enables video processing)
               video jobs cancel --postgres-connection-env NAME --database DB
                                 --job-id UUID [--apply]
                                 (dry-run default; explicit cancellation request;
