@@ -10,6 +10,11 @@ public sealed class VideoGuardedToolExecutorTests
         TimeSpan.FromSeconds(10), 1024 * 1024,
         InspectionInterval: TimeSpan.FromMilliseconds(100));
 
+    private static VideoToolExecutionBudget PublicationBudget => Budget with
+    {
+        WindowsJobLimits = new WindowsVideoJobLimits(512, 1, 25)
+    };
+
     [Fact]
     public async Task Revoked_initial_permit_never_starts_or_creates_scratch()
     {
@@ -129,7 +134,7 @@ public sealed class VideoGuardedToolExecutorTests
             var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
             VideoGuardedToolExecutionResult completed = await executor.RunAsync(
                 executable, await HashAsync(executable), scratch,
-                _ => ["/d", "/c", "exit /b 0"], Budget,
+                _ => ["/d", "/c", "exit /b 0"], PublicationBudget,
                 _ => Task.FromResult(VideoExecutionPermit.Ready),
                 TimeSpan.FromMilliseconds(100),
                 onValidatedSuccessfulExit: (workspace, _) =>
@@ -161,7 +166,7 @@ public sealed class VideoGuardedToolExecutorTests
             var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
             await Assert.ThrowsAsync<InvalidOperationException>(() => executor.RunAsync(
                 executable, hash, scratch,
-                _ => ["/d", "/c", "exit /b 0"], Budget,
+                _ => ["/d", "/c", "exit /b 0"], PublicationBudget,
                 _ => Task.FromResult(VideoExecutionPermit.Ready),
                 TimeSpan.FromMilliseconds(100),
                 onValidatedSuccessfulExit: (_, _) =>
