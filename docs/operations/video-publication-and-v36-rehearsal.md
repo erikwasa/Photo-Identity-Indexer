@@ -16,6 +16,9 @@ a queue selector or an operator enable switch.
    photo-priority checks.
 3. An optional guarded callback fires only after successful child exit and a
    fresh safety observation, **before the owned tool workspace is deleted**.
+   **Publishing requires native suspended Windows Job Object execution with
+   a one-process cap** so no surviving descendant can write during commit;
+   uncapped/multi-process execution cannot invoke a publication callback.
    The unregistered `VideoPublishedToolAdapter` wires this callback to
    `VideoDerivativeFilePublisher`, which requires the exact `output.mp4`
    in a marked direct-child `video-tool-<guid>` scratch workspace.
