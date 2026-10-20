@@ -96,6 +96,11 @@ public sealed class VideoScopedOneShotControlTests
                 await scoped.ArmAsync(selectedJob, FfmpegHash,
                     Preset, TimeSpan.FromMinutes(2)));
             Assert.Equal(selectedJob, grant.JobId);
+            VideoProcessingControlState armedStatus =
+                await new PostgresVideoProcessingControlRepository(database).GetAsync();
+            Assert.Equal(selectedJob, armedStatus.SelectedJobId);
+            Assert.NotNull(armedStatus.AuthorizationExpiresAtUtc);
+            Assert.True(armedStatus.Enabled);
             Assert.Null(await scoped.ArmAsync(firstJob, FfmpegHash,
                 Preset, TimeSpan.FromMinutes(2)));
 
@@ -134,6 +139,8 @@ public sealed class VideoScopedOneShotControlTests
                 await new PostgresVideoProcessingControlRepository(database).GetAsync();
             Assert.False(control.Enabled);
             Assert.True(control.Paused);
+            Assert.Null(control.SelectedJobId);
+            Assert.Null(control.AuthorizationExpiresAtUtc);
         }
         finally
         {
