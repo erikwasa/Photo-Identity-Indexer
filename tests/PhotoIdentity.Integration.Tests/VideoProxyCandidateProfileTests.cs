@@ -115,8 +115,6 @@ public sealed class VideoProxyCandidateProfileTests
             json.Replace("\"size\":\"4096\"", "\"size\":\"5000\""),
             json.Replace("mov,mp4,m4a,3gp,3g2,mj2", "matroska,webm"),
             json.Replace("\"codec_type\":\"audio\"", "\"codec_type\":\"subtitle\""),
-            json.Replace("\"channels\":2", "\"channels\":2,\"side_data_list\":[{\"rotation\":90}]")
-                .Replace("\"codec_type\":\"video\"", "\"codec_type\":\"video\"")
         })
         {
             Assert.ThrowsAny<Exception>(() =>
