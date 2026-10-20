@@ -65,9 +65,14 @@ public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogue
             control.CommandText = """
                 SELECT generation FROM video_processing_control
                 WHERE singleton_id=1 AND enabled AND NOT paused
-                  AND generation=@generation FOR SHARE;
+                  AND generation=@generation
+                  AND (selected_job_id IS NULL OR
+                       (selected_job_id=@job
+                        AND authorization_expires_at_utc>now()))
+                FOR SHARE;
                 """;
             control.Parameters.AddWithValue("generation", lease.ControlGeneration);
+            control.Parameters.AddWithValue("job", lease.Id);
             if (await control.ExecuteScalarAsync(token) is not long)
                 return false;
         }

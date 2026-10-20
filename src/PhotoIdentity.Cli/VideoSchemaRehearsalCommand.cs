@@ -159,7 +159,12 @@ public static class VideoSchemaRehearsalCommandRunner
                     WHERE version=35 AND name='isolated-video-processing-operator-control'),
                 (SELECT count(*) FROM video_published_derivatives),
                 (SELECT count(*) FROM photo_identity_schema_migrations
-                    WHERE version=36 AND name='lease-fenced-video-derivative-publication');
+                    WHERE version=36 AND name='lease-fenced-video-derivative-publication'),
+                (SELECT count(*) FROM photo_identity_schema_migrations
+                    WHERE version=37 AND name='scoped-one-shot-video-operator-authorization'),
+                (SELECT count(*) FROM video_processing_control
+                    WHERE singleton_id=1 AND selected_job_id IS NULL
+                      AND authorization_expires_at_utc IS NULL);
             """;
         await using NpgsqlDataReader reader = await verify.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token) ||
@@ -172,9 +177,10 @@ public static class VideoSchemaRehearsalCommandRunner
              reader.GetInt64(5) != expectedCounts["video_processing_jobs"]) ||
             reader.GetInt64(6) != 1 || reader.GetInt64(7) != 1 ||
             reader.GetInt64(8) != 1 || reader.GetInt64(9) != 0 ||
-            reader.GetInt64(10) != 1)
+            reader.GetInt64(10) != 1 || reader.GetInt64(11) != 1 ||
+            reader.GetInt64(12) != 1)
             throw new InvalidDataException(
-                "Video isolation, control or empty v36 publication registry verification failed.");
+                "Video v37 scoped control or v36 private publication registry verification failed.");
 
         output.WriteLine($"Schema v{expectedRestoredSchemaVersion} -> v{PostgresCatalogueDatabase.CurrentSchemaVersion} rehearsal passed on the isolated restored database.");
         output.WriteLine($"Rehearsal database: {restoredName}");
@@ -183,7 +189,7 @@ public static class VideoSchemaRehearsalCommandRunner
             ? "Original photo-only catalogue preserved; video tables and new queue empty."
             : expectedRestoredSchemaVersion == 33
                 ? "Original photo/video catalogue preserved; new video job queue empty; video control disabled and paused."
-                : "Original photo/video catalogue and queued job counts preserved; video control disabled and paused.");
+                : "Original photo/video catalogue and queued job counts preserved; v37 video control disabled, paused and unselected.");
         output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
         return 0;
     }

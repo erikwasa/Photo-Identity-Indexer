@@ -288,6 +288,13 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 JOIN video_revision_metadata metadata ON metadata.asset_revision_id = revision.id
                 WHERE job.status = 'queued' AND job.cancellation_requested_at_utc IS NULL
                   AND job.attempt_count < 3 AND job.available_at_utc <= now()
+                  AND EXISTS (
+                    SELECT 1 FROM video_processing_control scope
+                    WHERE scope.singleton_id=1 AND scope.enabled AND NOT scope.paused
+                      AND (scope.selected_job_id IS NULL OR
+                           (scope.selected_job_id=job.id
+                            AND scope.authorization_expires_at_utc>now()))
+                  )
                   AND job.source_bytes <= @max_source
                   AND job.reserved_temporary_bytes <= @remaining
                   AND job.requested_frames <= @max_frames
@@ -392,6 +399,9 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                   WHERE control.singleton_id=1 AND control.enabled
                     AND NOT control.paused
                     AND control.generation=video_processing_jobs.control_generation
+                    AND (control.selected_job_id IS NULL OR
+                        (control.selected_job_id=video_processing_jobs.id
+                         AND control.authorization_expires_at_utc>now()))
               )
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
@@ -486,6 +496,9 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                   WHERE control.singleton_id=1 AND control.enabled
                     AND NOT control.paused
                     AND control.generation=job.control_generation
+                    AND (control.selected_job_id IS NULL OR
+                        (control.selected_job_id=job.id
+                         AND control.authorization_expires_at_utc>now()))
               )
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision

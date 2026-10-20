@@ -507,6 +507,52 @@ checkpoint. Continue development after CI and PR review.
   source exclusion full purge integration, and a consolidated
   Windows photo-only vs mixed-load/OneDrive no-recall benchmark.
 
+### Integrated checkpoint 17 — explicit time-limited selected-video one-shot (2026-10-20)
+
+- Added an **append-only schema v37** selected-video authorization field
+  pair on the v35 video operator control row. Both fields are NULL by
+  default on restored databases; the video lane remains disabled/paused.
+  A single deliberate grant binds exactly one queued job UUID and an
+  absolute 13-minute expiration to a new control generation. Source,
+  revision/exclusion, photo-priority and zero-running-job checks must
+  pass before this narrowly scoped enablement can be issued.
+- Extended **queue claim SQL, source locator, heartbeat, live safety
+  probe, retry acknowledgement and final v36 publication** to honor the
+  selected UUID and deadline. A crash cannot leave an indefinitely
+  active authorization; any authorization expiry vetoes claims,
+  source staging, tool execution renewal and publication.
+- Added two explicit operator-only commands. `video one-shot enqueue`
+  accepts only an existing revision UUID and approved FFmpeg hash,
+  probes **filesystem availability metadata only** (no content read or
+  OneDrive hydration), and optionally persists an idempotent fixed-preset
+  PlayableProxy job. `video one-shot run` requires that exact queued
+  job, a locally marked cache, two SHA-256 pinned binaries, a **dry-run
+  first**, and separate `--apply` plus v37 rehearsal acknowledgement.
+  It authorizes one bounded Windows Job Object attempt, runs the
+  previously unregistered SDP/MP4 validation/publisher integration and
+  disarms the matching generation after completion. No unrelated queued
+  job is cancelled by the scoped disarm.
+- New disposable PostgreSQL tests cover wrong-job admission, operator
+  photo/lease gates, selected-only claims, expiry-preempted heartbeats
+  and private-source access, exact-match disarm and preservation of
+  unrelated queued jobs. Parser tests refuse broad source-path
+  injection, missing rehearsal acknowledgement, wrong hashes and
+  duplicate/unrecognized options.
+- The isolated restore rehearsal now applies v34→**v37** in one
+  sequence and checks the null/default-off selected-grant fields,
+  migration records and preserved table counts.
+- No hosted worker, unattended requeue, source hydration, photo pipeline
+  change or public API registration. No production enablement is
+  approved. See [v37 selected trial operator runbook](../../operations/video-scoped-one-shot-v37.md).
+  The maintained v34 PostgreSQL database must not be opened by the
+  newer v37 app/CLI until a **new authoritative backup and isolated
+  v34→v37 rehearsal** have passed.
+- Remaining WI-0188/WI-0189 gates: comprehensive hard disk/IO/network
+  containment or reviewed measured limits, representative real MOV/MP4
+  playback/audio/color and browser seek acceptance, proxy policy,
+  automatic privacy cleanup, and consolidated photo-only versus
+  mixed-load/OneDrive no-hydration measurements.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

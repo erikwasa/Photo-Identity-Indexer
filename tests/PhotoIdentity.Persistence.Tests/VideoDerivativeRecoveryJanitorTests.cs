@@ -37,7 +37,7 @@ public sealed class VideoDerivativeRecoveryJanitorTests
             };
             await using PostgresCatalogueDatabase database = new(config.ConnectionString);
             await database.InitializeAsync();
-            Assert.Equal(36, PostgresCatalogueDatabase.CurrentSchemaVersion);
+            Assert.Equal(37, PostgresCatalogueDatabase.CurrentSchemaVersion);
             var janitor = new VideoDerivativeRecoveryJanitor(database);
             Guid source = Guid.NewGuid();
             Guid asset = Guid.NewGuid();

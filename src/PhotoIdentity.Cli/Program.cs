@@ -48,10 +48,20 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 33),
-                "catalogue" when args.Length > 1 && args[1] is "rehearse-v35" or "rehearse-v36" =>
+                "catalogue" when args.Length > 1 && args[1] is "rehearse-v35" or "rehearse-v36" or "rehearse-v37" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
+                "video" when args.Length > 2 &&
+                    args[1] == "one-shot" && args[2] == "enqueue" =>
+                    await VideoSelectedEnqueueCommandRunner.RunAsync(
+                        VideoSelectedEnqueueOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
+                    args[1] == "one-shot" && args[2] == "run" =>
+                    await VideoScopedOneShotCommandRunner.RunAsync(
+                        VideoScopedOneShotOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 &&
                     args[1] == "derivatives" &&
                     args[2] is "maintain" or "requeue" =>
@@ -172,10 +182,26 @@ public static class Program
                           (both commands require a successful restore report and
                            modify ONLY its matched local photoidentity_restore_* database)
 
-              catalogue rehearse-v36 --postgres-connection-env NAME
+              catalogue rehearse-v37 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
-                                     (v34 isolated restore; verifies v35 control and v36 empty artifact registry)
-              catalogue rehearse-v35 (legacy alias; also applies through v36)
+                                     (v34 isolated restore: apply v35-v37,
+                                      verify control defaults and scoped fields)
+              catalogue rehearse-v35 / rehearse-v36
+                                     (legacy aliases; also apply through v37)
+
+              video one-shot enqueue --postgres-connection-env NAME --database DB
+                                     --revision-id UUID --ffmpeg-sha256 HASH
+                                     [--apply]
+                                     (dry run; observes only local source status;
+                                      no media read, processing or lane enable)
+              video one-shot run --postgres-connection-env NAME --database DB
+                                 --job-id UUID --cache-root MARKED_PRIVATE_ROOT
+                                 --ffmpeg ABS_EXE --ffmpeg-sha256 HASH
+                                 --ffprobe ABS_EXE --ffprobe-sha256 HASH
+                                 [--apply --acknowledge-isolated-v37-rehearsal]
+                                 (dry run by default; exactly one 13-minute
+                                  scoped authorization, single bounded attempt,
+                                  automatic disarm; NOT a hosted video worker)
 
               video derivatives maintain --postgres-connection-env NAME --database DB
                                          --cache-root PRIVATE_ROOT

@@ -39,6 +39,9 @@ public sealed class PostgresVideoLocalSourceLocator(PostgresCatalogueDatabase da
               AND job.control_generation=@generation
               AND control.enabled AND NOT control.paused
               AND control.generation=job.control_generation
+              AND (control.selected_job_id IS NULL OR
+                   (control.selected_job_id=job.id
+                    AND control.authorization_expires_at_utc>now()))
               AND job.status='running' AND job.cancellation_requested_at_utc IS NULL
               AND job.leased_until_utc>now()
               AND source.kind='local-folder'

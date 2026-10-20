@@ -74,7 +74,8 @@ public sealed partial class PostgresCatalogueDatabase
             new Migration(33, "opt-in-video-revision-metadata-and-posters", VideoCatalogueSchemaMigration),
             new Migration(34, "isolated-video-processing-jobs", VideoProcessingQueueSchemaMigration),
             new Migration(35, "isolated-video-processing-operator-control", VideoProcessingControlSchemaMigration),
-            new Migration(36, "lease-fenced-video-derivative-publication", VideoPublicationSchemaMigration)];
+            new Migration(36, "lease-fenced-video-derivative-publication", VideoPublicationSchemaMigration),
+            new Migration(37, "scoped-one-shot-video-operator-authorization", VideoScopedAttemptSchemaMigration)];
 
         // Keep historical runtime-owned extension DDL attached to the exact
         // v33 migration which originally introduced it; v34 is queue-only.

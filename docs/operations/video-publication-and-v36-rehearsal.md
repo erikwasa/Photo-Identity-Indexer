@@ -147,6 +147,21 @@ and deliberate regeneration. This does **not** change schema v36,
 automatically enforce a hard disk quota, or activate a worker.
 The old orphan cleanup still protects all registered receipts.
 
+## Additive v37 exact-job operator scope
+
+Checkpoint 17 advances the video-only schema to **v37** with a nullable
+selected job ID and absolute expiration. It has **no new video data by
+default and does not enable the lane on migration**. The
+`catalogue rehearse-v37` command uses the already-isolated v34
+restored-database rehearsal and applies v35→v37 in one sequence; older
+`rehearse-v35` / `rehearse-v36` entry points are compatibility
+aliases applying the current version. The existing maintained v34
+backup and isolated rehearsal requirement must now be read as a
+**fresh v34→v37 rehearsal**, not v34→v36.
+
+[Full selected one-shot protocol and no-go boundaries](video-scoped-one-shot-v37.md).
+This adds no unattended video worker or release approval.
+
 ## CI and remaining Windows proof
 
 Tests cover canonical job/lease path names, unowned-output rejection,
