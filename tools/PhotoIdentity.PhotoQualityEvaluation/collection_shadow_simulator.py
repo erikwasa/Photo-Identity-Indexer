@@ -69,7 +69,13 @@ def _id(value):
 
 
 def read_scores(scores):
-    # Reject any embedded labels, score-to-tier mappings, or output drift.
+    # A model-score export may have legitimate provenance/runtime metadata,
+    # but MUST NEVER carry human quality reviews or proposed absolute tiers.
+    if (not isinstance(scores, dict) or
+            any(key in scores for key in (
+                "qualityLevel", "humanReview", "review", "labels",
+                "heldOutLabels", "veryLowThreshold", "absoluteQualityTier"))):
+        raise ValueError("Human reviews/absolute quality tiers forbidden in research scores")
     if (not isinstance(scores, dict) or
             scores.get("schemaVersion") != 1 or
             scores.get("higherIsBetter") is not True or
