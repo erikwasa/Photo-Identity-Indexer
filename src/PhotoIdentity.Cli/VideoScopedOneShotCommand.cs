@@ -175,7 +175,19 @@ public static class VideoScopedOneShotCommandRunner
             // to veto source reads, claims, heartbeats and publication.
             using var cleanupDeadline = new CancellationTokenSource(
                 TimeSpan.FromSeconds(15));
-            await scoped.DisarmAsync(grant, cleanupDeadline.Token);
+            bool disarmed = await scoped.DisarmAsync(grant, cleanupDeadline.Token);
+            if (!disarmed)
+            {
+                // An independent pause/stop can advance the generation.
+                // Do not report successful safe shutdown while an enabled
+                // newer generation or abandoned selected scope remains.
+                VideoProcessingControlState latest =
+                    await new PostgresVideoProcessingControlRepository(database)
+                        .GetAsync(cleanupDeadline.Token);
+                if (latest.Enabled)
+                    throw new InvalidOperationException(
+                        "Video scope could not be disarmed; issue reviewed operator stop.");
+            }
         }
         bool published = cycle?.Published == true;
         Write(output, false, cycle?.Claimed == true,
