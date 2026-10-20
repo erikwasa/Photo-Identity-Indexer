@@ -37,7 +37,7 @@ public sealed class VideoProxyOutputValidator(
             ffprobePath, ffprobeSha256, scratchRoot,
             workspace =>
             [
-                "-v", "error", "-hide_banner", "-nostdin",
+                "-v", "error", "-hide_banner",
                 "-protocol_whitelist", "file",
                 "-probesize", "2097152", "-analyzeduration", "2000000",
                 "-show_streams", "-show_format",
