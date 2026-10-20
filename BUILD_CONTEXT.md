@@ -4,6 +4,26 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**M37 WI-0195 research-only shadow development (2026-10-20):**
+WI-0194 reviewed 200 calibration + 180 selected held-out pairs;
+automatic redundancy and combined suppression remain explicit
+NO-GO (Wilson lower bounds below 95%, missing held-out
+far-dHash/high-CLIP disagreement, nonrepresentative sampling).
+WI-0193's TOPIQ p75 exact 0.16755089163780212 gap is
+RESEARCH-ONLY pairwise preference, with NO absolute quality
+classifier, Very Low exclusion or production model/license approval.
+Original WI-0195 four-arm acceptance stays blocked. This branch
+introduces one bundled OFFLINE/READ-ONLY shadow probe of
+captured Creative/Search-anchored preview shortlists: same kind
+and same existing relevance score contiguous positions only;
+no missing-score inference, no held-out quality labels, no
+automatic suppression. Existing 600-photo scores are sparse;
+report all coverage and abstention. Private score-blind A/B
+plus audit, optional current-proxy map, local Finish & Report
+browser, aggregate-only preferences, safety tests, one PowerShell
+runner. Zero collection/snapshot/cataloque mutation. Do not
+mark original WI-0195 acceptance complete. PR targets main.
+
 **M37 WI-0194 independent validation bundle (2026-10-19):**
 Maintainer finished all 200 calibration labels with 82 Redundant,
 17 Similar-keep-both, 101 Not-similar, 0 Unsure. dHash0-4 and
