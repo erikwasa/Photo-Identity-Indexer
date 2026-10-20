@@ -116,7 +116,7 @@ def scenarios_from_creative_preview(preview, *, target):
             "relevanceScore": row["selectionScore"],
             "kind": row["kind"],
         })
-    return {"kind": "creative",
+    return {"kind": "search" if preview.get("anchorKind") == "search" else "creative",
             "scenarioId": preview["collectionId"],
             "targetCount": target,
             "candidates": candidates}
