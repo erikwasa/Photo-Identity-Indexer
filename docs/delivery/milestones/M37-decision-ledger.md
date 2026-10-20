@@ -95,6 +95,44 @@ See `docs/operations/manual-quality-suggestions.md`. Review utility,
 not unattainable unattended-exclusion precision, is the new *separate*
 research question. Do not mark full M37 four-arm acceptance as met.
 
+## Final manual-suggestion pilot acceptance and native product follow-up (2026-10-21)
+
+After PR #631 merged, the maintainer successfully reviewed **129/129**
+automatically suggested technical candidates in Archive cleanup:
+**72 Keep, 37 Dismiss, 20 Consider exclusion**, zero automatic actions.
+Technical reason counts overlap; low sharpness was the dominant suggestion
+reason (96/129). **Most of the 20 photos considered for exclusion were
+genuinely unwanted**, in the maintainer's judgment, and the process was
+**reasonably convenient**. These are qualitative usefulness observations,
+NOT objective false-positive precision, representativeness, recall or
+deployment safety evidence.
+
+**Manual-suggestion candidate generation and local human-review
+feasibility: GO.** Advance a first native in-app operator-controlled
+review workstream in issue #629, using existing local durable proxies,
+bounded deterministic technical suggestions, durable decisions across
+restarts, a Consider-exclusion follow-up filter and independent review
+context switches. The native work uses the **existing separately
+confirmed source-copy purge only after an explicit human action** and
+never bulk-excludes. No collection/slideshow eligibility or producer
+background jobs are modified. See
+`docs/operations/native-quality-suggestion-review.md`.
+
+**M37 adoption boundaries remain explicit:**
+- Quality preference in actual saved collections: **DEFER** (WI-0193
+  TOPIQ pairwise research-only, 0/80 coverage in WI-0195 live scenarios,
+  no operator-approved new model weights/license/backfill).
+- Very Low **automatic** exclusion: **NO-GO**.
+- Visual redundancy **automatic** suppression: **NO-GO**.
+- Combined automatic suppression: **NO-GO**.
+- **Human-reviewed technical low-quality suggestions: GO for a
+  manually controlled product experience**, not unattended quality
+  exclusion and not an approval for all photo/smart/slideshow contexts.
+- The original WI-0195 four-policy acceptance remained **unmet**.
+  Close or defer the evaluation milestone only with this distinction
+  recorded; native operator UI is a separate subsequent product
+  workstream, not a retroactive completed four-arm experiment.
+
 ## What must happen NEXT before a closure recommendation
 
 1. Merge one substantive bounded-scoring + milestone-documentation PR after

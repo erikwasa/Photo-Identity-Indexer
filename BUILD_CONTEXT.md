@@ -4,6 +4,30 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-21 WI-0629 native manual suggestions:** First merged
+manual research companion generated 129 automatically suggested
+technical-quality candidates and operator reviewed ALL in Archive
+cleanup (72 Keep, 37 Dismiss, 20 Consider exclusion). Operator
+confirmed MOST considered photos genuinely unwanted, review
+reasonably convenient. **GO to a native manual quality suggestion
+experience** separate from M37's automatic Very Low/redundancy
+NO-GO. Current branch adds a native /quality-suggestions Blazor
+page; bounded explicit scan of existing current SHA-checked
+jpeg-1600-q78 review proxies using WI-0182 technical reasons,
+no new model or originals; local app-data durable reviewer
+choices and independent Archive/Collection/Slideshow review
+settings; Consider exclusion follow-up view linking existing
+native Photo viewer for separately confirmed existing Exclude
+& purge. No auto purge, no changes in Search/Smart/Creative/
+Slideshow. Existing companion private human review records
+remain private and are NOT silently imported; native scan
+begins new standalone queue. On merge, one native end-to-end
+verification with restart and per-context isolation. See
+docs/operations/native-quality-suggestion-review.md and
+issue #629. M37 record research-only TOPIQ collection DEFER,
+automatic Very Low/redundancy/combined NO-GO, human suggestion
+feasibility GO, old WI-0195 four-arm acceptance unmet.
+
 **2026-10-20 M37 manual suggestions pivot:** First WI-0195 bounded
 plan passed locally (6+8 tests, 80/80 verified current proxies,
 0 matching original TOPIQ scores, prospective 80 new CPU scores,
