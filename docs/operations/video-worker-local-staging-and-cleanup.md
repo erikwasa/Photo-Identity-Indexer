@@ -59,6 +59,19 @@ workspace or an explicitly accepted equivalent with measured worst-case
 disk pressure. CPU-only / no GPU, low privilege, network restrictions and
 Windows mixed photo/video acceptance are still separate gates.
 
+## Guarded publication bridge (unregistered, v36)
+
+An optional guarded callback runs *after* a supervised child exits cleanly
+but *before* the private tool workspace is deleted. It rechecks current
+lease/photo priority and can call the v36 private artifact publisher.
+The unregistered `VideoPublishedToolAdapter` uses it to atomically rename
+a bounded verified `output.mp4` in app-owned scratch, then commits the
+receipt and durable success under PostgreSQL source/control/lease fencing.
+A stale lease cannot publish, and an unexpected DB failure can leave a
+private, **unreferenced orphan** that a future DB-aware janitor must reclaim.
+This does not validate real MP4 semantics or authorize FFmpeg/worker use.
+See [v36 integration and upgrade gate](video-publication-and-v36-rehearsal.md).
+
 ## Operator-only abandoned scratch cleanup
 
 New owned temporary workspaces contain an exact
