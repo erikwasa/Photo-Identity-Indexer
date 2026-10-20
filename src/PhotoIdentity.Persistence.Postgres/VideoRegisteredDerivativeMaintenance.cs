@@ -143,6 +143,9 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
                     throw new InvalidDataException(
                         "Noncanonical registered video artifact: no maintenance writes were made.");
                 bool current = reader.GetBoolean(6);
+                if (reader.GetString(5) != "succeeded")
+                    throw new InvalidOperationException(
+                        "Registered derivative does not belong to a succeeded job.");
                 string sha = reader.GetString(2);
                 long bytes = reader.GetInt64(3);
                 DateTime created = reader.GetDateTime(4);
@@ -215,7 +218,9 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
                 """;
             revoke.Parameters.AddWithValue("job", entry.JobId);
             revoke.Parameters.AddWithValue("path", entry.RelativePath);
-            await revoke.ExecuteNonQueryAsync(token);
+            if (await revoke.ExecuteNonQueryAsync(token) != 2)
+                throw new InvalidOperationException(
+                    "Registered derivative changed during revocation; rollback the maintenance batch.");
         }
 
         // Revocation MUST commit before the first unlink. A crash after commit
