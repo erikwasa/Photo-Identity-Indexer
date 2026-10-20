@@ -6,7 +6,7 @@ namespace PhotoIdentity.Cli;
 /// Only predetermined, source-free evidence identifiers; never tool output,
 /// file names, exception messages or metadata from the inspected MP4.
 /// </summary>
-public sealed class VideoProxyValidationException : InvalidDataException
+public sealed class VideoProxyValidationException : Exception
 {
     public string ReasonCode { get; }
     public int? ToolExitCode { get; }
