@@ -79,21 +79,34 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         if (!permit.Allowed)
             return new(true, false, permit.ReasonCode);
 
+        // Bound cooperative adapter lifetime independently from the lease's
+        // 60-second renewed heartbeats. Adapters MUST terminate their child
+        // process and staged copy before acknowledging cancellation.
+        using CancellationTokenSource attempt = CancellationTokenSource
+            .CreateLinkedTokenSource(token);
+        attempt.CancelAfter(TimeSpan.FromSeconds(budget.MaximumJobSeconds));
+
         VideoDerivativeAttemptReport report;
         try
         {
-            report = await adapter.ProcessAsync(lease, token);
+            report = await adapter.ProcessAsync(lease, attempt.Token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            // The caller cancelled; adapter owns safe child shutdown. Leave
-            // the durable lease to expire if the control was revoked.
+            // External stop: the adapter must have awaited safe child
+            // termination before returning/throwing.
             throw;
+        }
+        catch (OperationCanceledException) when (attempt.IsCancellationRequested)
+        {
+            return await RecordFailureAsync(
+                queue, lease, retryable: true, CancellationToken.None);
         }
         catch
         {
             // Do not expose source names, tool output or exception content.
-            return await RecordFailureAsync(queue, lease, retryable: true, token);
+            return await RecordFailureAsync(
+                queue, lease, retryable: true, token);
         }
 
         if (!report.Published)
@@ -123,7 +136,7 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         // failed to atomically commit its durable derivative.
         await queue.TryFinishAttemptAsync(
             lease.Id, lease.LeaseToken, succeeded: false,
-            retryable: false, token);
+            retryable: false, token: token);
         return new(true, false, "publication-required");
     }
 
