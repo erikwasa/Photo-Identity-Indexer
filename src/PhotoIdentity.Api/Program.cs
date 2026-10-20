@@ -108,6 +108,9 @@ public partial class Program
             builder.Services,
             CataloguePersistenceComposition.GetRequiredPostgresConnectionString(builder.Configuration));
         builder.Services.AddSingleton<ISimilarFaceRepository, PostgresSimilarFaceRepository>();
+        builder.Services.AddSingleton<PostgresPhotoQualityEvaluationRepository>();
+        builder.Services.AddSingleton(new QualitySuggestionWorkspace(
+            Path.Combine(defaultApplicationRoot, "quality-suggestions")));
         builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
         builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
         builder.Services.AddSingleton<IPhotoSearchRepository>(
@@ -295,6 +298,7 @@ public partial class Program
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
         app.MapPhotoDetailsEndpoints();
+        app.MapQualitySuggestionEndpoints();
         app.MapSmartCollectionEndpoints();
         app.MapPhotoListCollectionEndpoints();
         app.MapPhotoSearchEndpoints();
