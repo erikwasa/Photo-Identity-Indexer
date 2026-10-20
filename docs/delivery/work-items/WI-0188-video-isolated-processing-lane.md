@@ -467,6 +467,46 @@ checkpoint. Continue development after CI and PR review.
   envelope, explicit production video worker/selection controls, and
   consolidated Windows OneDrive no-recall/photo-priority/throughput acceptance.
 
+### Integrated checkpoint 16 — registered derivative lifecycle (2026-10-20)
+
+- Added **database-first, operator-only** registered v36 derivative maintenance.
+  It closes a critical gap that the earlier orphan janitor intentionally
+  left open: exclusion, deleted/superseded revision, missing cache bytes,
+  corrupt cached content and optional over-quota current derivatives.
+- A single bounded transaction requires the video lane **disabled+paused**
+  and no running leases, locks affected source/job/receipt rows, selects
+  at most 32 registered files and atomically deletes their receipts while
+  moving their durable succeeded job to failed/`revision-invalid`.
+  Only **after** committing that invisibility fence does it unlink exact,
+  owned private MP4 paths. A failed unlink remains an invisible orphan
+  recoverable by the existing stopped-lane janitor. No external source
+  archive files are touched.
+- The new dry-run-first `video derivatives maintain` command optionally
+  reports an aggregate registered-byte budget (64..16384 MiB),
+  minimum healthy quota age, bounded batch size, and SHA-256 byte
+  verification. This is logical cache maintenance, not an OS hard
+  filesystem/IO quota.
+- A separate explicit UUID-only, stopped-lane
+  `video derivatives requeue` command allows a revoked job to re-enter
+  `queued` **only after its exact source and revision are again
+  supported, latest, unexcluded and receipt-free**. It does not claim
+  or process the job; generic production video activation is still absent.
+- Deterministic CLI tests and isolated PostgreSQL+synthetic private-file
+  tests cover exclusion and restoration, missing and same-size-corrupt
+  files, oldest-first quota eviction, no-op dry runs, disabled/running
+  lane fences, requeue, and original/private-entry preservation.
+- No schema migration after v36, hosted video process, API exposure,
+  OneDrive hydration or alteration of photo workflows. See
+  [registered derivative lifecycle and deferred operator procedure](../../operations/video-registered-derivative-lifecycle-v36.md).
+  The maintained schema v34→v36 authoritative backup and isolated
+  rehearsal gate remains mandatory before starting any v36 app/CLI
+  against the maintained database.
+- **Still outstanding**: approved real-media quality/browser seeking
+  (WI-0189), hard or explicitly accepted measured filesystem/IO/network
+  isolation, future single-job production selector/enablement,
+  source exclusion full purge integration, and a consolidated
+  Windows photo-only vs mixed-load/OneDrive no-recall benchmark.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

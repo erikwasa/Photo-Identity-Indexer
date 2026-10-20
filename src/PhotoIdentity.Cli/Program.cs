@@ -53,6 +53,13 @@ public static class Program
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
                 "video" when args.Length > 2 &&
+                    args[1] == "derivatives" &&
+                    args[2] is "maintain" or "requeue" =>
+                    await VideoRegisteredDerivativeCommandRunner.RunAsync(
+                        VideoRegisteredDerivativeOptions.Parse(
+                            args[2], args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "derivatives" && args[2] == "recover" =>
                     await VideoDerivativeRecoveryCommandRunner.RunAsync(
                         VideoDerivativeRecoveryOptions.Parse(args.Skip(3).ToArray()),
@@ -169,6 +176,20 @@ public static class Program
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (v34 isolated restore; verifies v35 control and v36 empty artifact registry)
               catalogue rehearse-v35 (legacy alias; also applies through v36)
+
+              video derivatives maintain --postgres-connection-env NAME --database DB
+                                         --cache-root PRIVATE_ROOT
+                                         [--max-records COUNT (1..32)]
+                                         [--quota-mib TOTAL (64..16384)]
+                                         [--min-age-hours HOURS (24..720)]
+                                         [--verify-hashes] [--apply]
+                                         (dry run by default; requires a stopped
+                                          lane and zero running leases; DB-first
+                                          receipt revocation, then private unlink)
+              video derivatives requeue --postgres-connection-env NAME --database DB
+                                        --job-id UUID [--apply]
+                                        (explicitly requeue ONLY a current,
+                                         unexcluded previously revoked job)
 
               video derivatives recover --postgres-connection-env NAME --database DB
                                         --cache-root ABSOLUTE_PRIVATE_ROOT

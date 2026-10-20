@@ -135,6 +135,18 @@ The actual proxy profile, browser/seek/audio acceptance and quotas remain
 WI-0189 responsibilities, while resource isolation and controlled activation
 remain WI-0188 requirements.
 
+## Registered privacy and retention lifecycle (checkpoint 16)
+
+A separate bounded, dry-run-first
+[registered derivative maintenance](video-registered-derivative-lifecycle-v36.md)
+command now revokes invalidated, missing and optionally hash-corrupt
+receipts before deleting the known owned private bytes; it can plan a
+registered-byte budget and requires the video lane fully stopped.
+A separately approved UUID-only requeue handles reversible exclusions
+and deliberate regeneration. This does **not** change schema v36,
+automatically enforce a hard disk quota, or activate a worker.
+The old orphan cleanup still protects all registered receipts.
+
 ## CI and remaining Windows proof
 
 Tests cover canonical job/lease path names, unowned-output rejection,

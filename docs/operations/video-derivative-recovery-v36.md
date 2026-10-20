@@ -88,6 +88,19 @@ Expected outcomes:
 - `deleted=N` in apply mode: exactly N unregistered, bounded, old
   private files were removed. No other files or database rows were changed.
 
+## Registered receipts now have a separate operator lifecycle
+
+The orphan recovery command **still protects every registered receipt**.
+A complementary dry-run-first maintenance command can explicitly revoke
+invalidated/missing/corrupt registered files and quota-selected old valid
+files under the same stopped-lane control fence. It first invalidates
+the DB receipt/job, then unlinks known private outputs; failures to
+unlink become future orphan-recovery work. It also supports an explicit
+separate UUID-only regeneration request when the video source is again
+eligible. See [registered receipt maintenance](video-registered-derivative-lifecycle-v36.md).
+Neither command creates a production video worker or bypasses v34→v36
+local rehearsal.
+
 ## Limits / remaining WI-0188 and WI-0189 work
 
 This operator tool does not solve a malicious local filesystem race or
