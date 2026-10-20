@@ -106,7 +106,7 @@ database-free dry-run.
 
 ## Windows synthetic-pilot failure triage (WI-0188 follow-up)
 
-The maintainer's first complete local v37 verification passed **all nine
+The maintainer's reported v37 runtime checks passed **all nine
 photo regression checks**, read-only video status (disabled/paused,
 no queued/running jobs) and the opt-in video API default-off 404 check.
 The synthetic pilot's dry run also passed, but actual `--apply` yielded
