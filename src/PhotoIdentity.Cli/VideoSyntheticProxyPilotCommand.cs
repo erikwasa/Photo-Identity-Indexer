@@ -207,7 +207,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
                 toolExitCode ??
                     (error is VideoProxyValidationException probe
                         ? probe.ToolExitCode : null),
-                error is Win32Exception native ? native.NativeErrorCode : null);
+                error is Win32Exception native ? native.NativeErrorCode : null,
+                VideoToolFailureEvidence.Read(error));
             return 1;
         }
     }
@@ -318,7 +319,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
         IReadOnlyList<VideoSyntheticProxyPilotCase> results,
         string? failureStage = null, string? failureOrientation = null,
         string? failureClass = null, int? toolExitCode = null,
-        int? nativeErrorCode = null)
+        int? nativeErrorCode = null, string? failureCheckpoint = null)
     {
         output.WriteLine(JsonSerializer.Serialize(new
         {
@@ -326,7 +327,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
             dryRun, status, schemaUsed = false, originalsOpened = false,
             videoWorkersActivated = false, derivativesRetained = false,
             failureStage, failureOrientation, failureClass,
-            toolExitCode, nativeErrorCode, results
+            toolExitCode, nativeErrorCode, failureCheckpoint, results
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 }
