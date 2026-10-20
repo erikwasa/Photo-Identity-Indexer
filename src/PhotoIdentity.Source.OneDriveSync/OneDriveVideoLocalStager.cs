@@ -67,6 +67,11 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
         if (OperatingSystem.IsWindows() && scratchRoot.StartsWith(@"\\", StringComparison.Ordinal))
             throw new ArgumentException("Remote scratch roots are not permitted.");
 
+        // Preflight the full source copy without touching the original. This
+        // check is not a filesystem quota; a later active worker must still
+        // isolate scratch from unrelated writes and enforce a hard cap.
+        VideoScratchCapacityGuard.EnsureCapacity(scratchRoot, expectedBytes);
+
         string local = source.GetLocalPath(reference); // refuses online-only sources
         if (!File.Exists(local) || new FileInfo(local).LinkTarget is not null)
             throw new IOException("Source video is missing or linked.");

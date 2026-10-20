@@ -315,6 +315,28 @@ checkpoint. Continue development after CI and PR review.
   describes the still-required production publisher and local acceptance.
   Schema v35 remains locally unverified against the maintained v34 database.
 
+### Checkpoint 11 — video scratch-volume admission preflight (2026-10-20)
+
+- Added `VideoScratchCapacityGuard` to fail closed unless the dedicated
+  scratch directory is on an available, fixed local volume without linked
+  ancestors and has the estimated write allocation **plus 512 MiB** free.
+  Arithmetic remains bounded and overflow safe; tests cover exact-boundary,
+  missing-directory, invalid estimate and combined input/output cases.
+- `OneDriveVideoLocalStager` checks the expected source-copy bytes before
+  opening the original. The unregistered `VideoUnpublishedToolAttempt`
+  additionally checks the **combined** lease reservation for input plus
+  tool scratch; the OS-capped supervisor rechecks the tool output allowance
+  immediately before tool launch. Uncapped legacy synthetic tool calls are
+  not implicitly opted in.
+- This is a protective **preflight**, NOT a volume reservation, hard disk quota,
+  write-I/O limit, filesystem sandbox or guarantee about changes after the
+  check. The external encoder remains unregistered. Do not enable video
+  processing until stronger containment/publication and maintained Windows
+  throughput/OneDrive checks are accepted.
+- No schema migration, API, source modification, OneDrive hydration or
+  automatic video job activity. The maintained v34 → v35 backup/isolated
+  rehearsal gate is still outstanding before the first local v35 startup.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

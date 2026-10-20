@@ -41,6 +41,24 @@ exists in WI-0188 yet. A future output adapter must atomically publish a
 revision-bound artifact with PostgreSQL source/exclusion/lease fencing
 before success can be acknowledged.
 
+## Scratch-volume admission (checkpoint 11)
+
+The explicit-call staging path now first requires enough available free space
+on a **fixed, local, non-linked volume** for its bounded input copy plus
+512 MiB of headroom. The unregistered single-attempt bridge separately
+checks the combined leased input + tool scratch allowance, and an OS-capped
+tool launch rechecks the output budget. Nonexistent, network and linked scratch
+roots fail closed. Checks use filesystem free-space observations and produce
+no private source paths in the result.
+
+**This is not hard disk/I/O isolation.** Another process can consume the
+space immediately after the check, tool writes can spike between periodic
+scratch inspections, and the volume may also serve non-video software.
+Before production registration, provide a dedicated hard-quota/enforced
+workspace or an explicitly accepted equivalent with measured worst-case
+disk pressure. CPU-only / no GPU, low privilege, network restrictions and
+Windows mixed photo/video acceptance are still separate gates.
+
 ## Operator-only abandoned scratch cleanup
 
 New owned temporary workspaces contain an exact
