@@ -83,6 +83,33 @@ independently justified, separately scoped follow-up outside this
 milestone. Do not indefinitely extend WI-0194/0195 with single-command
 micro-checkpoints.
 
+## Clarified intended product use: suggestions with manual control (2026-10-20)
+
+The maintainer wants **automatic low-quality/unwanted-photo suggestions that
+they can evaluate and exclude manually**, with opt-in decisions **per
+use case**. This is less risky than the originally proposed automatic Very
+Low exclusion and automatic redundant-photo suppression, which remain
+NO-GO under existing evidence. The old 98%+ automatic-exclusion precision
+gate does not apply unchanged to a *human-reviewed candidate shortlist*;
+measure review burden, suggestions accepted, useful discoveries and harm
+avoided instead. Avoid automatically hiding photos from Search, Smart,
+Creative, Archive or slideshows.
+
+The existing manual 'Exclude from Photo Identity' action is a **source-copy
+scoped local purge** (ADR-0008): it leaves the OneDrive original intact but
+removes Photo Identity's retained derivatives and identity/metadata evidence;
+it is not a reversible soft hide. A review suggestion must be kept separate
+from the explicit operator-confirmed purge. Per-collection/slideshow
+reversible omission would be a different future action with separate opt-in.
+Track the product implementation in
+[issue #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629).
+
+For M37, complete the bounded real-collection quality experiment, and
+record **manual suggestion feasibility separately** from the original four
+automatic-policy decisions. Do not claim manual review/product exclusion
+support is delivered merely by a research scorer; end-user workflow belongs
+in an explicitly accepted follow-up.
+
 ## Exit criteria
 
 - [ ] The quality benchmark is demonstrably broader than WI-0182's deterministic 300-photo sample and covers representative archive strata plus model-disagreement/challenge cases.
