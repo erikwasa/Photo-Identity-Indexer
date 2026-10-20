@@ -231,8 +231,10 @@ public sealed class VideoRegisteredDerivativeMaintenanceTests
                 output.SetLength(size);
             }
             // For short synthetic fixtures, hash exactly what the file holds.
-            string hash = Convert.ToHexString(
-                await SHA256.HashDataAsync(File.OpenRead(file))).ToLowerInvariant();
+            string hash;
+            await using (FileStream input = File.OpenRead(file))
+                hash = Convert.ToHexString(
+                    await SHA256.HashDataAsync(input)).ToLowerInvariant();
             _files.Add(job, (relative, size));
             await using NpgsqlConnection connection = await Db.OpenConnectionAsync();
             await using NpgsqlCommand seed = connection.CreateCommand();
