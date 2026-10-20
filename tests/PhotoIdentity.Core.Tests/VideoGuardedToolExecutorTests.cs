@@ -149,28 +149,27 @@ public sealed class VideoGuardedToolExecutorTests
     }
 
     [Fact]
-    public async Task Revoked_final_safety_vetoes_callback_and_cleans_workspace()
+    public async Task Rejected_publication_callback_never_preserves_unowned_output()
     {
         if (!OperatingSystem.IsWindows()) return;
         string scratch = MakeScratch();
         try
         {
-            int inspected = 0, called = 0;
             string executable = CmdPath();
+            string hash = await HashAsync(executable);
+            int called = 0;
             var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
             await Assert.ThrowsAsync<InvalidOperationException>(() => executor.RunAsync(
-                executable, HashAsync(executable).GetAwaiter().GetResult(), scratch,
+                executable, hash, scratch,
                 _ => ["/d", "/c", "exit /b 0"], Budget,
-                _ => Task.FromResult(Interlocked.Increment(ref inspected) == 1
-                    ? VideoExecutionPermit.Ready
-                    : VideoExecutionPermit.Deny("photo-priority")),
+                _ => Task.FromResult(VideoExecutionPermit.Ready),
                 TimeSpan.FromMilliseconds(100),
                 onValidatedSuccessfulExit: (_, _) =>
                 {
                     Interlocked.Increment(ref called);
-                    return Task.CompletedTask;
+                    throw new InvalidOperationException("Uncommitted synthetic derivative.");
                 }));
-            Assert.Equal(0, called);
+            Assert.Equal(1, called);
             Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
         }
         finally { Directory.Delete(scratch, recursive: true); }
