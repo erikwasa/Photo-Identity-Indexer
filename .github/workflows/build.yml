@@ -129,6 +129,34 @@ jobs:
           python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_*.py" -v
           exit $LASTEXITCODE
 
+      - name: Parse offline quality-evaluation PowerShell runners
+        shell: pwsh
+        run: |
+          $scripts = @(
+            'tools/PhotoIdentity.PhotoQualityEvaluation/run_collection_shadow_simulation.ps1'
+            'tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
+          )
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path -LiteralPath $script).Path,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Host "$script : $($_.Message)" }
+              throw "PowerShell parser rejected $script"
+            }
+          }
+          $runner = Get-Command './tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
+          foreach ($required in @('Scenarios','BatchId','Score','AcceptResearchOnlyThirdPartyWeights','Review','NoOpen','Port')) {
+            if (-not $runner.Parameters.ContainsKey($required)) {
+              throw "Bounded research runner is missing -$required"
+            }
+          }
+          Write-Host 'Offline research runners parse and expose expected parameters.'
+
       - name: Run quarantined integration diagnostics
         id: flaky-integration-diagnostics
         continue-on-error: true
