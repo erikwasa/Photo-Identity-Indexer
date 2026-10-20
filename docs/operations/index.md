@@ -28,7 +28,7 @@ PostgreSQL production operations own the current backup/restore procedure.
 - [Whole-image embedding evaluation](whole-image-embedding-evaluation.md) — bounded WI-0127 exact-vector experiment for semantic retrieval, similar-photo retrieval and Creative Collection diversity; not a production vector-store procedure.
 - [Local caption and narration evaluation](local-caption-narration-evaluation.md) — WI-0128 experiment evidence plus the retained loopback-only archive caption-enrichment policy; generated captions are revision-bound derived photo evidence and consumers do not trigger generation.
 
-## Retained model-evaluation evidence
+- [WI-0195 read-only collection shadow research](collection-shadow-simulation.md) — optional local offline simulator and private blinded shortlist comparison; no approved production quality/redundancy policy or collection writes.\n\n## Retained model-evaluation evidence
 
 - [Historical local reviewed-catalogue evaluation workflow](local-evaluation.md) — pre-WI-0149 procedure retained for reproducibility principles; its SQLite/batch/match/export commands are retired.
 - [Historical multi-model comparison workflow](multi-model-comparison.md) — accepted FP32/INT8 comparison evidence; the former automation is retired and its script path is only a historical tombstone.
