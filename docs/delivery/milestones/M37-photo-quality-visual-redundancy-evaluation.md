@@ -57,6 +57,32 @@ WI-0194 has now labelled 200 calibration and 180 guarded held-out visual pairs. 
 
 The existing WI-0195 four-arm acceptance **cannot be represented as passed or safely activated**. One optional read-only, offline **shadow-simulation research probe** has been implemented to measure real Creative preview score-coverage and the observed effect of the frozen TOPIQ rule only **within identical relevance-score and candidate-kind contiguous tiers**, while baseline remains unchanged. This limited experiment does not lift the WI-0195 dependency for production, use held-out human quality/redundancy labels, or start a new model. The original acceptance criteria remain pending. Even a favorable A/B preference would require separately approved broader-quality evidence, license/deployment and full-archive score coverage before product integration.
 
+## Final research-evaluation closure path (2026-10-20)
+
+See [M37 decision ledger](M37-decision-ledger.md) for the authoritative
+evidence, explicit GO/NO-GO/DEFER policy matrix, remaining WI-0195 bounded
+collection comparison and closure plan. The accepted WI-0192 benchmark and
+WI-0193 frozen quality research are complete. WI-0194 archive-scale candidate
+retrieval and 200+180 calibration/held-out pair reviews found promising
+candidate classes but **rejected all production automatic redundancy
+suppression**. No absolute quality rating, Very Low exclusion, or combined
+automatic selection policy was approved. These **NO-GO outcomes are valid
+research decisions**, not missing engineering to be silently optimized.
+
+The maintainer's first WI-0195 real Creative Collection trial passed
+8/8 tests but had **0/80 candidates covered** by 600 old IQA scores.
+The final bounded research tranche maps existing current local proxies
+and **defaults to no-inference planning**. Optional model use is explicit
+and limited to 120 new photos with third-party rights/weight cautions; then
+the *same frozen* relevance-safe quality shortlist comparator and existing
+blind A/B viewer can assess real maintained collection experience once.
+After that single bounded phase, record four explicit policy outcomes
+and either **close M37 as an evidence-based research rejection/defer**
+(with the original unachieved four-arm goals documented) or identify an
+independently justified, separately scoped follow-up outside this
+milestone. Do not indefinitely extend WI-0194/0195 with single-command
+micro-checkpoints.
+
 ## Exit criteria
 
 - [ ] The quality benchmark is demonstrably broader than WI-0182's deterministic 300-photo sample and covers representative archive strata plus model-disagreement/challenge cases.
