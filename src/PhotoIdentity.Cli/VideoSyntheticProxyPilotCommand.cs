@@ -204,7 +204,9 @@ public static class VideoSyntheticProxyPilotCommandRunner
             // traces, raw stdout/stderr, source names or media paths.
             Write(output, false, "pilot-failed", observations,
                 stage, orientationForReport, ClassifyFailure(error),
-                toolExitCode,
+                toolExitCode ??
+                    (error is VideoProxyValidationException probe
+                        ? probe.ToolExitCode : null),
                 error is Win32Exception native ? native.NativeErrorCode : null);
             return 1;
         }
