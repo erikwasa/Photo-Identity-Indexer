@@ -55,3 +55,147 @@ That option invokes the read-only PostgreSQL proxy mapper only for the locally c
 ## Acceptance/disposition boundary
 
 The original WI-0195 full four-arm acceptance criteria are **not satisfied** by this narrower probe and must not be marked complete. The only allowed end decision from this research phase is whether a **separate, fully licensed/covered and independently evaluated quality-preference product experiment** merits work, versus a no-go/defer. Very Low exclusion and automatic redundancy/combined suppression remain **NO-GO** unless their separate evidence gates are satisfied. No saved collection changes, Archive/Search/Smart/Creative APIs, slideshow snapshots, derived quality catalogue persistence, source originals, or OneDrive hydration occur.
+
+## Bounded score-covered collections: final M37 research phase (2026-10-20)
+
+The maintainer's first merged WI-0195 simulation on an 80-photo Creative
+shortlist (20 target slots) **PASSED 8/8 tests** and reported **0 existing
+TOPIQ scores / 80 candidates, 267 missing-score comparisons, 0 changed
+selection slots and 0 production changes**. This establishes simulator
+integrity, **not** that quality preference is useful or useless. The 600
+WI-0193 benchmark scores do not overlap arbitrary collections sufficiently
+for a representative human comparison. Avoid sampling more unscored
+collections or repeating unchanged A/B review.
+
+The next development batch supplies a **one-shot, bounded local score-coverage
+bridge** and an auditable end-of-milestone decision ledger
+(`docs/delivery/milestones/M37-decision-ledger.md`).
+
+### Boundaries
+
+- Map **at most 240 distinct current review proxies** from the private
+  captured Creative/search scenario cohort; refuse stale/missing proxies.
+  Only `jpeg-1600-q78`, no original reads, hydration or catalogue writes.
+  No same-person/time restriction is used as a quality proxy.
+- The default command runs offline synthetic tests, maps the existing
+  immutable review-proxy locators *read-only* and prints a **no-inference**
+  plan: model-score overlap, missing photo count and approximate CPU time
+  using historical ~4.423 seconds/photo median.
+- If the operator explicitly authorizes third-party model use,
+  `-Score -AcceptResearchOnlyThirdPartyWeights` permits **at most 120 NEW
+  photo scores**, reusing exact-match previously exported TOPIQ scores
+  and preserving the frozen version `pyiqa 0.1.16` and score-gap
+  `0.16755089163780212`. All hashes/lengths are checked before model
+  initialization. This action **may download third-party weights** via
+  `pyiqa.create_metric`; checkpoint identity and rights have *not* been
+  independently approved for commercial/production redistribution.
+  **Do not take permission to download/use weights for granted.** Keep
+  scoring explicitly opt-in and strictly private/research-only.
+- The output is a **new private score export**, bound to the captured
+  scenario, proxy map and original frozen score export; separate from
+  `private/topiq_nr-scores-600.json` and never overwriting benchmark data.
+  No human labels, challenge ratings or previously consumed WI-0193
+  held-out quality judgments are opened; no model tuning or reranking
+  relative to archive percentiles.
+- The runner then uses the **already implemented** constrained original
+  Creative selection vs score-shadow comparator, with no promotion
+  across contiguous equal-kind/equal-existing-relevance-score runs.
+  Baseline eligibility and target size are unchanged. Very Low exclusion,
+  automatic redundancy and combined policy remain disabled/NO-GO.
+- When selections change, **optional** hash-verified local blinded
+  visual reviewer with Finish & Report saves private aggregate votes;
+  identical results never require a human review. Use a batch ID to
+  keep distinct captured scenarios and all artifacts separate, immutable
+  and resumable.
+
+### One local preflight round (no inference)
+
+After merging the bounded-scoring PR into `main`, run on Windows:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch main
+git pull --ff-only origin main
+
+Test-Path "private/wi0195-collection-shadow-scenarios-v1.json"
+Test-Path "private/topiq_nr-scores-600.json"
+
+# Keep the known working connection/root from WI-0194; never paste secrets
+[bool]$env:PhotoIdentity__Postgres__ConnectionString
+Test-Path $env:PhotoIdentity__ReviewProxyRoot
+$env:PhotoIdentity__ReviewProxyProfileId = "jpeg-1600-q78"
+
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_bounded_collection_shadow.ps1
+~~~
+
+Expect synthetic unit tests to pass, `wi0195-private-candidate-proxies-v1`
+reporting the count of existing current review proxies, and
+`wi0195-bounded-research-quality-scores-v1` with
+`status=plan-only-no-inference`, `inferencePerformed=false`,
+`reusedKnownTOPIQScores`, `additionalCandidatePhotosNeedingScores`
+and `plannedBatchFitsHardCap`.
+**Share only this aggregate JSON.** We will decide whether the bounded
+private opt-in inference is warranted from its actual scale and risks.
+Do not rerun the one-shot WI-0193 held-out quality experiment, edit
+the old private score export, or attempt a 27k-photo rescore.
+
+### Only after explicit decision: bounded scoring and optional review
+
+If the operator personally accepts the third-party weights/rights
+implications and wants a research-only run:
+
+~~~powershell
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_bounded_collection_shadow.ps1 `
+  -Score -AcceptResearchOnlyThirdPartyWeights
+~~~
+
+This reuses `-BatchId first` private outputs, refuses to overwrite scores
+or blind/audit files, and reports coverage and selection differences. If
+at least one changed-selection scenario exists, optionally:
+
+~~~powershell
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_bounded_collection_shadow.ps1 -Review
+~~~
+
+The A/B viewer uses port **5187** and a genuine Finish & Report button,
+which exits the server and prints aggregate preferences. This is an
+evaluation of *a candidate research experience*, not a deployment
+authorization or a guarantee of broad archive effectiveness.
+
+### Optional diverse real scenarios (one batch, no new code)
+
+Use the existing read-only Creative preview GET on one or two additional
+existing Smart Collections or search-anchored Creative recipes. Each
+captured JSON remains under `private/`. Import multiple previews into a
+**new, separately named** scenario file:
+
+~~~powershell
+$python = Join-Path $env:LOCALAPPDATA "PhotoIdentity\iqa-venv\Scripts\python.exe"
+& $python tools/PhotoIdentity.PhotoQualityEvaluation/collection_shadow_simulator.py import-creative-preview `
+  --input private/wi0195-creative-preview.json `
+  --input private/wi0195-second-creative-preview.json `
+  --target-count 20 `
+  --output private/wi0195-two-collection-scenarios.json
+
+.\tools\PhotoIdentity.PhotoQualityEvaluation\run_bounded_collection_shadow.ps1 `
+  -Scenarios private/wi0195-two-collection-scenarios.json -BatchId second
+~~~
+
+The 240-mapped/120-new-photo hard caps still apply across the batch.
+A new `-BatchId` ensures the first review or score files are never
+replaced. Don't manipulate cohort identities to chase a desired score.
+If the bound is exceeded, report the failed gate and choose fewer
+scenarios **before** collecting human preferences; do not manufacture
+model accuracy or tune against already consumed held-out labels.
+
+### Final milestone decision
+
+After this ONE bounded-scoring phase, record one aggregate go/no-go/defer
+recommendation for the *research-only* quality-preference experience.
+Very Low auto-exclusion, visual automatic suppression and their combined
+policy remain **NO-GO**. If inference rights or meaningful score coverage
+are unavailable, **DEFER** quality integration honestly. M37 can then be
+closed as an **evaluation with documented rejected/deferred candidates**;
+it must not be depicted as fulfilling the original four-approved-policy
+experiment. New production-weight licensing, domain transfer, persistence,
+full-archive backfill and UI work go into *separate future milestones*.

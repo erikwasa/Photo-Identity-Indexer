@@ -391,7 +391,8 @@ def main():
     prep.add_argument("--blind-output", required=True)
     prep.add_argument("--audit-output", required=True)
     importer = group.add_parser("import-creative-preview")
-    importer.add_argument("--input", required=True)
+    importer.add_argument("--input", required=True, action="append",
+                          help="One or more existing private captured Creative previews")
     importer.add_argument("--target-count", type=int, required=True)
     importer.add_argument("--output", required=True)
     report = group.add_parser("report")
@@ -404,12 +405,14 @@ def main():
     args = parser.parse_args()
     try:
         if args.action == "import-creative-preview":
-            src = private_path(args.input, required=True)
+            sources = [private_path(x, required=True) for x in args.input]
             dest = private_path(args.output, required=False)
-            if src == dest or dest.exists():
-                raise ValueError("Creative scenario output must be a new private file")
-            captured = load(src)
-            previews = captured if isinstance(captured, list) else [captured]
+            if dest in sources or len(set(sources)) != len(sources) or dest.exists():
+                raise ValueError("Creative input/output paths must be unique/new")
+            previews = []
+            for source in sources:
+                captured = load(source)
+                previews.extend(captured if isinstance(captured, list) else [captured])
             if not 1 <= len(previews) <= MAX_SCENARIOS:
                 raise ValueError("Invalid number of captured previews")
             scenarios = {"schemaVersion": 1, "protocol": SCENARIO_PROTOCOL,

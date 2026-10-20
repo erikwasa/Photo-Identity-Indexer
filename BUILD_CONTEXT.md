@@ -4,6 +4,32 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**M37 final research evaluation path (2026-10-20):** This
+milestone concludes with defensible GO/NO-GO/DEFER decisions,
+not required production deployment. Decision ledger is
+`docs/delivery/milestones/M37-decision-ledger.md`. WI-0192
+and WI-0193 research concluded; WI-0194's 200 calibration
+and 180 selected guarded heldout pair reviews led to NO-GO for
+automatic redundancy/combined suppression. WI-0193 TOPIQ
+`0.16755089163780212` p75 score-gap is research-only; NO
+absolute quality tier, Very Low auto-exclusion, or deployment
+model license approval. First WI-0195 maintained Creative
+preview test passed 8 tests but 0/80 old 600-photo TOPIQ score
+coverage, thus no meaningful A/B review. ONE substantive
+bounded WI-0195 phase now adds private, read-only current
+proxy mapping (<=240 revision IDs), NO-INFERENCE default
+coverage/time/rights plan, separately authorized local
+pyiqa 0.1.16 TOPIQ research scoring <=120 new photos, and
+reuse existing frozen same-kind/relevance shortlist shadow +
+private blinded Finish & Report, with multi-preview support.
+No original hydration, consumed human held-out labels,
+catalogue writes, selection API changes or production model.
+Local operator should first RUN PLAN and share aggregate;
+no inference permission presumed. After one bounded result
+make explicit final 4-policy disposition and close M37 as
+evaluation/rejection/defer with unmet four-arm checklist
+clearly acknowledged. Stop micro-checkpoint loop. PR -> main.
+
 **M37 WI-0195 research-only shadow development (2026-10-20):**
 WI-0194 reviewed 200 calibration + 180 selected held-out pairs;
 automatic redundancy and combined suppression remain explicit
