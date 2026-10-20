@@ -71,6 +71,16 @@ default-off/persisted-off admission, false in-memory publication claims,
 retryable exceptions without private diagnostic leakage, pause refusal and
 no adapter calls outside the gated path. No original video is opened.
 
+## Scratch capacity preflight (checkpoint 11)
+
+The unregistered staging and tool attempt now preflight an available fixed
+local scratch volume. Input copying requires its full expected byte count,
+the attempt requires the **combined** lease temp reservation, and an OS-capped
+child launch checks the tool-output budget again. Each leaves 512 MiB of
+free-space headroom. This is not an atomic reservation or disk-I/O hard quota;
+volume contention, hard filesystem confinement and production media-output
+publication remain unapproved. No worker is registered or enabled.
+
 ## Before local acceptance
 
 The coordinator is a *pre-activation foundation*. The remaining work is:
