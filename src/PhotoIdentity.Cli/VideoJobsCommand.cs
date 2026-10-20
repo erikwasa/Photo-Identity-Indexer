@@ -16,7 +16,7 @@ public sealed record VideoJobsCommandOptions(
 {
     public static VideoJobsCommandOptions Parse(string action, string[] args)
     {
-        if (action is not ("status" or "cancel" or "pause" or "resume" or "stop"))
+        if (action is not ("status" or "cancel" or "pause" or "resume" or "stop" or "recover"))
             throw new ArgumentException("Unknown video jobs action.");
 
         Dictionary<string, string> values = new(StringComparer.Ordinal);
@@ -51,10 +51,10 @@ public sealed record VideoJobsCommandOptions(
             return new(action, variable, database, null, false);
         }
 
-        if (action is "pause" or "resume" or "stop")
+        if (action is "pause" or "resume" or "stop" or "recover")
         {
             if (values.ContainsKey("--job-id"))
-                throw new ArgumentException("Video lane control is global and does not accept --job-id.");
+                throw new ArgumentException("Global video lane operations do not accept --job-id.");
             return new(action, variable, database, null, apply);
         }
 
@@ -116,6 +116,35 @@ public static class VideoJobsCommandRunner
                 executionEnabled = false, // no background worker is registered
                 photoPriority,
                 control, overview, recent
+            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+            return 0;
+        }
+
+        if (options.Action == "recover")
+        {
+            // Stale leases must also be recoverable while a lane is paused
+            // or stopped, as no hosted worker is registered to clean them up.
+            // Status/preview remains read-only; recovery requires --apply.
+            VideoProcessingQueueOverview before =
+                await new PostgresVideoProcessingQueueInspector(database)
+                    .GetOverviewAsync(cancellationToken);
+            if (!options.Apply)
+            {
+                output.WriteLine("Dry run: no expired video leases were changed. Add --apply to recover.");
+                output.WriteLine(JsonSerializer.Serialize(new
+                {
+                    protocol = "wi0188-video-lease-recovery-v1",
+                    dryRun = true, visibleExpiredLeases = before.ExpiredLeases
+                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+                return 0;
+            }
+
+            int changed = await new PostgresVideoProcessingJobRepository(database)
+                .RecoverExpiredAsync(cancellationToken);
+            output.WriteLine(JsonSerializer.Serialize(new
+            {
+                protocol = "wi0188-video-lease-recovery-v1",
+                dryRun = false, recovered = changed
             }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
             return 0;
         }
