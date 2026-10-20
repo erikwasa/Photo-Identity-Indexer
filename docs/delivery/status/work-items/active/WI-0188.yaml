@@ -5,7 +5,7 @@ status: in_progress
 owner: ai-agent
 started_at: 2026-10-19
 last_updated_at: 2026-10-20
-branch: agent/WI-0188-scoped-one-shot-video-worker
+branch: agent/WI-0188-synthetic-pilot-failure-evidence
 document: ../work-items/WI-0188-video-isolated-processing-lane.md
 blockers: []
 blocker_notes: []
