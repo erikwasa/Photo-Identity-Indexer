@@ -150,6 +150,50 @@ and numeric code first. The repo's optional environment-gated Windows
 real-tool test remains the targeted regression once approved binaries
 are provided; normal CI does not supply either executable.
 
+## Follow-up: Windows fixture generation safety checkpoint
+
+The subsequent maintainer rerun with the diagnostic revision returned:
+
+```json
+{"status":"pilot-failed","failureStage":"fixture-generation",
+ "failureOrientation":"landscape","failureClass":"execution-safety-rejected",
+ "toolExitCode":null,"nativeErrorCode":null,"results":[]}
+```
+
+The video source was *generated* test footage; no catalogue/original files
+were opened and no video jobs activated. There is no successful synthetic
+codec evidence yet. The `execution-safety-rejected` classification still
+covers multiple separate .NET fail-closed guards and is not proof that FFmpeg
+was even launched. Do not relax CPU/memory caps or approve real-video trials.
+
+The next revision adds an **additional optional** `failureCheckpoint`
+field to the same sanitized pilot JSON, drawn exclusively from fixed
+source-authored codes, without changing the existing failureClass contract.
+Useful values include `tool-digest-mismatch`, `linked-tool-path`,
+`linked-executable`, `job-object-setup`,
+`suspended-process-launch`, `process-observation`,
+`scratch-entry-limit`, `scratch-linked-entry`,
+`scratch-byte-limit`, `post-exit-validation` and
+`process-shutdown-unverified`. It returns `null` for unrecognized
+exceptions rather than copying an exception message. The first inner
+failure checkpoint wins when a bounded tool is nested within another
+supervisor. Nothing writes, reads or reveals private video paths, hashes,
+tool output or exception text.
+
+Once the checkpoint PR passes CI and merges, the operator can reuse the
+previously approved `$argsPilot` array if and only if the dedicated scratch
+root still contains **only** its ownership marker:
+
+~~~powershell
+Get-ChildItem -LiteralPath $lab -Force | Select-Object Name
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @argsPilot --apply
+~~~
+
+Report **only the JSON** (not the FFmpeg paths, source folders, hashes
+or detailed Windows logs). Checkpoints are diagnostics, not a guarantee
+that the Windows tool chain is validated. Avoid repeated `--apply`
+once a new failure classification is available.
+
 ## Explicit H.264 SDR bitstream color evidence
 
 A local FFmpeg/FFprobe smoke test revealed that container-level Rec.709
