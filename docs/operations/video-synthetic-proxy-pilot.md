@@ -1,0 +1,124 @@
+# WI-0188 — self-contained synthetic proxy roundtrip
+
+**Development-only, dry-run-first, Windows-only. No catalogue access.**
+This command is deliberately not a video worker, not an admission switch and
+not a source-file transcode feature. It exists to validate the experimental
+WI-0188/WI-0189 720p H.264/AAC encoder + independent FFprobe contract on
+operator-installed binaries before asking the maintainer to test private MOV/MP4.
+
+## What it exercises
+
+The optional explicit-call CLI `video synthetic-proxy-pilot`:
+
+1. Requires a dedicated otherwise-empty, marked, **nonlinked direct/indirect
+   child of the OS temporary directory**. It refuses network scratch, archive
+   paths, existing files and any root without the exact lab marker.
+2. Creates two short artificial moving-picture **source fixtures** in
+   app-owned transient scratch using a SHA-256-approved, separately installed
+   FFmpeg: 1280×720 landscape with sine audio and 720×1280 portrait without
+   audio. It cannot accept a user-media input path and never reads the archive.
+3. Runs each generated fixture through the *same*
+   `VideoProxyCandidateProfile.BuildArguments` fixed H.264/AAC 720p
+   argument builder used by the unregistered experimental video adapter.
+4. Independently validates MP4 box layout, fast-start `moov` before
+   `mdat`, duration/size, codec, Rec.709 transfer/color metadata,
+   normalized orientation and optional AAC audio. The validator uses a
+   separately SHA-256-approved FFprobe with its own guarded native Job Object.
+5. Verifies the landscape output is landscape with audio, the portrait
+   output is portrait without audio, and both are roughly three seconds.
+   All generated video and JSON files are deleted by nested supervisors
+   before returning. It emits only sanitized orientation/size/duration/
+   encode-time measurements and no media paths, tags, names or hashes.
+
+**Containment:** native suspended-launch single-process Windows Job Objects
+for each external process, 768 MiB memory, 15% CPU rate hard cap,
+120-second per-tool wall budget, 32 MiB each workspace, no inherited
+credentials, bounded stdout/stderr, source-free FFmpeg lavfi fixtures and
+local-file-only FFprobe. The existing scratch-capacity guard checks at
+least 128 MiB of estimated free space plus safety headroom. There is
+**no hard disk or I/O quota and no independent network sandbox**. Only
+synthetic input is permitted and no application/video worker is enabled.
+
+**No schema requirement for the standalone pilot:** it neither opens
+PostgreSQL nor invokes catalogue migration, the source scanner, OneDrive
+or any photo/video API. That is why it can be reviewed separately from the
+later maintained-host schema v34→v36 rehearsal. Never use it to evaluate
+production source media; there is no option to supply such a source.
+
+## Optional operator procedure — not yet requested
+
+This may be run on a Windows development environment with operator-approved,
+separately installed FFmpeg/FFprobe tools. The manifest of tool binaries
+and their prior approved SHA-256 values is part of accepted ADR-0012.
+Do not mistake a freshly computed hash alone for approval.
+
+In PowerShell from the repository root:
+
+~~~powershell
+$ErrorActionPreference = "Stop"
+
+# Confirm these point to your separately installed, previously approved
+# binaries; no installers or downloads are part of this procedure.
+$ffmpeg = (Get-Command ffmpeg.exe -ErrorAction Stop).Source
+$ffprobe = (Get-Command ffprobe.exe -ErrorAction Stop).Source
+$ffmpegHash = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+$ffprobeHash = (Get-FileHash -LiteralPath $ffprobe -Algorithm SHA256).Hash.ToLowerInvariant()
+
+# Independently compare both hashes with the accepted ADR-0012 fingerprints.
+# Stop and review any mismatch before using the --apply switch.
+
+$lab = Join-Path $env:TEMP ("photoidentity-video-lab-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $lab | Out-Null
+[IO.File]::WriteAllText(
+    (Join-Path $lab ".photoidentity-synthetic-video-lab"),
+    "wi0188-synthetic-video-lab-v1"
+)
+
+$argsPilot = @(
+    "video", "synthetic-proxy-pilot",
+    "--scratch-root", $lab,
+    "--ffmpeg", $ffmpeg, "--ffmpeg-sha256", $ffmpegHash,
+    "--ffprobe", $ffprobe, "--ffprobe-sha256", $ffprobeHash
+)
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @argsPilot
+if ($LASTEXITCODE -ne 0) { throw "Synthetic pilot preview failed." }
+
+# Only after the binary fingerprints match the accepted approved values:
+# dotnet run --project src/PhotoIdentity.Cli -c Release -- @argsPilot --apply
+~~~
+
+Preview must report `dryRun=true`, `status=not-run`, no results and
+`schemaUsed=false`. With explicit `--apply`, expect two sanitized
+results, `status=validated`, `dryRun=false`, and both orientations
+correct. The command itself deletes its tool/input/probe workspaces. It
+leaves the operator-created empty marked lab root in place for inspection.
+
+An optional environment-gated xUnit integration test can perform this
+roundtrip with exactly four variables:
+`PHOTOIDENTITY_WI0188_TEST_FFMPEG`,
+`PHOTOIDENTITY_WI0188_TEST_FFMPEG_SHA256`,
+`PHOTOIDENTITY_WI0188_TEST_FFPROBE` and
+`PHOTOIDENTITY_WI0188_TEST_FFPROBE_SHA256`. Normal CI builds do not need
+these variables or third-party encoder installations; ordinary tests
+exercise CLI parsing, marker/empty-root checks, exact arguments, and a
+database-free dry-run.
+
+## Boundaries and future verification
+
+A successful roundtrip is useful proof that those **two synthetic SDR
+cases** survived the local encoder/validator pipeline. It is not proof of
+compatibility with real camera HEVC, 4K, HDR/HLG, rotation metadata,
+variable frame rate, longer-duration clips, OneDrive online-only files,
+browser seeking or quality. Real-media and retention approval remains
+WI-0189; full video resource isolation and opt-in worker activation remain
+WI-0188. The single consolidated maintained Windows acceptance must still
+include photo-vs-mixed throughput, search/slideshow latency, source hashes,
+lease revocation and no-hydration evidence.
+
+The last accepted maintained PostgreSQL schema remains v34. Before any
+v36 application or catalogue CLI command opens it, the independently
+required **fresh backup and isolated v34→v36 rehearsal** from
+[the v36 publication runbook](video-publication-and-v36-rehearsal.md)
+must pass. This standalone database-free synthetic pilot does not satisfy
+or bypass that gate.
