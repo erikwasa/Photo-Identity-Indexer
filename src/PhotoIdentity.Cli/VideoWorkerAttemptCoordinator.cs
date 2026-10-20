@@ -122,9 +122,12 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         // The adapter cannot authorize success by returning true. It must
         // have committed a durable revision/exclusion/lease-fenced result.
         VideoProcessingJobState? state;
+        VideoPublishedDerivativeReceipt? receipt;
         try
         {
             state = await queue.GetAsync(lease.Id, token);
+            receipt = await new PostgresVideoPublishedDerivativeRepository(database)
+                .GetCurrentAsync(lease.Id, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -136,9 +139,7 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
 
         if (state?.Status == "succeeded" && state.ProgressPercent == 100 &&
-            !state.CancellationRequested &&
-            await new PostgresVideoPublishedDerivativeRepository(database)
-                .GetCurrentAsync(lease.Id, token) is { } receipt &&
+            !state.CancellationRequested && receipt is not null &&
             receipt.RevisionId == lease.RevisionId.Value)
             return new(true, true, "published");
 
