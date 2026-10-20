@@ -463,6 +463,14 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             VideoProcessingJobLease lease = Assert.IsType<VideoProcessingJobLease>(
                 await queue.TryClaimNextAsync(budget));
             Assert.Equal(first, lease.Id);
+            var locator = new PostgresVideoLocalSourceLocator(database);
+            VideoLeasedLocalSource binding =
+                Assert.IsType<VideoLeasedLocalSource>(await locator.ResolveAsync(lease));
+            Assert.Equal(source, binding.SourceId);
+            Assert.Equal("clip.mov", binding.SourceKey);
+            Assert.Equal(new string('a', 64), binding.Sha256);
+            Assert.Equal(5000, binding.SizeBytes);
+            Assert.Null(await locator.ResolveAsync(lease with { LeaseToken = Guid.NewGuid() }));
             var probe = new PostgresVideoLeaseSafetyProbe(database);
             Assert.True((await probe.CheckAsync(lease)).Allowed);
             VideoProcessingJobLease bogusToken = lease with { LeaseToken = Guid.NewGuid() };
@@ -475,6 +483,7 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.True(paused.Enabled);
             Assert.Equal("pause", paused.LastAction);
             Assert.Equal("video-paused", (await probe.CheckAsync(lease)).ReasonCode);
+            Assert.Null(await locator.ResolveAsync(lease));
             Assert.Null(await queue.TryClaimNextAsync(budget, photoWorkActive: false));
             Assert.False(await queue.TryHeartbeatAsync(first, lease.LeaseToken, 40));
             Assert.False(await queue.TryFinishAttemptAsync(
@@ -547,6 +556,7 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
             Assert.True((await queue.GetAsync(first))?.CancellationRequested);
             Assert.Equal("video-disabled",
                 (await probe.CheckAsync(resumedLease)).ReasonCode);
+            Assert.Null(await locator.ResolveAsync(resumedLease));
             Assert.False(await queue.TryHeartbeatAsync(first, resumedLease.LeaseToken, 60));
             Assert.False(await queue.TryFinishAttemptAsync(
                 first, resumedLease.LeaseToken, succeeded: true, retryable: false));

@@ -31,10 +31,10 @@ public sealed record WindowsVideoJobLimits(
 /// no unsupported-OS fallback and no unbounded video child on assignment
 /// failure. The entire tree dies when the last job handle closes.
 ///
-/// IMPORTANT: Process.Start followed by Assign has a brief uncontained
-/// start-to-assignment interval. A production video worker must eventually
-/// launch suspended/atomically into a job before it may process untrusted
-/// media. This class does not claim that startup boundary or hard I/O,
+/// A production worker must use the internal suspended native launcher,
+/// which assigns a process to the job before its first instruction executes.
+/// The legacy public Assign method remains only for test compatibility and
+/// must not authorize video execution. This class does not claim hard I/O,
 /// scratch-disk, GPU, filesystem or network confinement.
 /// </summary>
 public sealed class WindowsVideoJobObject : IDisposable
@@ -105,6 +105,16 @@ public sealed class WindowsVideoJobObject : IDisposable
         if (!AssignProcessToJobObject(_handle, process.Handle))
             throw new Win32Exception(Marshal.GetLastWin32Error(),
                 "Video subprocess could not be assigned to its resource job.");
+    }
+
+    /// <summary>Internal suspended-launch-only assignment before ResumeThread.</summary>
+    internal void AssignNative(IntPtr processHandle)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (processHandle == IntPtr.Zero ||
+            !AssignProcessToJobObject(_handle, processHandle))
+            throw new Win32Exception(Marshal.GetLastWin32Error(),
+                "Suspended video child could not enter its limited process job.");
     }
 
     /// <summary>Close the last job handle; Windows terminates all members.</summary>

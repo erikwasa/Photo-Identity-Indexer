@@ -43,10 +43,9 @@ public sealed record VideoToolExecutionResult(int ExitCode, TimeSpan Elapsed);
 ///
 /// Scratch polling is best-effort: an OS disk quota is still required to bound
 /// transient allocation. WindowsJobLimits, when explicitly supplied, configures
-/// a Windows Job Object for memory/CPU/process caps and kill-on-close. Because
-/// Process.Start precedes job assignment, the short startup gap is NOT fully
-/// contained. No production worker may process untrusted media until a
-/// suspended/atomic launch path and disk/IO caps have been reviewed.
+/// a Windows Job Object for memory/CPU/process caps and kill-on-close.
+/// Capped children launch natively suspended, are assigned before executing,
+/// then resumed. An activated worker still needs disk/IO and source controls.
 /// </summary>
 public sealed class VideoToolProcessSupervisor
 {
@@ -90,14 +89,15 @@ public sealed class VideoToolProcessSupervisor
             throw new InvalidOperationException("Video executable digest is not approved.");
 
         cancellationToken.ThrowIfCancellationRequested();
-        string workspace = Path.Combine(scratchRoot, "video-tool-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workspace);
+        string workspace = VideoScratchOwnership.Create(scratchRoot, "video-tool");
         WindowsVideoJobObject? resourceJob = null;
         bool resourceJobAssigned = false;
         bool processStopped = true;
         Task? stdoutDrain = null;
         Task? stderrDrain = null;
-        using Process process = new();
+        using Process defaultProcess = new();
+        Process process = defaultProcess;
+        Process? nativeProcess = null;
         Stopwatch timer = Stopwatch.StartNew();
         using CancellationTokenSource timeout = new(budget.MaximumWallTime);
         using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
@@ -145,22 +145,30 @@ public sealed class VideoToolProcessSupervisor
             if (budget.WindowsJobLimits is { } resourceLimits)
                 resourceJob = WindowsVideoJobObject.Create(resourceLimits);
 
-            process.StartInfo = start;
-            if (!process.Start())
-                throw new InvalidOperationException("Approved video tool could not start.");
-            processStopped = false;
-            // Assignment is intentionally fail-closed; future production startup
-            // must launch suspended to eliminate this transient uncontained gap.
             if (resourceJob is not null)
             {
-                resourceJob.Assign(process);
+                // Never run capped video media before the OS job is attached.
+                // Child stdout/stderr/stdin go directly to inherited NUL handles.
+                nativeProcess = WindowsVideoSuspendedLauncher.Start(
+                    resourceJob, executablePath, workspace, arguments,
+                    start.Environment, linked.Token);
+                process = nativeProcess;
+                processStopped = false;
                 resourceJobAssigned = true;
+                stdoutDrain = Task.CompletedTask;
+                stderrDrain = Task.CompletedTask;
             }
-
-            // Streaming discard prevents unbounded metadata, path or stderr
-            // accumulation and prevents a child from blocking on full pipes.
-            stdoutDrain = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
-            stderrDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
+            else
+            {
+                process.StartInfo = start;
+                if (!process.Start())
+                    throw new InvalidOperationException("Approved video tool could not start.");
+                processStopped = false;
+                // Streaming discard prevents unbounded private output,
+                // backpressure and inherited pipe lifetime on ordinary tools.
+                stdoutDrain = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
+                stderrDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
+            }
 
             while (!process.HasExited)
             {
@@ -225,7 +233,8 @@ public sealed class VideoToolProcessSupervisor
             // the root process's exit. Use a bounded, uncancellable retry;
             // never treat the caller's cancellation as permission to leave
             // temporary files behind.
-            await DeleteWorkspaceAfterExitAsync(workspace);
+            try { await DeleteWorkspaceAfterExitAsync(workspace); }
+            finally { nativeProcess?.Dispose(); }
         }
     }
 

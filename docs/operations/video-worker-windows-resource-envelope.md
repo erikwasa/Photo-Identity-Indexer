@@ -22,7 +22,12 @@ An explicitly selected bounded profile requires:
 | Process tree lifecycle | mandatory | `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` |
 
 The supervisor sets all required Windows limits before launching its
-subprocess, then assigns the process to the job immediately after launch.
+subprocess. For capped profiles it now uses native `CreateProcessW` with
+`CREATE_SUSPENDED`, assigns the suspended process to the job, opens a durable
+wait handle, and only then calls `ResumeThread`. Standard handles are
+the inherited Windows NUL device only, through a
+`PROC_THREAD_ATTRIBUTE_HANDLE_LIST` allowlist: child output is never
+collected or logged, and unrelated parent handles are not inherited.
 If the platform cannot create/configure or assign the job, execution fails
 closed; it does not silently continue without limits. The job handle is
 closed during all exit paths, terminating surviving members. This is
@@ -33,11 +38,12 @@ programs or photo processes on the machine.
 
 ## Production-activation blockers
 
-- **Important startup race:** `Process.Start()` returns before
-  `AssignProcessToJobObject()`. The child can briefly execute without the
-  job's caps. A reviewed suspended or atomically assigned process launch is
-  required before using untrusted video content. The code is opt-in and no
-  production worker is connected until that is resolved.
+- **Startup containment:** the capped execution path now uses native
+  suspended launch and no process instruction runs before job assignment.
+  The older uncapped supervisor path remains for historical explicit callers;
+  it is **not** acceptable for an enabled production worker.
+  Native launch, handle inheritance and multi-process tests require Windows CI
+  and maintained-machine inspection before activation.
 - **Disk and I/O:** scratch size/entry polling is not a kernel-enforced
   filesystem quota; a process could temporarily allocate over budget or
   create files outside scratch. Provide a real contained scratch volume

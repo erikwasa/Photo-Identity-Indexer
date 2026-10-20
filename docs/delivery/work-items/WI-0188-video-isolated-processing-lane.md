@@ -246,6 +246,44 @@ checkpoint. Continue development after CI and PR review.
 - No schema changes; previously merged v35 still requires an isolated
   v34 → v35 rehearsal before the maintainer starts v35 code.
 
+### Checkpoint 9 — suspended Windows process containment (2026-10-19)
+
+- For explicitly capped native Windows profiles, replace the uncontained
+  `Process.Start` → Job Object assignment sequence with `CreateProcessW`
+  using `CREATE_SUSPENDED`, job assignment, and only then `ResumeThread`.
+  Failure anywhere before resume terminates the never-run process. The
+  subprocess has inherited standard handles attached to NUL; original paths,
+  private stderr and launcher secrets are not logged or inherited.
+- Existing legacy uncapped calls remain supported for prior tests, but
+  production video workers must require an OS-capped suspended profile.
+- Windows tests exercise successful native launch, cancellation, and
+  bounded scratch teardown. The native child inherits only an explicitly
+  allowlisted NUL device handle and a sanitized environment, never arbitrary
+  photo-application handles.
+  [Updated resource envelope](../../operations/video-worker-windows-resource-envelope.md).
+- Added private `PostgresVideoLocalSourceLocator` and
+  `VideoLeasedInputPreparer` to bind the actual source root/key/hash to
+  the fenced PostgreSQL video job, check photo/operator safety, and stage
+  only already-local MOV/MP4 into bounded, stream-hashed private scratch.
+  Windows source opening requests `FILE_FLAG_OPEN_NO_RECALL`, avoiding
+  intentional OneDrive hydration; maintained-host provider behavior still
+  needs local verification. [Source staging](../../operations/video-worker-local-staging-and-cleanup.md).
+- Added a deliberately unregistered `VideoUnpublishedToolAttempt` bridge
+  with 15-second lease heartbeats, staged-only external input, required
+  Windows Job Object limits and ongoing photo-priority preemption.
+  **It does not acknowledge job success or publish derivatives**:
+  versioned, revision-fenced atomic publication belongs to later media
+  adapters; the video lane remains disabled by default.
+- Added app-owned markers for tool/input scratch directories, a bounded
+  conservative 24h+ `VideoScratchJanitor`, and dry-run-first
+  `video scratch-cleanup` operator CLI. Tests cover unowned/recent folder
+  preservation, verified source hash, lease revocation, and scratch cleanup.
+  No photo archive or original media delete command is introduced.
+- Native Job Object limits still do not enforce GPU, filesystem sandboxing,
+  full disk/IO quotas, or safe source-content authorization. Those remain
+  separate activation gates. No schema change; the already merged v35
+  migration still requires maintained-machine rehearsal before startup.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
@@ -266,7 +304,10 @@ checkpoint. Continue development after CI and PR review.
 - Checkpoint 6: merged PR #611, v35 durable stop controls; the local
   backup and isolated v34 → v35 rehearsal gate is still pending.
 - Checkpoint 7: merged PR #613; fail-closed execution preemption bridge.
-- Checkpoint 8: optional native Windows resource limits with production
-  activation blocked on the suspended process launch boundary.
+- Checkpoint 8: merged PR #615; opt-in native Windows resource bounds.
+- Checkpoint 9: bounded, handle-allowlisted suspended Windows launch,
+  hash-verified no-recall source staging, fenced source lookup, aborted-work
+  cleanup and dry-run-only default scratch janitor. Actual artifact publishing,
+  activation and OS disk/IO/GPU isolation remain further work.
 - WI-0188 still requires a real resource-controlled worker and Windows
   mixed-photo/video verification before acceptance.
