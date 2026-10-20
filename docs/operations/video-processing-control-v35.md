@@ -1,5 +1,12 @@
 # WI-0188 checkpoint 6 — safe schema v35 video-lane control
 
+> **Historical checkpoint only.** The current development build is v36.
+> For the maintained database still at v34, perform ONE fresh backup and
+> isolated **v34→v36** rehearsal using
+> [the consolidated publication runbook](video-publication-and-v36-rehearsal.md).
+> Do not use the old v35-only expected health/migration result below for
+> the current branch.
+
 **Do not start a v35 app on the maintained v34 catalogue until a CURRENT backup
 and isolated v34 → v35 rehearsal succeed.** Maintainer previously accepted
 v33 → v34 on 2026-10-19; this is a NEW migration and needs a new rehearsal.
