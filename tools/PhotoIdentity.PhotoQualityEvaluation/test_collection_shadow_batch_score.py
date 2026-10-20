@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import collection_shadow_batch_score as batch
 import collection_shadow_simulator as shadow
@@ -172,7 +173,7 @@ class BoundedResearchScoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             paths, output, proxies = materialize(folder)
             inputs = batch.checked_inputs(*paths)
-            with unittest.mock.patch.object(batch, "MAX_NEW", 1):
+            with patch.object(batch, "MAX_NEW", 1):
                 self.assertFalse(batch.summary(inputs)["plannedBatchFitsHardCap"])
                 with self.assertRaises(ValueError):
                     batch.score(inputs, output, accept_weights=True,
