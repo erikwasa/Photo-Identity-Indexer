@@ -57,6 +57,61 @@ Test whether independently evaluated absolute quality and visual redundancy actu
 
 **No-go / acceptance rule:** This implementation is an **exploratory research infrastructure slice**, not formal WI-0195 acceptance; it does not deliver the original four validated variants, collection representative preference, Very Low exclusion, redundant-set selection, or a bounded production integration plan. The existing full acceptance checkboxes must remain unchecked. Do not change dependency status to completed or product activation. On aggregate local evidence, decide whether an independent, properly licensed and adequately scored research experiment merits a NEW explicitly scoped follow-up. If the existing 600-score coverage is inadequate, report that as a blocker and defer rather than spuriously simulating a deployed quality model.
 
+## Substantive final bounded research phase (2026-10-20; local plan/permission pending)
+
+The first local real Creative preview test used 80 Fideli candidates and
+20 target slots, passing **all 8 simulator tests** with 0/80 overlap
+against the prior 600-photo TOPIQ scores, 267 abstentions from missing
+evidence, and zero changes. This is confirmed **score coverage failure**,
+not evidence that research quality preferences harm or help actual
+collections; no blind review of identical selections is appropriate.
+
+This PR develops an **end-to-end bounded, privacy-preserving answer**:
+- Read-only `collection-shadow candidate-proxies` .NET command binds a
+  private captured scenario manifest and resolves at most **240**
+  current `jpeg-1600-q78` durable proxy metadata entries, without
+  source originals, catalogue writes or hydration. Missing/stale proxies
+  fail closed; SHA-bound private output is exclusive-write.
+- `collection_shadow_batch_score.py plan` validates scenario, map and
+  existing TOPIQ version/evidence **without importing a learned model
+  or opening proxy pixels**. It prints only aggregate overlap, at most
+  **120** additional photo candidates for an optional research run,
+  approximate prior CPU cost, and license/identity warnings. Safe
+  read-only plan is the next operator action after PR merges.
+- The separate **explicit opt-in `score` mode** requires research-only
+  third-party weight consent, hashes/size-verifies **all** current
+  proxy bytes *before* model initialization, enforces installed
+  `pyiqa 0.1.16` and `topiq_nr`, caps new inference to 120 photos,
+  copies previously scored TOPIQ values only where versions match,
+  and writes new private source-/proxy-/score-bound score exports
+  distinct from WI-0193's consumed benchmark. Third-party model
+  weights may be downloaded; this is **not** proof of checkpoint
+  licensing or deployment permission.
+- Reuse the existing strict original-kind and existing-selection-score
+  contiguous-tier score-gap `0.16755089163780212` selection
+  simulator and bound private blinded reviewer with Finish & Report.
+  No rank retuning; no absolute tier, Very Low exclusion, redundancy
+  or combined automatic suppression. Run only if evidence actually
+  changes the same-sized collection selection.
+- Allow multiple *distinct* read-only preview imports into one
+  scenario manifest and isolated per-batch private artifacts, with
+  synthetic tests for provenance/consent, mismatched manifests,
+  tampered local proxies, bounded inference and no-overwrite behavior.
+  One Windows PowerShell operator runner performs tests, plan, optional
+  separately authorized scoring and optional A/B review. No large
+  photo-archive rerun and no repeated per-command development PRs.
+
+**Closure gate:** After one bounded result (or an explicit defer if
+third-party inference is not authorized), record the final four-policy
+GO/NO-GO/DEFER evidence decisions and close M37 as a completed **evaluation**
+only if the original unmet four-arm criteria are transparently
+documented as not demonstrated. WI-0195 is not production acceptance;
+the full old four-policy checklist remains unchecked. Any production
+score backfill, weight/license attestation, original/proxy transfer,
+absolute classification or suppressor policy belongs in new future
+work outside this milestone. Runbook:
+`docs/operations/collection-shadow-simulation.md`.
+
 ## Verification requirements
 
 Automated simulator determinism tests plus blinded maintainer review of representative real collection outputs and privacy-safe aggregate comparison evidence.
