@@ -55,7 +55,8 @@ public sealed class VideoToolProcessSupervisor
         string scratchRoot,
         Func<string, IReadOnlyList<string>> buildArguments,
         VideoToolExecutionBudget budget,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<string, CancellationToken, Task>? afterSuccessfulExit = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(scratchRoot);
@@ -187,6 +188,14 @@ public sealed class VideoToolProcessSupervisor
             await process.WaitForExitAsync(linked.Token);
             await Task.WhenAll(stdoutDrain, stderrDrain).WaitAsync(TimeSpan.FromSeconds(5), linked.Token);
             CheckWorkspace(workspace, budget);
+            if (process.ExitCode == 0 && afterSuccessfulExit is not null)
+            {
+                // The child tree has exited, but the owned workspace still
+                // exists. External publication must revalidate the exact lease
+                // before moving any bytes. Finally always cleans scratch.
+                linked.Token.ThrowIfCancellationRequested();
+                await afterSuccessfulExit(workspace, linked.Token);
+            }
             return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&
