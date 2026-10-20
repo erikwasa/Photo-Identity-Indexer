@@ -185,7 +185,7 @@ Automated simulator determinism tests plus blinded maintainer review of represen
 
 ## Final work-item disposition — 2026-10-21
 
-**WI-0195 original four-arm automatic-policy acceptance NOT DEMONSTRATED (research disposition completed) /**, following independent quality and visual
+**WI-0195 research disposition COMPLETED; original four-arm automatic-policy acceptance NOT DEMONSTRATED**, following independent quality and visual
 redundancy policy no-go decisions. This is not a claim that
 baseline vs approved Very Low, redundancy-only and combined
 four-arm selection was evaluated successfully.
