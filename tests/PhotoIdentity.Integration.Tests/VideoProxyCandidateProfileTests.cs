@@ -170,6 +170,35 @@ public sealed class VideoProxyCandidateProfileTests
         finally { if (File.Exists(path)) File.Delete(path); }
     }
 
+    [Fact]
+    public async Task Revoked_photo_priority_prevents_independent_probe_launch()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-video-probe-denied-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string file = Path.Combine(root, "candidate.mp4");
+            File.WriteAllBytes(file, Boxes("ftyp", "moov", "mdat"));
+            int observed = 0;
+            var validator = new VideoProxyOutputValidator(
+                Path.Combine(root, "unapproved-ffprobe.exe"),
+                new string('a', 64), root);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                validator.ValidateAsync(file, _ =>
+                {
+                    Interlocked.Increment(ref observed);
+                    return Task.FromResult(
+                        PhotoIdentity.Core.Processing.VideoExecutionPermit.Deny("photo-priority"));
+                }));
+            Assert.Equal(1, observed);
+            Assert.True(File.Exists(file)); // never modified or published
+            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     private static byte[] Boxes(params string[] types)
     {
         using MemoryStream file = new();
