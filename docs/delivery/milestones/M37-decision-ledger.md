@@ -152,7 +152,7 @@ acceptance was **not demonstrated and its rollout track is cancelled**.
 | Archive-scale visual redundancy candidate discovery (WI-0194) | **PASS AS RESEARCH** | 27,050 proxies; 200 calibration plus 180 guarded heldout blind pair reviews; not representative whole-archive precision |
 | Unattended visual redundancy suppression | **NO-GO** | No heldout candidate-stratum 95% Wilson lower bound met conservative suppression precision; unobserved leakage and missing disagreement controls |
 | Combined quality + redundancy automatic policy | **NO-GO** | Both prerequisites rejected / not deployment-approved |
-| Original WI-0195 four-arm real-collection policy comparison | **NOT DEMONSTRATED / CANCELLED** | Safe preview importer, 8/8 shadow tests; 80 candidates, 0 pre-existing TOPIQ scores, 0 effective score comparisons; opt-in bounded scoring deliberately not authorized |
+| Original WI-0195 four-arm real-collection policy comparison | **NOT DEMONSTRATED / NO-GO (evaluation closed)** | Safe preview importer, 8/8 shadow tests; 80 candidates, 0 pre-existing TOPIQ scores, 0 effective score comparisons; opt-in bounded scoring deliberately not authorized |
 | WI-0195 bounded score-coverage preflight | **PASS PLANNING** | 6+8 synthetic tests passed, 80/80 existing current proxies, 80 prospective scored photos fitting cap 120, 353.8 seconds projected CPU, **zero inference** |
 | Human-controlled low-quality suggestions (issue #629) | **GO FOR MANUAL PRODUCT EXPERIENCE** | 129/129 Archive suggestions human-reviewed; 72 Keep, 37 Dismiss, 20 Consider exclusion. Maintainer confirmed most considered cases genuinely unwanted, and review reasonably convenient; 0 automatic exclusions |
 
@@ -171,7 +171,7 @@ redundancy suggestions requires separate explicit product scope.
 The original M37 work-item statuses are now:
 WI-0192 **completed**, WI-0193 **completed**, WI-0194
 **completed (candidate discovery/evaluation, suppression NO-GO)**,
-WI-0195 **cancelled (four-arm acceptance unmet)**.
+WI-0195 **completed as research disposition (four-arm acceptance unmet)**.
 M37 itself is **completed as an evaluation with these outcomes**.
 
 ## Safety and privacy evidence that cannot be relaxed
