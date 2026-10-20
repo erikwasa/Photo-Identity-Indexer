@@ -89,12 +89,12 @@ public sealed class VideoWorkerAttemptCoordinatorTests
                 seed.Parameters.AddWithValue("revision", revision);
                 await seed.ExecuteNonQueryAsync();
             }
-            Guid Job(string preset) => queue.EnqueueAsync(
+            Task<Guid> JobAsync(string preset) => queue.EnqueueAsync(
                 new VideoDerivativeJobIdentity(AssetRevisionId.From(revision),
                     VideoDerivativeKind.PlayableProxy, "wi0188-v1", preset,
-                    new string('d', 64)), budget, candidate).GetAwaiter().GetResult();
+                    new string('d', 64)), budget, candidate);
 
-            Guid disabledJob = Job("not-started");
+            Guid disabledJob = await JobAsync("not-started");
             var callback = new SyntheticAdapter((_, _) =>
                 Task.FromResult(new VideoDerivativeAttemptReport(true, false)));
             VideoWorkerCycleResult stillOff =
@@ -124,7 +124,7 @@ public sealed class VideoWorkerAttemptCoordinatorTests
             Assert.Equal("publication-required", fakeSuccess.ReasonCode);
             Assert.Equal("failed", (await queue.GetAsync(disabledJob))?.Status);
 
-            Guid retryId = Job("retryable");
+            Guid retryId = await JobAsync("retryable");
             callback = new SyntheticAdapter((_, _) =>
                 Task.FromException<VideoDerivativeAttemptReport>(
                     new IOException("sensitive-source-path.mp4")));
@@ -135,7 +135,7 @@ public sealed class VideoWorkerAttemptCoordinatorTests
             Assert.Equal("queued", (await queue.GetAsync(retryId))?.Status);
             Assert.DoesNotContain("sensitive", retry.ReasonCode);
 
-            Guid cancelledId = Job("paused");
+            Guid cancelledId = await JobAsync("paused");
             await control.PauseAsync();
             var neverRun = new SyntheticAdapter((_, _) =>
                 throw new InvalidOperationException("Should not run while paused."));
