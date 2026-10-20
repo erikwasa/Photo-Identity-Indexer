@@ -89,6 +89,10 @@ public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogue
                   AND job.policy_version=@policy
                   AND job.preset_version=@preset
                   AND job.tool_sha256=@tool
+                  AND job.source_bytes=@source_bytes
+                  AND job.reserved_temporary_bytes=@temporary_bytes
+                  AND job.requested_frames=@frames
+                  AND job.reserved_temporary_bytes>=@encoded_bytes
                   AND job.control_generation=@generation
                   AND job.status='running' AND job.leased_until_utc>now()
                   AND job.cancellation_requested_at_utc IS NULL
@@ -118,6 +122,10 @@ public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogue
             complete.Parameters.AddWithValue("policy", lease.PolicyVersion);
             complete.Parameters.AddWithValue("preset", lease.PresetVersion);
             complete.Parameters.AddWithValue("tool", lease.ToolSha256);
+            complete.Parameters.AddWithValue("source_bytes", lease.SourceBytes);
+            complete.Parameters.AddWithValue("temporary_bytes", lease.TemporaryBytes);
+            complete.Parameters.AddWithValue("frames", lease.RequestedFrames);
+            complete.Parameters.AddWithValue("encoded_bytes", encodedBytes);
             complete.Parameters.AddWithValue("generation", lease.ControlGeneration);
             if (await complete.ExecuteScalarAsync(token) is not Guid)
                 return false;
