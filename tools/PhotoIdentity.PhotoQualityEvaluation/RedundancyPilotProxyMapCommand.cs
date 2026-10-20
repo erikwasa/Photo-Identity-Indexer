@@ -32,7 +32,8 @@ internal static class RedundancyPilotProxyMapCommand
             {
                 Console.WriteLine(
                     "redundancy pilot-proxies --input private/wi0194-pilot-blind.json " +
-                    "--output private/wi0194-pilot-proxies.json");
+                    "--output private/wi0194-pilot-proxies.json " +
+                    "[--validation-audit private/wi0194-heldout-audit.json]");
                 return 0;
             }
             Dictionary<string, string> values = new(StringComparer.Ordinal);
@@ -41,8 +42,8 @@ internal static class RedundancyPilotProxyMapCommand
                 if (i + 1 >= args.Length || !values.TryAdd(args[i], args[++i]))
                     throw new ArgumentException("Unknown or duplicate proxy-map argument.");
             }
-            if (values.Count != 2 || !values.ContainsKey("--input") ||
-                !values.ContainsKey("--output"))
+            if (values.Count != (values.ContainsKey("--validation-audit") ? 3 : 2) ||
+                !values.ContainsKey("--input") || !values.ContainsKey("--output"))
                 throw new ArgumentException("Required proxy-map arguments are missing.");
 
             string input = RedundancyCandidateExportCommand.PrivatePath(values["--input"]);
@@ -53,14 +54,42 @@ internal static class RedundancyPilotProxyMapCommand
             byte[] pilotBytes = await File.ReadAllBytesAsync(input);
             BlindPilot pilot = JsonSerializer.Deserialize<BlindPilot>(pilotBytes, Options)
                 ?? throw new InvalidDataException("Invalid blind pilot.");
-            if (pilot.SchemaVersion != 1 || pilot.Protocol != PilotProtocol ||
-                pilot.Purpose != "calibration-only-pilot-unfrozen-heldout-excluded" ||
+            bool isHeldOut = pilot.Protocol == "wi0194-heldout-blind-validation-v1";
+            if (pilot.SchemaVersion != 1 ||
+                !(pilot.Protocol == PilotProtocol || isHeldOut) ||
+                pilot.Purpose != (isHeldOut
+                    ? "heldout-independent-pair-validation-frozen-before-labels"
+                    : "calibration-only-pilot-unfrozen-heldout-excluded") ||
                 pilot.Pairs is null || pilot.Pairs.Length is < 1 or > 200 ||
                 pilot.Labels is null || !pilot.Labels.SequenceEqual(new[]
                 {
                     "redundant", "similar-keep-both", "not-similar", "unsure"
                 }))
-                throw new InvalidDataException("Input must be a calibration-only blind pilot.");
+                throw new InvalidDataException("Input must be an approved blind review protocol.");
+
+            // Require the SEPARATE frozen audit before resolving any held-out photos.
+            if (isHeldOut != values.ContainsKey("--validation-audit"))
+                throw new InvalidDataException("Held-out proxy mapping requires its frozen audit.");
+            if (isHeldOut)
+            {
+                string auditPath = RedundancyCandidateExportCommand.PrivatePath(
+                    values["--validation-audit"]);
+                if (auditPath == input || auditPath == output)
+                    throw new InvalidDataException("Private held-out paths must be distinct.");
+                using JsonDocument audit = JsonDocument.Parse(
+                    await File.ReadAllBytesAsync(auditPath));
+                JsonElement root = audit.RootElement;
+                string sha = Convert.ToHexString(SHA256.HashData(pilotBytes))
+                    .ToLowerInvariant();
+                if (root.GetProperty("protocol").GetString() !=
+                        "wi0194-heldout-validation-audit-v1" ||
+                    root.GetProperty("status").GetString() !=
+                        "heldout-validation-frozen-before-human-labels" ||
+                    root.GetProperty("pilotSha256").GetString() != sha ||
+                    root.GetProperty("suppressionThresholdFrozen").GetBoolean() ||
+                    root.GetProperty("productionSuppressionApproved").GetBoolean())
+                    throw new InvalidDataException("Held-out audit failed pilot binding.");
+            }
             HashSet<string> pairIds = new(StringComparer.Ordinal);
             HashSet<string> photoIds = new(StringComparer.OrdinalIgnoreCase);
             foreach (BlindPair pair in pilot.Pairs)
@@ -138,7 +167,9 @@ internal static class RedundancyPilotProxyMapCommand
             }
             Console.WriteLine(JsonSerializer.Serialize(new
             {
-                status = "local-pilot-proxy-map-only",
+                status = isHeldOut
+                    ? "local-heldout-validation-proxy-map-only"
+                    : "local-pilot-proxy-map-only",
                 currentProxiesMatched = selected.Count,
                 blindPilotPairs = pilot.Pairs.Length,
                 noOriginalsHydrated = true,
