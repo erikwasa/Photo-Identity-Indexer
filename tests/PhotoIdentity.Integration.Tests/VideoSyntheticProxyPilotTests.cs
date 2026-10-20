@@ -135,6 +135,61 @@ public sealed class VideoSyntheticProxyPilotTests
                 "relative-scratch", 1280, 720, true));
     }
 
+    [Fact]
+    public async Task Approved_installed_tools_can_roundtrip_two_synthetic_clips_without_a_catalogue()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        // Optional developer machine/CI tool-installed evidence. This never
+        // downloads software or opens user media; the normal build is fully
+        // deterministic and skips when tool paths/hashes are not configured.
+        string? ffmpeg = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_WI0188_TEST_FFMPEG");
+        string? ffmpegHash = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_WI0188_TEST_FFMPEG_SHA256");
+        string? ffprobe = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_WI0188_TEST_FFPROBE");
+        string? ffprobeHash = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_WI0188_TEST_FFPROBE_SHA256");
+        if (new[] { ffmpeg, ffmpegHash, ffprobe, ffprobeHash }
+                .Any(string.IsNullOrWhiteSpace))
+            return;
+
+        string root = NewScratch();
+        try
+        {
+            VideoSyntheticProxyPilotOptions options =
+                VideoSyntheticProxyPilotOptions.Parse(
+                [
+                    "--scratch-root", root,
+                    "--ffmpeg", ffmpeg!,
+                    "--ffmpeg-sha256", ffmpegHash!,
+                    "--ffprobe", ffprobe!,
+                    "--ffprobe-sha256", ffprobeHash!,
+                    "--apply"
+                ]);
+            using StringWriter output = new();
+            Assert.Equal(0, await VideoSyntheticProxyPilotCommandRunner
+                .RunAsync(options, output));
+            using JsonDocument report = JsonDocument.Parse(output.ToString());
+            JsonElement fields = report.RootElement;
+            Assert.Equal("validated", fields.GetProperty("status").GetString());
+            Assert.False(fields.GetProperty("dryRun").GetBoolean());
+            JsonElement rows = fields.GetProperty("results");
+            Assert.Equal(2, rows.GetArrayLength());
+            Assert.Equal("landscape", rows[0].GetProperty("orientation").GetString());
+            Assert.True(rows[0].GetProperty("hasAudio").GetBoolean());
+            Assert.Equal("portrait", rows[1].GetProperty("orientation").GetString());
+            Assert.False(rows[1].GetProperty("hasAudio").GetBoolean());
+            Assert.All(rows.EnumerateArray(), item =>
+            {
+                Assert.True(item.GetProperty("encodedBytes").GetInt64() > 128);
+                Assert.True(item.GetProperty("encodeMilliseconds").GetInt64() > 0);
+            });
+            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     private static string NewScratch()
     {
         string dir = Path.Combine(Path.GetTempPath(),
