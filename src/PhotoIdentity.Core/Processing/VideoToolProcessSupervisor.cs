@@ -72,6 +72,11 @@ public sealed class VideoToolProcessSupervisor
             throw new ArgumentException("Remote paths cannot be used for video tool execution.");
 
         AssertNoReparsePoints(scratchRoot);
+        // Production-shaped, OS-capped video tools must also prove enough
+        // local free space for their worst-case scratch output before launch.
+        // Preserve uncapped legacy synthetic callers until their migration.
+        if (budget.WindowsJobLimits is not null)
+            VideoScratchCapacityGuard.EnsureCapacity(scratchRoot, budget.MaximumTemporaryBytes);
         AssertNoReparsePoints(Path.GetDirectoryName(Path.GetFullPath(executablePath))!);
         if ((File.GetAttributes(executablePath) & FileAttributes.ReparsePoint) != 0)
             throw new InvalidOperationException("Video executable must not be a symbolic link.");
