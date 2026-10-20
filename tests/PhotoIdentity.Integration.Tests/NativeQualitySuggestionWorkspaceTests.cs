@@ -43,8 +43,8 @@ public sealed class NativeQualitySuggestionWorkspaceTests
 
             // No default cross-use-case effects: this photo is unreviewed
             // in slideshow/collection contexts and those contexts are disabled.
-            Assert.Empty(saved.Decisions.Where(x =>
-                x.Key.StartsWith("slideshow-curation/", StringComparison.Ordinal)));
+            Assert.DoesNotContain(saved.Decisions,
+                x => x.Key.StartsWith("slideshow-curation/", StringComparison.Ordinal));
             await Assert.ThrowsAsync<InvalidOperationException>(
                 () => resumed.DecideAsync("slideshow-curation", B, "consider-exclusion"));
 
