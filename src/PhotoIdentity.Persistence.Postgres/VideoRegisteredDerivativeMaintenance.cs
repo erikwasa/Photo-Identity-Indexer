@@ -208,19 +208,29 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
             await using NpgsqlCommand revoke = connection.CreateCommand();
             revoke.Transaction = transaction;
             revoke.CommandText = """
-                DELETE FROM video_published_derivatives
-                WHERE job_id=@job AND artifact_relative_path=@path;
-                UPDATE video_processing_jobs
-                SET status='failed', failure_code='revision-invalid',
-                    progress_percent=0, completed_at_utc=now(),
-                    lease_token=NULL, leased_until_utc=NULL, updated_at_utc=now()
-                WHERE id=@job AND status='succeeded';
+                WITH removed AS (
+                    DELETE FROM video_published_derivatives
+                    WHERE job_id=@job AND artifact_relative_path=@path
+                    RETURNING job_id
+                ), invalidated AS (
+                    UPDATE video_processing_jobs job
+                    SET status='failed', failure_code='revision-invalid',
+                        progress_percent=0, completed_at_utc=now(),
+                        lease_token=NULL, leased_until_utc=NULL, updated_at_utc=now()
+                    WHERE job.id IN (SELECT job_id FROM removed)
+                      AND job.status='succeeded'
+                    RETURNING job.id
+                )
+                SELECT (SELECT count(*) FROM removed)::integer,
+                       (SELECT count(*) FROM invalidated)::integer;
                 """;
             revoke.Parameters.AddWithValue("job", entry.JobId);
             revoke.Parameters.AddWithValue("path", entry.RelativePath);
-            if (await revoke.ExecuteNonQueryAsync(token) != 2)
+            await using NpgsqlDataReader changed = await revoke.ExecuteReaderAsync(token);
+            if (!await changed.ReadAsync(token) ||
+                changed.GetInt32(0) != 1 || changed.GetInt32(1) != 1)
                 throw new InvalidOperationException(
-                    "Registered derivative changed during revocation; rollback the maintenance batch.");
+                    "Registered derivative changed during revocation; roll back the maintenance batch.");
         }
 
         // Revocation MUST commit before the first unlink. A crash after commit
