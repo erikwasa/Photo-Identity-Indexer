@@ -140,6 +140,12 @@ public static class VideoSyntheticProxyPilotCommandRunner
                                     candidate,
                                     _ => Task.FromResult(VideoExecutionPermit.Ready),
                                     encodeToken);
+                                if (valid.HasAudio != audio ||
+                                    valid.DurationSeconds is < 2.5 or > 3.5 ||
+                                    (orientation == "portrait" && valid.Height <= valid.Width) ||
+                                    (orientation == "landscape" && valid.Width <= valid.Height))
+                                    throw new InvalidDataException(
+                                        "Synthetic proxy did not preserve its expected orientation, duration or audio policy.");
                                 long bytes = new FileInfo(candidate).Length;
                                 observed = new(orientation, valid.Width, valid.Height,
                                     valid.HasAudio, valid.DurationSeconds, bytes,
@@ -216,8 +222,10 @@ public static class VideoSyntheticProxyPilotCommandRunner
     public static IReadOnlyList<string> GenerateArguments(
         string workspace, int width, int height, bool audio)
     {
-        if (!Path.IsPathFullyQualified(workspace) ||
-            (width, height, audio) is not ((1280, 720, true) or (720, 1280, false)))
+        bool approvedFixture =
+            (width == 1280 && height == 720 && audio) ||
+            (width == 720 && height == 1280 && !audio);
+        if (!Path.IsPathFullyQualified(workspace) || !approvedFixture)
             throw new ArgumentException("Only the two fixed generated video fixtures are permitted.");
 
         List<string> args =
