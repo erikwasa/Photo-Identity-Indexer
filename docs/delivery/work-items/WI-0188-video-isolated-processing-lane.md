@@ -337,6 +337,36 @@ checkpoint. Continue development after CI and PR review.
   automatic video job activity. The maintained v34 → v35 backup/isolated
   rehearsal gate is still outstanding before the first local v35 startup.
 
+### Integrated checkpoint 12 — v36 private derivative receipts and guarded publication (2026-10-20)
+
+- Added v36 append-only `video_published_derivatives` registry.
+  Private artifact receipts use exact job/revision, SHA-256, byte count and an
+  opaque job/lease-derived path. Job success and receipt are written in **one
+  PostgreSQL transaction** after current lease, video control generation,
+  cancellation, latest supported revision and exclusion checks.
+- The existing generic queue `TryFinishAttemptAsync(succeeded: true)` still
+  fails closed. The single-job dispatch coordinator now requires both durable
+  successful status and an independently read authorized publication receipt.
+- Added an optional guarded successful-tool-exit callback, with live
+  lease/priority observation, **before** supervised workspace cleanup.
+  An unregistered `VideoPublishedToolAdapter` integrates the previously
+  separate staged input, Windows-capped process, optional callback and
+  `VideoDerivativeFilePublisher` for a bounded same-volume private rename.
+  No process, worker or video enablement is registered.
+- Synthetic filesystem/disposable PostgreSQL and Windows callback tests
+  cover output key binding, missing ownership, durable success, invalidated
+  control, source exclusion, callback cleanup and unchanged photo operations.
+  See [v36 publication and one consolidated v34→v36 isolated rehearsal](../../operations/video-publication-and-v36-rehearsal.md).
+- **Remaining before acceptance**: WI-0189's audited FFmpeg/MP4 profile and
+  independent media validation, database-aware orphan recovery and quota/
+  privacy-aware eviction, real filesystem/IO/network limits, a production
+  opt-in worker/selection interface, current Windows OneDrive no-recall and
+  photo-only vs. mixed-load acceptance. A DB receipt is not proof of playable
+  media, and the filesystem + DB are NOT one atomic transaction.
+- The maintained v34 database MUST NOT start any v36 build until a **fresh**
+  authoritative backup and verified isolated **v34→v36** rehearsal passes.
+  This single exercise covers both previously pending v35 and new v36.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
