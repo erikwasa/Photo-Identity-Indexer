@@ -73,7 +73,9 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
             control.Transaction = transaction;
             control.CommandText = """
                 UPDATE video_processing_control
-                SET enabled=false, paused=true, last_action='stop',
+                SET enabled=false, paused=true,
+                    selected_job_id=NULL, authorization_expires_at_utc=NULL,
+                    last_action='stop',
                     generation=generation+1, updated_at_utc=now()
                 WHERE singleton_id=1;
                 """;
