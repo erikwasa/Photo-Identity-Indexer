@@ -187,13 +187,16 @@ public sealed class VideoProxyCandidateProfileTests
             var validator = new VideoProxyOutputValidator(
                 Path.Combine(root, "unapproved-ffprobe.exe"),
                 new string('a', 64), root);
-            await Assert.ThrowsAsync<InvalidDataException>(() =>
-                validator.ValidateAsync(file, _ =>
-                {
-                    Interlocked.Increment(ref observed);
-                    return Task.FromResult(
-                        PhotoIdentity.Core.Processing.VideoExecutionPermit.Deny("photo-priority"));
-                }));
+            VideoProxyValidationException failure =
+                await Assert.ThrowsAsync<VideoProxyValidationException>(() =>
+                    validator.ValidateAsync(file, _ =>
+                    {
+                        Interlocked.Increment(ref observed);
+                        return Task.FromResult(
+                            PhotoIdentity.Core.Processing.VideoExecutionPermit.Deny("photo-priority"));
+                    }));
+            Assert.Equal("probe-not-started", failure.ReasonCode);
+            Assert.Null(failure.ToolExitCode);
             Assert.Equal(1, observed);
             Assert.True(File.Exists(file)); // never modified or published
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
