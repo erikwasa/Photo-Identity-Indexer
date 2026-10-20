@@ -51,6 +51,12 @@ M37's benchmark and frozen WI-0193 research results were integrated into `main` 
 
 WI-0192 benchmark accepted and WI-0193 quality research concluded: frozen TOPIQ selective pairwise preferences passed 80%/20%/80% held-out *point-estimate* criteria, with overall ordering 95% photo-bootstrap interval extending below 80%. **No absolute quality classifier, automatic Very Low exclusion, or production model was approved.** WI-0194 archive-wide redundancy evidence and WI-0195 collection simulation remain pending. Never reuse the consumed WI-0193 held-out labels for alternative model or threshold selection.
 
+## M37 governance after completed WI-0194 human studies (2026-10-20)
+
+WI-0194 has now labelled 200 calibration and 180 guarded held-out visual pairs. The observed pair-level dHash0–8/high-CLIP candidate rates were promising but none qualified for **automatic suppression** given selected pair populations, correlated photos, holdout quarantine and inadequate hard-disagreement coverage. The formal result is **NO-GO / DEFER** on all automatic redundancy suppression and combination arms. WI-0193 concluded that the frozen TOPIQ p75 pairwise ordering was a **research-level selective preference only**, with no absolute classifier, Very Low exclusion or production-license gate acceptance.
+
+The existing WI-0195 four-arm acceptance **cannot be represented as passed or safely activated**. One optional read-only, offline **shadow-simulation research probe** has been implemented to measure real Creative preview score-coverage and the observed effect of the frozen TOPIQ rule only **within identical relevance-score and candidate-kind contiguous tiers**, while baseline remains unchanged. This limited experiment does not lift the WI-0195 dependency for production, use held-out human quality/redundancy labels, or start a new model. The original acceptance criteria remain pending. Even a favorable A/B preference would require separately approved broader-quality evidence, license/deployment and full-archive score coverage before product integration.
+
 ## Exit criteria
 
 - [ ] The quality benchmark is demonstrably broader than WI-0182's deterministic 300-photo sample and covers representative archive strata plus model-disagreement/challenge cases.
