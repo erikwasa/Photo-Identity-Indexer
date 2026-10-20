@@ -42,6 +42,28 @@ job, excluded video or unavailable PostgreSQL refuses completion. Exceptions
 are sanitized to codes; filenames, media paths, stack traces, source SHA
 and subprocess output are not surfaced through coordinator results.
 
+## Operator recovery while disabled
+
+The video lane may remain paused or stopped while an interrupted lease ages
+past its 60-second expiry. With no hosted worker, automatic claim recovery
+is intentionally not running. To recover only expired video leases, use the
+existing PostgreSQL operator command on a **verified local schema-v35 database**:
+
+~~~powershell
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video jobs recover --postgres-connection-env YOUR_VERIFIED_CONNECTION_ENV --database YOUR_CONFIRMED_APP_DATABASE
+~~~
+
+This is **read-only dry run by default** and reports an aggregate count of
+visible expired leases. Review it, then explicitly repeat with `--apply`
+to recover expired queue records (including excluded/deleted video jobs which
+are intentionally hidden from the operator preview). Recovery does not open,
+hydrate, modify, or delete source files, nor does it change photo jobs.
+Running jobs with unexpired leases cannot be claimed or recovered by this
+command. Stop/pause intent remains unchanged.
+
+**The operator must not run any v35 CLI against the maintained v34 database
+before completing the fresh backup and isolated v34→v35 rehearsal.**
+
 ## Tests
 
 Disposable PostgreSQL tests use one synthetic video revision to assert
