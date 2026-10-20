@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Npgsql;
 using PhotoIdentity.Core.Processing;
 
 namespace PhotoIdentity.Persistence.Postgres;
@@ -32,18 +31,9 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
         ArgumentNullException.ThrowIfNull(lease);
         if (lease.DerivativeKind != "PlayableProxy")
             throw new ArgumentException("Only approved playable-proxy contracts may use this publisher.");
-        if (!Path.IsPathFullyQualified(privateCacheRoot) ||
-            !Directory.Exists(privateCacheRoot) ||
-            (OperatingSystem.IsWindows() && privateCacheRoot.StartsWith(@"\\", StringComparison.Ordinal)))
-            throw new ArgumentException("An existing private local video cache is required.");
-
-        string root = Path.GetFullPath(privateCacheRoot);
+        string root = await VideoDerivativeCacheGuard.ValidateAsync(
+            database, privateCacheRoot, token);
         VideoScratchCapacityGuard.EnsureCapacity(root, lease.TemporaryBytes);
-        string marker = Path.Combine(root, CacheMarker);
-        if (!File.Exists(marker) ||
-            (File.GetAttributes(marker) & FileAttributes.ReparsePoint) != 0 ||
-            await File.ReadAllTextAsync(marker, token) != CacheMarkerContents)
-            throw new InvalidOperationException("An approved private video cache marker is required.");
 
         if (!Path.IsPathFullyQualified(completedToolOutput))
             throw new ArgumentException("Video output must be an absolute owned path.");
@@ -63,7 +53,6 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
             await File.ReadAllTextAsync(workspaceMarker, token) != VideoScratchOwnership.MarkerContents)
             throw new InvalidOperationException("Video output workspace ownership cannot be verified.");
 
-        await RejectSourceArchiveOverlapAsync(root, token);
 
         // Open without sharing READ/WRITE to prevent an encoder or competing
         // local caller from mutating bytes through a normal Windows handle.
@@ -108,29 +97,6 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
             File.Delete(destination);
         }
         return committed;
-    }
-
-    private async Task RejectSourceArchiveOverlapAsync(string root, CancellationToken token)
-    {
-        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
-        await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT root_locator FROM sources WHERE kind='local-folder';";
-        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
-        while (await reader.ReadAsync(token))
-        {
-            string source = reader.GetString(0);
-            if (Path.IsPathFullyQualified(source) && Overlap(root, Path.GetFullPath(source)))
-                throw new InvalidOperationException("Private video cache must not overlap a media source.");
-        }
-    }
-
-    private static bool Overlap(string a, string b)
-    {
-        a = Path.TrimEndingDirectorySeparator(a);
-        b = Path.TrimEndingDirectorySeparator(b);
-        return string.Equals(a, b, Comparison) ||
-            a.StartsWith(b + Path.DirectorySeparatorChar, Comparison) ||
-            b.StartsWith(a + Path.DirectorySeparatorChar, Comparison);
     }
 
     private static StringComparison Comparison => OperatingSystem.IsWindows()
