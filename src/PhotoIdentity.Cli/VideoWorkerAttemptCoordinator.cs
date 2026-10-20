@@ -4,9 +4,9 @@ using PhotoIdentity.Persistence.Postgres;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
-/// Derivative-specific, reviewed adapter boundary. There is deliberately no
-/// production implementation or hosted registration in WI-0188; downstream
-/// derivative milestones must supply an approved source/format publisher.
+/// Derivative-specific adapter boundary. Checkpoint 12 includes an unregistered
+/// integration adapter, but there is no approved production FFmpeg profile,
+/// hosted registration or video enablement. WI-0189 must approve output format.
 /// Implementations may report Published only after they have atomically
 /// committed the revision-bound derivative AND fenced success acknowledgement.
 /// </summary>
