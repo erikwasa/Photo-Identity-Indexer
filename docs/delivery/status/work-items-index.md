@@ -18,7 +18,7 @@ Current work items: **19**. Archived terminal items: **181**.
 | [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) Extract timestamped video-frame captions and visual embeddings | M30 | proposed | unassigned | [YAML](work-items/active/WI-0190.yaml) |
 | [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) Offer opt-in semantic and caption search over indexed videos | M30 | proposed | unassigned | [YAML](work-items/active/WI-0191.yaml) |
 | [WI-0194](../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md) Evaluate archive-wide visual redundancy embeddings and suppression thresholds | M37 | in_progress | ai-agent | [YAML](work-items/active/WI-0194.yaml) |
-| [WI-0195](../work-items/WI-0195-quality-aware-collection-simulation.md) Simulate quality-aware visual redundancy during collection creation | M37 | proposed | unassigned | [YAML](work-items/active/WI-0195.yaml) |
+| [WI-0195](../work-items/WI-0195-quality-aware-collection-simulation.md) Simulate quality-aware visual redundancy during collection creation | M37 | in_progress | ai-agent | [YAML](work-items/active/WI-0195.yaml) |
 | [WI-0196](../work-items/WI-0196-tv-portrait-benchmark-framing.md) Define TV portrait-viewing benchmark and safe-framing rules | M38 | ready | unassigned | [YAML](work-items/active/WI-0196.yaml) |
 | [WI-0197](../work-items/WI-0197-subject-aware-portrait-zoom.md) Prototype automatic subject-aware portrait enlargement | M38 | proposed | unassigned | [YAML](work-items/active/WI-0197.yaml) |
 | [WI-0198](../work-items/WI-0198-opt-in-tv-focus-playback.md) Integrate opt-in TV-focus slideshow mode with quality and performance safeguards | M38 | proposed | unassigned | [YAML](work-items/active/WI-0198.yaml) |
