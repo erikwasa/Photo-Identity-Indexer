@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -106,6 +107,12 @@ public static class VideoSyntheticProxyPilotCommandRunner
         var validator = new VideoProxyOutputValidator(
             options.Ffprobe, options.FfprobeSha256, root);
         List<VideoSyntheticProxyPilotCase> observations = [];
+        // Only predetermined, public phase identifiers are reported. Tool
+        // stderr, executable locations and private workspace names are never
+        // emitted even if a binary or probe fails.
+        string stage = "fixture-generation";
+        string orientationForReport = "landscape";
+        int? toolExitCode = null;
         try
         {
             foreach ((string orientation, int width, int height, bool audio)
@@ -113,6 +120,9 @@ public static class VideoSyntheticProxyPilotCommandRunner
                                 ("portrait", 720, 1280, false) })
             {
                 token.ThrowIfCancellationRequested();
+                orientationForReport = orientation;
+                stage = "fixture-generation";
+                toolExitCode = null;
                 VideoSyntheticProxyPilotCase? observed = null;
                 VideoToolExecutionResult generator = await encoder.RunAsync(
                     options.Ffmpeg, options.FfmpegSha256, root,
@@ -127,6 +137,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
                         if (!File.Exists(input))
                             throw new InvalidDataException(
                                 "Synthetic fixture generator did not produce an input.");
+                        stage = "proxy-encode";
                         Stopwatch clock = Stopwatch.StartNew();
                         VideoToolExecutionResult transcode = await encoder.RunAsync(
                             options.Ffmpeg, options.FfmpegSha256, root,
@@ -139,10 +150,12 @@ public static class VideoSyntheticProxyPilotCommandRunner
                                 // independent FFprobe pass in encode duration.
                                 clock.Stop();
                                 string candidate = Path.Combine(encodeWorkspace, "output.mp4");
+                                stage = "independent-probe";
                                 VideoProxyInspection valid = await validator.ValidateAsync(
                                     candidate,
                                     _ => Task.FromResult(VideoExecutionPermit.Ready),
                                     encodeToken);
+                                stage = "output-contract";
                                 if (valid.HasAudio != audio ||
                                     valid.DurationSeconds is < 2.5 or > 3.5 ||
                                     (orientation == "portrait" && valid.Height <= valid.Width) ||
@@ -154,12 +167,24 @@ public static class VideoSyntheticProxyPilotCommandRunner
                                     valid.HasAudio, valid.DurationSeconds, bytes,
                                     (long)clock.Elapsed.TotalMilliseconds);
                             });
-                        if (transcode.ExitCode != 0 || observed is null)
+                        if (transcode.ExitCode != 0)
+                        {
+                            stage = "proxy-encode";
+                            toolExitCode = transcode.ExitCode;
+                            throw new InvalidDataException("Synthetic proxy encoder returned a nonzero exit code.");
+                        }
+                        if (observed is null)
                             throw new InvalidDataException(
                                 "Synthetic transcode or independent verification failed.");
                     });
 
-                if (generator.ExitCode != 0 || observed is null)
+                if (generator.ExitCode != 0)
+                {
+                    stage = "fixture-generation";
+                    toolExitCode = generator.ExitCode;
+                    throw new InvalidDataException("Synthetic fixture generator returned a nonzero exit code.");
+                }
+                if (observed is null)
                     throw new InvalidDataException(
                         "Synthetic fixture generator or codec validation failed.");
                 observations.Add(observed);
@@ -172,10 +197,15 @@ public static class VideoSyntheticProxyPilotCommandRunner
         {
             throw;
         }
-        catch
+        catch (Exception error)
         {
-            // Tool messages and private scratch locations are never printed.
-            Write(output, false, "pilot-failed", observations);
+            // Only allowlisted reason classes, phase and numeric tool/Win32
+            // status appear here. Never include exception.Message, stack
+            // traces, raw stdout/stderr, source names or media paths.
+            Write(output, false, "pilot-failed", observations,
+                stage, orientationForReport, ClassifyFailure(error),
+                toolExitCode,
+                error is Win32Exception native ? native.NativeErrorCode : null);
             return 1;
         }
     }
@@ -265,16 +295,36 @@ public static class VideoSyntheticProxyPilotCommandRunner
         return args;
     }
 
+    public static string ClassifyFailure(Exception error) => error switch
+    {
+        VideoProxyValidationException validation => validation.ReasonCode,
+        Win32Exception => "native-process-setup",
+        TimeoutException => "timeout",
+        UnauthorizedAccessException => "filesystem-access-denied",
+        FileNotFoundException => "required-file-missing",
+        DirectoryNotFoundException => "required-directory-missing",
+        IOException => "filesystem-io",
+        InvalidDataException => "invalid-media-evidence",
+        ArgumentException => "configuration-rejected",
+        InvalidOperationException => "execution-safety-rejected",
+        OperationCanceledException => "cancelled",
+        _ => "unexpected-failure"
+    };
+
     private static void Write(
         TextWriter output, bool dryRun, string status,
-        IReadOnlyList<VideoSyntheticProxyPilotCase> results)
+        IReadOnlyList<VideoSyntheticProxyPilotCase> results,
+        string? failureStage = null, string? failureOrientation = null,
+        string? failureClass = null, int? toolExitCode = null,
+        int? nativeErrorCode = null)
     {
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0188-synthetic-proxy-pilot-v1",
             dryRun, status, schemaUsed = false, originalsOpened = false,
             videoWorkersActivated = false, derivativesRetained = false,
-            results
+            failureStage, failureOrientation, failureClass,
+            toolExitCode, nativeErrorCode, results
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 }
