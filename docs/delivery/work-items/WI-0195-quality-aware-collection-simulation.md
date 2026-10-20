@@ -147,6 +147,31 @@ scenarios. Automatic Very Low exclusion and automatic redundancy suppression
 remain NO-GO on the original research evidence. Preserve the originally unmet
 four-variant WI-0195 acceptance instead of claiming it passed.
 
+## Final bounded WI-0195 verification and user-directed next step (2026-10-20)
+
+Maintainer ran the updated read-only default path successfully:
+**6/6** new bounded scoring tests and **8/8** prior shadow tests PASS,
+read-only durable proxy mapping **80/80**, **0/80** previously scored
+TOPIQ candidates, **80** prospective new scores under the hard 120
+cap, estimated ~354 seconds, **no inference**, no originals,
+hydration, persistence or production model/ranking approval. This
+closes the bounded **planning** acceptance; it does *not* establish
+real collection preference or authorize optional model weights.
+Do not run `-Score` without an explicit separate operator
+rights/utility decision.
+
+The operator's clarified priority is now *automatic suggestions
+for manually reviewing/excluding poor photos*, tolerating some
+false positives, with operator-selectable use cases. WI-0195's
+original attempted four automatic policy arms remain not accepted.
+First usable, non-destructive technical-suggestion workbench is
+tracked in [issue #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629)
+and `docs/operations/manual-quality-suggestions.md`, with
+follow-up native app integration contingent on maintainer review
+utility. M37 should document **manual-suggestion feasibility**
+separately from its existing automatic-exclusion NO-GO, and
+record the originally unachieved WI-0195 arms transparently.
+
 ## Verification requirements
 
 Automated simulator determinism tests plus blinded maintainer review of representative real collection outputs and privacy-safe aggregate comparison evidence.

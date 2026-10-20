@@ -68,6 +68,33 @@ Full operator-facing exclusion integration and per-context settings remain
 follow-up work; do not claim they exist just because M37 scoring tools do.
 The original four-arm WI-0195 automatic-policy acceptance remains unmet.
 
+## Bounded WI-0195 real-archive preflight passed; prioritize manual suggestion value (2026-10-20)
+
+The maintainer ran the corrected `run_bounded_collection_shadow.ps1`
+against the existing 80-photo Creative shortlist:
+**6/6 bounded-score tests PASS + 8/8 shadow tests PASS**; all 80
+current durable review proxies matched, **0 pre-existing TOPIQ scores**,
+80 new score candidates <=120 hard cap, estimated research CPU
+353.8 seconds, and a **strict no-inference** plan. No source
+originals/hydration, catalogue writes or production changes.
+The user now explicitly prefers manually choosing what to exclude
+from an **automatic suggestion queue** rather than another isolated
+collection-ranking benchmark. **Do not interpret a passed planning
+gate as approval to download third-party TOPIQ weights or perform
+inference.** Record bounded WI-0195 plan acceptance PASS, quality
+collection effect still UNMEASURED/DEFERRED pending separate
+model-licensing and usefulness decisions.
+
+Issue #629 now begins a **first substantive usable local review phase**:
+`manual_quality_suggestions.py` consumes existing bounded read-only
+`proxy-technical-quality-v1` evidence; the local review workbench
+supports human-controlled Keep, Dismiss, Consider exclusion, per-use-case
+**review** switches and private resumable state. It cannot trigger native
+Exclude & purge or change production collection/slideshow eligibility.
+See `docs/operations/manual-quality-suggestions.md`. Review utility,
+not unattainable unattended-exclusion precision, is the new *separate*
+research question. Do not mark full M37 four-arm acceptance as met.
+
 ## What must happen NEXT before a closure recommendation
 
 1. Merge one substantive bounded-scoring + milestone-documentation PR after

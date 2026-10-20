@@ -4,6 +4,27 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-20 M37 manual suggestions pivot:** First WI-0195 bounded
+plan passed locally (6+8 tests, 80/80 verified current proxies,
+0 matching original TOPIQ scores, prospective 80 new CPU scores,
+**no inference**/no writes). Maintainer clarified the real
+product requirement is **automatic poor-photo suggestions with
+operator-selected manual exclusion**, false positives acceptable
+because decisions are manual, and independent per-use-case
+controls (Archive cleanup vs collections vs slideshows).
+Existing ADR-0008 Photo Identity exclusion is a CONFIRMED
+source-copy-local purge of stored derivatives/metadata and is
+NOT a reversible context-specific hide. New issue #629 and
+`docs/operations/manual-quality-suggestions.md` contain
+first non-destructive local reviewer: bounded existing verified
+proxy technical scan, explained ranked candidates, private
+Keep/Dismiss/Consider decisions + separate context review modes,
+no API-based exclude and no production collection/slideshow
+changes. M37 no-go for unattended Very Low/visual suppression
+remains. This is a bounded product UX validation before
+larger native in-app work, not a full policy acceptance.
+PRs target main.
+
 **M37 final research evaluation path (2026-10-20):** This
 milestone concludes with defensible GO/NO-GO/DEFER decisions,
 not required production deployment. Decision ledger is
