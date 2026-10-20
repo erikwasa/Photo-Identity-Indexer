@@ -432,6 +432,41 @@ checkpoint. Continue development after CI and PR review.
   The maintained v34 catalogue still requires the **fresh backup +
   isolated v34→v36 rehearsal** before any v36 startup.
 
+### Integrated checkpoint 15 — source-free synthetic real-tool roundtrip (2026-10-20)
+
+- Added an **operator-only, dry-run-first, database-free** CLI
+  `video synthetic-proxy-pilot`. It cannot take a user-media source path;
+  it generates its own three-second landscape+audio and portrait+silent
+  fixture under a dedicated, otherwise-empty, marker-protected local
+  temporary root, then passes the fixtures through the **same fixed
+  `VideoProxyCandidateProfile.BuildArguments`** used by the still-unregistered
+  video adapter.
+- The independently SHA-256-approved FFmpeg and FFprobe processes each run
+  within single-process native Windows Job Objects with bounded CPU, RAM,
+  wall time, workspace bytes and no inherited application credentials.
+  Candidate MP4s pass the independent faststart, codec, SDR, duration,
+  orientation and optional AAC probe verification before success is reported.
+  All generated media/probe workspaces are removed after execution.
+- Command reports only aggregate synthetic video orientation, dimensions,
+  encoded bytes, audio presence, duration and elapsed encoding time.
+  It does **not** open PostgreSQL, start/enable a video worker, enqueue jobs,
+  access archive originals, hydrate OneDrive, expose video APIs or affect
+  photo processing. No v36 schema migration is involved.
+- Deterministic tests cover parser safety, strict scratch ownership/empty
+  root, no archive input, dry-run, fixed synthetic argument arrays and
+  forbidden extra source options. An **environment-gated Windows
+  integration test** can run a real installed FFmpeg/FFprobe roundtrip
+  without requiring tool installation or external media in ordinary CI.
+- See [synthetic pilot and optional Windows procedure](../../operations/video-synthetic-proxy-pilot.md).
+  This is a development verification instrument, not WI-0189's
+  representative camera-media or browser acceptance. The maintained
+  v34→v36 authoritative backup+isolated rehearsal remains mandatory
+  before starting any v36 app/CLI *against the maintained DB*.
+- **Remaining**: reviewed real-media encoding/preset and retention/eviction
+  (WI-0189), hard video IO/disk/network isolation or approved measured
+  envelope, explicit production video worker/selection controls, and
+  consolidated Windows OneDrive no-recall/photo-priority/throughput acceptance.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
