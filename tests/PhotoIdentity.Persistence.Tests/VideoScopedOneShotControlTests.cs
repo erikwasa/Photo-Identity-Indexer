@@ -120,10 +120,10 @@ public sealed class VideoScopedOneShotControlTests
             }
             Assert.False((await safety.CheckAsync(lease)).Allowed);
             Assert.False(await queue.TryHeartbeatAsync(lease.Id, lease.LeaseToken, 50));
-            Assert.False(await new PostgresVideoPublishedDerivativeRepository(database)
-                .TryCommitAsync(lease,
-                    VideoDerivativeArtifactPath.ForLease(lease),
-                    new string('e', 64), 100));
+            Assert.Null(await new PostgresVideoLocalSourceLocator(database)
+                .ResolveAsync(lease));
+            Assert.False(await queue.TryFinishAttemptAsync(
+                lease.Id, lease.LeaseToken, succeeded: false, retryable: true));
             Assert.Null(await queue.TryClaimNextAsync(budget));
 
             Assert.True(await scoped.DisarmAsync(grant));
