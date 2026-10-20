@@ -29,16 +29,17 @@ public static class VideoScratchCapacityGuard
                 "Video scratch requires an existing local absolute directory.",
                 nameof(scratchRoot));
 
-        string full = Path.GetFullPath(scratchRoot);
-        for (string? path = full; path is not null; path = Path.GetDirectoryName(path))
-        {
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("Linked video scratch volumes are not allowed.");
-            if (Path.GetPathRoot(path) == path) break;
-        }
-
         try
         {
+            string full = Path.GetFullPath(scratchRoot);
+            for (string? path = full; path is not null;
+                 path = Path.GetDirectoryName(path))
+            {
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("Linked video scratch volumes are not allowed.");
+                if (Path.GetPathRoot(path) == path) break;
+            }
+
             string root = Path.GetPathRoot(full)
                 ?? throw new IOException("Video scratch volume cannot be identified.");
             DriveInfo drive = new(root);
@@ -47,10 +48,13 @@ public static class VideoScratchCapacityGuard
                 throw new IOException("Video scratch volume lacks reserved free space.");
         }
         catch (Exception ex) when (
-            ex is ArgumentException or UnauthorizedAccessException or IOException)
+            ex is ArgumentException or UnauthorizedAccessException or IOException
+                or System.Security.SecurityException)
         {
+            // Avoid retaining OS exception messages that might include a
+            // private scratch path or volume name.
             throw new IOException(
-                "Video scratch volume is unavailable or lacks reserved space.", ex);
+                "Video scratch volume is unavailable or lacks reserved space.");
         }
     }
 
