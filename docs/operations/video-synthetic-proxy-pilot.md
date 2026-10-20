@@ -104,6 +104,52 @@ these variables or third-party encoder installations; ordinary tests
 exercise CLI parsing, marker/empty-root checks, exact arguments, and a
 database-free dry-run.
 
+## Windows synthetic-pilot failure triage (WI-0188 follow-up)
+
+The maintainer's reported v37 runtime checks passed **all nine
+photo regression checks**, read-only video status (disabled/paused,
+no queued/running jobs) and the opt-in video API default-off 404 check.
+The synthetic pilot's dry run also passed, but actual `--apply` yielded
+only `status=pilot-failed` with zero validated results. The original
+runner caught all exceptions without retaining a failure category. This
+is **not evidence that source media or PostgreSQL were accessed**; the
+pilot is deliberately independent of them.
+
+A subsequent diagnostic revision adds sanitized *failure evidence* to the
+same existing JSON response, without exposing original paths, arguments,
+child stdout/stderr, stack traces, or private catalogue identifiers:
+
+- `failureOrientation`: `landscape` or `portrait`; the first case
+  is landscape with sine audio, and portrait is deliberately silent
+- `failureStage`: `scratch-preflight`, `fixture-generation`,
+  `proxy-encode`, `independent-probe` or `output-contract`
+- `failureClass`: a strict allowlist such as
+  `configuration-rejected`, `native-process-setup`,
+  `filesystem-io`, `execution-safety-rejected`, `timeout`,
+  `invalid-media-evidence`, `probe-tool-nonzero`,
+  `probe-not-started`, `probe-preempted`,
+  `probe-missing-output` or `unexpected-failure`
+- `toolExitCode` and `nativeErrorCode`: numeric process/Win32 codes
+  only, when available; both may be null
+
+The CLI's existing success/no-media access declarations remain unchanged.
+No broad logging mode or retention of failed media was introduced.
+
+**Next step:** After the diagnostic PR passes CI and merges, inspect the
+existing marked `$lab` directory *without recursively deleting unknown
+files*. If it contains only the expected marker, rerun the already
+constructed `$argsPilot` with `--apply`, and share only the returned
+sanitized JSON. If it contains retained workspaces or an unfamiliar entry,
+stop and investigate separately; `ValidateRoot` deliberately refuses a
+nonempty root. Do not attempt `video one-shot run` to work around a
+synthetic failure.
+
+Never replace an approved FFmpeg/FFprobe executable or loosen Windows
+Job Object limits merely to make a test pass. Review the failure stage
+and numeric code first. The repo's optional environment-gated Windows
+real-tool test remains the targeted regression once approved binaries
+are provided; normal CI does not supply either executable.
+
 ## Explicit H.264 SDR bitstream color evidence
 
 A local FFmpeg/FFprobe smoke test revealed that container-level Rec.709

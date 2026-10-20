@@ -3,6 +3,26 @@ using PhotoIdentity.Core.Processing;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
+/// Only predetermined, source-free evidence identifiers; never tool output,
+/// file names, exception messages or metadata from the inspected MP4.
+/// </summary>
+public sealed class VideoProxyValidationException : Exception
+{
+    public string ReasonCode { get; }
+    public int? ToolExitCode { get; }
+
+    public VideoProxyValidationException(string reasonCode, int? toolExitCode = null)
+        : base("Independent video probe rejected the candidate.")
+    {
+        if (reasonCode is not ("probe-not-started" or "probe-preempted" or
+                              "probe-tool-nonzero" or "probe-missing-output"))
+            throw new ArgumentException("Invalid sanitized proxy probe code.");
+        ReasonCode = reasonCode;
+        ToolExitCode = toolExitCode;
+    }
+}
+
+/// <summary>
 /// Independent, hash-pinned, Windows-constrained FFprobe inspection of the
 /// finished experimental MP4 before private publication. Unregistered.
 /// Binary stdout/stderr and all source/media tags are discarded.
@@ -64,8 +84,15 @@ public sealed class VideoProxyOutputValidator(
                 byte[] data = await File.ReadAllBytesAsync(json, checkToken);
                 inspection = VideoProxyCandidateProfile.ValidateOutputJson(data, length);
             });
-        if (!result.Completed || result.ExitCode != 0 || inspection is null)
-            throw new InvalidDataException("Video proxy inspection could not verify the candidate.");
+        if (!result.Started)
+            throw new VideoProxyValidationException("probe-not-started");
+        if (!result.Completed)
+            throw new VideoProxyValidationException("probe-preempted");
+        if (result.ExitCode != 0)
+            throw new VideoProxyValidationException(
+                "probe-tool-nonzero", result.ExitCode);
+        if (inspection is null)
+            throw new VideoProxyValidationException("probe-missing-output");
         // The encoder's finished file must remain unchanged between probe
         // and publication. The final publisher opens/rehashes under its own
         // owned-root and lease fencing; both checks are required.

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 using PhotoIdentity.Cli;
 using Xunit;
@@ -185,6 +186,78 @@ public sealed class VideoSyntheticProxyPilotTests
                 Assert.True(item.GetProperty("encodedBytes").GetInt64() > 128);
                 Assert.True(item.GetProperty("encodeMilliseconds").GetInt64() > 0);
             });
+            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void Sanitized_failures_distinguish_subprocess_from_probe_without_messages()
+    {
+        Assert.Equal("native-process-setup",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new Win32Exception(5, @"C:\\secret\\original.mov")));
+        Assert.Equal("timeout",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new TimeoutException("private local file location")));
+        Assert.Equal("invalid-media-evidence",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new InvalidDataException("private video filename")));
+        Assert.Equal("configuration-rejected",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new ArgumentException("private installed binary location")));
+        Assert.Equal("filesystem-io",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new IOException("private scratch path")));
+        Assert.Equal("execution-safety-rejected",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new InvalidOperationException("private user metadata")));
+        Assert.Equal("unexpected-failure",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(
+                new Exception("private text")));
+
+        var unsupported = new VideoProxyValidationException(
+            "probe-tool-nonzero", 1);
+        Assert.Equal("probe-tool-nonzero", unsupported.ReasonCode);
+        Assert.Equal(1, unsupported.ToolExitCode);
+        Assert.Equal("probe-tool-nonzero",
+            VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(unsupported));
+        Assert.Throws<ArgumentException>(() =>
+            new VideoProxyValidationException("C:\\not-a-safe-reason"));
+    }
+
+    [Fact]
+    public async Task Missing_external_tool_produces_private_safe_first_stage_failure()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = NewScratch();
+        try
+        {
+            // No subprocess can run: the options name deliberately absent
+            // binaries and the existing unrelated archive is never accessed.
+            VideoSyntheticProxyPilotOptions options =
+                VideoSyntheticProxyPilotOptions.Parse(
+                    [.. Arguments(root), "--apply"]);
+            using StringWriter output = new();
+            Assert.Equal(1, await VideoSyntheticProxyPilotCommandRunner
+                .RunAsync(options, output));
+            string reportJson = output.ToString();
+            using JsonDocument report = JsonDocument.Parse(reportJson);
+            JsonElement fields = report.RootElement;
+            Assert.Equal("pilot-failed", fields.GetProperty("status").GetString());
+            Assert.Equal("fixture-generation",
+                fields.GetProperty("failureStage").GetString());
+            Assert.Equal("landscape",
+                fields.GetProperty("failureOrientation").GetString());
+            Assert.Equal("configuration-rejected",
+                fields.GetProperty("failureClass").GetString());
+            Assert.Equal(JsonValueKind.Null,
+                fields.GetProperty("toolExitCode").ValueKind);
+            Assert.Equal(0, fields.GetProperty("results").GetArrayLength());
+            Assert.False(fields.GetProperty("schemaUsed").GetBoolean());
+            Assert.False(fields.GetProperty("originalsOpened").GetBoolean());
+            Assert.False(fields.GetProperty("videoWorkersActivated").GetBoolean());
+            Assert.DoesNotContain(root, reportJson, StringComparison.OrdinalIgnoreCase);
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
         }
         finally { Directory.Delete(root, recursive: true); }

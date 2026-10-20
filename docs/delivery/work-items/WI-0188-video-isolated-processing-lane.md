@@ -553,6 +553,41 @@ checkpoint. Continue development after CI and PR review.
   automatic privacy cleanup, and consolidated photo-only versus
   mixed-load/OneDrive no-hydration measurements.
 
+### Integrated checkpoint 18 — first maintained v37 regression observations and diagnosable synthetic execution (2026-10-20)
+
+- Maintainer-reported **PASS** across all nine photo regression groups:
+  Archive browsing, People/faces, visual/caption/combined search,
+  Smart/Creative Collections, photo metadata, slideshows and photo
+  archive processing. Local application health is `ok`, PostgreSQL
+  `ready` and `schemaVersion=37`.
+- Read-only `video jobs status` reports default-off `enabled=false`,
+  `paused=true`, `selectedJobId=null`, no authorizations, no
+  queued/running/succeeded/failed/cancelled video jobs, no reservations and
+  photo priority inactive. Disabled video endpoint returned HTTP **404**.
+- The database-independent synthetic FFmpeg pilot **dry run passed**, but
+  **actual `--apply` failed with `status=pilot-failed` and zero results**.
+  This is explicitly **not** video encoding acceptance. The prior CLI
+  suppressed all failure detail; neither the stage nor a safe reason
+  code could be recovered from its JSON. The root cause on the
+  maintainer's Windows toolchain is **not yet identified**.
+- Updated the synthetic pilot to report a strict allowlist of failure
+  stage, fixture orientation, reason class and, when known, numeric tool
+  exit/Windows error. Independent FFprobe launch/exit/preemption are
+  distinguished without disclosing paths, media, secrets or tool stderr.
+  Windows no-tool and error-class tests are included. No database
+  migration, original-file access or worker activation is introduced.
+- **Reported evidence limits**: no backup/isolated v34→v37 rehearsal
+  output was included in this report, so do not claim this separately
+  proven here. Video-library positive browsing and private cache
+  janitor previews remain optional/unreported. Continue to require
+  the backup/isolated rehearsal and explicit approval gates for any
+  future actual video one-shot test.
+- **Next maintainer action after CI/merge**: if the marked lab root
+  is empty except for its marker, rerun the *synthetic-only* test once
+  and share the sanitized output. Do not run real-media one-shot,
+  disable containment or alter private originals while diagnosis
+  is outstanding.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
