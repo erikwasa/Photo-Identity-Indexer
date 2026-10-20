@@ -114,6 +114,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
                 queue, lease, retryable: true, token);
         }
 
+        if (report is null)
+            return await RecordFailureAsync(queue, lease, retryable: false, token);
         if (!report.Published)
             return await RecordFailureAsync(queue, lease, report.Retryable, token);
 
