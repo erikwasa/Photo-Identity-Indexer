@@ -401,6 +401,37 @@ checkpoint. Continue development after CI and PR review.
   privacy-aware eviction, enforceable disk/network/IO policy, production
   opt-in worker and maintained Windows OneDrive/photo-vs-mixed-load acceptance.
 
+### Integrated checkpoint 14 — unregistered SDR proxy profile + independent output validation (2026-10-20)
+
+- Added an intentionally experimental, **unregistered** 720p H.264/AAC
+  MP4 candidate profile at the WI-0188/WI-0189 boundary. It uses fixed
+  argument arrays, explicit file-only protocols, software libx264,
+  bounded output/frame rate/time/size, preserved aspect and FFmpeg camera
+  autorotation, stripped private metadata and Rec.709 output tagging.
+- Strict revision-bound eligibility permits only already-inspected
+  supported H.264/HEVC SDR **bt709** videos with bounded dimensions,
+  duration and known rotation. HDR HLG/PQ, unknown transfer and
+  unsupported codecs are deferred, never silently tone-mapped.
+- A new separately hash-pinned FFprobe validator runs under its own
+  native single-process Windows Job Object in a temporary workspace,
+  with file-only protocols and a 64KiB JSON limit. Before v36 durable
+  publication, checks include faststart MP4 box ordering, actual size,
+  H.264 yuv420p SDR color metadata, dimensions/framerate, normalized
+  rotation and optional AAC mono/stereo audio with no extra streams.
+  A failed check cannot record successful derivative publication.
+- Added synthetic negative/positive tests for codecs, HDR/unknown color,
+  profiles/metadata, rotation, stream count, output dimensions/rates,
+  malformed boxes and canonical argument arrays.
+- **No new migration, worker/CLI activation, bundled FFmpeg binary,
+  OneDrive hydration, source modification, photo feature change or
+  production-profile approval.** Real-world codec compatibility,
+  quality, audio sync and browser seek behavior remain WI-0189
+  acceptance work. Hard quotas, network/filesystem confinement,
+  reviewable enablement and mixed-load measurements remain WI-0188.
+- See [SDR candidate and deferred Windows acceptance](../../operations/video-proxy-pilot-validation-v36.md).
+  The maintained v34 catalogue still requires the **fresh backup +
+  isolated v34→v36 rehearsal** before any v36 startup.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
