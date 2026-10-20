@@ -27,8 +27,8 @@ MAX_SCENARIOS = 40
 MAX_CANDIDATES = 2000
 MAX_REVIEW_VARIANTS = 40
 SOURCE_KINDS = ("smart", "creative", "search")
-CANDIDATE_KINDS = ("direct", "context", "search")
-REVIEW_CHOICES = ("baseline", "quality-shadow", "same", "unsure")
+CANDIDATE_KINDS = ("direct-anchor", "contextual-addition", "search")
+REVIEW_CHOICES = ("left", "right", "same", "unsure")
 
 
 def private_path(name, *, required):
@@ -108,7 +108,7 @@ def scenarios_from_creative_preview(preview, *, target):
     candidates = []
     for rank, row in enumerate(preview["selectedCandidates"]):
         if (not isinstance(row, dict) or
-                row.get("kind") not in ("direct", "context") or
+                row.get("kind") not in ("direct-anchor", "contextual-addition") or
                 type(row.get("selectionScore")) is not int):
             raise ValueError("Unsupported Creative preview candidate row")
         candidates.append({
@@ -162,16 +162,9 @@ def validate_scenarios(data):
         if set(row["rank"] for row in normalized) != set(range(len(normalized))):
             raise ValueError("Scenario baseline ranks must be contiguous")
         normalized.sort(key=lambda row: row["rank"])
-        # The baseline ordering must already honor relevance; do not invent it.
-        # Direct and context are separate eligibility tiers. Quality never
-        # promotes context across a direct anchor or a lower relevance score.
-        previous = None
-        for row in normalized:
-            level = (0 if row["kind"] == "direct" else 1,
-                     -row["relevanceScore"])
-            if previous is not None and level < previous:
-                raise ValueError("Baseline pool not ordered by relevance tier")
-            previous = level
+        # Preserve the exact captured baseline order (which may already be
+        # chronological/paced). Quality may reorder only CONTIGUOUS runs
+        # with identical original candidate-kind and selection score.
         parsed.append((case["kind"], name, target, normalized))
     return parsed
 
@@ -187,15 +180,14 @@ def quality_shadow(candidates, scores):
     comparisons = 0
     missing_comparisons = 0
     undecided = 0
-    groups = defaultdict(list)
-    order = []
+    groups = []
     for row in candidates:
         key = (row["kind"], row["relevanceScore"])
-        if key not in groups:
-            order.append(key)
-        groups[key].append(row)
-    for key in order:
-        pool = list(groups[key])
+        if not groups or groups[-1][0] != key:
+            groups.append((key, []))
+        groups[-1][1].append(row)
+    for _, group in groups:
+        pool = list(group)
         while pool:
             first = pool[0]
             primary = scores.get(first["revisionId"])
@@ -392,11 +384,39 @@ def main():
     prep.add_argument("--scores", required=True)
     prep.add_argument("--blind-output", required=True)
     prep.add_argument("--audit-output", required=True)
+    importer = group.add_parser("import-creative-preview")
+    importer.add_argument("--input", required=True)
+    importer.add_argument("--target-count", type=int, required=True)
+    importer.add_argument("--output", required=True)
     report = group.add_parser("report")
     report.add_argument("--blind", required=True)
     report.add_argument("--audit", required=True)
     args = parser.parse_args()
     try:
+        if args.action == "import-creative-preview":
+            src = private_path(args.input, required=True)
+            dest = private_path(args.output, required=False)
+            if src == dest or dest.exists():
+                raise ValueError("Creative scenario output must be a new private file")
+            captured = load(src)
+            previews = captured if isinstance(captured, list) else [captured]
+            if not 1 <= len(previews) <= MAX_SCENARIOS:
+                raise ValueError("Invalid number of captured previews")
+            scenarios = {"schemaVersion": 1, "protocol": SCENARIO_PROTOCOL,
+                         "scenarios": [
+                             scenarios_from_creative_preview(x, target=args.target_count)
+                             for x in previews]}
+            validate_scenarios(scenarios)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with dest.open("xb") as file:
+                file.write((json.dumps(scenarios, indent=2) + "\n").encode())
+            print(json.dumps({
+                "protocol": SCENARIO_PROTOCOL,
+                "status": "private-readonly-creative-preview-import",
+                "scenarioCount": len(scenarios["scenarios"]),
+                "productionChangesMade": False,
+            }, indent=2))
+            return
         if args.action == "prepare":
             paths = [private_path(x, required=y)
                      for x, y in ((args.scenarios, True), (args.scores, True),
