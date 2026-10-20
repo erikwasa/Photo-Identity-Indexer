@@ -135,6 +135,7 @@ jobs:
           $scripts = @(
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_collection_shadow_simulation.ps1'
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
+            'tools/PhotoIdentity.PhotoQualityEvaluation/run_manual_quality_suggestions.ps1'
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -155,7 +156,13 @@ jobs:
               throw "Bounded research runner is missing -$required"
             }
           }
-          Write-Host 'Offline research runners parse and expose expected parameters.'
+          $manual = Get-Command './tools/PhotoIdentity.PhotoQualityEvaluation/run_manual_quality_suggestions.ps1'
+          foreach ($required in @('ScanLimit','SuggestionLimit','BatchId','Review','NoOpen','Port')) {
+            if (-not $manual.Parameters.ContainsKey($required)) {
+              throw "Manual quality suggestion runner is missing -$required"
+            }
+          }
+          Write-Host 'Offline and manual-review runners parse and expose expected parameters.'
 
       - name: Run quarantined integration diagnostics
         id: flaky-integration-diagnostics
