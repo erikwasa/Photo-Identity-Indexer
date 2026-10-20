@@ -369,6 +369,38 @@ checkpoint. Continue development after CI and PR review.
   authoritative backup and verified isolated **v34→v36** rehearsal passes.
   This single exercise covers both previously pending v35 and new v36.
 
+### Integrated checkpoint 13 — conservative v36 orphan reconciliation (2026-10-20)
+
+- Added `VideoDerivativeCacheGuard` shared by the private publisher and the
+  recovery tool. Both independently verify the exact owned root marker,
+  absolute local unlinked directory and no overlap with registered local
+  source archives. The guard neither creates roots nor reads originals.
+- Added `VideoDerivativeRecoveryJanitor`: a bounded, nonrecursive scan of
+  canonical, opaque job/lease MP4 files. The operator must hold an exclusive
+  v35 video control-row lock, with the lane **disabled and paused** and no
+  running video jobs. Only aged (at least 48 hours), **unregistered** outputs
+  for known terminal jobs are eligible; default behavior is dry run.
+- Existing **registered receipts are always protected**, even if excluded or
+  superseded. The aggregate `invalidatedRegistered` count identifies work
+  remaining for WI-0189's explicit invalidation/privacy purge and recovery
+  lifecycle; this command will not create false `succeeded` records with
+  missing files after reversible exclusion restoration.
+- New operator CLI `video derivatives recover` requires an explicit local
+  already-v36 database, exact cache root and optional bounded age/file count.
+  It refuses implicit schema migration, exposes only counts, and never
+  touches photo jobs, originals or unrelated folders. Synthetic PostgreSQL,
+  filesystem and parser tests cover stopped/running control gates, valid and
+  excluded receipts, recent output, unowned paths, archive overlap and
+  dry-run/apply behavior.
+- **No schema change after v36**, no registered worker or new enablement.
+  [Runbook](../../operations/video-derivative-recovery-v36.md).
+  The unfulfilled **fresh v34→v36 backup/isolated rehearsal** remains a
+  mandatory gate before any maintained v36 application/CLI startup.
+- Production blockers remain: audited playable proxy media contract and
+  independently validated output, registered-artifact invalidation and
+  privacy-aware eviction, enforceable disk/network/IO policy, production
+  opt-in worker and maintained Windows OneDrive/photo-vs-mixed-load acceptance.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
