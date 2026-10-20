@@ -104,6 +104,17 @@ these variables or third-party encoder installations; ordinary tests
 exercise CLI parsing, marker/empty-root checks, exact arguments, and a
 database-free dry-run.
 
+## Explicit H.264 SDR bitstream color evidence
+
+A local FFmpeg/FFprobe smoke test revealed that container-level Rec.709
+flags alone could yield an H.264 stream with `color_space=bt709` but
+missing `color_transfer` and `color_primaries`. The candidate encoder
+now pins libx264 bitstream VUI using the fixed
+`colorprim=bt709:transfer=bt709:colormatrix=bt709` parameter string.
+The strict independent validator still requires *all three* color fields
+rather than relaxing the SDR contract. Pure tests pin this encoder flag,
+and the optional installed-binary roundtrip verifies its real output.
+
 ## Boundaries and future verification
 
 A successful roundtrip is useful proof that those **two synthetic SDR
