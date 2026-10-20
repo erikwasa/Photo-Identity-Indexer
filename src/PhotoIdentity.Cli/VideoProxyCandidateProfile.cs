@@ -56,6 +56,10 @@ public static class VideoProxyCandidateProfile
             "-vf", "scale=w=720:h=720:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=30,format=yuv420p",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
             "-profile:v", "main", "-level:v", "3.1",
+            // Container color fields alone are not sufficient: libx264 can
+            // otherwise leave transfer/primaries unspecified in the H.264
+            // VUI. Independent FFprobe validation requires explicit values.
+            "-x264-params", "colorprim=bt709:transfer=bt709:colormatrix=bt709",
             "-maxrate", "2500k", "-bufsize", "5000k",
             "-pix_fmt", "yuv420p", "-color_primaries", "bt709",
             "-color_trc", "bt709", "-colorspace", "bt709",
