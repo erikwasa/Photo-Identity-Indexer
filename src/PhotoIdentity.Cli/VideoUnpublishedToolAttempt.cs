@@ -8,9 +8,10 @@ namespace PhotoIdentity.Cli;
 /// Deliberately unregistered, explicit-call scaffold for an approved future
 /// derivative adapter. Stages only a current locally verified input, runs
 /// an OS-limited child against the STAGED copy, maintains the lease, and
-/// preempts on photo activity or lost operator control. It never marks a
-/// job successful or publishes files: a later adapter must provide a fenced
-/// atomic database/file publication transaction before final acknowledgement.
+/// preempts on photo activity or lost operator control. By default it
+/// never marks success or publishes files. A separate, guarded post-exit
+/// callback may explicitly invoke the unregistered v36 publisher; real media
+/// processing still requires audited codecs, containment and activation.
 /// </summary>
 public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase database)
 {
@@ -20,7 +21,8 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
         string scratchRoot,
         VideoToolExecutionBudget limits,
         Func<string, string, IReadOnlyList<string>> approvedArguments,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        Func<string, CancellationToken, Task>? onValidatedSuccessfulExit = null)
     {
         ArgumentNullException.ThrowIfNull(lease);
         ArgumentNullException.ThrowIfNull(limits);
@@ -69,7 +71,8 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
                 workspace => approvedArguments(staged.FilePath, workspace),
                 limits, checkToken => safety.CheckAsync(lease, checkToken),
                 inspectionInterval: TimeSpan.FromMilliseconds(200),
-                cancellationToken: workToken.Token);
+                cancellationToken: workToken.Token,
+                onValidatedSuccessfulExit: onValidatedSuccessfulExit);
 
             // This deliberately remains an uncommitted execution receipt.
             // Do not call TryFinishAttemptAsync(success:true) from here:

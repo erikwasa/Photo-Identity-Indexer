@@ -48,7 +48,7 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 33),
-                "catalogue" when args.Length > 1 && args[1] == "rehearse-v35" =>
+                "catalogue" when args.Length > 1 && args[1] is "rehearse-v35" or "rehearse-v36" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
@@ -156,9 +156,10 @@ public static class Program
                           (both commands require a successful restore report and
                            modify ONLY its matched local photoidentity_restore_* database)
 
-              catalogue rehearse-v35 --postgres-connection-env NAME
+              catalogue rehearse-v36 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
-                                     (v34 isolated restore only; video control defaults off)
+                                     (v34 isolated restore; verifies v35 control and v36 empty artifact registry)
+              catalogue rehearse-v35 (legacy alias; also applies through v36)
 
               video scratch-cleanup --scratch-root DIR
                                     [--min-age-hours HOURS (24..720)]

@@ -108,7 +108,7 @@ work_items:
   document: ../work-items/WI-0188-video-isolated-processing-lane.md
   started_at: 2026-10-19
   last_updated_at: 2026-10-20
-  branch: agent/WI-0188-scratch-volume-admission
+  branch: agent/WI-0188-integrated-derivative-publication
   blockers: []
   blocker_notes: []
   evidence:
@@ -132,6 +132,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/617
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/619
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/620
   - type: documentation
     value: docs/operations/video-processing-job-queue-v34.md
 - id: WI-0189

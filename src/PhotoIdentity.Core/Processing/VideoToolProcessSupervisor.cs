@@ -39,7 +39,9 @@ public sealed record VideoToolExecutionResult(int ExitCode, TimeSpan Elapsed);
 /// discards stdout/stderr without retaining media names, checks scratch usage,
 /// and kills the process tree on cancel/time limit/over-budget. Does NOT take
 /// a source path or open/authorize video originals, publish artifacts, hydrate,
-/// or schedule a job. Callers must use a fixed, audited FFmpeg argument profile.
+/// or schedule a job itself. An optional post-exit callback can publish a
+/// validated output before owned workspace teardown; this remains unregistered.
+/// Callers must use a fixed, audited FFmpeg argument profile before activation.
 ///
 /// Scratch polling is best-effort: an OS disk quota is still required to bound
 /// transient allocation. WindowsJobLimits, when explicitly supplied, configures
@@ -55,13 +57,23 @@ public sealed class VideoToolProcessSupervisor
         string scratchRoot,
         Func<string, IReadOnlyList<string>> buildArguments,
         VideoToolExecutionBudget budget,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<string, CancellationToken, Task>? afterSuccessfulExit = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(scratchRoot);
         ArgumentNullException.ThrowIfNull(buildArguments);
         ArgumentNullException.ThrowIfNull(budget);
         budget.Validate();
+        // Publication may only happen after the complete constrained process
+        // tree has ended. With a one-process Job Object, an exited parent
+        // cannot have left a live media-writing descendant. Uncapped and
+        // multi-process profiles remain execution-only, never publishers.
+        if (afterSuccessfulExit is not null &&
+            (!OperatingSystem.IsWindows() ||
+             budget.WindowsJobLimits?.MaximumProcesses != 1))
+            throw new InvalidOperationException(
+                "Video publication requires a single-process Windows Job Object.");
         if (!Path.IsPathFullyQualified(executablePath) || !File.Exists(executablePath))
             throw new ArgumentException("Video executable must be an existing absolute local file.", nameof(executablePath));
         if (!Path.IsPathFullyQualified(scratchRoot) || !Directory.Exists(scratchRoot))
@@ -187,6 +199,14 @@ public sealed class VideoToolProcessSupervisor
             await process.WaitForExitAsync(linked.Token);
             await Task.WhenAll(stdoutDrain, stderrDrain).WaitAsync(TimeSpan.FromSeconds(5), linked.Token);
             CheckWorkspace(workspace, budget);
+            if (process.ExitCode == 0 && afterSuccessfulExit is not null)
+            {
+                // The child tree has exited, but the owned workspace still
+                // exists. External publication must revalidate the exact lease
+                // before moving any bytes. Finally always cleans scratch.
+                linked.Token.ThrowIfCancellationRequested();
+                await afterSuccessfulExit(workspace, linked.Token);
+            }
             return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&

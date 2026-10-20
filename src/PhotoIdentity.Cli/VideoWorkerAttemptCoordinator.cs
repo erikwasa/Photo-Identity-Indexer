@@ -4,9 +4,9 @@ using PhotoIdentity.Persistence.Postgres;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
-/// Derivative-specific, reviewed adapter boundary. There is deliberately no
-/// production implementation or hosted registration in WI-0188; downstream
-/// derivative milestones must supply an approved source/format publisher.
+/// Derivative-specific adapter boundary. Checkpoint 12 includes an unregistered
+/// integration adapter, but there is no approved production FFmpeg profile,
+/// hosted registration or video enablement. WI-0189 must approve output format.
 /// Implementations may report Published only after they have atomically
 /// committed the revision-bound derivative AND fenced success acknowledgement.
 /// </summary>
@@ -122,9 +122,12 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         // The adapter cannot authorize success by returning true. It must
         // have committed a durable revision/exclusion/lease-fenced result.
         VideoProcessingJobState? state;
+        VideoPublishedDerivativeReceipt? receipt;
         try
         {
             state = await queue.GetAsync(lease.Id, token);
+            receipt = await new PostgresVideoPublishedDerivativeRepository(database)
+                .GetCurrentAsync(lease.Id, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -136,7 +139,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
 
         if (state?.Status == "succeeded" && state.ProgressPercent == 100 &&
-            !state.CancellationRequested)
+            !state.CancellationRequested && receipt is not null &&
+            receipt.RevisionId == lease.RevisionId.Value)
             return new(true, true, "published");
 
         // Never grant a successful result to an adapter that forgot or

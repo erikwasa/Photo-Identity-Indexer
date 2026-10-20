@@ -36,7 +36,8 @@ public sealed class VideoGuardedToolExecutor(VideoToolProcessSupervisor supervis
         VideoToolExecutionBudget budget,
         Func<CancellationToken, Task<VideoExecutionPermit>> inspect,
         TimeSpan inspectionInterval,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<string, CancellationToken, Task>? onValidatedSuccessfulExit = null)
     {
         ArgumentNullException.ThrowIfNull(supervisor);
         ArgumentNullException.ThrowIfNull(inspect);
@@ -52,9 +53,22 @@ public sealed class VideoGuardedToolExecutor(VideoToolProcessSupervisor supervis
 
         using CancellationTokenSource linked =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Func<string, CancellationToken, Task>? guardedPublication = null;
+        if (onValidatedSuccessfulExit is not null)
+        {
+            guardedPublication = async (workspace, publicationToken) =>
+            {
+                VideoExecutionPermit permit = await InspectFailClosedAsync(
+                    inspect, publicationToken);
+                if (!permit.Allowed)
+                    throw new InvalidOperationException(
+                        "Video publication authorization was revoked.");
+                await onValidatedSuccessfulExit(workspace, publicationToken);
+            };
+        }
         Task<VideoToolExecutionResult> execution = supervisor.RunAsync(
             executablePath, expectedSha256, scratchRoot, buildArguments,
-            budget, linked.Token);
+            budget, linked.Token, afterSuccessfulExit: guardedPublication);
 
         try
         {

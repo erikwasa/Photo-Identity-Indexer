@@ -10,6 +10,11 @@ public sealed class VideoGuardedToolExecutorTests
         TimeSpan.FromSeconds(10), 1024 * 1024,
         InspectionInterval: TimeSpan.FromMilliseconds(100));
 
+    private static VideoToolExecutionBudget PublicationBudget => Budget with
+    {
+        WindowsJobLimits = new WindowsVideoJobLimits(512, 1, 25)
+    };
+
     [Fact]
     public async Task Revoked_initial_permit_never_starts_or_creates_scratch()
     {
@@ -113,6 +118,95 @@ public sealed class VideoGuardedToolExecutorTests
             Assert.True(completed.Completed);
             Assert.Equal(0, completed.ExitCode);
             Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Guarded_completion_callback_runs_before_owned_workspace_cleanup()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = MakeScratch();
+        try
+        {
+            string executable = CmdPath();
+            int called = 0;
+            var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
+            VideoGuardedToolExecutionResult completed = await executor.RunAsync(
+                executable, await HashAsync(executable), scratch,
+                _ => ["/d", "/c", "exit /b 0"], PublicationBudget,
+                _ => Task.FromResult(VideoExecutionPermit.Ready),
+                TimeSpan.FromMilliseconds(100),
+                onValidatedSuccessfulExit: (workspace, _) =>
+                {
+                    Assert.True(Directory.Exists(workspace));
+                    Assert.True(File.Exists(Path.Combine(workspace,
+                        VideoScratchOwnership.MarkerName)));
+                    File.WriteAllText(Path.Combine(workspace, "output.mp4"), "synthetic");
+                    Interlocked.Increment(ref called);
+                    return Task.CompletedTask;
+                });
+            Assert.True(completed.Completed);
+            Assert.Equal(1, called);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Rejected_publication_callback_never_preserves_unowned_output()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string scratch = MakeScratch();
+        try
+        {
+            string executable = CmdPath();
+            string hash = await HashAsync(executable);
+            int called = 0;
+            var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => executor.RunAsync(
+                executable, hash, scratch,
+                _ => ["/d", "/c", "exit /b 0"], PublicationBudget,
+                _ => Task.FromResult(VideoExecutionPermit.Ready),
+                TimeSpan.FromMilliseconds(100),
+                onValidatedSuccessfulExit: (_, _) =>
+                {
+                    Interlocked.Increment(ref called);
+                    throw new InvalidOperationException("Uncommitted synthetic derivative.");
+                }));
+            Assert.Equal(1, called);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+        }
+        finally { Directory.Delete(scratch, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Publishing_refuses_uncapped_or_multi_process_tool_profiles()
+    {
+        var executor = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
+        string scratch = MakeScratch();
+        try
+        {
+            foreach (VideoToolExecutionBudget budget in new[]
+            {
+                Budget, PublicationBudget with
+                {
+                    WindowsJobLimits = new WindowsVideoJobLimits(512, 2, 25)
+                }
+            })
+            {
+                InvalidOperationException failure =
+                    await Assert.ThrowsAsync<InvalidOperationException>(
+                        () => executor.RunAsync(
+                            "never-open", new string('0', 64), scratch,
+                            _ => [], budget,
+                            _ => Task.FromResult(VideoExecutionPermit.Ready),
+                            TimeSpan.FromMilliseconds(100),
+                            onValidatedSuccessfulExit: (_, _) => Task.CompletedTask));
+                Assert.Contains("single-process", failure.Message,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
+            }
         }
         finally { Directory.Delete(scratch, recursive: true); }
     }

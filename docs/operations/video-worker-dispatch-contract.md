@@ -81,6 +81,17 @@ free-space headroom. This is not an atomic reservation or disk-I/O hard quota;
 volume contention, hard filesystem confinement and production media-output
 publication remain unapproved. No worker is registered or enabled.
 
+## Integrated v36 derivative publication
+
+Checkpoint 12 provides an unregistered `VideoPublishedToolAdapter` that
+combines leased local staging, capped child execution, live safety checks,
+pre-cleanup publication, same-volume private rename and one-transaction
+PostgreSQL receipt+success commit. `VideoWorkerAttemptCoordinator` now checks
+a visible receipt alongside durable success, and the generic queue cannot
+mark uncommitted success. No encoder profile, API, worker or enablement exists.
+See [v36 integrated publication](video-publication-and-v36-rehearsal.md)
+for synthetic-only boundaries and consolidated schema rehearsal.
+
 ## Before local acceptance
 
 The coordinator is a *pre-activation foundation*. The remaining work is:
