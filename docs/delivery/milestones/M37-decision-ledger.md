@@ -185,3 +185,24 @@ M37 itself is **completed as an evaluation with these outcomes**.
 - Sparse existing 600-score overlap is a **coverage blocker**, not evidence
   that selective ranking cannot help users. If local third-party inference
   is unauthorized, the milestone can still conclude **DEFER**.
+
+
+## Post-closure product acceptance checkpoint — 2026-10-21
+
+The maintained operator confirmed that after PR #644, the **native Archive
+quality review works as expected and all reported regressions are OK**,
+including the full-screen one-photo keyboard UX and explicitly confirmed
+manual exclusion. WI-0629 (issue #629) is now **accepted and closed**.
+This is **not** a change to M37's automatic-exclusion research NO-GO.
+
+The next user-directed product area is **collection/slideshow curation**,
+which share a single selection use case. Issue #638 begins an operator
+pilot with side-by-side dHash near-copy groups derived from existing
+saved Creative Collection materialization. For this first step, the
+operator may record **Keep all** or **Prefer this photo** as private
+per-recipe annotations: **they have zero effect on saved collection
+membership or slideshow generation**. Collection-only reversible
+omission and any auto-omission require additional explicit acceptance.
+Issue #639 independently scopes a continuous photo-quality rating
+with versioned provenance; TOPIQ licensing/frozen heldout constraints
+remain, and no fake universal 0–100 quality score is approved.
