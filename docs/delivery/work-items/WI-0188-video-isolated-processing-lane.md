@@ -930,7 +930,7 @@ Production activation remains prohibited until reviewed.
 
 ### Development checkpoint 30 — native Windows creation mitigations, synthetic only (2026-10-22)
 
-- Opt-in `WindowsVideoJobLimits.RequireProcessCreationMitigations`
+- Opt-in `WindowsVideoJobLimits.RequireChildProcessRestriction`
   (default `false`) adds the Windows
   `PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY` deny-child-creation
   and `PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY` deny-remote-image,
