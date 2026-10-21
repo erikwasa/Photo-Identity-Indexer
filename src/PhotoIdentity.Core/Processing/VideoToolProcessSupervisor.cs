@@ -31,7 +31,9 @@ public sealed record VideoToolExecutionBudget(
 }
 
 /// <summary>Only sanitized measurements, never subprocess stdout, stderr or media paths.</summary>
-public sealed record VideoToolExecutionResult(int ExitCode, TimeSpan Elapsed);
+public sealed record VideoToolExecutionResult(
+    int ExitCode, TimeSpan Elapsed,
+    ulong? ObservedReadBytes = null, ulong? ObservedWriteBytes = null);
 
 /// <summary>
 /// Unregistered, explicit-call local process supervisor for a future video
@@ -198,6 +200,7 @@ public sealed class VideoToolProcessSupervisor
             {
                 linked.Token.ThrowIfCancellationRequested();
                 CheckWorkspace(workspace, budget);
+                _ = resourceJob?.CheckObservedIo();
                 await Task.Delay(
                     budget.InspectionInterval ?? TimeSpan.FromMilliseconds(200),
                     linked.Token);
@@ -206,6 +209,7 @@ public sealed class VideoToolProcessSupervisor
             await process.WaitForExitAsync(linked.Token);
             await Task.WhenAll(stdoutDrain, stderrDrain).WaitAsync(TimeSpan.FromSeconds(5), linked.Token);
             CheckWorkspace(workspace, budget);
+            VideoJobIoSnapshot? finalIo = resourceJob?.CheckObservedIo();
             if (process.ExitCode == 0 && afterSuccessfulExit is not null)
             {
                 // The child tree has exited, but the owned workspace still
@@ -215,7 +219,12 @@ public sealed class VideoToolProcessSupervisor
                 checkpoint = "post-exit-validation";
                 await afterSuccessfulExit(workspace, linked.Token);
             }
-            return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed);
+            // The independent callback runs in the caller, not in the
+            // supervised job, so the post-exit accounting snapshot already
+            // covers the complete child process. Publication is never
+            // followed by a new failure on the same unchanged counters.
+            return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed,
+                finalIo?.ReadBytes, finalIo?.WriteBytes);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&
                                                  timeout.IsCancellationRequested)

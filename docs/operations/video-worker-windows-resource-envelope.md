@@ -36,6 +36,54 @@ binary SHA-256 verification, sanitized output discard and process cancellation.
 The limits apply to the Job Object and its members, not arbitrary other
 programs or photo processes on the machine.
 
+## Optional observed per-job read/write transfer budget — 2026-10-21
+
+The opt-in Windows Job Object now supports paired
+`MaximumObservedReadBytes` and `MaximumObservedWriteBytes` counters
+(1 MiB–2 GiB per direction). If configured, the supervisor calls
+`QueryInformationJobObject(JobObjectExtendedLimitInformation)`
+during process execution and **after process exit, before any
+post-exit validation or publication callback**.
+
+The kernel-reported `ReadTransferCount` / `WriteTransferCount`
+values cover the supervised Job Object, not the host's whole
+filesystem. When a count exceeds its configured maximum, the tool
+is stopped with the allowlisted `io-budget-exceeded` checkpoint.
+If the OS query is unavailable or returns incomplete data, the
+process fails closed with `io-accounting-unavailable`, and the
+existing kill-on-close Job Object cleanup is preserved. Exposed
+successful tool evidence may contain only these numeric counter
+values, never archive paths, child output or private filenames.
+When no limits are set, historical synthetic/test callers retain
+their prior behavior.
+
+The explicitly selected one-shot's FFmpeg now uses **512 MiB
+observed read and 384 MiB observed write** limits. Independent
+FFprobe uses **512 MiB observed read and 32 MiB observed write**
+limits. The one-process memory (768 MiB/512 MiB), CPU (15%/25%),
+9-minute/15-second deadlines and source/temporary volume
+budgets stay unchanged. The original's verified private staging
+occurs outside the child Job Object, but remains separately
+size-bounded and no-recall.
+
+**Important: This is a sampled, cumulative diagnostic and abort
+condition, NOT a kernel-enforced peak allocation, instantaneous
+bandwidth throttle, per-volume quota, firewall or sandbox.**
+An untrusted process can exceed the count between polls (at
+most the configured 1-second interval), mmap I/O may not be
+fully represented by transfer counters, and a child could
+write outside the scratch folder without a low-privilege
+filesystem boundary. The host process's input staging and
+private publication I/O are not counted in the child job.
+A hard independent disk allocation/I/O and network containment
+review remains a separate blocker for production activation.
+
+**OS design restriction:** Microsoft's
+`SetIoRateControlInformationJobObject` function is explicitly
+unsupported on Windows 10 version 1607 and newer, so this
+work does not attempt to use that deprecated rate-control API.
+Reference: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-setioratecontrolinformationjobobject
+
 ## Production-activation blockers
 
 - **Startup containment:** the capped execution path now uses native

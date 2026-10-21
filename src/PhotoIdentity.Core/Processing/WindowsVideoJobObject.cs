@@ -12,16 +12,41 @@ namespace PhotoIdentity.Core.Processing;
 public sealed record WindowsVideoJobLimits(
     int MaximumJobMemoryMiB,
     int MaximumProcesses,
-    int MaximumCpuPercent)
+    int MaximumCpuPercent,
+    long? MaximumObservedReadBytes = null,
+    long? MaximumObservedWriteBytes = null)
 {
     public void Validate()
     {
         if (MaximumJobMemoryMiB is < 128 or > 4096 ||
             MaximumProcesses is < 1 or > 8 ||
-            MaximumCpuPercent is < 1 or > 50)
+            MaximumCpuPercent is < 1 or > 50 ||
+            (MaximumObservedReadBytes is null) != (MaximumObservedWriteBytes is null) ||
+            (MaximumObservedReadBytes is long read &&
+             read is < 1048576 or > 2147483648L) ||
+            (MaximumObservedWriteBytes is long write &&
+             write is < 1048576 or > 2147483648L))
             throw new ArgumentOutOfRangeException(nameof(WindowsVideoJobLimits),
                 "Windows video limits must bound memory (128..4096 MiB), " +
-                "processes (1..8), and CPU rate (1..50 percent).");
+                "processes (1..8), CPU rate (1..50 percent), and " +
+                "paired observed read/write bounds (1 MiB..2 GiB).");
+    }
+}
+
+/// <summary>
+/// Measured per-job Windows read/write transfer counters. Counts can include
+/// cached operations and are NOT an OS-enforced file, rate or volume quota.
+/// </summary>
+public sealed record VideoJobIoSnapshot(ulong ReadBytes, ulong WriteBytes)
+{
+    public static bool WithinLimits(VideoJobIoSnapshot snapshot,
+        long maximumReadBytes, long maximumWriteBytes)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (maximumReadBytes < 1 || maximumWriteBytes < 1)
+            throw new ArgumentOutOfRangeException(nameof(maximumReadBytes));
+        return snapshot.ReadBytes <= (ulong)maximumReadBytes &&
+               snapshot.WriteBytes <= (ulong)maximumWriteBytes;
     }
 }
 
@@ -48,9 +73,14 @@ public sealed class WindowsVideoJobObject : IDisposable
     private const int CpuRateControlInformation = 15;
 
     private readonly SafeFileHandle _handle;
+    private readonly WindowsVideoJobLimits _limits;
     private bool _disposed;
 
-    private WindowsVideoJobObject(SafeFileHandle handle) => _handle = handle;
+    private WindowsVideoJobObject(SafeFileHandle handle, WindowsVideoJobLimits limits)
+    {
+        _handle = handle;
+        _limits = limits;
+    }
 
     public static WindowsVideoJobObject Create(WindowsVideoJobLimits limits)
     {
@@ -87,13 +117,51 @@ public sealed class WindowsVideoJobObject : IDisposable
                 CpuRate = (uint)(limits.MaximumCpuPercent * 100)
             };
             SetLimits(handle, CpuRateControlInformation, cpu);
-            return new WindowsVideoJobObject(handle);
+            return new WindowsVideoJobObject(handle, limits);
         }
         catch
         {
             handle.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Native job read/write transfer counters (not peak bandwidth or a hard
+    /// kernel quota). If an observed per-job limit is requested, fail closed
+    /// on missing accounting data or an exceeded total. This is a best-effort
+    /// polling cutoff; an untrusted child can exceed limits between samples.
+    /// </summary>
+    internal VideoJobIoSnapshot? CheckObservedIo()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_limits.MaximumObservedReadBytes is not long readLimit ||
+            _limits.MaximumObservedWriteBytes is not long writeLimit)
+            return null;
+
+        int size = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
+        IntPtr buffer = Marshal.AllocHGlobal(size);
+        try
+        {
+            if (!QueryInformationJobObject(_handle, ExtendedLimitInformation,
+                    buffer, (uint)size, out uint returned) ||
+                returned < size)
+                throw VideoToolFailureEvidence.Mark(
+                    new InvalidOperationException(
+                        "Video job I/O accounting is not available."),
+                    "io-accounting-unavailable");
+            JobObjectExtendedLimitInformation info =
+                Marshal.PtrToStructure<JobObjectExtendedLimitInformation>(buffer);
+            var observed = new VideoJobIoSnapshot(
+                info.IoInfo.ReadTransferCount, info.IoInfo.WriteTransferCount);
+            if (!VideoJobIoSnapshot.WithinLimits(observed, readLimit, writeLimit))
+                throw VideoToolFailureEvidence.Mark(
+                    new InvalidOperationException(
+                        "Video job exceeded its observed disk-I/O transfer budget."),
+                    "io-budget-exceeded");
+            return observed;
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
     }
 
     /// <summary>Fail-closed assignment immediately after Process.Start().
@@ -195,6 +263,12 @@ public sealed class WindowsVideoJobObject : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetInformationJobObject(
         SafeFileHandle job, int jobInfoClass, IntPtr jobInfo, uint length);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryInformationJobObject(
+        SafeFileHandle job, int infoClass, IntPtr result, uint length,
+        out uint returnLength);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

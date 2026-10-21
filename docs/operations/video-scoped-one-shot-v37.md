@@ -259,6 +259,35 @@ exclusion, restart and post-trial integrity are **not** discharged
 by this offline comparison or by the earlier source proof.
 No `one-shot enqueue --apply` or `one-shot run --apply` is authorized.
 
+## Explicit one-shot job I/O accounting (new safety checkpoint)
+
+The current single-video FFmpeg and independent FFprobe paths now
+enforce sampled read/write **transfer counters** from their native
+one-process Windows Job Objects. This applies only to the already
+reviewed selected-one-shot path: FFmpeg is configured for
+512 MiB observed read / 384 MiB observed write; FFprobe for
+512 MiB observed read / 32 MiB observed write.
+
+The supervisor checks current job-wide counters while the process
+is running and again immediately after exit, **before publishing**
+a validated derivative. It fails closed on either observed
+over-budget count or unavailable accounting, preserving explicit
+process kill-on-close and existing scratch cleanup. This requires
+no operator change to the prior approved tool hashes or v37 schema.
+No unattended background worker is enabled.
+
+**Caveat:** this measure is **not** an OS disk-quota, instantaneous
+I/O-rate throttle, low-privilege filesystem policy, network-denial
+sandbox or guaranteed enforcement of peak/transient writes.
+Parent process's staged source read and derivative publication
+are also outside child job accounting. Source-level integrity,
+exclusion, no recall, free-space headroom, Job Object CPU/memory
+and absolute timeouts remain independent controls. The selected
+one-shot must **not be activated** until the outstanding
+filesystem/IO/network isolation review and controlled workload
+approval are separately completed. See
+[Windows tool resource limits](video-worker-windows-resource-envelope.md).
+
 ## Two deliberate operator actions
 
 1. `video one-shot enqueue` accepts only a previously catalogued

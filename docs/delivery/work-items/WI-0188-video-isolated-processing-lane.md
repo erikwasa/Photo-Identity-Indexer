@@ -887,6 +887,47 @@ restart/retry and unexpected termination with clean recovery;
 and independent post-trial original SHA-256/no hydration evidence.
 Production activation remains prohibited until reviewed.
 
+### Development checkpoint 29 — sampled Windows Job Object I/O transfer cutoff
+
+- The Windows native Job Object resource profile now optionally requires
+  paired **read and write transfer-byte ceilings** (each 1 MiB–2 GiB).
+  Missing one side, negative/unbounded limits and invalid pairs fail
+  validation before the child is launched. Normal existing capped
+  synthetic callers continue to work without opting into additional
+  accounting.
+- A supervised capped process queries **Windows Job Object extended I/O
+  accounting** during execution and again **immediately after exit,
+  before any independent output validation/private publication**.
+  When an observed job-wide read/write counter is above its limit,
+  execution fails closed with the allowlisted code
+  `io-budget-exceeded`; missing/failed accounting is refused as
+  `io-accounting-unavailable`, retaining kill-on-close, time bounds
+  and owner-scoped scratch cleanup. Only aggregate read/write byte
+  counts may be returned from successful supervisor calls.
+- The selected **single-video** FFmpeg profile opts into
+  512 MiB observed read / 384 MiB observed write limits; its
+  independent FFprobe uses 512 MiB read / 32 MiB write limits.
+  Existing maximum memory, CPU, process count, tool wall time,
+  staged original bounds, private workspace ownership and no-recall
+  logic are unchanged.
+- Windows CI tests cover limits and paired-bound refusals, overflow,
+  native Job Object accounting around a fully bounded test process,
+  no surviving scratch, and source-free diagnostics. No real
+  archive files or maintained PostgreSQL were touched in development.
+- **Limitations remain explicit:** these are sampled total child
+  I/O transfer counters, *not* kernel-enforced disk-size, peak IOPS,
+  bandwidth throttling, safe executable filesystem ACLs, network
+  egress denial, GPU isolation or all parent staging/publication
+  I/O. The Windows 10 1607+ OS does not support the old
+  `SetIoRateControlInformationJobObject` API. It must not
+  be described as equivalent to full sandboxing.
+- **No real-video execution authorization:** a future isolated
+  container/volume and per-process permissions/egress policy,
+  followed by photo-only versus mixed-load measurements and
+  cancellation/exclusion/restart/post-original checks, remain
+  necessary before WI-0188 can be accepted.
+  See [Windows Job Object safety runbook](../../operations/video-worker-windows-resource-envelope.md).
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

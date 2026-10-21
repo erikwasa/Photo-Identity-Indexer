@@ -37,7 +37,11 @@ public sealed class VideoProxyOutputValidator(
         InspectionInterval: TimeSpan.FromMilliseconds(100),
         WindowsJobLimits: new WindowsVideoJobLimits(
             MaximumJobMemoryMiB: 512, MaximumProcesses: 1,
-            MaximumCpuPercent: 25));
+            MaximumCpuPercent: 25,
+            // FFprobe is separately capped. Counters are sampled and may
+            // overshoot; this is not a Windows disk-I/O kernel quota.
+            MaximumObservedReadBytes: 512L * 1024 * 1024,
+            MaximumObservedWriteBytes: 32L * 1024 * 1024));
 
     public async Task<VideoProxyInspection> ValidateAsync(
         string candidateFile,
