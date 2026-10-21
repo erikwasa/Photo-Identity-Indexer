@@ -101,9 +101,9 @@ public sealed class WindowsVideoJobObjectTests
             Assert.NotNull(result.ObservedReadBytes);
             Assert.NotNull(result.ObservedWriteBytes);
             Assert.InRange(result.ObservedReadBytes.Value, 0UL,
-                (ulong)limits.MaximumObservedReadBytes.Value);
+                (ulong)limits.MaximumObservedReadBytes.GetValueOrDefault());
             Assert.InRange(result.ObservedWriteBytes.Value, 0UL,
-                (ulong)limits.MaximumObservedWriteBytes.Value);
+                (ulong)limits.MaximumObservedWriteBytes.GetValueOrDefault());
             Assert.Empty(Directory.EnumerateFileSystemEntries(root));
         }
         finally { Directory.Delete(root, recursive: true); }
