@@ -18,25 +18,29 @@ Windows security identity as its calling application.
 This optional checkpoint adds
 `WindowsVideoJobLimits.RequireChildProcessRestriction` (default
 **false**). For opted-in processes only, the native launcher
-installs three `STARTUPINFOEX` attributes **before** `CreateProcessW`:
+installs the existing handle list and one additional native
+`STARTUPINFOEX` attribute **before** `CreateProcessW`:
 
 | Attribute | Requested Windows policy |
 | --- | --- |
 | `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | Existing single NUL handle only |
 | `PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY` | `PROCESS_CREATION_CHILD_PROCESS_RESTRICTED` |
-| `PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY` | Disable legacy extension points, reject remotely loaded images and low-integrity-label images |
 
-The two added mitigation attributes use native fixed-size DWORD / ULONG64
-buffers that remain allocated until the process attribute list is
-destroyed. If initialization or either policy installation fails,
-the native launch fails **closed**. The existing kill-on-job-close,
+The child-process restriction uses a fixed-size native DWORD buffer
+that remains allocated until the process attribute list is destroyed.
+If initialization or policy installation fails, the native launch
+fails **closed**. Windows CI initially proved that combining this with
+additional executable-image and extension-point mitigations caused
+`cmd.exe` DLL initialization to fail with `0xC0000142`. Those
+unproven policies were explicitly **removed** from this experiment;
+they must not be represented as accepted protections. The existing kill-on-job-close,
 SHA-256 tool validation, bounded scratch, source/derivative guards,
 sanitized errors and CPU/memory/I/O caps remain unchanged.
 
 ## Deliberate scope
 
 For this checkpoint, **only the synthetic fixture FFmpeg generator and
-the synthetic candidate encoder** opt into these policies. The existing
+the synthetic candidate encoder** opt into this child restriction. The existing
 real-video selected one-shot FFmpeg, independent FFprobe, all photo
 processing and the general uncapped supervisor **do not** opt in.
 This is intended to verify compatibility and the concrete native
@@ -87,7 +91,7 @@ The existing restricted inherited handle list helps but does **not**
 replace an AppContainer token, filesystem ACL, low-privilege identity
 or independent privilege audit.
 
-These attributes do **not** prohibit arbitrary outbound sockets,
+This child-process restriction does **not** prohibit arbitrary outbound sockets,
 filesystem access under the caller's permissions, GPU usage or
 unbounded writes outside the observed scratch directory. They do
 not enforce hard storage capacity or I/O-rate quotas. Windows Job Object
