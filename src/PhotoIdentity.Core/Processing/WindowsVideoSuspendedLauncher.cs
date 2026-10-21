@@ -74,7 +74,7 @@ internal static class WindowsVideoSuspendedLauncher
             // inheritable handles from the parent application. Use a single
             // explicit HANDLE_LIST containing only the NUL device.
             nuint bytes = 0;
-            int attributeCount = job.RequireProcessCreationMitigations ? 2 : 1;
+            int attributeCount = job.RequireChildProcessRestriction ? 2 : 1;
             _ = InitializeProcThreadAttributeList(
                 IntPtr.Zero, attributeCount, 0, ref bytes);
             if (bytes == 0)
@@ -93,7 +93,7 @@ internal static class WindowsVideoSuspendedLauncher
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Video child inherited-handle allowlist could not be installed.");
 
-            if (job.RequireProcessCreationMitigations)
+            if (job.RequireChildProcessRestriction)
             {
                 // Value must remain allocated until the attribute list is
                 // destroyed. Creation fails closed if the OS refuses the
