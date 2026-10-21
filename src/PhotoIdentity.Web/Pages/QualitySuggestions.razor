@@ -1,173 +1,178 @@
 @page "/quality-suggestions"
-@implements IAsyncDisposable
-@inject HttpClient Http
-@inject IJSRuntime JS
 
 <PageTitle>Quality suggestions · Photo Identity</PageTitle>
 
-<section class="hero collection-hero">
-    <div>
-        <p class="eyebrow">Archive cleanup · manual review</p>
-        <h1>Possible low-quality photos</h1>
-        <p>One photo at a time. Use 1, 2 or 3 to record a decision, and ← / → to navigate.
-           Nothing is automatically excluded.</p>
-    </div>
-</section>
-
-@if (Error is not null)
-{
-    <div class="notice error" role="alert">@Error</div>
-}
-@if (Message is not null)
-{
-    <div class="notice" role="status">@Message</div>
-}
-
-<section class="collection-panel quality-scan-controls">
-    <div class="section-heading">
-        <div>
-            <h2>Find suggestions</h2>
-            <p>Choose the next batch, continue until the archive is scanned, or explicitly start again.</p>
+<div class="quality-review-screen" tabindex="0" @ref="ReviewSurface"
+     @onkeydown="HandleKeyboardAsync" aria-label="Photo quality review workspace">
+    <header class="quality-review-toolbar">
+        <div class="quality-review-heading">
+            <strong>Archive quality review</strong>
+            <span class="quality-review-subtitle">1 Keep · 2 Dismiss · 3 Consider · ← / → Navigate</span>
         </div>
-    </div>
-    <div class="quality-controls">
-        <label>Photos per batch
-            <select @bind="BatchSize" disabled="@Busy">
-                <option value="100">100</option>
-                <option value="500">500</option>
-                <option value="1000">1,000</option>
-                <option value="5000">5,000</option>
-            </select>
-        </label>
-        <button class="button secondary" disabled="@(Busy || Page?.ScanComplete == true)"
-                @onclick="ScanNextAsync">Scan next batch</button>
-        <button class="button secondary" disabled="@(Busy || Page?.ScanComplete == true)"
-                @onclick="ScanAllAsync">Scan all remaining</button>
-        @if (ScanningAll)
-        {
-            <button class="button secondary" @onclick="CancelScanning">Stop after current batch</button>
-        }
-        <button class="button secondary" disabled="@Busy" @onclick="RestartScanAsync">Start scan over</button>
-    </div>
-    <p class="small">
-        Scanned @((Page?.Scanned ?? 0).ToString("N0")) existing proxies ·
-        @(Page?.Suggested ?? 0) suggestions retained ·
-        @(Page?.ScanComplete == true ? "Scan complete" : "More photos available") ·
-        next archive position @(Page?.NextScanOffset ?? 0).
-        Existing review decisions survive rescan.
-    </p>
-    <p class="small">Scanning uses existing local JPEG proxies only. It never downloads originals,
-       changes collection contents or runs an IQA model. A large scan may take time;
-       each request is bounded to the selected batch size.</p>
-</section>
+        <div class="quality-toolbar-actions">
+            <label>Reason
+                <select @bind="Reason" @bind:after="FiltersChangedAsync"
+                        @onkeydown:stopPropagation="true" disabled="@Busy">
+                    @foreach (QualityOption option in ReasonOptions)
+                    {
+                        <option value="@option.Code">@option.Name</option>
+                    }
+                </select>
+            </label>
+            <label>Status
+                <select @bind="Filter" @bind:after="FiltersChangedAsync"
+                        @onkeydown:stopPropagation="true" disabled="@Busy">
+                    <option value="unreviewed">Not reviewed</option>
+                    <option value="all">All suggestions</option>
+                    <option value="consider-exclusion">Consider exclusion</option>
+                </select>
+            </label>
+            <button type="button" class="button secondary" aria-expanded="@ShowScanSettings"
+                    @onclick="ToggleScanSettings">@(ShowScanSettings ? "Hide scan options" : "Scan options")</button>
+            <a class="quality-review-exit" href="/archive">Close review</a>
+        </div>
+    </header>
 
-<section class="collection-panel quality-review-panel">
-    <div class="quality-controls">
-        <label>Technical reason
-            <select @bind="Reason" @bind:after="FiltersChangedAsync" disabled="@Busy">
-                @foreach (QualityOption option in ReasonOptions)
-                {
-                    <option value="@option.Code">@option.Name</option>
-                }
-            </select>
-        </label>
-        <label>Review status
-            <select @bind="Filter" @bind:after="FiltersChangedAsync" disabled="@Busy">
-                <option value="unreviewed">Not reviewed</option>
-                <option value="all">All suggestions</option>
-                <option value="consider-exclusion">Consider exclusion</option>
-            </select>
-        </label>
-    </div>
-
-    @if (Loading)
+    @if (ShowScanSettings)
     {
-        <div class="quality-empty">Loading suggestions…</div>
+        <section class="quality-scan-drawer" aria-label="Quality suggestion scan options">
+            <div class="quality-scan-head">
+                <strong>Scan existing local photo proxies</strong>
+                <button type="button" class="button secondary" @onclick="ToggleScanSettings">Close</button>
+            </div>
+            <div class="quality-scan-options">
+                <label>Batch size
+                    <select @bind="BatchSize" @onkeydown:stopPropagation="true" disabled="@Busy">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1,000</option>
+                        <option value="5000">5,000</option>
+                    </select>
+                </label>
+                <button type="button" class="button secondary"
+                        disabled="@(Busy || Page?.ScanComplete == true)"
+                        @onclick="ScanNextAsync">Scan next batch</button>
+                <button type="button" class="button secondary"
+                        disabled="@(Busy || Page?.ScanComplete == true)"
+                        @onclick="ScanAllAsync">Scan all remaining</button>
+                @if (ScanningAll)
+                {
+                    <button type="button" class="button secondary"
+                            @onclick="CancelScanning">Stop after current batch</button>
+                }
+                <button type="button" class="button secondary"
+                        disabled="@Busy" @onclick="RestartScanAsync">Start scan over</button>
+            </div>
+            <p class="quality-scan-summary">
+                @((Page?.Scanned ?? 0).ToString("N0")) proxies scanned ·
+                @(Page?.Suggested ?? 0) suggestions ·
+                @(Page?.ScanComplete == true ? "Complete" : "More available") ·
+                next position @(Page?.NextScanOffset ?? 0).
+                Only existing local review proxies are read; originals and saved collections are unchanged.
+            </p>
+        </section>
     }
-    else if (Page is not null)
-    {
-        <div class="quality-review-progress">
-            <span>@Page.Total matching · @Page.ReviewedInScope reviewed · @Page.ConsiderExclusionInScope considered</span>
-            <span>@(Page.Total == 0 ? 0 : Offset + 1) / @Page.Total</span>
-        </div>
-        @if (!Page.Enabled)
+
+    <section class="quality-photo-stage" aria-label="Photo under review">
+        @if (Loading)
         {
-            <div class="notice">
-                Archive cleanup review was disabled in your older review settings.
-                <button class="button secondary" @onclick="EnableArchiveAsync">
-                    Enable Archive cleanup review
-                </button>
+            <p>Loading suggestions…</p>
+        }
+        else if (Page is not null && !Page.Enabled)
+        {
+            <div class="quality-empty-review">
+                <p>Archive cleanup review was disabled in an earlier version.</p>
+                <button type="button" class="button secondary"
+                        @onclick="EnableArchiveAsync">Enable Archive cleanup review</button>
             </div>
         }
-
-        @if (Current is QualitySuggestionItem item)
+        else if (Current is QualitySuggestionItem photo)
         {
-            <div class="quality-focus-image">
-                <img src="@item.ProxyUrl" alt="Current quality suggestion photo from local review proxy"/>
-            </div>
-            <div class="quality-review-reasons">
-                @foreach (QualityReason reason in item.Reasons)
-                {
-                    <span class="coverage-chip">@reason.Label</span>
-                }
-            </div>
-            @if (item.Decision is not null)
-            {
-                <p class="small">Saved decision: @DecisionLabel(item.Decision)</p>
-            }
-            <div class="quality-primary-actions">
-                <button class="button secondary" disabled="@Busy"
-                        @onclick="() => KeepAsync(item.RevisionId)">1 · Keep</button>
-                <button class="button secondary" disabled="@Busy"
-                        @onclick="() => DismissAsync(item.RevisionId)">2 · Dismiss</button>
-                <button class="button secondary" disabled="@Busy"
-                        @onclick="() => ConsiderAsync(item.RevisionId)">3 · Consider exclusion</button>
-            </div>
-            <div class="quality-navigation">
-                <button class="button secondary" disabled="@(Busy || Offset == 0)"
-                        @onclick="PreviousAsync">← Previous</button>
-                <button class="button secondary" disabled="@(Busy || Offset + 1 >= Page.Total)"
-                        @onclick="NextAsync">Next →</button>
-                <a href="@item.PhotoUrl" target="_blank" rel="noopener noreferrer">Open full photo</a>
-                <button class="button danger" disabled="@Busy" @onclick="() => OpenExclude(item.RevisionId)">
-                    Exclude from Photo Identity…
-                </button>
-            </div>
-            @if (PendingExclusion == item.RevisionId)
-            {
-                <div class="notice warning quality-confirm" role="group" aria-label="Confirm durable photo exclusion">
-                    <strong>Confirm exclusion of this source copy?</strong>
-                    <p>Photo Identity will immediately block this photo and permanently purge its
-                       locally retained proxies, face links and metadata. The OneDrive original
-                       remains untouched. This is not a reversible collection hide.</p>
-                    <div class="quality-controls">
-                        <button class="button danger" disabled="@Busy" @onclick="ConfirmExcludeAsync">
-                            Confirm exclude &amp; purge
-                        </button>
-                        <button class="button secondary" disabled="@Busy" @onclick="CancelExclude">Cancel</button>
-                    </div>
-                    <p class="small">There is deliberately no keyboard shortcut for the final purge confirmation.</p>
-                </div>
-            }
+            <img src="@photo.ProxyUrl" alt="Entire photo being reviewed for technical quality" />
         }
         else
         {
-            <div class="quality-empty">
-                <p>@(Page.GeneratedAtUtc is null
-                    ? "No scan has been run. Scan a batch above to find suggestions."
-                    : "No photos match this filter. Try another reason or review status, or scan the next batch.")</p>
+            <div class="quality-empty-review">
+                <p>@(Page?.GeneratedAtUtc is null
+                    ? "No suggestions scanned yet. Open Scan options to get started."
+                    : "Nothing matches this reason/status filter. Change filters or scan the next batch.")</p>
+                <button type="button" class="button secondary" @onclick="ToggleScanSettings">Scan options</button>
             </div>
         }
-    }
-</section>
+    </section>
 
-<section class="collection-panel">
-    <h2>Other curation goals</h2>
-    <p>Collection and slideshow curation will share a separate similarity-comparison
-       workflow, so these Archive cleanup controls only identify technically
-       questionable photos. A future numerical quality signal can help compare
-       alternatives, without automatically excluding anything from Photo Identity.</p>
-</section>
+    <footer class="quality-review-footer">
+        <div class="quality-review-metadata">
+            <span>@(Page?.Total ?? 0) matching · @(Page?.ReviewedInScope ?? 0) reviewed ·
+                @(Page?.ConsiderExclusionInScope ?? 0) considered</span>
+            <span>@(Page is null || Page.Total == 0 ? 0 : Offset + 1) / @(Page?.Total ?? 0)</span>
+        </div>
+        <div class="quality-review-reasons" aria-label="Reasons for suggestion">
+            @if (Current is QualitySuggestionItem current)
+            {
+                @foreach (QualityReason reason in current.Reasons)
+                {
+                    <span class="coverage-chip">@reason.Label</span>
+                }
+                @if (current.Decision is not null)
+                {
+                    <span class="quality-choice">Saved: @DecisionLabel(current.Decision)</span>
+                }
+            }
+        </div>
+        <div class="quality-review-buttons">
+            <button type="button" class="button secondary" disabled="@(Busy || Current is null)"
+                    @onclick="() => KeepAsync(Current!.RevisionId)">1 · Keep</button>
+            <button type="button" class="button secondary" disabled="@(Busy || Current is null)"
+                    @onclick="() => DismissAsync(Current!.RevisionId)">2 · Dismiss</button>
+            <button type="button" class="button secondary" disabled="@(Busy || Current is null)"
+                    @onclick="() => ConsiderAsync(Current!.RevisionId)">3 · Consider</button>
+            <span class="quality-button-divider" aria-hidden="true"></span>
+            <button type="button" class="button secondary"
+                    disabled="@(Busy || Offset == 0 || Page?.Total is null || Page.Total == 0)"
+                    @onclick="PreviousAsync">← Previous</button>
+            <button type="button" class="button secondary"
+                    disabled="@(Busy || Page is null || Offset + 1 >= Page.Total)"
+                    @onclick="NextAsync">Next →</button>
+            <button type="button" class="button danger" disabled="@(Busy || Current is null)"
+                    @onclick="OpenCurrentExclusion">Exclude photo…</button>
+            @if (Current is QualitySuggestionItem currentPhoto)
+            {
+                <a class="quality-photo-link" href="@currentPhoto.PhotoUrl"
+                   target="_blank" rel="noopener noreferrer">Open full photo</a>
+            }
+        </div>
+    </footer>
+
+    @if (PendingExclusion is not null)
+    {
+        <div class="quality-modal-backdrop">
+            <section class="quality-exclusion-modal" role="dialog" aria-modal="true"
+                     aria-labelledby="quality-purge-title"
+                     aria-describedby="quality-purge-description">
+                <h2 id="quality-purge-title">Exclude this photo from Photo Identity?</h2>
+                <p id="quality-purge-description">This permanently purges this source copy's locally retained
+                    review proxies, face links and metadata from Photo Identity. Its OneDrive original remains
+                    untouched. This is not a reversible collection hide.</p>
+                <p><strong>Only an explicit click on Confirm exclude &amp; purge performs this action.</strong></p>
+                <div class="quality-modal-actions">
+                    <button type="button" class="button secondary" disabled="@Busy"
+                            @onclick="CancelExclude">Cancel</button>
+                    <button type="button" class="button danger" disabled="@Busy"
+                            @onclick="ConfirmExcludeAsync">Confirm exclude &amp; purge</button>
+                </div>
+            </section>
+        </div>
+    }
+
+    @if (Error is not null || Message is not null)
+    {
+        <div class="quality-review-notice" role="status">
+            <span>@(Error ?? Message)</span>
+            <button type="button" aria-label="Dismiss notification" @onclick="DismissNotice">×</button>
+        </div>
+    }
+</div>
 
 @code {
     private const string ArchiveScope = "archive-cleanup";
@@ -210,24 +215,26 @@
     private bool Loading = true;
     private bool ScanningAll;
     private bool StopAfterBatch;
-    private IJSObjectReference? Keys;
-    private DotNetObjectReference<QualitySuggestions>? SelfReference;
+    private ElementReference ReviewSurface;
+    private bool ShowScanSettings;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        Keys = await JS.InvokeAsync<IJSObjectReference>(
-            "import", "./js/quality-review-keys.js");
-        SelfReference = DotNetObjectReference.Create(this);
-        await Keys.InvokeVoidAsync("attach", SelfReference);
+        // Focus the Blazor review surface itself. Native keydown events bubble
+        // here even after clicking action/navigation buttons. No JavaScript
+        // module import, document listener or hidden interop error is needed.
+        if (firstRender)
+            await ReviewSurface.FocusAsync(preventScroll: true);
     }
 
-    [JSInvokable]
-    public async Task OnReviewKeyAsync(string key)
+    private async Task HandleKeyboardAsync(KeyboardEventArgs args)
     {
-        if (Busy || Loading || PendingExclusion is not null || Current is null) return;
-        switch (key)
+        if (args.AltKey || args.CtrlKey || args.MetaKey ||
+            Busy || Loading || PendingExclusion is not null || Current is null)
+            return;
+        switch (args.Key)
         {
             case "1": await DecideAsync(Current.RevisionId, "keep"); break;
             case "2": await DecideAsync(Current.RevisionId, "dismiss"); break;
@@ -236,6 +243,9 @@
             case "ArrowRight": await NextAsync(); break;
         }
     }
+
+    private void ToggleScanSettings() => ShowScanSettings = !ShowScanSettings;
+    private void DismissNotice() { Error = null; Message = null; }
 
     private static string DecisionLabel(string? value) => value switch
     {
@@ -387,7 +397,14 @@
         finally { Busy = false; }
     }
 
-    private void OpenExclude(string id) => PendingExclusion = id;
+    private void OpenCurrentExclusion()
+    {
+        if (!Busy && Current is not null)
+        {
+            ShowScanSettings = false;
+            PendingExclusion = Current.RevisionId;
+        }
+    }
     private void CancelExclude() => PendingExclusion = null;
 
     private async Task ConfirmExcludeAsync()
@@ -428,14 +445,4 @@
         finally { Busy = false; }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (Keys is not null)
-        {
-            try { await Keys.InvokeVoidAsync("detach"); }
-            catch (JSDisconnectedException) { }
-            await Keys.DisposeAsync();
-        }
-        SelfReference?.Dispose();
-    }
 }
