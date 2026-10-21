@@ -216,6 +216,82 @@
                     }
                 </div>
 
+                @if (SelectedRecipeId is not null)
+                {
+                    <section class="creative-similarity-review" aria-label="Similar photos for this Creative Collection">
+                        <div class="smart-subheading">
+                            <strong>Review similar photos</strong>
+                            <button type="button" class="button secondary" disabled="@Busy"
+                                    @onclick="LoadSimilarityAsync">
+                                @(Similarity is null ? "Find similar alternatives" : "Refresh similarity review")
+                            </button>
+                        </div>
+                        <p class="smart-help">
+                            Compare locally detected near-identical burst frames.
+                            Keep all by default, or record a preference for one photo.
+                            <strong>These preferences are annotations only:</strong>
+                            neither the saved collection nor slideshow selection is changed.
+                        </p>
+                        @if (Similarity is SimilarityReviewResponse similarity)
+                        {
+                            <p class="smart-help">
+                                @similarity.TotalGroups possible groups among @similarity.TotalCandidates candidates.
+                                @similarity.DisplayedGroups shown ·
+                                method @similarity.AlgorithmVersion ·
+                                policy @similarity.PolicyVersion.
+                                @(similarity.GroupSampleTruncated ? "Additional groups omitted from this review page." : "")
+                            </p>
+                            @if (similarity.Groups.Length == 0)
+                            {
+                                <div class="empty-state compact">
+                                    <p>No similar burst groups detected. That does not mean all photos are unique;
+                                       the conservative local hash detector may miss meaningful similarities.</p>
+                                </div>
+                            }
+                            @foreach (SimilarityGroupResponse group in similarity.Groups)
+                            {
+                                <article class="creative-similarity-group" @key="group.GroupKey">
+                                    <div class="creative-similarity-group-head">
+                                        <strong>@group.MemberCount similar photos</strong>
+                                        <span>@group.StartedAtLocal.ToString("yyyy-MM-dd HH:mm") ·
+                                              max Hamming distance @group.MaximumPairDistance</span>
+                                        <span>@(group.Decision == "keep-all" ? "Your preference: keep all" :
+                                            group.Decision == "prefer-one" ? "Your preference: one photo" :
+                                            "No review decision")</span>
+                                    </div>
+                                    <div class="creative-similarity-photos">
+                                        @foreach (SimilarityPhotoResponse photo in group.Members)
+                                        {
+                                            <div class="creative-similarity-photo" @key="photo.RevisionId">
+                                                <img src="@photo.ThumbnailUrl" loading="lazy"
+                                                     alt="One similar photo alternative in the collection" />
+                                                <p class="smart-help">
+                                                    @(photo.SelectedByCurrentRecipe ? "Currently selected" : "Not selected") ·
+                                                    distance @photo.DistanceFromRepresentative
+                                                    @if (photo.RevisionId == group.PreferredRevisionId)
+                                                    {
+                                                        <strong> · Preferred by you</strong>
+                                                    }
+                                                </p>
+                                                <button type="button" class="button secondary" disabled="@Busy"
+                                                        @onclick="() => PreferSimilarityPhotoAsync(group, photo)">
+                                                    Prefer this photo
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="smart-actions">
+                                        <button type="button" class="button secondary" disabled="@Busy"
+                                                @onclick="() => KeepSimilarityGroupAsync(group)">
+                                            Keep all alternatives
+                                        </button>
+                                    </div>
+                                </article>
+                            }
+                        }
+                    </section>
+                }
+
                 @if (Preview is CreativeCollectionPreviewResponse preview)
                 {
                     <div class="creative-summary" aria-label="Creative Collection preview counts">
@@ -279,6 +355,7 @@
     private IReadOnlyList<SmartCollectionDefinitionResponse> SmartCollections { get; set; } = [];
     private IReadOnlyList<CreativeCollectionRecipeResponse> Recipes { get; set; } = [];
     private CreativeCollectionPreviewResponse? Preview { get; set; }
+    private SimilarityReviewResponse? Similarity { get; set; }
     private string? SelectedRecipeId { get; set; }
     private string AnchorKind { get; set; } = "smart-collection";
     private string? SmartAnchorId { get; set; }
@@ -674,7 +751,89 @@
         }
     }
 
-    private void ClearPreview() => Preview = null;
+    private sealed record SimilarityPhotoResponse(
+        string RevisionId, string ThumbnailUrl, int DistanceFromRepresentative,
+        bool SelectedByCurrentRecipe);
+    private sealed record SimilarityGroupResponse(
+        string GroupKey, int MaximumPairDistance,
+        DateTime StartedAtLocal, DateTime EndedAtLocal,
+        int MemberCount, SimilarityPhotoResponse[] Members,
+        string? Decision, string? PreferredRevisionId);
+    private sealed record SimilarityReviewResponse(
+        string CollectionId, string CollectionName, string PolicyVersion,
+        string AlgorithmVersion, int MaximumHammingDistance, double MaximumCaptureSpanSeconds,
+        int TotalGroups, int DisplayedGroups, bool GroupSampleTruncated,
+        int TotalCandidates, int SelectedCount, SimilarityGroupResponse[] Groups,
+        bool CollectionSelectionChanged, bool AutoOmissionEnabled, string EvidenceSemantics);
+
+    private async Task LoadSimilarityAsync()
+    {
+        if (SelectedRecipeId is null) return;
+        Busy = true;
+        Error = null;
+        try
+        {
+            Similarity = await Http.GetFromJsonAsync<SimilarityReviewResponse>(
+                $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}/similarity-review");
+            if (Similarity is null)
+                throw new InvalidOperationException("No similarity review data returned.");
+            Notice = "Similarity suggestions prepared from the current Creative Collection. " +
+                "Review choices do not change the collection or slideshow.";
+        }
+        catch (Exception exception)
+        {
+            Error = "Could not prepare the similarity review: " + exception.Message;
+            Similarity = null;
+        }
+        finally { Busy = false; }
+    }
+
+    private Task KeepSimilarityGroupAsync(SimilarityGroupResponse group) =>
+        SaveSimilarityChoiceAsync(group, "keep-all", null);
+
+    private Task PreferSimilarityPhotoAsync(
+        SimilarityGroupResponse group, SimilarityPhotoResponse photo) =>
+        SaveSimilarityChoiceAsync(group, "prefer-one", photo.RevisionId);
+
+    private async Task SaveSimilarityChoiceAsync(
+        SimilarityGroupResponse group, string decision, string? preferredRevisionId)
+    {
+        if (SelectedRecipeId is null || Busy) return;
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}/similarity-review",
+                new { groupKey = group.GroupKey, decision, preferredRevisionId });
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await ReadErrorAsync(response, "Similarity group changed. Refresh the review.");
+                return;
+            }
+            if (Similarity is not null)
+            {
+                SimilarityGroupResponse[] revised = Similarity.Groups.Select(item =>
+                    item.GroupKey == group.GroupKey
+                        ? item with { Decision = decision, PreferredRevisionId = preferredRevisionId }
+                        : item).ToArray();
+                Similarity = Similarity with { Groups = revised };
+            }
+            Notice = "Your similarity preference was saved for future curation design. " +
+                "Nothing has been removed from a collection or slideshow.";
+        }
+        catch (Exception exception)
+        {
+            Error = "Could not save similarity preference: " + exception.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private void ClearPreview()
+    {
+        Preview = null;
+        Similarity = null;
+    }
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string fallback)
     {
