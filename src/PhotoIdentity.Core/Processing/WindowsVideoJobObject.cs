@@ -14,7 +14,8 @@ public sealed record WindowsVideoJobLimits(
     int MaximumProcesses,
     int MaximumCpuPercent,
     long? MaximumObservedReadBytes = null,
-    long? MaximumObservedWriteBytes = null)
+    long? MaximumObservedWriteBytes = null,
+    bool RequireProcessCreationMitigations = false)
 {
     public void Validate()
     {
@@ -81,6 +82,11 @@ public sealed class WindowsVideoJobObject : IDisposable
         _handle = handle;
         _limits = limits;
     }
+
+    // Defense-in-depth for explicitly opted-in tools, not a token sandbox.
+    // Allows the suspended launcher to make mitigation setup mandatory.
+    internal bool RequireProcessCreationMitigations =>
+        _limits.RequireProcessCreationMitigations;
 
     public static WindowsVideoJobObject Create(WindowsVideoJobLimits limits)
     {
