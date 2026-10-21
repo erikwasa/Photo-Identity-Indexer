@@ -169,6 +169,33 @@ public static class VideoOneShotSourceProofCommandRunner
             return 1;
         }
 
+        // The explicit original read also observes the same authoritative
+        // idle/photo-first and stopped-lane admission gate as the no-job
+        // environment preflight. This does not replace interruption checks
+        // during a future real video worker; the 256 MiB checksum is bounded.
+        VideoProcessingControlState control =
+            await new PostgresVideoProcessingControlRepository(db).GetAsync(token);
+        VideoPhotoPrioritySnapshot photo =
+            await new PostgresVideoPhotoPriorityProbe(db).GetAsync(token);
+        bool runningVideo;
+        await using (NpgsqlConnection active = await db.OpenConnectionAsync(token))
+        await using (NpgsqlCommand lease = active.CreateCommand())
+        {
+            lease.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM video_processing_jobs WHERE status='running'
+                );
+                """;
+            runningVideo = await lease.ExecuteScalarAsync(token) is true;
+        }
+        string? gate = VideoOneShotEnvironmentCommandRunner.EvaluateControl(
+            control, photo.PhotoWorkActive, runningVideo);
+        if (gate is not null)
+        {
+            Write(output, true, VideoOneShotSourceProofResult.Fail(false, gate));
+            return 1;
+        }
+
         VideoOneShotSourceProofResult result;
         using CancellationTokenSource bounded =
             CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -269,7 +296,9 @@ public static class VideoOneShotSourceProofCommandRunner
         if (reason is not (
             "not-run" or "verified" or "revision-not-eligible" or
             "source-unavailable" or "source-not-local" or
-            "source-changed" or "digest-mismatch" or "timeout"))
+            "source-changed" or "digest-mismatch" or "timeout" or
+            "video-control-not-stopped" or "running-video-lease" or
+            "photo-work-active"))
             throw new ArgumentException("Unrecognized source proof reason code.");
         output.WriteLine(JsonSerializer.Serialize(new
         {
