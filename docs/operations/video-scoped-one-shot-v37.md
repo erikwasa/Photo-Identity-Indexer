@@ -28,6 +28,63 @@ its deadline. If the process crashes before disarming, operators must use
 the existing `video jobs stop --apply` after inspecting the queue; do not
 manually bypass the scope. **No polling or automatic retries are started.**
 
+## Maintained v37 preflight gate accepted — subsequent operator report (2026-10-21)
+
+The original design paragraphs below describe the **requirements at the
+time of implementation** (then an unverified v34→v37 upgrade). The
+maintainer subsequently confirmed PASS for a fresh authoritative
+PostgreSQL backup, isolated restore, v34→v37 rehearsal, preserved
+catalogue table counts, repeated initialization, maintained PostgreSQL
+health at v37, and disabled/paused/unselected video control. Photo
+regressions, read-only Videos library/posters and no unintended
+OneDrive hydration/original changes also passed. The database-free
+approved FFmpeg/FFprobe synthetic pilot passed for 3-second landscape
+with AAC and portrait without audio.
+
+**These prerequisites no longer need rerunning solely for the next
+read-only selection step.** They do not independently authorize
+executing the real-video `--apply` path or claim real-media IO quotas,
+mixed-load isolation, exclusion/restart/cancellation acceptance or
+browser playback.
+
+## Read-only shortlist before the two deliberate actions
+
+The optional command below identifies *potential* Rec.709 SDR input
+revision UUIDs from current v37 catalogue **metadata only**. It never
+opens media, performs OneDrive availability/hydration calls, runs tools,
+creates jobs or enables the video lane:
+
+~~~powershell
+# The same already-verified, process-scoped PostgreSQL connection variable
+# and authoritative maintained v37 database used for successful read-only
+# video jobs status; never paste or print the connection string.
+$connectionVariable = 'PHOTOIDENTITY_M30_VERIFY_PG'
+# $databaseName must already name the confirmed launcher-connected database.
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot candidates `
+  --postgres-connection-env $connectionVariable `
+  --database $databaseName `
+  --limit 12
+if ($LASTEXITCODE -ne 0) { throw 'Video candidate metadata preflight failed.' }
+~~~
+
+The output protocol is `wi0188-one-shot-candidates-v1`. It returns
+up to 12 `candidates`, each containing only `revisionId`,
+`sourceBytes`, `durationSeconds`, `orientation` (explicitly
+**coded** orientation; 90-degree camera display rotation may differ)
+and `hasAudio`, plus a `hasMore` flag. It exposes no file path,
+source key, filename, GPS, face/person or capture-date information.
+
+**Important:** `localAvailabilityChecked=false`. Being shortlisted
+is NOT evidence that a video file is already local or unchanged.
+The operator must deliberately pick **one** UUID and run the existing
+`video one-shot enqueue` **without `--apply`** as described below.
+That stronger dry run checks exact current revision, current exclusion,
+already-local availability metadata, source size and codec inspection,
+again without opening the media. Do not enqueue or run real-video
+processing until the distinct containment/mixed-load gates have been
+reviewed. No automatic execution or new source path flag is present.
+
 ## Two deliberate operator actions
 
 1. `video one-shot enqueue` accepts only a previously catalogued

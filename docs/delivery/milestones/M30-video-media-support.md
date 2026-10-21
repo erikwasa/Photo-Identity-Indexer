@@ -11,6 +11,35 @@ depends_on: [M19, M22, M24, M27]
 
 **Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 is now `in_progress` with WI-0188 started on 2026-10-19. Its first implementation checkpoint adds fail-closed video job identity/admission contracts and focused unit tests; the durable queue, worker, APIs and mixed-load verification remain outstanding. The completed WI-0151 slice is unchanged, and playback, analysis, retrieval and collection integrations remain proposed. **M30 is not complete.**
 
+## Maintained-host WI-0188 checkpoint acceptance (2026-10-21)
+
+The maintainer confirmed **PASS** for fresh authoritative backup,
+isolated restore, guarded **v34→v37** schema rehearsal, unchanged existing
+catalogue counts, repeatable schema initialization, and the maintained
+v37 PostgreSQL application's health. Video job control remained
+**disabled, paused and unselected**.
+
+Maintained regression checks also passed: existing photo Archive,
+People/face review, Visual/Caption/Combined search, Smart and Creative
+Collections, metadata edits, slideshows, and the existing Videos
+library/posters, without unintended OneDrive hydration or changes to
+original media. Finally, the optional database-free FFmpeg/FFprobe
+synthetic pilot passed with independently validated SDR H.264/AAC
+landscape and silent portrait outputs.
+
+These checkpoints are **accepted**; they do not prove real-video
+one-shot publication, hard disk/IO/network isolation, cancellation
+under workload, or photo-only versus concurrent photo/video
+performance. WI-0188 remains `in_progress` until that separate
+evidence is collected. No mass video processing or general hosted
+video worker has been enabled.
+
+The next safe development checkpoint adds a **read-only metadata-only
+one-shot candidate shortlist**, permitting operator selection of an
+opaque video revision UUID. It does not open or enqueue media; the
+existing exact-revision `video one-shot enqueue` dry run must still
+prove local availability before further trial decisions.
+
 ## Goal and rollout
 
 Support private family videos on local hardware without modifying originals, expanding online-only hydration unexpectedly, or changing normal photo ingestion, recognition, search, collections and slideshows. The **initial slice is a separate, opt-in video lane**; ordinary photo results remain photo-only.
