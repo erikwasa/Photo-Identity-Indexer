@@ -107,8 +107,8 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0188-video-isolated-processing-lane.md
   started_at: 2026-10-19
-  last_updated_at: 2026-10-20
-  branch: agent/WI-0188-windows-tool-safety-checkpoints
+  last_updated_at: 2026-10-21
+  branch: agent/WI-0188-accept-synthetic-proxy-windows-trial
   blockers: []
   blocker_notes: []
   evidence:
@@ -144,6 +144,12 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/625
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/626
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/628
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/632
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/634
   - type: documentation
     value: docs/operations/video-processing-job-queue-v34.md
 - id: WI-0189

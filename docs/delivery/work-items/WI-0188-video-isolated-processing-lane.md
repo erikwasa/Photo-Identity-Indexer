@@ -615,6 +615,44 @@ checkpoint. Continue development after CI and PR review.
   binaries and scratch marker. No new PostgreSQL migration, video
   worker enabling or real-video processing is part of this fix.
 
+### Maintainer local checkpoint 20 — synthetic proxy validation accepted (2026-10-21)
+
+**Result: PASS for the synthetic-only Windows encoder/validator roundtrip.**
+The approved native FFmpeg/FFprobe binaries had originally been invoked
+through a Windows linked executable path and were correctly refused at
+`failureCheckpoint=linked-executable`. The maintainer resolved the
+installed tool paths to the real files and verified them against the
+previously accepted ADR-0012 SHA-256 fingerprints, without disabling
+the reparse-point guard or weakening resource limits.
+
+A fresh read-only `video synthetic-proxy-pilot` preview returned
+`dryRun=true`, `status=not-run`, and `schemaUsed=false`.
+The explicit `--apply` rerun returned `status=validated` with two
+independently FFprobe-validated cases and null failure fields:
+
+| Source fixture | Validated output | Audio | Duration | Size | Encode time |
+| --- | --- | --- | --- | --- | --- |
+| Landscape 1280×720 | 720×406 | AAC present | 3 s | 218430 bytes | 793 ms |
+| Portrait 720×1280 | 406×720 | None | 3 s | 184101 bytes | 470 ms |
+
+The report explicitly states `schemaUsed=false`,
+`originalsOpened=false`, `videoWorkersActivated=false` and
+`derivativesRetained=false`. This closes **only** the optional
+source-less codec/containment smoke-test checkpoint, not WI-0188 or
+WI-0189. The project already recorded independent PASS for nine
+photo regression areas, v37 health, the disabled/unselected job lane,
+and the disabled Videos API. The backup/isolated v34→v37 rehearsal
+output was **not included in the same reported results**, so retain
+that separate prerequisite as unverified in this evidence record.
+
+**Remaining acceptance**: one selected real and already-local SDR
+video trial, authoritative source checksum/no OneDrive hydration
+evidence, bounded resource and cancellation/restart/exclusion behavior,
+photo-only versus competing-video throughput/search/slideshow latency,
+and reviewed hard filesystem/IO/network or alternate containment.
+No persistent unattended worker, media API or production activation
+is authorized by the successful synthetic test.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
