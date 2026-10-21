@@ -20,7 +20,8 @@ class NativeQualityViewportContractTests(unittest.TestCase):
         self.assertIn('tabindex="0" @ref="ReviewSurface"', code)
         self.assertIn('@onkeydown="HandleKeyboardAsync"', code)
         self.assertIn('ReviewSurface.FocusAsync(preventScroll: true)', code)
-        self.assertIn('ModalCancelButton.FocusAsync(preventScroll: true)', code)
+        self.assertIn('ModalConfirmButton.FocusAsync(preventScroll: true)', code)
+        self.assertIn('ReviewSurface.FocusAsync(preventScroll: true)', code)
         self.assertIn('@onkeydown:stopPropagation="true"', code)
         for key in ('case "1":', 'case "2":', 'case "3":',
                     'case "ArrowLeft":', 'case "ArrowRight":'):
@@ -59,7 +60,21 @@ class NativeQualityViewportContractTests(unittest.TestCase):
         self.assertIn('"api/archive/exclusions/revision"', code)
         keyboard = code.split("private async Task HandleKeyboardAsync", 1)[1].split(
             "private static string DecisionLabel", 1)[0]
-        self.assertNotIn("ConfirmExcludeAsync", keyboard)
+        self.assertIn('case "e":', keyboard)
+        self.assertIn('case "E": OpenCurrentExclusion();', keyboard)
+        self.assertIn('case "c":', keyboard)
+        self.assertIn('case "C":', keyboard)
+        self.assertIn('if (ModalReady)', keyboard)
+        self.assertIn('await ConfirmExcludeAsync();', keyboard)
+        self.assertIn('case "Escape":', keyboard)
+        # Enter belongs to the browser's native click on the focused
+        # Confirm button; keyboard handler must not duplicate the request.
+        self.assertNotIn('case "Enter":', keyboard)
+        self.assertIn("Enter is handled by the focused Confirm button", keyboard)
+        self.assertIn("args.Repeat", keyboard)
+        self.assertIn("PendingExclusion is null || !ModalReady", code)
+        self.assertIn('C / Enter · Confirm exclude &amp; purge', code)
+        self.assertIn('Escape · Cancel', code)
 
     def test_scan_options_are_overlay_not_above_photo(self):
         code = PAGE.read_text(encoding="utf-8")
