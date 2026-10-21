@@ -39,26 +39,28 @@ sanitized errors and CPU/memory/I/O caps remain unchanged.
 
 ## Deliberate scope
 
-For this checkpoint, **only the synthetic fixture FFmpeg generator and
-the synthetic candidate encoder** opt into this child restriction. The existing
-real-video selected one-shot FFmpeg, independent FFprobe, all photo
-processing and the general uncapped supervisor **do not** opt in.
-This is intended to verify compatibility and the concrete native
-child-process denial first, without touching maintained originals.
+**No existing FFmpeg or FFprobe execution path currently enables this
+experimental native restriction.** Windows CI demonstrated that even a
+harmless first-party `cmd.exe` returned `STATUS_DLL_INIT_FAILED
+(0xC0000142)` with the restriction enabled. The flag therefore
+remains default-off and is exercised only by deliberately opted-in
+Windows test code. Neither the previously accepted synthetic pilot
+nor real-video one-shot is altered. The native attribute API is a
+feasibility seam, **not an accepted isolation control**.
 
-The new Windows unit test compares the same harmless
-system `cmd.exe` nested launch both *without* and *with*
-`RequireChildProcessRestriction`, under a Job Object allowing
-two processes: the unrestricted nested call must succeed; the restricted
-one must be rejected. It also proves a single first-party process still
-runs normally and scratch teardown succeeds. This is a compatibility
-and basic native process-policy assertion, not a hostile-code bypass test.
+The new Windows unit test first confirms that ordinary bounded
+single and nested `cmd.exe` commands work without the flag. With the
+flag enabled, if the single command can start, the test then requires
+that a nested child command fail. If even the single command cannot
+initialize (the observed CI behavior), the test records that as
+incompatibility, **not as proof of child-process prevention**. No
+hostile-code bypass or AppContainer security claim is made.
 
-The optional real Windows FFmpeg test remains the prior strictly marked
-synthetic-only command. **After a fully green CI and PR merge**, the
-maintainer can reuse the already approved physical/unlinked FFmpeg and
-FFprobe binaries, unchanged approved hashes and the existing owned
-synthetic scratch directory:
+The original accepted real Windows FFmpeg synthetic pilot remains
+**unchanged** by this compatibility-only checkpoint. No maintained-host
+repeat of its validation is needed for this PR. The following commands
+remain available for future explicit synthetic test work, but they
+are **not required** for the native mitigation feasibility finding:
 
 ~~~powershell
 git switch main
@@ -97,6 +99,11 @@ unbounded writes outside the observed scratch directory. They do
 not enforce hard storage capacity or I/O-rate quotas. Windows Job Object
 observed I/O transfer counters remain sampled fail-closed diagnostics,
 not OS-enforced disk limits.
+
+This trial did **not** establish compatibility for the child-process
+restriction on Windows CI. Before any deployment, a separate
+AppContainer/low-privilege executable must prove expected startup
+behavior and a policy denial under sandbox-specific conditions.
 
 **Do not authorize real video `one-shot enqueue --apply` or
 `one-shot run --apply` on this evidence.** The next planned
