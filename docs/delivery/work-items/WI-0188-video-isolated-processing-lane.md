@@ -653,6 +653,77 @@ and reviewed hard filesystem/IO/network or alternate containment.
 No persistent unattended worker, media API or production activation
 is authorized by the successful synthetic test.
 
+### Maintainer checkpoint 21 — full maintained v37 verification confirmed (2026-10-21)
+
+**Updated evidence from the maintainer:** the earlier checkpoint-18/20 notes
+incorrectly left the backup/rehearsal and positive Videos library checks as
+unreported. The maintainer has now explicitly confirmed **PASS** for every
+item below during the same local verification session:
+
+| Verification category | Maintainer result |
+| --- | --- |
+| Fresh authoritative PostgreSQL backup | PASS |
+| Isolated PostgreSQL restore | PASS |
+| Guarded v34→v37 rehearsal | PASS |
+| Existing catalogue counts preserved | PASS |
+| Repeated schema initialization | PASS |
+| Maintained app health, schema v37 / PostgreSQL ready | PASS |
+| Video control disabled, paused, no selected job | PASS |
+| Existing photo Archive browsing | PASS |
+| People library and manual face review | PASS |
+| Visual, Caption and Combined search | PASS |
+| Smart and Creative Collections | PASS |
+| Photo metadata editing | PASS |
+| Existing slideshow playback | PASS |
+| Videos library and previously created still posters | PASS |
+| No unintended OneDrive hydration or original-byte changes | PASS |
+| Synthetic proxy preview | PASS |
+| Independent FFmpeg/FFprobe synthetic roundtrip | PASS |
+
+The accepted synthetic outputs were **720×406 / AAC / 3 seconds**
+and **406×720 / silent / 3 seconds**, both H.264 SDR Rec.709 validated,
+after selecting physical tool paths matching approved ADR-0012 hashes.
+The CLI reported no database access, original-file reads, background video
+workers or retained synthetic derivatives. These are maintainer-reported
+acceptance results; private database dumps, source names and media evidence
+are not committed to this repository.
+
+**Accepted checkpoints:** source-less codec smoke test, maintained v37
+migration/restore/idempotency, default-off operator state and integrated
+photo/Videos-library compatibility. This supersedes only the earlier
+**unreported** status for those checks; the preceding checkpoint notes
+are preserved as an audit trail.
+
+**WI-0188 remains in progress:** no real private-video proxy has yet
+been produced via the selected one-shot lane; explicit privacy isolation,
+bounded source copy/IO and OneDrive placeholder behavior, cancellation/
+exclusion/restart protection under real load, and photo-only versus mixed
+CPU/latency evidence remain to be verified before production enablement.
+
+### Development checkpoint 22 — bounded read-only v37 candidate discovery
+
+- New optional `video one-shot candidates` command accepts only a named
+  localhost PostgreSQL connection variable, explicit current-schema v37
+  database and optional `--limit` (1..20; default 12).
+- It performs **metadata-only** SQL against currently latest, unexcluded,
+  nondeleted, locally registered video revisions with fixed experimental
+  Rec.709 codec/pixel format, duration, rotation and input-byte bounds.
+  Results contain only opaque revision UUIDs, source byte counts, numeric
+  duration, raw coded orientation and presence of audio. Ordering is
+  deterministic, shortest duration first, and all results are bounded.
+- No archive path or source key is fetched, no file is opened, and no
+  OneDrive availability or hydration API is called. No DB migration,
+  job creation, queue activation or tool execution occurs. The output
+  explicitly says `localAvailabilityChecked=false`: this is **not**
+  proof that a candidate is already available on disk.
+- The existing `video one-shot enqueue` **without `--apply`** remains
+  the mandatory exact-revision availability/inspection and size gate.
+  No real-media enqueue or one-shot apply is requested by this PR.
+  Test coverage pins parse/refusal rules, empty/no-DB behavior, and
+  privacy-safe output.
+- Real-media trial approval remains a separate decision after reviewing
+  local free-space, IO containment and photo-priority risk.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
