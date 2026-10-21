@@ -55,12 +55,12 @@ public sealed record VideoOneShotSourceProofOptions(
 }
 
 public sealed record VideoOneShotSourceProofResult(
-    bool Verified, bool OriginalOpened, bool SourceMetadataStable,
+    bool Verified, bool? OriginalOpened, bool SourceMetadataStable,
     string ReasonCode)
 {
     public static VideoOneShotSourceProofResult Success() =>
         new(true, true, true, "verified");
-    public static VideoOneShotSourceProofResult Fail(bool opened, string reason) =>
+    public static VideoOneShotSourceProofResult Fail(bool? opened, string reason) =>
         new(false, opened, false, reason);
 }
 
@@ -181,14 +181,14 @@ public static class VideoOneShotSourceProofCommandRunner
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            result = VideoOneShotSourceProofResult.Fail(false, "timeout");
+            result = VideoOneShotSourceProofResult.Fail(null, "timeout");
         }
         catch (Exception error) when (
             error is IOException or UnauthorizedAccessException or
                      ArgumentException or System.Security.SecurityException)
         {
             // Never expose untrusted .Message/paths or Windows exceptions.
-            result = VideoOneShotSourceProofResult.Fail(false, "source-unavailable");
+            result = VideoOneShotSourceProofResult.Fail(null, "source-unavailable");
         }
         Write(output, true, result);
         return result.Verified ? 0 : 1;
@@ -278,7 +278,7 @@ public static class VideoOneShotSourceProofCommandRunner
             explicitLocalReadRequested = requested,
             status = reason,
             revisionDigestMatched = result?.Verified,
-            originalBytesOpened = result?.OriginalOpened ?? false,
+            originalBytesOpened = requested ? result?.OriginalOpened : false,
             sourceMetadataStable = result?.SourceMetadataStable,
             originalWriteAccessRequested = false,
             oneDriveHydrationRequested = false,
