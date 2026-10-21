@@ -139,6 +139,97 @@ public sealed class NativeQualitySuggestionWorkspaceTests
             state, "archive-cleanup", "all", "all", 0, 200));
     }
 
+    [Fact]
+    public async Task Progressive_scan_advances_cursor_accumulates_and_preserves_human_decisions()
+    {
+        string dir = TempPath();
+        try
+        {
+            QualitySuggestionWorkspace store = new(dir);
+            QualitySuggestionSnapshot first = await store.AppendScanPageAsync(
+                0, 2, false,
+                [Candidate(A, "candidate-low-sharpness", 21)], restart: false);
+            Assert.Equal(2, first.Scanned);
+            Assert.Equal(2, first.NextScanOffset);
+            Assert.False(first.ScanComplete);
+            await store.DecideAsync("archive-cleanup", A, "keep");
+            QualitySuggestionSnapshot next = await store.AppendScanPageAsync(
+                2, 2, true,
+                [Candidate(A, "candidate-low-sharpness", 21),
+                 Candidate(B, "candidate-severe-underexposure", 41)],
+                restart: false);
+            Assert.Equal(4, next.Scanned);
+            Assert.Equal(4, next.NextScanOffset);
+            Assert.True(next.ScanComplete);
+            Assert.Equal(2, next.Candidates.Count);
+            Assert.Equal("keep", next.Decisions[
+                QualitySuggestionWorkspace.Key("archive-cleanup", A)]);
+            QualitySuggestionPage page = QualitySuggestionWorkspace.Page(
+                next, "archive-cleanup", "all", "unreviewed", 0, 1);
+            Assert.Equal(B, Assert.Single(page.Items).RevisionId);
+            Assert.True(page.ScanComplete);
+            Assert.Equal(4, page.NextScanOffset);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                store.AppendScanPageAsync(4, 1, true, [], restart: false));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                store.AppendScanPageAsync(2, 1, false, [], restart: false));
+            QualitySuggestionSnapshot resumed = await new QualitySuggestionWorkspace(dir).ReadAsync();
+            Assert.True(resumed.ScanComplete);
+
+            QualitySuggestionSnapshot restarted = await store.AppendScanPageAsync(
+                0, 1, false, [Candidate(B, "candidate-severe-underexposure", 41)],
+                restart: true);
+            Assert.Single(restarted.Candidates);
+            Assert.Equal(1, restarted.NextScanOffset);
+            Assert.Equal(1, restarted.Scanned);
+            Assert.Equal("keep", restarted.Decisions[
+                QualitySuggestionWorkspace.Key("archive-cleanup", A)]);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Previously_excluded_revision_can_be_withdrawn_without_global_data_mutation()
+    {
+        string dir = TempPath();
+        try
+        {
+            QualitySuggestionWorkspace store = new(dir);
+            await store.ReplaceCandidatesAsync(3,
+                [Candidate(A, "candidate-low-sharpness", 21),
+                 Candidate(B, "candidate-low-contrast", 11)]);
+            await store.DecideAsync("archive-cleanup", A, "consider-exclusion");
+            await store.RemoveExcludedCandidateAsync(A);
+            QualitySuggestionSnapshot updated = await new QualitySuggestionWorkspace(dir).ReadAsync();
+            Assert.Single(updated.Candidates);
+            Assert.Equal(B, updated.Candidates[0].RevisionId);
+            Assert.Equal("consider-exclusion",
+                updated.Decisions[QualitySuggestionWorkspace.Key("archive-cleanup", A)]);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Legacy_native_state_resumes_after_its_first_bounded_batch()
+    {
+        string dir = TempPath();
+        try
+        {
+            QualitySuggestionWorkspace store = new(dir);
+            await store.ReplaceCandidatesAsync(1000,
+                [Candidate(A, "candidate-low-sharpness", 21)]);
+            QualitySuggestionSnapshot old = await store.ReadAsync();
+            Assert.Equal(1000, old.Scanned);
+            // Old persistence did not have the scan-position field. The
+            // migrated cursor must start after the existing first 1000.
+            Assert.Equal(1000, old.NextScanOffset);
+            QualitySuggestionSnapshot resumed = await new QualitySuggestionWorkspace(dir).ReadAsync();
+            Assert.Equal(1000, resumed.NextScanOffset);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
     private static QualitySuggestionCandidate Candidate(string id, string reason, int priority) =>
         new(id, [reason], priority);
 

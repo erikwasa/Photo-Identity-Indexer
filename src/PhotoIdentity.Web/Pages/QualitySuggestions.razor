@@ -1,59 +1,69 @@
 @page "/quality-suggestions"
+@implements IAsyncDisposable
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Quality suggestions · Photo Identity</PageTitle>
 
 <section class="hero collection-hero">
     <div>
-        <p class="eyebrow">Operator review · opt-in</p>
+        <p class="eyebrow">Archive cleanup · manual review</p>
         <h1>Possible low-quality photos</h1>
-        <p>Automatically find photos worth a closer look. You decide what to keep.
-           Suggestions and review choices never exclude or hide photos automatically.</p>
+        <p>One photo at a time. Use 1, 2 or 3 to record a decision, and ← / → to navigate.
+           Nothing is automatically excluded.</p>
     </div>
-    <button class="button secondary" disabled="@Busy" @onclick="RefreshSuggestionsAsync">
-        @(Busy && Refreshing ? "Scanning existing proxies…" : "Refresh suggestions")
-    </button>
 </section>
 
-@if (!string.IsNullOrWhiteSpace(Error))
+@if (Error is not null)
 {
     <div class="notice error" role="alert">@Error</div>
 }
-@if (!string.IsNullOrWhiteSpace(Message))
+@if (Message is not null)
 {
     <div class="notice" role="status">@Message</div>
 }
 
-<section class="collection-panel">
+<section class="collection-panel quality-scan-controls">
     <div class="section-heading">
         <div>
-            <p class="eyebrow">Contexts</p>
-            <h2>Where do suggestions help?</h2>
-            <p>These switches affect this review queue only — never real collection or slideshow eligibility.</p>
+            <h2>Find suggestions</h2>
+            <p>Choose the next batch, continue until the archive is scanned, or explicitly start again.</p>
         </div>
     </div>
-    <div class="quality-context-toggles">
-        @foreach (QualityContext context in Contexts)
-        {
-            <label class="quality-context">
-                <input type="checkbox" checked="@IsEnabled(context.Code)" disabled="@Busy"
-                       @onchange="async e => await SetContextAsync(context.Code, e.Value is bool enabled && enabled)" />
-                <span>@context.Name</span>
-            </label>
-        }
-    </div>
-    <div class="quality-review-filters">
-        <label>
-            <span>Review context</span>
-            <select @bind="Scope" @bind:after="FiltersChangedAsync" disabled="@Busy">
-                @foreach (QualityContext context in Contexts)
-                {
-                    <option value="@context.Code">@context.Name</option>
-                }
+    <div class="quality-controls">
+        <label>Photos per batch
+            <select @bind="BatchSize" disabled="@Busy">
+                <option value="100">100</option>
+                <option value="500">500</option>
+                <option value="1000">1,000</option>
+                <option value="5000">5,000</option>
             </select>
         </label>
-        <label>
-            <span>Reason</span>
+        <button class="button secondary" disabled="@(Busy || Page?.ScanComplete == true)"
+                @onclick="ScanNextAsync">Scan next batch</button>
+        <button class="button secondary" disabled="@(Busy || Page?.ScanComplete == true)"
+                @onclick="ScanAllAsync">Scan all remaining</button>
+        @if (ScanningAll)
+        {
+            <button class="button secondary" @onclick="CancelScanning">Stop after current batch</button>
+        }
+        <button class="button secondary" disabled="@Busy" @onclick="RestartScanAsync">Start scan over</button>
+    </div>
+    <p class="small">
+        Scanned @((Page?.Scanned ?? 0).ToString("N0")) existing proxies ·
+        @(Page?.Suggested ?? 0) suggestions retained ·
+        @(Page?.ScanComplete == true ? "Scan complete" : "More photos available") ·
+        next archive position @(Page?.NextScanOffset ?? 0).
+        Existing review decisions survive rescan.
+    </p>
+    <p class="small">Scanning uses existing local JPEG proxies only. It never downloads originals,
+       changes collection contents or runs an IQA model. A large scan may take time;
+       each request is bounded to the selected batch size.</p>
+</section>
+
+<section class="collection-panel quality-review-panel">
+    <div class="quality-controls">
+        <label>Technical reason
             <select @bind="Reason" @bind:after="FiltersChangedAsync" disabled="@Busy">
                 @foreach (QualityOption option in ReasonOptions)
                 {
@@ -61,127 +71,106 @@
                 }
             </select>
         </label>
-        <label>
-            <span>Review status</span>
+        <label>Review status
             <select @bind="Filter" @bind:after="FiltersChangedAsync" disabled="@Busy">
-                <option value="all">All suggestions</option>
                 <option value="unreviewed">Not reviewed</option>
+                <option value="all">All suggestions</option>
                 <option value="consider-exclusion">Consider exclusion</option>
             </select>
         </label>
     </div>
-</section>
 
-@if (Loading)
-{
-    <section class="empty-state"><p>Loading your suggestions…</p></section>
-}
-else if (Page is not null)
-{
-    <section class="collection-panel">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Private manual review</p>
-                <h2>@Page.Total matching suggestions</h2>
-                <p>@Page.Suggested suggested in the last bounded scan ·
-                   @Page.ReviewedInScope reviewed in this context ·
-                   @Page.ConsiderExclusionInScope marked for exclusion consideration</p>
-                @if (Page.GeneratedAtUtc is not null)
+    @if (Loading)
+    {
+        <div class="quality-empty">Loading suggestions…</div>
+    }
+    else if (Page is not null)
+    {
+        <div class="quality-review-progress">
+            <span>@Page.Total matching · @Page.ReviewedInScope reviewed · @Page.ConsiderExclusionInScope considered</span>
+            <span>@(Page.Total == 0 ? 0 : Offset + 1) / @Page.Total</span>
+        </div>
+        @if (!Page.Enabled)
+        {
+            <div class="notice">
+                Archive cleanup review was disabled in your older review settings.
+                <button class="button secondary" @onclick="EnableArchiveAsync">
+                    Enable Archive cleanup review
+                </button>
+            </div>
+        }
+
+        @if (Current is QualitySuggestionItem item)
+        {
+            <div class="quality-focus-image">
+                <img src="@item.ProxyUrl" alt="Current quality suggestion photo from local review proxy"/>
+            </div>
+            <div class="quality-review-reasons">
+                @foreach (QualityReason reason in item.Reasons)
                 {
-                    <p>Last scan: @Page.GeneratedAtUtc.Value.ToLocalTime().ToString("g")</p>
+                    <span class="coverage-chip">@reason.Label</span>
                 }
             </div>
-        </div>
-        @if (Page.GeneratedAtUtc is null)
-        {
-            <div class="empty-state compact">
-                <p>No suggestions have been prepared in the native app yet.
-                   Choose <strong>Refresh suggestions</strong> to scan up to 1,000
-                   existing local review proxies without opening originals.</p>
+            @if (item.Decision is not null)
+            {
+                <p class="small">Saved decision: @DecisionLabel(item.Decision)</p>
+            }
+            <div class="quality-primary-actions">
+                <button class="button secondary" disabled="@Busy"
+                        @onclick="() => KeepAsync(item.RevisionId)">1 · Keep</button>
+                <button class="button secondary" disabled="@Busy"
+                        @onclick="() => DismissAsync(item.RevisionId)">2 · Dismiss</button>
+                <button class="button secondary" disabled="@Busy"
+                        @onclick="() => ConsiderAsync(item.RevisionId)">3 · Consider exclusion</button>
             </div>
-        }
-        else if (!Page.Enabled)
-        {
-            <div class="empty-state compact">
-                <p>This review context is disabled. Enable its checkbox above to
-                   review suggestions. This does not affect actual collections.</p>
+            <div class="quality-navigation">
+                <button class="button secondary" disabled="@(Busy || Offset == 0)"
+                        @onclick="PreviousAsync">← Previous</button>
+                <button class="button secondary" disabled="@(Busy || Offset + 1 >= Page.Total)"
+                        @onclick="NextAsync">Next →</button>
+                <a href="@item.PhotoUrl" target="_blank" rel="noopener noreferrer">Open full photo</a>
+                <button class="button danger" disabled="@Busy" @onclick="() => OpenExclude(item.RevisionId)">
+                    Exclude from Photo Identity…
+                </button>
             </div>
-        }
-        else if (Page.Items.Count == 0)
-        {
-            <div class="empty-state compact">
-                <p>No suggestions match these filters. You can review a different
-                   reason, or switch to <strong>Consider exclusion</strong> to revisit flagged photos.</p>
-            </div>
+            @if (PendingExclusion == item.RevisionId)
+            {
+                <div class="notice warning quality-confirm" role="group" aria-label="Confirm durable photo exclusion">
+                    <strong>Confirm exclusion of this source copy?</strong>
+                    <p>Photo Identity will immediately block this photo and permanently purge its
+                       locally retained proxies, face links and metadata. The OneDrive original
+                       remains untouched. This is not a reversible collection hide.</p>
+                    <div class="quality-controls">
+                        <button class="button danger" disabled="@Busy" @onclick="ConfirmExcludeAsync">
+                            Confirm exclude &amp; purge
+                        </button>
+                        <button class="button secondary" disabled="@Busy" @onclick="CancelExclude">Cancel</button>
+                    </div>
+                    <p class="small">There is deliberately no keyboard shortcut for the final purge confirmation.</p>
+                </div>
+            }
         }
         else
         {
-            <div class="quality-suggestion-grid">
-                @foreach (QualitySuggestionItem item in Page.Items)
-                {
-                    <article class="quality-suggestion-card" @key="item.RevisionId">
-                        <a href="@item.PhotoUrl" title="View photo in Photo Identity">
-                            <img src="@item.ProxyUrl" loading="lazy"
-                                 alt="Review photo candidate from local archive" />
-                        </a>
-                        <div class="quality-suggestion-body">
-                            <div class="quality-reason-list">
-                                @foreach (QualityReason reason in item.Reasons)
-                                {
-                                    <span class="coverage-chip">@reason.Label</span>
-                                }
-                            </div>
-                            @if (item.Decision is not null)
-                            {
-                                <p class="quality-decision">Review choice: @DecisionLabel(item.Decision)</p>
-                            }
-                            <div class="quality-review-actions">
-                                <button class="button secondary" disabled="@Busy"
-                                        @onclick="() => KeepAsync(item)">
-                                    Keep
-                                </button>
-                                <button class="button secondary" disabled="@Busy"
-                                        @onclick="() => DismissAsync(item)">
-                                    Dismiss
-                                </button>
-                                <button class="button secondary" disabled="@Busy"
-                                        @onclick="() => ConsiderAsync(item)">
-                                    Consider exclusion
-                                </button>
-                            </div>
-                            <a class="quality-open-photo" href="@item.PhotoUrl">
-                                Open photo / native exclusion confirmation →
-                            </a>
-                        </div>
-                    </article>
-                }
-            </div>
-            <div class="quality-pagination">
-                <button class="button secondary" disabled="@(Busy || Offset == 0)"
-                        @onclick="PreviousAsync">Previous</button>
-                <span>@(Offset + 1)–@(Math.Min(Offset + Page.Items.Count, Page.Total)) of @Page.Total</span>
-                <button class="button secondary"
-                        disabled="@(Busy || Offset + Page.Items.Count >= Page.Total)"
-                        @onclick="NextAsync">Next</button>
+            <div class="quality-empty">
+                <p>@(Page.GeneratedAtUtc is null
+                    ? "No scan has been run. Scan a batch above to find suggestions."
+                    : "No photos match this filter. Try another reason or review status, or scan the next batch.")</p>
             </div>
         }
-    </section>
-}
+    }
+</section>
 
 <section class="collection-panel">
-    <h2>Exclusion is always a separate decision</h2>
-    <p>Marking a photo <strong>Consider exclusion</strong> stores only your review intent.
-       To exclude a photo from Photo Identity, open that photo and use its existing
-       separately confirmed exclusion action. This durably removes Photo Identity's
-       retained source-copy data; it does not delete the OneDrive original.
-       There is no bulk exclusion in this review queue.</p>
-    <p>Technical candidate reasons may flag meaningful photos, intentional
-       softness or blurred backgrounds. The suggestions are not absolute quality
-       grades and do not change Search, Smart Collections or Slideshows.</p>
+    <h2>Other curation goals</h2>
+    <p>Collection and slideshow curation will share a separate similarity-comparison
+       workflow, so these Archive cleanup controls only identify technically
+       questionable photos. A future numerical quality signal can help compare
+       alternatives, without automatically excluding anything from Photo Identity.</p>
 </section>
 
 @code {
-    private sealed record QualityContext(string Code, string Name);
+    private const string ArchiveScope = "archive-cleanup";
     private sealed record QualityOption(string Code, string Name);
     private sealed record QualityReason(string Code, string Label);
     private sealed record QualitySuggestionItem(
@@ -192,19 +181,14 @@ else if (Page is not null)
         Dictionary<string, bool> EnabledScopes, string Scope, bool Enabled,
         string Reason, string Filter, int Total, int Offset,
         List<QualitySuggestionItem> Items, int ReviewedInScope,
-        int ConsiderExclusionInScope);
-
-    private static readonly QualityContext[] Contexts =
-    [
-        new("archive-cleanup", "Archive cleanup"),
-        new("collection-curation", "Collection review"),
-        new("slideshow-curation", "Slideshow review")
-    ];
-
+        int ConsiderExclusionInScope, int NextScanOffset, bool ScanComplete);
+    private sealed record ScanResult(
+        int ProcessedThisBatch, int ScannedCurrentProxyCandidates,
+        int Suggested, int NextScanOffset, bool ScanComplete);
     private static readonly QualityOption[] ReasonOptions =
     [
         new("all", "All candidate reasons"),
-        new("candidate-low-sharpness", "Possible blur / missed focus"),
+        new("candidate-low-sharpness", "Possible blur or missed focus"),
         new("candidate-severe-underexposure", "Severe underexposure"),
         new("candidate-severe-overexposure", "Severe overexposure"),
         new("candidate-shadow-clipping", "Shadow clipping"),
@@ -214,34 +198,52 @@ else if (Page is not null)
     ];
 
     private QualityPage? Page;
-    private string Scope = "archive-cleanup";
+    private QualitySuggestionItem? Current => Page?.Items.FirstOrDefault();
     private string Reason = "all";
     private string Filter = "unreviewed";
-    private int Offset;
-    private bool Loading = true;
-    private bool Busy;
-    private bool Refreshing;
     private string? Message;
     private string? Error;
+    private string? PendingExclusion;
+    private int Offset;
+    private int BatchSize = 1000;
+    private bool Busy;
+    private bool Loading = true;
+    private bool ScanningAll;
+    private bool StopAfterBatch;
+    private IJSObjectReference? Keys;
+    private DotNetObjectReference<QualitySuggestions>? SelfReference;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        Keys = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./js/quality-review-keys.js");
+        SelfReference = DotNetObjectReference.Create(this);
+        await Keys.InvokeVoidAsync("attach", SelfReference);
+    }
 
-    private bool IsEnabled(string scope) =>
-        Page?.EnabledScopes.GetValueOrDefault(scope) ?? scope == "archive-cleanup";
+    [JSInvokable]
+    public async Task OnReviewKeyAsync(string key)
+    {
+        if (Busy || Loading || PendingExclusion is not null || Current is null) return;
+        switch (key)
+        {
+            case "1": await DecideAsync(Current.RevisionId, "keep"); break;
+            case "2": await DecideAsync(Current.RevisionId, "dismiss"); break;
+            case "3": await DecideAsync(Current.RevisionId, "consider-exclusion"); break;
+            case "ArrowLeft": await PreviousAsync(); break;
+            case "ArrowRight": await NextAsync(); break;
+        }
+    }
 
-    private static string DecisionLabel(string value) => value switch
+    private static string DecisionLabel(string? value) => value switch
     {
         "keep" => "Keep",
         "dismiss" => "Dismiss",
         "consider-exclusion" => "Consider exclusion",
-        _ => "Unknown"
+        _ => "Not reviewed"
     };
-
-    private Task FiltersChangedAsync()
-    {
-        Offset = 0;
-        return LoadAsync();
-    }
 
     private async Task LoadAsync()
     {
@@ -249,99 +251,191 @@ else if (Page is not null)
         Error = null;
         try
         {
-            string url = "api/quality-suggestions?scope=" + Uri.EscapeDataString(Scope)
+            string url = "api/quality-suggestions?scope=" + ArchiveScope
                 + "&reason=" + Uri.EscapeDataString(Reason)
                 + "&filter=" + Uri.EscapeDataString(Filter)
                 + "&offset=" + Offset.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                + "&limit=12";
+                + "&limit=1";
             Page = await Http.GetFromJsonAsync<QualityPage>(url)
-                ?? throw new InvalidOperationException("Suggestion state is unavailable.");
+                ?? throw new InvalidOperationException("Suggestion queue unavailable.");
+            if (Page.Total > 0 && Offset >= Page.Total)
+            {
+                Offset = Math.Max(0, Page.Total - 1);
+                Page = await Http.GetFromJsonAsync<QualityPage>(
+                    "api/quality-suggestions?scope=" + ArchiveScope +
+                    "&reason=" + Uri.EscapeDataString(Reason) +
+                    "&filter=" + Uri.EscapeDataString(Filter) +
+                    "&offset=" + Offset + "&limit=1");
+            }
         }
-        catch (Exception exception)
-        {
-            Error = "Could not load suggestions: " + exception.Message;
-        }
+        catch (Exception e) { Error = "Unable to load suggestions: " + e.Message; }
         finally { Loading = false; }
     }
 
-    private async Task RefreshSuggestionsAsync()
+    private Task FiltersChangedAsync()
+    {
+        Offset = 0;
+        PendingExclusion = null;
+        return LoadAsync();
+    }
+
+    private async Task<ScanResult> RunBatchAsync(string mode)
+    {
+        using HttpResponseMessage response = await Http.PostAsync(
+            "api/quality-suggestions/scan?mode=" + mode + "&limit=" + BatchSize, null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ScanResult>()
+            ?? throw new InvalidOperationException("Scan response missing.");
+    }
+
+    private async Task ScanNextAsync() => await ScanAsync("next");
+    private async Task RestartScanAsync() => await ScanAsync("restart");
+    private async Task ScanAsync(string mode)
     {
         Busy = true;
-        Refreshing = true;
         Error = null;
         try
         {
-            using HttpResponseMessage response =
-                await Http.PostAsync("api/quality-suggestions/scan?limit=1000", null);
-            response.EnsureSuccessStatusCode();
+            ScanResult result = await RunBatchAsync(mode);
+            Message = $"Scanned {result.ScannedCurrentProxyCandidates:N0} current proxies, " +
+                $"found {result.Suggested:N0} suggestions. " +
+                (result.ScanComplete ? "Entire eligible archive scanned." : "More batches available.");
             Offset = 0;
-            Message = "Existing local review proxies scanned. Your previous human decisions are retained.";
             await LoadAsync();
         }
-        catch (Exception exception)
-        {
-            Error = "Suggestion refresh failed: " + exception.Message;
-        }
-        finally { Busy = false; Refreshing = false; }
+        catch (Exception e) { Error = "Scan failed: " + e.Message; }
+        finally { Busy = false; }
     }
 
-    private Task KeepAsync(QualitySuggestionItem item) =>
-        DecideAsync(item.RevisionId, "keep");
-    private Task DismissAsync(QualitySuggestionItem item) =>
-        DecideAsync(item.RevisionId, "dismiss");
-    private Task ConsiderAsync(QualitySuggestionItem item) =>
-        DecideAsync(item.RevisionId, "consider-exclusion");
-
-    private async Task DecideAsync(string revisionId, string choice)
+    private async Task ScanAllAsync()
     {
+        Busy = true;
+        ScanningAll = true;
+        StopAfterBatch = false;
+        Error = null;
+        try
+        {
+            ScanResult result;
+            do
+            {
+                result = await RunBatchAsync("next");
+                Message = $"Scanned {result.ScannedCurrentProxyCandidates:N0} existing proxies. " +
+                    $"{result.Suggested:N0} suggestions. " +
+                    (result.ScanComplete ? "Complete." : "Scanning further batches…");
+                await InvokeAsync(StateHasChanged);
+            }
+            while (!result.ScanComplete && !StopAfterBatch);
+            Offset = 0;
+            await LoadAsync();
+        }
+        catch (Exception e) { Error = "Full scan stopped: " + e.Message; }
+        finally { Busy = false; ScanningAll = false; }
+    }
+
+    private void CancelScanning() => StopAfterBatch = true;
+
+    private Task KeepAsync(string id) => DecideAsync(id, "keep");
+    private Task DismissAsync(string id) => DecideAsync(id, "dismiss");
+    private Task ConsiderAsync(string id) => DecideAsync(id, "consider-exclusion");
+
+    private async Task DecideAsync(string revisionId, string decision)
+    {
+        if (Busy || PendingExclusion is not null) return;
         Busy = true;
         Error = null;
         try
         {
             using HttpResponseMessage response = await Http.PutAsJsonAsync(
                 "api/quality-suggestions/review/" + Uri.EscapeDataString(revisionId),
-                new { scope = Scope, decision = choice });
+                new { scope = ArchiveScope, decision });
             response.EnsureSuccessStatusCode();
-            Message = "Review decision saved. No photo was excluded.";
+            if (Filter == "all") Offset++;
+            Message = "Decision saved. No photo excluded.";
             await LoadAsync();
         }
-        catch (Exception exception)
-        {
-            Error = "Could not save review choice: " + exception.Message;
-        }
+        catch (Exception e) { Error = "Could not save review: " + e.Message; }
         finally { Busy = false; }
     }
 
-    private async Task SetContextAsync(string scope, bool enabled)
+    private async Task PreviousAsync()
+    {
+        if (Busy) return;
+        Offset = Math.Max(0, Offset - 1);
+        await LoadAsync();
+    }
+
+    private async Task NextAsync()
+    {
+        if (Busy) return;
+        Offset++;
+        await LoadAsync();
+    }
+
+    private async Task EnableArchiveAsync()
     {
         Busy = true;
         Error = null;
         try
         {
             using HttpResponseMessage response = await Http.PutAsJsonAsync(
-                "api/quality-suggestions/context/" + Uri.EscapeDataString(scope),
-                new { enabled });
+                "api/quality-suggestions/context/" + ArchiveScope,
+                new { enabled = true });
             response.EnsureSuccessStatusCode();
-            Offset = 0;
-            Message = "Only the suggestion review context changed; collection and slideshow filters remain unchanged.";
             await LoadAsync();
         }
-        catch (Exception exception)
-        {
-            Error = "Could not change review context: " + exception.Message;
-        }
+        catch (Exception error) { Error = "Could not enable Archive review: " + error.Message; }
         finally { Busy = false; }
     }
 
-    private async Task PreviousAsync()
+    private void OpenExclude(string id) => PendingExclusion = id;
+    private void CancelExclude() => PendingExclusion = null;
+
+    private async Task ConfirmExcludeAsync()
     {
-        Offset = Math.Max(0, Offset - 12);
-        await LoadAsync();
+        if (Busy || PendingExclusion is null) return;
+        string revisionId = PendingExclusion;
+        Busy = true;
+        Error = null;
+        try
+        {
+            // Reuse the existing native source-copy exclusion/purge API,
+            // which performs revision/current-source verification and durable
+            // exclusion. The extra explicit on-screen confirmation is required.
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/revision", new { revisionId });
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    "Exclusion failed (HTTP " + (int)response.StatusCode + ").");
+            PendingExclusion = null;
+            try
+            {
+                using HttpResponseMessage withdraw = await Http.PostAsync(
+                    "api/quality-suggestions/excluded/" +
+                    Uri.EscapeDataString(revisionId), null);
+                withdraw.EnsureSuccessStatusCode();
+                Message = "Source copy excluded from Photo Identity; its OneDrive original remains untouched.";
+            }
+            catch (Exception)
+            {
+                // The irreversible native source-copy exclusion succeeded.
+                // Do not show a generic failure or invite a second purge.
+                Message = "Photo exclusion succeeded. The review queue could not be updated; " +
+                    "refresh the page or scan again to clear the stale suggestion.";
+            }
+            await LoadAsync();
+        }
+        catch (Exception e) { Error = e.Message; }
+        finally { Busy = false; }
     }
 
-    private async Task NextAsync()
+    public async ValueTask DisposeAsync()
     {
-        Offset += 12;
-        await LoadAsync();
+        if (Keys is not null)
+        {
+            try { await Keys.InvokeVoidAsync("detach"); }
+            catch (JSDisconnectedException) { }
+            await Keys.DisposeAsync();
+        }
+        SelfReference?.Dispose();
     }
 }

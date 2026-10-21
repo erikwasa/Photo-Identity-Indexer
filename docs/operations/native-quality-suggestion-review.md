@@ -1,3 +1,118 @@
+## v2: one-photo keyboard review, direct confirmed exclusion, progressive scan (2026-10-21)
+
+The maintainer's first native smoke test **passed all checks**: M37 docs,
+suggestion images, Keep/Dismiss/Consider, independent context state,
+persistence through restart, existing Archive/Search/Collections/Slideshow
+behavior. There were approximately **30 native suggestions**. However,
+the gallery required repeated scrolling and mouse clicks; the operator
+preferred the prior fast loopback viewer, where 1/2/3 saved and arrows
+moved to the adjacent photo. The original native refresh selected the
+SAME deterministically hashed first 1,000 proxies each time, **not**
+the next 1,000. This follow-up directly corrects those two limitations.
+
+### Focused Archive-cleanup review
+
+The Quality suggestions page now presents **one large proxy photo** and
+a compact set of reasons with non-destructive keyboard decisions:
+
+- `1` Keep; `2` Dismiss; `3` Consider exclusion. Saving a choice
+  advances to the next photo when the filter is `Not reviewed`.
+- Left/right arrow keys move to adjacent photos; keyboard shortcuts do
+  not trigger when typing in forms or interacting with selects.
+- Use Reason and Review status = Not reviewed / All /
+  Consider exclusion to revisit any prior candidate; the review queue
+  and operator choices persist across restarts and batch scans.
+- **Exclude from Photo Identity…** enters an explicit on-screen
+  confirmation. Only the distinct **Confirm exclude & purge** button
+  invokes the exact existing native `POST /api/archive/exclusions/revision`
+  source-copy boundary, and subsequently removes the now-ineligible
+  candidate from the current suggestion queue. There is NO keyboard
+  shortcut for this final destructive step, no bulk exclude, no silent
+  exclusion by the low-quality detector and NO OneDrive original deletion.
+  The operation is a durable source-copy-local purge, not a reversible
+  hide. Use it only for genuinely unwanted photos, never for testing.
+
+### Scan mode and progress — no full archive inference requirement
+
+The native API now supports bounded `mode=next` and
+`mode=restart` scans with `limit` 1–5000. The UI offers batch sizes
+**100, 500, 1,000, 5,000** plus:
+
+- **Scan next batch**: uses the retained next-offset cursor and
+  scans the *next* set of current existing `jpeg-1600-q78` proxies
+  in deterministic order. No repeats from clicking Refresh again.
+- **Scan all remaining**: repeatedly invokes the SAME bounded
+  endpoint to advance through the current eligible archive,
+  retaining progress after each successful batch. **Stop after current
+  batch** cooperatively stops launching subsequent requests and
+  preserves completed work.
+- **Start scan over**: deliberately begins at page zero (for a new
+  archive sweep) and replaces the current suggestion candidate list;
+  importantly, previous human Keep/Dismiss/Consider decisions remain
+  saved and are restored where revision IDs appear again.
+
+No original hydration, no external model weights, no automatic exclusion,
+no background scheduling, no production collection/slide filtering, and
+no unbounded single HTTP request. The local reviewer accepts new
+candidate batches as they are prepared. In a changing catalogue,
+offset pagination may overlap/skip a few items because a source revision
+can be inserted/removed between scans: candidate IDs are deduplicated,
+and every exposed review proxy is verified current/exclusion-aware.
+If strict catalogue snapshot coverage is ever required, a separate
+versioned-snapshot work item is needed. The persisted cursor is
+automatically migrated from the previous native first-batch state:
+an earlier 1,000-photo scan will resume at its recorded scanned count
+instead of rerunning that first page.
+
+### Simplified use cases and scope
+
+Archive cleanup now focuses on **technically poor photos** and manual
+Photo Identity-wide exclusion. The confusing combination of context
+checkboxes plus dropdown has been removed from this page.
+Existing persisted per-context decisions remain in local state,
+but Collections/Slideshows are treated as **one distinct curation
+workflow** rather than a second use of technical-only cleanup. The
+follow-ons are:
+
+- [Collection similarity groups and non-destructive optional omission](https://github.com/erikwasa/Photo-Identity-Indexer/issues/638)
+- [Continuous, calibrated per-revision quality rating with provenance](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639)
+
+Neither future work item inherits M37's rejected automatic global
+suppression as a production permission. A raw technical candidate
+priority is NOT an absolute quality rating or a calibrated 0–100
+score; no new model weights/inference/license are approved by the
+current UX improvements.
+
+### New local validation after merge
+
+1. Update `main`, start the maintained Photo Identity launcher, open
+   `http://127.0.0.1:5080/quality-suggestions`.
+2. Check the old overlapping context checkboxes/dropdown are absent;
+   only Archive quality cleanup is shown.
+3. Check the scan counters and next-offset. **Scan next batch** with
+   100 (or 500) photos, then scan another batch and verify cumulative
+   scanned count advances, and old saved decisions remain.
+4. Try `Not reviewed`, then press 1/2/3. Each saves and moves to the
+   next photo without scrolling. Try left/right and reason filters.
+5. Mark one candidate `Consider exclusion`; switch Review status to
+   `Consider exclusion` to revisit it. Optionally open the
+   **Exclude…** confirmation, read the purge text, then choose
+   **Cancel**. Do **not** actually purge a photo just for testing.
+6. Restart the app and verify the progress cursor and review
+   decisions persisted. If desired, use **Scan all remaining** but
+   it is not needed for acceptance; scans are read-only and
+   deliberately bounded per request. Check Stop-after-batch.
+7. Confirm Archive, Search, Smart/Creative Collections and slideshow
+   still behave normally and no original was hydrated.
+
+Report only aggregate counts, general usability and unexpected
+behavior. No per-photo revision IDs, decisions or local proxy paths
+need to be shared.
+
+## Historical v1 behavior (superseded by the v2 steps above)
+
+The following description documents the original native gallery before the keyboard and progressive-scan improvements. Its checkboxes, dropdown and repeatedly refreshed first batch no longer describe the current UX. Use the v2 procedure above for live operation.
+
 # Native operator-controlled technical quality suggestions
 
 WI-0629's **second substantive product phase** adds a built-in `/quality-suggestions`
