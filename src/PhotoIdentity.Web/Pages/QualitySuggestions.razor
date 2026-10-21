@@ -3,12 +3,12 @@
 
 <PageTitle>Quality suggestions · Photo Identity</PageTitle>
 
-<div class="quality-review-screen" tabindex="0" @ref="ReviewSurface" aria-keyshortcuts="1 2 3 ArrowLeft ArrowRight"
+<div class="quality-review-screen" tabindex="0" @ref="ReviewSurface" aria-keyshortcuts="1 2 3 ArrowLeft ArrowRight E C Escape Enter"
      @onkeydown="HandleKeyboardAsync" aria-label="Photo quality review workspace">
     <header class="quality-review-toolbar">
         <div class="quality-review-heading">
             <strong>Archive quality review</strong>
-            <span class="quality-review-subtitle">1 Keep · 2 Dismiss · 3 Consider · ← / → Navigate</span>
+            <span class="quality-review-subtitle">1 Keep · 2 Dismiss · 3 Consider · E Exclude · ← / → Navigate</span>
         </div>
         <div class="quality-toolbar-actions">
             <label>Reason
@@ -136,7 +136,7 @@
                     disabled="@(Busy || Page is null || Offset + 1 >= Page.Total)"
                     @onclick="NextAsync">Next →</button>
             <button type="button" class="button danger" disabled="@(Busy || Current is null)"
-                    @onclick="OpenCurrentExclusion">Exclude photo…</button>
+                    @onclick="OpenCurrentExclusion">E · Exclude photo…</button>
             @if (Current is QualitySuggestionItem currentPhoto)
             {
                 <a class="quality-photo-link" href="@currentPhoto.PhotoUrl"
@@ -155,12 +155,13 @@
                 <p id="quality-purge-description">This permanently purges this source copy's locally retained
                     review proxies, face links and metadata from Photo Identity. Its OneDrive original remains
                     untouched. This is not a reversible collection hide.</p>
-                <p><strong>Only an explicit click on Confirm exclude &amp; purge performs this action.</strong></p>
+                <p><strong>Press C or Enter to confirm and purge, or Escape to cancel.</strong>
+                    The same choices are available as buttons below.</p>
                 <div class="quality-modal-actions">
-                    <button type="button" class="button secondary" disabled="@Busy" @ref="ModalCancelButton"
-                            @onclick="CancelExclude">Cancel</button>
-                    <button type="button" class="button danger" disabled="@Busy"
-                            @onclick="ConfirmExcludeAsync">Confirm exclude &amp; purge</button>
+                    <button type="button" class="button secondary" disabled="@Busy"
+                            @onclick="CancelExclude">Escape · Cancel</button>
+                    <button type="button" class="button danger" disabled="@Busy" @ref="ModalConfirmButton"
+                            @onclick="ConfirmExcludeAsync">C / Enter · Confirm exclude &amp; purge</button>
                 </div>
             </section>
         </div>
@@ -217,10 +218,11 @@
     private bool ScanningAll;
     private bool StopAfterBatch;
     private ElementReference ReviewSurface;
-    private ElementReference ModalCancelButton;
+    private ElementReference ModalConfirmButton;
     private bool ShowScanSettings;
     private bool HasRendered;
     private bool FocusModalOnRender;
+    private bool ModalReady;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -233,7 +235,11 @@
         if (FocusModalOnRender)
         {
             FocusModalOnRender = false;
-            await ModalCancelButton.FocusAsync(preventScroll: true);
+            // Focus the confirmation button so the browser's standard
+            // Enter-to-click behavior works without dispatching a second
+            // destructive request from the bubbling keydown handler.
+            await ModalConfirmButton.FocusAsync(preventScroll: true);
+            ModalReady = true;
         }
         else if (firstRender)
         {
@@ -243,20 +249,40 @@
 
     private async Task HandleKeyboardAsync(KeyboardEventArgs args)
     {
+        // Ignore held keys and modified shortcuts. In particular, a held E
+        // must not progress into a destructive confirmation by repetition.
+        if (args.AltKey || args.CtrlKey || args.MetaKey || args.Repeat || Busy || Loading)
+            return;
+
         if (PendingExclusion is not null)
         {
-            if (args.Key == "Escape" && !Busy)
-                await CancelExclude();
+            switch (args.Key)
+            {
+                case "Escape":
+                    await CancelExclude();
+                    break;
+                case "c":
+                case "C":
+                    // The confirmation must already be visible and focused.
+                    if (ModalReady)
+                        await ConfirmExcludeAsync();
+                    break;
+                // Enter is handled by the focused Confirm button's native
+                // click behavior. Never also invoke ConfirmExcludeAsync here
+                // or one keystroke could submit twice.
+            }
             return;
         }
-        if (args.AltKey || args.CtrlKey || args.MetaKey ||
-            Busy || Loading || Current is null)
+
+        if (Current is null)
             return;
         switch (args.Key)
         {
             case "1": await DecideAsync(Current.RevisionId, "keep"); break;
             case "2": await DecideAsync(Current.RevisionId, "dismiss"); break;
             case "3": await DecideAsync(Current.RevisionId, "consider-exclusion"); break;
+            case "e":
+            case "E": OpenCurrentExclusion(); break;
             case "ArrowLeft": await PreviousAsync(); break;
             case "ArrowRight": await NextAsync(); break;
         }
@@ -425,6 +451,7 @@
         {
             ShowScanSettings = false;
             PendingExclusion = Current.RevisionId;
+            ModalReady = false;
             FocusModalOnRender = true;
         }
     }
@@ -432,12 +459,13 @@
     private async Task CancelExclude()
     {
         PendingExclusion = null;
+        ModalReady = false;
         await ReviewSurface.FocusAsync(preventScroll: true);
     }
 
     private async Task ConfirmExcludeAsync()
     {
-        if (Busy || PendingExclusion is null) return;
+        if (Busy || PendingExclusion is null || !ModalReady) return;
         string revisionId = PendingExclusion;
         Busy = true;
         Error = null;
@@ -452,6 +480,7 @@
                 throw new InvalidOperationException(
                     "Exclusion failed (HTTP " + (int)response.StatusCode + ").");
             PendingExclusion = null;
+            ModalReady = false;
             try
             {
                 using HttpResponseMessage withdraw = await Http.PostAsync(
@@ -470,7 +499,14 @@
             await LoadAsync();
         }
         catch (Exception e) { Error = e.Message; }
-        finally { Busy = false; }
+        finally
+        {
+            Busy = false;
+            // A successful purge removes the focused Confirm button. Restore
+            // focus to the review surface for the next photo's shortcuts.
+            if (PendingExclusion is null)
+                await ReviewSurface.FocusAsync(preventScroll: true);
+        }
     }
 
 }
