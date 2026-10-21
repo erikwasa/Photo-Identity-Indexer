@@ -4,6 +4,28 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-21 native Archive quality-review acceptance and next curation pilot:**
+WI-0629 / issue #629 is **closed** after maintainer's successful native
+keyboard review plus regressions (merged PR #644). 1/2/3, arrows,
+E opening a visible exclusion warning, C/Enter explicitly confirming
+only within the warning, Escape cancellation, full-image viewport and
+native quality scan work as expected. No unattended source-copy purges
+or OneDrive originals affected. Follow-on #638 begins saved Creative
+Collection *similarity review* using the already accepted moment-scoped
+complete-link H8 dHash groups from existing Creative materialization.
+First review UI: side-by-side thumbnails, current recipe selection,
+**Keep all** or **Prefer this photo**, per-recipe per-exact-group
+locally persisted annotations only; **NO EFFECT yet on actual collection
+or slideshow output**. Verify with a burst-heavy saved Creative
+Collection before building reversible collection-only omission. Issue
+#639 separate continuous, provenance-bearing quality rating, not a
+hardcoded 0-100 relabel of proxy technical flags. M37 automatic
+redundancy/Very Low/combined suppression NO-GOs and research-only
+TOPIQ heldout freeze stand. See
+docs/operations/creative-similarity-review.md.
+
+## Current focus
+
 **M37 formal disposition (2026-10-21):** Research evaluation
 COMPLETE with explicit NO-GO/DEFER decisions. WI-0192 and
 WI-0193 completed; WI-0194 COMPLETED as archive-wide
