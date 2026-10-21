@@ -161,7 +161,11 @@ public static class VideoScopedOneShotCommandRunner
                 InspectionInterval: TimeSpan.FromMilliseconds(200),
                 WindowsJobLimits: new WindowsVideoJobLimits(
                     MaximumJobMemoryMiB: 768,
-                    MaximumProcesses: 1, MaximumCpuPercent: 15));
+                    MaximumProcesses: 1, MaximumCpuPercent: 15,
+                    // Observed native job I/O transfer cutoff, NOT a
+                    // kernel-enforced disk-bandwidth or capacity quota.
+                    MaximumObservedReadBytes: 512L * 1024 * 1024,
+                    MaximumObservedWriteBytes: 384L * 1024 * 1024));
             var adapter = new VideoExperimentalProxyAdapter(
                 database, options.Ffmpeg, options.Ffprobe,
                 options.FfprobeSha256, options.CacheRoot, toolBudget);
