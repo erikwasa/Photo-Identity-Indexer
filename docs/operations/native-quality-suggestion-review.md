@@ -1,3 +1,63 @@
+## v3: full-viewport keyboard review — maintained-app UX correction (2026-10-21)
+
+The maintainer reported the native review remained unusable on a normal browser
+viewport after the previous keyboard-focused PR: only about half of the photo
+was initially visible because the hero/scan panel/filters appeared above the
+image; navigation left the browser scrolled below the photo; selecting
+"Exclude" inserted the destructive confirmation farther down the document;
+and 1/2/3/arrow shortcuts did not function.
+
+**Now the entire review is a fixed 100dvh viewport** separate from the
+ordinary Photo Identity page layout: compact top toolbar, remaining available
+height for one `object-fit:contain` image, and a permanently visible bottom
+row of reasons + Keep/Dismiss/Consider/Previous/Next/Exclude buttons. Photo
+dimensions cannot push actions below the fold. The scan controls open as an
+overlapping drawer, not above the image. Explicit Exclude opens a centered
+accessible confirmation dialog *over* the review screen. The existing
+source-copy purge API is still invoked ONLY by clicking **Confirm exclude &
+purge**, not by a number key or merely opening the dialog. The original
+OneDrive photo is untouched.
+
+**Keyboard contract**: native Blazor `@onkeydown` event handling on a focused
+`tabindex=0` review screen, replacing the fragile JS-module document
+listener. The review screen is auto-focused without scrolling at initialization
+and again after filter changes / navigation. Press `1` for Keep, `2` for
+Dismiss, `3` for Consider; `←` / `→` for previous / next. Pressing keys while
+selecting filters is suppressed so form inputs work normally. There is
+deliberately no destructive key binding; Escape cancels an open exclusion
+confirmation. A modal is placed within the same viewport and cannot expand
+the browser document.
+
+### One short operator verification (after green CI/merge)
+
+1. `git switch main; git pull --ff-only origin main`. Restart Photo Identity
+   and open `http://127.0.0.1:5080/quality-suggestions`.
+2. **Without scrolling**, verify the WHOLE photo is visible along with
+   reasons, Keep/Dismiss/Consider, Previous/Next, and Exclude.
+   Try both portrait and landscape examples if available; optionally zoom
+   browser to 100%. The top area must remain compact.
+3. Immediately press `1`, `2` or `3` and check that the choice saves and
+   the next matching photo is displayed. Press `←`/`→`, then select a new
+   reason/status filter and press numbers again **without clicking the image**.
+4. Click Next/Previous: image and buttons remain visible without the browser
+   jumping/scrolling to a retained old position.
+5. Click **Exclude photo…**. Confirm its entire warning and **Cancel** /
+   **Confirm exclude & purge** buttons are visible in a centered overlay,
+   with no scrolling. Press Escape to cancel and confirm the photo remains.
+   Do NOT perform an actual exclusion just to test this.
+6. Open/close **Scan options** and confirm its drawer does not shrink/move
+   the reviewed photo below the viewport. Existing next/all scan and
+   restart-persisted decisions are unchanged.
+7. Report PASS/FAIL for full-image visibility, keyboard actions, arrow
+   navigation, in-place confirmation, and anything unexpected. Do not
+   share private photo identifiers.
+
+The new offline Python test `test_native_quality_viewport.py` guards the
+source-level viewport and keyboard contract, while the real browser
+verification above remains necessary before final UX acceptance.
+
+---
+
 ## v2: one-photo keyboard review, direct confirmed exclusion, progressive scan (2026-10-21)
 
 The maintainer's first native smoke test **passed all checks**: M37 docs,
