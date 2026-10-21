@@ -114,7 +114,7 @@ public sealed class VideoOneShotCandidatesCommandTests
         using StringWriter output = new();
         VideoOneShotCandidatesCommandRunner.Write(output, [], false);
         using JsonDocument parsed = JsonDocument.Parse(output.ToString());
-        Assert.Empty(parsed.RootElement.GetProperty("candidates").EnumerateArray());
+        Assert.Equal(0, parsed.RootElement.GetProperty("candidates").GetArrayLength());
         Assert.False(parsed.RootElement.GetProperty("hasMore").GetBoolean());
     }
 }
