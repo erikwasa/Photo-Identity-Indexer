@@ -928,6 +928,37 @@ Production activation remains prohibited until reviewed.
   necessary before WI-0188 can be accepted.
   See [Windows Job Object safety runbook](../../operations/video-worker-windows-resource-envelope.md).
 
+### Development checkpoint 30 — native Windows creation mitigations, synthetic only (2026-10-22)
+
+- Opt-in `WindowsVideoJobLimits.RequireProcessCreationMitigations`
+  (default `false`) adds the Windows
+  `PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY` deny-child-creation
+  and `PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY` deny-remote-image,
+  deny-low-label-image and disable-legacy-extension-point attributes
+  to the existing native suspended process launcher. Each attribute
+  must be installed **before** the tool process resumes; failure
+  aborts launch. All native attribute buffers remain valid through
+  the `STARTUPINFOEX` lifetime. Existing bounded Job Object, handle
+  allowlist, sanitized environment, source authorization and IO
+  counters are unchanged.
+- **Only synthetic FFmpeg fixture generation and candidate encoding**
+  opt in for now, not the selected real-video FFmpeg, independent
+  FFprobe, unattended workers or photo tasks. Tests compare the same
+  harmless nested system command with and without the policy while
+  allowing two Job Object members, plus a straightforward restricted
+  single-command launch and workspace cleanup.
+- The restricted child-process setting is *defense in depth* and
+  Microsoft states it is effective only in a sandbox which also
+  denies elevated process handles, e.g. AppContainer. This is
+  explicitly **not** low-privilege identity, hard disk/storage
+  or bandwidth quota, network egress denial or archive access
+  confinement. No unchanged real-video source was opened or queued.
+- [Native mitigation operator experiment and next AppContainer design gate](../../operations/video-windows-native-mitigation-pilot.md)
+  documents limitations and the optional **synthetic-only** host
+  revalidation after CI and merge. WI-0188 remains `in_progress`.
+  Real video trial, photo mixed-load measurements and post-trial
+  integrity still require additional independent acceptance.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
