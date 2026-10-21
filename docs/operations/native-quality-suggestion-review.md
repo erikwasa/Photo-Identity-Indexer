@@ -109,6 +109,10 @@ Report only aggregate counts, general usability and unexpected
 behavior. No per-photo revision IDs, decisions or local proxy paths
 need to be shared.
 
+## Historical v1 behavior (superseded by the v2 steps above)
+
+The following description documents the original native gallery before the keyboard and progressive-scan improvements. Its checkboxes, dropdown and repeatedly refreshed first batch no longer describe the current UX. Use the v2 procedure above for live operation.
+
 # Native operator-controlled technical quality suggestions
 
 WI-0629's **second substantive product phase** adds a built-in `/quality-suggestions`
