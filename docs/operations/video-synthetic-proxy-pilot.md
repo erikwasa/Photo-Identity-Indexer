@@ -194,6 +194,45 @@ or detailed Windows logs). Checkpoints are diagnostics, not a guarantee
 that the Windows tool chain is validated. Avoid repeated `--apply`
 once a new failure classification is available.
 
+## Maintained Windows result — accepted synthetic fixture proof (2026-10-21)
+
+The maintainer's first `--apply` attempts did not launch the fixture
+generator: the original diagnostic returned `pilot-failed`, then the
+allowlisted checkpoint identified `linked-executable`. This was a
+**correct safety rejection**, not evidence of an encoder defect.
+The Winget-installed tool entry point resolved through a link, while the
+approved supervised process contract requires an **unlinked physical
+executable** with the separately accepted ADR-0012 SHA-256.
+
+The maintainer selected the installed nonlinked, hash-matched FFmpeg and
+FFprobe files without changing the native Job Object resource envelope
+or bypassing the executable-link guard. The next database-free preview
+passed; the explicit `--apply` returned `status=validated`:
+
+| Fixture | Final proxy | Audio | Duration | Bytes | Encode ms |
+| --- | --- | --- | --- | --- | --- |
+| Landscape 1280×720 | 720×406 | Present | 3 s | 218430 | 793 |
+| Portrait 720×1280 | 406×720 | Absent | 3 s | 184101 | 470 |
+
+All reported `failureStage`, `failureOrientation`, `failureClass`,
+`failureCheckpoint`, `toolExitCode` and `nativeErrorCode` values
+were `null`. `schemaUsed=false`, `originalsOpened=false`,
+`videoWorkersActivated=false` and `derivativesRetained=false`.
+
+**Acceptance:** This closes the self-contained, synthetic H.264/AAC
+codec/FFprobe smoke-test checkpoint. The original media archive
+was not involved; no durable proxy, full storage/network sandbox,
+real MOV/MP4 camera compatibility, HDR/HEVC fidelity, no-hydration
+proof, interactive playback, or photo-versus-video contention was
+validated. WI-0188 and WI-0189 remain open.
+
+**Operational rule:** Do not silently follow Winget executable links
+or weaken the reparse-point checks. Resolve only a trusted physical
+tool file, confirm its actual hash against the accepted fingerprints,
+and supply that absolute physical path explicitly. Different binaries
+require separate approval. Synthetic fixture results do not authorize
+`video one-shot run` against the maintained family catalogue.
+
 ## Explicit H.264 SDR bitstream color evidence
 
 A local FFmpeg/FFprobe smoke test revealed that container-level Rec.709
