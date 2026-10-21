@@ -88,10 +88,13 @@ Reference: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi
 
 The supervised suspended launcher now supports an optional native
 `RequireChildProcessRestriction` flag. It installs an explicit Windows
-child-process denial plus mitigation policies for remote-image loading,
-low-integrity image loading and legacy extension points, **before**
-`CreateProcessW` and before resuming the restricted tool. If an
-attribute is unsupported or rejected, the launch fails closed.
+child-process denial attribute, **before** `CreateProcessW`
+and before resuming the restricted tool. If the attribute is
+unsupported or rejected, the launch fails closed. The initial
+combined remote-image/low-label/extension-point mitigations caused
+`cmd.exe` DLL initialization failure (`0xC0000142`) in Windows
+CI, so they have been removed from the experimental profile rather
+than being incorrectly treated as compatible.
 
 Initially **only the synthetic encoder/generator** enables this flag.
 The selected one-shot FFmpeg/FFprobe and ordinary production paths retain
