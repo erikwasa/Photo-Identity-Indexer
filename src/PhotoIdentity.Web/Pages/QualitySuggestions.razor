@@ -108,11 +108,11 @@
             }
             <div class="quality-primary-actions">
                 <button class="button secondary" disabled="@Busy"
-                        @onclick="() => DecideAsync(item.RevisionId, &quot;keep&quot;)">1 · Keep</button>
+                        @onclick="() => KeepAsync(item.RevisionId)">1 · Keep</button>
                 <button class="button secondary" disabled="@Busy"
-                        @onclick="() => DecideAsync(item.RevisionId, &quot;dismiss&quot;)">2 · Dismiss</button>
+                        @onclick="() => DismissAsync(item.RevisionId)">2 · Dismiss</button>
                 <button class="button secondary" disabled="@Busy"
-                        @onclick="() => DecideAsync(item.RevisionId, &quot;consider-exclusion&quot;)">3 · Consider exclusion</button>
+                        @onclick="() => ConsiderAsync(item.RevisionId)">3 · Consider exclusion</button>
             </div>
             <div class="quality-navigation">
                 <button class="button secondary" disabled="@(Busy || Offset == 0)"
@@ -252,7 +252,11 @@
             if (Page.Total > 0 && Offset >= Page.Total)
             {
                 Offset = Math.Max(0, Page.Total - 1);
-                await LoadAsync();
+                Page = await Http.GetFromJsonAsync<QualityPage>(
+                    "api/quality-suggestions?scope=" + ArchiveScope +
+                    "&reason=" + Uri.EscapeDataString(Reason) +
+                    "&filter=" + Uri.EscapeDataString(Filter) +
+                    "&offset=" + Offset + "&limit=1");
             }
         }
         catch (Exception e) { Error = "Unable to load suggestions: " + e.Message; }
@@ -320,6 +324,10 @@
     }
 
     private void CancelScanning() => StopAfterBatch = true;
+
+    private Task KeepAsync(string id) => DecideAsync(id, "keep");
+    private Task DismissAsync(string id) => DecideAsync(id, "dismiss");
+    private Task ConsiderAsync(string id) => DecideAsync(id, "consider-exclusion");
 
     private async Task DecideAsync(string revisionId, string decision)
     {
