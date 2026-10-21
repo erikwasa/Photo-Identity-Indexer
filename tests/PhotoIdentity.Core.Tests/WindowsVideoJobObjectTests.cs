@@ -89,7 +89,7 @@ public sealed class WindowsVideoJobObjectTests
                     MaximumJobMemoryMiB: 512,
                     MaximumProcesses: 2,
                     MaximumCpuPercent: 25,
-                    RequireProcessCreationMitigations: true));
+                    RequireChildProcessRestriction: true));
 
             // Pure first-party cmd.exe without child creation must still work.
             var simple = await new VideoToolProcessSupervisor().RunAsync(
@@ -108,7 +108,7 @@ public sealed class WindowsVideoJobObjectTests
                 {
                     WindowsJobLimits = budget.WindowsJobLimits! with
                     {
-                        RequireProcessCreationMitigations = false
+                        RequireChildProcessRestriction = false
                     }
                 });
             Assert.Equal(0, unrestricted.ExitCode);
