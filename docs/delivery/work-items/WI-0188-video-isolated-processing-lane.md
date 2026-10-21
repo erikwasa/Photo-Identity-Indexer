@@ -724,6 +724,50 @@ CPU/latency evidence remain to be verified before production enablement.
 - Real-media trial approval remains a separate decision after reviewing
   local free-space, IO containment and photo-priority risk.
 
+### Maintainer checkpoint 23 — exact local video eligibility confirmed (2026-10-21)
+
+The maintainer's first `video one-shot candidates` metadata-only query
+returned **one** possible SDR video: 12.3 seconds, coded landscape,
+21,687,565 bytes, and audio present. The exact-revision
+`video one-shot enqueue` command was then run **without
+`--apply`**, returning `dryRun=true`, `eligible=true`,
+`jobId=null`, `mediaOpened=false` and `videoExecuted=false`.
+
+**Accepted:** one latest, nonexcluded, technically supported source
+revision passes size and *currently local* availability metadata checks.
+The source bytes were **not** opened; there was no video job, FFmpeg
+execution, hydration or durable derivative. The private UUID and
+source/archive paths are intentionally excluded from tracking.
+
+### Development checkpoint 24 — independent no-job one-shot environment review
+
+- Adds `video one-shot environment`, a Windows-only command that
+  accepts explicit v37 localhost DB, marked private cache root and
+  already-approved physical FFmpeg/FFprobe paths and digests.
+  It is read-only and **cannot** accept `--apply`, `--job-id`,
+  `--revision-id` or a source path.
+- Checks disabled/paused/unselected/no-expiration video control,
+  zero running video leases, idle authoritative photo jobs,
+  private-cache ownership marker, no archive/cache overlap,
+  unlinked local directory, OS fixed-volume free space for
+  a full 512 MiB reservation plus 512 MiB headroom, and both
+  unlinked executable digests against the selected approvals.
+- Reuses the **exact existing** v37 cache guard and the one-shot
+  executable verifier; this adds no novel media I/O and no
+  modified authorizations. JSON is source-free, explicitly
+  `dryRun=true`, `realVideoExecutionAuthorized=false`,
+  `hardDiskIoQuotaVerified=false`, and
+  `networkSandboxVerified=false`.
+- Test coverage refuses real-media command flags, checks
+  all active control/photo-priority cases and asserts neither
+  media access nor hard-IO/network isolation is claimed.
+  The operator runbook documents creating only a new marked
+  private root outside source/OneDrive directories.
+- **Outstanding:** independent original-integrity assurance and
+  photo-only/mixed-load measures, plus reviewed hard disk/IO/network
+  isolation (or a specifically approved measured substitute) before
+  actual real-video trial or milestone completion.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
