@@ -768,6 +768,63 @@ source/archive paths are intentionally excluded from tracking.
   isolation (or a specifically approved measured substitute) before
   actual real-video trial or milestone completion.
 
+### Maintainer checkpoint 25 — one-shot Windows environment preflight PASS (2026-10-21)
+
+The maintainer merged PR #641 and ran the environment-only command on the
+maintained **schema-v37** system using the reviewed private cache and
+approved unlinked physical FFmpeg/FFprobe executables. Returned evidence:
+
+- `dryRun=true`, `passed=true`, `reasonCode=preflight-only`,
+  `schemaVersion=37`.
+- `originalsOpened=false`, `oneDriveHydrationRequested=false`,
+  `videoWorkersActivated=false`, `jobsEnqueued=false`,
+  `derivativesPublished=false`.
+- `hardDiskIoQuotaVerified=false`,
+  `networkSandboxVerified=false`,
+  `realVideoExecutionAuthorized=false`.
+
+**Accepted:** exact current selected-trial environment readiness,
+private-cache ownership and non-overlap, approved tool hashes and
+available capacity, and current disabled/paused/unselected/idle
+admission checks. The command does not inspect original video bytes
+or authorize video processing. Do not repeat the accepted synthetic
+or v34→v37 migration checks merely for this step.
+
+### Development checkpoint 26 — explicit no-recall source integrity read
+
+- Adds `video one-shot source-proof` accepting **only** a previously
+  ingested video revision UUID, the verified current v37 localhost
+  PostgreSQL reference and optional `--read-local-bytes`.
+  Default mode performs **zero database or source reads**, reporting
+  `not-run`. There is no `--apply`, arbitrary media path, enqueue,
+  FFmpeg execution, publication or worker activation.
+- Only after an operator deliberately selects `--read-local-bytes`
+  does it fetch the exact latest, supported/nonexcluded source
+  identity, size and catalogued SHA-256 from a **read-only**
+  PostgreSQL transaction. A fresh stopped/paused/unselected lane,
+  zero running video leases and idle authoritative photo activity
+  are also required before any source-byte IO. It checks already-local OneDrive status,
+  bounded 256 MiB size, unlinked source and ancestors, and streams
+  at most the approved file length using the same Windows
+  `FILE_FLAG_OPEN_NO_RECALL` handle already used for leased staging.
+- It compares the SHA-256 against the original catalogued revision,
+  checks source size/mtime/local status again after reading, and
+  returns only allowlisted outcome codes and booleans. Unknown
+  interrupted-read state is reported as `null`, never falsely
+  `false`. No filenames, paths, original hashes or media bytes
+  are printed or persisted.
+- Shared no-recall reader replaces the original private P/Invoke in
+  the existing video stager with the **same handle flags and access
+  rights**. This changes no staging policy or source write behavior.
+  Windows synthetic file tests cover matching/mismatching content,
+  size rejection, privacy-safe outputs and opt-in parsing.
+- A successful source-proof will establish **pre-trial** original
+  integrity only. It **does not** prove post-video source integrity,
+  hard disk/IO/network containment, photo-interactive performance or
+  authorization to execute the real-video worker. The maintainer
+  must explicitly authorize original byte reads by choosing the
+  flag after review.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

@@ -1,7 +1,5 @@
 using System.Buffers;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using Microsoft.Win32.SafeHandles;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
 
@@ -95,7 +93,7 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
             Path.GetExtension(local).ToLowerInvariant());
         try
         {
-            await using (FileStream from = OpenWithoutRecall(local))
+            await using (FileStream from = OneDriveVideoNoRecallReader.OpenRead(local))
             await using (FileStream to = new(destination, FileMode.CreateNew,
                              FileAccess.Write, FileShare.None, 65536,
                              FileOptions.Asynchronous | FileOptions.SequentialScan))
@@ -147,24 +145,6 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
         }
     }
 
-    private static FileStream OpenWithoutRecall(string path)
-    {
-        if (!OperatingSystem.IsWindows())
-            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
-                65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        // FILE_FLAG_OPEN_NO_RECALL prevents network/cloud retrieval requests for
-        // this handle. If a Cloud Files provider cannot serve local bytes,
-        // reads fail rather than intentionally issuing a hydration request.
-        SafeFileHandle handle = CreateFileW(path, 0x80000000, 0x1, IntPtr.Zero,
-            3, 0x00100000, IntPtr.Zero);
-        if (handle.IsInvalid)
-        {
-            handle.Dispose();
-            throw new IOException("Already-local video bytes could not be opened without recall.");
-        }
-        return new FileStream(handle, FileAccess.Read, 65536, isAsync: false);
-    }
-
     private static bool Overlaps(string root, string scratch)
     {
         StringComparison cmp = OperatingSystem.IsWindows()
@@ -189,8 +169,5 @@ public sealed class OneDriveVideoLocalStager(OneDriveVideoAssetSource source)
         }
     }
 
-    [DllImport("kernel32.dll", EntryPoint = "CreateFileW",
-        CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFileW(string name, uint access,
-        uint share, IntPtr security, uint creation, uint flags, IntPtr templateFile);
+
 }
