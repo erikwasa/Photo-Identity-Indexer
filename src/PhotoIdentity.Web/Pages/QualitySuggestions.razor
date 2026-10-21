@@ -90,6 +90,15 @@
             <span>@Page.Total matching · @Page.ReviewedInScope reviewed · @Page.ConsiderExclusionInScope considered</span>
             <span>@(Page.Total == 0 ? 0 : Offset + 1) / @Page.Total</span>
         </div>
+        @if (!Page.Enabled)
+        {
+            <div class="notice">
+                Archive cleanup review was disabled in your older review settings.
+                <button class="button secondary" @onclick="EnableArchiveAsync">
+                    Enable Archive cleanup review
+                </button>
+            </div>
+        }
 
         @if (Current is QualitySuggestionItem item)
         {
@@ -362,6 +371,22 @@
         await LoadAsync();
     }
 
+    private async Task EnableArchiveAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                "api/quality-suggestions/context/" + ArchiveScope,
+                new { enabled = true });
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (Exception error) { Error = "Could not enable Archive review: " + error.Message; }
+        finally { Busy = false; }
+    }
+
     private void OpenExclude(string id) => PendingExclusion = id;
     private void CancelExclude() => PendingExclusion = null;
 
@@ -381,12 +406,22 @@
             if (!response.IsSuccessStatusCode)
                 throw new InvalidOperationException(
                     "Exclusion failed (HTTP " + (int)response.StatusCode + ").");
-            using HttpResponseMessage withdraw = await Http.PostAsync(
-                "api/quality-suggestions/excluded/" +
-                Uri.EscapeDataString(revisionId), null);
-            withdraw.EnsureSuccessStatusCode();
             PendingExclusion = null;
-            Message = "Source copy excluded from Photo Identity; its OneDrive original remains untouched.";
+            try
+            {
+                using HttpResponseMessage withdraw = await Http.PostAsync(
+                    "api/quality-suggestions/excluded/" +
+                    Uri.EscapeDataString(revisionId), null);
+                withdraw.EnsureSuccessStatusCode();
+                Message = "Source copy excluded from Photo Identity; its OneDrive original remains untouched.";
+            }
+            catch (Exception)
+            {
+                // The irreversible native source-copy exclusion succeeded.
+                // Do not show a generic failure or invite a second purge.
+                Message = "Photo exclusion succeeded. The review queue could not be updated; " +
+                    "refresh the page or scan again to clear the stale suggestion.";
+            }
             await LoadAsync();
         }
         catch (Exception e) { Error = e.Message; }
