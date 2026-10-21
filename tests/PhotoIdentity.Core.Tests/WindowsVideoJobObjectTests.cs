@@ -67,6 +67,50 @@ public sealed class WindowsVideoJobObjectTests
     }
 
     [Fact]
+    public async Task Opt_in_native_process_mitigations_refuse_child_process_creation()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = Path.Combine(Path.GetTempPath(),
+            "wi0188-mitigated-video-tool-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string cmd = Path.Combine(Environment.GetFolderPath(
+                Environment.SpecialFolder.System), "cmd.exe");
+            await using FileStream file = File.OpenRead(cmd);
+            string sha = Convert.ToHexString(
+                await System.Security.Cryptography.SHA256.HashDataAsync(file))
+                .ToLowerInvariant();
+
+            var budget = new VideoToolExecutionBudget(
+                TimeSpan.FromSeconds(15), 1024 * 1024,
+                MaximumTemporaryEntries: 8,
+                WindowsJobLimits: new WindowsVideoJobLimits(
+                    MaximumJobMemoryMiB: 512,
+                    MaximumProcesses: 2,
+                    MaximumCpuPercent: 25,
+                    RequireProcessCreationMitigations: true));
+
+            // Pure first-party cmd.exe without child creation must still work.
+            var simple = await new VideoToolProcessSupervisor().RunAsync(
+                cmd, sha, root, _ => ["/d", "/c", "exit /b 0"], budget);
+            Assert.Equal(0, simple.ExitCode);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(root));
+
+            // Allow two members in the Job Object to distinguish native
+            // child mitigation from the one-process Job Object cap.
+            // Attempt a second cmd.exe and assert no marker was written.
+            var refused = await new VideoToolProcessSupervisor().RunAsync(
+                cmd, sha, root,
+                _ => ["/d", "/c", "cmd.exe /d /c echo unsafe > child.txt"],
+                budget);
+            Assert.NotEqual(0, refused.ExitCode);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(root));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public async Task Windows_native_job_io_counters_are_read_after_supervised_process_exit()
     {
         if (!OperatingSystem.IsWindows()) return;
