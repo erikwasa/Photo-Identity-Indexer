@@ -944,12 +944,14 @@ Production activation remains prohibited until reviewed.
   the `STARTUPINFOEX` lifetime. Existing bounded Job Object, handle
   allowlist, sanitized environment, source authorization and IO
   counters are unchanged.
-- **Only synthetic FFmpeg fixture generation and candidate encoding**
-  opt in for now, not the selected real-video FFmpeg, independent
-  FFprobe, unattended workers or photo tasks. Tests compare the same
-  harmless nested system command with and without the policy while
-  allowing two Job Object members, plus a straightforward restricted
-  single-command launch and workspace cleanup.
+- **Nothing in the application, synthetic pilot or selected real-video
+  one-shot opts in.** Windows CI demonstrated that even first-party
+  `cmd.exe` fails at loader initialization (`0xC0000142`) with the
+  restriction requested, before it can demonstrate child-process
+  denial. The policy stays an inactive opt-in for compatibility
+  investigation only. Tests confirm that normal Job Object single
+  and nested commands work, and treat mitigated startup failure as
+  *incompatibility*, not evidence of secure denial.
 - The restricted child-process setting is *defense in depth* and
   Microsoft states it is effective only in a sandbox which also
   denies elevated process handles, e.g. AppContainer. This is
