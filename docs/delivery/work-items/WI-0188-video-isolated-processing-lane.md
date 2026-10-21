@@ -933,11 +933,14 @@ Production activation remains prohibited until reviewed.
 - Opt-in `WindowsVideoJobLimits.RequireChildProcessRestriction`
   (default `false`) adds the Windows
   `PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY` deny-child-creation
-  and `PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY` deny-remote-image,
-  deny-low-label-image and disable-legacy-extension-point attributes
-  to the existing native suspended process launcher. Each attribute
-  must be installed **before** the tool process resumes; failure
-  aborts launch. All native attribute buffers remain valid through
+  attribute to the existing native suspended process launcher. The
+  initial additional executable-image and legacy-extension mitigations
+  caused native `cmd.exe` DLL initialization failure (`0xC0000142`)
+  in Windows CI; they were deliberately removed pending separate
+  investigation rather than being described as compatible.
+  The required child restriction must be installed **before** the
+  tool process resumes; failure aborts launch. The native attribute
+  buffer remains valid through
   the `STARTUPINFOEX` lifetime. Existing bounded Job Object, handle
   allowlist, sanitized environment, source authorization and IO
   counters are unchanged.
