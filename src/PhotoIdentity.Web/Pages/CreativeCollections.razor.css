@@ -1,0 +1,42 @@
+.creative-similarity-review {
+    margin-block: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color, #7c8390);
+    border-radius: 12px;
+}
+.creative-similarity-group {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color, #687485);
+    border-radius: 10px;
+    padding: 12px;
+}
+.creative-similarity-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .4rem 1rem;
+    margin-bottom: 12px;
+    font-size: .86rem;
+}
+.creative-similarity-photos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 12px;
+}
+.creative-similarity-photo {
+    min-width: 0;
+    border: 1px solid var(--border-color, #657085);
+    border-radius: 8px;
+    padding: 9px;
+}
+.creative-similarity-photo img {
+    display: block;
+    width: 100%;
+    height: clamp(160px, 24vh, 300px);
+    object-fit: contain;
+    background: #11151b;
+    border-radius: 6px;
+}
+.creative-similarity-photo p { min-height: 1.7rem; }
+.creative-similarity-photo button { width: 100%; }
+.creative-similarity-group .smart-actions { margin-top: 12px; }
