@@ -83,7 +83,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
             MaximumCpuPercent: 15,
             // Only synthetic fixtures opt in until Windows CI + maintained
             // toolchain validate the native mitigation attributes.
-            RequireProcessCreationMitigations: true));
+            RequireChildProcessRestriction: true));
 
     public static async Task<int> RunAsync(
         VideoSyntheticProxyPilotOptions options, TextWriter output,
