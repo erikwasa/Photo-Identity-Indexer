@@ -22,20 +22,12 @@ internal static class WindowsVideoSuspendedLauncher
     private const nuint ProcThreadAttributeHandleList = 0x00020002;
     // Documented STARTUPINFOEX process creation attributes; set in the
     // suspended launcher BEFORE any native child instruction executes.
-    private const nuint ProcThreadAttributeMitigationPolicy = 0x00020007;
     private const nuint ProcThreadAttributeChildProcessPolicy = 0x0002000E;
     private const uint ChildProcessRestricted = 0x00000001;
 
-    // Opt-in defense in depth. Do NOT enable dynamic-code block or signed-
-    // Microsoft-only binaries: Gyan FFmpeg requires its own loader/codecs.
-    // Extension-point disable, no remote executable images and no images
-    // carrying a low mandatory-integrity label are the selected mitigations.
-    private const ulong MitigationExtensionPointDisable = 1UL << 32;
-    private const ulong MitigationImageNoRemote = 1UL << 52;
-    private const ulong MitigationImageNoLowLabel = 1UL << 56;
-    private const ulong VideoMitigationPolicies =
-        MitigationExtensionPointDisable | MitigationImageNoRemote |
-        MitigationImageNoLowLabel;
+    // No executable-image or legacy-extension mitigation is installed yet:
+    // the combined pilot caused DLL initialization failure (0xC0000142)
+    // for cmd.exe in Windows CI and is not accepted for FFmpeg.
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
     private const uint FileShareRead = 0x00000001;
@@ -59,7 +51,6 @@ internal static class WindowsVideoSuspendedLauncher
         IntPtr nativeEnvironment = Marshal.StringToHGlobalUni(environmentBlock);
         IntPtr attributes = IntPtr.Zero;
         IntPtr inheritedList = IntPtr.Zero;
-        IntPtr mitigationPolicy = IntPtr.Zero;
         IntPtr childProcessPolicy = IntPtr.Zero;
         bool attributesInitialized = false;
         ProcessInformation native = default;
@@ -83,7 +74,7 @@ internal static class WindowsVideoSuspendedLauncher
             // inheritable handles from the parent application. Use a single
             // explicit HANDLE_LIST containing only the NUL device.
             nuint bytes = 0;
-            int attributeCount = job.RequireProcessCreationMitigations ? 3 : 1;
+            int attributeCount = job.RequireProcessCreationMitigations ? 2 : 1;
             _ = InitializeProcThreadAttributeList(
                 IntPtr.Zero, attributeCount, 0, ref bytes);
             if (bytes == 0)
@@ -104,17 +95,9 @@ internal static class WindowsVideoSuspendedLauncher
 
             if (job.RequireProcessCreationMitigations)
             {
-                // All attribute values must remain allocated until
-                // DeleteProcThreadAttributeList has returned.
-                mitigationPolicy = Marshal.AllocHGlobal(sizeof(ulong));
-                Marshal.WriteInt64(mitigationPolicy,
-                    unchecked((long)VideoMitigationPolicies));
-                if (!UpdateProcThreadAttribute(attributes, 0,
-                        ProcThreadAttributeMitigationPolicy, mitigationPolicy,
-                        (nuint)sizeof(ulong), IntPtr.Zero, IntPtr.Zero))
-                    throw new Win32Exception(Marshal.GetLastWin32Error(),
-                        "Native video process mitigations could not be installed.");
-
+                // Value must remain allocated until the attribute list is
+                // destroyed. Creation fails closed if the OS refuses the
+                // child process restriction; no fallback is attempted.
                 childProcessPolicy = Marshal.AllocHGlobal(sizeof(uint));
                 Marshal.WriteInt32(childProcessPolicy,
                     unchecked((int)ChildProcessRestricted));
@@ -177,8 +160,6 @@ internal static class WindowsVideoSuspendedLauncher
                 DeleteProcThreadAttributeList(attributes);
             if (inheritedList != IntPtr.Zero)
                 Marshal.FreeHGlobal(inheritedList);
-            if (mitigationPolicy != IntPtr.Zero)
-                Marshal.FreeHGlobal(mitigationPolicy);
             if (childProcessPolicy != IntPtr.Zero)
                 Marshal.FreeHGlobal(childProcessPolicy);
             if (attributes != IntPtr.Zero)
