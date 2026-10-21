@@ -801,7 +801,9 @@ or v34→v37 migration checks merely for this step.
 - Only after an operator deliberately selects `--read-local-bytes`
   does it fetch the exact latest, supported/nonexcluded source
   identity, size and catalogued SHA-256 from a **read-only**
-  PostgreSQL transaction. It checks already-local OneDrive status,
+  PostgreSQL transaction. A fresh stopped/paused/unselected lane,
+  zero running video leases and idle authoritative photo activity
+  are also required before any source-byte IO. It checks already-local OneDrive status,
   bounded 256 MiB size, unlinked source and ancestors, and streams
   at most the approved file length using the same Windows
   `FILE_FLAG_OPEN_NO_RECALL` handle already used for leased staging.
