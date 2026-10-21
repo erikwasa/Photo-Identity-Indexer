@@ -1,3 +1,24 @@
+## Accepted native Archive cleanup review — maintainer checkpoint (2026-10-21)
+
+After merging PR #644, the maintainer verified that **Archive quality
+review works as expected and existing feature regressions are OK**.
+The accepted interactive behavior is full-viewport one-photo review,
+keyboard 1 Keep / 2 Dismiss / 3 Consider, arrow previous/next, E opening
+the separately confirmed exclusion dialog, C or Enter confirming only
+within that dialog, and Escape cancelling. User manually chooses which
+source copy to exclude; no unattended exclusion, OneDrive original change,
+or collection/slideshow selection effect was introduced.
+
+**WI-0629 / issue #629 is accepted and closed as Archive cleanup product
+work.** The archive-side technical candidate queue and keyboard UX
+are no longer blocked pending another 129-photo review. The next
+distinct curation workstream is [issue #638](https://github.com/erikwasa/Photo-Identity-Indexer/issues/638)
+for similar photos in collections/slideshows, and a separately calibrated
+continuous quality-rating evaluation is [issue #639](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639).
+Do not reopen M37's consumed model held-out labels.
+
+---
+
 ## v4: deliberate keyboard-confirmed exclusion (2026-10-21)
 
 Maintainer confirmed the full-viewport single-photo reviewer now works much

@@ -148,6 +148,8 @@ public partial class Program
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
         builder.Services.AddSingleton<PhotoCaptionEnrichmentWorkerState>();
         builder.Services.AddSingleton<CreativeCollectionMaterializationService>();
+        builder.Services.AddSingleton(new CreativeSimilarityReviewStore(
+            Path.Combine(defaultApplicationRoot, "creative-similarity-review")));
 
         builder.Services.AddSingleton<ArchiveSourceCatalogueScanner>();
         builder.Services.AddSingleton<LocalArchiveSyncCoordinator>();
