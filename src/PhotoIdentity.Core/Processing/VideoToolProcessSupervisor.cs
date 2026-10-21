@@ -219,10 +219,10 @@ public sealed class VideoToolProcessSupervisor
                 checkpoint = "post-exit-validation";
                 await afterSuccessfulExit(workspace, linked.Token);
             }
-            // Post-publication observation catches any verified output read
-            // charged to the supervised job. The job remains owned until
-            // the encompassing finally closes its process-tree handle.
-            finalIo = resourceJob?.CheckObservedIo() ?? finalIo;
+            // The independent callback runs in the caller, not in the
+            // supervised job, so the post-exit accounting snapshot already
+            // covers the complete child process. Publication is never
+            // followed by a new failure on the same unchanged counters.
             return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed,
                 finalIo?.ReadBytes, finalIo?.WriteBytes);
         }
