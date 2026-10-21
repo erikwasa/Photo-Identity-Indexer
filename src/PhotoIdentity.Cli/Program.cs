@@ -53,6 +53,11 @@ public static class Program
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
                 "video" when args.Length > 2 &&
+                    args[1] == "one-shot" && args[2] == "environment" =>
+                    await VideoOneShotEnvironmentCommandRunner.RunAsync(
+                        VideoOneShotEnvironmentOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "candidates" =>
                     await VideoOneShotCandidatesCommandRunner.RunAsync(
                         VideoOneShotCandidatesOptions.Parse(args.Skip(3).ToArray()),
@@ -194,6 +199,13 @@ public static class Program
               catalogue rehearse-v35 / rehearse-v36
                                      (legacy aliases; also apply through v37)
 
+              video one-shot environment --postgres-connection-env NAME --database DB
+                                        --cache-root MARKED_PRIVATE_ROOT
+                                        --ffmpeg ABS_EXE --ffmpeg-sha256 HASH
+                                        --ffprobe ABS_EXE --ffprobe-sha256 HASH
+                                        (read-only Windows cache/tool/resource preflight;
+                                         no job creation or real-media access;
+                                         no hard disk/IO/network isolation claim)
               video one-shot candidates --postgres-connection-env NAME --database DB
                                        [--limit COUNT (1..20)]
                                        (read-only, UUID-only metadata shortlist;

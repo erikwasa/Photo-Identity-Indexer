@@ -196,7 +196,7 @@ public static class VideoScopedOneShotCommandRunner
         return published ? 0 : 1;
     }
 
-    private static async Task VerifyExecutableAsync(
+    internal static async Task VerifyExecutableAsync(
         string path, string expectedSha256, CancellationToken token)
     {
         if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)

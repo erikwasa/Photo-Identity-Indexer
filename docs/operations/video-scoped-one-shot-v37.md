@@ -85,6 +85,84 @@ again without opening the media. Do not enqueue or run real-video
 processing until the distinct containment/mixed-load gates have been
 reviewed. No automatic execution or new source path flag is present.
 
+## Read-only selected-video and environment proof (2026-10-21)
+
+After merging the metadata shortlist checkpoint, the maintainer ran
+`video one-shot candidates` successfully. It returned **one** potential
+coded-landscape Rec.709 video (12.3 s, 21,687,565 bytes, with audio).
+The separate exact-revision `video one-shot enqueue` command, invoked
+**without `--apply`**, then returned:
+
+~~~json
+{"protocol":"wi0188-selected-enqueue-v1","dryRun":true,
+ "eligible":true,"jobId":null,"mediaOpened":false,"videoExecuted":false}
+~~~
+
+This **accepts the specific media-availability/inspection preflight
+only**, not any FFmpeg execution, private publishing or photo-mixed-load
+performance requirement. Nothing was queued. Do not commit archive paths
+or the selected revision UUID in public tracking.
+
+## New no-job Windows environment preflight — before any trial authorization
+
+The experimental `video one-shot environment` command checks whether a
+**future** one-shot might be safe to configure, without creating any
+queued job. It independently checks current-schema local v37 PostgreSQL,
+stopped/paused/unselected video control, no running video lease, no
+authoritative photo work, ownership and catalogue-wide source separation
+of an existing marked private cache, at least **512 MiB** estimated
+scratch capacity **plus 512 MiB free headroom** on a fixed local
+volume, and both physical nonlinked FFmpeg/FFprobe executables against
+the previously approved exact SHA-256 hashes. It never opens original
+media or runs either executable. It cannot accept `--apply`,
+`--job-id`, `--revision-id` or `--source-path`.
+
+Use an operator-owned private root *outside all archive and OneDrive-sync
+folders*, on a local fixed disk, never reusing a real folder with
+unknown contents. From PowerShell in the repository root:
+
+~~~powershell
+$ErrorActionPreference = 'Stop'
+$cacheRoot = Join-Path $env:LOCALAPPDATA (
+  'PhotoIdentity\\video-one-shot-readiness-' + [guid]::NewGuid().ToString('N')
+)
+if (Test-Path -LiteralPath $cacheRoot) {
+  throw 'Private cache root already exists; stop and review.'
+}
+New-Item -ItemType Directory -Path $cacheRoot | Out-Null
+[IO.File]::WriteAllText(
+  (Join-Path $cacheRoot '.photoidentity-video-derivative-root'),
+  'wi0188-video-derivative-root-v1'
+)
+
+# Use ONLY the previously approved physical, unlinked binary paths and
+# matching SHA-256 variables from the successful synthetic pilot.
+# Confirm the live maintained DB name and process-scoped PG variable.
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot environment `
+  --postgres-connection-env PHOTOIDENTITY_M30_VERIFY_PG `
+  --database $databaseName `
+  --cache-root $cacheRoot `
+  --ffmpeg $ffmpeg --ffmpeg-sha256 $ffmpegHash `
+  --ffprobe $ffprobe --ffprobe-sha256 $ffprobeHash
+if ($LASTEXITCODE -ne 0) { throw 'Video trial environment preflight failed.' }
+~~~
+
+Successful output includes `passed=true`,
+`reasonCode=preflight-only`, and explicit `false` values for
+`originalsOpened`, `oneDriveHydrationRequested`,
+`jobsEnqueued`, `derivativesPublished`, and
+`realVideoExecutionAuthorized`.
+
+The check also **always** reports
+`hardDiskIoQuotaVerified=false` and
+`networkSandboxVerified=false`: available storage, Job Object RAM/CPU
+caps and checked tool hashes are not OS-enforced disk-I/O or network
+confinement. **A PASS is not permission to enqueue or encode the real
+video.** The remaining containment and planned independent
+original-integrity/mixed-load measurements must be reviewed before
+any real-video `--apply` attempt. Keep the marked root available
+for subsequent reviewed steps; never recursively clean another directory.
+
 ## Two deliberate operator actions
 
 1. `video one-shot enqueue` accepts only a previously catalogued
