@@ -163,6 +163,73 @@ original-integrity/mixed-load measurements must be reviewed before
 any real-video `--apply` attempt. Keep the marked root available
 for subsequent reviewed steps; never recursively clean another directory.
 
+## No-recall original-integrity proof (optional, explicit media read)
+
+**Maintainer observed:** after merging PR #641, `video one-shot
+environment` passed with schema v37, `dryRun=true`,
+`passed=true`, `reasonCode=preflight-only`, no original reads,
+no hydration request, no jobs, and no published derivatives. Its
+hard disk/IO quota, network sandbox and real-video authorization
+flags remain **false**, as intended.
+
+The follow-up `video one-shot source-proof` command offers a separate
+source-integrity check for **the same exact revision UUID already
+eligible in the earlier enqueue preview**. Because verifying the
+catalogued SHA-256 means reading actual private video bytes, the
+default command does NOT open any files or even connect to PostgreSQL:
+
+~~~powershell
+# Existing session values: $databaseName, $revisionId and
+# process-only environment variable PHOTOIDENTITY_M30_VERIFY_PG.
+# Do not paste original paths, source file hashes or credentials.
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot source-proof `
+  --postgres-connection-env PHOTOIDENTITY_M30_VERIFY_PG `
+  --database $databaseName --revision-id $revisionId
+~~~
+
+The result must say `status=not-run`,
+`explicitLocalReadRequested=false` and
+`originalBytesOpened=false`. Only if the maintainer explicitly
+consents to read the **already-local** original bytes for checksum
+verification, add the exact flag below:
+
+~~~powershell
+# OPTIONAL: explicitly reads this one current source's bytes,
+# without opening for write or intentionally recalling cloud data.
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot source-proof `
+  --postgres-connection-env PHOTOIDENTITY_M30_VERIFY_PG `
+  --database $databaseName --revision-id $revisionId `
+  --read-local-bytes
+if ($LASTEXITCODE -ne 0) { throw 'One-shot source integrity check failed.' }
+~~~
+
+The tool rejects online-only, outdated, excluded, linked, unsupported
+or oversized revisions. It rereads exact source identity/size/hash from
+a read-only current-schema PostgreSQL transaction, uses the same
+no-recall Windows handle as the bounded video stager, reads at most
+256 MiB under a three-minute deadline, and checks SHA-256 against
+the catalogued original digest plus file size, mtime and already-local
+status after reading. Only fixed nonprivate reason codes are printed.
+Unknown interrupted-read state is explicitly `null`.
+
+Expected on success: `status=verified`,
+`revisionDigestMatched=true`,
+`originalBytesOpened=true`,
+`sourceMetadataStable=true`,
+`oneDriveHydrationRequested=false`,
+`originalWriteAccessRequested=false` and
+`realVideoExecutionAuthorized=false`.
+This is **pre-trial** source integrity only, not a final assurance
+that originals remain unchanged after a future video processing run.
+No video processing or job creation is authorized by this command.
+
+**A real video `one-shot enqueue --apply` or `one-shot run --apply`
+is still OUT OF SCOPE** until hard disk/IO and network risks (or
+explicitly approved bounded alternative) and mixed-photo load
+monitoring have been reviewed and an individual trial separately
+authorized. Do not repeat the successful environment/read-only
+eligibility/synthetic/migration checks merely for this new checkpoint.
+
 ## Two deliberate operator actions
 
 1. `video one-shot enqueue` accepts only a previously catalogued
