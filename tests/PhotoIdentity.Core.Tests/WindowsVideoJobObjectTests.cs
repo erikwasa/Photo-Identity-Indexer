@@ -99,11 +99,23 @@ public sealed class WindowsVideoJobObjectTests
 
             // Allow two members in the Job Object to distinguish native
             // child mitigation from the one-process Job Object cap.
-            // Attempt a second cmd.exe and assert no marker was written.
+            // Same exact nested command must succeed without the opt-in
+            // creation mitigation, proving the nested invocation is valid.
+            string[] nested = ["/d", "/c", "cmd.exe /d /c exit /b 0"];
+            var unrestricted = await new VideoToolProcessSupervisor().RunAsync(
+                cmd, sha, root, _ => nested,
+                budget with
+                {
+                    WindowsJobLimits = budget.WindowsJobLimits! with
+                    {
+                        RequireProcessCreationMitigations = false
+                    }
+                });
+            Assert.Equal(0, unrestricted.ExitCode);
+
             var refused = await new VideoToolProcessSupervisor().RunAsync(
                 cmd, sha, root,
-                _ => ["/d", "/c", "cmd.exe /d /c echo unsafe > child.txt"],
-                budget);
+                _ => nested, budget);
             Assert.NotEqual(0, refused.ExitCode);
             Assert.Empty(Directory.EnumerateFileSystemEntries(root));
         }
