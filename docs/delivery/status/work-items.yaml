@@ -178,36 +178,6 @@ work_items:
   - WI-0190
   blocker_notes: []
   evidence: []
-- id: WI-0194
-  title: Evaluate archive-wide visual redundancy embeddings and suppression thresholds
-  milestone: M37
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0194-archive-wide-visual-redundancy-evaluation.md
-  started_at: 2026-10-18
-  last_updated_at: 2026-10-19
-  branch: agent/WI-0194-existing-evidence-export
-  blockers: []
-  blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/537
-- id: WI-0195
-  title: Simulate quality-aware visual redundancy during collection creation
-  milestone: M37
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0195-quality-aware-collection-simulation.md
-  started_at: 2026-10-20
-  last_updated_at: 2026-10-20
-  blockers: []
-  blocker_notes:
-  - WI-0193 research-only quality preference is available for nonproduction simulation; no absolute tier or Very Low exclusion approved.
-  - WI-0194 documented NO-GO to production similarity suppression; redundancy and combined policy arms remain blocked.
-  - Original four-policy WI-0195 acceptance cannot be claimed; bounded research-only simulation in progress.
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/538
 - id: WI-0196
   title: Define TV portrait-viewing benchmark and safe-framing rules
   milestone: M38

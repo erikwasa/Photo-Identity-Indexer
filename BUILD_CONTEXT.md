@@ -4,6 +4,31 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**M37 formal disposition (2026-10-21):** Research evaluation
+COMPLETE with explicit NO-GO/DEFER decisions. WI-0192 and
+WI-0193 completed; WI-0194 COMPLETED as archive-wide
+visual-redundancy candidate discovery + 200 calibration /
+180 guarded heldout human-pair evaluation, with **NO-GO**
+to unattended similarity suppression. WI-0195
+CLOSED as research disposition, original four-arm NOT DEMONSTRATED in its original FOUR-ARM automatic
+policy acceptance: bounded 80-photo live Creative shadow
+and 6+8 synthetic tests passed and 80/80 proxy plan
+worked, but 0/80 prior TOPIQ score overlap and no
+third-party weights/inference authorized. Production TOPIQ
+quality preference DEFER; automatic Very Low and combined
+suppression NO-GO. Human manual technical suggestions
+were genuinely useful in first pilot (129 reviewed,
+20 Consider exclusion, most unwanted as judged by
+maintainer). Issue #629 remains active for native
+product; PR #633 merged (native UI, durable local
+decisions, context review toggles); **local native
+smoke test still required**. Never conflate review
+context toggles with production collection/slideshow
+filtering; no auto purge. Canonical M37 closure memo:
+docs/delivery/milestones/M37-decision-ledger.md.
+Do not reopen consumed WI-0193 heldout labels or
+indefinitely extend M37 with further scoring probes.
+
 **2026-10-21 WI-0629 native manual suggestions:** First merged
 manual research companion generated 129 automatically suggested
 technical-quality candidates and operator reviewed ALL in Archive

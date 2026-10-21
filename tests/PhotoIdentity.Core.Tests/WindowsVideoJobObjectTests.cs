@@ -58,8 +58,12 @@ public sealed class WindowsVideoJobObjectTests
                 await System.Security.Cryptography.SHA256.HashDataAsync(input))
                 .ToLowerInvariant();
             var supervisor = new VideoToolProcessSupervisor();
+            // This test verifies suspended launch, Job Object assignment,
+            // and caller cancellation, not the production wall-time ceiling.
+            // Allow for slow process startup on a busy Windows CI host;
+            // the explicit 450 ms caller cancellation is still asserted below.
             VideoToolExecutionBudget limit = new(
-                TimeSpan.FromSeconds(7), 1024 * 1024,
+                TimeSpan.FromSeconds(20), 1024 * 1024,
                 WindowsJobLimits: new WindowsVideoJobLimits(512, 2, 25),
                 InspectionInterval: TimeSpan.FromMilliseconds(100));
 

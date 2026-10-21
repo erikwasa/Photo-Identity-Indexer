@@ -133,40 +133,46 @@ background jobs are modified. See
   recorded; native operator UI is a separate subsequent product
   workstream, not a retroactive completed four-arm experiment.
 
-## What must happen NEXT before a closure recommendation
+## Final M37 disposition — evaluation closed with research NO-GO / DEFER (2026-10-21)
 
-1. Merge one substantive bounded-scoring + milestone-documentation PR after
-   CI passes. On the maintained archive, run **one no-inference local
-   preparation and coverage plan** against the already captured Creative
-   scenario, optionally a few more independent previews. Do not rescore
-   the entire archive.
-2. Operator explicitly decides whether to authorize one bounded CPU TOPIQ
-   research-only inference on **existing hash-verified review proxies**.
-   The installed `pyiqa 0.1.16` model may load or download third-party
-   weights. This **does not confer a production license or model identity
-   attestation**. If authorization is withheld, record a research-scope
-   no-go/defer and proceed to disposition; do not demand repeated commands.
-3. If authorized and score coverage materially increases, run the frozen
-   same-kind/same-relevance-gap shadow selection on captured REAL
-   Creative/search-anchored previews. Only if one or more resulting
-   collections change, ask for ONE blinded human A/B review round using the
-   already-built Finish & Report UI. Interpret wins/losses, retention and
-   score coverage honestly; do not use these preferences to retune TOPIQ
-   cutoff or select another IQA model.
-4. Record **one explicit end-of-M37 adoption memo** for four independent
-   decisions: selective quality preference; Very Low exclusion; automatic
-   visual redundancy; combined policy. Each must be `GO`, `NO-GO` or
-   `DEFER` with a clear reason. Quality preference may remain research-
-   promising without becoming a production GO.
-5. Close the evaluation milestone **with documented no-go/defer outcomes**
-   when the decisions and bounded collection experience experiment are
-   assessed. Retain the original unmet four-variant/suppression criterion
-   in work-item history; label it **not demonstrated due to research no-go**
-   rather than claiming all four deployed policy arms were validated.
-   Any future model license/weight pinning, absolute quality backfill,
-   ANN/similarity-model work, production persistence or collection UI
-   adoption belongs in **new work outside M37**, not an endless sequence
-   of M37 micro-checkpoints.
+**The goal of M37 was to evaluate whether independent quality and
+visual-redundancy signals can be safely applied.** The empirical answer is
+that automated exclusions/suppression cannot be approved with this
+evidence, while **human-controlled technical-quality suggestions have
+demonstrated practical value**. Closing a *research evaluation* with
+negative/deferred policy decisions is not a claim that those policies
+were implemented. The original WI-0195 four-arm policy simulation
+acceptance was **not demonstrated and its rollout track is cancelled**.
+
+| Evaluated capability | Final M37 decision | Evidence and boundary |
+| --- | --- | --- |
+| Representative quality review protocol (WI-0192) | **PASS** | 400 representative + 200 challenge benchmark; frozen calibration/heldout |
+| Selective TOPIQ preference (WI-0193) | **RESEARCH SIGNAL / PRODUCTION DEFER** | Frozen p75 score gap 0.16755089163780212; heldout point estimate only, confidence/license and original/proxy transfer not sufficient for deployment |
+| Absolute quality tier or unattended Very Low exclusion | **NO-GO** | Not safe enough to exclude meaningfully distinct photos without human review |
+| Archive-scale visual redundancy candidate discovery (WI-0194) | **PASS AS RESEARCH** | 27,050 proxies; 200 calibration plus 180 guarded heldout blind pair reviews; not representative whole-archive precision |
+| Unattended visual redundancy suppression | **NO-GO** | No heldout candidate-stratum 95% Wilson lower bound met conservative suppression precision; unobserved leakage and missing disagreement controls |
+| Combined quality + redundancy automatic policy | **NO-GO** | Both prerequisites rejected / not deployment-approved |
+| Original WI-0195 four-arm real-collection policy comparison | **NOT DEMONSTRATED / NO-GO (evaluation closed)** | Safe preview importer, 8/8 shadow tests; 80 candidates, 0 pre-existing TOPIQ scores, 0 effective score comparisons; opt-in bounded scoring deliberately not authorized |
+| WI-0195 bounded score-coverage preflight | **PASS PLANNING** | 6+8 synthetic tests passed, 80/80 existing current proxies, 80 prospective scored photos fitting cap 120, 353.8 seconds projected CPU, **zero inference** |
+| Human-controlled low-quality suggestions (issue #629) | **GO FOR MANUAL PRODUCT EXPERIENCE** | 129/129 Archive suggestions human-reviewed; 72 Keep, 37 Dismiss, 20 Consider exclusion. Maintainer confirmed most considered cases genuinely unwanted, and review reasonably convenient; 0 automatic exclusions |
+
+**Follow-up ownership:** WI-0629/issue #629 is a separate ongoing
+product-development workstream. PR #633 merged the native
+`/quality-suggestions` page with durable per-context review choices
+and an operator-triggered bounded scan. It requires a **small local
+native UX verification** before product acceptance; M37 research closure
+does NOT pre-approve a native production experience, automatic
+photo filtering, background inference or broad archive claims.
+The previous companion's 129 private human choices are not silently
+imported. Keep them confidential. Any future reversible hide,
+whole-archive batch scanning, model weight/license approval or semantic
+redundancy suggestions requires separate explicit product scope.
+
+The original M37 work-item statuses are now:
+WI-0192 **completed**, WI-0193 **completed**, WI-0194
+**completed (candidate discovery/evaluation, suppression NO-GO)**,
+WI-0195 **completed as research disposition (four-arm acceptance unmet)**.
+M37 itself is **completed as an evaluation with these outcomes**.
 
 ## Safety and privacy evidence that cannot be relaxed
 

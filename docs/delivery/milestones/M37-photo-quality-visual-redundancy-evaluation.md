@@ -122,3 +122,38 @@ in an explicitly accepted follow-up.
 - [ ] Real collection scenarios compare current behavior, quality preference, similarity suppression and the combined policy without mutating production collections.
 - [ ] The milestone records separate go/no-go decisions for absolute quality, Very Low exclusion, visual redundancy and combined collection use.
 - [ ] Any production persistence, Search/Smart/Creative behavior or UI change is created as separate follow-up work after the evaluation.
+
+## Final acceptance reconciliation — 2026-10-21
+
+**Completed research evaluation; original production-policy aspiration
+NOT achieved.** Accepted benchmark/review design, blinded heldout
+quality evidence, archive-wide visual redundancy candidate search,
+and explicit adoption/go-no-go decisions are evidenced in
+[M37 final decision ledger](M37-decision-ledger.md).
+The original WI-0195 proposed fully populated four-arm production-style
+simulation is **not demonstrated**: a real 80-photo shortlist had
+0 overlapping pre-existing TOPIQ scores; a subsequent bounded
+80/80 current-proxy score *plan* passed, but no operator consent
+was given to load any additional third-party weights. Unattended
+Very Low exclusion, visual redundancy suppression, and their
+combination are explicit **NO-GO**, not suppressed behind an
+unproven heuristic. Research-level TOPIQ selective ordering
+is **DEFER for product integration**. Any original criteria
+requiring a four-arm validated *automatic* selection experiment
+remain intentionally **unmet**, not silently checked off.
+
+The operator's separate human-in-the-loop aim did pass:
+a bounded companion queue generated 129 technical suggestions;
+the maintainer reviewed all (72 Keep, 37 Dismiss, 20 Consider)
+and confirmed most considered cases genuinely unwanted and review
+reasonably convenient. Issue [#629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629)
+owns the resulting native manual-review product, including
+merged PR #633 and its pending maintained-app smoke test.
+The native UI is **not** part of the WI-0195 four-arm acceptance
+and has no automatic exclusion or collection/slideshow filtering.
+
+**M37 marked completed as a decision-oriented research milestone**;
+WI-0194 completed with **suppression NO-GO**, WI-0195
+closed as a research disposition with the original four-arm acceptance explicitly
+unmet. This is the final boundary between research and
+operator-facing product work.

@@ -196,3 +196,20 @@ Reproducible neighbour generation, deterministic review-set export, maintainer p
 - Trade-offs:
 - Deferred work:
 - Commands run:
+
+## Final research disposition — 2026-10-21
+
+**WI-0194 completed as a visual redundancy EVALUATION, not production
+automatic suppression.** The maintained archive research
+covered 27,050 current proxies and 165,181 enriched
+candidate/control relationships, with 200 calibration and 180 guarded
+held-out human pair reviews. Positive dHash-close and high-CLIP
+candidate strata are interesting for **future manual suggestions**,
+but none met a defensible conservative deployment precision
+standard. Heldout photo-correlation, selected candidate strata,
+quarantine-related bias, uncovered far-dHash/high-CLIP
+disagreements and incomplete true-copy controls rule out a
+safe automatic suppression threshold. **NO-GO to unattended
+redundancy suppression.** All source originals and production
+collection behavior unchanged. The operator's human-controlled
+suggestion goal continues separately under issue #629.

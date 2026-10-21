@@ -182,3 +182,31 @@ Automated simulator determinism tests plus blinded maintainer review of represen
 - Trade-offs:
 - Deferred work:
 - Commands run:
+
+## Final work-item disposition — 2026-10-21
+
+**WI-0195 research disposition COMPLETED; original four-arm automatic-policy acceptance NOT DEMONSTRATED**, following independent quality and visual
+redundancy policy no-go decisions. This is not a claim that
+baseline vs approved Very Low, redundancy-only and combined
+four-arm selection was evaluated successfully.
+
+Completed non-destructive portions: real Creative preview
+import; 8/8 shadow tests on maintained data with
+80 selected candidates, **0/80 existing TOPIQ scores**
+and no score comparisons/selection changes; 6/6 additional
+bounded-scorer tests, 80/80 verified current review
+proxies, plan to score at most 80 new photos with
+explicit rights/consent, **no model inference performed**,
+no originals read/hydrated, no catalogue/collection changes.
+Original four approved policy variants remain unavailable:
+selective TOPIQ preference only research evidence (production DEFER),
+absolute Very Low exclusion NO-GO, automatic redundancy
+suppression NO-GO, combined policy NO-GO.
+
+**Separate useful product outcome:** 129/129 manually reviewed
+technical candidates under issue #629, with 20 marked
+Consider exclusion and maintainer finding most genuinely
+unwanted. Human-controlled suggestions GO for product
+development, not any unattended automatic exclusion.
+Final M37 acceptance documented in
+`docs/delivery/milestones/M37-decision-ledger.md`.
