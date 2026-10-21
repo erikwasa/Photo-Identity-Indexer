@@ -42,11 +42,23 @@ public sealed class PostgresPhotoQualityEvaluationRepository
         int limit,
         CancellationToken cancellationToken = default)
     {
+        return await ReadCurrentProxyPageAsync(profileId, 0, limit, cancellationToken);
+    }
+
+    /// <summary>
+    /// Stable, bounded pages of the existing review-proxy population. The
+    /// caller stores its next offset; this never hydrates authoritative media.
+    /// Rescans and concurrent catalogue changes may shift offsets slightly:
+    /// consumers must deduplicate by revision and revalidate current proxies.
+    /// </summary>
+    public async Task<IReadOnlyList<PhotoQualityEvaluationCandidate>> ReadCurrentProxyPageAsync(
+        string profileId, int offset, int limit,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        if (limit is <= 0 or > 5000)
-        {
-            throw new ArgumentOutOfRangeException(nameof(limit), "Evaluation sample size must be between 1 and 5000.");
-        }
+        if (limit is <= 0 or > 5001 || offset is < 0 or > 200000)
+            throw new ArgumentOutOfRangeException(nameof(limit),
+                "Quality review page requires 1..5001 photos and a bounded nonnegative offset.");
 
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
@@ -80,11 +92,12 @@ public sealed class PostgresPhotoQualityEvaluationRepository
               AND asset.media_kind = 'photo'
               AND revision.media_kind = 'photo'
 
-            ORDER BY md5(revision.id::text)
-            LIMIT @limit;
+            ORDER BY md5(revision.id::text), revision.id
+            LIMIT @limit OFFSET @offset;
             """;
         command.Parameters.AddWithValue("profile_id", profileId.Trim());
         command.Parameters.AddWithValue("limit", limit);
+        command.Parameters.AddWithValue("offset", offset);
 
         List<PhotoQualityEvaluationCandidate> candidates = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
