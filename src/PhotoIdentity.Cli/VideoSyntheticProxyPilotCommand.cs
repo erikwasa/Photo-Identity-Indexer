@@ -80,7 +80,10 @@ public static class VideoSyntheticProxyPilotCommandRunner
         InspectionInterval: TimeSpan.FromMilliseconds(200),
         WindowsJobLimits: new WindowsVideoJobLimits(
             MaximumJobMemoryMiB: 768, MaximumProcesses: 1,
-            MaximumCpuPercent: 15));
+            MaximumCpuPercent: 15,
+            // Only synthetic fixtures opt in until Windows CI + maintained
+            // toolchain validate the native mitigation attributes.
+            RequireProcessCreationMitigations: true));
 
     public static async Task<int> RunAsync(
         VideoSyntheticProxyPilotOptions options, TextWriter output,
