@@ -16,7 +16,7 @@ inherited NUL standard handle. It still runs FFmpeg under the same
 Windows security identity as its calling application.
 
 This optional checkpoint adds
-`WindowsVideoJobLimits.RequireProcessCreationMitigations` (default
+`WindowsVideoJobLimits.RequireChildProcessRestriction` (default
 **false**). For opted-in processes only, the native launcher
 installs three `STARTUPINFOEX` attributes **before** `CreateProcessW`:
 
@@ -44,7 +44,7 @@ child-process denial first, without touching maintained originals.
 
 The new Windows unit test compares the same harmless
 system `cmd.exe` nested launch both *without* and *with*
-`RequireProcessCreationMitigations`, under a Job Object allowing
+`RequireChildProcessRestriction`, under a Job Object allowing
 two processes: the unrestricted nested call must succeed; the restricted
 one must be rejected. It also proves a single first-party process still
 runs normally and scratch teardown succeeds. This is a compatibility
