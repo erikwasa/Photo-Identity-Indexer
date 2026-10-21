@@ -21,7 +21,8 @@ public static class VideoToolFailureEvidence
         "suspended-process-launch", "process-observation",
         "post-exit-validation", "scratch-entry-limit",
         "scratch-linked-entry", "scratch-byte-limit",
-        "process-shutdown-unverified"
+        "process-shutdown-unverified", "io-accounting-unavailable",
+        "io-budget-exceeded"
     ];
 
     /// <summary>Assign a fixed code only. Never pass a tool-derived string.</summary>
