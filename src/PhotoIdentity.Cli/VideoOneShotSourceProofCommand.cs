@@ -60,8 +60,8 @@ public sealed record VideoOneShotSourceProofResult(
 {
     public static VideoOneShotSourceProofResult Success() =>
         new(true, true, true, "verified");
-    public static VideoOneShotSourceProofResult Fail(bool? opened, string reason) =>
-        new(false, opened, false, reason);
+    public static VideoOneShotSourceProofResult Fail(bool? opened, string reason, bool stable = false) =>
+        new(false, opened, stable, reason);
 }
 
 public static class VideoOneShotSourceProofCommandRunner
@@ -198,7 +198,7 @@ public static class VideoOneShotSourceProofCommandRunner
         digest.Length == 64 &&
         digest.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 
-    private static async Task<VideoOneShotSourceProofResult> VerifyLocalFileAsync(
+    internal static async Task<VideoOneShotSourceProofResult> VerifyLocalFileAsync(
         Guid sourceId, string sourceRoot, string sourceKey,
         string expectedSha, long expectedBytes, CancellationToken token)
     {
@@ -256,7 +256,7 @@ public static class VideoOneShotSourceProofCommandRunner
             return VideoOneShotSourceProofResult.Fail(true, "source-changed");
 
         if (!string.Equals(actual, expectedSha, StringComparison.Ordinal))
-            return VideoOneShotSourceProofResult.Fail(true, "digest-mismatch");
+            return VideoOneShotSourceProofResult.Fail(true, "digest-mismatch", stable: true);
 
         return VideoOneShotSourceProofResult.Success();
     }
