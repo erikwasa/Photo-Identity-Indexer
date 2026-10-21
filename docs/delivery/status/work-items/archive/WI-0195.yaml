@@ -6,6 +6,8 @@ owner: ai-agent
 document: ../work-items/WI-0195-quality-aware-collection-simulation.md
 started_at: 2026-10-20
 completed_at: 2026-10-21
+verified_at: 2026-10-21
+verified_by: ai-agent
 last_updated_at: 2026-10-21
 blockers: []
 blocker_notes:
