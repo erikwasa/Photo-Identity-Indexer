@@ -205,7 +205,9 @@ if ($LASTEXITCODE -ne 0) { throw 'One-shot source integrity check failed.' }
 
 The tool rejects online-only, outdated, excluded, linked, unsupported
 or oversized revisions. It rereads exact source identity/size/hash from
-a read-only current-schema PostgreSQL transaction, uses the same
+a read-only current-schema PostgreSQL transaction, refuses
+photo-work activity, running video leases and enabled/unpaused/selected
+video control, and uses the same
 no-recall Windows handle as the bounded video stager, reads at most
 256 MiB under a three-minute deadline, and checks SHA-256 against
 the catalogued original digest plus file size, mtime and already-local
