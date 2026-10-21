@@ -87,7 +87,7 @@ Reference: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi
 ## Synthetic-only native process-creation mitigations (2026-10-22)
 
 The supervised suspended launcher now supports an optional native
-`RequireProcessCreationMitigations` flag. It installs an explicit Windows
+`RequireChildProcessRestriction` flag. It installs an explicit Windows
 child-process denial plus mitigation policies for remote-image loading,
 low-integrity image loading and legacy extension points, **before**
 `CreateProcessW` and before resuming the restricted tool. If an
