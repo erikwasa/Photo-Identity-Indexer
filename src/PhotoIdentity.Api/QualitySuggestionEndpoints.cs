@@ -14,6 +14,7 @@ namespace PhotoIdentity.Api;
 public static class QualitySuggestionEndpoints
 {
     private const string ProfileId = "jpeg-1600-q78";
+    private static readonly SemaphoreSlim ScanGate = new(1, 1);
 
     public static IEndpointRouteBuilder MapQualitySuggestionEndpoints(
         this IEndpointRouteBuilder endpoints)
@@ -22,6 +23,7 @@ public static class QualitySuggestionEndpoints
         endpoints.MapPost("/api/quality-suggestions/scan", ScanAsync);
         endpoints.MapPut("/api/quality-suggestions/context/{scope}", SetContextAsync);
         endpoints.MapPut("/api/quality-suggestions/review/{revisionId}", ReviewAsync);
+        endpoints.MapPost("/api/quality-suggestions/excluded/{revisionId}", WithdrawExcludedAsync);
         return endpoints;
     }
 
@@ -95,8 +97,23 @@ public static class QualitySuggestionEndpoints
         }
     }
 
+    private static async Task<IResult> WithdrawExcludedAsync(
+        string revisionId, CollectionReviewProxyFileResolver resolver,
+        QualitySuggestionWorkspace store, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(revisionId, out Guid guid) || guid == Guid.Empty)
+            return Results.BadRequest(new { error = "Invalid photo revision." });
+        // The source-copy privacy exclusion must have been committed by the
+        // existing native exclusion endpoint before withdrawing this row.
+        if (await resolver.ResolveWithMetadataAsync(
+            AssetRevisionId.From(guid), cancellationToken) is not null)
+            return Results.Conflict(new { error = "Photo remains eligible; exclusion not confirmed." });
+        await store.RemoveExcludedCandidateAsync(revisionId.ToLowerInvariant(), cancellationToken);
+        return Results.Ok(new { withdrawn = true, originalsDeleted = false });
+    }
+
     private static async Task<IResult> ScanAsync(
-        int? limit,
+        int? limit, string? mode,
         PostgresPhotoQualityEvaluationRepository repository,
         CollectionReviewProxyFileResolver resolver,
         ReviewProxyServingConfiguration configuration,
@@ -104,88 +121,125 @@ public static class QualitySuggestionEndpoints
         CancellationToken cancellationToken)
     {
         int count = limit ?? 1000;
-        if (count is < 1 or > 5000)
-            return Results.BadRequest(new { error = "The existing-proxy scan limit must be 1 to 5,000." });
-
+        string action = mode ?? "next";
+        if (count is < 1 or > 5000 || action is not ("next" or "restart"))
+            return Results.BadRequest(new
+            {
+                error = "Select next or restart, with 1 to 5,000 existing proxies per batch."
+            });
         if (!configuration.IsConfigured || configuration.ProfileId != ProfileId)
-            return Results.Conflict(new { error = "Calibrated jpeg-1600-q78 review proxies must be configured." });
+            return Results.Conflict(new
+            {
+                error = "Calibrated jpeg-1600-q78 review proxies must be configured."
+            });
+        if (!await ScanGate.WaitAsync(0, cancellationToken))
+            return Results.Conflict(new { error = "A review-proxy scan is already running." });
 
-        IReadOnlyList<PhotoQualityEvaluationCandidate> population =
-            await repository.ReadCurrentProxySampleAsync(ProfileId, count, cancellationToken);
-
-        IReadOnlyDictionary<AssetRevisionId, ResolvedCollectionReviewProxy> eligible =
-            await resolver.ResolveManyWithMetadataAsync(
-                population.Select(x => x.AssetRevisionId).ToArray(), cancellationToken);
-
-        OpenCvTechnicalPhotoQualityAnalyzer analyzer = new();
-        ReviewProxyProfile profile = new(ProfileId, 1600, 78);
-        List<QualitySuggestionCandidate> candidates = [];
-        int unreadable = 0;
-
-        foreach (PhotoQualityEvaluationCandidate row in population)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!eligible.TryGetValue(row.AssetRevisionId, out ResolvedCollectionReviewProxy? proxy) ||
-                proxy.Metadata.ProfileId != ProfileId)
+            QualitySuggestionSnapshot before = await store.ReadAsync(cancellationToken);
+            int offset = action == "restart" ? 0 : before.NextScanOffset;
+            if (action == "next" && before.ScanComplete)
+                return Results.Ok(new
+                {
+                    protocol = QualitySuggestionWorkspace.Protocol,
+                    processedThisBatch = 0,
+                    scannedCurrentProxyCandidates = before.Scanned,
+                    suggested = before.Candidates.Count,
+                    nextScanOffset = before.NextScanOffset,
+                    scanComplete = true,
+                    noOriginalsHydrated = true,
+                    exclusionsPerformed = 0
+                });
+
+            // Fetch one extra revision solely to determine whether more pages
+            // exist. Every scan request is bounded and cancellation-aware.
+            IReadOnlyList<PhotoQualityEvaluationCandidate> page =
+                await repository.ReadCurrentProxyPageAsync(
+                    ProfileId, offset, count + 1, cancellationToken);
+            PhotoQualityEvaluationCandidate[] population =
+                page.Take(count).ToArray();
+            bool complete = page.Count <= count;
+
+            IReadOnlyDictionary<AssetRevisionId, ResolvedCollectionReviewProxy> eligible =
+                await resolver.ResolveManyWithMetadataAsync(
+                    population.Select(x => x.AssetRevisionId).ToArray(), cancellationToken);
+            OpenCvTechnicalPhotoQualityAnalyzer analyzer = new();
+            ReviewProxyProfile profile = new(ProfileId, 1600, 78);
+            List<QualitySuggestionCandidate> candidates = [];
+            int unreadable = 0;
+
+            foreach (PhotoQualityEvaluationCandidate row in population)
             {
-                unreadable++;
-                continue;
-            }
-            try
-            {
-                FileInfo info = new(proxy.File.Path);
-                if (!info.Exists || info.Length < 1 ||
-                    info.Length > 16 * 1024 * 1024 ||
-                    info.Length != proxy.Metadata.EncodedByteLength)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!eligible.TryGetValue(row.AssetRevisionId, out ResolvedCollectionReviewProxy? proxy) ||
+                    proxy.Metadata.ProfileId != ProfileId)
                 {
                     unreadable++;
                     continue;
                 }
-                byte[] encoded = await File.ReadAllBytesAsync(proxy.File.Path, cancellationToken);
-                if (!string.Equals(
-                    Convert.ToHexString(SHA256.HashData(encoded)),
-                    proxy.Metadata.ContentHash.ToString(), StringComparison.OrdinalIgnoreCase))
+                try
+                {
+                    FileInfo info = new(proxy.File.Path);
+                    if (!info.Exists || info.Length < 1 ||
+                        info.Length > 16 * 1024 * 1024 ||
+                        info.Length != proxy.Metadata.EncodedByteLength)
+                    {
+                        unreadable++;
+                        continue;
+                    }
+                    byte[] encoded = await File.ReadAllBytesAsync(proxy.File.Path, cancellationToken);
+                    if (!string.Equals(
+                        Convert.ToHexString(SHA256.HashData(encoded)),
+                        proxy.Metadata.ContentHash.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        unreadable++;
+                        continue;
+                    }
+                    TechnicalPhotoQualityEvidence evidence =
+                        analyzer.Analyze(encoded, profile, cancellationToken);
+                    string[] known = evidence.Reasons
+                        .Where(reason => QualitySuggestionWorkspace.Reasons.ContainsKey(reason))
+                        .Distinct(StringComparer.Ordinal).ToArray();
+                    if (known.Length == 0) continue;
+                    int priority = known.Max(reason =>
+                        QualitySuggestionWorkspace.Reasons[reason].Weight) * 10 + known.Length;
+                    candidates.Add(new QualitySuggestionCandidate(
+                        row.AssetRevisionId.ToString().ToLowerInvariant(), known, priority));
+                }
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException or InvalidDataException)
                 {
                     unreadable++;
-                    continue;
                 }
-                TechnicalPhotoQualityEvidence evidence =
-                    analyzer.Analyze(encoded, profile, cancellationToken);
-                string[] known = evidence.Reasons
-                    .Where(reason => QualitySuggestionWorkspace.Reasons.ContainsKey(reason))
-                    .Distinct(StringComparer.Ordinal).ToArray();
-                if (known.Length == 0)
-                    continue;
-                int priority = known.Max(reason =>
-                    QualitySuggestionWorkspace.Reasons[reason].Weight) * 10 + known.Length;
-                candidates.Add(new QualitySuggestionCandidate(
-                    row.AssetRevisionId.ToString().ToLowerInvariant(), known, priority));
             }
-            catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or InvalidDataException)
+
+            QualitySuggestionSnapshot after = await store.AppendScanPageAsync(
+                offset, population.Length, complete, candidates,
+                restart: action == "restart", cancellationToken);
+            return Results.Ok(new
             {
-                unreadable++;
-            }
+                protocol = QualitySuggestionWorkspace.Protocol,
+                processedThisBatch = population.Length,
+                scannedCurrentProxyCandidates = after.Scanned,
+                suggested = after.Candidates.Count,
+                unreadableOrExcluded = unreadable,
+                nextScanOffset = after.NextScanOffset,
+                scanComplete = after.ScanComplete,
+                humanDecisionsPreserved = after.Decisions.Count,
+                noInferredModelWeights = true,
+                noOriginalsHydrated = true,
+                exclusionsPerformed = 0,
+                productionCollectionChanges = false
+            });
         }
-
-        QualitySuggestionCandidate[] ranked = candidates
-            .OrderByDescending(c => c.Priority)
-            .ThenBy(c => c.RevisionId, StringComparer.Ordinal).Take(1500).ToArray();
-        QualitySuggestionSnapshot state =
-            await store.ReplaceCandidatesAsync(population.Count, ranked, cancellationToken);
-        return Results.Ok(new
+        catch (InvalidOperationException)
         {
-            protocol = QualitySuggestionWorkspace.Protocol,
-            scannedCurrentProxyCandidates = population.Count,
-            suggested = state.Candidates.Count,
-            unreadableOrExcluded = unreadable,
-            humanDecisionsPreserved = state.Decisions.Count,
-            noInferredModelWeights = true,
-            noOriginalsHydrated = true,
-            exclusionsPerformed = 0,
-            productionCollectionChanges = false
-        });
+            return Results.Conflict(new { error = "Scan cursor changed; reload and try again." });
+        }
+        finally { ScanGate.Release(); }
     }
+
 }
 
 public sealed record QualitySuggestionDecisionRequest(string Scope, string Decision);
