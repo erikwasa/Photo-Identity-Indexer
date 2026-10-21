@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Npgsql;
@@ -74,10 +75,19 @@ public static class VideoOneShotCandidatesCommandRunner
 
         await using PostgresCatalogueDatabase database = new(builder.ConnectionString);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlTransaction readOnly = await connection.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted, token);
+        await using (NpgsqlCommand readOnlyGuard = connection.CreateCommand())
+        {
+            readOnlyGuard.Transaction = readOnly;
+            readOnlyGuard.CommandText = "SET TRANSACTION READ ONLY;";
+            await readOnlyGuard.ExecuteNonQueryAsync(token);
+        }
         // No Schema.Initialize call; only an explicitly already-migrated v37
         // database is queried. A mismatched catalogue is never upgraded.
         await using (NpgsqlCommand version = connection.CreateCommand())
         {
+            version.Transaction = readOnly;
             version.CommandText = """
                 SELECT COALESCE(MAX(version),0)
                 FROM photo_identity_schema_migrations;
@@ -89,6 +99,7 @@ public static class VideoOneShotCandidatesCommandRunner
         }
 
         await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = readOnly;
         command.CommandText = """
             SELECT revision.id, revision.size_bytes,
                    metadata.duration_seconds,
