@@ -96,10 +96,11 @@ combined remote-image/low-label/extension-point mitigations caused
 CI, so they have been removed from the experimental profile rather
 than being incorrectly treated as compatible.
 
-Initially **only the synthetic encoder/generator** enables this flag.
-The selected one-shot FFmpeg/FFprobe and ordinary production paths retain
-their existing settings until Windows CI and the separately approved
-FFmpeg synthetic host trial demonstrate compatibility. This is defense
+**No production or synthetic FFmpeg/FFprobe path enables this flag**,
+because a first-party system `cmd.exe` failed to initialize
+(`0xC0000142`) even with only the child restriction installed in
+Windows CI. The optional setting is deliberately **default-off** and
+is exercised only in compatibility tests. This is defense
 in depth; Microsoft's documented child-process restriction is not
 considered complete isolation without a restricted token and inaccessible
 privileged process handles. It does not confer network denial, file ACL
