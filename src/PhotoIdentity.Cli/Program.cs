@@ -53,6 +53,11 @@ public static class Program
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
                 "video" when args.Length > 2 &&
+                    args[1] == "one-shot" && args[2] == "assess-photo-load" =>
+                    await VideoPhotoLoadEvidenceCommandRunner.RunAsync(
+                        VideoPhotoLoadEvidenceOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "source-proof" =>
                     await VideoOneShotSourceProofCommandRunner.RunAsync(
                         VideoOneShotSourceProofOptions.Parse(args.Skip(3).ToArray()),
@@ -204,6 +209,12 @@ public static class Program
               catalogue rehearse-v35 / rehearse-v36
                                      (legacy aliases; also apply through v37)
 
+              video one-shot assess-photo-load --baseline-file ABS_JSON
+                                               --mixed-file ABS_JSON
+                                               --limits-file ABS_JSON
+                                               (offline numeric comparison;
+                                                no database, photo/video or tool IO;
+                                                never authorizes production)
               video one-shot source-proof --postgres-connection-env NAME --database DB
                                           --revision-id UUID [--read-local-bytes]
                                           (default no media read; explicit bounded

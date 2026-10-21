@@ -825,6 +825,68 @@ or v34→v37 migration checks merely for this step.
   must explicitly authorize original byte reads by choosing the
   flag after review.
 
+### Maintainer checkpoint 27 — explicit pre-trial source checksum accepted (2026-10-21)
+
+The maintainer executed both modes of `video one-shot source-proof` for
+the previously selected eligible local SDR revision. The default call
+returned `dryRun=true`, `explicitLocalReadRequested=false`,
+`status=not-run`, `originalBytesOpened=false`. The expressly
+authorized `--read-local-bytes` call returned:
+`status=verified`, `revisionDigestMatched=true`,
+`originalBytesOpened=true`, `sourceMetadataStable=true`,
+`originalWriteAccessRequested=false`,
+`oneDriveHydrationRequested=false`, `jobsEnqueued=false`,
+`videoWorkersActivated=false`, `derivativesPublished=false`,
+`originalPostTrialIntegrityVerified=false`, and
+`realVideoExecutionAuthorized=false`.
+
+**Accepted:** the exact original's currently catalogued SHA-256 before
+any video processing. This is **not** post-trial byte integrity and
+does not prove a general cloud/no-network OS sandbox. No source
+filename, source path, SHA-256 bytes, private media content or
+credential is recorded in the public work item.
+
+### Development checkpoint 28 — reproducible offline photo mixed-load evidence gate
+
+- Introduce a standalone `video one-shot assess-photo-load` CLI
+  with **no PostgreSQL, FFmpeg, source-original, media, worker or
+  cloud dependency**. It accepts three bounded local JSON files:
+  photo-only measurements, genuinely observed selected-video mixed
+  measurements, and explicit operator-reviewed percentage limits.
+- Strict numeric-only input requires elapsed windows 60–3600 seconds,
+  actually completed photo jobs, 20–200 latency observations for
+  Visual, Caption, Combined search and slideshow advance in each
+  phase. Invalid/missing metrics, wrong phase, wrong observed-video
+  flag, extraneous source paths/fields, NaNs and invalid limits are
+  rejected rather than silently scored.
+- The tool produces per-minute photo job throughput and nearest-rank
+  per-mode p95 regression comparisons against the **operator-supplied**
+  maximum throughput drop and p95 increase. WI-0150/ADR-0012 does
+  **not** define accepted numeric thresholds in the repo, so this
+  change does not invent them or assert a passing regression.
+- Output is source-free; even a within-limit calculation retains
+  `diagnosticOnly=true`,
+  `photoWorkloadIdenticalIndependentlyVerified=false`,
+  `independentVideoProcessObservationVerified=false`,
+  `videoExecutionAuthorized=false` and `wi0188Accepted=false`.
+  Only reviewed field measurements can close the mixed-load gate.
+- [Benchmark procedure and privacy contract](../../operations/video-photo-mixed-load-evidence.md)
+  describes collecting matched offline samples, operator approval
+  of thresholds **before** running a mixed trial, and the outstanding
+  hard disk/IO/network boundary and cancellation/restart/exclusion
+  proofs. This development PR **does not enable** a video worker,
+  create a job, touch real videos or require any local benchmark yet.
+
+**Remaining WI-0188 acceptance:** an explicitly reviewed disk/I/O,
+filesystem privilege and network isolation policy (or separately
+accepted bounded alternative); a real single-video controlled
+encode and lease-fenced private derivative verification; concurrent
+photo-job throughput and all search/slideshow p95 timings against
+a fixed photo-only baseline; cancellation, pause, exclusion,
+restart/retry and unexpected termination with clean recovery;
+and independent post-trial original SHA-256/no hydration evidence.
+Production activation remains prohibited until reviewed.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

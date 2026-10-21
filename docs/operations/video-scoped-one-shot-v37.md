@@ -232,6 +232,33 @@ monitoring have been reviewed and an individual trial separately
 authorized. Do not repeat the successful environment/read-only
 eligibility/synthetic/migration checks merely for this new checkpoint.
 
+## Maintainer original-checksum PASS and future photo-load benchmark gate
+
+The maintainer explicitly tested `video one-shot source-proof`:
+the default command performed no source read, and the consented
+`--read-local-bytes` invocation returned
+`status=verified`, `revisionDigestMatched=true`,
+`sourceMetadataStable=true`, with no write access, OneDrive
+hydration request, video job or derivative. This accepts only
+**pre-trial integrity** of the selected original, not its safety
+after processing.
+
+The next development slice provides the offline
+`video one-shot assess-photo-load` evaluator for carefully collected
+photo-only and observed video-competing samples. See the
+[full operator evidence contract](video-photo-mixed-load-evidence.md)
+for its bounded JSON format and commands. **Do not use it yet with
+invented mixed data**: mixed samples require a separately authorized
+single-video trial, actual independent process observation and
+repeatable photo workload measurements. Numeric acceptance limits
+must first be reviewed by the maintainer because WI-0150/ADR-0012
+does not supply them.
+
+Hard disk/I/O and network containment and real-media cancellation,
+exclusion, restart and post-trial integrity are **not** discharged
+by this offline comparison or by the earlier source proof.
+No `one-shot enqueue --apply` or `one-shot run --apply` is authorized.
+
 ## Two deliberate operator actions
 
 1. `video one-shot enqueue` accepts only a previously catalogued
