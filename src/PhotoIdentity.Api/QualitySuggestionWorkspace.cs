@@ -254,6 +254,13 @@ public sealed class QualitySuggestionWorkspace
                 !Decisions.Contains(pair.Value) ||
                 !Scopes.Any(scope => pair.Key.StartsWith(scope + "/", StringComparison.Ordinal))))
             throw new InvalidDataException("Unsafe or incompatible manual-suggestion state.");
+        // Older native state from PR #633 had no scan cursor: its
+        // existing deterministic scan always began at offset zero.
+        // Continue after its recorded first batch instead of scanning
+        // that same batch again. Keep the old human decisions untouched.
+        if (loaded.NextScanOffset == 0 && loaded.Scanned > 0 &&
+            loaded.GeneratedAtUtc is not null && !loaded.ScanComplete)
+            loaded = loaded with { NextScanOffset = loaded.Scanned };
         return loaded;
     }
 
