@@ -263,6 +263,47 @@ public sealed class VideoSyntheticProxyPilotTests
         finally { Directory.Delete(root, recursive: true); }
     }
 
+    [Fact]
+    public async Task Wrong_approved_binary_hash_reports_only_digest_checkpoint_without_executing_tools()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = NewScratch();
+        try
+        {
+            string systemCmd = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                "cmd.exe");
+            VideoSyntheticProxyPilotOptions options =
+                VideoSyntheticProxyPilotOptions.Parse(
+                [
+                    "--scratch-root", root,
+                    "--ffmpeg", systemCmd,
+                    "--ffmpeg-sha256", Hash,
+                    "--ffprobe", systemCmd,
+                    "--ffprobe-sha256", Hash,
+                    "--apply"
+                ]);
+            using StringWriter output = new();
+            Assert.Equal(1, await VideoSyntheticProxyPilotCommandRunner
+                .RunAsync(options, output));
+            using JsonDocument document = JsonDocument.Parse(output.ToString());
+            JsonElement result = document.RootElement;
+            Assert.Equal("pilot-failed", result.GetProperty("status").GetString());
+            Assert.Equal("fixture-generation",
+                result.GetProperty("failureStage").GetString());
+            Assert.Equal("execution-safety-rejected",
+                result.GetProperty("failureClass").GetString());
+            Assert.Equal("tool-digest-mismatch",
+                result.GetProperty("failureCheckpoint").GetString());
+            Assert.False(result.GetProperty("originalsOpened").GetBoolean());
+            Assert.False(result.GetProperty("schemaUsed").GetBoolean());
+            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+            Assert.DoesNotContain(systemCmd, output.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     private static string NewScratch()
     {
         string dir = Path.Combine(Path.GetTempPath(),

@@ -588,6 +588,33 @@ checkpoint. Continue development after CI and PR review.
   disable containment or alter private originals while diagnosis
   is outstanding.
 
+### Integrated checkpoint 19 — Windows process safety rejection triage (2026-10-21)
+
+- Maintainer retried merged synthetic pilot; the already-accepted v37
+  application/photo checks remain unchanged. Pilot continues to **FAIL**
+  before first landscape fixture is generated, with
+  `failureStage=fixture-generation`,
+  `failureClass=execution-safety-rejected`, no process/Win32 exit
+  code and zero results. This is **not** codec validation, FFmpeg
+  runtime acceptance or evidence of source/archive access.
+- Added an optional, source-controlled **`failureCheckpoint`** to the
+  synthetic-only sanitized report. The supervisor tags existing
+  `InvalidOperationException` objects without changing their
+  catch behavior or bypassing guards. It distinguishes tool SHA
+  mismatch, linked executable/path, native Job Object setup,
+  suspended process launch, process monitoring, output verification,
+  scratch resource limit and shutdown failure. The checkpoint
+  can only be a fixed allowlisted string; arbitrary exception
+  messages, paths, subprocess logs and media metadata are never
+  reported, and nested failures retain the original innermost code.
+- New tests check allowlist rejection, existing exception type
+  stability, mismatch classification using approved-hash shape,
+  no subprocess invocation, and private scratch cleanup.
+- **Next proof**: GitHub Windows CI green, followed by exactly one
+  synthetic-only rerun by the maintainer with the same approved
+  binaries and scratch marker. No new PostgreSQL migration, video
+  worker enabling or real-video processing is part of this fix.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

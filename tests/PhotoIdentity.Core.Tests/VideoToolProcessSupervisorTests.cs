@@ -32,10 +32,13 @@ public sealed class VideoToolProcessSupervisorTests
         try
         {
             string executable = CmdPath();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new VideoToolProcessSupervisor().RunAsync(
-                    executable, new string('0', 64), scratch,
-                    _ => ["/d", "/c", "echo should-not-run"], SmallBudget));
+            InvalidOperationException digestFailure =
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    new VideoToolProcessSupervisor().RunAsync(
+                        executable, new string('0', 64), scratch,
+                        _ => ["/d", "/c", "echo should-not-run"], SmallBudget));
+            Assert.Equal("tool-digest-mismatch",
+                VideoToolFailureEvidence.Read(digestFailure));
             Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
         }
         finally { Directory.Delete(scratch, recursive: true); }
@@ -155,6 +158,28 @@ public sealed class VideoToolProcessSupervisorTests
             Assert.Empty(Directory.EnumerateFileSystemEntries(scratch));
         }
         finally { Directory.Delete(scratch, recursive: true); }
+    }
+
+    [Fact]
+    public void Safety_checkpoints_are_allowlisted_and_never_emit_messages()
+    {
+        InvalidOperationException error = new(
+            @"C:\\Archive\\Family\\Original.mp4");
+        Assert.Null(VideoToolFailureEvidence.Read(error));
+        Assert.Same(error, VideoToolFailureEvidence.Mark(error, "suspended-process-launch"));
+        Assert.Equal("suspended-process-launch",
+            VideoToolFailureEvidence.Read(error));
+        // Preserve the first identified failure, even if an outer
+        // supervised process adds an enclosing stage.
+        Assert.Same(error, VideoToolFailureEvidence.Mark(error, "post-exit-validation"));
+        Assert.Equal("suspended-process-launch",
+            VideoToolFailureEvidence.Read(error));
+        Assert.Throws<ArgumentException>(() =>
+            VideoToolFailureEvidence.Mark(error, @"C:\\Archive\\Family\\Original.mp4"));
+        InvalidOperationException fake = new("fake");
+        fake.Data["PhotoIdentity.VideoTool.SanitizedCheckpoint"] =
+            @"C:\\Archive\\Family\\Original.mp4";
+        Assert.Null(VideoToolFailureEvidence.Read(fake));
     }
 
     private static string MakeScratch()

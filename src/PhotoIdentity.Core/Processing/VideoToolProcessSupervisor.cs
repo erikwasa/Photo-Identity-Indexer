@@ -72,8 +72,9 @@ public sealed class VideoToolProcessSupervisor
         if (afterSuccessfulExit is not null &&
             (!OperatingSystem.IsWindows() ||
              budget.WindowsJobLimits?.MaximumProcesses != 1))
-            throw new InvalidOperationException(
-                "Video publication requires a single-process Windows Job Object.");
+            throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                "Video publication requires a single-process Windows Job Object."),
+                "resource-profile-refused");
         if (!Path.IsPathFullyQualified(executablePath) || !File.Exists(executablePath))
             throw new ArgumentException("Video executable must be an existing absolute local file.", nameof(executablePath));
         if (!Path.IsPathFullyQualified(scratchRoot) || !Directory.Exists(scratchRoot))
@@ -91,7 +92,8 @@ public sealed class VideoToolProcessSupervisor
             VideoScratchCapacityGuard.EnsureCapacity(scratchRoot, budget.MaximumTemporaryBytes);
         AssertNoReparsePoints(Path.GetDirectoryName(Path.GetFullPath(executablePath))!);
         if ((File.GetAttributes(executablePath) & FileAttributes.ReparsePoint) != 0)
-            throw new InvalidOperationException("Video executable must not be a symbolic link.");
+            throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                "Video executable must not be a symbolic link."), "linked-executable");
         if (expectedSha256 is null || expectedSha256.Length != 64 ||
             expectedSha256.Any(c => c is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
             throw new ArgumentException("Provide the lowercase SHA-256 of the approved executable.", nameof(expectedSha256));
@@ -103,7 +105,8 @@ public sealed class VideoToolProcessSupervisor
         if (!string.Equals(
             Convert.ToHexString(digest), expectedSha256,
             StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Video executable digest is not approved.");
+            throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                "Video executable digest is not approved."), "tool-digest-mismatch");
 
         cancellationToken.ThrowIfCancellationRequested();
         string workspace = VideoScratchOwnership.Create(scratchRoot, "video-tool");
@@ -120,6 +123,7 @@ public sealed class VideoToolProcessSupervisor
         using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, timeout.Token);
 
+        string checkpoint = "argument-preparation";
         try
         {
             IReadOnlyList<string> arguments = buildArguments(workspace)
@@ -159,6 +163,7 @@ public sealed class VideoToolProcessSupervisor
 
             // Resource constraints must be configured successfully before
             // starting the process. On failure, refuse execution and clean scratch.
+            checkpoint = "job-object-setup";
             if (budget.WindowsJobLimits is { } resourceLimits)
                 resourceJob = WindowsVideoJobObject.Create(resourceLimits);
 
@@ -166,6 +171,7 @@ public sealed class VideoToolProcessSupervisor
             {
                 // Never run capped video media before the OS job is attached.
                 // Child stdout/stderr/stdin go directly to inherited NUL handles.
+                checkpoint = "suspended-process-launch";
                 nativeProcess = WindowsVideoSuspendedLauncher.Start(
                     resourceJob, executablePath, workspace, arguments,
                     start.Environment, linked.Token);
@@ -187,6 +193,7 @@ public sealed class VideoToolProcessSupervisor
                 stderrDrain = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
             }
 
+            checkpoint = "process-observation";
             while (!process.HasExited)
             {
                 linked.Token.ThrowIfCancellationRequested();
@@ -205,6 +212,7 @@ public sealed class VideoToolProcessSupervisor
                 // exists. External publication must revalidate the exact lease
                 // before moving any bytes. Finally always cleans scratch.
                 linked.Token.ThrowIfCancellationRequested();
+                checkpoint = "post-exit-validation";
                 await afterSuccessfulExit(workspace, linked.Token);
             }
             return new VideoToolExecutionResult(process.ExitCode, timer.Elapsed);
@@ -213,6 +221,14 @@ public sealed class VideoToolProcessSupervisor
                                                  timeout.IsCancellationRequested)
         {
             throw new TimeoutException("Video tool exceeded its maximum wall-clock duration.");
+        }
+        catch (InvalidOperationException error)
+        {
+            // Preserve the original exception type/throw semantics. The
+            // diagnostic marker is a fixed, source-free phase and is never
+            // derived from the exception message or child process output.
+            VideoToolFailureEvidence.Mark(error, checkpoint);
+            throw;
         }
         finally
         {
@@ -246,9 +262,11 @@ public sealed class VideoToolProcessSupervisor
                 }
                 catch (OperationCanceledException)
                 {
-                    throw new InvalidOperationException(
-                        "Video process tree or its inherited pipes did not terminate; " +
-                        "preserve scratch for controlled cleanup.");
+                    throw VideoToolFailureEvidence.Mark(
+                        new InvalidOperationException(
+                            "Video process tree or its inherited pipes did not terminate; " +
+                            "preserve scratch for controlled cleanup."),
+                        "process-shutdown-unverified");
                 }
             }
 
@@ -296,7 +314,9 @@ public sealed class VideoToolProcessSupervisor
              cursor = Path.GetDirectoryName(cursor))
         {
             if ((File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
-                throw new InvalidOperationException("Video tool paths must not traverse junctions or links.");
+                throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                    "Video tool paths must not traverse junctions or links."),
+                    "linked-tool-path");
             if (Path.GetPathRoot(cursor) == cursor) break;
         }
     }
@@ -312,10 +332,14 @@ public sealed class VideoToolProcessSupervisor
             foreach (string entry in Directory.EnumerateFileSystemEntries(dir))
             {
                 if (++entries > budget.MaximumTemporaryEntries)
-                    throw new InvalidOperationException("Video tool exceeded its scratch entry limit.");
+                    throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                        "Video tool exceeded its scratch entry limit."),
+                        "scratch-entry-limit");
                 FileAttributes attributes = File.GetAttributes(entry);
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
-                    throw new InvalidOperationException("Video tool created a linked scratch entry.");
+                    throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                        "Video tool created a linked scratch entry."),
+                        "scratch-linked-entry");
                 if ((attributes & FileAttributes.Directory) != 0)
                 {
                     dirs.Push(entry);
@@ -323,7 +347,9 @@ public sealed class VideoToolProcessSupervisor
                 }
                 bytes += new FileInfo(entry).Length;
                 if (bytes > budget.MaximumTemporaryBytes)
-                    throw new InvalidOperationException("Video tool exceeded its scratch byte estimate.");
+                    throw VideoToolFailureEvidence.Mark(new InvalidOperationException(
+                        "Video tool exceeded its scratch byte estimate."),
+                        "scratch-byte-limit");
             }
         }
     }
