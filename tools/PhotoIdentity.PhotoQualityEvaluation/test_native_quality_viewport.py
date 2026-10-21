@@ -52,7 +52,7 @@ class NativeQualityViewportContractTests(unittest.TestCase):
         self.assertIn('role="dialog"', code)
         self.assertIn('Confirm exclude &amp; purge', code)
         self.assertIn('PendingExclusion is not null', code)
-        self.assertIn('if (args.Key == "Escape"', code)
+        self.assertIn('case "Escape":', code)
         self.assertIn('.quality-modal-backdrop', styles)
         self.assertIn('position: absolute;', styles)
         self.assertIn('align-items: center;', styles)
