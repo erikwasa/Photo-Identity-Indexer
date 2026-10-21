@@ -50,7 +50,7 @@ public sealed class QualitySuggestionWorkspace
         int scanned, IReadOnlyList<QualitySuggestionCandidate> suggestions,
         CancellationToken cancellationToken = default)
     {
-        if (scanned is < 0 or > 5000 || suggestions.Count > 1500 ||
+        if (scanned is < 0 or > 5000 || suggestions.Count > 30000 ||
             suggestions.Select(x => x.RevisionId).Distinct(StringComparer.OrdinalIgnoreCase).Count()
                 != suggestions.Count ||
             suggestions.Any(x => !Guid.TryParse(x.RevisionId, out Guid id) ||
@@ -73,6 +73,76 @@ public sealed class QualitySuggestionWorkspace
             };
             await PersistAsync(after, cancellationToken);
             return after;
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Append one bounded scan page. A retained continuation cursor advances
+    /// only after the candidate list and the cursor have been atomically
+    /// persisted together. Human choices always survive a new scan session.
+    /// </summary>
+    public async Task<QualitySuggestionSnapshot> AppendScanPageAsync(
+        int expectedOffset, int processed, bool complete,
+        IReadOnlyList<QualitySuggestionCandidate> suggestions,
+        bool restart,
+        CancellationToken cancellationToken = default)
+    {
+        if (expectedOffset is < 0 or > 200000 || processed is < 0 or > 5000 ||
+            suggestions.Count > processed ||
+            suggestions.Any(x => !Guid.TryParse(x.RevisionId, out Guid revision) ||
+                revision == Guid.Empty || x.Reasons.Count == 0 ||
+                x.Reasons.Any(reason => !Reasons.ContainsKey(reason))))
+            throw new ArgumentException("Invalid bounded suggestion scan page.");
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            QualitySuggestionSnapshot before = await LoadAsync(cancellationToken);
+            if ((!restart && (expectedOffset != before.NextScanOffset || before.ScanComplete)) ||
+                (restart && expectedOffset != 0))
+                throw new InvalidOperationException("Stale or completed scan cursor.");
+            IReadOnlyList<QualitySuggestionCandidate> prior = restart
+                ? [] : before.Candidates;
+            Dictionary<string, QualitySuggestionCandidate> byRevision = prior.ToDictionary(
+                x => x.RevisionId, StringComparer.OrdinalIgnoreCase);
+            foreach (QualitySuggestionCandidate candidate in suggestions)
+                byRevision[candidate.RevisionId] = candidate;
+            if (byRevision.Count > 30000)
+                throw new InvalidOperationException("Maximum retained candidate count exceeded.");
+            QualitySuggestionSnapshot next = before with
+            {
+                Scanned = (restart ? 0 : before.Scanned) + processed,
+                NextScanOffset = expectedOffset + processed,
+                ScanComplete = complete,
+                GeneratedAtUtc = DateTimeOffset.UtcNow,
+                Candidates = byRevision.Values
+                    .OrderByDescending(x => x.Priority)
+                    .ThenBy(x => x.RevisionId, StringComparer.Ordinal)
+                    .ToList()
+            };
+            await PersistAsync(next, cancellationToken);
+            return next;
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>Withdraw an already-excluded photo from the review queue.
+    /// The API must establish that the source revision is no longer accessible
+    /// before calling this method.</summary>
+    public async Task RemoveExcludedCandidateAsync(
+        string revisionId, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            QualitySuggestionSnapshot before = await LoadAsync(cancellationToken);
+            QualitySuggestionSnapshot after = before with
+            {
+                Candidates = before.Candidates.Where(x =>
+                    !string.Equals(x.RevisionId, revisionId,
+                        StringComparison.OrdinalIgnoreCase)).ToList()
+            };
+            await PersistAsync(after, cancellationToken);
         }
         finally { _gate.Release(); }
     }
@@ -159,7 +229,8 @@ public sealed class QualitySuggestionWorkspace
                 snapshot.Decisions.ContainsKey(Key(scope, x.RevisionId))),
             snapshot.Candidates.Count(x =>
                 snapshot.Decisions.GetValueOrDefault(Key(scope, x.RevisionId))
-                == "consider-exclusion"));
+                == "consider-exclusion"),
+            snapshot.NextScanOffset, snapshot.ScanComplete);
     }
 
     private async Task<QualitySuggestionSnapshot> LoadAsync(CancellationToken cancellationToken)
@@ -173,7 +244,8 @@ public sealed class QualitySuggestionWorkspace
             ?? throw new InvalidDataException("Empty quality suggestion state.");
         if (loaded.Version != 1 || loaded.Protocol != Protocol ||
             loaded.Candidates is null || loaded.EnabledScopes is null || loaded.Decisions is null ||
-            loaded.Candidates.Count > 1500 || loaded.Scanned is < 0 or > 5000 ||
+            loaded.Candidates.Count > 30000 || loaded.Scanned is < 0 or > 200001 ||
+            loaded.NextScanOffset is < 0 or > 200001 ||
             loaded.EnabledScopes.Count != Scopes.Length ||
             Scopes.Any(s => !loaded.EnabledScopes.ContainsKey(s)) ||
             loaded.Candidates.Any(c => !Guid.TryParse(c.RevisionId, out _) ||
@@ -209,7 +281,8 @@ public sealed record QualitySuggestionSnapshot(
     int Version, string Protocol, DateTimeOffset? GeneratedAtUtc, int Scanned,
     List<QualitySuggestionCandidate> Candidates,
     Dictionary<string, bool> EnabledScopes,
-    Dictionary<string, string> Decisions)
+    Dictionary<string, string> Decisions,
+    int NextScanOffset = 0, bool ScanComplete = false)
 {
     public static QualitySuggestionSnapshot Empty() => new(
         1, QualitySuggestionWorkspace.Protocol, null, 0, [],
@@ -230,4 +303,5 @@ public sealed record QualitySuggestionPage(
     Dictionary<string, bool> EnabledScopes,
     string Scope, bool Enabled, string Reason, string Filter,
     int Total, int Offset, IReadOnlyList<QualitySuggestionView> Items,
-    int ReviewedInScope, int ConsiderExclusionInScope);
+    int ReviewedInScope, int ConsiderExclusionInScope,
+    int NextScanOffset, bool ScanComplete);
