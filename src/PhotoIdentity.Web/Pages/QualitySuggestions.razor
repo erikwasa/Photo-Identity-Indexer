@@ -2,7 +2,7 @@
 
 <PageTitle>Quality suggestions · Photo Identity</PageTitle>
 
-<div class="quality-review-screen" tabindex="0" @ref="ReviewSurface"
+<div class="quality-review-screen" tabindex="0" @ref="ReviewSurface" aria-keyshortcuts="1 2 3 ArrowLeft ArrowRight"
      @onkeydown="HandleKeyboardAsync" aria-label="Photo quality review workspace">
     <header class="quality-review-toolbar">
         <div class="quality-review-heading">
@@ -156,7 +156,7 @@
                     untouched. This is not a reversible collection hide.</p>
                 <p><strong>Only an explicit click on Confirm exclude &amp; purge performs this action.</strong></p>
                 <div class="quality-modal-actions">
-                    <button type="button" class="button secondary" disabled="@Busy"
+                    <button type="button" class="button secondary" disabled="@Busy" @ref="ModalCancelButton"
                             @onclick="CancelExclude">Cancel</button>
                     <button type="button" class="button danger" disabled="@Busy"
                             @onclick="ConfirmExcludeAsync">Confirm exclude &amp; purge</button>
@@ -216,23 +216,40 @@
     private bool ScanningAll;
     private bool StopAfterBatch;
     private ElementReference ReviewSurface;
+    private ElementReference ModalCancelButton;
     private bool ShowScanSettings;
+    private bool HasRendered;
+    private bool FocusModalOnRender;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Focus the Blazor review surface itself. Native keydown events bubble
-        // here even after clicking action/navigation buttons. No JavaScript
-        // module import, document listener or hidden interop error is needed.
-        if (firstRender)
+        // Blazor handles keyboard events on its own focused review surface,
+        // without a fragile page-specific JS module. Focus is kept within
+        // the viewport and never scrolls the original document.
+        HasRendered = true;
+        if (FocusModalOnRender)
+        {
+            FocusModalOnRender = false;
+            await ModalCancelButton.FocusAsync(preventScroll: true);
+        }
+        else if (firstRender)
+        {
             await ReviewSurface.FocusAsync(preventScroll: true);
+        }
     }
 
     private async Task HandleKeyboardAsync(KeyboardEventArgs args)
     {
+        if (PendingExclusion is not null)
+        {
+            if (args.Key == "Escape" && !Busy)
+                await CancelExclude();
+            return;
+        }
         if (args.AltKey || args.CtrlKey || args.MetaKey ||
-            Busy || Loading || PendingExclusion is not null || Current is null)
+            Busy || Loading || Current is null)
             return;
         switch (args.Key)
         {
@@ -280,6 +297,10 @@
         }
         catch (Exception e) { Error = "Unable to load suggestions: " + e.Message; }
         finally { Loading = false; }
+        // A select may still own focus after its value changes. Re-enable
+        // 1/2/3 and arrow shortcuts automatically without requiring a click.
+        if (HasRendered && PendingExclusion is null)
+            await ReviewSurface.FocusAsync(preventScroll: true);
     }
 
     private Task FiltersChangedAsync()
@@ -403,9 +424,15 @@
         {
             ShowScanSettings = false;
             PendingExclusion = Current.RevisionId;
+            FocusModalOnRender = true;
         }
     }
-    private void CancelExclude() => PendingExclusion = null;
+
+    private async Task CancelExclude()
+    {
+        PendingExclusion = null;
+        await ReviewSurface.FocusAsync(preventScroll: true);
+    }
 
     private async Task ConfirmExcludeAsync()
     {
