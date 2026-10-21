@@ -156,13 +156,16 @@ acceptance was **not demonstrated and its rollout track is cancelled**.
 | WI-0195 bounded score-coverage preflight | **PASS PLANNING** | 6+8 synthetic tests passed, 80/80 existing current proxies, 80 prospective scored photos fitting cap 120, 353.8 seconds projected CPU, **zero inference** |
 | Human-controlled low-quality suggestions (issue #629) | **GO FOR MANUAL PRODUCT EXPERIENCE** | 129/129 Archive suggestions human-reviewed; 72 Keep, 37 Dismiss, 20 Consider exclusion. Maintainer confirmed most considered cases genuinely unwanted, and review reasonably convenient; 0 automatic exclusions |
 
-**Follow-up ownership:** WI-0629/issue #629 is a separate ongoing
-product-development workstream. PR #633 merged the native
-`/quality-suggestions` page with durable per-context review choices
-and an operator-triggered bounded scan. It requires a **small local
-native UX verification** before product acceptance; M37 research closure
-does NOT pre-approve a native production experience, automatic
-photo filtering, background inference or broad archive claims.
+**Follow-up ownership (updated 2026-10-21):** WI-0629/issue #629
+is now **accepted and closed** after the maintained native keyboard
+review and regression tests passed through merged PR #644. No
+automatic exclusion or model deployment was authorized by that
+acceptance. The next separate collection/slideshow curation
+workstream is issue #638 (manual similarity review and later
+reversible collection-only omission), while #639 owns continuous
+quality rating. M37 research closure still does NOT pre-approve
+global automatic photo filtering, background inference or
+whole-archive precision claims.
 The previous companion's 129 private human choices are not silently
 imported. Keep them confidential. Any future reversible hide,
 whole-archive batch scanning, model weight/license approval or semantic
