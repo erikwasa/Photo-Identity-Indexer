@@ -1,3 +1,51 @@
+## v4: deliberate keyboard-confirmed exclusion (2026-10-21)
+
+Maintainer confirmed the full-viewport single-photo reviewer now works much
+better, and explicitly requested two further keyboard steps:
+
+- **E** opens the in-place exclusion confirmation for the current photo.
+- **C** or **Enter** confirms **Exclude from Photo Identity** *only while
+  the confirmation dialog is displayed*. The dialog automatically focuses
+  the Confirm button; **Enter** uses its normal native button activation,
+  rather than executing a duplicate `keydown` exclusion request.
+- **Escape** cancels. Keep/Dismiss/Consider keys 1/2/3 and ←/→ continue
+  to work only when the exclusion dialog is closed.
+- Key-repeat and Alt/Ctrl/Meta modified shortcuts are ignored for the
+  application's keyboard handler. Enter does not initiate exclusion from
+  the photo screen; no single key from the initial review screen can
+  immediately purge a photo.
+- Exclusion is the **existing irreversible source-copy purge** of
+  Photo Identity's retained data (not deletion of the OneDrive original).
+  This keyboard shortcut is a deliberate user action, not an automatic
+  detector policy and not a reversible collection omission.
+
+### Manual verification (important, destructive action)
+
+After green CI and PR merge, update `main`, restart Photo Identity,
+open `/quality-suggestions` and test:
+
+1. On a photo you intend to **keep**, press `E`. Check the dialog opens
+   *over the image*, and Confirm gets keyboard focus; then press
+   `Escape`. Confirm the photo remains and the usual 1/2/3 and
+   arrow keys work afterward.
+2. Open the dialog again with `E`, then click **Cancel**. The
+   dialog should close and keyboard review should resume.
+3. The confirmation text and button should visibly advertise
+   **C / Enter**. Confirm that pressing **C or Enter without an open
+   dialog** does not exclude a photo. The static regression tests check
+   that both paths are guarded behind the visible confirmation.
+4. If you have a **genuinely unwanted photo that you independently
+   intend to remove**, you may test `E` then `C` (or `Enter`) **once**.
+   Verify the review queue advances and OneDrive original is untouched.
+   **Do not perform a destructive confirmation on a photo kept solely
+   for testing**. Live C/Enter purge need not be tested if no real
+   exclusion is desired.
+
+No new source hydration, automatic quality suppression, or collection
+changes are introduced. Manual exclusion remains a two-action flow.
+
+---
+
 ## v3: full-viewport keyboard review — maintained-app UX correction (2026-10-21)
 
 The maintainer reported the native review remained unusable on a normal browser
