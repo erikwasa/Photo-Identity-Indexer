@@ -40,7 +40,7 @@ NO-GO conclusions for unattended Very Low exclusion, automatic redundancy
 suppression or combined hidden-photo policies.
 
 Record the separate follow-up in
-[manual low-quality suggestion issue #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629).
+[manual low-quality suggestion WI-0206](../work-items/WI-0206-native-quality-suggestion-review.md).
 The low ~98%+ high-precision bar applied to *automatic destructive
 exclusion*, **not** to ranked manual suggestions. A useful suggestion
 pipeline should instead report **discovery yield, false-alarm/review burden,
