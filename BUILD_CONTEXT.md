@@ -4,6 +4,19 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-22 repository-only planning / issue-retirement cleanup:**
+Audit all 33 surviving GitHub issues (12 open, 21 closed) and retire them
+only after the canonical documentation PR merges and generated views validate.
+[Issue-retirement audit](docs/delivery/retired-github-issues-2026-10-22.md)
+maps each issue to its work item, ADR/runbook or explicit accidental status.
+New [WI-0205](docs/delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
+under M40 preserves the **proposed** continuous photo rating from #639.
+New [WI-0206](docs/delivery/work-items/WI-0206-native-quality-suggestion-review.md)
+under M40 preserves **completed** native Archive reviewer acceptance from #629.
+Existing M36 and M38 delivery work remains in its unchanged nonterminal
+canonical YAML, even after its historical issues are deleted. Do not create
+new GitHub issues or infer work-item acceptance from issue deletion.
+
 **2026-10-22: restore repository-native Creative curation tracking.**
 The former issue-only feature labelled **WI-0638** in merged PRs
 #647, #651, #653 and #654 now belongs to canonical
