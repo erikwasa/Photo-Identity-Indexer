@@ -613,8 +613,19 @@ public sealed class CreativeCollectionMaterializationService
         cancellationToken.ThrowIfCancellationRequested();
         _logger?.LogInformation("Creative visual phase: phase=grouping msElapsed={ElapsedMilliseconds}.", visualTimer.ElapsedMilliseconds);
         PhotoVisualFingerprint[] evidence = fingerprints.ToArray();
+        // Keep the accepted selector evidence byte-for-byte scoped to the
+        // original H8/20s eligible set. Review requests may fingerprint
+        // extra frames within 45 seconds; those must not change the normal
+        // Creative selection or its "Currently selected" review badges.
+        HashSet<AssetRevisionId>? acceptedRevisionIds = includeSimilarityReview
+            ? SelectVisualFingerprintCandidates(candidates, moments, policy)
+                .Select(candidate => candidate.RevisionId).ToHashSet()
+            : null;
+        PhotoVisualFingerprint[] acceptedEvidence = acceptedRevisionIds is null
+            ? evidence
+            : evidence.Where(item => acceptedRevisionIds.Contains(item.RevisionId)).ToArray();
         return new VisualRedundancyBuild(
-            PhotoVisualRedundancyGrouper.Group(evidence, moments, policy),
+            PhotoVisualRedundancyGrouper.Group(acceptedEvidence, moments, policy),
             includeSimilarityReview
                 ? PhotoVisualRedundancyGrouper.Group(
                     evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
