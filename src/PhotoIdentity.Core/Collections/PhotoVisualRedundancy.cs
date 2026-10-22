@@ -123,7 +123,8 @@ public sealed record PhotoVisualRedundancyGroup(
     DateTime StartedAtLocal,
     DateTime EndedAtLocal,
     int MaximumPairDistance,
-    IReadOnlyList<PhotoVisualRedundancyMember> Members);
+    IReadOnlyList<PhotoVisualRedundancyMember> Members,
+    int VisualSubgroupCount = 1);
 
 public sealed record PhotoVisualRedundancyResult(
     string PolicyVersion,
@@ -290,5 +291,158 @@ public static class PhotoVisualRedundancyGrouper
         public DateTime EndedAtLocal => Members[^1].TakenAtLocal!.Value;
 
         public void Add(PhotoVisualFingerprint candidate) => Members.Add(candidate);
+    }
+}
+
+
+/// <summary>
+/// Human-review-only presentation grouping. The input groups have genuine local
+/// dHash evidence under the H12/H18 45-second policy. This groups those nearby
+/// matches into bounded burst review sets even when their *cross-group* hashes
+/// differ greatly. Being in one review set is NOT evidence of mutual similarity
+/// and is never suitable for collection/slideshow suppression.
+/// </summary>
+public static class PhotoSimilarityBurstReviewGrouper
+{
+    public const string PolicyVersion = "wi0638-review-nearby-bursts-gap4m-span10m-v3";
+    public static readonly TimeSpan MaximumBetweenGroups = TimeSpan.FromMinutes(4);
+    public static readonly TimeSpan MaximumReviewSpan = TimeSpan.FromMinutes(10);
+    public const int MaximumReviewPhotos = 40;
+
+    public static PhotoVisualRedundancyResult Combine(
+        PhotoVisualRedundancyResult detected,
+        IReadOnlyList<PhotoVisualFingerprint> fingerprints)
+    {
+        ArgumentNullException.ThrowIfNull(detected);
+        ArgumentNullException.ThrowIfNull(fingerprints);
+        Dictionary<AssetRevisionId, PhotoVisualFingerprint> byRevision =
+            fingerprints.ToDictionary(item => item.RevisionId);
+
+        List<PhotoVisualRedundancyGroup> combined = [];
+        foreach (IGrouping<string, PhotoVisualRedundancyGroup> moment in detected.Groups
+                     .GroupBy(group => group.MomentId, StringComparer.Ordinal)
+                     .OrderBy(group => group.Key, StringComparer.Ordinal))
+        {
+            List<PhotoVisualRedundancyGroup> pending = [];
+            foreach (PhotoVisualRedundancyGroup group in moment
+                         .OrderBy(item => item.StartedAtLocal)
+                         .ThenBy(item => item.RepresentativeRevisionId.ToString(), StringComparer.Ordinal)
+                         .SelectMany(SplitOversizedGroup))
+            {
+                if (pending.Count > 0 && !CanAppend(pending, group))
+                {
+                    combined.Add(CombinePending(pending, byRevision));
+                    pending.Clear();
+                }
+
+                pending.Add(group);
+            }
+
+            if (pending.Count > 0)
+                combined.Add(CombinePending(pending, byRevision));
+        }
+
+        PhotoVisualRedundancyGroup[] ordered = combined
+            .OrderBy(group => group.StartedAtLocal)
+            .ThenBy(group => group.RepresentativeRevisionId.ToString(), StringComparer.Ordinal)
+            .Select((group, index) => group with { Id = $"visual-group-{index + 1:D4}" })
+            .ToArray();
+
+        return new PhotoVisualRedundancyResult(
+            PolicyVersion,
+            detected.AlgorithmVersion,
+            detected.MaximumHammingDistance,
+            MaximumReviewSpan,
+            detected.FingerprintCount,
+            ordered);
+    }
+
+    // A single dense 45-second visual group may already exceed the review
+    // payload limit. Split that one source group deterministically instead
+    // of letting an otherwise bounded review set grow without limit.
+    private static IEnumerable<PhotoVisualRedundancyGroup> SplitOversizedGroup(
+        PhotoVisualRedundancyGroup group)
+    {
+        if (group.Members.Count <= MaximumReviewPhotos)
+        {
+            yield return group;
+            yield break;
+        }
+
+        for (int offset = 0; offset < group.Members.Count; offset += MaximumReviewPhotos)
+        {
+            PhotoVisualRedundancyMember[] members = group.Members
+                .Skip(offset)
+                .Take(MaximumReviewPhotos)
+                .OrderBy(member => member.TakenAtLocal)
+                .ThenBy(member => member.RevisionId.ToString(), StringComparer.Ordinal)
+                .ToArray();
+            yield return group with
+            {
+                RepresentativeRevisionId = members[0].RevisionId,
+                StartedAtLocal = members[0].TakenAtLocal,
+                EndedAtLocal = members[^1].TakenAtLocal,
+                Members = members,
+                VisualSubgroupCount = 1
+            };
+        }
+    }
+
+    private static bool CanAppend(
+        IReadOnlyList<PhotoVisualRedundancyGroup> pending,
+        PhotoVisualRedundancyGroup next)
+    {
+        PhotoVisualRedundancyGroup first = pending[0];
+        DateTime latestEnd = pending.Max(group => group.EndedAtLocal);
+        int existingPhotos = pending.Sum(group => group.Members.Count);
+        return first.MomentId == next.MomentId &&
+               next.StartedAtLocal - latestEnd <= MaximumBetweenGroups &&
+               Math.Max(latestEnd.Ticks, next.EndedAtLocal.Ticks) - first.StartedAtLocal.Ticks
+                   <= MaximumReviewSpan.Ticks &&
+               existingPhotos + next.Members.Count <= MaximumReviewPhotos;
+    }
+
+    private static PhotoVisualRedundancyGroup CombinePending(
+        IReadOnlyList<PhotoVisualRedundancyGroup> pending,
+        IReadOnlyDictionary<AssetRevisionId, PhotoVisualFingerprint> byRevision)
+    {
+        PhotoVisualRedundancyMember[] originalMembers = pending
+            .SelectMany(group => group.Members)
+            .OrderBy(member => member.TakenAtLocal)
+            .ThenBy(member => member.RevisionId.ToString(), StringComparer.Ordinal)
+            .ToArray();
+
+        if (originalMembers.Select(member => member.RevisionId).Distinct().Count() != originalMembers.Length)
+            throw new InvalidDataException("Review source groups must not contain overlapping photo revisions.");
+
+        PhotoVisualFingerprint first = byRevision[originalMembers[0].RevisionId];
+        PhotoVisualRedundancyMember[] members = originalMembers
+            .Select(member => member with
+            {
+                DistanceFromRepresentative = first.Hash.HammingDistance(byRevision[member.RevisionId].Hash)
+            })
+            .ToArray();
+
+        int maximumPairDistance = 0;
+        for (int i = 0; i < members.Length; i++)
+        {
+            for (int j = i + 1; j < members.Length; j++)
+            {
+                maximumPairDistance = Math.Max(maximumPairDistance,
+                    byRevision[members[i].RevisionId].Hash.HammingDistance(
+                        byRevision[members[j].RevisionId].Hash));
+            }
+        }
+
+        return new PhotoVisualRedundancyGroup(
+            string.Empty,
+            pending[0].MomentId,
+            PolicyVersion,
+            first.RevisionId,
+            members[0].TakenAtLocal,
+            members[^1].TakenAtLocal,
+            maximumPairDistance,
+            members,
+            pending.Sum(group => group.VisualSubgroupCount));
     }
 }

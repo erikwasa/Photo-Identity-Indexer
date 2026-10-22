@@ -318,8 +318,10 @@ public sealed class CreativeCollectionMaterializationService
                         : CreativeCollectionNoveltyPolicies.Disabled)
                 {
                     SimilarityReviewRedundancy = includeSimilarityReview
-                        ? PhotoVisualRedundancyGrouper.Group(
-                            [], noMoments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
+                        ? PhotoSimilarityBurstReviewGrouper.Combine(
+                            PhotoVisualRedundancyGrouper.Group(
+                                [], noMoments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2),
+                            [])
                         : null
                 };
             }
@@ -499,8 +501,10 @@ public sealed class CreativeCollectionMaterializationService
             return new VisualRedundancyBuild(
                 PhotoVisualRedundancyGrouper.Group([], moments, policy),
                 includeSimilarityReview
-                    ? PhotoVisualRedundancyGrouper.Group(
-                        [], moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
+                    ? PhotoSimilarityBurstReviewGrouper.Combine(
+                        PhotoVisualRedundancyGrouper.Group(
+                            [], moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2),
+                        [])
                     : null,
                 0,
                 0,
@@ -627,8 +631,10 @@ public sealed class CreativeCollectionMaterializationService
         return new VisualRedundancyBuild(
             PhotoVisualRedundancyGrouper.Group(acceptedEvidence, moments, policy),
             includeSimilarityReview
-                ? PhotoVisualRedundancyGrouper.Group(
-                    evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
+                ? PhotoSimilarityBurstReviewGrouper.Combine(
+                    PhotoVisualRedundancyGrouper.Group(
+                        evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2),
+                    evidence)
                 : null,
             eligible.Length,
             proxies.Count,

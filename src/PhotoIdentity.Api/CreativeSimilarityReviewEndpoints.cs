@@ -64,7 +64,8 @@ public static class CreativeSimilarityReviewEndpoints
                             $"/api/collections/photos/{member.RevisionId}/thumbnail",
                             member.DistanceFromRepresentative,
                             selected.Contains(member.RevisionId.ToString()))).ToArray(),
-                        choice?.Decision, choice?.PreferredRevisionId));
+                        choice?.Decision, choice?.PreferredRevisionId,
+                        group.VisualSubgroupCount));
                 }
                 return Results.Ok(new CreativeSimilarityReviewResponse(
                     recipe.Id.ToString(), recipe.Name,
@@ -78,9 +79,10 @@ public static class CreativeSimilarityReviewEndpoints
                     materialized.Selection.SelectedCount,
                     groups.ToArray(),
                     false, false,
-                    "Manual-review-only neighbor H12 + first-frame H18, maximum 45 seconds " +
-                    "within the same derived moment. Groups may include less-similar pairs; " +
-                    "they are candidates for human comparison, not confirmed duplicates. " +
+                    "Manual-review burst sets combine visual groups detected by H12-neighbor/H18-anchor " +
+                    "within 45 seconds when they occur within 4 minutes of one another, up to 10 minutes " +
+                    "and 40 photos total per set, within the same inferred moment. Members from different " +
+                    "visual groups are NOT guaranteed visually similar; inspect before preferring one. " +
                     "Keep all is the default. Preferences do not change collection membership, " +
                     "slideshow playback or source copies. The production selector retains H8 complete-link."));
             }, cancellationToken);
@@ -149,7 +151,8 @@ public sealed record CreativeSimilarityPhotoResponse(
 public sealed record CreativeSimilarityGroupReviewResponse(
     string GroupKey, int MaximumPairDistance, DateTime StartedAtLocal, DateTime EndedAtLocal,
     int MemberCount, CreativeSimilarityPhotoResponse[] Members,
-    string? Decision, string? PreferredRevisionId);
+    string? Decision, string? PreferredRevisionId,
+    int VisualSubgroupCount);
 public sealed record CreativeSimilarityReviewResponse(
     string CollectionId, string CollectionName, string PolicyVersion,
     string AlgorithmVersion, int MaximumHammingDistance, double MaximumCaptureSpanSeconds,
