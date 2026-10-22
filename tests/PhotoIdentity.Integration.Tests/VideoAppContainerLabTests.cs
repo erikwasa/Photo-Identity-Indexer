@@ -1,4 +1,7 @@
 using System.Security.AccessControl;
+using System.Security.Principal;
+using System.ComponentModel;
+using PhotoIdentity.Core.Processing;
 using System.Text.Json;
 using PhotoIdentity.Cli;
 using Xunit;
@@ -104,6 +107,72 @@ public sealed class VideoAppContainerLabTests
             Assert.Empty(Directory.EnumerateFileSystemEntries(root));
         }
         finally { Directory.Delete(root); }
+    }
+
+
+    [Fact]
+    public void Windows_synthetic_acl_audit_rejects_overbroad_grants()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = NewLab();
+        string allowed = Path.Combine(root, "sandbox-allowed");
+        string working = Path.Combine(root, "sandbox-working");
+        string blocked = Path.Combine(root, "sandbox-ungranted");
+        DirectorySecurity initialAcl = new DirectoryInfo(root)
+            .GetAccessControl(AccessControlSections.Access);
+        WindowsVideoAppContainerProfile? profile = null;
+        try
+        {
+            try { profile = WindowsVideoAppContainerProfile.CreateSyntheticLab(root); }
+            catch (Win32Exception)
+            {
+                // A Windows runner that cannot create disposable profiles
+                // cannot establish positive AppContainer isolation evidence.
+                return;
+            }
+
+            foreach (string path in new[] { allowed, working, blocked })
+                Directory.CreateDirectory(path);
+            profile.GrantOwnedRootTraverse(root);
+            profile.GrantOwnedDirectory(allowed, readOnly: true);
+            profile.GrantOwnedDirectory(working, readOnly: false);
+            File.WriteAllText(Path.Combine(allowed, "generated-public.txt"), "public");
+            File.WriteAllText(Path.Combine(blocked, "generated-restricted.txt"), "private");
+
+            // A host may already inherit wildcard package grants from its
+            // temporary root. Such a host is correctly not audit-eligible.
+            if (!profile.AuditSyntheticAcl()) return;
+
+            DirectoryInfo blockedDir = new(blocked);
+            DirectorySecurity broad = blockedDir.GetAccessControl(
+                AccessControlSections.Access);
+            broad.AddAccessRule(new FileSystemAccessRule(
+                new SecurityIdentifier("S-1-15-2-1"),
+                FileSystemRights.ReadAndExecute,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            blockedDir.SetAccessControl(broad);
+            Assert.False(profile.AuditSyntheticAcl());
+
+            DirectoryInfo allowedDir = new(allowed);
+            DirectorySecurity writable = allowedDir.GetAccessControl(
+                AccessControlSections.Access);
+            writable.AddAccessRule(new FileSystemAccessRule(
+                profile.Identity, FileSystemRights.Write,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            allowedDir.SetAccessControl(writable);
+            Assert.False(profile.AuditSyntheticAcl());
+        }
+        finally
+        {
+            new DirectoryInfo(root).SetAccessControl(initialAcl);
+            foreach (string path in new[] { allowed, working, blocked })
+                if (Directory.Exists(path))
+                    Directory.Delete(path, recursive: true);
+            profile?.Dispose();
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
