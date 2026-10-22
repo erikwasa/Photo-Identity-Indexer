@@ -21,6 +21,9 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
 
     private WindowsVideoAppContainerProfile(string name, IntPtr sid)
     {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException(
+                "AppContainer identity construction requires Windows.");
         _name = name;
         _sid = sid;
         Identity = new SecurityIdentifier(sid);
