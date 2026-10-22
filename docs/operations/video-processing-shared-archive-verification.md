@@ -61,13 +61,16 @@ rotation and streams, maximum 600 seconds and 256 MiB input. Unsupported,
 large and HDR video are not silently declared successful. More profiles and
 codec fallbacks belong to WI-0189 and a possible future Azure design.
 
-**Current discovery boundary:** the worker processes video revisions that
-already have valid WI-0151 metadata inspection in the video catalogue.
-Video ingestion and posters remain separately configured and do not
-automatically download every historical online-only placeholder. Enabling
-the online-only switch permits retrieval of those eligible, already
-registered online-only video revisions. This prevents uncontrolled bulk
-hydration until a separate bounded discovery/inspection change is accepted.
+**Incremental discovery:** after processing any already-inspected supported
+candidates, the shared archive scans the operator's included coverage for
+one new MOV/MP4 at a time, preferring already-local files and explicitly
+skipping excluded copies. A bounded FFprobe metadata inspection and
+SHA-256 verification registers that video as a video-only catalogue
+revision. Unsupported inspected clips are not transcoded. With the separate
+online-only switch on, the same bounded single-file workflow may request
+OneDrive hydration for one previously online-only video and return the
+app-initiated download to online-only afterwards. There is no bulk recall,
+and the one-file and available disk caps still apply.
 
 ## Local verification session — operator driven
 
