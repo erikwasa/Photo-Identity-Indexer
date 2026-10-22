@@ -69,7 +69,7 @@ Support private family videos on local hardware without modifying originals, exp
 
 - [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) — design and explicit activation.
 - [WI-0151](../work-items/WI-0151-video-ingestion-metadata-posters.md) — metadata and still posters.
-- [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [issue #589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589).
+- [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — isolated scheduling/limits.
 - [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — local playable proxies.
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.

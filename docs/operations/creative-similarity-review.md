@@ -2,7 +2,7 @@
 
 ## Background and accepted scope
 
-The operator verified the completed WI-0629 Archive cleanup workflow:
+The operator verified the completed WI-0206 Archive cleanup workflow:
 the full-screen keyboard quality-suggestion reviewer and all existing
 feature regressions work as expected after merged PR #644.
 **Archive cleanup stays focused exclusively on low-quality photos.**
@@ -97,7 +97,7 @@ Only after live side-by-side review should optional *automatic
 collection-only* omission be considered, with its own precision,
 fallback and operator acceptance gate.
 
-A distinct [quality rating issue #639](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639)
+A distinct [quality rating WI-0205](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
 will define a continuous rating with model/proxy provenance,
 uncertainty and licensing/normalization constraints. The existing
 technical suggestion priority is NOT a calibrated 0–100 quality score.

@@ -7,6 +7,4 @@ document: ../work-items/WI-0198-opt-in-tv-focus-playback.md
 blockers: 
 - WI-0197
 blocker_notes: []
-evidence:
-- type: issue
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/567
+evidence: []

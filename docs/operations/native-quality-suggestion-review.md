@@ -9,12 +9,12 @@ within that dialog, and Escape cancelling. User manually chooses which
 source copy to exclude; no unattended exclusion, OneDrive original change,
 or collection/slideshow selection effect was introduced.
 
-**WI-0629 / issue #629 is accepted and closed as Archive cleanup product
+**WI-0206 is accepted and closed as Archive cleanup product
 work.** The archive-side technical candidate queue and keyboard UX
 are no longer blocked pending another 129-photo review. The next
 distinct curation workstream is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md)
 for similar photos in collections/slideshows, and a separately calibrated
-continuous quality-rating evaluation is [issue #639](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639).
+continuous quality-rating evaluation is [WI-0205](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md).
 Do not reopen M37's consumed model held-out labels.
 
 ---
@@ -204,7 +204,7 @@ workflow** rather than a second use of technical-only cleanup. The
 follow-ons are:
 
 - [Creative similarity review and scoped omission planning](../delivery/milestones/M39-creative-collection-curation.md)
-- [Continuous, calibrated per-revision quality rating with provenance](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639)
+- [Continuous, calibrated per-revision quality rating with provenance](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
 
 Neither future work item inherits M37's rejected automatic global
 suppression as a production permission. A raw technical candidate
@@ -244,7 +244,7 @@ The following description documents the original native gallery before the keybo
 
 # Native operator-controlled technical quality suggestions
 
-WI-0629's **second substantive product phase** adds a built-in `/quality-suggestions`
+WI-0206's **second substantive product phase** adds a built-in `/quality-suggestions`
 page in Photo Identity. The first local companion review was fully used by
 the maintainer: **129/129** Archive candidates reviewed, **72 Keep, 37 Dismiss,
 20 Consider exclusion**; the maintainer judged **most considered photos

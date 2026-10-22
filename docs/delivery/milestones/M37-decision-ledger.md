@@ -40,7 +40,7 @@ NO-GO conclusions for unattended Very Low exclusion, automatic redundancy
 suppression or combined hidden-photo policies.
 
 Record the separate follow-up in
-[manual low-quality suggestion issue #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629).
+[manual low-quality suggestion WI-0206](../work-items/WI-0206-native-quality-suggestion-review.md).
 The low ~98%+ high-precision bar applied to *automatic destructive
 exclusion*, **not** to ranked manual suggestions. A useful suggestion
 pipeline should instead report **discovery yield, false-alarm/review burden,
@@ -62,7 +62,7 @@ would require a distinct product design, not reuse this purge endpoint.
 
 **Updated M37 completion interpretation:** Finish the bounded, read-only
 score-coverage experiment as planned, then ask whether **manual suggestion
-review** is useful enough to warrant issue #629's product development.
+review** is useful enough to warrant WI-0206's product development.
 Document this as a separate **GO/NO-GO/DEFER** research decision.
 Full operator-facing exclusion integration and per-context settings remain
 follow-up work; do not claim they exist just because M37 scoring tools do.
@@ -85,7 +85,7 @@ inference.** Record bounded WI-0195 plan acceptance PASS, quality
 collection effect still UNMEASURED/DEFERRED pending separate
 model-licensing and usefulness decisions.
 
-Issue #629 now begins a **first substantive usable local review phase**:
+WI-0206 now begins a **first substantive usable local review phase**:
 `manual_quality_suggestions.py` consumes existing bounded read-only
 `proxy-technical-quality-v1` evidence; the local review workbench
 supports human-controlled Keep, Dismiss, Consider exclusion, per-use-case
@@ -109,7 +109,7 @@ deployment safety evidence.
 
 **Manual-suggestion candidate generation and local human-review
 feasibility: GO.** Advance a first native in-app operator-controlled
-review workstream in issue #629, using existing local durable proxies,
+review workstream in WI-0206, using existing local durable proxies,
 bounded deterministic technical suggestions, durable decisions across
 restarts, a Consider-exclusion follow-up filter and independent review
 context switches. The native work uses the **existing separately
@@ -154,14 +154,14 @@ acceptance was **not demonstrated and its rollout track is cancelled**.
 | Combined quality + redundancy automatic policy | **NO-GO** | Both prerequisites rejected / not deployment-approved |
 | Original WI-0195 four-arm real-collection policy comparison | **NOT DEMONSTRATED / NO-GO (evaluation closed)** | Safe preview importer, 8/8 shadow tests; 80 candidates, 0 pre-existing TOPIQ scores, 0 effective score comparisons; opt-in bounded scoring deliberately not authorized |
 | WI-0195 bounded score-coverage preflight | **PASS PLANNING** | 6+8 synthetic tests passed, 80/80 existing current proxies, 80 prospective scored photos fitting cap 120, 353.8 seconds projected CPU, **zero inference** |
-| Human-controlled low-quality suggestions (issue #629) | **GO FOR MANUAL PRODUCT EXPERIENCE** | 129/129 Archive suggestions human-reviewed; 72 Keep, 37 Dismiss, 20 Consider exclusion. Maintainer confirmed most considered cases genuinely unwanted, and review reasonably convenient; 0 automatic exclusions |
+| Human-controlled low-quality suggestions (WI-0206) | **GO FOR MANUAL PRODUCT EXPERIENCE** | 129/129 Archive suggestions human-reviewed; 72 Keep, 37 Dismiss, 20 Consider exclusion. Maintainer confirmed most considered cases genuinely unwanted, and review reasonably convenient; 0 automatic exclusions |
 
-**Follow-up ownership (updated 2026-10-21):** WI-0629/issue #629
+**Follow-up ownership (updated 2026-10-21):** WI-0206
 is now **accepted and closed** after the maintained native keyboard
 review and regression tests passed through merged PR #644. No
 automatic exclusion or model deployment was authorized by that
 acceptance. The next separate collection/slideshow curation
-workstream is issue #638 (manual similarity review and later
+workstream is WI-0203/WI-0204 (manual similarity review and later
 reversible collection-only omission), while #639 owns continuous
 quality rating. M37 research closure still does NOT pre-approve
 global automatic photo filtering, background inference or
@@ -195,7 +195,7 @@ M37 itself is **completed as an evaluation with these outcomes**.
 The maintained operator confirmed that after PR #644, the **native Archive
 quality review works as expected and all reported regressions are OK**,
 including the full-screen one-photo keyboard UX and explicitly confirmed
-manual exclusion. WI-0629 (issue #629) is now **accepted and closed**.
+manual exclusion. WI-0206 is now **accepted and closed**.
 This is **not** a change to M37's automatic-exclusion research NO-GO.
 
 The next user-directed product area is **collection/slideshow curation**,
@@ -206,6 +206,6 @@ operator may record **Keep all** or **Prefer this photo** as private
 per-recipe annotations: **they have zero effect on saved collection
 membership or slideshow generation**. Collection-only reversible
 omission and any auto-omission require additional explicit acceptance.
-Issue #639 independently scopes a continuous photo-quality rating
+WI-0205 independently scopes a continuous photo-quality rating
 with versioned provenance; TOPIQ licensing/frozen heldout constraints
 remain, and no fake universal 0–100 quality score is approved.

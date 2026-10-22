@@ -12,7 +12,7 @@ affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Postgres, PhotoI
 
 ## Priority and tracking
 
-**High-priority production-scale photo regression**, detected during the maintained Windows verification for WI-0151 (video ingestion). Tracked in [GitHub issue #589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589). WI-0151 remains **in_review** and is not accepted until photo-only regression checks pass.
+**High-priority production-scale photo regression**, detected during the maintained Windows verification for WI-0151 (video ingestion). Tracked in [GitHub WI-0202](WI-0202-photo-catalogue-query-performance-regression.md). WI-0151 remains **in_review** and is not accepted until photo-only regression checks pass.
 
 ## Objective
 

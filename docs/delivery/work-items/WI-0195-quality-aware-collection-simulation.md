@@ -140,7 +140,7 @@ distinct steps. A reversible per-use-case hide needs a separate
 implementation, not the destructive exclusion API.
 
 Carry the substantial implementation into
-[operator-controlled low-quality suggestions #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629);
+[operator-controlled low-quality suggestions #629](WI-0206-native-quality-suggestion-review.md);
 M37 should record a separate manual suggestion feasibility decision based on
 accepted/rejected candidates, false-alarm burden and usefulness in real
 scenarios. Automatic Very Low exclusion and automatic redundancy suppression
@@ -165,7 +165,7 @@ for manually reviewing/excluding poor photos*, tolerating some
 false positives, with operator-selectable use cases. WI-0195's
 original attempted four automatic policy arms remain not accepted.
 First usable, non-destructive technical-suggestion workbench is
-tracked in [issue #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629)
+tracked in [WI-0206](WI-0206-native-quality-suggestion-review.md)
 and `docs/operations/manual-quality-suggestions.md`, with
 follow-up native app integration contingent on maintainer review
 utility. M37 should document **manual-suggestion feasibility**
@@ -204,7 +204,7 @@ absolute Very Low exclusion NO-GO, automatic redundancy
 suppression NO-GO, combined policy NO-GO.
 
 **Separate useful product outcome:** 129/129 manually reviewed
-technical candidates under issue #629, with 20 marked
+technical candidates under WI-0206, with 20 marked
 Consider exclusion and maintainer finding most genuinely
 unwanted. Human-controlled suggestions GO for product
 development, not any unattended automatic exclusion.

@@ -1,0 +1,29 @@
+id: WI-0206
+title: Native operator-controlled technical-quality suggestions and Archive exclusion review
+milestone: M40
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0206-native-quality-suggestion-review.md
+started_at: 2026-10-20
+completed_at: 2026-10-21
+verified_at: 2026-10-21
+verified_by: maintainer
+last_updated_at: 2026-10-22
+blockers:
+- WI-0195
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/631
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/633
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/640
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/643
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/644
+- type: maintainer_verification
+  value: '2026-10-21 129/129 pilot reviewed; 72 Keep, 37 Dismiss, 20 Consider; most Consider cases unwanted. Native viewport and keyboard review accepted after PR 644; existing feature regressions OK, zero automatic exclusions.'
+- type: documentation
+  value: docs/operations/native-quality-suggestion-review.md

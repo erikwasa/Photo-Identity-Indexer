@@ -15,7 +15,7 @@ blocker_notes:
 - WI-0194 documented NO-GO to production similarity suppression; redundancy and combined policy arms remain blocked.
 - Original four-policy WI-0195 acceptance was NOT DEMONSTRATED; the bounded, no-inference research probe finished and the automatic-policy rollout was rejected/deferred in the M37 final decision.
 evidence:
-- type: issue
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/538
+- type: documentation
+  value: docs/delivery/retired-github-issues-2026-10-22.md
 - type: research-disposition
   value: 'Evaluation/disposition completed; original four-arm automatic-policy acceptance NOT DEMONSTRATED (quality selective pairwise research-only with 0/80 live score overlap; Very Low automatic exclusion NO-GO; redundancy suppression NO-GO; combined NO-GO). Safe offline shadow tests and 80/80 no-inference proxy plan passed. Manual suggestion experience accepted separately in issue #629; do not call this work item a passed four-arm product experiment.'

@@ -72,6 +72,7 @@ Most Azure documentation is retained as historical design/reference material. [A
 - [Roadmap](delivery/roadmap.md)
 - [Milestones](delivery/milestones/)
 - [Work items](delivery/work-items/)
+- [Historical GitHub issue retirement audit and canonical work-item map](delivery/retired-github-issues-2026-10-22.md)
 - [Canonical work-item registry](delivery/status/work-items.yaml)
 - [Canonical milestone registry](delivery/status/milestones.yaml)
 - [Risks](delivery/risks.md)

@@ -212,4 +212,4 @@ disagreements and incomplete true-copy controls rule out a
 safe automatic suppression threshold. **NO-GO to unattended
 redundancy suppression.** All source originals and production
 collection behavior unchanged. The operator's human-controlled
-suggestion goal continues separately under issue #629.
+suggestion goal continues separately under WI-0206.

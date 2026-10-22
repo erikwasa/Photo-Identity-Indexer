@@ -9,6 +9,4 @@ blockers:
 - WI-0199
 - WI-0200
 blocker_notes: []
-evidence:
-- type: issue
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/570
+evidence: []

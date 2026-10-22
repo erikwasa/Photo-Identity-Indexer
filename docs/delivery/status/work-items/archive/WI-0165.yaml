@@ -20,8 +20,8 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/442
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/470
-- type: issue
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/499
+- type: documentation
+  value: docs/delivery/retired-github-issues-2026-10-22.md
 - type: maintainer-observation
   value: '2026-10-04 Europe/Stockholm: counts are correct and standalone Prepare originals shows Prepared, but player-triggered preparation does not produce Prepared and page reload does not restore Prepared. WI-0165 remains in_review.'
 - type: pull_request

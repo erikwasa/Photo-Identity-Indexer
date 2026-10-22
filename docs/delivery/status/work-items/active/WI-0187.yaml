@@ -10,8 +10,6 @@ branch: agent/WI-0187-search-creative-anchors
 blockers: []
 blocker_notes: []
 evidence:
-- type: issue
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/513
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/516
 - type: documentation
