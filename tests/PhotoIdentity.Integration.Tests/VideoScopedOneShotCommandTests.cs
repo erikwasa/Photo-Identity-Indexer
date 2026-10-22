@@ -1,4 +1,5 @@
 using PhotoIdentity.Cli;
+using System.Text.Json;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -94,6 +95,68 @@ public sealed class VideoScopedOneShotCommandTests
         Assert.Throws<ArgumentException>(() =>
             VideoSelectedEnqueueOptions.Parse(
                 [.. options, "--ffmpeg-sha256", new string('G', 64)]));
+    }
+
+    [Fact]
+    public async Task Real_media_apply_is_denied_before_database_or_original_access()
+    {
+        const string key = "PHOTOIDENTITY_WI0188_APPLY_HARD_STOP_MISSING";
+        string? previous = Environment.GetEnvironmentVariable(key);
+        try
+        {
+            Environment.SetEnvironmentVariable(key, null);
+            string[] common = [.. OneShot()];
+            common[1] = key;
+            VideoScopedOneShotOptions run = VideoScopedOneShotOptions.Parse([
+                .. common, "--apply", "--acknowledge-isolated-v37-rehearsal"
+            ]);
+            using StringWriter output = new();
+            Assert.Equal(1, await VideoScopedOneShotCommandRunner.RunAsync(run, output));
+            using JsonDocument report = JsonDocument.Parse(output.ToString());
+            Assert.Equal("media-isolation-not-approved",
+                report.RootElement.GetProperty("reasonCode").GetString());
+            Assert.True(report.RootElement.GetProperty("dryRun").GetBoolean());
+            Assert.False(report.RootElement.GetProperty("published").GetBoolean());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(key, previous);
+        }
+    }
+
+    [Fact]
+    public async Task Real_media_enqueue_is_denied_before_database_or_original_access()
+    {
+        const string key = "PHOTOIDENTITY_WI0188_ENQUEUE_HARD_STOP_MISSING";
+        string? previous = Environment.GetEnvironmentVariable(key);
+        try
+        {
+            Environment.SetEnvironmentVariable(key, null);
+            string[] args =
+            [
+                "--postgres-connection-env", key,
+                "--database", "photoidentity_catalogue",
+                "--revision-id", Revision.ToString(),
+                "--ffmpeg-sha256", Hash,
+                "--apply"
+            ];
+            VideoSelectedEnqueueOptions enqueue = VideoSelectedEnqueueOptions.Parse(args);
+            using StringWriter output = new();
+            Assert.Equal(1, await VideoSelectedEnqueueCommandRunner.RunAsync(enqueue, output));
+            using JsonDocument report = JsonDocument.Parse(output.ToString());
+            Assert.Equal("media-isolation-not-approved",
+                report.RootElement.GetProperty("reasonCode").GetString());
+            Assert.True(report.RootElement.GetProperty("dryRun").GetBoolean());
+            Assert.False(report.RootElement.GetProperty("eligible").GetBoolean());
+            Assert.Equal(JsonValueKind.Null,
+                report.RootElement.GetProperty("jobId").ValueKind);
+            Assert.False(report.RootElement.GetProperty("mediaOpened").GetBoolean());
+            Assert.False(report.RootElement.GetProperty("videoExecuted").GetBoolean());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(key, previous);
+        }
     }
 
     [Fact]
