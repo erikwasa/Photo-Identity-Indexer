@@ -118,8 +118,9 @@ public sealed class VideoAppContainerLabTests
         string allowed = Path.Combine(root, "sandbox-allowed");
         string working = Path.Combine(root, "sandbox-working");
         string blocked = Path.Combine(root, "sandbox-ungranted");
-        DirectorySecurity initialAcl = new DirectoryInfo(root)
-            .GetAccessControl(AccessControlSections.Access);
+        string initialAcl = new DirectoryInfo(root)
+            .GetAccessControl(AccessControlSections.Access)
+            .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
         WindowsVideoAppContainerProfile? profile = null;
         try
         {
@@ -166,7 +167,14 @@ public sealed class VideoAppContainerLabTests
         }
         finally
         {
-            new DirectoryInfo(root).SetAccessControl(initialAcl);
+            DirectorySecurity restored = new();
+            restored.SetSecurityDescriptorSddlForm(initialAcl,
+                AccessControlSections.Access);
+            DirectoryInfo lab = new(root);
+            lab.SetAccessControl(restored);
+            string actualAcl = lab.GetAccessControl(AccessControlSections.Access)
+                .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+            Assert.Equal(initialAcl, actualAcl);
             foreach (string path in new[] { allowed, working, blocked })
                 if (Directory.Exists(path))
                     Directory.Delete(path, recursive: true);
