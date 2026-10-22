@@ -18,6 +18,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
     private const string Prefix = "PhotoIdentity.WI0188.Lab.";
     private readonly string _name;
     private readonly string _labRoot;
+    private readonly string _scopeRoot;
     private IntPtr _sid;
     private bool _disposed;
 
@@ -28,6 +29,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
                 "AppContainer identity construction requires Windows.");
         _name = name;
         _labRoot = labRoot;
+        _scopeRoot = Path.Combine(labRoot, "sandbox-scope");
         _sid = sid;
         Identity = new SecurityIdentifier(sid);
     }
@@ -86,7 +88,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             throw new ArgumentException("Owned synthetic ACL target must exist locally.");
         // Never become a general-purpose ACL grant API: only the exact
         // predefined synthetic lab directory may receive this SID's ACE.
-        string expected = Path.Combine(_labRoot,
+        string expected = Path.Combine(_scopeRoot,
             readOnly ? "sandbox-allowed" : "sandbox-working");
         if (!string.Equals(Path.GetFullPath(directory), expected,
                 StringComparison.OrdinalIgnoreCase))
@@ -105,7 +107,8 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
     }
 
     /// <summary>
-    /// Allow directory traversal of only the newly created lab root. This
+    /// Allow traversal only on the newly created disposable scope root.
+    /// The surviving operator-marked lab root is never ACL-modified. This
     /// ACE never inherits to the ungranted sibling directory or its files.
     /// </summary>
     public void GrantOwnedRootTraverse(string directory)
@@ -117,10 +120,10 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             !Directory.Exists(directory) ||
             (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new ArgumentException("Synthetic lab root must exist locally.");
-        if (!string.Equals(Path.GetFullPath(directory), _labRoot,
+        if (!string.Equals(Path.GetFullPath(directory), _scopeRoot,
                 StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException(
-                "AppContainer traversal is restricted to the marked lab root.");
+                "AppContainer traversal is restricted to the disposable scope root.");
         DirectoryInfo info = new(directory);
         DirectorySecurity acl = info.GetAccessControl(AccessControlSections.Access);
         acl.AddAccessRule(new FileSystemAccessRule(Identity,
@@ -141,13 +144,13 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
     public bool AuditSyntheticAcl()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        string working = Path.Combine(_labRoot, "sandbox-working");
-        string allowed = Path.Combine(_labRoot, "sandbox-allowed");
-        string blocked = Path.Combine(_labRoot, "sandbox-ungranted");
+        string working = Path.Combine(_scopeRoot, "sandbox-working");
+        string allowed = Path.Combine(_scopeRoot, "sandbox-allowed");
+        string blocked = Path.Combine(_scopeRoot, "sandbox-ungranted");
         string allowedFile = Path.Combine(allowed, "generated-public.txt");
         string blockedFile = Path.Combine(blocked, "generated-restricted.txt");
 
-        foreach (string directory in new[] { _labRoot, working, allowed, blocked })
+        foreach (string directory in new[] { _scopeRoot, working, allowed, blocked })
             if (!Directory.Exists(directory) ||
                 (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
                 return false;
@@ -157,7 +160,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
                 return false;
 
         FileSystemAccessRule[] rootRules = Rules(
-            new DirectoryInfo(_labRoot).GetAccessControl(AccessControlSections.Access));
+            new DirectoryInfo(_scopeRoot).GetAccessControl(AccessControlSections.Access));
         FileSystemAccessRule[] allowedRules = Rules(
             new DirectoryInfo(allowed).GetAccessControl(AccessControlSections.Access));
         FileSystemAccessRule[] workingRules = Rules(
@@ -203,8 +206,9 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
 
         InheritanceFlags descendants = InheritanceFlags.ContainerInherit |
             InheritanceFlags.ObjectInherit;
-        // The root grant is traversal only. In particular, listing the
-        // sibling names or reading data is not part of the package grant.
+        // The disposable scope root grant is traversal only. In particular,
+        // listing the sibling names or reading data is not part of the grant.
+        // No change is made to the surviving marked lab root.
         return rootRules.Where(rule => rule.IdentityReference.Equals(Identity))
                    .All(rule => (rule.FileSystemRights &
                        ~(FileSystemRights.Traverse | FileSystemRights.Synchronize)) == 0) &&
