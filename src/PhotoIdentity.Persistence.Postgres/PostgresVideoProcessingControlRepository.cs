@@ -35,6 +35,52 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
                 reader.GetFieldValue<DateTimeOffset>(5));
     }
 
+    /// <summary>Enable just the video lane. Photos remain independently controlled.
+    /// The single-video worker still requires a running archive advancement
+    /// request and a live photo-idle check before any tool launch.</summary>
+    public Task<VideoProcessingControlState> EnableAsync(CancellationToken token = default) =>
+        SetEnabledAsync(true, token);
+
+    /// <summary>
+    /// Disable video admission and fence any running lease while preserving
+    /// queued jobs for a future retry. Unlike operator StopAsync this does not
+    /// permanently cancel queued work.
+    /// </summary>
+    public Task<VideoProcessingControlState> DisableKeepQueuedAsync(
+        CancellationToken token = default) => SetEnabledAsync(false, token);
+
+    private async Task<VideoProcessingControlState> SetEnabledAsync(
+        bool enabled, CancellationToken token)
+    {
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE video_processing_control
+            SET enabled=@enabled, paused=NOT @enabled,
+                selected_job_id=NULL, authorization_expires_at_utc=NULL,
+                generation=generation+1, last_action=@action, updated_at_utc=now()
+            WHERE singleton_id=1
+            RETURNING enabled, paused, generation, last_action,
+                      selected_job_id, authorization_expires_at_utc;
+            """;
+        command.Parameters.AddWithValue("enabled", enabled);
+        command.Parameters.AddWithValue("action", enabled ? "enable" : "disable");
+        VideoProcessingControlState state;
+        await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(token))
+        {
+            if (!await reader.ReadAsync(token))
+                throw new InvalidOperationException("Video control row is missing: fail closed.");
+            state = new(reader.GetBoolean(0), reader.GetBoolean(1),
+                reader.GetInt64(2), reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetGuid(4),
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5));
+        }
+        await transaction.CommitAsync(token);
+        return state;
+    }
+
     /// <summary>Pause new video claims; the future worker must also observe
     /// generation changes and interrupt any running subprocess safely.</summary>
     public Task<VideoProcessingControlState> PauseAsync(CancellationToken token = default) =>
