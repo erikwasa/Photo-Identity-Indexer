@@ -1,22 +1,50 @@
 .creative-similarity-review {
-    margin-block: 1.5rem;
-    padding: 1rem;
+    margin-block: .75rem;
+    padding: .75rem 1rem;
     border: 1px solid var(--border-color, #7c8390);
     border-radius: 12px;
 }
-.creative-similarity-group {
-    margin-top: 1rem;
-    border: 1px solid var(--border-color, #687485);
-    border-radius: 10px;
-    padding: 12px;
-}
-.creative-similarity-group-head {
+.creative-similarity-review > .smart-subheading { margin-bottom: .25rem; }
+.creative-similarity-tools {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: .4rem 1rem;
-    margin-bottom: 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem 1rem;
+    margin-block: .5rem 1rem;
+}
+.creative-similarity-group {
+    margin-top: .5rem;
+    border: 1px solid var(--border-color, #687485);
+    border-radius: 10px;
+    padding: .4rem .7rem;
+}
+.creative-similarity-group.reviewed { border-style: dashed; }
+.creative-similarity-group-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .35rem .75rem;
+    cursor: pointer;
     font-size: .86rem;
+}
+.creative-similarity-group-head:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.creative-similarity-preview {
+    width: 56px;
+    height: 42px;
+    object-fit: cover;
+    background: #11151b;
+    border-radius: 5px;
+    flex-shrink: 0;
+}
+.creative-similarity-decision {
+    margin-inline-start: auto;
+    font-weight: 600;
+}
+.creative-similarity-group[open] .creative-similarity-group-head {
+    padding-bottom: .75rem;
+    border-bottom: 1px solid var(--border-color, #687485);
+    margin-bottom: .75rem;
 }
 .creative-similarity-photos {
     display: grid;
@@ -40,3 +68,15 @@
 .creative-similarity-photo p { min-height: 1.7rem; }
 .creative-similarity-photo button { width: 100%; }
 .creative-similarity-group .smart-actions { margin-top: 12px; }
+.creative-similarity-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .6rem;
+    margin-block: .9rem .25rem;
+}
+@media (max-width: 600px) {
+    .creative-similarity-decision { margin-inline-start: 0; }
+    .creative-similarity-pager { justify-content: center; }
+}
