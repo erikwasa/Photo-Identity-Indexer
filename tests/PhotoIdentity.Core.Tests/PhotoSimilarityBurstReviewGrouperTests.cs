@@ -170,6 +170,18 @@ public sealed class PhotoSimilarityBurstReviewGrouperTests
         Assert.Equal(42, review.Groups.SelectMany(g => g.Members).Select(m => m.RevisionId).Distinct().Count());
     }
 
+    [Fact]
+    public void A_single_oversized_visual_group_is_split_into_bounded_review_sets()
+    {
+        DateTime start = new(2024, 1, 1, 10, 0, 0);
+        PhotoVisualFingerprint[] photos = Enumerable.Range(0, 42)
+            .Select(i => Photo(i + 1, start, i, 0)).ToArray();
+        Assert.Single(Detect(photos).Groups);
+        PhotoVisualRedundancyResult result = Combine(photos);
+        Assert.Equal([40, 2], result.Groups.Select(g => g.Members.Count).ToArray());
+        Assert.Equal(42, result.Groups.SelectMany(g => g.Members).Select(m => m.RevisionId).Distinct().Count());
+    }
+
     private static PhotoVisualRedundancyResult Combine(PhotoVisualFingerprint[] photos) =>
         PhotoSimilarityBurstReviewGrouper.Combine(Detect(photos), photos);
 
