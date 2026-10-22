@@ -112,7 +112,7 @@ public sealed class VideoArchiveProcessingService(
                 .RecoverExpiredAsync(token);
 
             VideoCandidate? candidate = await FindPendingAsync(
-                ffmpegHash, token);
+                ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
             bool ownedHydration = false;
             string? ownedPath = null;
             try
@@ -267,7 +267,7 @@ public sealed class VideoArchiveProcessingService(
         Guid RevisionId, Guid SourceId, string Root, string Key, long Size);
 
     private async Task<VideoCandidate?> FindPendingAsync(
-        string toolSha256, CancellationToken token)
+        string toolSha256, bool includeOnlineOnly, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
@@ -306,14 +306,39 @@ public sealed class VideoArchiveProcessingService(
                     AND job.preset_version=@preset AND job.tool_sha256=@tool
                     AND job.policy_version='wi0188-v1')
             ORDER BY metadata.duration_seconds, revision.id
-            LIMIT 1;
+            LIMIT 200;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
         query.Parameters.AddWithValue("preset", VideoProxyCandidateProfile.Version);
         query.Parameters.AddWithValue("tool", toolSha256);
-        await using NpgsqlDataReader reader = await query.ExecuteReaderAsync(token);
-        if (!await reader.ReadAsync(token)) return null;
-        return new VideoCandidate(reader.GetGuid(0), reader.GetGuid(1),
-            reader.GetString(2), reader.GetString(3), reader.GetInt64(4));
+        List<VideoCandidate> candidates = [];
+        await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
+        {
+            while (await reader.ReadAsync(token))
+                candidates.Add(new VideoCandidate(reader.GetGuid(0), reader.GetGuid(1),
+                    reader.GetString(2), reader.GetString(3), reader.GetInt64(4)));
+        }
+        VideoCandidate? online = null;
+        foreach (VideoCandidate candidate in candidates)
+        {
+            var source = new OneDriveVideoAssetSource(
+                SourceId.From(candidate.SourceId), candidate.Root);
+            AssetAvailability availability;
+            try
+            {
+                availability = await source.GetAvailabilityAsync(
+                    new SourceAssetReference(source.SourceId, candidate.Key), token);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                continue;
+            }
+            // Always prefer local videos even when cloud retrieval is opted in.
+            if (availability == AssetAvailability.Local) return candidate;
+            if (includeOnlineOnly && availability == AssetAvailability.OnlineOnly)
+                online ??= candidate;
+        }
+        return online;
     }
 }
