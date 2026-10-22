@@ -62,7 +62,7 @@ public static class VideoSelectedEnqueueCommandRunner
         // are independently accepted in a subsequent reviewed PR.
         if (options.Apply)
         {
-            Write(output, true, false, null, "media-isolation-not-approved");
+            WriteApplyDenied(output);
             return 1;
         }
         if (!OperatingSystem.IsWindows())
@@ -196,12 +196,22 @@ public static class VideoSelectedEnqueueCommandRunner
         return 0;
     }
 
-    private static void Write(TextWriter output, bool dryRun, bool eligible,
-        Guid? jobId, string? reasonCode = null) =>
+    // Keep the established successful preview response shape unchanged.
+    // Only denied apply includes a fixed, non-private reason code.
+    private static void WriteApplyDenied(TextWriter output) =>
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0188-selected-enqueue-v1",
-            dryRun, eligible, jobId, reasonCode,
+            dryRun = true, eligible = false, jobId = (Guid?)null,
+            mediaOpened = false, videoExecuted = false,
+            reasonCode = "media-isolation-not-approved"
+        }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+
+    private static void Write(TextWriter output, bool dryRun, bool eligible, Guid? jobId) =>
+        output.WriteLine(JsonSerializer.Serialize(new
+        {
+            protocol = "wi0188-selected-enqueue-v1",
+            dryRun, eligible, jobId,
             mediaOpened = false, videoExecuted = false
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
 }
