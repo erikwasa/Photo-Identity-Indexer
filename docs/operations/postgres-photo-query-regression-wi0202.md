@@ -1,6 +1,6 @@
 # WI-0202 — PostgreSQL photo query regression: safe triage and statistics recovery
 
-**Issue:** [#589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589) · **Work item:** [WI-0202](../delivery/work-items/WI-0202-photo-catalogue-query-performance-regression.md) · **Blocks:** WI-0151 maintained photo-only acceptance.
+**Issue:** [#589](../delivery/work-items/WI-0202-photo-catalogue-query-performance-regression.md) · **Work item:** [WI-0202](../delivery/work-items/WI-0202-photo-catalogue-query-performance-regression.md) · **Blocks:** WI-0151 maintained photo-only acceptance.
 
 ## Symptom and current hypothesis
 
