@@ -25,6 +25,8 @@ public static class VideoProcessingEndpoints
     {
         endpoints.MapGet("/api/video-processing/settings", GetAsync);
         endpoints.MapPut("/api/video-processing/settings", UpdateAsync);
+        endpoints.MapPost("/api/video-processing/jobs/{jobId:guid}/retry",
+            RetryFailedAsync);
         return endpoints;
     }
 
@@ -76,6 +78,21 @@ public static class VideoProcessingEndpoints
         return Results.Ok(ToResponse(saved, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
             processor.LastResult, recent));
+    }
+
+    private static async Task<IResult> RetryFailedAsync(
+        Guid jobId, PostgresCatalogueDatabase database,
+        CancellationToken token)
+    {
+        if (jobId == Guid.Empty)
+            return Results.BadRequest(new ArchiveErrorResponse(
+                "A valid video job ID is required."));
+        bool restarted = await new PostgresVideoProcessingJobRepository(database)
+            .RestartFailedAsync(jobId, token);
+        return restarted
+            ? Results.Ok(new { restarted = true })
+            : Results.Conflict(new ArchiveErrorResponse(
+                "This video job is not a retryable failed/cancelled current revision."));
     }
 
     private static bool ToolsConfigured(IConfiguration configuration) =>
