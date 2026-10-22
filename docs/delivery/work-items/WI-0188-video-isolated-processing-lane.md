@@ -1028,6 +1028,13 @@ Production activation remains prohibited until reviewed.
   inspection from the separate observed allowed/denied file-access probes.
   Reported `independentAclAuditVerified` remains false because no real
   archive/cache/tool locations were inspected.
+- Windows CI exposed that restoring the original inherited root DACL
+  after adding an AppContainer ACE may leave changed Windows `AI`
+  (auto-inheritance) descriptor flags even when the ACE is removed. This
+  is treated as a real nonpassing cleanup failure, not normalized away.
+  The pilot now grants scope traversal only on a disposable
+  `sandbox-scope` child, deletes that child and verifies the surviving
+  marked root ACL is unchanged, without writing to that root's DACL.
 - This is **not** production identity or a network boundary. FFmpeg/FFprobe
   binary and DLL loading, real cache/source ACLs, independent socket denial,
   disk limits, and an authorized single-video/mixed-load trial all remain
