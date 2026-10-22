@@ -1,0 +1,25 @@
+id: WI-0203
+title: Human-reviewed similar-photo and burst sets for saved Creative Collections
+milestone: M39
+status: in_review
+owner: ai-agent
+document: ../work-items/WI-0203-creative-collection-similarity-review.md
+started_at: 2026-10-21
+last_updated_at: 2026-10-22
+blockers:
+- WI-0123
+- WI-0158
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/647
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/651
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/653
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/654
+- type: maintainer_verification
+  value: 2026-10-22 first review pilot 11 of 11 checks passed with 1535 candidates and 157 groups; latest UI described as better and v3 burst sets as much better; last v3 regression not yet signed off.
+- type: documentation
+  value: docs/operations/creative-similarity-review.md
