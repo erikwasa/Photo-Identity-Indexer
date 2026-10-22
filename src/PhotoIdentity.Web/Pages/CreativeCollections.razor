@@ -239,7 +239,7 @@
                             <p class="smart-help">
                                 Compare existing local thumbnails. Keep all by default, or record a preference.
                                 <strong>Review annotations only:</strong> no collection, slideshow or source photo is changed.
-                                Groups are conservative complete-link matches; a single burst can appear in several groups.
+                                Review groups use a more permissive nearby-burst match (H12 neighbors, H18 from the first frame, at most 45 seconds within the same moment). They are suggestions, not confirmed duplicates. Normal slideshow selection still uses conservative H8 complete-link matching.
                             </p>
                             @if (Similarity is SimilarityReviewResponse similarity)
                             {
