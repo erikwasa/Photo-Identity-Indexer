@@ -58,15 +58,17 @@ folder containing media.
 
 The explicit apply performs only these actions:
 
-1. Creates three new, clearly synthetic directories inside the marked lab:
-   working, allowed input, and ungranted input.
+1. Creates a **disposable `sandbox-scope` child** inside the marked lab,
+   containing three clearly synthetic directories: working, allowed input
+   and ungranted input. The surviving marked directory ACL is never changed.
 2. Creates a **unique disposable** user AppContainer profile and obtains its
    Package SID. It requests **zero** capability SIDs, including zero
    network capability SIDs.
-3. Grants the Package SID noninheriting root traversal, read/execute access
-   (inherited by one generated input file), and modify access only to the
-   new working directory and descendants. The sibling ungranted input
-   gets **no** AppContainer ACL grant.
+3. Grants the Package SID noninheriting traversal **only to the disposable
+   scope**, read/execute access to its allowed-input directory (inherited
+   by one generated file), and modify access to its working directory.
+   No ACE is added to the lasting marked root. The sibling ungranted
+   input gets **no** AppContainer ACL grant.
 4. Before any launch, independently audits the generated root, allowed-input,
    working and ungranted-input DACLs plus both generated files. It requires
    exactly the intended AppContainer SID rules, no inherited access to the
@@ -84,10 +86,11 @@ The explicit apply performs only these actions:
 6. If the allowed copy succeeds, repeats the exact same process profile
    against the ungranted synthetic sibling. Unexpected access to the
    ungranted bytes is a hard **failure**.
-7. Deletes all newly created scratch folders and the disposable Windows
-   AppContainer profile. A cleanup failure is not accepted as PASS;
-   it is reported as `sandbox-cleanup-unverified`. No arbitrary directory
-   cleanup is performed.
+7. Deletes the owned disposable scope subtree and the disposable Windows
+   AppContainer profile, then verifies the untouched marked root's original
+   DACL SDDL (including inheritance flags) is unchanged. A cleanup failure
+   is not accepted as PASS; it is `sandbox-cleanup-unverified`. No arbitrary
+   directory cleanup or persistent-root ACL restoration is performed.
 
 The command uses the existing supervisor's timeout, scratch-count/size
 limits, job-wide memory/CPU/process cap, native process join-before-resume,
@@ -116,10 +119,10 @@ appear in the result.
   permissions and denied sibling have been verified.
 - `ungranted-read-not-denied` is a security regression: never authorize
   production if an ungranted synthetic file can be read.
-- `sandbox-cleanup-unverified` means the persistent Windows profile
-  or owned lab cleanup could not be proven; inspect the host under
-  controlled operator procedures rather than silently deleting unrelated
-  profiles.
+- `sandbox-cleanup-unverified` means the persistent Windows profile,
+  disposable child cleanup or untouched marked-root DACL integrity could not
+  be proven; inspect the host under controlled operator procedures rather
+  than silently deleting unrelated profiles.
 
 Every response includes `syntheticAclAuditVerified`, which can be true
 only after a fresh on-disk DACL inspection of generated test paths. This
