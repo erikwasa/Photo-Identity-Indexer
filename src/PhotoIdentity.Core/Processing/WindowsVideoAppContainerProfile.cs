@@ -129,6 +129,95 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
         info.SetAccessControl(acl);
     }
 
+
+    /// <summary>
+    /// Independently inspect the synthetic DACL shape before executing any
+    /// child. This checks only generated lab paths and does not constitute
+    /// an audit of the real archive, runtime/tool directories or cache.
+    /// The observed allow/deny probes are still required afterwards.
+    /// </summary>
+    public bool AuditSyntheticAcl()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        string working = Path.Combine(_labRoot, "sandbox-working");
+        string allowed = Path.Combine(_labRoot, "sandbox-allowed");
+        string blocked = Path.Combine(_labRoot, "sandbox-ungranted");
+        string allowedFile = Path.Combine(allowed, "generated-public.txt");
+        string blockedFile = Path.Combine(blocked, "generated-restricted.txt");
+
+        foreach (string directory in new[] { _labRoot, working, allowed, blocked })
+            if (!Directory.Exists(directory) ||
+                (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                return false;
+        foreach (string file in new[] { allowedFile, blockedFile })
+            if (!File.Exists(file) ||
+                (File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
+                return false;
+
+        FileSystemAccessRule[] rootRules = Rules(
+            new DirectoryInfo(_labRoot).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] allowedRules = Rules(
+            new DirectoryInfo(allowed).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] workingRules = Rules(
+            new DirectoryInfo(working).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] blockedRules = Rules(
+            new DirectoryInfo(blocked).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] allowedFileRules = Rules(
+            new FileInfo(allowedFile).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] blockedFileRules = Rules(
+            new FileInfo(blockedFile).GetAccessControl(AccessControlSections.Access));
+
+        // Neither a parent inherited wildcard ACE nor the Windows
+        // ALL APPLICATION PACKAGES principals may bypass the unique lab SID.
+        foreach (FileSystemAccessRule[] rules in new[]
+            { rootRules, allowedRules, workingRules, blockedRules,
+              allowedFileRules, blockedFileRules })
+            if (rules.Any(rule => rule.AccessControlType == AccessControlType.Allow &&
+                rule.IdentityReference is SecurityIdentifier sid &&
+                sid.Value is "S-1-15-2-1" or "S-1-15-2-2"))
+                return false;
+
+        bool ExactPackageRule(FileSystemAccessRule[] rules,
+            FileSystemRights required, bool inherited,
+            InheritanceFlags inheritance, bool mayWrite)
+        {
+            FileSystemAccessRule[] matching = rules.Where(rule =>
+                rule.IdentityReference.Equals(Identity)).ToArray();
+            if (matching.Length != 1) return false;
+            FileSystemAccessRule rule = matching[0];
+            if (rule.AccessControlType != AccessControlType.Allow ||
+                rule.IsInherited != inherited ||
+                rule.InheritanceFlags != inheritance ||
+                (rule.FileSystemRights & required) != required)
+                return false;
+            const FileSystemRights forbiddenWrite =
+                FileSystemRights.WriteData | FileSystemRights.AppendData |
+                FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles |
+                FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership |
+                FileSystemRights.WriteAttributes |
+                FileSystemRights.WriteExtendedAttributes;
+            return mayWrite || (rule.FileSystemRights & forbiddenWrite) == 0;
+        }
+
+        InheritanceFlags descendants = InheritanceFlags.ContainerInherit |
+            InheritanceFlags.ObjectInherit;
+        return ExactPackageRule(rootRules, FileSystemRights.Traverse,
+                   inherited: false, InheritanceFlags.None, mayWrite: false) &&
+               ExactPackageRule(allowedRules, FileSystemRights.ReadAndExecute,
+                   inherited: false, descendants, mayWrite: false) &&
+               ExactPackageRule(workingRules, FileSystemRights.Modify,
+                   inherited: false, descendants, mayWrite: true) &&
+               ExactPackageRule(allowedFileRules, FileSystemRights.ReadAndExecute,
+                   inherited: true, InheritanceFlags.None, mayWrite: false) &&
+               !blockedRules.Any(rule => rule.IdentityReference.Equals(Identity)) &&
+               !blockedFileRules.Any(rule => rule.IdentityReference.Equals(Identity));
+    }
+
+    private static FileSystemAccessRule[] Rules(FileSystemSecurity security) =>
+        security.GetAccessRules(includeExplicit: true, includeInherited: true,
+            targetType: typeof(SecurityIdentifier))
+            .Cast<FileSystemAccessRule>().ToArray();
+
     private static string ValidateLabRoot(string labRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(labRoot);
