@@ -120,10 +120,66 @@ The page defaults to 12 groups; GET supports `offset` (0-based, nonnegative) and
 PUT verification. Changing the selected recipe clears stale review data. No source or
 selection change is introduced.
 
-**Similarity policy deliberately unchanged.** The current accepted complete-link H8,
-same-moment, max-20-second algorithm intentionally breaks A≈B≈C chains if A and C
-are too far apart. Widening it would risk hiding meaningfully different expressions,
-angles or subjects. A separate *read-only nearby-burst review* experiment should display
-adjacent same-moment groups together without claiming that all cross-group pairs qualify;
-measure what the maintainer regards as one curation choice, with a manual grouping override
-only after operator acceptance. Do not silently reclassify groups or apply suppression.
+**At the time of the compact UI PR**, similarity policy remained H8 complete-link:
+its conservative A≈B≈C splitting motivated the later, explicitly review-only
+broader policy described below. Slideshow selection remains on the old policy;
+automatic suppression is not authorized.
+
+## 2026-10-22: broader review-only groups (operator follow-up)
+
+After the compact/paginated review UI was merged (#651), the maintainer reported
+that **every inspected group contained a redundant frame** and most bursts of
+more than two near-copy photos were split into smaller groups. The operator
+explicitly prefers a lower-precision **manual suggestion list** if that results
+in larger, more useful curation choices. These observations are qualitative,
+not a measured recall/precision study.
+
+For **GET/PUT saved Creative similarity review only**, materialization now
+creates an independent, versioned review grouping:
+
+- `wi0638-review-neighbor-h12-anchor-h18-45s-v2`
+- Same inferred moment; 45-second maximum span for the whole group.
+- A candidate must have Hamming distance **<=12 to at least one group member**
+  and distance **<=18 from the first representative**. This joins more
+  nearby burst frames without an unbounded connected-component chain.
+- The maximum **pairwise** Hamming distance shown in the UI can therefore
+  exceed 12; that metric still describes the worst pair, not the admission
+  criterion. The display labels remain descriptive, never exclusion evidence.
+- Proxy fingerprinting is expanded to the review window **only for explicit
+  similarity-review API calls**, using the existing revision-checked local
+  proxy/hash cache. Other Creative materializations still use their normal
+  workload and the accepted `m26-dhash64-h8-20s-v1` complete-link policy.
+- GET displays the new review policy and groups; PUT recomputes and validates
+  exact **current** group membership under the same review policy.
+  Previous choices remain only if their exact group membership fingerprint
+  still matches; changed groups deliberately do not inherit old decisions.
+
+This changes no Creative selector penalties, stored recipe, slideshow snapshots,
+Archive, Search, Smart Collection membership, existing Photo Identity exclusions,
+source copies, or OneDrive originals. New groups have a higher chance of
+including meaningful differences; a human still decides Keep all vs Prefer.
+There is **no automatic removal/omission** from collections or slideshows.
+
+### Verification after green CI and merge
+
+1. Update main, restart the updated Photo Identity package, choose the same
+   burst-heavy saved Creative Collection used for the first 1,535-candidate review.
+2. Open similarity review and check policy
+   `wi0638-review-neighbor-h12-anchor-h18-45s-v2`. The total group count
+   is expected to change; no new fixed target count is claimed.
+3. Inspect examples formerly split among several 2–3-photo groups: ideally
+   more burst alternatives appear in one group. Use the group thumbnail
+   disclosure and bounded page navigation.
+4. Assess whether broader groups contain obviously unrelated/different-moment
+   photos, or examples you want to keep for meaningful differences. A lower
+   precision is expected, but different moments and >45-second groups remain
+   forbidden. Record aggregate counts, approximate typical group size, and
+   whether split bursts improved.
+5. Verify **Prefer this photo**, **Keep all**, restart persistence and recipe
+   isolation for the newly keyed groups. An annotation on a *changed* old
+   group must **not** be silently applied to its broader replacement.
+6. Compare Creative preview and slideshow before/after recording preferences.
+   They must remain unchanged by review decisions. Verify no new original
+   hydration, automatic source exclusion, or photo-feature regression.
+
+Do not publish private photo IDs, thumbnails or review-state JSON files.
