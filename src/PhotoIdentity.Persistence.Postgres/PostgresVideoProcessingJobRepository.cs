@@ -163,8 +163,8 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 available_at_utc=now(), updated_at_utc=now()
             WHERE job.id=@id AND job.status IN ('failed','cancelled')
               AND NOT EXISTS (
-                  SELECT 1 FROM video_published_derivative_receipts receipt
-                  WHERE receipt.video_processing_job_id=job.id)
+                  SELECT 1 FROM video_published_derivatives receipt
+                  WHERE receipt.job_id=job.id)
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
                   JOIN assets asset ON asset.id=revision.asset_id
