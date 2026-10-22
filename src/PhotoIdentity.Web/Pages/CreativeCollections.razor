@@ -814,7 +814,7 @@
         string CollectionId, string CollectionName, string PolicyVersion,
         string AlgorithmVersion, int MaximumHammingDistance, double MaximumCaptureSpanSeconds,
         int TotalGroups, int DisplayedGroups, bool GroupSampleTruncated,
-        int TotalCandidates, int SelectedCount, SimilarityGroupResponse[] Groups,
+        int GroupOffset, int TotalCandidates, int SelectedCount, SimilarityGroupResponse[] Groups,
         bool CollectionSelectionChanged, bool AutoOmissionEnabled, string EvidenceSemantics);
 
     private async Task ToggleSimilarityReviewAsync()
