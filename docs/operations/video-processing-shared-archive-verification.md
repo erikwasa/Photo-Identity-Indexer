@@ -87,25 +87,30 @@ production catalogue state.
    already-local eligible video complete or report a sanitized failure.
    Verify its current revision receipt only after the bounded tool and
    independent FFprobe validator have completed.
-3. While a second video attempts processing, press **Pause archive**.
+3. Verify queued online-only media cannot block a later already-local queued
+   video while hydration is disabled. Narrow Archive included folders after
+   videos have been queued, then verify the removed folder's queued jobs
+   remain unclaimed. The PostgreSQL claim checks current coverage, not merely
+   the coverage snapshot when the job was created.
+4. While a second video attempts processing, press **Pause archive**.
    The process should stop and leave no published partial output. Start
    archive again to retry/continue from scratch. Repeat after an app restart.
    Do not expect frame-exact resumption.
-4. Test a source exclusion or revision change and verify the old video
+5. Test a source exclusion or revision change and verify the old video
    receipt is not treated as current; source and photo catalogue records
    must not be changed by the video job. A terminal failed/cancelled job has
    a **Retry** action in Settings which requeues the *same idempotent job*
    from scratch only while the revision remains current, supported and
    unexcluded. A succeeded job or receipt cannot be retried/overwritten.
-5. Compare original video SHA-256 before and after a successful run.
+6. Compare original video SHA-256 before and after a successful run.
    Verify the archive photo files and existing photo functions remain
    unchanged. No video processing step opens originals for writing.
-6. Only for an already-catalogued online-only video, explicitly turn on
+7. Only for an already-catalogued online-only video, explicitly turn on
    **Include online-only videos**, verify one bounded OneDrive hydration
    request and eventual online-only release. If release fails or OneDrive
    is unavailable, the app reports/retains the file; **never delete the
    OneDrive original to reclaim disk**.
-7. Verify a malformed/unsupported/oversized clip never publishes an
+8. Verify a malformed/unsupported/oversized clip never publishes an
    apparently valid result. Failed jobs or observed tool capacity limits
    remain visible for later local troubleshooting or an independently
    reviewed Azure fallback.

@@ -131,11 +131,11 @@ public sealed class VideoArchiveProcessingService(
             // A retryable queued job takes priority. Its original may have
             // become online-only since enqueue/restart; never claim it blindly
             // or hydrate it unless the separate opt-in is active.
-            VideoCandidate? candidate = await FindOldestQueuedAsync(token);
-            bool alreadyQueued = candidate is not null;
+            VideoArchiveCandidate? candidate = await FindOldestQueuedAsync(
+                coverage, preferences.Current.IncludeOnlineOnly, token);
             if (candidate is null)
                 candidate = await FindPendingAsync(
-                    ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
+                    coverage, ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
@@ -146,12 +146,21 @@ public sealed class VideoArchiveProcessingService(
                     coverage, ffprobe, token);
                 if (discovered)
                     candidate = await FindPendingAsync(
-                        ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
+                        coverage, ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
+            }
+            if (candidate is null)
+            {
+                // Never claim an unrelated queued job when the current
+                // coverage has no admissible video.
+                Volatile.Write(ref _lastResult,
+                    discovered ? "video-inspected" : "no-eligible-video");
+                return discovered;
             }
             bool ownedHydration = false;
             string? ownedPath = null;
             try
             {
+                Guid selectedJobId = candidate.JobId ?? Guid.Empty;
                 if (candidate is not null)
                 {
                     var source = new OneDriveVideoAssetSource(
@@ -211,8 +220,8 @@ public sealed class VideoArchiveProcessingService(
                         SourceBytes: candidate.Size,
                         ExpectedTemporaryBytes: candidate.Size + 256L * 1024 * 1024,
                         RequestedFrames: 0);
-                    if (!alreadyQueued)
-                        await new PostgresVideoProcessingJobRepository(database)
+                    if (candidate.JobId is null)
+                        selectedJobId = await new PostgresVideoProcessingJobRepository(database)
                             .EnqueueAsync(identity, JobBudget, admission, token);
                 }
 
@@ -220,7 +229,9 @@ public sealed class VideoArchiveProcessingService(
                     database, ffmpeg, ffprobe, ffprobeHash, cache, ToolBudget);
                 VideoWorkerCycleResult result =
                     await new VideoWorkerAttemptCoordinator(database)
-                        .RunOneAsync(JobBudget, adapter, token);
+                        .RunOneAsync(JobBudget, adapter, token,
+                            selectedJobId: selectedJobId,
+                            requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
                 return result.Claimed || candidate is not null || discovered;
             }
@@ -491,20 +502,18 @@ public sealed class VideoArchiveProcessingService(
         }
     }
 
-    private sealed record VideoCandidate(
-        Guid RevisionId, Guid SourceId, string Root, string Key, long Size);
-
     /// <summary>
-    /// Choose the same oldest eligible queued video as the serialized
-    /// Postgres claim, so pause/restart respects *current* availability.
-    /// Do not re-enqueue an existing idempotency identity.
+    /// Select an eligible queued job only within the current archive coverage.
+    /// Inspect all queued candidates in order: an older OneDrive placeholder
+    /// cannot block an already-local queued video.
     /// </summary>
-    private async Task<VideoCandidate?> FindOldestQueuedAsync(CancellationToken token)
+    private async Task<VideoArchiveCandidate?> FindOldestQueuedAsync(
+        ArchiveCoverageState coverage, bool includeOnlineOnly, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
         query.CommandText = """
-            SELECT revision.id, source.id, source.root_locator,
+            SELECT job.id, revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes
             FROM video_processing_jobs job
             JOIN asset_revisions revision ON revision.id=job.asset_revision_id
@@ -528,17 +537,24 @@ public sealed class VideoArchiveProcessingService(
                   SELECT 1 FROM source_copy_exclusions excluded
                   WHERE excluded.source_id=asset.source_id
                     AND excluded.source_key=asset.source_key)
-            ORDER BY job.requested_at_utc, job.id LIMIT 1;
+            ORDER BY job.requested_at_utc, job.id;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
-        await using NpgsqlDataReader reader = await query.ExecuteReaderAsync(token);
-        if (!await reader.ReadAsync(token)) return null;
-        return new VideoCandidate(reader.GetGuid(0), reader.GetGuid(1),
-            reader.GetString(2), reader.GetString(3), reader.GetInt64(4));
+        List<VideoArchiveCandidate> candidates = [];
+        await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
+        {
+            while (await reader.ReadAsync(token))
+                candidates.Add(new VideoArchiveCandidate(
+                    reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3),
+                    reader.GetString(4), reader.GetInt64(5), reader.GetGuid(0)));
+        }
+        return await VideoArchiveCandidateSelector.SelectAsync(
+            coverage, candidates, includeOnlineOnly, ReadAvailabilityAsync, token);
     }
 
-    private async Task<VideoCandidate?> FindPendingAsync(
-        string toolSha256, bool includeOnlineOnly, CancellationToken token)
+    private async Task<VideoArchiveCandidate?> FindPendingAsync(
+        ArchiveCoverageState coverage, string toolSha256,
+        bool includeOnlineOnly, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
@@ -576,38 +592,89 @@ public sealed class VideoArchiveProcessingService(
                     AND job.derivative_kind='PlayableProxy'
                     AND job.preset_version=@preset AND job.tool_sha256=@tool
                     AND job.policy_version='wi0188-v1')
-            ORDER BY metadata.duration_seconds, revision.id
-            LIMIT 200;
+            ORDER BY metadata.duration_seconds, revision.id;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
         query.Parameters.AddWithValue("preset", VideoProxyCandidateProfile.Version);
         query.Parameters.AddWithValue("tool", toolSha256);
-        List<VideoCandidate> candidates = [];
+        List<VideoArchiveCandidate> candidates = [];
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
         {
             while (await reader.ReadAsync(token))
-                candidates.Add(new VideoCandidate(reader.GetGuid(0), reader.GetGuid(1),
-                    reader.GetString(2), reader.GetString(3), reader.GetInt64(4)));
+                candidates.Add(new VideoArchiveCandidate(
+                    reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2),
+                    reader.GetString(3), reader.GetInt64(4)));
         }
-        VideoCandidate? online = null;
-        foreach (VideoCandidate candidate in candidates)
+        return await VideoArchiveCandidateSelector.SelectAsync(
+            coverage, candidates, includeOnlineOnly, ReadAvailabilityAsync, token);
+    }
+
+    private static Task<AssetAvailability> ReadAvailabilityAsync(
+        VideoArchiveCandidate candidate, CancellationToken token)
+    {
+        var source = new OneDriveVideoAssetSource(
+            SourceId.From(candidate.SourceId), candidate.Root);
+        return source.GetAvailabilityAsync(
+            new SourceAssetReference(source.SourceId, candidate.Key), token);
+    }
+}
+
+/// <summary>A catalogue video revision and optional existing queued job.</summary>
+public sealed record VideoArchiveCandidate(
+    Guid RevisionId, Guid SourceId, string Root, string Key, long Size,
+    Guid? JobId = null);
+
+/// <summary>
+/// Shared local-first selection for the queued and newly inspected lanes.
+/// A source must be in the currently selected included folders before even
+/// querying local/OneDrive availability, and local always wins over online-only.
+/// </summary>
+public static class VideoArchiveCandidateSelector
+{
+    public static bool IsIncluded(
+        ArchiveCoverageState coverage, VideoArchiveCandidate candidate)
+    {
+        if (coverage.Source.SourceId.Value != candidate.SourceId ||
+            !string.Equals(coverage.Source.RootLocator, candidate.Root,
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            return false;
+
+        try
         {
-            var source = new OneDriveVideoAssetSource(
-                SourceId.From(candidate.SourceId), candidate.Root);
-            AssetAvailability availability;
-            try
-            {
-                availability = await source.GetAvailabilityAsync(
-                    new SourceAssetReference(source.SourceId, candidate.Key), token);
-            }
-            catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or ArgumentException)
+            return coverage.IncludedFolders.Any(folder =>
+                ArchiveCoverage.Covers(folder, candidate.Key));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    public static async Task<VideoArchiveCandidate?> SelectAsync(
+        ArchiveCoverageState coverage,
+        IEnumerable<VideoArchiveCandidate> candidates,
+        bool includeOnlineOnly,
+        Func<VideoArchiveCandidate, CancellationToken, Task<AssetAvailability>> availability,
+        CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(coverage);
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(availability);
+        VideoArchiveCandidate? online = null;
+        foreach (VideoArchiveCandidate candidate in candidates)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!IsIncluded(coverage, candidate)) continue;
+            AssetAvailability state;
+            try { state = await availability(candidate, token); }
+            catch (Exception e) when (
+                e is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 continue;
             }
-            // Always prefer local videos even when cloud retrieval is opted in.
-            if (availability == AssetAvailability.Local) return candidate;
-            if (includeOnlineOnly && availability == AssetAvailability.OnlineOnly)
+            if (state == AssetAvailability.Local) return candidate;
+            if (includeOnlineOnly && state == AssetAvailability.OnlineOnly)
                 online ??= candidate;
         }
         return online;

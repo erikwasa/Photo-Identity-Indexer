@@ -152,6 +152,136 @@ public sealed class VideoWorkerAttemptCoordinatorTests
         }
     }
 
+    [Fact]
+    public async Task Selected_video_claim_rechecks_live_included_folders()
+    {
+        string? admin = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(admin)) return;
+
+        string name = "photoidentity_video_scope_" + Guid.NewGuid().ToString("N");
+        await using NpgsqlConnection adminConnection = new(
+            new NpgsqlConnectionStringBuilder(admin) { Pooling = false }.ConnectionString);
+        await adminConnection.OpenAsync();
+        await using (NpgsqlCommand create = adminConnection.CreateCommand())
+        {
+            create.CommandText = $"CREATE DATABASE \"{name}\";";
+            await create.ExecuteNonQueryAsync();
+        }
+        try
+        {
+            var config = new NpgsqlConnectionStringBuilder(admin)
+            {
+                Database = name, Pooling = false
+            };
+            await using PostgresCatalogueDatabase db = new(config.ConnectionString);
+            await db.InitializeAsync();
+            var queue = new PostgresVideoProcessingJobRepository(db);
+            var control = new PostgresVideoProcessingControlRepository(db);
+            VideoProcessingBudget budget = new(
+                Enabled: true, Paused: false, MaximumConcurrentJobs: 1,
+                MaximumSourceBytes: 20000, MaximumTemporaryBytes: 80000,
+                MaximumExtractedFrames: 8);
+            var admission = new VideoProcessingCandidate(
+                true, false, true, true, 10000, 20000, 3);
+            Guid source = Guid.NewGuid();
+            Guid removedAsset = Guid.NewGuid(), coveredAsset = Guid.NewGuid();
+            Guid removedRevision = Guid.NewGuid(), coveredRevision = Guid.NewGuid();
+            await using (NpgsqlConnection connection = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand seed = connection.CreateCommand())
+            {
+                seed.CommandText = """
+                    INSERT INTO sources(id,kind,root_locator,created_at_utc)
+                    VALUES (@source,'local-folder','fixture-root',now());
+                    INSERT INTO archive_configuration(id,source_id,configured_at_utc)
+                    VALUES (1,@source,now());
+                    INSERT INTO archive_included_folders(source_id,relative_path,included_at_utc)
+                    VALUES (@source,'2024',now());
+                    INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
+                    VALUES (@removed,@source,'2024/removed/old.mp4',now(),'video'),
+                           (@covered,@source,'2024/included/current.mp4',now(),'video');
+                    INSERT INTO asset_revisions(id,asset_id,content_sha256,size_bytes,
+                        observed_at_utc,media_type,media_kind)
+                    VALUES (@removedRevision,@removed,repeat('a',64),10000,now(),'video/mp4','video'),
+                           (@coveredRevision,@covered,repeat('b',64),10000,now(),'video/mp4','video');
+                    INSERT INTO video_revision_metadata(asset_revision_id,
+                        inspection_status,duration_seconds,inspected_at_utc,
+                        tool_sha256,inspection_profile_id)
+                    VALUES (@removedRevision,'supported',8,now(),repeat('c',64),'scope-fixture'),
+                           (@coveredRevision,'supported',8,now(),repeat('c',64),'scope-fixture');
+                    """;
+                seed.Parameters.AddWithValue("source", source);
+                seed.Parameters.AddWithValue("removed", removedAsset);
+                seed.Parameters.AddWithValue("covered", coveredAsset);
+                seed.Parameters.AddWithValue("removedRevision", removedRevision);
+                seed.Parameters.AddWithValue("coveredRevision", coveredRevision);
+                await seed.ExecuteNonQueryAsync();
+            }
+
+            Task<Guid> Queue(Guid revision) => queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(AssetRevisionId.From(revision),
+                    VideoDerivativeKind.PlayableProxy, "wi0188-v1",
+                    "coverage-claim", new string('d', 64)), budget, admission);
+            Guid old = await Queue(removedRevision);
+            Guid current = await Queue(coveredRevision);
+            await control.EnableAsync();
+
+            // Coverage changed *after* jobs were queued. The database gate
+            // must reject the old job even though it is still queued.
+            await using (NpgsqlConnection connection = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand narrow = connection.CreateCommand())
+            {
+                narrow.CommandText = """
+                    UPDATE archive_included_folders SET relative_path='2024/included'
+                    WHERE source_id=@source;
+                    """;
+                narrow.Parameters.AddWithValue("source", source);
+                await narrow.ExecuteNonQueryAsync();
+            }
+            Assert.Null(await queue.TryClaimNextAsync(
+                budget, photoWorkActive: false, selectedJobId: old,
+                requireArchiveCoverage: true));
+            Assert.Equal("queued", (await queue.GetAsync(old))?.Status);
+
+            // Explicit selection cannot accidentally claim the older job.
+            VideoProcessingJobLease? lease = await queue.TryClaimNextAsync(
+                budget, photoWorkActive: false, selectedJobId: current,
+                requireArchiveCoverage: true);
+            Assert.NotNull(lease);
+            Assert.Equal(current, lease!.Id);
+            Assert.Equal("running", (await queue.GetAsync(current))?.Status);
+
+            // Replacing coverage again is honored without deleting jobs.
+            await using (NpgsqlConnection connection = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand narrow = connection.CreateCommand())
+            {
+                narrow.CommandText = """
+                    UPDATE archive_included_folders SET relative_path='2024/removed'
+                    WHERE source_id=@source;
+                    """;
+                narrow.Parameters.AddWithValue("source", source);
+                await narrow.ExecuteNonQueryAsync();
+            }
+            // Current lease remains running; another cannot start concurrently.
+            Assert.Null(await queue.TryClaimNextAsync(
+                budget, photoWorkActive: false, selectedJobId: old,
+                requireArchiveCoverage: true));
+            Assert.True(await queue.TryFinishAttemptAsync(
+                lease.Id, lease.LeaseToken, succeeded: false, retryable: false));
+            VideoProcessingJobLease? restored = await queue.TryClaimNextAsync(
+                budget, photoWorkActive: false, selectedJobId: old,
+                requireArchiveCoverage: true);
+            Assert.NotNull(restored);
+            Assert.Equal(old, restored!.Id);
+        }
+        finally
+        {
+            await using NpgsqlCommand drop = adminConnection.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE);";
+            await drop.ExecuteNonQueryAsync();
+        }
+    }
+
     private sealed class SyntheticAdapter(
         Func<VideoProcessingJobLease, CancellationToken,
             Task<VideoDerivativeAttemptReport>> execute)

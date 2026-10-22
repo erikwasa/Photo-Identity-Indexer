@@ -1141,6 +1141,11 @@ Production activation remains prohibited until reviewed.
   replaces the older real-media CLI hard-stop with guarded in-app execution
   subject to explicit Settings opt-in and archive start; direct operator
   one-shot `--apply` stays blocked.
+- **Queued selection follow-up (PR #656):** queued online-only placeholders
+  cannot block a later local video, even when hydration is disabled. Previously
+  queued and newly inspected candidates are limited to current included
+  folders, and serialized PostgreSQL claims re-check current durable coverage
+  for the specifically selected job. Selection and claim have regression tests.
 - **CI and maintained-host verification are pending.** Documentation and
   implementation are not acceptance by themselves.
 

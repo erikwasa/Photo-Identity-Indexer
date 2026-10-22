@@ -40,7 +40,9 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
     public async Task<VideoWorkerCycleResult> RunOneAsync(
         VideoProcessingBudget budget,
         IVideoPublishedDerivativeAdapter adapter,
-        CancellationToken token = default)
+        CancellationToken token = default,
+        Guid? selectedJobId = null,
+        bool requireArchiveCoverage = false)
     {
         ArgumentNullException.ThrowIfNull(budget);
         ArgumentNullException.ThrowIfNull(adapter);
@@ -55,7 +57,9 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
             return new(false, false, "caller-disabled");
 
         var queue = new PostgresVideoProcessingJobRepository(database);
-        VideoProcessingJobLease? lease = await queue.TryClaimNextAsync(budget, token);
+        VideoProcessingJobLease? lease = await queue.TryClaimNextAsync(
+            budget, photoWorkActive: false, token: token,
+            selectedJobId: selectedJobId, requireArchiveCoverage: requireArchiveCoverage);
         if (lease is null)
             return new(false, false, "no-admissible-job");
 

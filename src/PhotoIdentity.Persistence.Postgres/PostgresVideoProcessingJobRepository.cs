@@ -237,11 +237,14 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
     /// </summary>
     public async Task<VideoProcessingJobLease?> TryClaimNextAsync(
         VideoProcessingBudget budget, bool photoWorkActive,
-        CancellationToken token = default)
+        CancellationToken token = default, Guid? selectedJobId = null,
+        bool requireArchiveCoverage = false)
     {
         ArgumentNullException.ThrowIfNull(budget);
         budget.Validate();
-        if (!budget.Enabled || budget.Paused || photoWorkActive) return null;
+        if (!budget.Enabled || budget.Paused || photoWorkActive ||
+            (requireArchiveCoverage && selectedJobId is null))
+            return null;
 
         await _exclusions.EnsureReadyAsync(token);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
@@ -337,6 +340,17 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 JOIN video_revision_metadata metadata ON metadata.asset_revision_id = revision.id
                 WHERE job.status = 'queued' AND job.cancellation_requested_at_utc IS NULL
                   AND job.attempt_count < 3 AND job.available_at_utc <= now()
+                  AND (NOT @restrict_job OR job.id=@selected_job)
+                  AND (NOT @require_archive_coverage OR EXISTS (
+                      SELECT 1 FROM archive_configuration archive
+                      JOIN archive_included_folders included
+                        ON included.source_id=archive.source_id
+                      WHERE archive.id=1 AND archive.source_id=asset.source_id
+                        AND (included.relative_path='' OR
+                             LEFT(LOWER(REPLACE(asset.source_key, CHR(92), '/')),
+                                  LENGTH(included.relative_path)+1)
+                                = LOWER(included.relative_path) || '/')
+                  ))
                   AND EXISTS (
                     SELECT 1 FROM video_processing_control scope
                     WHERE scope.singleton_id=1 AND scope.enabled AND NOT scope.paused
@@ -362,6 +376,9 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 ORDER BY job.requested_at_utc, job.id
                 LIMIT 1 FOR UPDATE OF job SKIP LOCKED;
                 """;
+            select.Parameters.AddWithValue("restrict_job", selectedJobId.HasValue);
+            select.Parameters.AddWithValue("selected_job", selectedJobId ?? Guid.Empty);
+            select.Parameters.AddWithValue("require_archive_coverage", requireArchiveCoverage);
             select.Parameters.AddWithValue("max_source", budget.MaximumSourceBytes);
             select.Parameters.AddWithValue("remaining", available);
             select.Parameters.AddWithValue("max_frames", budget.MaximumExtractedFrames);
