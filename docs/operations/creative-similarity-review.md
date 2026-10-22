@@ -2,7 +2,7 @@
 
 ## Background and accepted scope
 
-The operator verified the completed WI-0629 Archive cleanup workflow:
+The operator verified the completed WI-0206 Archive cleanup workflow:
 the full-screen keyboard quality-suggestion reviewer and all existing
 feature regressions work as expected after merged PR #644.
 **Archive cleanup stays focused exclusively on low-quality photos.**
