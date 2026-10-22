@@ -86,14 +86,20 @@ public sealed class VideoArchiveProcessingService(
             await VerifyToolAsync(ffmpeg, ffmpegHash, token);
             await VerifyToolAsync(ffprobe, ffprobeHash, token);
 
-            string cache = configuration["PhotoIdentity:VideoProcessing:CacheRoot"]
+            string? configuredCache = configuration["PhotoIdentity:VideoProcessing:CacheRoot"];
+            string cache = configuredCache
                 ?? Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "PhotoIdentity", "video-worker-cache");
-            // Do not create or mark a pre-existing directory that might hold
-            // unrelated data. A new owned cache stays outside all archive roots.
-            if (!Directory.Exists(cache))
+            // Never create/claim an arbitrary operator-selected directory:
+            // it might be a OneDrive/archive root. Custom caches must
+            // already be privately marked under the published runbook.
+            // Only our fixed application-local default may be created.
+            if (!Directory.Exists(cache) && configuredCache is null)
             {
+                string parent = Path.GetDirectoryName(cache)!;
+                Directory.CreateDirectory(parent);
+                VideoDerivativeCacheGuard.AssertNoLinks(parent);
                 Directory.CreateDirectory(cache);
                 await File.WriteAllTextAsync(
                     Path.Combine(cache, VideoDerivativeFilePublisher.CacheMarker),
