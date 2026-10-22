@@ -1,0 +1,170 @@
+@inject HttpClient Http
+
+<section class="review-filter-panel" aria-labelledby="video-processing-settings-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Photo-first archive</p>
+            <h2 id="video-processing-settings-heading">Video processing</h2>
+            <p>Run eligible videos after the photo archive has no pending work.
+               The usual Advance archive and Pause archive buttons control the session.</p>
+        </div>
+    </div>
+
+    @if (Loading)
+    {
+        <div class="empty-state compact">Loading video settings…</div>
+    }
+    else if (Status is null)
+    {
+        <div class="notice error">Video processing status is unavailable.</div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="notice error" role="alert">@Error</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <div class="notice success" role="status">@Message</div>
+        }
+
+        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="review-filter-grid">
+                <div>
+                    <label class="field-label" for="video-processing-enabled">
+                        <input id="video-processing-enabled" type="checkbox"
+                               @bind="Enabled" disabled="@Saving" />
+                        Process videos
+                    </label>
+                    <p>Off by default. When on, eligible videos run one at a time
+                       after photo processing. No parallel video jobs.</p>
+                </div>
+                <div>
+                    <label class="field-label" for="video-processing-online">
+                        <input id="video-processing-online" type="checkbox"
+                               @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled)" />
+                        Include online-only videos
+                    </label>
+                    <p>Off by default. Allows bounded OneDrive downloads for video
+                       processing and requests online-only again afterwards.
+                       Videos already stored locally are left as they were.</p>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="button primary" type="submit" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save video settings")
+                </button>
+            </div>
+            <p class="field-help">
+                These preferences are saved immediately. Use Advance archive
+                to start processing; use Pause archive to interrupt it.
+                An interrupted video restarts from scratch when retried.
+            </p>
+        </form>
+
+        @if (!Status.ToolsConfigured)
+        {
+            <div class="notice warning">
+                Video execution is not configured. Add approved FFmpeg/FFprobe
+                executable paths and SHA-256 hashes in application configuration.
+                No video runs until those tools are configured.
+            </div>
+        }
+
+        <h3>Video queue</h3>
+        <div class="review-filter-grid">
+            <div><span class="field-label">Pending</span><strong>@Status.Queued</strong></div>
+            <div><span class="field-label">Processing</span><strong>@(Status.Processing ? "Yes" : "No")</strong></div>
+            <div><span class="field-label">Completed</span><strong>@Status.Succeeded</strong></div>
+            <div><span class="field-label">Failed</span><strong>@Status.Failed</strong></div>
+            <div><span class="field-label">Cancelled</span><strong>@Status.Cancelled</strong></div>
+            <div><span class="field-label">Recovery needed</span><strong>@Status.ExpiredLeases</strong></div>
+        </div>
+        <button class="button secondary" disabled="@Saving" @onclick="LoadAsync">
+            Refresh video status
+        </button>
+    }
+</section>
+
+@code {
+    [Parameter] public int RefreshVersion { get; set; }
+
+    private sealed record VideoSettingsResponse(
+        bool Enabled, bool IncludeOnlineOnly,
+        bool Processing, bool ToolsConfigured,
+        long Queued, long Running, long Succeeded,
+        long Failed, long Cancelled, long ExpiredLeases);
+    private sealed record VideoSettingsUpdate(bool Enabled, bool IncludeOnlineOnly);
+    private sealed record ErrorResponse(string Error);
+
+    private VideoSettingsResponse? Status;
+    private bool Enabled;
+    private bool IncludeOnlineOnly;
+    private bool Loading = true;
+    private bool Saving;
+    private string? Error;
+    private string? Message;
+    private int LoadedVersion = -1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LoadedVersion == RefreshVersion) return;
+        LoadedVersion = RefreshVersion;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Status = await Http.GetFromJsonAsync<VideoSettingsResponse>(
+                "api/video-processing/settings");
+            if (Status is not null)
+            {
+                Enabled = Status.Enabled;
+                IncludeOnlineOnly = Status.IncludeOnlineOnly;
+            }
+        }
+        catch (Exception)
+        {
+            Error = "Video settings could not be loaded.";
+        }
+        finally { Loading = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        Error = null;
+        Message = null;
+        Saving = true;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                "api/video-processing/settings",
+                new VideoSettingsUpdate(Enabled, IncludeOnlineOnly));
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorResponse? failure = null;
+                try { failure = await response.Content.ReadFromJsonAsync<ErrorResponse>(); }
+                catch { }
+                Error = failure?.Error ?? "Video settings could not be saved.";
+                return;
+            }
+            Status = await response.Content.ReadFromJsonAsync<VideoSettingsResponse>();
+            if (Status is not null)
+            {
+                Enabled = Status.Enabled;
+                IncludeOnlineOnly = Status.IncludeOnlineOnly;
+            }
+            Message = "Video settings saved.";
+        }
+        catch (Exception)
+        {
+            Error = "Video settings could not be saved.";
+        }
+        finally { Saving = false; }
+    }
+}
