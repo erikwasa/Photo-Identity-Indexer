@@ -89,7 +89,7 @@
                 <table class="archive-table">
                     <thead>
                         <tr><th>Job</th><th>Status</th><th>Attempts</th>
-                            <th>Progress</th><th>Failure</th></tr>
+                            <th>Progress</th><th>Failure</th><th>Action</th></tr>
                     </thead>
                     <tbody>
                         @foreach (VideoJobRow job in Status.Recent)
@@ -100,6 +100,15 @@
                                 <td>@job.Attempts</td>
                                 <td>@job.ProgressPercent%</td>
                                 <td>@(job.FailureCode ?? "—")</td>
+                                <td>
+                                    @if (job.Status is "failed" or "cancelled")
+                                    {
+                                        <button class="button secondary" disabled="@Saving"
+                                                @onclick="() => RetryAsync(job.JobId)">
+                                            Retry
+                                        </button>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -162,6 +171,30 @@
             Error = "Video settings could not be loaded.";
         }
         finally { Loading = false; }
+    }
+
+    private async Task RetryAsync(Guid jobId)
+    {
+        Error = null;
+        Message = null;
+        Saving = true;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsync(
+                $"api/video-processing/jobs/{jobId:D}/retry", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "This job cannot be restarted. It may have changed, been excluded, or already completed.";
+                return;
+            }
+            Message = "Video queued for a fresh attempt. Start Advance archive to process it.";
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            Error = "Video retry request failed.";
+        }
+        finally { Saving = false; }
     }
 
     private async Task SaveAsync()
