@@ -56,6 +56,15 @@ public static class VideoSelectedEnqueueCommandRunner
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
+        // A previously eligible local revision is not a green light to
+        // enqueue real media. Block before opening PostgreSQL or inspecting
+        // original-file availability until the WI-0188 containment gates
+        // are independently accepted in a subsequent reviewed PR.
+        if (options.Apply)
+        {
+            Write(output, true, false, null, "media-isolation-not-approved");
+            return 1;
+        }
         if (!OperatingSystem.IsWindows())
             throw new InvalidOperationException("Selected video enqueue requires Windows.");
         string? raw = Environment.GetEnvironmentVariable(options.ConnectionEnv);
@@ -187,11 +196,12 @@ public static class VideoSelectedEnqueueCommandRunner
         return 0;
     }
 
-    private static void Write(TextWriter output, bool dryRun, bool eligible, Guid? jobId) =>
+    private static void Write(TextWriter output, bool dryRun, bool eligible,
+        Guid? jobId, string? reasonCode = null) =>
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0188-selected-enqueue-v1",
-            dryRun, eligible, jobId,
+            dryRun, eligible, jobId, reasonCode,
             mediaOpened = false, videoExecuted = false
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
 }
