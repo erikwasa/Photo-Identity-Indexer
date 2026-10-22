@@ -91,6 +91,28 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
         info.SetAccessControl(acl);
     }
 
+    /// <summary>
+    /// Allow directory traversal of only the newly created lab root. This
+    /// ACE never inherits to the ungranted sibling directory or its files.
+    /// </summary>
+    public void GrantOwnedRootTraverse(string directory)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        if (!OperatingSystem.IsWindows() ||
+            !Path.IsPathFullyQualified(directory) ||
+            !Directory.Exists(directory) ||
+            (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+            throw new ArgumentException("Synthetic lab root must exist locally.");
+        DirectoryInfo info = new(directory);
+        DirectorySecurity acl = info.GetAccessControl(AccessControlSections.Access);
+        acl.AddAccessRule(new FileSystemAccessRule(Identity,
+            FileSystemRights.Traverse,
+            InheritanceFlags.None, PropagationFlags.None,
+            AccessControlType.Allow));
+        info.SetAccessControl(acl);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
