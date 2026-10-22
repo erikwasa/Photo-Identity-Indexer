@@ -57,6 +57,12 @@ public static class VideoAppContainerLabCommandRunner
         // temp directory and rejects all non-marker contents and junctions.
         string root = VideoSyntheticProxyPilotCommandRunner.ValidateRoot(
             options.ScratchRoot);
+        // cmd.exe is deliberately used as a fixed synthetic ACL probe.
+        // Reject shell metacharacters in the owned root before constructing
+        // any command line; no user media paths are ever accepted.
+        if (root.IndexOfAny(['%', '!', '^', '&', '|', '<', '>', '"']) >= 0)
+            throw new ArgumentException(
+                "AppContainer lab root contains unsupported command metacharacters.");
         if (!options.Apply)
         {
             Write(output, true, "not-run", false, false, false, true);
@@ -88,17 +94,20 @@ public static class VideoAppContainerLabCommandRunner
                         "Synthetic lab contained an unexpected existing entry.");
                 Directory.CreateDirectory(path);
             }
-            string accessible = Path.Combine(allowed, "generated-public.txt");
-            string inaccessible = Path.Combine(blocked, "generated-restricted.txt");
-            await File.WriteAllTextAsync(accessible, AllowedContent, cancellationToken);
-            await File.WriteAllTextAsync(inaccessible, PrivateContent, cancellationToken);
-
             VideoScratchCapacityGuard.EnsureCapacity(working, 32 * 1024 * 1024);
             profile = WindowsVideoAppContainerProfile.CreateSyntheticLab();
             state = GrantLimit;
             profile.GrantOwnedRootTraverse(root);
             profile.GrantOwnedDirectory(allowed, readOnly: true);
             profile.GrantOwnedDirectory(working, readOnly: false);
+
+            // Write files only AFTER the directory ACEs are installed, so
+            // the generated file inherits the AppContainer's requested
+            // read-only access on Windows. The separate sibling gets no ACE.
+            string accessible = Path.Combine(allowed, "generated-public.txt");
+            string inaccessible = Path.Combine(blocked, "generated-restricted.txt");
+            await File.WriteAllTextAsync(accessible, AllowedContent, cancellationToken);
+            await File.WriteAllTextAsync(inaccessible, PrivateContent, cancellationToken);
 
             // Windows system cmd.exe is used ONLY to probe access to these
             // two known generated text files. Never allow caller-selected
