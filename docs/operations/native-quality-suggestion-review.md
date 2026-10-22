@@ -14,7 +14,7 @@ work.** The archive-side technical candidate queue and keyboard UX
 are no longer blocked pending another 129-photo review. The next
 distinct curation workstream is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md)
 for similar photos in collections/slideshows, and a separately calibrated
-continuous quality-rating evaluation is [issue #639](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639).
+continuous quality-rating evaluation is [WI-0205](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md).
 Do not reopen M37's consumed model held-out labels.
 
 ---
@@ -204,7 +204,7 @@ workflow** rather than a second use of technical-only cleanup. The
 follow-ons are:
 
 - [Creative similarity review and scoped omission planning](../delivery/milestones/M39-creative-collection-curation.md)
-- [Continuous, calibrated per-revision quality rating with provenance](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639)
+- [Continuous, calibrated per-revision quality rating with provenance](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
 
 Neither future work item inherits M37's rejected automatic global
 suppression as a production permission. A raw technical candidate
