@@ -35,6 +35,12 @@
 
 Never commit personal photos, face crops, embeddings, biometric datasets, model binaries, credentials, tokens, private paths or large generated logs.
 
+## Repository-native work-item planning (mandatory)
+
+**The repository is the only planning/status authority.** Before beginning feature development, create or update a numbered `docs/delivery/work-items/WI-XXXX-*.md` and a canonical `docs/delivery/status/work-items/active/WI-XXXX.yaml`, associate that item with exactly one milestone in `docs/delivery/status/milestones.yaml` and its milestone document, and refresh the generated discovery/roadmap views via `PhotoIdentity.Docs generate`. Use the next repository work-item number, not a GitHub issue/PR number.
+
+**Do not create GitHub issues as feature work items or use issues as parallel requirement/status trackers.** GitHub pull requests are for code and documentation review; historical issue URLs can remain as traceable evidence when migrating an old issue, but must never replace the repository work-item lifecycle. When an old issue is migrated, preserve its substantive intent and evidence in the repository before retiring the issue. Do not silently reopen completed milestones for unrelated follow-on work; create a new milestone where appropriate. Continue to use the existing `PhotoIdentity.Docs` lifecycle commands and validations.
+
 ## Status workflow
 
 Canonical machine/audit status is stored one work item per YAML file under `docs/delivery/status/work-items/`. Non-terminal items live in `active/WI-XXXX.yaml`; terminal items live in `archive/WI-XXXX.yaml`. `registry.yaml` contains only schema/status metadata. `PhotoIdentity.Docs` combines active and archived shards for validation, blockers, milestone status and work selection.

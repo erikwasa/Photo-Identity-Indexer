@@ -43,6 +43,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M36 | Semantic collection composition | in_progress |
 | M37 | Photo quality and visual redundancy evaluation | completed |
 | M38 | TV-friendly portrait slideshow presentation | ready |
+| M39 | Creative Collection human-review curation and reversible alternatives | in_progress |
 
 Expected evolution:
 

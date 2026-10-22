@@ -4,25 +4,21 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**2026-10-21 native Archive quality-review acceptance and next curation pilot:**
-WI-0629 / issue #629 is **closed** after maintainer's successful native
-keyboard review plus regressions (merged PR #644). 1/2/3, arrows,
-E opening a visible exclusion warning, C/Enter explicitly confirming
-only within the warning, Escape cancellation, full-image viewport and
-native quality scan work as expected. No unattended source-copy purges
-or OneDrive originals affected. Follow-on #638 begins saved Creative
-Collection *similarity review* using the already accepted moment-scoped
-complete-link H8 dHash groups from existing Creative materialization.
-First review UI: side-by-side thumbnails, current recipe selection,
-**Keep all** or **Prefer this photo**, per-recipe per-exact-group
-locally persisted annotations only; **NO EFFECT yet on actual collection
-or slideshow output**. Verify with a burst-heavy saved Creative
-Collection before building reversible collection-only omission. Issue
-#639 separate continuous, provenance-bearing quality rating, not a
-hardcoded 0-100 relabel of proxy technical flags. M37 automatic
-redundancy/Very Low/combined suppression NO-GOs and research-only
-TOPIQ heldout freeze stand. See
-docs/operations/creative-similarity-review.md.
+**2026-10-22: restore repository-native Creative curation tracking.**
+The former issue-only feature labelled **WI-0638** in merged PRs
+#647, #651, #653 and #654 now belongs to canonical
+[WI-0203](docs/delivery/work-items/WI-0203-creative-collection-similarity-review.md)
+under new [M39](docs/delivery/milestones/M39-creative-collection-curation.md).
+The initial private pilot passed 11/11 checks, the compact UI was accepted as
+better, and later burst-review groups were judged *much better*. WI-0203
+awaits final latest-package verification. These review choices are still
+**annotations only**, with NO effect on Creative selection or slideshow
+snapshots; M37 unattended/global suppression remains NO-GO.
+[WI-0204](docs/delivery/work-items/WI-0204-reversible-collection-scoped-alternative-omission.md)
+owns the not-yet-developed, explicitly opted-in reversible **collection-only**
+omit/restore feature. **Never create GitHub issues as planning work items
+again.** Review the work-item YAML and operator runbook for next steps.
+Historical context below is archival and not the current handoff.
 
 ## Current focus
 

@@ -1,0 +1,10 @@
+id: WI-0204
+title: Reversible opt-in omission of reviewed alternatives from one Creative Collection
+milestone: M39
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0204-reversible-collection-scoped-alternative-omission.md
+blockers:
+- WI-0203
+blocker_notes: []
+evidence: []

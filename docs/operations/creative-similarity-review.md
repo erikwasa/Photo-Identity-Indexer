@@ -1,4 +1,4 @@
-# Collection similarity review — first operator-controlled pilot (WI-0638)
+# Collection similarity review — saved Creative Collection curation (WI-0203)
 
 ## Background and accepted scope
 
@@ -48,7 +48,7 @@ The resulting **Review similar photos** panel shows:
   irreversible source-copy exclusion endpoint.
 
 This is an operator-review baseline and a first substantive part of
-issue #638, **not yet collection filtering**. Future reversible
+WI-0203, **not yet collection filtering**. Future reversible
 collection-scoped omission and any user-opted-in automatic curation
 must be designed, tested and approved independently. It will need
 selection/recipe integration and a way to restore omitted photos.
@@ -243,3 +243,7 @@ Verify pagination and preserved decisions on unchanged groups, and check
 newly combined groups require a fresh review decision. Keep-all and
 Prefer remain annotations only. Do not interpret a whole review set as
 one safe automatic omission decision.
+
+## Repository ownership after 2026-10-22 migration
+
+The original review PRs use the historical label `WI-0638` derived from a GitHub issue number. This was **not** a registered repository work item. The canonical item now is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md) under [M39](../delivery/milestones/M39-creative-collection-curation.md); all operator observations and PR acceptance evidence were migrated there. [WI-0204](../delivery/work-items/WI-0204-reversible-collection-scoped-alternative-omission.md) separately owns any future reversible, default-off collection-only omit/restore feature. GitHub issues are not the planning/status authority.
