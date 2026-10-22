@@ -66,7 +66,9 @@ public sealed class PostgresVideoProcessingControlRepository(PostgresCatalogueDa
                       selected_job_id, authorization_expires_at_utc;
             """;
         command.Parameters.AddWithValue("enabled", enabled);
-        command.Parameters.AddWithValue("action", enabled ? "enable" : "disable");
+        // v35's existing CHECK constraint permits resume/pause, not
+        // new action strings; reuse them without a schema migration.
+        command.Parameters.AddWithValue("action", enabled ? "resume" : "pause");
         VideoProcessingControlState state;
         await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(token))
         {
