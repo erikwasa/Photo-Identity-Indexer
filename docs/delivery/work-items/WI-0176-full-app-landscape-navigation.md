@@ -52,3 +52,33 @@ Retest Archive in phone landscape and portrait, including rotation without reloa
 ## Maintainer acceptance — 2026-10-02
 
 After the follow-up was merged, the maintainer reported that WI-0176 verified successfully on the maintained device. This satisfies the pending phone/PWA acceptance gate for the landscape navigation fix and completes the work item.
+
+## Retired issue #461: complete navigation/settings scope retained (2026-10-22 audit)
+
+The prior GitHub issue #461 combined several accepted operator-experience
+improvements; WI-0176 covered only its final landscape phone/PWA acceptance
+gate. The original issue is now retired in favor of this permanent history.
+
+- **PR #462:** mobile/PWA primary navigation wraps and stays reachable
+  without hiding accidental horizontal overflow.
+- **PR #463:** unused Library and Progress primary pages were removed;
+  `/collections` keeps a compatibility redirect. Duplicated
+  Suggestion-policy controls moved to Settings; manual **Regenerate matches**
+  and **Lifecycle** moved from Review to Advanced.
+- **PR #463:** operator can edit launcher-backed archive storage
+  capacity/retention policy from Settings. Display/edit capacity in **GB**,
+  with deterministic conversion to the existing byte-backed settings;
+  changes apply on **restart** rather than hot-swapping active
+  hydration/concurrency gates.
+- **PR #463:** Settings groups are accessible and collapsible under
+  Archive & storage, Metadata enrichment and Identity matching.
+- **PR #479:** full-app navigation wrapping and Advanced positioning fixed
+  intermediate-width / landscape rightward panning.
+- **PR #483:** a coarse-pointer/no-hover header uses the proper mobile
+  layout even in landscape, hiding the redundant Local catalogue badge
+  and preventing the pale right-hand strip; desktop remains unchanged.
+
+Maintainer acceptance on **2026-10-02** confirmed the final WI-0176
+phone/PWA fix worked as expected. This appendix retains the wider
+requirements formerly present only in issue #461 without reopening M32
+or claiming unrelated new implementation.
