@@ -1043,6 +1043,33 @@ Production activation remains prohibited until reviewed.
   unchanged. See the [synthetic runbook](../../operations/video-synthetic-appcontainer-feasibility.md).
 
 
+
+### Development checkpoint 33 — hard-stop real-media one-shot mutations pending isolation acceptance (2026-10-22)
+
+- The documentation has consistently **prohibited** real-video one-shot
+  enqueue/processing before reviewed filesystem, network and disk containment
+  and mixed photo/video load acceptance. Previously, however, the CLI
+  `--apply` path could be reached with a schema-rehearsal acknowledgement
+  even though the hardening evidence is incomplete.
+- The selected `video one-shot enqueue --apply` and
+  `video one-shot run --apply` CLI handlers now refuse real-media mutation
+  **before PostgreSQL or filesystem access** with a fixed sanitized
+  `media-isolation-not-approved` response, nonzero exit and
+  `dryRun=true`. The existing v37 rehearsal acknowledgement and checked
+  FFmpeg hashes are not sufficient to bypass the refusal.
+- Tests run each apply request with **no configured PostgreSQL variable**
+  and verify no queued job ID, source access or publication, and a denied
+  result on all hosts. Read-only operator previews, synthetic experiments,
+  ordinary photos and database schema are unchanged.
+- This is intentionally a code-level fail-closed activation gate, not a
+  declaration that the sandbox is complete. It can be lifted only through
+  another separately reviewed change after evidence of real-path ACL/tool
+  compatibility, independently observed socket denial, bounded disk/IO,
+  single-video/source-integrity checks and maintained-host mixed load.
+  No operator database migration, video encode or backup is requested by
+  this checkpoint. See [current one-shot runbook](../../operations/video-scoped-one-shot-v37.md).
+
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
