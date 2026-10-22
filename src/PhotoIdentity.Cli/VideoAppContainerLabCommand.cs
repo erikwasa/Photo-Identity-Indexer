@@ -48,6 +48,7 @@ public static class VideoAppContainerLabCommandRunner
     private const string GrantLimit = "sandbox-acl-unavailable";
     private const string DenialFailed = "ungranted-read-not-denied";
     private const string CleanupFailed = "sandbox-cleanup-unverified";
+    private const string AuditFailed = "sandbox-acl-audit-failed";
 
     public static async Task<int> RunAsync(VideoAppContainerLabOptions options,
         TextWriter output, CancellationToken cancellationToken = default)
@@ -82,6 +83,7 @@ public static class VideoAppContainerLabCommandRunner
         bool tokenVerified = false;
         bool allowedVerified = false;
         bool forbiddenDenied = false;
+        bool aclAuditVerified = false;
         bool cleaned = true;
         WindowsVideoAppContainerProfile? profile = null;
         DirectorySecurity? originalLabRootAcl = null;
@@ -117,6 +119,15 @@ public static class VideoAppContainerLabCommandRunner
             string inaccessible = Path.Combine(blocked, "generated-restricted.txt");
             await File.WriteAllTextAsync(accessible, AllowedContent, cancellationToken);
             await File.WriteAllTextAsync(inaccessible, PrivateContent, cancellationToken);
+
+            // Static ACL inspection is independent of the runtime copy probes.
+            // A broad inherited package grant or a write-enabled read-only
+            // file is an immediate nonpassing result before child launch.
+            state = AuditFailed;
+            aclAuditVerified = profile.AuditSyntheticAcl();
+            if (!aclAuditVerified)
+                throw new InvalidOperationException(
+                    "Synthetic AppContainer ACL verification refused the grants.");
 
             // Windows system cmd.exe is used ONLY to probe access to these
             // two known generated text files. Never allow caller-selected
@@ -223,7 +234,7 @@ public static class VideoAppContainerLabCommandRunner
             // internal file paths or source contents in the JSON result.
             if (state is not (ProfileLimit or GrantLimit or LaunchLimit or
                 "allowed-read-write-unavailable" or DenialFailed or
-                "file-boundary-observed"))
+                AuditFailed or "file-boundary-observed"))
                 state = LaunchLimit;
         }
         finally
@@ -256,7 +267,7 @@ public static class VideoAppContainerLabCommandRunner
         }
         if (!cleaned) state = CleanupFailed;
         Write(output, false, state, tokenVerified, allowedVerified,
-            forbiddenDenied, cleaned);
+            forbiddenDenied, cleaned, aclAuditVerified);
         return state == "file-boundary-observed" ? 0 : 1;
     }
 
@@ -278,14 +289,15 @@ public static class VideoAppContainerLabCommandRunner
     }
 
     public static void Write(TextWriter output, bool dryRun, string status,
-        bool token, bool allowed, bool denied, bool cleanup)
+        bool token, bool allowed, bool denied, bool cleanup,
+        bool syntheticAclAudit = false)
     {
         ArgumentNullException.ThrowIfNull(output);
         if (status is not ("not-run" or "profile-unavailable" or
             "sandbox-launch-unavailable" or "sandbox-acl-unavailable" or
             "allowed-read-write-unavailable" or
             "ungranted-read-not-denied" or "sandbox-cleanup-unverified" or
-            "file-boundary-observed"))
+            "sandbox-acl-audit-failed" or "file-boundary-observed"))
             throw new ArgumentException("Invalid AppContainer synthetic pilot status.");
         output.WriteLine(JsonSerializer.Serialize(new
         {
@@ -294,6 +306,7 @@ public static class VideoAppContainerLabCommandRunner
             allowedReadWriteVerified = allowed,
             ungrantedReadDenied = denied,
             profileAndScratchCleanupVerified = cleanup,
+            syntheticAclAuditVerified = syntheticAclAudit,
             networkCapabilitiesRequested = false,
             networkEgressDenialVerified = false,
             independentAclAuditVerified = false,
