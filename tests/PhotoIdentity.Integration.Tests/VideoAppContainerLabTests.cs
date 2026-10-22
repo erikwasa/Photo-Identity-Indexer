@@ -115,9 +115,10 @@ public sealed class VideoAppContainerLabTests
     {
         if (!OperatingSystem.IsWindows()) return;
         string root = NewLab();
-        string allowed = Path.Combine(root, "sandbox-allowed");
-        string working = Path.Combine(root, "sandbox-working");
-        string blocked = Path.Combine(root, "sandbox-ungranted");
+        string scope = Path.Combine(root, "sandbox-scope");
+        string allowed = Path.Combine(scope, "sandbox-allowed");
+        string working = Path.Combine(scope, "sandbox-working");
+        string blocked = Path.Combine(scope, "sandbox-ungranted");
         string initialAcl = new DirectoryInfo(root)
             .GetAccessControl(AccessControlSections.Access)
             .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
@@ -132,9 +133,9 @@ public sealed class VideoAppContainerLabTests
                 return;
             }
 
-            foreach (string path in new[] { allowed, working, blocked })
+            foreach (string path in new[] { scope, allowed, working, blocked })
                 Directory.CreateDirectory(path);
-            profile.GrantOwnedRootTraverse(root);
+            profile.GrantOwnedRootTraverse(scope);
             profile.GrantOwnedDirectory(allowed, readOnly: true);
             profile.GrantOwnedDirectory(working, readOnly: false);
             File.WriteAllText(Path.Combine(allowed, "generated-public.txt"), "public");
@@ -167,19 +168,21 @@ public sealed class VideoAppContainerLabTests
         }
         finally
         {
-            DirectorySecurity restored = new();
-            restored.SetSecurityDescriptorSddlForm(initialAcl,
-                AccessControlSections.Access);
-            DirectoryInfo lab = new(root);
-            lab.SetAccessControl(restored);
-            string actualAcl = lab.GetAccessControl(AccessControlSections.Access)
-                .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
-            Assert.Equal(initialAcl, actualAcl);
-            foreach (string path in new[] { allowed, working, blocked })
-                if (Directory.Exists(path))
-                    Directory.Delete(path, recursive: true);
-            profile?.Dispose();
-            Directory.Delete(root, recursive: true);
+            try
+            {
+                if (Directory.Exists(scope))
+                    Directory.Delete(scope, recursive: true);
+                string actualAcl = new DirectoryInfo(root)
+                    .GetAccessControl(AccessControlSections.Access)
+                    .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                Assert.Equal(initialAcl, actualAcl);
+                Assert.Single(Directory.EnumerateFileSystemEntries(root));
+            }
+            finally
+            {
+                profile?.Dispose();
+                Directory.Delete(root, recursive: true);
+            }
         }
     }
 
