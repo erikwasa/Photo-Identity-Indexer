@@ -326,7 +326,8 @@ public static class PhotoSimilarityBurstReviewGrouper
             List<PhotoVisualRedundancyGroup> pending = [];
             foreach (PhotoVisualRedundancyGroup group in moment
                          .OrderBy(item => item.StartedAtLocal)
-                         .ThenBy(item => item.RepresentativeRevisionId.ToString(), StringComparer.Ordinal))
+                         .ThenBy(item => item.RepresentativeRevisionId.ToString(), StringComparer.Ordinal)
+                         .SelectMany(SplitOversizedGroup))
             {
                 if (pending.Count > 0 && !CanAppend(pending, group))
                 {
@@ -354,6 +355,37 @@ public static class PhotoSimilarityBurstReviewGrouper
             MaximumReviewSpan,
             detected.FingerprintCount,
             ordered);
+    }
+
+    // A single dense 45-second visual group may already exceed the review
+    // payload limit. Split that one source group deterministically instead
+    // of letting an otherwise bounded review set grow without limit.
+    private static IEnumerable<PhotoVisualRedundancyGroup> SplitOversizedGroup(
+        PhotoVisualRedundancyGroup group)
+    {
+        if (group.Members.Count <= MaximumReviewPhotos)
+        {
+            yield return group;
+            yield break;
+        }
+
+        for (int offset = 0; offset < group.Members.Count; offset += MaximumReviewPhotos)
+        {
+            PhotoVisualRedundancyMember[] members = group.Members
+                .Skip(offset)
+                .Take(MaximumReviewPhotos)
+                .OrderBy(member => member.TakenAtLocal)
+                .ThenBy(member => member.RevisionId.ToString(), StringComparer.Ordinal)
+                .ToArray();
+            yield return group with
+            {
+                RepresentativeRevisionId = members[0].RevisionId,
+                StartedAtLocal = members[0].TakenAtLocal,
+                EndedAtLocal = members[^1].TakenAtLocal,
+                Members = members,
+                VisualSubgroupCount = 1
+            };
+        }
     }
 
     private static bool CanAppend(
