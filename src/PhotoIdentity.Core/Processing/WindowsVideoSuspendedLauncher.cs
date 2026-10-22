@@ -25,6 +25,7 @@ internal static class WindowsVideoSuspendedLauncher
     private const nuint ProcThreadAttributeChildProcessPolicy = 0x0002000E;
     private const nuint ProcThreadAttributeSecurityCapabilities = 0x00020009;
     private const int TokenIsAppContainer = 29;
+    private const int TokenAppContainerSid = 31;
     private const uint TokenQuery = 0x0008;
     private const uint ChildProcessRestricted = 0x00000001;
 
@@ -163,7 +164,8 @@ internal static class WindowsVideoSuspendedLauncher
             // suspended. A silently ignored SECURITY_CAPABILITIES attribute
             // must never turn into an unrestricted successful lab result.
             if (appContainer is not null)
-                AssertNativeAppContainerToken(native.Process);
+                AssertNativeAppContainerToken(
+                    native.Process, appContainer.NativeSid);
 
             // This must happen BEFORE ResumeThread. On any failure the
             // suspended process is terminated and no unbounded process runs.
@@ -216,7 +218,8 @@ internal static class WindowsVideoSuspendedLauncher
         public uint Reserved;
     }
 
-    private static void AssertNativeAppContainerToken(IntPtr process)
+    private static void AssertNativeAppContainerToken(
+        IntPtr process, IntPtr expectedPackageSid)
     {
         if (!OpenProcessToken(process, TokenQuery, out IntPtr token))
             throw new Win32Exception(Marshal.GetLastWin32Error(),
@@ -228,6 +231,16 @@ internal static class WindowsVideoSuspendedLauncher
                 length != sizeof(int) || isAppContainer != 1)
                 throw new InvalidOperationException(
                     "Windows did not establish an AppContainer child security token.");
+
+            // TokenIsAppContainer alone is insufficient. It must be this
+            // newly created lab's EXACT SID, not any other Package identity.
+            if (!GetTokenInformation(token, TokenAppContainerSid,
+                    out IntPtr actualSid, IntPtr.Size, out int sidSize) ||
+                sidSize != IntPtr.Size || actualSid == IntPtr.Zero ||
+                expectedPackageSid == IntPtr.Zero ||
+                !EqualSid(actualSid, expectedPackageSid))
+                throw new InvalidOperationException(
+                    "Windows AppContainer child identity did not match the disposable lab.");
         }
         finally { _ = CloseHandle(token); }
     }
@@ -360,6 +373,18 @@ internal static class WindowsVideoSuspendedLauncher
         IntPtr token, int tokenInformationClass,
         out int tokenInformation, int tokenInformationLength,
         out int returnLength);
+
+    [DllImport("advapi32.dll", EntryPoint = "GetTokenInformation",
+        SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetTokenInformation(
+        IntPtr token, int tokenInformationClass,
+        out IntPtr tokenInformation, int tokenInformationLength,
+        out int returnLength);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EqualSid(IntPtr first, IntPtr second);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
