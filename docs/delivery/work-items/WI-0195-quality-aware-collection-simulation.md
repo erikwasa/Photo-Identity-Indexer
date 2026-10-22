@@ -204,7 +204,7 @@ absolute Very Low exclusion NO-GO, automatic redundancy
 suppression NO-GO, combined policy NO-GO.
 
 **Separate useful product outcome:** 129/129 manually reviewed
-technical candidates under issue #629, with 20 marked
+technical candidates under WI-0206, with 20 marked
 Consider exclusion and maintainer finding most genuinely
 unwanted. Human-controlled suggestions GO for product
 development, not any unattended automatic exclusion.
