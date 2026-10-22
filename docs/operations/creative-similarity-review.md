@@ -183,3 +183,63 @@ There is **no automatic removal/omission** from collections or slideshows.
    hydration, automatic source exclusion, or photo-feature regression.
 
 Do not publish private photo IDs, thumbnails or review-state JSON files.
+
+## 2026-10-22: nearby visual-group review sets (operator examples)
+
+After PR #653, the operator identified two concrete examples in which detected visual
+subgroups should be visible as **one manual review choice**:
+
+- **2024-10-05 15:57–16:02:** five detected visual groups of sizes
+  2, 2, 2, 4, 2, with group-local maximum distances of 0, 0, 0, 4 and 0.
+  Different groups at the *same event* can be minutes apart.
+- **2024-12-31 17:24:** three groups of sizes 2, 2, 3, with maximum
+  distances 9, 12, 15. The groups share a minute but the hash
+  threshold/representative restriction still separates them.
+
+**Important:** A maximum pair distance of zero means that the photos *within that
+particular group* have identical hashes; it does not show that different
+groups resemble one another. A maximum pair distance of 15 can legitimately
+occur under the neighbor H12/anchor H18 rule. The operator's visual
+inspection of the private examples is the evidence for combining them for
+review, not a cross-group hash-distance measurement.
+
+For saved Creative similarity **review only**, the v2 visual groups are now
+collected into v3 **burst review sets**:
+
+- Version `wi0638-review-nearby-bursts-gap4m-span10m-v3`.
+- Start with independently detected local visual groups (H12/H18,
+  ≤45 seconds). Only those groups' photo members are included; unrelated
+  timestamped singletons are not inserted into review sets.
+- Merge consecutive groups from the **same inferred moment** if the gap
+  between the latest captured photo in the current set and the start of
+  the next group is ≤4 minutes, the total set duration is ≤10 minutes,
+  and the accumulated count is ≤40 photos. Otherwise start another set.
+- Individual subgroups remain evidence of actual dHash proximity.
+  **Cross-subgroup similarity is not guaranteed**, so a combined set
+  is a *review opportunity*, not a claim that all photos are duplicates.
+  The UI displays each set's photo count, time range and number of
+  underlying visual subgroups; maximum pair distance and per-photo
+  distance are recalculated from the original local fingerprints.
+- Existing bounded page navigation, exact revision group keys and
+  GET/PUT decision validation still apply. A merged set has a new group
+  key and **does not silently inherit annotations from old smaller groups**.
+  Unchanged groups retain exact-revision decisions.
+- Strict Creative H8 complete-link selection, saved recipes, slideshow
+  exposure/selection and snapshots, Archive, Search, Smart membership,
+  original photos, cloud hydration and automatic omission are unchanged.
+
+### Focused local check after CI/merge
+
+Compare the same two maintained-archive examples from October 5 and December 31.
+Expected review result is one 12-photo set in the first example and one
+7-photo set in the second **if the underlying groups belong to the same
+derived moment and the precise capture timestamps satisfy the bounds**.
+The UI will show the number of visual subgroups in each set.
+
+Also inspect a busy ten-minute period to judge the downside of overly broad
+grouping, and check that a 4-minute gap, 10-minute span, 40-photo cap and
+moment boundary prevent unrelated long sessions from being collapsed.
+Verify pagination and preserved decisions on unchanged groups, and check
+newly combined groups require a fresh review decision. Keep-all and
+Prefer remain annotations only. Do not interpret a whole review set as
+one safe automatic omission decision.
