@@ -174,12 +174,15 @@ public static class VideoAppContainerLabCommandRunner
                 // only a non-inheriting Traverse ACE on the lab root.
                 // A successful read is a security FAIL, never a pass.
                 bool didCopyForbidden = false;
+                bool denialMarkerObserved = false;
                 VideoToolExecutionResult negative = await supervisor.RunAsync(
                     cmd, hash, working,
                     workspace =>
                     [
                         "/d", "/c", "type", inaccessible, ">",
-                        Path.Combine(workspace, "forbidden-copied.txt")
+                        Path.Combine(workspace, "forbidden-copied.txt"),
+                        "&", "if", "errorlevel", "1", "echo", "denied", ">",
+                        Path.Combine(workspace, "denial-marker.txt")
                     ],
                     budget, cancellationToken,
                     afterSuccessfulExit: async (workspace, token) =>
@@ -191,9 +194,19 @@ public static class VideoAppContainerLabCommandRunner
                             didCopyForbidden = (await File.ReadAllTextAsync(
                                 result, token)).Contains(PrivateContent,
                                 StringComparison.Ordinal);
+                        string marker = Path.Combine(workspace, "denial-marker.txt");
+                        if (File.Exists(marker) &&
+                            new FileInfo(marker).Length <= 32)
+                            denialMarkerObserved = (await File.ReadAllTextAsync(
+                                marker, token)).Trim() == "denied";
                     },
                     syntheticAppContainer: profile);
-                forbiddenDenied = negative.ExitCode != 0 && !didCopyForbidden;
+                // Require the same AppContainer process to execute a known
+                // command after a failed read and write an explicit marker.
+                // An early process crash or arbitrary nonzero exit is NOT
+                // evidence of access denial.
+                forbiddenDenied = negative.ExitCode == 0 &&
+                    denialMarkerObserved && !didCopyForbidden;
                 state = forbiddenDenied ? "file-boundary-observed" : DenialFailed;
             }
         }
