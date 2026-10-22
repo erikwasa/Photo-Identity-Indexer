@@ -6,6 +6,29 @@ inspected Rec.709 MOV/MP4 revisions. There is no automatic video scanner,
 hydration, hosted video service, web video endpoint, photo job change,
 arbitrary archive path argument or general-purpose FFmpeg command runner.
 
+## Current executable safety gate (2026-10-22)
+
+**Real-media mutations remain disabled at the CLI boundary.** Following the
+synthetic AppContainer ACL feasibility work in merged PR #650, the source,
+tool-loader, network and storage boundaries are still not verified for a
+private-video run. Until separately reviewed acceptance evidence exists,
+`video one-shot enqueue --apply` and
+`video one-shot run --apply --acknowledge-isolated-v37-rehearsal`
+return a nonzero exit and the fixed sanitized reason
+`media-isolation-not-approved`. They do so **before** opening PostgreSQL,
+reading source availability, touching cache roots, staging bytes, arming a
+lease, spawning FFmpeg/FFprobe, or publishing any derivative. The response
+uses `dryRun=true` to reflect that nothing was executed or enqueued.
+
+Earlier instructions later in this file describe the **intended future**
+one-shot workflow, **not a currently usable authorization procedure**.
+No environment variable, acknowledgement flag or operator-provided tool hash
+may override the current hard stop. Ordinary read-only candidate, enqueue
+preview, environment and source-proof commands remain separate and unchanged.
+Removing this stop requires another reviewed code change after the independent
+network, real-path ACL, hard storage and mixed-photo-load gates are satisfied.
+Passing a synthetic lab does not automatically lift it.
+
 ## Why v37 is necessary
 
 The v34 queue normally takes the oldest eligible video job when a
