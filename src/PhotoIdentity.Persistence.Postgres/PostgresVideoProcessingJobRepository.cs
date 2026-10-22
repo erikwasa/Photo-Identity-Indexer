@@ -142,6 +142,55 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
     /// Recover expired leases; a late worker's old token no longer authorizes
     /// acknowledgement. Three expired attempts become a bounded terminal failure.
     /// </summary>
+    /// <summary>
+    /// Explicit operator retry from scratch for a *terminal* failed or
+    /// cancelled video job. Preserve idempotency identity and never alter a
+    /// succeeded/running job or durable published receipt. A stale, deleted,
+    /// excluded or unsupported source is not retryable.
+    /// </summary>
+    public async Task<bool> RestartFailedAsync(
+        Guid jobId, CancellationToken token = default)
+    {
+        if (jobId == Guid.Empty) return false;
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE video_processing_jobs job
+            SET status='queued', attempt_count=0, progress_percent=0,
+                cancellation_requested_at_utc=NULL,
+                lease_token=NULL, leased_until_utc=NULL,
+                failure_code=NULL, completed_at_utc=NULL,
+                available_at_utc=now(), updated_at_utc=now()
+            WHERE job.id=@id AND job.status IN ('failed','cancelled')
+              AND NOT EXISTS (
+                  SELECT 1 FROM video_published_derivative_receipts receipt
+                  WHERE receipt.video_processing_job_id=job.id)
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id=revision.asset_id
+                  JOIN sources source ON source.id=asset.source_id
+                  JOIN video_revision_metadata metadata
+                    ON metadata.asset_revision_id=revision.id
+                  WHERE revision.id=job.asset_revision_id
+                    AND revision.media_kind='video'
+                    AND asset.media_kind='video'
+                    AND asset.deleted_at_utc IS NULL
+                    AND source.kind='local-folder'
+                    AND metadata.inspection_status='supported'
+                    AND revision.size_bytes=job.source_bytes
+                    AND revision.id=(
+                        SELECT latest.id FROM asset_revisions latest
+                        WHERE latest.asset_id=asset.id AND latest.media_kind='video'
+                        ORDER BY latest.observed_at_utc DESC,latest.id DESC LIMIT 1)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM source_copy_exclusions excluded
+                        WHERE excluded.source_id=asset.source_id
+                          AND excluded.source_key=asset.source_key));
+            """;
+        command.Parameters.AddWithValue("id", jobId);
+        return await command.ExecuteNonQueryAsync(token) == 1;
+    }
+
     public async Task<int> RecoverExpiredAsync(CancellationToken token = default)
     {
         await database.InitializeAsync(token);
