@@ -402,3 +402,10 @@ milestones:
   work_items:
   - WI-0203
   - WI-0204
+- id: M40
+  title: Continuous photo quality rating and accepted manual Archive review
+  status: ready
+  document: ../milestones/M40-photo-quality-rating-and-review.md
+  work_items:
+  - WI-0205
+  - WI-0206
