@@ -928,6 +928,42 @@ Production activation remains prohibited until reviewed.
   necessary before WI-0188 can be accepted.
   See [Windows Job Object safety runbook](../../operations/video-worker-windows-resource-envelope.md).
 
+### Development checkpoint 30 — native Windows creation mitigations, synthetic only (2026-10-22)
+
+- Opt-in `WindowsVideoJobLimits.RequireChildProcessRestriction`
+  (default `false`) adds the Windows
+  `PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY` deny-child-creation
+  attribute to the existing native suspended process launcher. The
+  initial additional executable-image and legacy-extension mitigations
+  caused native `cmd.exe` DLL initialization failure (`0xC0000142`)
+  in Windows CI; they were deliberately removed pending separate
+  investigation rather than being described as compatible.
+  The required child restriction must be installed **before** the
+  tool process resumes; failure aborts launch. The native attribute
+  buffer remains valid through
+  the `STARTUPINFOEX` lifetime. Existing bounded Job Object, handle
+  allowlist, sanitized environment, source authorization and IO
+  counters are unchanged.
+- **Nothing in the application, synthetic pilot or selected real-video
+  one-shot opts in.** Windows CI demonstrated that even first-party
+  `cmd.exe` fails at loader initialization (`0xC0000142`) with the
+  restriction requested, before it can demonstrate child-process
+  denial. The policy stays an inactive opt-in for compatibility
+  investigation only. Tests confirm that normal Job Object single
+  and nested commands work, and treat mitigated startup failure as
+  *incompatibility*, not evidence of secure denial.
+- The restricted child-process setting is *defense in depth* and
+  Microsoft states it is effective only in a sandbox which also
+  denies elevated process handles, e.g. AppContainer. This is
+  explicitly **not** low-privilege identity, hard disk/storage
+  or bandwidth quota, network egress denial or archive access
+  confinement. No unchanged real-video source was opened or queued.
+- [Native mitigation operator experiment and next AppContainer design gate](../../operations/video-windows-native-mitigation-pilot.md)
+  documents limitations and the optional **synthetic-only** host
+  revalidation after CI and merge. WI-0188 remains `in_progress`.
+  Real video trial, photo mixed-load measurements and post-trial
+  integrity still require additional independent acceptance.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

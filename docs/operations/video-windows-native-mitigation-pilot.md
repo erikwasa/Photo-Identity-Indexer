@@ -1,0 +1,121 @@
+# WI-0188 — native Windows creation-mitigation compatibility pilot
+
+**Development experiment only.** A passing Windows Job Object CPU/memory,
+process-count, wall-time and transfer-counter test does **not** make
+FFmpeg a low-privilege or network-denied process. The remaining
+filesystem, network, hard disk/I/O and measured mixed-photo-load gates
+are separate requirements for authorizing the first original-video trial.
+
+## Proposed additional process creation boundary
+
+The existing `WindowsVideoSuspendedLauncher` already creates approved
+processes suspended, assigns them to the native Windows Job Object
+**before** resuming any instruction, passes only Windows system
+environment variables, a private `TEMP` directory and an allowlisted
+inherited NUL standard handle. It still runs FFmpeg under the same
+Windows security identity as its calling application.
+
+This optional checkpoint adds
+`WindowsVideoJobLimits.RequireChildProcessRestriction` (default
+**false**). For opted-in processes only, the native launcher
+installs the existing handle list and one additional native
+`STARTUPINFOEX` attribute **before** `CreateProcessW`:
+
+| Attribute | Requested Windows policy |
+| --- | --- |
+| `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` | Existing single NUL handle only |
+| `PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY` | `PROCESS_CREATION_CHILD_PROCESS_RESTRICTED` |
+
+The child-process restriction uses a fixed-size native DWORD buffer
+that remains allocated until the process attribute list is destroyed.
+If initialization or policy installation fails, the native launch
+fails **closed**. Windows CI initially proved that combining this with
+additional executable-image and extension-point mitigations caused
+`cmd.exe` DLL initialization to fail with `0xC0000142`. Those
+unproven policies were explicitly **removed** from this experiment;
+they must not be represented as accepted protections. The existing kill-on-job-close,
+SHA-256 tool validation, bounded scratch, source/derivative guards,
+sanitized errors and CPU/memory/I/O caps remain unchanged.
+
+## Deliberate scope
+
+**No existing FFmpeg or FFprobe execution path currently enables this
+experimental native restriction.** Windows CI demonstrated that even a
+harmless first-party `cmd.exe` returned `STATUS_DLL_INIT_FAILED
+(0xC0000142)` with the restriction enabled. The flag therefore
+remains default-off and is exercised only by deliberately opted-in
+Windows test code. Neither the previously accepted synthetic pilot
+nor real-video one-shot is altered. The native attribute API is a
+feasibility seam, **not an accepted isolation control**.
+
+The new Windows unit test first confirms that ordinary bounded
+single and nested `cmd.exe` commands work without the flag. With the
+flag enabled, if the single command can start, the test then requires
+that a nested child command fail. If even the single command cannot
+initialize (the observed CI behavior), the test records that as
+incompatibility, **not as proof of child-process prevention**. No
+hostile-code bypass or AppContainer security claim is made.
+
+The original accepted real Windows FFmpeg synthetic pilot remains
+**unchanged** by this compatibility-only checkpoint. No maintained-host
+repeat of its validation is needed for this PR. The following commands
+remain available for future explicit synthetic test work, but they
+are **not required** for the native mitigation feasibility finding:
+
+~~~powershell
+git switch main
+git pull --ff-only origin main
+# Confirm the dedicated $lab still contains only its ownership marker:
+Get-ChildItem -LiteralPath $lab -Force | Select-Object Name
+
+# First perform the no-side-effect preview.
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @argsPilot
+if ($LASTEXITCODE -ne 0) { throw 'Synthetic mitigation preview failed.' }
+
+# This --apply writes/deletes synthetic footage ONLY, not real videos.
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @argsPilot --apply
+if ($LASTEXITCODE -ne 0) { throw 'Synthetic mitigation pilot failed.' }
+~~~
+
+Reusing `$argsPilot` requires the unchanged approved **physical** binary
+paths and hashes from the prior successful Windows synthetic roundtrip.
+Never reselect a Winget symlink, launch a real archive source, or discard
+an unknown scratch directory. Submit only the sanitized JSON outcome,
+not source/executable paths, private log text, or media details.
+
+## Security limitations and remaining WI-0188 acceptance
+
+Microsoft explicitly warns that
+`PROCESS_CREATION_CHILD_PROCESS_RESTRICTED` can be bypassed by code
+with access to powerful process handles; it is *effective only in
+combination with a genuine sandbox boundary* such as AppContainer.
+The existing restricted inherited handle list helps but does **not**
+replace an AppContainer token, filesystem ACL, low-privilege identity
+or independent privilege audit.
+
+This child-process restriction does **not** prohibit arbitrary outbound sockets,
+filesystem access under the caller's permissions, GPU usage or
+unbounded writes outside the observed scratch directory. They do
+not enforce hard storage capacity or I/O-rate quotas. Windows Job Object
+observed I/O transfer counters remain sampled fail-closed diagnostics,
+not OS-enforced disk limits.
+
+This trial did **not** establish compatibility for the child-process
+restriction on Windows CI. Before any deployment, a separate
+AppContainer/low-privilege executable must prove expected startup
+behavior and a policy denial under sandbox-specific conditions.
+
+**Do not authorize real video `one-shot enqueue --apply` or
+`one-shot run --apply` on this evidence.** The next planned
+checkpoint is an explicit AppContainer/low-privilege launcher
+feasibility and ACL/capability audit on owned **synthetic** files,
+followed by a separately reviewed dedicated bounded storage location,
+low-privilege network-denial test, and finally a one-video mixed-photo
+measurement / cancellation / exclusion / restart / post-source-integrity
+trial.
+
+References:
+
+- [Microsoft: UpdateProcThreadAttribute](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)
+- [Microsoft: Launch an AppContainer](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)
+- [Existing Windows Job Object resource envelope](video-worker-windows-resource-envelope.md)

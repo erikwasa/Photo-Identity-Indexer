@@ -84,6 +84,29 @@ unsupported on Windows 10 version 1607 and newer, so this
 work does not attempt to use that deprecated rate-control API.
 Reference: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-setioratecontrolinformationjobobject
 
+## Synthetic-only native process-creation mitigations (2026-10-22)
+
+The supervised suspended launcher now supports an optional native
+`RequireChildProcessRestriction` flag. It installs an explicit Windows
+child-process denial attribute, **before** `CreateProcessW`
+and before resuming the restricted tool. If the attribute is
+unsupported or rejected, the launch fails closed. The initial
+combined remote-image/low-label/extension-point mitigations caused
+`cmd.exe` DLL initialization failure (`0xC0000142`) in Windows
+CI, so they have been removed from the experimental profile rather
+than being incorrectly treated as compatible.
+
+**No production or synthetic FFmpeg/FFprobe path enables this flag**,
+because a first-party system `cmd.exe` failed to initialize
+(`0xC0000142`) even with only the child restriction installed in
+Windows CI. The optional setting is deliberately **default-off** and
+is exercised only in compatibility tests. This is defense
+in depth; Microsoft's documented child-process restriction is not
+considered complete isolation without a restricted token and inaccessible
+privileged process handles. It does not confer network denial, file ACL
+restriction, hard storage quota or GPU isolation. See the
+[mitigation pilot and AppContainer follow-up](video-windows-native-mitigation-pilot.md).
+
 ## Production-activation blockers
 
 - **Startup containment:** the capped execution path now uses native

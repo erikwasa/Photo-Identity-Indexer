@@ -20,6 +20,14 @@ internal static class WindowsVideoSuspendedLauncher
     private const uint StartUseStdHandles = 0x00000100;
     private const uint ExtendedStartupInfoPresent = 0x00080000;
     private const nuint ProcThreadAttributeHandleList = 0x00020002;
+    // Documented STARTUPINFOEX process creation attributes; set in the
+    // suspended launcher BEFORE any native child instruction executes.
+    private const nuint ProcThreadAttributeChildProcessPolicy = 0x0002000E;
+    private const uint ChildProcessRestricted = 0x00000001;
+
+    // No executable-image or legacy-extension mitigation is installed yet:
+    // the combined pilot caused DLL initialization failure (0xC0000142)
+    // for cmd.exe in Windows CI and is not accepted for FFmpeg.
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
     private const uint FileShareRead = 0x00000001;
@@ -43,6 +51,7 @@ internal static class WindowsVideoSuspendedLauncher
         IntPtr nativeEnvironment = Marshal.StringToHGlobalUni(environmentBlock);
         IntPtr attributes = IntPtr.Zero;
         IntPtr inheritedList = IntPtr.Zero;
+        IntPtr childProcessPolicy = IntPtr.Zero;
         bool attributesInitialized = false;
         ProcessInformation native = default;
         Process? owned = null;
@@ -65,13 +74,14 @@ internal static class WindowsVideoSuspendedLauncher
             // inheritable handles from the parent application. Use a single
             // explicit HANDLE_LIST containing only the NUL device.
             nuint bytes = 0;
+            int attributeCount = job.RequireChildProcessRestriction ? 2 : 1;
             _ = InitializeProcThreadAttributeList(
-                IntPtr.Zero, 1, 0, ref bytes);
+                IntPtr.Zero, attributeCount, 0, ref bytes);
             if (bytes == 0)
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Video child handle inheritance could not be bounded.");
             attributes = Marshal.AllocHGlobal(checked((nint)bytes));
-            if (!InitializeProcThreadAttributeList(attributes, 1, 0, ref bytes))
+            if (!InitializeProcThreadAttributeList(attributes, attributeCount, 0, ref bytes))
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Video child inheritance list could not be initialized.");
             attributesInitialized = true;
@@ -82,6 +92,21 @@ internal static class WindowsVideoSuspendedLauncher
                     (nuint)IntPtr.Size, IntPtr.Zero, IntPtr.Zero))
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Video child inherited-handle allowlist could not be installed.");
+
+            if (job.RequireChildProcessRestriction)
+            {
+                // Value must remain allocated until the attribute list is
+                // destroyed. Creation fails closed if the OS refuses the
+                // child process restriction; no fallback is attempted.
+                childProcessPolicy = Marshal.AllocHGlobal(sizeof(uint));
+                Marshal.WriteInt32(childProcessPolicy,
+                    unchecked((int)ChildProcessRestricted));
+                if (!UpdateProcThreadAttribute(attributes, 0,
+                        ProcThreadAttributeChildProcessPolicy, childProcessPolicy,
+                        (nuint)sizeof(uint), IntPtr.Zero, IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error(),
+                        "Native video child-process restriction could not be installed.");
+            }
 
             StartupInfoEx startup = new()
             {
@@ -135,6 +160,8 @@ internal static class WindowsVideoSuspendedLauncher
                 DeleteProcThreadAttributeList(attributes);
             if (inheritedList != IntPtr.Zero)
                 Marshal.FreeHGlobal(inheritedList);
+            if (childProcessPolicy != IntPtr.Zero)
+                Marshal.FreeHGlobal(childProcessPolicy);
             if (attributes != IntPtr.Zero)
                 Marshal.FreeHGlobal(attributes);
             Marshal.FreeHGlobal(nativeEnvironment);
