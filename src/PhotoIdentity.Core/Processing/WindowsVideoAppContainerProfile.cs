@@ -16,15 +16,17 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
 {
     private const string Prefix = "PhotoIdentity.WI0188.Lab.";
     private readonly string _name;
+    private readonly string _labRoot;
     private IntPtr _sid;
     private bool _disposed;
 
-    private WindowsVideoAppContainerProfile(string name, IntPtr sid)
+    private WindowsVideoAppContainerProfile(string name, IntPtr sid, string labRoot)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException(
                 "AppContainer identity construction requires Windows.");
         _name = name;
+        _labRoot = labRoot;
         _sid = sid;
         Identity = new SecurityIdentifier(sid);
     }
@@ -40,11 +42,13 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
         }
     }
 
-    public static WindowsVideoAppContainerProfile CreateSyntheticLab()
+    public static WindowsVideoAppContainerProfile CreateSyntheticLab(
+        string markedLabRoot)
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException(
                 "AppContainer feasibility is Windows-only.");
+        string labRoot = ValidateLabRoot(markedLabRoot);
         // A fresh name is mandatory: never attach to an existing user's
         // installed AppContainer profile or delete another app's profile.
         string name = Prefix + Guid.NewGuid().ToString("N");
@@ -57,7 +61,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             throw new Win32Exception(hresult,
                 "Windows AppContainer profile creation was refused.");
         }
-        try { return new WindowsVideoAppContainerProfile(name, sid); }
+        try { return new WindowsVideoAppContainerProfile(name, sid, labRoot); }
         catch
         {
             _ = FreeSid(sid);
@@ -79,9 +83,14 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             !Directory.Exists(directory) ||
             (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new ArgumentException("Owned synthetic ACL target must exist locally.");
-        // The caller validates and owns the marked sandbox root before any
-        // grant. This method does not mutate existing entry inheritance:
-        // its sole grant applies to this AppContainer's unique SID.
+        // Never become a general-purpose ACL grant API: only the exact
+        // predefined synthetic lab directory may receive this SID's ACE.
+        string expected = Path.Combine(_labRoot,
+            readOnly ? "sandbox-allowed" : "sandbox-working");
+        if (!string.Equals(Path.GetFullPath(directory), expected,
+                StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                "AppContainer SID may only be granted to predefined synthetic lab directories.");
         DirectoryInfo info = new(directory);
         DirectorySecurity acl = info.GetAccessControl(AccessControlSections.Access);
         FileSystemRights rights = readOnly
@@ -107,6 +116,10 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             !Directory.Exists(directory) ||
             (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new ArgumentException("Synthetic lab root must exist locally.");
+        if (!string.Equals(Path.GetFullPath(directory), _labRoot,
+                StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                "AppContainer traversal is restricted to the marked lab root.");
         DirectoryInfo info = new(directory);
         DirectorySecurity acl = info.GetAccessControl(AccessControlSections.Access);
         acl.AddAccessRule(new FileSystemAccessRule(Identity,
@@ -114,6 +127,35 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             InheritanceFlags.None, PropagationFlags.None,
             AccessControlType.Allow));
         info.SetAccessControl(acl);
+    }
+
+    private static string ValidateLabRoot(string labRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(labRoot);
+        if (!Path.IsPathFullyQualified(labRoot) ||
+            labRoot.StartsWith(@"\\", StringComparison.Ordinal))
+            throw new ArgumentException("AppContainer requires a local marked synthetic root.");
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(labRoot));
+        string temp = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+        if (!root.StartsWith(temp + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) ||
+            !Directory.Exists(root))
+            throw new ArgumentException("AppContainer root must be under the OS temporary directory.");
+        for (string? cursor = root; cursor is not null;
+             cursor = Path.GetDirectoryName(cursor))
+        {
+            if ((File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
+                throw new ArgumentException("Linked AppContainer scratch directories are forbidden.");
+            if (string.Equals(cursor, temp, StringComparison.OrdinalIgnoreCase))
+                break;
+        }
+        string marker = Path.Combine(root, ".photoidentity-synthetic-video-lab");
+        if (!File.Exists(marker) ||
+            (File.GetAttributes(marker) & FileAttributes.ReparsePoint) != 0 ||
+            File.ReadAllText(marker) != "wi0188-synthetic-video-lab-v1" ||
+            Directory.EnumerateFileSystemEntries(root).Count() != 1)
+            throw new ArgumentException("AppContainer requires an otherwise empty owned synthetic root.");
+        return root;
     }
 
     public void Dispose()
