@@ -17,7 +17,6 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
 {
     private const string Prefix = "PhotoIdentity.WI0188.Lab.";
     private readonly string _name;
-    private readonly string _labRoot;
     private readonly string _scopeRoot;
     private IntPtr _sid;
     private bool _disposed;
@@ -28,7 +27,6 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             throw new PlatformNotSupportedException(
                 "AppContainer identity construction requires Windows.");
         _name = name;
-        _labRoot = labRoot;
         _scopeRoot = Path.Combine(labRoot, "sandbox-scope");
         _sid = sid;
         Identity = new SecurityIdentifier(sid);
