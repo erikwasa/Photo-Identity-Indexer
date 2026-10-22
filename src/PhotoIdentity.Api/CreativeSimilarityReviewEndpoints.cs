@@ -22,8 +22,12 @@ public static class CreativeSimilarityReviewEndpoints
         Guid id, ICreativeCollectionRecipeRepository recipes,
         CreativeCollectionMaterializationService materializer,
         CreativeSimilarityReviewStore store,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int offset = 0,
+        int pageSize = CreativeSimilarityReviewPaging.DefaultPageSize)
     {
+        if (!CreativeSimilarityReviewPaging.IsValid(offset, pageSize))
+            return Results.BadRequest(new { error = "Review offset must be non-negative and pageSize must be between 1 and 80." });
         if (id == Guid.Empty)
             return Results.BadRequest(new { error = "Collection ID cannot be empty." });
         CreativeCollectionRecipe? recipe = await recipes.GetAsync(
@@ -38,9 +42,10 @@ public static class CreativeSimilarityReviewEndpoints
                 if (materialized is null) return Results.NotFound();
                 PhotoVisualRedundancyGroup[] allGroups =
                     materialized.VisualRedundancy.Groups.ToArray();
-                // Safety cap on visual review payload. Grouping and selection
-                // are still the existing versioned, exclusion-aware policies.
-                PhotoVisualRedundancyGroup[] sample = allGroups.Take(80).ToArray();
+                // Page the complete set rather than dropping groups after the first 80.
+                // No grouping, selector or review-choice semantics change.
+                PhotoVisualRedundancyGroup[] sample = CreativeSimilarityReviewPaging.Page(
+                    allGroups, offset, pageSize);
                 var selected = materialized.Selection.Selected
                     .Select(item => item.Candidate.RevisionId.ToString().ToLowerInvariant())
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -66,7 +71,8 @@ public static class CreativeSimilarityReviewEndpoints
                     materialized.VisualRedundancy.AlgorithmVersion,
                     materialized.VisualRedundancy.MaximumHammingDistance,
                     materialized.VisualRedundancy.MaximumCaptureSpan.TotalSeconds,
-                    allGroups.Length, sample.Length, allGroups.Length > sample.Length,
+                    allGroups.Length, sample.Length, offset + sample.Length < allGroups.Length,
+                    offset,
                     materialized.Generated.TotalCandidateCount,
                     materialized.Selection.SelectedCount,
                     groups.ToArray(),
@@ -143,5 +149,27 @@ public sealed record CreativeSimilarityReviewResponse(
     string CollectionId, string CollectionName, string PolicyVersion,
     string AlgorithmVersion, int MaximumHammingDistance, double MaximumCaptureSpanSeconds,
     int TotalGroups, int DisplayedGroups, bool GroupSampleTruncated,
-    int TotalCandidates, int SelectedCount, CreativeSimilarityGroupReviewResponse[] Groups,
+    int GroupOffset, int TotalCandidates, int SelectedCount, CreativeSimilarityGroupReviewResponse[] Groups,
     bool CollectionSelectionChanged, bool AutoOmissionEnabled, string EvidenceSemantics);
+
+/// <summary>
+/// Bounded, deterministic review paging without altering the saved group's
+/// fingerprint or the complete-link similarity policy.
+/// </summary>
+public static class CreativeSimilarityReviewPaging
+{
+    public const int DefaultPageSize = 12;
+    public const int MaximumPageSize = 80;
+
+    public static bool IsValid(int offset, int pageSize) =>
+        offset >= 0 && pageSize is >= 1 and <= MaximumPageSize;
+
+    public static T[] Page<T>(IReadOnlyList<T> groups, int offset, int pageSize)
+    {
+        ArgumentNullException.ThrowIfNull(groups);
+        if (!IsValid(offset, pageSize))
+            throw new ArgumentOutOfRangeException(nameof(pageSize),
+                "Review offset must be non-negative and page size must be between 1 and 80.");
+        return groups.Skip(offset).Take(pageSize).ToArray();
+    }
+}
