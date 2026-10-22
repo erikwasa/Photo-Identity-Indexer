@@ -27,6 +27,8 @@ public sealed class VideoArchiveProcessingService(
     private const long ReservationBytes = 512L * 1024 * 1024;
     private readonly object _activeLock = new();
     private CancellationTokenSource? _active;
+    private string _lastResult = "not-run";
+    public string LastResult => Volatile.Read(ref _lastResult);
     public bool IsProcessing
     {
         get { lock (_activeLock) return _active is not null; }
@@ -61,7 +63,10 @@ public sealed class VideoArchiveProcessingService(
         ArchiveCoverageState coverage, CancellationToken stoppingToken)
     {
         if (!OperatingSystem.IsWindows() || !preferences.Current.Enabled)
+        {
+            Volatile.Write(ref _lastResult, "disabled");
             return false;
+        }
 
         CancellationTokenSource active;
         lock (_activeLock)
@@ -113,7 +118,10 @@ public sealed class VideoArchiveProcessingService(
 
             if ((await new PostgresVideoPhotoPriorityProbe(database)
                     .GetAsync(token)).PhotoWorkActive)
+            {
+                Volatile.Write(ref _lastResult, "photos-first");
                 return false;
+            }
 
             // Recover expired claims after a crashed process before making
             // another attempt; never reset completed derivative receipts.
@@ -198,6 +206,7 @@ public sealed class VideoArchiveProcessingService(
                 VideoWorkerCycleResult result =
                     await new VideoWorkerAttemptCoordinator(database)
                         .RunOneAsync(JobBudget, adapter, token);
+                Volatile.Write(ref _lastResult, result.ReasonCode);
                 return result.Claimed || candidate is not null || discovered;
             }
             finally
@@ -224,14 +233,28 @@ public sealed class VideoArchiveProcessingService(
         }
         catch (OperationCanceledException) when (active.IsCancellationRequested)
         {
+            Volatile.Write(ref _lastResult, "paused");
             return true; // Archive pause or shutdown; lease fencing handles retry.
+        }
+        catch (OperationCanceledException)
+        {
+            Volatile.Write(ref _lastResult, "source-timeout");
+            return false;
         }
         catch (Exception exception)
         {
-            // No private source keys, paths or media data in operator logs.
-            logger.LogWarning(
-                "Video processing skipped or failed ({FailureType}); photos remain unaffected.",
-                exception.GetType().Name);
+            // Fixed, path-free diagnostic codes: no source names, keys or
+            // native exception messages are returned to clients or logs.
+            string code = exception switch
+            {
+                UnauthorizedAccessException => "filesystem-access-refused",
+                IOException => "video-io-failure",
+                InvalidDataException => "invalid-video-evidence",
+                InvalidOperationException => "video-safety-or-configuration-rejected",
+                _ => "video-attempt-failed"
+            };
+            Volatile.Write(ref _lastResult, code);
+            logger.LogWarning("Video processing ended with {Code}.", code);
             return false;
         }
         finally
