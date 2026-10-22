@@ -10,7 +10,8 @@ public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
     bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
-    long Cancelled, long ExpiredLeases, string LastResult);
+    long Cancelled, long ExpiredLeases, string LastResult,
+    IReadOnlyList<VideoProcessingJobOperatorRow> Recent);
 
 /// <summary>
 /// Operator settings only. No arbitrary source paths, executable paths,
@@ -34,11 +35,12 @@ public static class VideoProcessingEndpoints
         IConfiguration configuration,
         CancellationToken token)
     {
-        var overview = await new PostgresVideoProcessingQueueInspector(database)
-            .GetOverviewAsync(token);
+        var inspector = new PostgresVideoProcessingQueueInspector(database);
+        var overview = await inspector.GetOverviewAsync(token);
+        var recent = await inspector.ListRecentAsync(12, token);
         return Results.Ok(ToResponse(preferences.Current, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
-            processor.LastResult));
+            processor.LastResult, recent));
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -68,11 +70,12 @@ public static class VideoProcessingEndpoints
         }
         VideoProcessingPreferences saved = await preferences.SaveAsync(
             new(value.Enabled, value.IncludeOnlineOnly), token);
-        var overview = await new PostgresVideoProcessingQueueInspector(database)
-            .GetOverviewAsync(token);
+        var inspector = new PostgresVideoProcessingQueueInspector(database);
+        var overview = await inspector.GetOverviewAsync(token);
+        var recent = await inspector.ListRecentAsync(12, token);
         return Results.Ok(ToResponse(saved, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
-            processor.LastResult));
+            processor.LastResult, recent));
     }
 
     private static bool ToolsConfigured(IConfiguration configuration) =>
@@ -83,9 +86,10 @@ public static class VideoProcessingEndpoints
     private static VideoProcessingSettingsResponse ToResponse(
         VideoProcessingPreferences settings,
         VideoProcessingQueueOverview status,
-        bool processing, bool configured, string lastResult) =>
+        bool processing, bool configured, string lastResult,
+        IReadOnlyList<VideoProcessingJobOperatorRow> recent) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
-            status.ExpiredLeases, lastResult);
+            status.ExpiredLeases, lastResult, recent);
 }
