@@ -220,73 +220,121 @@
                 {
                     <section class="creative-similarity-review" aria-label="Similar photos for this Creative Collection">
                         <div class="smart-subheading">
-                            <strong>Review similar photos</strong>
+                            <strong>Similar photo review</strong>
                             <button type="button" class="button secondary" disabled="@Busy"
-                                    @onclick="LoadSimilarityAsync">
-                                @(Similarity is null ? "Find similar alternatives" : "Refresh similarity review")
+                                    aria-expanded="@SimilarityExpanded"
+                                    @onclick="ToggleSimilarityReviewAsync">
+                                @(SimilarityExpanded ? "Hide review" : Similarity is null ? "Find similar alternatives" : "Show review")
                             </button>
                         </div>
-                        <p class="smart-help">
-                            Compare locally detected near-identical burst frames.
-                            Keep all by default, or record a preference for one photo.
-                            <strong>These preferences are annotations only:</strong>
-                            neither the saved collection nor slideshow selection is changed.
-                        </p>
-                        @if (Similarity is SimilarityReviewResponse similarity)
+                        @if (Similarity is SimilarityReviewResponse summary)
                         {
                             <p class="smart-help">
-                                @similarity.TotalGroups possible groups among @similarity.TotalCandidates candidates.
-                                @similarity.DisplayedGroups shown ·
-                                method @similarity.AlgorithmVersion ·
-                                policy @similarity.PolicyVersion.
-                                @(similarity.GroupSampleTruncated ? "Additional groups omitted from this review page." : "")
+                                @summary.TotalGroups possible groups among @summary.TotalCandidates candidates.
+                                @(SimilarityExpanded ? "Expand a group to compare photos." : "Review is collapsed; preferences are retained.")
                             </p>
-                            @if (similarity.Groups.Length == 0)
+                        }
+                        @if (SimilarityExpanded)
+                        {
+                            <p class="smart-help">
+                                Compare existing local thumbnails. Keep all by default, or record a preference.
+                                <strong>Review annotations only:</strong> no collection, slideshow or source photo is changed.
+                                Groups are conservative complete-link matches; a single burst can appear in several groups.
+                            </p>
+                            @if (Similarity is SimilarityReviewResponse similarity)
                             {
-                                <div class="empty-state compact">
-                                    <p>No similar burst groups detected. That does not mean all photos are unique;
-                                       the conservative local hash detector may miss meaningful similarities.</p>
+                                <p class="smart-help">
+                                    Showing @(similarity.DisplayedGroups == 0 ? 0 : similarity.GroupOffset + 1)–@(similarity.GroupOffset + similarity.DisplayedGroups)
+                                    of @similarity.TotalGroups groups · method @similarity.AlgorithmVersion · policy @similarity.PolicyVersion.
+                                </p>
+                                <div class="creative-similarity-tools">
+                                    <label class="smart-location-toggle">
+                                        <input type="checkbox" @bind="SimilarityHideReviewed" disabled="@Busy" />
+                                        <span>Hide reviewed groups on this page</span>
+                                    </label>
+                                    <button type="button" class="button secondary" disabled="@Busy"
+                                            @onclick="() => LoadSimilarityAsync(similarity.GroupOffset)">
+                                        Refresh current page
+                                    </button>
                                 </div>
-                            }
-                            @foreach (SimilarityGroupResponse group in similarity.Groups)
-                            {
-                                <article class="creative-similarity-group" @key="group.GroupKey">
-                                    <div class="creative-similarity-group-head">
-                                        <strong>@group.MemberCount similar photos</strong>
-                                        <span>@group.StartedAtLocal.ToString("yyyy-MM-dd HH:mm") ·
-                                              max Hamming distance @group.MaximumPairDistance</span>
-                                        <span>@(group.Decision == "keep-all" ? "Your preference: keep all" :
-                                            group.Decision == "prefer-one" ? "Your preference: one photo" :
-                                            "No review decision")</span>
+                                @if (similarity.TotalGroups == 0)
+                                {
+                                    <div class="empty-state compact">
+                                        <p>No similar burst groups detected. The conservative detector may still miss similar photos.</p>
                                     </div>
-                                    <div class="creative-similarity-photos">
-                                        @foreach (SimilarityPhotoResponse photo in group.Members)
-                                        {
-                                            <div class="creative-similarity-photo" @key="photo.RevisionId">
-                                                <img src="@photo.ThumbnailUrl" loading="lazy"
-                                                     alt="One similar photo alternative in the collection" />
-                                                <p class="smart-help">
-                                                    @(photo.SelectedByCurrentRecipe ? "Currently selected" : "Not selected") ·
-                                                    distance @photo.DistanceFromRepresentative
-                                                    @if (photo.RevisionId == group.PreferredRevisionId)
-                                                    {
-                                                        <strong> · Preferred by you</strong>
-                                                    }
-                                                </p>
-                                                <button type="button" class="button secondary" disabled="@Busy"
-                                                        @onclick="() => PreferSimilarityPhotoAsync(group, photo)">
-                                                    Prefer this photo
-                                                </button>
-                                            </div>
-                                        }
-                                    </div>
-                                    <div class="smart-actions">
-                                        <button type="button" class="button secondary" disabled="@Busy"
-                                                @onclick="() => KeepSimilarityGroupAsync(group)">
-                                            Keep all alternatives
+                                }
+                                else if (similarity.Groups.Length == 0)
+                                {
+                                    <p class="smart-help">No groups at this offset. Go to the previous page.</p>
+                                }
+                                else if (SimilarityHideReviewed && similarity.Groups.All(group => group.Decision is not null))
+                                {
+                                    <p class="smart-help">Every group on this page has a review decision. Show reviewed groups or continue to the next page.</p>
+                                }
+                                @foreach (SimilarityGroupResponse group in similarity.Groups)
+                                {
+                                    if (SimilarityHideReviewed && group.Decision is not null)
+                                    {
+                                        continue;
+                                    }
+                                    <details class="creative-similarity-group @(group.Decision is null ? "" : "reviewed")" @key="group.GroupKey">
+                                        <summary class="creative-similarity-group-head">
+                                            <img class="creative-similarity-preview" src="@group.Members[0].ThumbnailUrl"
+                                                 loading="lazy" alt="Thumbnail representing this similar-photo group" />
+                                            <span><strong>@group.MemberCount similar photos</strong> ·
+                                                @group.StartedAtLocal.ToString("yyyy-MM-dd HH:mm") ·
+                                                max distance @group.MaximumPairDistance</span>
+                                            <span class="creative-similarity-decision">
+                                                @(group.Decision == "keep-all" ? "Reviewed: keep all" :
+                                                  group.Decision == "prefer-one" ? "Reviewed: prefer one" :
+                                                  "Not reviewed")
+                                            </span>
+                                        </summary>
+                                        <div class="creative-similarity-photos">
+                                            @foreach (SimilarityPhotoResponse photo in group.Members)
+                                            {
+                                                <div class="creative-similarity-photo" @key="photo.RevisionId">
+                                                    <img src="@photo.ThumbnailUrl" loading="lazy"
+                                                         alt="One similar photo alternative in the collection" />
+                                                    <p class="smart-help">
+                                                        @(photo.SelectedByCurrentRecipe ? "Currently selected" : "Not selected") ·
+                                                        distance @photo.DistanceFromRepresentative
+                                                        @if (photo.RevisionId == group.PreferredRevisionId)
+                                                        {
+                                                            <strong> · Preferred by you</strong>
+                                                        }
+                                                    </p>
+                                                    <button type="button" class="button secondary" disabled="@Busy"
+                                                            @onclick="() => PreferSimilarityPhotoAsync(group, photo)">
+                                                        Prefer this photo
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="smart-actions">
+                                            <button type="button" class="button secondary" disabled="@Busy"
+                                                    @onclick="() => KeepSimilarityGroupAsync(group)">
+                                                Keep all alternatives
+                                            </button>
+                                        </div>
+                                    </details>
+                                }
+                                @if (similarity.TotalGroups > SimilarityPageSize)
+                                {
+                                    <nav class="creative-similarity-pager" aria-label="Similarity review pages">
+                                        <button type="button" class="button secondary"
+                                                disabled="@(Busy || similarity.GroupOffset == 0)"
+                                                @onclick="() => LoadSimilarityAsync(Math.Max(0, similarity.GroupOffset - SimilarityPageSize))">
+                                            Previous groups
                                         </button>
-                                    </div>
-                                </article>
+                                        <span>Page @(similarity.GroupOffset / SimilarityPageSize + 1) of @((similarity.TotalGroups + SimilarityPageSize - 1) / SimilarityPageSize)</span>
+                                        <button type="button" class="button secondary"
+                                                disabled="@(Busy || !similarity.GroupSampleTruncated)"
+                                                @onclick="() => LoadSimilarityAsync(similarity.GroupOffset + similarity.DisplayedGroups)">
+                                            Next groups
+                                        </button>
+                                    </nav>
+                                }
                             }
                         }
                     </section>
@@ -356,6 +404,9 @@
     private IReadOnlyList<CreativeCollectionRecipeResponse> Recipes { get; set; } = [];
     private CreativeCollectionPreviewResponse? Preview { get; set; }
     private SimilarityReviewResponse? Similarity { get; set; }
+    private const int SimilarityPageSize = 12;
+    private bool SimilarityExpanded { get; set; }
+    private bool SimilarityHideReviewed { get; set; }
     private string? SelectedRecipeId { get; set; }
     private string AnchorKind { get; set; } = "smart-collection";
     private string? SmartAnchorId { get; set; }
@@ -437,7 +488,7 @@
         TargetCount = 50;
         ContextStrength = "balanced";
         NoveltyEnabled = false;
-        Preview = null;
+        ClearPreview();
         Error = null;
         Notice = null;
     }
@@ -469,7 +520,7 @@
         TargetCount = recipe.TargetCount;
         ContextStrength = recipe.ContextStrength;
         NoveltyEnabled = recipe.NoveltyEnabled;
-        Preview = null;
+        ClearPreview();
         Error = null;
         Notice = null;
     }
@@ -766,7 +817,19 @@
         int TotalCandidates, int SelectedCount, SimilarityGroupResponse[] Groups,
         bool CollectionSelectionChanged, bool AutoOmissionEnabled, string EvidenceSemantics);
 
-    private async Task LoadSimilarityAsync()
+    private async Task ToggleSimilarityReviewAsync()
+    {
+        if (SimilarityExpanded)
+        {
+            SimilarityExpanded = false;
+            return;
+        }
+        SimilarityExpanded = true;
+        if (Similarity is null)
+            await LoadSimilarityAsync(0);
+    }
+
+    private async Task LoadSimilarityAsync(int offset)
     {
         if (SelectedRecipeId is null) return;
         Busy = true;
@@ -774,7 +837,7 @@
         try
         {
             Similarity = await Http.GetFromJsonAsync<SimilarityReviewResponse>(
-                $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}/similarity-review");
+                $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}/similarity-review?offset={offset}&pageSize={SimilarityPageSize}");
             if (Similarity is null)
                 throw new InvalidOperationException("No similarity review data returned.");
             Notice = "Similarity suggestions prepared from the current Creative Collection. " +
@@ -833,6 +896,8 @@
     {
         Preview = null;
         Similarity = null;
+        SimilarityExpanded = false;
+        SimilarityHideReviewed = false;
     }
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string fallback)
