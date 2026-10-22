@@ -239,7 +239,7 @@
                             <p class="smart-help">
                                 Compare existing local thumbnails. Keep all by default, or record a preference.
                                 <strong>Review annotations only:</strong> no collection, slideshow or source photo is changed.
-                                Review groups use a more permissive nearby-burst match (H12 neighbors, H18 from the first frame, at most 45 seconds within the same moment). They are suggestions, not confirmed duplicates. Normal slideshow selection still uses conservative H8 complete-link matching.
+                                Review sets combine nearby visually detected groups: up to 4 minutes between groups, 10 minutes overall, and 40 photos, within one inferred moment. The underlying groups use H12 neighbors/H18 representative within 45 seconds. <strong>Not every photo in a combined review set is necessarily similar.</strong> Inspect the alternatives before choosing; normal slideshow selection still uses H8 complete-link matching.
                             </p>
                             @if (Similarity is SimilarityReviewResponse similarity)
                             {
@@ -281,9 +281,10 @@
                                         <summary class="creative-similarity-group-head">
                                             <img class="creative-similarity-preview" src="@group.Members[0].ThumbnailUrl"
                                                  loading="lazy" alt="Thumbnail representing this similar-photo group" />
-                                            <span><strong>@group.MemberCount similar photos</strong> ·
-                                                @group.StartedAtLocal.ToString("yyyy-MM-dd HH:mm") ·
-                                                max distance @group.MaximumPairDistance</span>
+                                            <span><strong>@group.MemberCount photos to review</strong> ·
+                                                @group.StartedAtLocal.ToString("yyyy-MM-dd HH:mm")–@group.EndedAtLocal.ToString("HH:mm") ·
+                                                @group.VisualSubgroupCount visual @(group.VisualSubgroupCount == 1 ? "group" : "groups") ·
+                                                max pair distance @group.MaximumPairDistance</span>
                                             <span class="creative-similarity-decision">
                                                 @(group.Decision == "keep-all" ? "Reviewed: keep all" :
                                                   group.Decision == "prefer-one" ? "Reviewed: prefer one" :
@@ -809,7 +810,8 @@
         string GroupKey, int MaximumPairDistance,
         DateTime StartedAtLocal, DateTime EndedAtLocal,
         int MemberCount, SimilarityPhotoResponse[] Members,
-        string? Decision, string? PreferredRevisionId);
+        string? Decision, string? PreferredRevisionId,
+        int VisualSubgroupCount);
     private sealed record SimilarityReviewResponse(
         string CollectionId, string CollectionName, string PolicyVersion,
         string AlgorithmVersion, int MaximumHammingDistance, double MaximumCaptureSpanSeconds,
