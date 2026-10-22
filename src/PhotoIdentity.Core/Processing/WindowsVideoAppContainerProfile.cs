@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
@@ -136,6 +137,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
     /// an audit of the real archive, runtime/tool directories or cache.
     /// The observed allow/deny probes are still required afterwards.
     /// </summary>
+    [SupportedOSPlatform("windows")]
     public bool AuditSyntheticAcl()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -218,6 +220,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
                !blockedFileRules.Any(rule => rule.IdentityReference.Equals(Identity));
     }
 
+    [SupportedOSPlatform("windows")]
     private static FileSystemAccessRule[] Rules(FileSystemSecurity security) =>
         security.GetAccessRules(includeExplicit: true, includeInherited: true,
             targetType: typeof(SecurityIdentifier))
