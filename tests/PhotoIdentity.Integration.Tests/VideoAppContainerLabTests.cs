@@ -60,6 +60,7 @@ public sealed class VideoAppContainerLabTests
             Assert.True(result.GetProperty("dryRun").GetBoolean());
             Assert.Equal("not-run", result.GetProperty("status").GetString());
             Assert.False(result.GetProperty("appContainerTokenVerified").GetBoolean());
+            Assert.False(result.GetProperty("syntheticAclAuditVerified").GetBoolean());
             Assert.False(result.GetProperty("networkCapabilitiesRequested").GetBoolean());
             Assert.False(result.GetProperty("realVideoExecutionAuthorized").GetBoolean());
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
@@ -110,7 +111,8 @@ public sealed class VideoAppContainerLabTests
     {
         using StringWriter result = new();
         VideoAppContainerLabCommandRunner.Write(
-            result, false, "file-boundary-observed", true, true, true, true);
+            result, false, "file-boundary-observed", true, true, true, true,
+            syntheticAclAudit: true);
         using JsonDocument json = JsonDocument.Parse(result.ToString());
         JsonElement report = json.RootElement;
         Assert.Equal("wi0188-synthetic-appcontainer-feasibility-v1",
@@ -119,6 +121,7 @@ public sealed class VideoAppContainerLabTests
         Assert.True(report.GetProperty("allowedReadWriteVerified").GetBoolean());
         Assert.True(report.GetProperty("ungrantedReadDenied").GetBoolean());
         Assert.True(report.GetProperty("profileAndScratchCleanupVerified").GetBoolean());
+        Assert.True(report.GetProperty("syntheticAclAuditVerified").GetBoolean());
         foreach (string field in new[]
         {
             "networkCapabilitiesRequested", "networkEgressDenialVerified",
@@ -138,6 +141,22 @@ public sealed class VideoAppContainerLabTests
             VideoAppContainerLabCommandRunner.Write(
                 result, false, @"C:\\Archive\\private.mov", false,
                 false, false, false));
+    }
+
+
+    [Fact]
+    public void Nonpassing_acl_audit_report_never_claims_full_sandbox()
+    {
+        using StringWriter output = new();
+        VideoAppContainerLabCommandRunner.Write(output, false,
+            "sandbox-acl-audit-failed", false, false, false, true,
+            syntheticAclAudit: false);
+        using JsonDocument json = JsonDocument.Parse(output.ToString());
+        JsonElement report = json.RootElement;
+        Assert.False(report.GetProperty("syntheticAclAuditVerified").GetBoolean());
+        Assert.False(report.GetProperty("networkEgressDenialVerified").GetBoolean());
+        Assert.False(report.GetProperty("independentAclAuditVerified").GetBoolean());
+        Assert.False(report.GetProperty("realVideoExecutionAuthorized").GetBoolean());
     }
 
     [Fact]
@@ -162,6 +181,7 @@ public sealed class VideoAppContainerLabTests
             bool denied = report.GetProperty("ungrantedReadDenied").GetBoolean();
             bool cleaned = report.GetProperty(
                 "profileAndScratchCleanupVerified").GetBoolean();
+            bool audit = report.GetProperty("syntheticAclAuditVerified").GetBoolean();
             Assert.True(cleaned, "Windows AppContainer and owned lab must clean up.");
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
             string afterAcl = new DirectoryInfo(root)
@@ -173,7 +193,7 @@ public sealed class VideoAppContainerLabTests
             if (status == "file-boundary-observed")
             {
                 Assert.Equal(0, exit);
-                Assert.True(token && granted && denied);
+                Assert.True(token && granted && denied && audit);
             }
             else
             {
@@ -185,7 +205,7 @@ public sealed class VideoAppContainerLabTests
                 {
                     "profile-unavailable", "sandbox-acl-unavailable",
                     "sandbox-launch-unavailable", "allowed-read-write-unavailable",
-                    "ungranted-read-not-denied"
+                    "sandbox-acl-audit-failed", "ungranted-read-not-denied"
                 });
                 Assert.False(token && granted && denied);
             }
