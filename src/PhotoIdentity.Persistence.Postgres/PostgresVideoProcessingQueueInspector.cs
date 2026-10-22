@@ -13,7 +13,7 @@ public sealed record VideoProcessingQueueOverview(
 
 public sealed record VideoProcessingJobOperatorRow(
     Guid JobId, string Status, int Attempts, int ProgressPercent,
-    bool CancellationRequested);
+    bool CancellationRequested, string? FailureCode = null);
 
 public sealed class PostgresVideoProcessingQueueInspector(PostgresCatalogueDatabase database)
 {
@@ -66,7 +66,8 @@ public sealed class PostgresVideoProcessingQueueInspector(PostgresCatalogueDatab
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT job.id, job.status, job.attempt_count, job.progress_percent,
-                   job.cancellation_requested_at_utc IS NOT NULL
+                   job.cancellation_requested_at_utc IS NOT NULL,
+                   job.failure_code
             """ + "\n" + VisibleVideoJobs + "\n" + """
             ORDER BY job.requested_at_utc DESC, job.id DESC
             LIMIT @maximum;
@@ -78,7 +79,8 @@ public sealed class PostgresVideoProcessingQueueInspector(PostgresCatalogueDatab
         {
             rows.Add(new VideoProcessingJobOperatorRow(
                 reader.GetGuid(0), reader.GetString(1), reader.GetInt32(2),
-                reader.GetInt32(3), reader.GetBoolean(4)));
+                reader.GetInt32(3), reader.GetBoolean(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
         }
         return rows;
     }
