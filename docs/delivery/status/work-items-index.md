@@ -23,7 +23,6 @@ Current work items: **19**. Archived terminal items: **183**.
 | [WI-0199](../work-items/WI-0199-portrait-context-to-detail.md) Prototype full-photo then subject-detail sequence | M38 | proposed | unassigned | [YAML](work-items/active/WI-0199.yaml) |
 | [WI-0200](../work-items/WI-0200-portrait-context-detail-layout.md) Prototype simultaneous context-and-detail layout | M38 | proposed | unassigned | [YAML](work-items/active/WI-0200.yaml) |
 | [WI-0201](../work-items/WI-0201-tv-portrait-acceptance.md) Compare TV portrait presentation variants and decide adoption | M38 | proposed | unassigned | [YAML](work-items/active/WI-0201.yaml) |
-
 | [WI-0203](../work-items/WI-0203-creative-collection-similarity-review.md) Human-reviewed similar-photo and burst sets for saved Creative Collections | M39 | in_review | ai-agent | [YAML](work-items/active/WI-0203.yaml) |
 | [WI-0204](../work-items/WI-0204-reversible-collection-scoped-alternative-omission.md) Reversible opt-in omission of reviewed alternatives from one Creative Collection | M39 | proposed | unassigned | [YAML](work-items/active/WI-0204.yaml) |
 
