@@ -25,7 +25,8 @@ search-anchored. This triggers a bounded existing materialization operation.
 The resulting **Review similar photos** panel shows:
 
 - Number of detected groups and candidate count, with explicit
-  truncation if there are more than the first 80 groups.
+  paginated groups (12 per page by default, up to 80 per API request) so no groups are discarded after the first 80.
+- A collapsed-by-default review area, and compact per-group disclosure rows with a representative thumbnail, review status, and expandable side-by-side images. Previously reviewed groups can be hidden on the current page; Next/Previous navigates the full set of groups.
 - Each proposed visually similar group's thumbnail images side by side,
   differences relative to the first image (64-bit dHash Hamming distance),
   capture date/time, and whether each is presently selected by the recipe.
@@ -58,25 +59,29 @@ Do not mistake stored preferences for an active filter.
 1. Open a **saved Creative Collection** with some burst photos under
    `http://127.0.0.1:5080/creative-collections`. Do not modify its
    recipe or saved selection merely for this evaluation.
-2. Click **Find similar alternatives**. A panel should appear with
-   source-safe thumbnails and policy version, or an explicit zero-groups
-   message if no close moment pairs are detected.
-3. For one genuine same-moment group, click **Prefer this photo** and
+2. Click **Find similar alternatives**. The review opens, reports the total group count and policy,
+   and shows compact rows for the first 12 groups. Expand a row for side-by-side local thumbnails.
+   If there are no close moment pairs, expect an explicit zero-groups message.
+3. Expand one genuine same-moment group, click **Prefer this photo** and
    confirm the UI records your preference. For another, choose
    **Keep all alternatives**. If no groups are found on the first
    saved collection, a burst-heavy Smart-anchored Creative Collection
    is a more useful evaluation input.
-4. Navigate away, return, click **Find similar alternatives** again,
+4. Collapse the entire similarity section with **Hide review**, confirm the recipe editor stays compact,
+   and reopen with **Show review**. On an archive with >80 groups, navigate **Next groups** through the
+   complete set and return with **Previous groups**, confirming counts, grouping and choices remain stable.
+   Toggle **Hide reviewed groups on this page**; this hides entries visually, not from persisted evidence.
+5. Navigate away, return, click **Find similar alternatives** again,
    and verify your preferences are still present. Restart Photo Identity,
    repeat, and verify choices persist and remain independent of any
    *different* saved Creative Collection.
-5. Confirm **Save & start slideshow** and the normal Creative preview
+6. Confirm **Save & start slideshow** and the normal Creative preview
    still select exactly as before. Preferences are not yet applied to
    live slideshows; *that is intentional*.
-6. Confirm no unexpected OneDrive hydration, global Photo Identity
+7. Confirm no unexpected OneDrive hydration, global Photo Identity
    exclusions or changes to normal Archive, Search, Smart Collections
    or Slideshow playback.
-7. Report only aggregate totals (candidate count, number of proposed
+8. Report only aggregate totals (candidate count, number of proposed
    groups, how many were genuinely redundant vs distinct, whether
    Keep all / Prefer decisions were convenient), and any unexpected
    behavior. Do not publish thumbnails, photo IDs or raw decision files.
@@ -96,3 +101,29 @@ A distinct [quality rating issue #639](https://github.com/erikwasa/Photo-Identit
 will define a continuous rating with model/proxy provenance,
 uncertainty and licensing/normalization constraints. The existing
 technical suggestion priority is NOT a calibrated 0–100 quality score.
+
+## 2026-10-22 maintained-archive feedback and UI follow-up
+
+The operator passed all 11 local checks for merged PR #647 (persistence, recipe isolation,
+source safety and existing features). On 1,535 candidate photos, the accepted H8 policy
+proposed **157 groups**, with just 80 displayed by the initial safety cap. The review
+was only *partly* convenient because its content could not be collapsed. The operator
+judged almost every inspected group to include a redundant photo, but did not supply
+numerical redundant-vs-distinct counts. Several visually one-of-six bursts were split
+across adjacent 2–3-photo groups.
+
+The UI follow-up makes the whole section hideable, shows a compact preview/status row
+for each group with a disclosure to compare images, offers a reviewed-only visibility
+filter and bounded pagination covering **all** groups without generating giant DOMs.
+The page defaults to 12 groups; GET supports `offset` (0-based, nonnegative) and
+`pageSize` (1–80), with the same time-bounded materialization and exact revision-bound
+PUT verification. Changing the selected recipe clears stale review data. No source or
+selection change is introduced.
+
+**Similarity policy deliberately unchanged.** The current accepted complete-link H8,
+same-moment, max-20-second algorithm intentionally breaks A≈B≈C chains if A and C
+are too far apart. Widening it would risk hiding meaningfully different expressions,
+angles or subjects. A separate *read-only nearby-burst review* experiment should display
+adjacent same-moment groups together without claiming that all cross-group pairs qualify;
+measure what the maintainer regards as one curation choice, with a manual grouping override
+only after operator acceptance. Do not silently reclassify groups or apply suppression.
