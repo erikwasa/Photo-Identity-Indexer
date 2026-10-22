@@ -72,6 +72,7 @@
             </div>
         }
 
+        <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
         <h3>Video queue</h3>
         <div class="review-filter-grid">
             <div><span class="field-label">Pending</span><strong>@Status.Queued</strong></div>
@@ -94,7 +95,8 @@
         bool Enabled, bool IncludeOnlineOnly,
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
-        long Failed, long Cancelled, long ExpiredLeases);
+        long Failed, long Cancelled, long ExpiredLeases,
+        string LastResult);
     private sealed record VideoSettingsUpdate(bool Enabled, bool IncludeOnlineOnly);
     private sealed record ErrorResponse(string Error);
 
