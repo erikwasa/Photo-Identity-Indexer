@@ -807,3 +807,25 @@ Confirm `minReplicas=0`. A bridge or Photo Identity process stopping does not it
 - [Local caption and narration evaluation](local-caption-narration-evaluation.md)
 - [Local operator guide](local-operator-guide.md)
 - [Azure cost controls](../azure/cost-controls.md) — historical general Azure reference; validate current Container Apps/GPU billing before each burst
+
+## Historical issue retirement: direct-remote proposal rejected, bridge accepted
+
+The original GitHub #472 proposed modifying Photo Identity's production
+caption worker to support explicit direct Remote Ollama HTTPS inference.
+That proposal, including unmerged PR #473, was **closed as not planned**
+after the maintainer demonstrated that the unmodified loopback-only app
+could safely drain its caption backlog through a local reverse proxy.
+**Do not restore a direct remote mode from that abandoned proposal.**
+
+The accepted follow-up was GitHub #474 and merged **PR #475**, not a new
+runtime feature: [ADR-0011](../decisions/ADR-0011-operator-authorized-caption-burst-bridge.md)
+and this documented operator-controlled Azure Container Apps bridge.
+The retained evidence is 12/12 successful benchmark captions in
+both configurations, mean latency 122.18s local / 3.92s GPU, about
+31.15x speedup, a successfully drained production backlog, and idle
+Azure GPU minReplicas returned to **0**. Originals, catalogue and
+other private metadata stayed local; only the bounded locally rendered
+caption thumbnail plus required Ollama payload crossed to the
+operator-owned HTTPS endpoint. No cloud fallback is authorized.
+The old issue IDs are now historical only; the repo ADR/runbook
+govern future bursts.
