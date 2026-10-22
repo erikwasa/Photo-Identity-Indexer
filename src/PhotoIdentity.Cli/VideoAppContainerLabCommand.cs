@@ -48,6 +48,7 @@ public static class VideoAppContainerLabCommandRunner
     private const string GrantLimit = "sandbox-acl-unavailable";
     private const string DenialFailed = "ungranted-read-not-denied";
     private const string CleanupFailed = "sandbox-cleanup-unverified";
+    private const string AuditFailed = "sandbox-acl-audit-failed";
 
     public static async Task<int> RunAsync(VideoAppContainerLabOptions options,
         TextWriter output, CancellationToken cancellationToken = default)
@@ -75,16 +76,23 @@ public static class VideoAppContainerLabCommandRunner
             return 1;
         }
 
-        string working = Path.Combine(root, "sandbox-working");
-        string allowed = Path.Combine(root, "sandbox-allowed");
-        string blocked = Path.Combine(root, "sandbox-ungranted");
+        // All experimental ACEs live on this owned disposable subtree.
+        // Never edit the lasting operator-marked root ACL: Windows may
+        // normalize its inheritance control bits even after ACE removal.
+        string scope = Path.Combine(root, "sandbox-scope");
+        string working = Path.Combine(scope, "sandbox-working");
+        string allowed = Path.Combine(scope, "sandbox-allowed");
+        string blocked = Path.Combine(scope, "sandbox-ungranted");
         string state = ProfileLimit;
         bool tokenVerified = false;
         bool allowedVerified = false;
         bool forbiddenDenied = false;
+        bool aclAuditVerified = false;
         bool cleaned = true;
         WindowsVideoAppContainerProfile? profile = null;
-        DirectorySecurity? originalLabRootAcl = null;
+        string originalLabRootDaclSddl = new DirectoryInfo(root)
+            .GetAccessControl(AccessControlSections.Access)
+            .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -94,7 +102,7 @@ public static class VideoAppContainerLabCommandRunner
             profile = WindowsVideoAppContainerProfile.CreateSyntheticLab(root);
             state = GrantLimit;
             // Only newly created directories and known synthetic bytes.
-            foreach (string path in new[] { working, allowed, blocked })
+            foreach (string path in new[] { scope, working, allowed, blocked })
             {
                 if (Directory.Exists(path) || File.Exists(path))
                     throw new InvalidOperationException(
@@ -102,11 +110,8 @@ public static class VideoAppContainerLabCommandRunner
                 Directory.CreateDirectory(path);
             }
             VideoScratchCapacityGuard.EnsureCapacity(working, 32 * 1024 * 1024);
-            // The marked root survives this experiment. Preserve its exact
-            // original DACL before temporarily granting only traversal.
-            originalLabRootAcl = new DirectoryInfo(root)
-                .GetAccessControl(AccessControlSections.Access);
-            profile.GrantOwnedRootTraverse(root);
+            // The lasting marked root is never granted an AppContainer ACE.
+            profile.GrantOwnedRootTraverse(scope);
             profile.GrantOwnedDirectory(allowed, readOnly: true);
             profile.GrantOwnedDirectory(working, readOnly: false);
 
@@ -117,6 +122,15 @@ public static class VideoAppContainerLabCommandRunner
             string inaccessible = Path.Combine(blocked, "generated-restricted.txt");
             await File.WriteAllTextAsync(accessible, AllowedContent, cancellationToken);
             await File.WriteAllTextAsync(inaccessible, PrivateContent, cancellationToken);
+
+            // Static ACL inspection is independent of the runtime copy probes.
+            // A broad inherited package grant or a write-enabled read-only
+            // file is an immediate nonpassing result before child launch.
+            state = AuditFailed;
+            aclAuditVerified = profile.AuditSyntheticAcl();
+            if (!aclAuditVerified)
+                throw new InvalidOperationException(
+                    "Synthetic AppContainer ACL verification refused the grants.");
 
             // Windows system cmd.exe is used ONLY to probe access to these
             // two known generated text files. Never allow caller-selected
@@ -223,40 +237,39 @@ public static class VideoAppContainerLabCommandRunner
             // internal file paths or source contents in the JSON result.
             if (state is not (ProfileLimit or GrantLimit or LaunchLimit or
                 "allowed-read-write-unavailable" or DenialFailed or
-                "file-boundary-observed"))
+                AuditFailed or "file-boundary-observed"))
                 state = LaunchLimit;
         }
         finally
         {
-            // Restore the surviving marker root's original DACL even when
-            // AppContainer launch/ACL checks failed. Never retain an orphaned
-            // Package SID grant on a reusable operator-owned directory.
-            if (originalLabRootAcl is not null)
+            // Delete the complete disposable subtree only after checking
+            // every descendant is unlinked. The lasting root is untouched.
+            try
             {
-                try
+                if (Directory.Exists(scope))
                 {
-                    new DirectoryInfo(root).SetAccessControl(originalLabRootAcl);
+                    AssertNoLinksRecursively(scope);
+                    Directory.Delete(scope, recursive: true);
                 }
-                catch { cleaned = false; }
             }
-            foreach (string path in new[] { working, allowed, blocked })
+            catch { cleaned = false; }
+            // Verify original DACL and Windows inheritance flags unchanged.
+            try
             {
-                try
-                {
-                    if (Directory.Exists(path))
-                    {
-                        AssertNoLinksRecursively(path);
-                        Directory.Delete(path, recursive: true);
-                    }
-                }
-                catch { cleaned = false; }
+                string current = new DirectoryInfo(root)
+                    .GetAccessControl(AccessControlSections.Access)
+                    .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                if (!string.Equals(current, originalLabRootDaclSddl,
+                        StringComparison.Ordinal))
+                    cleaned = false;
             }
+            catch { cleaned = false; }
             try { profile?.Dispose(); }
             catch { cleaned = false; }
         }
         if (!cleaned) state = CleanupFailed;
         Write(output, false, state, tokenVerified, allowedVerified,
-            forbiddenDenied, cleaned);
+            forbiddenDenied, cleaned, aclAuditVerified);
         return state == "file-boundary-observed" ? 0 : 1;
     }
 
@@ -278,14 +291,15 @@ public static class VideoAppContainerLabCommandRunner
     }
 
     public static void Write(TextWriter output, bool dryRun, string status,
-        bool token, bool allowed, bool denied, bool cleanup)
+        bool token, bool allowed, bool denied, bool cleanup,
+        bool syntheticAclAudit = false)
     {
         ArgumentNullException.ThrowIfNull(output);
         if (status is not ("not-run" or "profile-unavailable" or
             "sandbox-launch-unavailable" or "sandbox-acl-unavailable" or
             "allowed-read-write-unavailable" or
             "ungranted-read-not-denied" or "sandbox-cleanup-unverified" or
-            "file-boundary-observed"))
+            "sandbox-acl-audit-failed" or "file-boundary-observed"))
             throw new ArgumentException("Invalid AppContainer synthetic pilot status.");
         output.WriteLine(JsonSerializer.Serialize(new
         {
@@ -294,6 +308,7 @@ public static class VideoAppContainerLabCommandRunner
             allowedReadWriteVerified = allowed,
             ungrantedReadDenied = denied,
             profileAndScratchCleanupVerified = cleanup,
+            syntheticAclAuditVerified = syntheticAclAudit,
             networkCapabilitiesRequested = false,
             networkEgressDenialVerified = false,
             independentAclAuditVerified = false,

@@ -1,4 +1,7 @@
 using System.Security.AccessControl;
+using System.Security.Principal;
+using System.ComponentModel;
+using PhotoIdentity.Core.Processing;
 using System.Text.Json;
 using PhotoIdentity.Cli;
 using Xunit;
@@ -60,6 +63,7 @@ public sealed class VideoAppContainerLabTests
             Assert.True(result.GetProperty("dryRun").GetBoolean());
             Assert.Equal("not-run", result.GetProperty("status").GetString());
             Assert.False(result.GetProperty("appContainerTokenVerified").GetBoolean());
+            Assert.False(result.GetProperty("syntheticAclAuditVerified").GetBoolean());
             Assert.False(result.GetProperty("networkCapabilitiesRequested").GetBoolean());
             Assert.False(result.GetProperty("realVideoExecutionAuthorized").GetBoolean());
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
@@ -105,12 +109,90 @@ public sealed class VideoAppContainerLabTests
         finally { Directory.Delete(root); }
     }
 
+
+    [Fact]
+    public void Windows_synthetic_acl_audit_rejects_overbroad_grants()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = NewLab();
+        string scope = Path.Combine(root, "sandbox-scope");
+        string allowed = Path.Combine(scope, "sandbox-allowed");
+        string working = Path.Combine(scope, "sandbox-working");
+        string blocked = Path.Combine(scope, "sandbox-ungranted");
+        string initialAcl = new DirectoryInfo(root)
+            .GetAccessControl(AccessControlSections.Access)
+            .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+        WindowsVideoAppContainerProfile? profile = null;
+        try
+        {
+            try { profile = WindowsVideoAppContainerProfile.CreateSyntheticLab(root); }
+            catch (Win32Exception)
+            {
+                // A Windows runner that cannot create disposable profiles
+                // cannot establish positive AppContainer isolation evidence.
+                return;
+            }
+
+            foreach (string path in new[] { scope, allowed, working, blocked })
+                Directory.CreateDirectory(path);
+            profile.GrantOwnedRootTraverse(scope);
+            profile.GrantOwnedDirectory(allowed, readOnly: true);
+            profile.GrantOwnedDirectory(working, readOnly: false);
+            File.WriteAllText(Path.Combine(allowed, "generated-public.txt"), "public");
+            File.WriteAllText(Path.Combine(blocked, "generated-restricted.txt"), "private");
+
+            // A host may already inherit wildcard package grants from its
+            // temporary root. Such a host is correctly not audit-eligible.
+            if (!profile.AuditSyntheticAcl()) return;
+
+            DirectoryInfo blockedDir = new(blocked);
+            DirectorySecurity broad = blockedDir.GetAccessControl(
+                AccessControlSections.Access);
+            broad.AddAccessRule(new FileSystemAccessRule(
+                new SecurityIdentifier("S-1-15-2-1"),
+                FileSystemRights.ReadAndExecute,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            blockedDir.SetAccessControl(broad);
+            Assert.False(profile.AuditSyntheticAcl());
+
+            DirectoryInfo allowedDir = new(allowed);
+            DirectorySecurity writable = allowedDir.GetAccessControl(
+                AccessControlSections.Access);
+            writable.AddAccessRule(new FileSystemAccessRule(
+                profile.Identity, FileSystemRights.Write,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            allowedDir.SetAccessControl(writable);
+            Assert.False(profile.AuditSyntheticAcl());
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(scope))
+                    Directory.Delete(scope, recursive: true);
+                string actualAcl = new DirectoryInfo(root)
+                    .GetAccessControl(AccessControlSections.Access)
+                    .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                Assert.Equal(initialAcl, actualAcl);
+                Assert.Single(Directory.EnumerateFileSystemEntries(root));
+            }
+            finally
+            {
+                profile?.Dispose();
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public void Sanitized_report_cannot_claim_full_network_or_quota_isolation()
     {
         using StringWriter result = new();
         VideoAppContainerLabCommandRunner.Write(
-            result, false, "file-boundary-observed", true, true, true, true);
+            result, false, "file-boundary-observed", true, true, true, true,
+            syntheticAclAudit: true);
         using JsonDocument json = JsonDocument.Parse(result.ToString());
         JsonElement report = json.RootElement;
         Assert.Equal("wi0188-synthetic-appcontainer-feasibility-v1",
@@ -119,6 +201,7 @@ public sealed class VideoAppContainerLabTests
         Assert.True(report.GetProperty("allowedReadWriteVerified").GetBoolean());
         Assert.True(report.GetProperty("ungrantedReadDenied").GetBoolean());
         Assert.True(report.GetProperty("profileAndScratchCleanupVerified").GetBoolean());
+        Assert.True(report.GetProperty("syntheticAclAuditVerified").GetBoolean());
         foreach (string field in new[]
         {
             "networkCapabilitiesRequested", "networkEgressDenialVerified",
@@ -138,6 +221,22 @@ public sealed class VideoAppContainerLabTests
             VideoAppContainerLabCommandRunner.Write(
                 result, false, @"C:\\Archive\\private.mov", false,
                 false, false, false));
+    }
+
+
+    [Fact]
+    public void Nonpassing_acl_audit_report_never_claims_full_sandbox()
+    {
+        using StringWriter output = new();
+        VideoAppContainerLabCommandRunner.Write(output, false,
+            "sandbox-acl-audit-failed", false, false, false, true,
+            syntheticAclAudit: false);
+        using JsonDocument json = JsonDocument.Parse(output.ToString());
+        JsonElement report = json.RootElement;
+        Assert.False(report.GetProperty("syntheticAclAuditVerified").GetBoolean());
+        Assert.False(report.GetProperty("networkEgressDenialVerified").GetBoolean());
+        Assert.False(report.GetProperty("independentAclAuditVerified").GetBoolean());
+        Assert.False(report.GetProperty("realVideoExecutionAuthorized").GetBoolean());
     }
 
     [Fact]
@@ -162,6 +261,7 @@ public sealed class VideoAppContainerLabTests
             bool denied = report.GetProperty("ungrantedReadDenied").GetBoolean();
             bool cleaned = report.GetProperty(
                 "profileAndScratchCleanupVerified").GetBoolean();
+            bool audit = report.GetProperty("syntheticAclAuditVerified").GetBoolean();
             Assert.True(cleaned, "Windows AppContainer and owned lab must clean up.");
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
             string afterAcl = new DirectoryInfo(root)
@@ -173,7 +273,7 @@ public sealed class VideoAppContainerLabTests
             if (status == "file-boundary-observed")
             {
                 Assert.Equal(0, exit);
-                Assert.True(token && granted && denied);
+                Assert.True(token && granted && denied && audit);
             }
             else
             {
@@ -185,7 +285,7 @@ public sealed class VideoAppContainerLabTests
                 {
                     "profile-unavailable", "sandbox-acl-unavailable",
                     "sandbox-launch-unavailable", "allowed-read-write-unavailable",
-                    "ungranted-read-not-denied"
+                    "sandbox-acl-audit-failed", "ungranted-read-not-denied"
                 });
                 Assert.False(token && granted && denied);
             }

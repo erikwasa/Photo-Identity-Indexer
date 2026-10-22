@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
@@ -16,7 +17,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
 {
     private const string Prefix = "PhotoIdentity.WI0188.Lab.";
     private readonly string _name;
-    private readonly string _labRoot;
+    private readonly string _scopeRoot;
     private IntPtr _sid;
     private bool _disposed;
 
@@ -26,7 +27,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             throw new PlatformNotSupportedException(
                 "AppContainer identity construction requires Windows.");
         _name = name;
-        _labRoot = labRoot;
+        _scopeRoot = Path.Combine(labRoot, "sandbox-scope");
         _sid = sid;
         Identity = new SecurityIdentifier(sid);
     }
@@ -85,7 +86,7 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             throw new ArgumentException("Owned synthetic ACL target must exist locally.");
         // Never become a general-purpose ACL grant API: only the exact
         // predefined synthetic lab directory may receive this SID's ACE.
-        string expected = Path.Combine(_labRoot,
+        string expected = Path.Combine(_scopeRoot,
             readOnly ? "sandbox-allowed" : "sandbox-working");
         if (!string.Equals(Path.GetFullPath(directory), expected,
                 StringComparison.OrdinalIgnoreCase))
@@ -104,7 +105,8 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
     }
 
     /// <summary>
-    /// Allow directory traversal of only the newly created lab root. This
+    /// Allow traversal only on the newly created disposable scope root.
+    /// The surviving operator-marked lab root is never ACL-modified. This
     /// ACE never inherits to the ungranted sibling directory or its files.
     /// </summary>
     public void GrantOwnedRootTraverse(string directory)
@@ -116,10 +118,10 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             !Directory.Exists(directory) ||
             (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new ArgumentException("Synthetic lab root must exist locally.");
-        if (!string.Equals(Path.GetFullPath(directory), _labRoot,
+        if (!string.Equals(Path.GetFullPath(directory), _scopeRoot,
                 StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException(
-                "AppContainer traversal is restricted to the marked lab root.");
+                "AppContainer traversal is restricted to the disposable scope root.");
         DirectoryInfo info = new(directory);
         DirectorySecurity acl = info.GetAccessControl(AccessControlSections.Access);
         acl.AddAccessRule(new FileSystemAccessRule(Identity,
@@ -128,6 +130,103 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
             AccessControlType.Allow));
         info.SetAccessControl(acl);
     }
+
+
+    /// <summary>
+    /// Independently inspect the synthetic DACL shape before executing any
+    /// child. This checks only generated lab paths and does not constitute
+    /// an audit of the real archive, runtime/tool directories or cache.
+    /// The observed allow/deny probes are still required afterwards.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public bool AuditSyntheticAcl()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        string working = Path.Combine(_scopeRoot, "sandbox-working");
+        string allowed = Path.Combine(_scopeRoot, "sandbox-allowed");
+        string blocked = Path.Combine(_scopeRoot, "sandbox-ungranted");
+        string allowedFile = Path.Combine(allowed, "generated-public.txt");
+        string blockedFile = Path.Combine(blocked, "generated-restricted.txt");
+
+        foreach (string directory in new[] { _scopeRoot, working, allowed, blocked })
+            if (!Directory.Exists(directory) ||
+                (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                return false;
+        foreach (string file in new[] { allowedFile, blockedFile })
+            if (!File.Exists(file) ||
+                (File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
+                return false;
+
+        FileSystemAccessRule[] rootRules = Rules(
+            new DirectoryInfo(_scopeRoot).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] allowedRules = Rules(
+            new DirectoryInfo(allowed).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] workingRules = Rules(
+            new DirectoryInfo(working).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] blockedRules = Rules(
+            new DirectoryInfo(blocked).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] allowedFileRules = Rules(
+            new FileInfo(allowedFile).GetAccessControl(AccessControlSections.Access));
+        FileSystemAccessRule[] blockedFileRules = Rules(
+            new FileInfo(blockedFile).GetAccessControl(AccessControlSections.Access));
+
+        // Neither a parent inherited wildcard ACE nor the Windows
+        // ALL APPLICATION PACKAGES principals may bypass the unique lab SID.
+        foreach (FileSystemAccessRule[] rules in new[]
+            { rootRules, allowedRules, workingRules, blockedRules,
+              allowedFileRules, blockedFileRules })
+            if (rules.Any(rule => rule.AccessControlType == AccessControlType.Allow &&
+                rule.IdentityReference is SecurityIdentifier sid &&
+                sid.Value is "S-1-15-2-1" or "S-1-15-2-2"))
+                return false;
+
+        bool ExactPackageRule(FileSystemAccessRule[] rules,
+            FileSystemRights required, bool inherited,
+            InheritanceFlags inheritance, bool mayWrite)
+        {
+            FileSystemAccessRule[] matching = rules.Where(rule =>
+                rule.IdentityReference.Equals(Identity)).ToArray();
+            if (matching.Length != 1) return false;
+            FileSystemAccessRule rule = matching[0];
+            if (rule.AccessControlType != AccessControlType.Allow ||
+                rule.IsInherited != inherited ||
+                rule.InheritanceFlags != inheritance ||
+                (rule.FileSystemRights & required) != required)
+                return false;
+            const FileSystemRights forbiddenWrite =
+                FileSystemRights.WriteData | FileSystemRights.AppendData |
+                FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles |
+                FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership |
+                FileSystemRights.WriteAttributes |
+                FileSystemRights.WriteExtendedAttributes;
+            return mayWrite || (rule.FileSystemRights & forbiddenWrite) == 0;
+        }
+
+        InheritanceFlags descendants = InheritanceFlags.ContainerInherit |
+            InheritanceFlags.ObjectInherit;
+        // The disposable scope root grant is traversal only. In particular,
+        // listing the sibling names or reading data is not part of the grant.
+        // No change is made to the surviving marked lab root.
+        return rootRules.Where(rule => rule.IdentityReference.Equals(Identity))
+                   .All(rule => (rule.FileSystemRights &
+                       ~(FileSystemRights.Traverse | FileSystemRights.Synchronize)) == 0) &&
+               ExactPackageRule(rootRules, FileSystemRights.Traverse,
+                   inherited: false, InheritanceFlags.None, mayWrite: false) &&
+               ExactPackageRule(allowedRules, FileSystemRights.ReadAndExecute,
+                   inherited: false, descendants, mayWrite: false) &&
+               ExactPackageRule(workingRules, FileSystemRights.Modify,
+                   inherited: false, descendants, mayWrite: true) &&
+               ExactPackageRule(allowedFileRules, FileSystemRights.ReadAndExecute,
+                   inherited: true, InheritanceFlags.None, mayWrite: false) &&
+               !blockedRules.Any(rule => rule.IdentityReference.Equals(Identity)) &&
+               !blockedFileRules.Any(rule => rule.IdentityReference.Equals(Identity));
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static FileSystemAccessRule[] Rules(FileSystemSecurity security) =>
+        security.GetAccessRules(includeExplicit: true, includeInherited: true,
+            targetType: typeof(SecurityIdentifier))
+            .Cast<FileSystemAccessRule>().ToArray();
 
     private static string ValidateLabRoot(string labRoot)
     {
