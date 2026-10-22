@@ -163,6 +163,10 @@ public sealed class VideoArchiveProcessingService(
                         // caller path. No duplicate archive downloads.
                         ownedPath = ResolveOwnedSourcePath(
                             candidate.Root, candidate.Key);
+                        // Reserve headroom on the SOURCE volume, which may
+                        // differ from the private derivative cache volume.
+                        VideoScratchCapacityGuard.EnsureCapacity(
+                            candidate.Root, candidate.Size);
                         if (oneDrive.GetSyncClientAvailability() ==
                             OneDriveSyncClientAvailability.Unavailable)
                             throw new InvalidOperationException(
@@ -403,6 +407,8 @@ public sealed class VideoArchiveProcessingService(
             {
                 hydratedPath = ResolveOwnedSourcePath(
                     sourceState.RootLocator, selected.Reference.ItemKey);
+                VideoScratchCapacityGuard.EnsureCapacity(
+                    sourceState.RootLocator, selected.SizeBytes);
                 if (oneDrive.GetSyncClientAvailability() ==
                     OneDriveSyncClientAvailability.Unavailable)
                     throw new InvalidOperationException(
