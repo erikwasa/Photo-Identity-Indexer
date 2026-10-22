@@ -12,7 +12,7 @@ or collection/slideshow selection effect was introduced.
 **WI-0629 / issue #629 is accepted and closed as Archive cleanup product
 work.** The archive-side technical candidate queue and keyboard UX
 are no longer blocked pending another 129-photo review. The next
-distinct curation workstream is [issue #638](https://github.com/erikwasa/Photo-Identity-Indexer/issues/638)
+distinct curation workstream is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md)
 for similar photos in collections/slideshows, and a separately calibrated
 continuous quality-rating evaluation is [issue #639](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639).
 Do not reopen M37's consumed model held-out labels.
@@ -203,7 +203,7 @@ but Collections/Slideshows are treated as **one distinct curation
 workflow** rather than a second use of technical-only cleanup. The
 follow-ons are:
 
-- [Collection similarity groups and non-destructive optional omission](https://github.com/erikwasa/Photo-Identity-Indexer/issues/638)
+- [Creative similarity review and scoped omission planning](../delivery/milestones/M39-creative-collection-curation.md)
 - [Continuous, calibrated per-revision quality rating with provenance](https://github.com/erikwasa/Photo-Identity-Indexer/issues/639)
 
 Neither future work item inherits M37's rejected automatic global
