@@ -86,7 +86,7 @@ public static class VideoAppContainerLabCommandRunner
         bool aclAuditVerified = false;
         bool cleaned = true;
         WindowsVideoAppContainerProfile? profile = null;
-        DirectorySecurity? originalLabRootAcl = null;
+        string? originalLabRootDaclSddl = null;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -106,8 +106,9 @@ public static class VideoAppContainerLabCommandRunner
             VideoScratchCapacityGuard.EnsureCapacity(working, 32 * 1024 * 1024);
             // The marked root survives this experiment. Preserve its exact
             // original DACL before temporarily granting only traversal.
-            originalLabRootAcl = new DirectoryInfo(root)
-                .GetAccessControl(AccessControlSections.Access);
+            originalLabRootDaclSddl = new DirectoryInfo(root)
+                .GetAccessControl(AccessControlSections.Access)
+                .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
             profile.GrantOwnedRootTraverse(root);
             profile.GrantOwnedDirectory(allowed, readOnly: true);
             profile.GrantOwnedDirectory(working, readOnly: false);
@@ -242,11 +243,26 @@ public static class VideoAppContainerLabCommandRunner
             // Restore the surviving marker root's original DACL even when
             // AppContainer launch/ACL checks failed. Never retain an orphaned
             // Package SID grant on a reusable operator-owned directory.
-            if (originalLabRootAcl is not null)
+            if (originalLabRootDaclSddl is not null)
             {
                 try
                 {
-                    new DirectoryInfo(root).SetAccessControl(originalLabRootAcl);
+                    // GetAccessControl returns a clean snapshot; passing it
+                    // unmodified to SetAccessControl is insufficient because
+                    // .NET persists only dirty ACL sections. Explicitly
+                    // materialize the original DACL as a *modified* descriptor
+                    // before applying, then verify exact SDDL equality.
+                    DirectorySecurity restored = new();
+                    restored.SetSecurityDescriptorSddlForm(
+                        originalLabRootDaclSddl, AccessControlSections.Access);
+                    DirectoryInfo directory = new(root);
+                    directory.SetAccessControl(restored);
+                    string observed = directory
+                        .GetAccessControl(AccessControlSections.Access)
+                        .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                    if (!string.Equals(observed, originalLabRootDaclSddl,
+                            StringComparison.Ordinal))
+                        cleaned = false;
                 }
                 catch { cleaned = false; }
             }
