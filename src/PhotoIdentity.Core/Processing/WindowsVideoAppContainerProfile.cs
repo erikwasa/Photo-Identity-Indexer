@@ -201,7 +201,12 @@ public sealed class WindowsVideoAppContainerProfile : IDisposable
 
         InheritanceFlags descendants = InheritanceFlags.ContainerInherit |
             InheritanceFlags.ObjectInherit;
-        return ExactPackageRule(rootRules, FileSystemRights.Traverse,
+        // The root grant is traversal only. In particular, listing the
+        // sibling names or reading data is not part of the package grant.
+        return rootRules.Where(rule => rule.IdentityReference.Equals(Identity))
+                   .All(rule => (rule.FileSystemRights &
+                       ~(FileSystemRights.Traverse | FileSystemRights.Synchronize)) == 0) &&
+               ExactPackageRule(rootRules, FileSystemRights.Traverse,
                    inherited: false, InheritanceFlags.None, mayWrite: false) &&
                ExactPackageRule(allowedRules, FileSystemRights.ReadAndExecute,
                    inherited: false, descendants, mayWrite: false) &&
