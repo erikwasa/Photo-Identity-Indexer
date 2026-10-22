@@ -102,7 +102,7 @@ it is not a reversible soft hide. A review suggestion must be kept separate
 from the explicit operator-confirmed purge. Per-collection/slideshow
 reversible omission would be a different future action with separate opt-in.
 Track the product implementation in
-[issue #629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629).
+[WI-0206](../work-items/WI-0206-native-quality-suggestion-review.md).
 
 For M37, complete the bounded real-collection quality experiment, and
 record **manual suggestion feasibility separately** from the original four
@@ -146,7 +146,7 @@ The operator's separate human-in-the-loop aim did pass:
 a bounded companion queue generated 129 technical suggestions;
 the maintainer reviewed all (72 Keep, 37 Dismiss, 20 Consider)
 and confirmed most considered cases genuinely unwanted and review
-reasonably convenient. Issue [#629](https://github.com/erikwasa/Photo-Identity-Indexer/issues/629)
+reasonably convenient. Issue [#629](../work-items/WI-0206-native-quality-suggestion-review.md)
 owns the resulting native manual-review product, including
 merged PR #633 and its pending maintained-app smoke test.
 The native UI is **not** part of the WI-0195 four-arm acceptance
