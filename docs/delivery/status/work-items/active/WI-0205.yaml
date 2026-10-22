@@ -1,0 +1,12 @@
+id: WI-0205
+title: Evaluate and productize a provenance-bearing continuous photo-quality rating
+milestone: M40
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0205-continuous-photo-quality-rating.md
+blockers:
+- WI-0193
+blocker_notes: []
+evidence:
+- type: documentation
+  value: docs/delivery/work-items/WI-0193-absolute-photo-quality-model-evaluation.md
