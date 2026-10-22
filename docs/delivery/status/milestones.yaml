@@ -395,3 +395,10 @@ milestones:
   - WI-0199
   - WI-0200
   - WI-0201
+- id: M39
+  title: Creative Collection human-review curation and reversible alternatives
+  status: in_progress
+  document: ../milestones/M39-creative-collection-curation.md
+  work_items:
+  - WI-0203
+  - WI-0204
