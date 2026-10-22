@@ -88,6 +88,11 @@ public static class VideoAppContainerLabCommandRunner
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // The profile factory independently requires ONLY the original
+            // owned marker, so create the disposable SID before adding any
+            // test directories. Its ACL methods accept only fixed lab paths.
+            profile = WindowsVideoAppContainerProfile.CreateSyntheticLab(root);
+            state = GrantLimit;
             // Only newly created directories and known synthetic bytes.
             foreach (string path in new[] { working, allowed, blocked })
             {
@@ -97,8 +102,6 @@ public static class VideoAppContainerLabCommandRunner
                 Directory.CreateDirectory(path);
             }
             VideoScratchCapacityGuard.EnsureCapacity(working, 32 * 1024 * 1024);
-            profile = WindowsVideoAppContainerProfile.CreateSyntheticLab();
-            state = GrantLimit;
             // The marked root survives this experiment. Preserve its exact
             // original DACL before temporarily granting only traversal.
             originalLabRootAcl = new DirectoryInfo(root)
