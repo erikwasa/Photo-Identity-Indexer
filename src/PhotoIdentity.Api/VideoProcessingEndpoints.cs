@@ -10,7 +10,7 @@ public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
     bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
-    long Cancelled, long ExpiredLeases);
+    long Cancelled, long ExpiredLeases, string LastResult);
 
 /// <summary>
 /// Operator settings only. No arbitrary source paths, executable paths,
@@ -37,7 +37,8 @@ public static class VideoProcessingEndpoints
         var overview = await new PostgresVideoProcessingQueueInspector(database)
             .GetOverviewAsync(token);
         return Results.Ok(ToResponse(preferences.Current, overview,
-            processor.IsProcessing, ToolsConfigured(configuration)));
+            processor.IsProcessing, ToolsConfigured(configuration),
+            processor.LastResult));
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -70,7 +71,8 @@ public static class VideoProcessingEndpoints
         var overview = await new PostgresVideoProcessingQueueInspector(database)
             .GetOverviewAsync(token);
         return Results.Ok(ToResponse(saved, overview,
-            processor.IsProcessing, ToolsConfigured(configuration)));
+            processor.IsProcessing, ToolsConfigured(configuration),
+            processor.LastResult));
     }
 
     private static bool ToolsConfigured(IConfiguration configuration) =>
@@ -81,9 +83,9 @@ public static class VideoProcessingEndpoints
     private static VideoProcessingSettingsResponse ToResponse(
         VideoProcessingPreferences settings,
         VideoProcessingQueueOverview status,
-        bool processing, bool configured) =>
+        bool processing, bool configured, string lastResult) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
-            status.ExpiredLeases);
+            status.ExpiredLeases, lastResult);
 }
