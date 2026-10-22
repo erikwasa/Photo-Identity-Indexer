@@ -17,7 +17,12 @@ public sealed record CreativeCollectionMaterialization(
     CreativeCollectionSelectionResult Selection,
     PhotoVisualRedundancyResult VisualRedundancy,
     IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> ExposureHistory,
-    string NoveltyPolicyVersion);
+    string NoveltyPolicyVersion)
+{
+    // Computed only for explicit similarity-review requests. Never used
+    // by the normal Creative selector/slideshow snapshot.
+    public PhotoVisualRedundancyResult? SimilarityReviewRedundancy { get; init; }
+}
 
 public sealed class CreativeCollectionMaterializationService
 {
@@ -138,7 +143,8 @@ public sealed class CreativeCollectionMaterializationService
     public async Task<CreativeCollectionMaterialization?> MaterializeAsync(
         SmartCollectionId collectionId,
         CreativeCollectionRecipeSettings settings,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool includeSimilarityReview = false)
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.ValidateSupported();
@@ -168,12 +174,14 @@ public sealed class CreativeCollectionMaterializationService
             searchScope: null,
             searchAnchorHits: [],
             anchorTimer.ElapsedMilliseconds,
-            cancellationToken);
+            cancellationToken,
+            includeSimilarityReview);
     }
 
     public async Task<CreativeCollectionMaterialization?> MaterializeAsync(
         CreativeCollectionRecipe recipe,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool includeSimilarityReview = false)
     {
         ArgumentNullException.ThrowIfNull(recipe);
         recipe.ValidateAnchorSupported();
@@ -189,7 +197,7 @@ public sealed class CreativeCollectionMaterializationService
 
         if (recipe.AnchorCollectionId is SmartCollectionId smartAnchor)
         {
-            return await MaterializeAsync(smartAnchor, settings, cancellationToken);
+            return await MaterializeAsync(smartAnchor, settings, cancellationToken, includeSimilarityReview);
         }
 
         CreativeCollectionSearchAnchor searchAnchor = recipe.SearchAnchor
@@ -227,7 +235,8 @@ public sealed class CreativeCollectionMaterializationService
             search.Scope,
             admittedHits,
             anchorTimer.ElapsedMilliseconds,
-            cancellationToken);
+            cancellationToken,
+            includeSimilarityReview);
     }
 
     private async Task<CreativeCollectionMaterialization> MaterializeResolvedAsync(
@@ -240,7 +249,8 @@ public sealed class CreativeCollectionMaterializationService
         PhotoSearchScopeSummary? searchScope,
         IReadOnlyList<PhotoSearchExecutionItem> searchAnchorHits,
         long anchorResolutionMilliseconds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeSimilarityReview)
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.ValidateSupported();
@@ -305,7 +315,13 @@ public sealed class CreativeCollectionMaterializationService
                     new Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary>(),
                     settings.NoveltyEnabled
                         ? CreativeCollectionNoveltyPolicies.BalancedV1
-                        : CreativeCollectionNoveltyPolicies.Disabled);
+                        : CreativeCollectionNoveltyPolicies.Disabled)
+                {
+                    SimilarityReviewRedundancy = includeSimilarityReview
+                        ? PhotoVisualRedundancyGrouper.Group(
+                            [], noMoments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
+                        : null
+                };
             }
 
             ReportPhase("catalogue-query");
@@ -339,7 +355,8 @@ public sealed class CreativeCollectionMaterializationService
             VisualRedundancyBuild visual = await BuildAcceptedVisualRedundancyAsync(
                 generated.Candidates,
                 moments,
-                cancellationToken);
+                cancellationToken,
+                includeSimilarityReview);
             visualMilliseconds = phase.ElapsedMilliseconds;
 
             ReportPhase("preferences-and-exposure");
@@ -402,7 +419,10 @@ public sealed class CreativeCollectionMaterializationService
                 exposureHistory,
                 settings.NoveltyEnabled
                     ? CreativeCollectionNoveltyPolicies.BalancedV1
-                    : CreativeCollectionNoveltyPolicies.Disabled);
+                    : CreativeCollectionNoveltyPolicies.Disabled)
+            {
+                SimilarityReviewRedundancy = visual.ReviewResult
+            };
         }
         finally
         {
@@ -460,17 +480,28 @@ public sealed class CreativeCollectionMaterializationService
     private async Task<VisualRedundancyBuild> BuildAcceptedVisualRedundancyAsync(
         IReadOnlyList<CreativeCollectionCandidate> candidates,
         PhotoMomentClusteringResult moments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeSimilarityReview)
     {
         PhotoVisualRedundancyPolicy policy = PhotoVisualRedundancyPolicy.AcceptedCreativeV1;
+        // On explicit review only, admit candidate neighbors over the longer
+        // review span. Still only local proxies and revision-validated hashes;
+        // normal materializations stay on their accepted H8 workload.
+        PhotoVisualRedundancyPolicy eligibilityPolicy = includeSimilarityReview
+            ? PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2
+            : policy;
         CreativeCollectionCandidate[] eligible = SelectVisualFingerprintCandidates(
             candidates,
             moments,
-            policy);
+            eligibilityPolicy);
         if (eligible.Length == 0)
         {
             return new VisualRedundancyBuild(
                 PhotoVisualRedundancyGrouper.Group([], moments, policy),
+                includeSimilarityReview
+                    ? PhotoVisualRedundancyGrouper.Group(
+                        [], moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
+                    : null,
                 0,
                 0,
                 0,
@@ -581,11 +612,13 @@ public sealed class CreativeCollectionMaterializationService
 
         cancellationToken.ThrowIfCancellationRequested();
         _logger?.LogInformation("Creative visual phase: phase=grouping msElapsed={ElapsedMilliseconds}.", visualTimer.ElapsedMilliseconds);
+        PhotoVisualFingerprint[] evidence = fingerprints.ToArray();
         return new VisualRedundancyBuild(
-            PhotoVisualRedundancyGrouper.Group(
-                fingerprints,
-                moments,
-                policy),
+            PhotoVisualRedundancyGrouper.Group(evidence, moments, policy),
+            includeSimilarityReview
+                ? PhotoVisualRedundancyGrouper.Group(
+                    evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2)
+                : null,
             eligible.Length,
             proxies.Count,
             cacheHits,
@@ -595,6 +628,7 @@ public sealed class CreativeCollectionMaterializationService
 
     private sealed record VisualRedundancyBuild(
         PhotoVisualRedundancyResult Result,
+        PhotoVisualRedundancyResult? ReviewResult,
         int EligibleCandidateCount,
         int ResolvedProxyCount,
         int CacheHitCount,
