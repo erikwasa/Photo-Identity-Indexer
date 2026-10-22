@@ -326,6 +326,7 @@ public sealed class VideoArchiveProcessingService(
             sourceState.SourceId, sourceState.RootLocator);
 
         HashSet<string> inspected = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> excluded = new(StringComparer.OrdinalIgnoreCase);
         await using (NpgsqlConnection db = await database.OpenConnectionAsync(token))
         await using (NpgsqlCommand known = db.CreateCommand())
         {
@@ -344,6 +345,21 @@ public sealed class VideoArchiveProcessingService(
                 inspected.Add(reader.GetString(0));
         }
 
+        // Exclusions must be checked before probing or hydrating content,
+        // not only at the final publication fence.
+        await using (NpgsqlConnection db = await database.OpenConnectionAsync(token))
+        await using (NpgsqlCommand exclusions = db.CreateCommand())
+        {
+            exclusions.CommandText = """
+                SELECT source_key FROM source_copy_exclusions WHERE source_id=@source;
+                """;
+            exclusions.Parameters.AddWithValue("source", sourceState.SourceId.Value);
+            await using NpgsqlDataReader reader =
+                await exclusions.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+                excluded.Add(reader.GetString(0));
+        }
+
         SourceAsset? onlineCandidate = null;
         SourceAsset? localCandidate = null;
         // A bounded discovery scan of metadata only. No content bytes are
@@ -356,7 +372,8 @@ public sealed class VideoArchiveProcessingService(
                     new SourceScanOptions(folder), token))
                 {
                     if (video.SizeBytes is < 1 or > MaxSourceBytes ||
-                        inspected.Contains(video.Reference.ItemKey))
+                        inspected.Contains(video.Reference.ItemKey) ||
+                        excluded.Contains(video.Reference.ItemKey))
                         continue;
                     if (video.Availability == AssetAvailability.Local)
                     {
