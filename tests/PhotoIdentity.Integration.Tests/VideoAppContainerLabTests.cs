@@ -89,6 +89,23 @@ public sealed class VideoAppContainerLabTests
     }
 
     [Fact]
+    public void AppContainer_profile_factory_rejects_unmarked_existing_folders()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string root = Path.Combine(Path.GetTempPath(),
+            "wi0188-unmarked-acl-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            Assert.Throws<ArgumentException>(() =>
+                PhotoIdentity.Core.Processing.WindowsVideoAppContainerProfile
+                    .CreateSyntheticLab(root));
+            Assert.Empty(Directory.EnumerateFileSystemEntries(root));
+        }
+        finally { Directory.Delete(root); }
+    }
+
+    [Fact]
     public void Sanitized_report_cannot_claim_full_network_or_quota_isolation()
     {
         using StringWriter result = new();
