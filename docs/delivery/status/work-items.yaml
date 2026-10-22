@@ -76,8 +76,6 @@ work_items:
   blockers: []
   blocker_notes: []
   evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/512
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/515
   - type: documentation
@@ -94,8 +92,6 @@ work_items:
   blockers: []
   blocker_notes: []
   evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/513
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/516
   - type: documentation
@@ -210,9 +206,7 @@ work_items:
   document: ../work-items/WI-0196-tv-portrait-benchmark-framing.md
   blockers: []
   blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/571
+  evidence: []
 - id: WI-0197
   title: Prototype automatic subject-aware portrait enlargement
   milestone: M38
@@ -222,9 +216,7 @@ work_items:
   blockers:
   - WI-0196
   blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/566
+  evidence: []
 - id: WI-0198
   title: Integrate opt-in TV-focus slideshow mode with quality and performance safeguards
   milestone: M38
@@ -234,9 +226,7 @@ work_items:
   blockers:
   - WI-0197
   blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/567
+  evidence: []
 - id: WI-0199
   title: Prototype full-photo then subject-detail sequence
   milestone: M38
@@ -246,9 +236,7 @@ work_items:
   blockers:
   - WI-0198
   blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/568
+  evidence: []
 - id: WI-0200
   title: Prototype simultaneous context-and-detail layout
   milestone: M38
@@ -258,9 +246,7 @@ work_items:
   blockers:
   - WI-0198
   blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/569
+  evidence: []
 - id: WI-0201
   title: Compare TV portrait presentation variants and decide adoption
   milestone: M38
@@ -272,9 +258,7 @@ work_items:
   - WI-0199
   - WI-0200
   blocker_notes: []
-  evidence:
-  - type: issue
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/570
+  evidence: []
 - id: WI-0203
   title: Human-reviewed similar-photo and burst sets for saved Creative Collections
   milestone: M39
