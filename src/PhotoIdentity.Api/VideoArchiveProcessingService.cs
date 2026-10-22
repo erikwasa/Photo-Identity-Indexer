@@ -128,8 +128,14 @@ public sealed class VideoArchiveProcessingService(
             await new PostgresVideoProcessingJobRepository(database)
                 .RecoverExpiredAsync(token);
 
-            VideoCandidate? candidate = await FindPendingAsync(
-                ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
+            // A retryable queued job takes priority. Its original may have
+            // become online-only since enqueue/restart; never claim it blindly
+            // or hydrate it unless the separate opt-in is active.
+            VideoCandidate? candidate = await FindOldestQueuedAsync(token);
+            bool alreadyQueued = candidate is not null;
+            if (candidate is null)
+                candidate = await FindPendingAsync(
+                    ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
@@ -158,7 +164,11 @@ public sealed class VideoArchiveProcessingService(
                     {
                         if (!preferences.Current.IncludeOnlineOnly ||
                             availability != AssetAvailability.OnlineOnly)
+                        {
+                            Volatile.Write(ref _lastResult,
+                                "online-only-skipped");
                             return false;
+                        }
                         // The source is a DB-vetted archive entry, never a
                         // caller path. No duplicate archive downloads.
                         ownedPath = ResolveOwnedSourcePath(
@@ -201,8 +211,9 @@ public sealed class VideoArchiveProcessingService(
                         SourceBytes: candidate.Size,
                         ExpectedTemporaryBytes: candidate.Size + 256L * 1024 * 1024,
                         RequestedFrames: 0);
-                    await new PostgresVideoProcessingJobRepository(database)
-                        .EnqueueAsync(identity, JobBudget, admission, token);
+                    if (!alreadyQueued)
+                        await new PostgresVideoProcessingJobRepository(database)
+                            .EnqueueAsync(identity, JobBudget, admission, token);
                 }
 
                 var adapter = new VideoExperimentalProxyAdapter(
@@ -482,6 +493,49 @@ public sealed class VideoArchiveProcessingService(
 
     private sealed record VideoCandidate(
         Guid RevisionId, Guid SourceId, string Root, string Key, long Size);
+
+    /// <summary>
+    /// Choose the same oldest eligible queued video as the serialized
+    /// Postgres claim, so pause/restart respects *current* availability.
+    /// Do not re-enqueue an existing idempotency identity.
+    /// </summary>
+    private async Task<VideoCandidate?> FindOldestQueuedAsync(CancellationToken token)
+    {
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand query = connection.CreateCommand();
+        query.CommandText = """
+            SELECT revision.id, source.id, source.root_locator,
+                   asset.source_key, revision.size_bytes
+            FROM video_processing_jobs job
+            JOIN asset_revisions revision ON revision.id=job.asset_revision_id
+            JOIN assets asset ON asset.id=revision.asset_id
+            JOIN sources source ON source.id=asset.source_id
+            JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
+            WHERE job.status='queued'
+              AND job.cancellation_requested_at_utc IS NULL
+              AND job.attempt_count<3 AND job.available_at_utc<=now()
+              AND revision.media_kind='video' AND asset.media_kind='video'
+              AND asset.deleted_at_utc IS NULL
+              AND source.kind='local-folder'
+              AND revision.size_bytes=job.source_bytes
+              AND revision.size_bytes BETWEEN 1 AND @max
+              AND metadata.inspection_status='supported'
+              AND revision.id=(
+                  SELECT latest.id FROM asset_revisions latest
+                  WHERE latest.asset_id=asset.id AND latest.media_kind='video'
+                  ORDER BY latest.observed_at_utc DESC,latest.id DESC LIMIT 1)
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_copy_exclusions excluded
+                  WHERE excluded.source_id=asset.source_id
+                    AND excluded.source_key=asset.source_key)
+            ORDER BY job.requested_at_utc, job.id LIMIT 1;
+            """;
+        query.Parameters.AddWithValue("max", MaxSourceBytes);
+        await using NpgsqlDataReader reader = await query.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return null;
+        return new VideoCandidate(reader.GetGuid(0), reader.GetGuid(1),
+            reader.GetString(2), reader.GetString(3), reader.GetInt64(4));
+    }
 
     private async Task<VideoCandidate?> FindPendingAsync(
         string toolSha256, bool includeOnlineOnly, CancellationToken token)
