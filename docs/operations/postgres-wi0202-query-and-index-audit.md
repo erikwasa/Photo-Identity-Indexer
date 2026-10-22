@@ -1,6 +1,6 @@
 # WI-0202 — read-only Smart Collection and oversized-index investigation
 
-**Issue:** [#589](https://github.com/erikwasa/Photo-Identity-Indexer/issues/589) · **Work item:** [WI-0202](../delivery/work-items/WI-0202-photo-catalogue-query-performance-regression.md)
+**Issue:** [#589](../delivery/work-items/WI-0202-photo-catalogue-query-performance-regression.md) · **Work item:** [WI-0202](../delivery/work-items/WI-0202-photo-catalogue-query-performance-regression.md)
 
 This procedure separates two different concerns: slow Smart Collection covers, and unusually large historical face-clustering / identity-regeneration tables. The photo regression recovered after targeted PostgreSQL ANALYZE; an individual saved Smart cover still took approximately 10.42 seconds. Neither that tail nor the table sizes establishes a specific SQL plan or an index defect.
 
