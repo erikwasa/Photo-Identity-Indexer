@@ -964,6 +964,54 @@ Production activation remains prohibited until reviewed.
   Real video trial, photo mixed-load measurements and post-trial
   integrity still require additional independent acceptance.
 
+### Development checkpoint 31 — disposable synthetic AppContainer token/ACL feasibility (2026-10-22)
+
+- Added **`video sandbox appcontainer-lab`** as a separate
+  dry-run-by-default, Windows-only **synthetic text-file** experiment.
+  The optional `--apply` does not touch video originals, codecs, the
+  catalogue, OneDrive, derivatives, or the video processing queue.
+  It requires the clean, marked OS-temporary-directory child previously
+  used for the synthetic codec pilot and refuses arbitrary existing
+  folders or user-selected executables and source paths.
+- The new `WindowsVideoAppContainerProfile` creates a unique
+  disposable Windows Package SID with **zero requested capabilities**.
+  The lab creates owned working, allowed-input and blocked-input
+  directories, grants this Package SID explicit working-write and
+  generated-input-read ACLs, and grants only noninheriting traversal
+  on the lab root. The sibling negative-test input has **no grant**.
+  All generated files are transient fixed strings, not media.
+- The existing native suspended launcher supports a **separate explicit
+  AppContainer security-capabilities** attribute. It checks
+  `TokenIsAppContainer=1` on the still-suspended child token
+  **before** assigning/resuming. A silently ignored security
+  attribute fails closed; no unrestricted fallback exists. The
+  independent Windows Job Object still enforces CPU, memory,
+  process count, wall-clock time, owned scratch and sampled I/O caps.
+  The selected real-video worker and FFmpeg/FFprobe remain unchanged.
+- A Windows lab probe tests **both** generated-file access paths:
+  permitted read+write must work and a second ungranted read must
+  fail. It never claims a complete sandbox when OS process launch or
+  ACL setup fails. Generated scratch/profile teardown is required;
+  any cleanup failure invalidates the proof.
+  CLI output uses only fixed codes/booleans without user filenames,
+  AppContainer SID, profile name, hashes or Windows error messages.
+- The synthetic CLI and tests explicitly preserve
+  `networkEgressDenialVerified=false`,
+  `independentAclAuditVerified=false`,
+  `hardDiskIoQuotaVerified=false`, and
+  `realVideoExecutionAuthorized=false`. Requesting zero network
+  capabilities is NOT the same as independently verifying
+  outbound socket denial. Failure of Windows host compatibility
+  is reported as **unavailable**, not security success.
+- [Operator procedure and remaining limits](../../operations/video-synthetic-appcontainer-feasibility.md)
+  covers the optional local test after Windows CI, the unique
+  profile/ACL cleanup and independent remaining acceptance:
+  FFmpeg+FFprobe AppContainer compatibility, no network egress,
+  private source/cache ACL audit, hard storage containment,
+  one-video controlled encode, mixed photo priority metrics,
+  cancellation/exclusion/restart and post-run original-byte proof.
+  WI-0188 remains `in_progress`; production activation is blocked.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
