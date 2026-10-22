@@ -9,7 +9,7 @@ within that dialog, and Escape cancelling. User manually chooses which
 source copy to exclude; no unattended exclusion, OneDrive original change,
 or collection/slideshow selection effect was introduced.
 
-**WI-0629 / issue #629 is accepted and closed as Archive cleanup product
+**WI-0206 is accepted and closed as Archive cleanup product
 work.** The archive-side technical candidate queue and keyboard UX
 are no longer blocked pending another 129-photo review. The next
 distinct curation workstream is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md)
@@ -244,7 +244,7 @@ The following description documents the original native gallery before the keybo
 
 # Native operator-controlled technical quality suggestions
 
-WI-0629's **second substantive product phase** adds a built-in `/quality-suggestions`
+WI-0206's **second substantive product phase** adds a built-in `/quality-suggestions`
 page in Photo Identity. The first local companion review was fully used by
 the maintainer: **129/129** Archive candidates reviewed, **72 Keep, 37 Dismiss,
 20 Consider exclusion**; the maintainer judged **most considered photos
