@@ -82,6 +82,30 @@
             <div><span class="field-label">Cancelled</span><strong>@Status.Cancelled</strong></div>
             <div><span class="field-label">Recovery needed</span><strong>@Status.ExpiredLeases</strong></div>
         </div>
+        @if (Status.Recent is { Count: > 0 })
+        {
+            <h3>Recent video jobs</h3>
+            <div class="archive-table-wrap">
+                <table class="archive-table">
+                    <thead>
+                        <tr><th>Job</th><th>Status</th><th>Attempts</th>
+                            <th>Progress</th><th>Failure</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (VideoJobRow job in Status.Recent)
+                        {
+                            <tr>
+                                <td><code>@job.JobId.ToString("N")[..8]</code></td>
+                                <td>@job.Status</td>
+                                <td>@job.Attempts</td>
+                                <td>@job.ProgressPercent%</td>
+                                <td>@(job.FailureCode ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
         <button class="button secondary" disabled="@Saving" @onclick="LoadAsync">
             Refresh video status
         </button>
@@ -91,12 +115,15 @@
 @code {
     [Parameter] public int RefreshVersion { get; set; }
 
+    private sealed record VideoJobRow(
+        Guid JobId, string Status, int Attempts, int ProgressPercent,
+        bool CancellationRequested, string? FailureCode);
     private sealed record VideoSettingsResponse(
         bool Enabled, bool IncludeOnlineOnly,
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
-        string LastResult);
+        string LastResult, IReadOnlyList<VideoJobRow> Recent);
     private sealed record VideoSettingsUpdate(bool Enabled, bool IncludeOnlineOnly);
     private sealed record ErrorResponse(string Error);
 
