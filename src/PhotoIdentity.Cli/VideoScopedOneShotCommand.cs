@@ -77,6 +77,16 @@ public static class VideoScopedOneShotCommandRunner
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
+        // A rehearsed database and checked executable hashes are NOT
+        // authorization to process family videos. Until network, filesystem
+        // and storage isolation plus mixed-load acceptance have been reviewed,
+        // fail before any PostgreSQL, source, cache, or tool interaction.
+        // Re-enable only by a separately reviewed change to this gate.
+        if (options.Apply)
+        {
+            Write(output, true, false, "media-isolation-not-approved", false);
+            return 1;
+        }
         if (!OperatingSystem.IsWindows())
             throw new InvalidOperationException(
                 "Video trial requires Windows native Job Object containment.");
