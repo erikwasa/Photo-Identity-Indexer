@@ -1131,9 +1131,12 @@ Production activation remains prohibited until reviewed.
 - Already-local sources are preferred. Explicitly opted-in OneDrive retrieval
   is followed by a request to return **only app-initiated** hydrated originals
   to online-only. Never delete or unpin already-local originals.
-- Metadata-only video registration remains separate from the video candidate
-  transcoding path; unsupported/uncatalogued media are not silently transcoded.
-  Final local verification is still mandatory.
+- When previously inspected eligible videos are exhausted, the shared
+  archive incrementally discovers and registers one new MOV/MP4 inside
+  included coverage per cycle, always preferring local media and excluding
+  blocked source copies before opening bytes. OneDrive-only discovery is
+  opt-in and bound to one download at a time. Unsupported media is recorded
+  but never silently transcoded; local verification remains mandatory.
 - No schema change is requested beyond maintained v37. This checkpoint
   replaces the older real-media CLI hard-stop with guarded in-app execution
   subject to explicit Settings opt-in and archive start; direct operator
