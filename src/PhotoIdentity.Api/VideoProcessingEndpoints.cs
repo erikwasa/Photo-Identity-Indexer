@@ -1,5 +1,5 @@
 using PhotoIdentity.Persistence.Postgres;
-using PhotoIdentity.Web.Contracts;
+using PhotoIdentity.Web;
 
 namespace PhotoIdentity.Api;
 
