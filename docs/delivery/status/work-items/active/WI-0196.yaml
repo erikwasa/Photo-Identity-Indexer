@@ -6,6 +6,4 @@ owner: unassigned
 document: ../work-items/WI-0196-tv-portrait-benchmark-framing.md
 blockers: []
 blocker_notes: []
-evidence:
-- type: issue
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/issues/571
+evidence: []
