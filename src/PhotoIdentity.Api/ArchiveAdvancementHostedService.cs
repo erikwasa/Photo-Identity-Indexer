@@ -188,7 +188,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                             "video-processing", syncRequired: false,
                             "Processing enabled videos after photos.",
                             _timeProvider.GetUtcNow(), stoppingToken);
-                        if (await _videos.AdvanceOnceAsync(stoppingToken))
+                        if (await _videos.AdvanceOnceAsync(coverage, stoppingToken))
                             continue;
                     }
                     await _control.CompleteAsync(coverage.Source.SourceId,
