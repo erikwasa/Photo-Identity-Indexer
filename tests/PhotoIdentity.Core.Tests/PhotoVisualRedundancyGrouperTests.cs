@@ -160,6 +160,110 @@ public sealed class PhotoVisualRedundancyGrouperTests
             PhotoVisualRedundancyPolicy.StrictEvaluationV1));
     }
 
+    [Fact]
+    public void Manual_review_combines_six_shot_burst_that_complete_link_splits()
+    {
+        PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 6)
+            .Select(i => Candidate(i, (i - 1) * 4))
+            .ToArray();
+        PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
+            catalogue, PhotoMomentGapPolicy.Evaluation30Minutes);
+        // Adjacent frames differ by <= 6 bits but the first and last
+        // differ by 18. H8 complete-link splits them into smaller groups.
+        ulong[] hashes = [0UL, 0x3fUL, 0xfffUL, 0x3fffUL, 0xffffUL, 0x3ffffUL];
+        PhotoVisualFingerprint[] evidence = Enumerable.Range(1, 6)
+            .Select(i => Fingerprint(i, (i - 1) * 4, hashes[i - 1]))
+            .ToArray();
+
+        PhotoVisualRedundancyResult accepted = PhotoVisualRedundancyGrouper.Group(
+            evidence, moments, PhotoVisualRedundancyPolicy.AcceptedCreativeV1);
+        PhotoVisualRedundancyResult review = PhotoVisualRedundancyGrouper.Group(
+            evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2);
+
+        Assert.True(accepted.Groups.Count > 1);
+        Assert.Equal("m26-dhash64-h8-20s-v1", accepted.PolicyVersion);
+        Assert.All(accepted.Groups, group => Assert.True(group.MaximumPairDistance <= 8));
+        PhotoVisualRedundancyGroup combined = Assert.Single(review.Groups);
+        Assert.Equal(6, combined.Members.Count);
+        Assert.Equal(18, combined.MaximumPairDistance);
+        Assert.Equal(18, combined.Members[^1].DistanceFromRepresentative);
+        Assert.Equal(12, review.MaximumHammingDistance);
+        Assert.Equal(45, review.MaximumCaptureSpan.TotalSeconds);
+        Assert.NotEqual(accepted.PolicyVersion, review.PolicyVersion);
+    }
+
+    [Fact]
+    public void Manual_review_does_not_allow_unbounded_similarity_chaining()
+    {
+        PhotoMomentCandidate[] catalogue = [Candidate(1, 0), Candidate(2, 5), Candidate(3, 10)];
+        PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
+            catalogue, PhotoMomentGapPolicy.Evaluation30Minutes);
+        PhotoVisualFingerprint[] evidence =
+        [
+            Fingerprint(1, 0, 0),
+            Fingerprint(2, 5, 0xfff),       // H12 from first
+            Fingerprint(3, 10, 0xffffff),  // H12 from second but H24 from first
+        ];
+
+        PhotoVisualRedundancyResult review = PhotoVisualRedundancyGrouper.Group(
+            evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2);
+
+        PhotoVisualRedundancyGroup group = Assert.Single(review.Groups);
+        Assert.Equal([Revision(1), Revision(2)], group.Members.Select(m => m.RevisionId).ToArray());
+    }
+
+    [Fact]
+    public void Manual_review_is_bound_by_capture_span_and_derived_moments()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, 0),
+            Candidate(2, 25),
+            Candidate(3, 44),
+            Candidate(4, 46),
+            Candidate(5, 3600),
+        ];
+        PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
+            catalogue, PhotoMomentGapPolicy.Evaluation30Minutes);
+        PhotoVisualFingerprint[] evidence =
+        [
+            Fingerprint(1, 0, 0),
+            Fingerprint(2, 25, 0),
+            Fingerprint(3, 44, 0),
+            Fingerprint(4, 46, 0),
+            Fingerprint(5, 3600, 0),
+        ];
+
+        PhotoVisualRedundancyResult review = PhotoVisualRedundancyGrouper.Group(
+            evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2);
+        PhotoVisualRedundancyGroup group = Assert.Single(review.Groups);
+        Assert.Equal([Revision(1), Revision(2), Revision(3)],
+            group.Members.Select(m => m.RevisionId).ToArray());
+        Assert.Equal(44, (group.EndedAtLocal - group.StartedAtLocal).TotalSeconds);
+    }
+
+    [Fact]
+    public void Manual_review_grouping_is_deterministic_under_reordering()
+    {
+        PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 6)
+            .Select(i => Candidate(i, (i - 1) * 4)).ToArray();
+        PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
+            catalogue, PhotoMomentGapPolicy.Evaluation30Minutes);
+        PhotoVisualFingerprint[] evidence = Enumerable.Range(1, 6)
+            .Select(i => Fingerprint(i, (i - 1) * 4, (1UL << (i * 3)) - 1))
+            .ToArray();
+
+        PhotoVisualRedundancyResult forward = PhotoVisualRedundancyGrouper.Group(
+            evidence, moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2);
+        PhotoVisualRedundancyResult reversed = PhotoVisualRedundancyGrouper.Group(
+            evidence.Reverse(), moments, PhotoVisualRedundancyPolicy.OperatorSimilarityReviewV2);
+
+        Assert.Equal(forward.Groups.Select(g => (g.Id, g.MaximumPairDistance,
+                Members: string.Join(",", g.Members.Select(m => m.RevisionId)))),
+            reversed.Groups.Select(g => (g.Id, g.MaximumPairDistance,
+                Members: string.Join(",", g.Members.Select(m => m.RevisionId)))));
+    }
+
     private static PhotoMomentCandidate Candidate(int suffix, int seconds) => new(
         Revision(suffix),
         new DateTime(2026, 1, 1, 10, 0, 0).AddSeconds(seconds));

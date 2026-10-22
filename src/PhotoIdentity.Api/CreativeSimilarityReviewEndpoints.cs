@@ -38,10 +38,11 @@ public static class CreativeSimilarityReviewEndpoints
             async token =>
             {
                 CreativeCollectionMaterialization? materialized =
-                    await materializer.MaterializeAsync(recipe, token);
+                    await materializer.MaterializeAsync(recipe, token, includeSimilarityReview: true);
                 if (materialized is null) return Results.NotFound();
-                PhotoVisualRedundancyGroup[] allGroups =
-                    materialized.VisualRedundancy.Groups.ToArray();
+                PhotoVisualRedundancyResult review = materialized.SimilarityReviewRedundancy
+                    ?? throw new InvalidOperationException("Similarity review evidence was not materialized.");
+                PhotoVisualRedundancyGroup[] allGroups = review.Groups.ToArray();
                 // Page the complete set rather than dropping groups after the first 80.
                 // No grouping, selector or review-choice semantics change.
                 PhotoVisualRedundancyGroup[] sample = CreativeSimilarityReviewPaging.Page(
@@ -67,19 +68,21 @@ public static class CreativeSimilarityReviewEndpoints
                 }
                 return Results.Ok(new CreativeSimilarityReviewResponse(
                     recipe.Id.ToString(), recipe.Name,
-                    materialized.VisualRedundancy.PolicyVersion,
-                    materialized.VisualRedundancy.AlgorithmVersion,
-                    materialized.VisualRedundancy.MaximumHammingDistance,
-                    materialized.VisualRedundancy.MaximumCaptureSpan.TotalSeconds,
+                    review.PolicyVersion,
+                    review.AlgorithmVersion,
+                    review.MaximumHammingDistance,
+                    review.MaximumCaptureSpan.TotalSeconds,
                     allGroups.Length, sample.Length, offset + sample.Length < allGroups.Length,
                     offset,
                     materialized.Generated.TotalCandidateCount,
                     materialized.Selection.SelectedCount,
                     groups.ToArray(),
                     false, false,
-                    "Suggestions use already-local dHash evidence within bounded moments. " +
-                    "Keep all is the default. Recorded preferences do not currently affect " +
-                    "collection membership, slideshow playback or Photo Identity source copies."));
+                    "Manual-review-only neighbor H12 + first-frame H18, maximum 45 seconds " +
+                    "within the same derived moment. Groups may include less-similar pairs; " +
+                    "they are candidates for human comparison, not confirmed duplicates. " +
+                    "Keep all is the default. Preferences do not change collection membership, " +
+                    "slideshow playback or source copies. The production selector retains H8 complete-link."));
             }, cancellationToken);
     }
 
@@ -105,9 +108,11 @@ public static class CreativeSimilarityReviewEndpoints
             async token =>
             {
                 CreativeCollectionMaterialization? current =
-                    await materializer.MaterializeAsync(recipe, token);
+                    await materializer.MaterializeAsync(recipe, token, includeSimilarityReview: true);
                 if (current is null) return Results.NotFound();
-                PhotoVisualRedundancyGroup? group = current.VisualRedundancy.Groups
+                PhotoVisualRedundancyResult review = current.SimilarityReviewRedundancy
+                    ?? throw new InvalidOperationException("Similarity review evidence was not materialized.");
+                PhotoVisualRedundancyGroup? group = review.Groups
                     .FirstOrDefault(candidate =>
                         CreativeSimilarityReviewStore.GroupKey(candidate) == request.GroupKey);
                 if (group is null)
@@ -153,8 +158,8 @@ public sealed record CreativeSimilarityReviewResponse(
     bool CollectionSelectionChanged, bool AutoOmissionEnabled, string EvidenceSemantics);
 
 /// <summary>
-/// Bounded, deterministic review paging without altering the saved group's
-/// fingerprint or the complete-link similarity policy.
+/// Bounded, deterministic review paging without altering the group's
+/// exact revision-based fingerprint or the active review grouping policy.
 /// </summary>
 public static class CreativeSimilarityReviewPaging
 {

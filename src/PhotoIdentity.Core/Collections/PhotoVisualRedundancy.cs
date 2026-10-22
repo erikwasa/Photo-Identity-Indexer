@@ -21,6 +21,16 @@ public sealed record PhotoVisualFingerprint(
     PhotoPerceptualHash64 Hash);
 
 /// <summary>
+/// Group membership criterion. The looser anchored-neighbor option is for human review only;
+/// production slideshow selection continues to require complete-link matches.
+/// </summary>
+public enum PhotoVisualGroupingRule
+{
+    CompleteLink,
+    AnchoredNeighbor,
+}
+
+/// <summary>
 /// Bounded, versioned policy for grouping visually redundant frames inside one inferred moment.
 /// Complete-link matching is intentionally conservative: every member in a group must remain within
 /// the hash threshold of every other member, and the total capture span must stay bounded.
@@ -32,7 +42,9 @@ public sealed record PhotoVisualRedundancyPolicy
     public PhotoVisualRedundancyPolicy(
         string version,
         int maximumHammingDistance,
-        TimeSpan maximumCaptureSpan)
+        TimeSpan maximumCaptureSpan,
+        PhotoVisualGroupingRule groupingRule = PhotoVisualGroupingRule.CompleteLink,
+        int? maximumRepresentativeDistance = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         if (maximumHammingDistance is < 0 or > 64)
@@ -45,14 +57,28 @@ public sealed record PhotoVisualRedundancyPolicy
             throw new ArgumentOutOfRangeException(nameof(maximumCaptureSpan));
         }
 
+        if (!Enum.IsDefined(groupingRule) ||
+            (groupingRule == PhotoVisualGroupingRule.CompleteLink && maximumRepresentativeDistance is not null) ||
+            (groupingRule == PhotoVisualGroupingRule.AnchoredNeighbor &&
+                (maximumRepresentativeDistance is null ||
+                 maximumRepresentativeDistance < maximumHammingDistance ||
+                 maximumRepresentativeDistance > 64)))
+        {
+            throw new ArgumentException("Invalid grouping rule or representative distance.");
+        }
+
         Version = version.Trim();
         MaximumHammingDistance = maximumHammingDistance;
         MaximumCaptureSpan = maximumCaptureSpan;
+        GroupingRule = groupingRule;
+        MaximumRepresentativeDistance = maximumRepresentativeDistance;
     }
 
     public string Version { get; }
     public int MaximumHammingDistance { get; }
     public TimeSpan MaximumCaptureSpan { get; }
+    public PhotoVisualGroupingRule GroupingRule { get; }
+    public int? MaximumRepresentativeDistance { get; }
 
     public static PhotoVisualRedundancyPolicy StrictEvaluationV1 { get; } =
         new("m26-dhash64-h4-20s-v1", 4, TimeSpan.FromSeconds(20));
@@ -65,6 +91,16 @@ public sealed record PhotoVisualRedundancyPolicy
 
     public static PhotoVisualRedundancyPolicy AcceptedCreativeV1 { get; } =
         BroadEvaluationV1;
+
+    /// <summary>
+    /// Intentionally recall-oriented, manual-review-only burst grouping.
+    /// A new frame needs ONE nearby member within H12 and must remain within
+    /// H18 of the first frame and within 45 seconds. Not eligible for
+    /// slideshow selection penalties or automatic omission.
+    /// </summary>
+    public static PhotoVisualRedundancyPolicy OperatorSimilarityReviewV2 { get; } =
+        new("wi0638-review-neighbor-h12-anchor-h18-45s-v2", 12,
+            TimeSpan.FromSeconds(45), PhotoVisualGroupingRule.AnchoredNeighbor, 18);
 
     public static IReadOnlyList<PhotoVisualRedundancyPolicy> EvaluationPolicies { get; } =
     [
@@ -187,6 +223,17 @@ public static class PhotoVisualRedundancyGrouper
         if (candidateTime - group.StartedAtLocal > policy.MaximumCaptureSpan)
         {
             return false;
+        }
+
+        if (policy.GroupingRule == PhotoVisualGroupingRule.AnchoredNeighbor)
+        {
+            // Looser than complete-link: adjacent photos in a burst can join
+            // without requiring every pair to look identical. The fixed first
+            // representative and capture-span limits prevent unbounded chains.
+            return group.Representative.Hash.HammingDistance(candidate.Hash) <=
+                       policy.MaximumRepresentativeDistance!.Value &&
+                   group.Members.Any(existing =>
+                       existing.Hash.HammingDistance(candidate.Hash) <= policy.MaximumHammingDistance);
         }
 
         return group.Members.All(existing =>
