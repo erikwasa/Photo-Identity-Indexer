@@ -31,6 +31,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics _metrics;
     private readonly ILogger<ArchiveAdvancementHostedService> _logger;
+    private readonly VideoArchiveProcessingService _videos;
+    private readonly VideoProcessingPreferencesStore _videoPreferences;
 
     public ArchiveAdvancementHostedService(
         IArchiveAdvancementControlRepository control,
@@ -53,6 +55,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         IConfiguration configuration,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics,
+        VideoArchiveProcessingService videos,
+        VideoProcessingPreferencesStore videoPreferences,
         ILogger<ArchiveAdvancementHostedService> logger)
     {
         _control = control;
@@ -73,6 +77,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _timeProvider = timeProvider;
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _logger = logger;
+        _videos = videos;
+        _videoPreferences = videoPreferences;
 
         ISourceCopyPurgeRepository purgeRepository = new PostgresSourceCopyPurgeRepository(postgres);
         string defaultApplicationRoot = Path.Combine(
@@ -171,7 +177,22 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 ArchiveAdvancementWorkClassification work = await GetWorkStateAsync(coverage, stoppingToken);
                 if (!work.HasWork)
                 {
-                    await _control.CompleteAsync(coverage.Source.SourceId, _timeProvider.GetUtcNow(), stoppingToken);
+                    // Only after all photo work has drained do we spend this
+                    // shared archive session on one video at a time. The
+                    // photo priority probe recognizes this precise runtime
+                    // phase, but any new sync or photo job still preempts it.
+                    if (_videoPreferences.Current.Enabled)
+                    {
+                        await _control.UpdateRuntimeAsync(
+                            coverage.Source.SourceId,
+                            "video-processing", syncRequired: false,
+                            "Processing enabled videos after photos.",
+                            _timeProvider.GetUtcNow(), stoppingToken);
+                        if (await _videos.AdvanceOnceAsync(stoppingToken))
+                            continue;
+                    }
+                    await _control.CompleteAsync(coverage.Source.SourceId,
+                        _timeProvider.GetUtcNow(), stoppingToken);
                     continue;
                 }
 
