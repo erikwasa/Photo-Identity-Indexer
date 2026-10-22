@@ -94,6 +94,11 @@ public static class Program
                     await VideoDerivativeRecoveryCommandRunner.RunAsync(
                         VideoDerivativeRecoveryOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 &&
+                    args[1] == "sandbox" && args[2] == "appcontainer-lab" =>
+                    await VideoAppContainerLabCommandRunner.RunAsync(
+                        VideoAppContainerLabOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "synthetic-proxy-pilot" =>
                     await VideoSyntheticProxyPilotCommandRunner.RunAsync(
                         VideoSyntheticProxyPilotOptions.Parse(args.Skip(2).ToArray()),
@@ -269,6 +274,9 @@ public static class Program
                                          unregistered opaque private output files;
                                          preserves every registered derivative)
 
+              video sandbox appcontainer-lab --scratch-root MARKED_TEMP_LAB [--apply]
+                                              (synthetic-only disposable Windows profile;
+                                               no database, originals or FFmpeg)
               video synthetic-proxy-pilot --scratch-root TEMP_CHILD_ROOT
                                           --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
                                           --ffprobe ABSOLUTE_EXE --ffprobe-sha256 HASH

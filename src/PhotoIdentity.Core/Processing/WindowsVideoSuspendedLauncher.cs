@@ -23,6 +23,10 @@ internal static class WindowsVideoSuspendedLauncher
     // Documented STARTUPINFOEX process creation attributes; set in the
     // suspended launcher BEFORE any native child instruction executes.
     private const nuint ProcThreadAttributeChildProcessPolicy = 0x0002000E;
+    private const nuint ProcThreadAttributeSecurityCapabilities = 0x00020009;
+    private const int TokenIsAppContainer = 29;
+    private const int TokenAppContainerSid = 31;
+    private const uint TokenQuery = 0x0008;
     private const uint ChildProcessRestricted = 0x00000001;
 
     // No executable-image or legacy-extension mitigation is installed yet:
@@ -38,7 +42,8 @@ internal static class WindowsVideoSuspendedLauncher
     public static Process Start(
         WindowsVideoJobObject job, string executable, string directory,
         IReadOnlyList<string> arguments, IDictionary<string, string?> environment,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        WindowsVideoAppContainerProfile? appContainer = null)
     {
         ArgumentNullException.ThrowIfNull(job);
         if (!OperatingSystem.IsWindows())
@@ -52,6 +57,7 @@ internal static class WindowsVideoSuspendedLauncher
         IntPtr attributes = IntPtr.Zero;
         IntPtr inheritedList = IntPtr.Zero;
         IntPtr childProcessPolicy = IntPtr.Zero;
+        IntPtr securityCapabilities = IntPtr.Zero;
         bool attributesInitialized = false;
         ProcessInformation native = default;
         Process? owned = null;
@@ -74,7 +80,9 @@ internal static class WindowsVideoSuspendedLauncher
             // inheritable handles from the parent application. Use a single
             // explicit HANDLE_LIST containing only the NUL device.
             nuint bytes = 0;
-            int attributeCount = job.RequireChildProcessRestriction ? 2 : 1;
+            int attributeCount = 1 +
+                (job.RequireChildProcessRestriction ? 1 : 0) +
+                (appContainer is not null ? 1 : 0);
             _ = InitializeProcThreadAttributeList(
                 IntPtr.Zero, attributeCount, 0, ref bytes);
             if (bytes == 0)
@@ -108,6 +116,30 @@ internal static class WindowsVideoSuspendedLauncher
                         "Native video child-process restriction could not be installed.");
             }
 
+            if (appContainer is not null)
+            {
+                // No named network, COM, file-access or other capability is
+                // requested. The package SID is unique to this synthetic
+                // profile and has only the owned-lab ACL grants.
+                SecurityCapabilities caps = new()
+                {
+                    AppContainerSid = appContainer.NativeSid,
+                    Capabilities = IntPtr.Zero,
+                    CapabilityCount = 0,
+                    Reserved = 0
+                };
+                securityCapabilities = Marshal.AllocHGlobal(
+                    Marshal.SizeOf<SecurityCapabilities>());
+                Marshal.StructureToPtr(caps, securityCapabilities, false);
+                if (!UpdateProcThreadAttribute(attributes, 0,
+                        ProcThreadAttributeSecurityCapabilities,
+                        securityCapabilities,
+                        (nuint)Marshal.SizeOf<SecurityCapabilities>(),
+                        IntPtr.Zero, IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error(),
+                        "Synthetic AppContainer security capabilities could not be installed.");
+            }
+
             StartupInfoEx startup = new()
             {
                 StartupInfo = new StartupInfo
@@ -127,6 +159,13 @@ internal static class WindowsVideoSuspendedLauncher
                     nativeEnvironment, directory, ref startup, out native))
                 throw new Win32Exception(Marshal.GetLastWin32Error(),
                     "Approved bounded video tool could not be launched suspended.");
+
+            // The AppContainer token is inspected while the process remains
+            // suspended. A silently ignored SECURITY_CAPABILITIES attribute
+            // must never turn into an unrestricted successful lab result.
+            if (appContainer is not null)
+                AssertNativeAppContainerToken(
+                    native.Process, appContainer.NativeSid);
 
             // This must happen BEFORE ResumeThread. On any failure the
             // suspended process is terminated and no unbounded process runs.
@@ -162,10 +201,48 @@ internal static class WindowsVideoSuspendedLauncher
                 Marshal.FreeHGlobal(inheritedList);
             if (childProcessPolicy != IntPtr.Zero)
                 Marshal.FreeHGlobal(childProcessPolicy);
+            if (securityCapabilities != IntPtr.Zero)
+                Marshal.FreeHGlobal(securityCapabilities);
             if (attributes != IntPtr.Zero)
                 Marshal.FreeHGlobal(attributes);
             Marshal.FreeHGlobal(nativeEnvironment);
         }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SecurityCapabilities
+    {
+        public IntPtr AppContainerSid;
+        public IntPtr Capabilities;
+        public uint CapabilityCount;
+        public uint Reserved;
+    }
+
+    private static void AssertNativeAppContainerToken(
+        IntPtr process, IntPtr expectedPackageSid)
+    {
+        if (!OpenProcessToken(process, TokenQuery, out IntPtr token))
+            throw new Win32Exception(Marshal.GetLastWin32Error(),
+                "Synthetic AppContainer child token could not be inspected.");
+        try
+        {
+            if (!GetTokenInformation(token, TokenIsAppContainer,
+                    out int isAppContainer, sizeof(int), out int length) ||
+                length != sizeof(int) || isAppContainer != 1)
+                throw new InvalidOperationException(
+                    "Windows did not establish an AppContainer child security token.");
+
+            // TokenIsAppContainer alone is insufficient. It must be this
+            // newly created lab's EXACT SID, not any other Package identity.
+            if (!GetTokenInformation(token, TokenAppContainerSid,
+                    out IntPtr actualSid, IntPtr.Size, out int sidSize) ||
+                sidSize != IntPtr.Size || actualSid == IntPtr.Zero ||
+                expectedPackageSid == IntPtr.Zero ||
+                !EqualSid(actualSid, expectedPackageSid))
+                throw new InvalidOperationException(
+                    "Windows AppContainer child identity did not match the disposable lab.");
+        }
+        finally { _ = CloseHandle(token); }
     }
 
     private static string Quote(string argument)
@@ -284,6 +361,30 @@ internal static class WindowsVideoSuspendedLauncher
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenProcessToken(
+        IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetTokenInformation(
+        IntPtr token, int tokenInformationClass,
+        out int tokenInformation, int tokenInformationLength,
+        out int returnLength);
+
+    [DllImport("advapi32.dll", EntryPoint = "GetTokenInformation",
+        SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetTokenInformation(
+        IntPtr token, int tokenInformationClass,
+        out IntPtr tokenInformation, int tokenInformationLength,
+        out int returnLength);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EqualSid(IntPtr first, IntPtr second);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

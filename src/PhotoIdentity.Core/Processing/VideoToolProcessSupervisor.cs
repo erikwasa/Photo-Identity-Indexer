@@ -60,13 +60,20 @@ public sealed class VideoToolProcessSupervisor
         Func<string, IReadOnlyList<string>> buildArguments,
         VideoToolExecutionBudget budget,
         CancellationToken cancellationToken = default,
-        Func<string, CancellationToken, Task>? afterSuccessfulExit = null)
+        Func<string, CancellationToken, Task>? afterSuccessfulExit = null,
+        WindowsVideoAppContainerProfile? syntheticAppContainer = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(scratchRoot);
         ArgumentNullException.ThrowIfNull(buildArguments);
         ArgumentNullException.ThrowIfNull(budget);
         budget.Validate();
+        if (syntheticAppContainer is not null &&
+            (!OperatingSystem.IsWindows() ||
+             budget.WindowsJobLimits?.MaximumProcesses != 1 ||
+             budget.WindowsJobLimits.RequireChildProcessRestriction))
+            throw new InvalidOperationException(
+                "Synthetic AppContainer experiment requires a single-process Windows Job Object without unproven child mitigations.");
         // Publication may only happen after the complete constrained process
         // tree has ended. With a one-process Job Object, an exited parent
         // cannot have left a live media-writing descendant. Uncapped and
@@ -176,7 +183,7 @@ public sealed class VideoToolProcessSupervisor
                 checkpoint = "suspended-process-launch";
                 nativeProcess = WindowsVideoSuspendedLauncher.Start(
                     resourceJob, executablePath, workspace, arguments,
-                    start.Environment, linked.Token);
+                    start.Environment, linked.Token, syntheticAppContainer);
                 process = nativeProcess;
                 processStopped = false;
                 resourceJobAssigned = true;
