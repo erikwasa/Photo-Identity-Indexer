@@ -67,16 +67,24 @@ The explicit apply performs only these actions:
    (inherited by one generated input file), and modify access only to the
    new working directory and descendants. The sibling ungranted input
    gets **no** AppContainer ACL grant.
-4. Uses the already-built suspended native launcher with one-process Job
+4. Before any launch, independently audits the generated root, allowed-input,
+   working and ungranted-input DACLs plus both generated files. It requires
+   exactly the intended AppContainer SID rules, no inherited access to the
+   blocked files, no write grant to the allowed read-only file, and no
+   wildcard `ALL APPLICATION PACKAGES` / `ALL RESTRICTED APPLICATION PACKAGES`
+   grants. Unexpected permissions produce a nonpassing fixed status without
+   starting a subprocess. This audit covers only the disposable lab, **not**
+   the actual archive, executable/DLL paths or private cache.
+5. Uses the already-built suspended native launcher with one-process Job
    Object and fixed Windows system `cmd.exe`—**not caller-selected
    FFmpeg**—to copy only the generated *allowed* text input to its owned
    scratch folder. Before resuming, it opens the suspended child token and
    requires `TokenIsAppContainer = 1`. A missing token check **kills the
    suspended child**; no unrestricted fallback is permitted.
-5. If the allowed copy succeeds, repeats the exact same process profile
+6. If the allowed copy succeeds, repeats the exact same process profile
    against the ungranted synthetic sibling. Unexpected access to the
    ungranted bytes is a hard **failure**.
-6. Deletes all newly created scratch folders and the disposable Windows
+7. Deletes all newly created scratch folders and the disposable Windows
    AppContainer profile. A cleanup failure is not accepted as PASS;
    it is reported as `sandbox-cleanup-unverified`. No arbitrary directory
    cleanup is performed.
@@ -103,12 +111,19 @@ appear in the result.
   means no positive file-boundary evidence was established. Some Windows
   host configurations do not permit unpackaged Win32 AppContainer tools
   to initialize.
+- `sandbox-acl-audit-failed` is a nonpassing ACL configuration result:
+  do not launch any synthetic child until the expected AppContainer SID
+  permissions and denied sibling have been verified.
 - `ungranted-read-not-denied` is a security regression: never authorize
   production if an ungranted synthetic file can be read.
 - `sandbox-cleanup-unverified` means the persistent Windows profile
   or owned lab cleanup could not be proven; inspect the host under
   controlled operator procedures rather than silently deleting unrelated
   profiles.
+
+Every response includes `syntheticAclAuditVerified`, which can be true
+only after a fresh on-disk DACL inspection of generated test paths. This
+is **not** `independentAclAuditVerified` for real private archives/cache.
 
 Every response states `networkCapabilitiesRequested=false`, but also
 `networkEgressDenialVerified=false`, `independentAclAuditVerified=false`,
