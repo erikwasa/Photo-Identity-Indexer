@@ -131,11 +131,13 @@ public sealed class VideoArchiveProcessingService(
             // A retryable queued job takes priority. Its original may have
             // become online-only since enqueue/restart; never claim it blindly
             // or hydrate it unless the separate opt-in is active.
-            VideoArchiveCandidate? candidate = await FindOldestQueuedAsync(
-                coverage, preferences.Current.IncludeOnlineOnly, token);
-            if (candidate is null)
-                candidate = await FindPendingAsync(
-                    coverage, ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
+            // Prefer all known local jobs (queued or pending) before any
+            // online-only job, even when hydration has been explicitly enabled.
+            VideoArchiveCandidate? candidate =
+                await VideoArchiveCandidateSelector.SelectLocalFirstAsync(
+                    preferences.Current.IncludeOnlineOnly,
+                    include => FindOldestQueuedAsync(coverage, include, token),
+                    include => FindPendingAsync(coverage, ffmpegHash, include, token));
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
@@ -649,6 +651,22 @@ public static class VideoArchiveCandidateSelector
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Queued online-only work must not jump ahead of a different local
+    /// catalogue candidate simply because it has an older queue timestamp.
+    /// </summary>
+    public static async Task<VideoArchiveCandidate?> SelectLocalFirstAsync(
+        bool includeOnlineOnly,
+        Func<bool, Task<VideoArchiveCandidate?>> queued,
+        Func<bool, Task<VideoArchiveCandidate?>> pending)
+    {
+        ArgumentNullException.ThrowIfNull(queued);
+        ArgumentNullException.ThrowIfNull(pending);
+        VideoArchiveCandidate? local = await queued(false) ?? await pending(false);
+        if (local is not null || !includeOnlineOnly) return local;
+        return await queued(true) ?? await pending(true);
     }
 
     public static async Task<VideoArchiveCandidate?> SelectAsync(

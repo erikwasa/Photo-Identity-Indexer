@@ -73,6 +73,43 @@ public sealed class VideoProcessingPreferencesTests
     }
 
     [Fact]
+    public async Task Local_pending_media_precedes_queued_cloud_media_even_with_opt_in()
+    {
+        VideoArchiveCandidate queuedCloud = new(
+            Guid.NewGuid(), Guid.NewGuid(), "root", "cloud.mp4", 100, Guid.NewGuid());
+        VideoArchiveCandidate pendingLocal = new(
+            Guid.NewGuid(), Guid.NewGuid(), "root", "local.mp4", 100);
+        List<string> calls = [];
+        Task<VideoArchiveCandidate?> Queued(bool allowOnline)
+        {
+            calls.Add("queued:" + allowOnline);
+            return Task.FromResult<VideoArchiveCandidate?>(
+                allowOnline ? queuedCloud : null);
+        }
+        Task<VideoArchiveCandidate?> Pending(bool allowOnline)
+        {
+            calls.Add("pending:" + allowOnline);
+            return Task.FromResult<VideoArchiveCandidate?>(pendingLocal);
+        }
+
+        Assert.Equal(pendingLocal,
+            await VideoArchiveCandidateSelector.SelectLocalFirstAsync(
+                true, Queued, Pending));
+        Assert.Equal(["queued:False", "pending:False"], calls);
+
+        calls.Clear();
+        Assert.Equal(queuedCloud,
+            await VideoArchiveCandidateSelector.SelectLocalFirstAsync(
+                true, Queued,
+                allowOnline =>
+                {
+                    calls.Add("pending:" + allowOnline);
+                    return Task.FromResult<VideoArchiveCandidate?>(null);
+                }));
+        Assert.Equal(["queued:False", "pending:False", "queued:True"], calls);
+    }
+
+    [Fact]
     public async Task Narrowed_archive_coverage_rejects_old_jobs_and_prefix_siblings()
     {
         SourceId sourceId = SourceId.New();
