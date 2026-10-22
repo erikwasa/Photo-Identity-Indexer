@@ -1,3 +1,4 @@
+using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -83,6 +84,7 @@ public static class VideoAppContainerLabCommandRunner
         bool forbiddenDenied = false;
         bool cleaned = true;
         WindowsVideoAppContainerProfile? profile = null;
+        DirectorySecurity? originalLabRootAcl = null;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -97,6 +99,10 @@ public static class VideoAppContainerLabCommandRunner
             VideoScratchCapacityGuard.EnsureCapacity(working, 32 * 1024 * 1024);
             profile = WindowsVideoAppContainerProfile.CreateSyntheticLab();
             state = GrantLimit;
+            // The marked root survives this experiment. Preserve its exact
+            // original DACL before temporarily granting only traversal.
+            originalLabRootAcl = new DirectoryInfo(root)
+                .GetAccessControl(AccessControlSections.Access);
             profile.GrantOwnedRootTraverse(root);
             profile.GrantOwnedDirectory(allowed, readOnly: true);
             profile.GrantOwnedDirectory(working, readOnly: false);
@@ -206,8 +212,17 @@ public static class VideoAppContainerLabCommandRunner
         }
         finally
         {
-            try { profile?.Dispose(); }
-            catch { cleaned = false; }
+            // Restore the surviving marker root's original DACL even when
+            // AppContainer launch/ACL checks failed. Never retain an orphaned
+            // Package SID grant on a reusable operator-owned directory.
+            if (originalLabRootAcl is not null)
+            {
+                try
+                {
+                    new DirectoryInfo(root).SetAccessControl(originalLabRootAcl);
+                }
+                catch { cleaned = false; }
+            }
             foreach (string path in new[] { working, allowed, blocked })
             {
                 try
@@ -220,6 +235,8 @@ public static class VideoAppContainerLabCommandRunner
                 }
                 catch { cleaned = false; }
             }
+            try { profile?.Dispose(); }
+            catch { cleaned = false; }
         }
         if (!cleaned) state = CleanupFailed;
         Write(output, false, state, tokenVerified, allowedVerified,
