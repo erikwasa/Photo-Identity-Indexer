@@ -93,7 +93,10 @@ production catalogue state.
    Do not expect frame-exact resumption.
 4. Test a source exclusion or revision change and verify the old video
    receipt is not treated as current; source and photo catalogue records
-   must not be changed by the video job.
+   must not be changed by the video job. A terminal failed/cancelled job has
+   a **Retry** action in Settings which requeues the *same idempotent job*
+   from scratch only while the revision remains current, supported and
+   unexcluded. A succeeded job or receipt cannot be retried/overwritten.
 5. Compare original video SHA-256 before and after a successful run.
    Verify the archive photo files and existing photo functions remain
    unchanged. No video processing step opens originals for writing.
