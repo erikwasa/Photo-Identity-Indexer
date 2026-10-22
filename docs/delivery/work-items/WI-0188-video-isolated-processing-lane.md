@@ -1012,6 +1012,30 @@ Production activation remains prohibited until reviewed.
   cancellation/exclusion/restart and post-run original-byte proof.
   WI-0188 remains `in_progress`; production activation is blocked.
 
+
+### Development checkpoint 32 — inspect generated AppContainer ACLs before launch (2026-10-22)
+
+- The disposable AppContainer synthetic test now audits its own generated
+  root, allowed input, blocked input and scratch DACLs before launching the
+  Windows command interpreter. The unique Package SID must have only root
+  traversal, read-only allowed-input access and working-directory modify;
+  no inherited Package SID permission may reach the blocked sibling.
+  Broad `ALL APPLICATION PACKAGES` and `ALL RESTRICTED APPLICATION PACKAGES`
+  ACEs on these lab paths are refused.
+- A misconfigured/overbroad ACL returns the nonpassing
+  `sandbox-acl-audit-failed` status before any child process starts.
+  The sanitized `syntheticAclAuditVerified` field distinguishes DACL
+  inspection from the separate observed allowed/denied file-access probes.
+  Reported `independentAclAuditVerified` remains false because no real
+  archive/cache/tool locations were inspected.
+- This is **not** production identity or a network boundary. FFmpeg/FFprobe
+  binary and DLL loading, real cache/source ACLs, independent socket denial,
+  disk limits, and an authorized single-video/mixed-load trial all remain
+  gates to WI-0188 acceptance. No maintained PostgreSQL work or video
+  job activation is requested; v37 host-migration requirements remain
+  unchanged. See the [synthetic runbook](../../operations/video-synthetic-appcontainer-feasibility.md).
+
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
