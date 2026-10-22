@@ -76,9 +76,13 @@ public static class VideoAppContainerLabCommandRunner
             return 1;
         }
 
-        string working = Path.Combine(root, "sandbox-working");
-        string allowed = Path.Combine(root, "sandbox-allowed");
-        string blocked = Path.Combine(root, "sandbox-ungranted");
+        // All experimental ACEs live on this owned disposable subtree.
+        // Never edit the lasting operator-marked root ACL: Windows may
+        // normalize its inheritance control bits even after ACE removal.
+        string scope = Path.Combine(root, "sandbox-scope");
+        string working = Path.Combine(scope, "sandbox-working");
+        string allowed = Path.Combine(scope, "sandbox-allowed");
+        string blocked = Path.Combine(scope, "sandbox-ungranted");
         string state = ProfileLimit;
         bool tokenVerified = false;
         bool allowedVerified = false;
@@ -86,7 +90,9 @@ public static class VideoAppContainerLabCommandRunner
         bool aclAuditVerified = false;
         bool cleaned = true;
         WindowsVideoAppContainerProfile? profile = null;
-        string? originalLabRootDaclSddl = null;
+        string originalLabRootDaclSddl = new DirectoryInfo(root)
+            .GetAccessControl(AccessControlSections.Access)
+            .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -96,7 +102,7 @@ public static class VideoAppContainerLabCommandRunner
             profile = WindowsVideoAppContainerProfile.CreateSyntheticLab(root);
             state = GrantLimit;
             // Only newly created directories and known synthetic bytes.
-            foreach (string path in new[] { working, allowed, blocked })
+            foreach (string path in new[] { scope, working, allowed, blocked })
             {
                 if (Directory.Exists(path) || File.Exists(path))
                     throw new InvalidOperationException(
@@ -104,12 +110,8 @@ public static class VideoAppContainerLabCommandRunner
                 Directory.CreateDirectory(path);
             }
             VideoScratchCapacityGuard.EnsureCapacity(working, 32 * 1024 * 1024);
-            // The marked root survives this experiment. Preserve its exact
-            // original DACL before temporarily granting only traversal.
-            originalLabRootDaclSddl = new DirectoryInfo(root)
-                .GetAccessControl(AccessControlSections.Access)
-                .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
-            profile.GrantOwnedRootTraverse(root);
+            // The lasting marked root is never granted an AppContainer ACE.
+            profile.GrantOwnedRootTraverse(scope);
             profile.GrantOwnedDirectory(allowed, readOnly: true);
             profile.GrantOwnedDirectory(working, readOnly: false);
 
@@ -240,44 +242,28 @@ public static class VideoAppContainerLabCommandRunner
         }
         finally
         {
-            // Restore the surviving marker root's original DACL even when
-            // AppContainer launch/ACL checks failed. Never retain an orphaned
-            // Package SID grant on a reusable operator-owned directory.
-            if (originalLabRootDaclSddl is not null)
+            // Delete the complete disposable subtree only after checking
+            // every descendant is unlinked. The lasting root is untouched.
+            try
             {
-                try
+                if (Directory.Exists(scope))
                 {
-                    // GetAccessControl returns a clean snapshot; passing it
-                    // unmodified to SetAccessControl is insufficient because
-                    // .NET persists only dirty ACL sections. Explicitly
-                    // materialize the original DACL as a *modified* descriptor
-                    // before applying, then verify exact SDDL equality.
-                    DirectorySecurity restored = new();
-                    restored.SetSecurityDescriptorSddlForm(
-                        originalLabRootDaclSddl, AccessControlSections.Access);
-                    DirectoryInfo directory = new(root);
-                    directory.SetAccessControl(restored);
-                    string observed = directory
-                        .GetAccessControl(AccessControlSections.Access)
-                        .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
-                    if (!string.Equals(observed, originalLabRootDaclSddl,
-                            StringComparison.Ordinal))
-                        cleaned = false;
+                    AssertNoLinksRecursively(scope);
+                    Directory.Delete(scope, recursive: true);
                 }
-                catch { cleaned = false; }
             }
-            foreach (string path in new[] { working, allowed, blocked })
+            catch { cleaned = false; }
+            // Verify original DACL and Windows inheritance flags unchanged.
+            try
             {
-                try
-                {
-                    if (Directory.Exists(path))
-                    {
-                        AssertNoLinksRecursively(path);
-                        Directory.Delete(path, recursive: true);
-                    }
-                }
-                catch { cleaned = false; }
+                string current = new DirectoryInfo(root)
+                    .GetAccessControl(AccessControlSections.Access)
+                    .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+                if (!string.Equals(current, originalLabRootDaclSddl,
+                        StringComparison.Ordinal))
+                    cleaned = false;
             }
+            catch { cleaned = false; }
             try { profile?.Dispose(); }
             catch { cleaned = false; }
         }
