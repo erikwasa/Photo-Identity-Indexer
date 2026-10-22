@@ -1,3 +1,4 @@
+using System.Security.AccessControl;
 using System.Text.Json;
 using PhotoIdentity.Cli;
 using Xunit;
@@ -129,6 +130,9 @@ public sealed class VideoAppContainerLabTests
         string root = NewLab();
         try
         {
+            string beforeAcl = new DirectoryInfo(root)
+                .GetAccessControl(AccessControlSections.Access)
+                .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
             using StringWriter output = new();
             int exit = await VideoAppContainerLabCommandRunner.RunAsync(
                 VideoAppContainerLabOptions.Parse(
@@ -143,6 +147,10 @@ public sealed class VideoAppContainerLabTests
                 "profileAndScratchCleanupVerified").GetBoolean();
             Assert.True(cleaned, "Windows AppContainer and owned lab must clean up.");
             Assert.Single(Directory.EnumerateFileSystemEntries(root));
+            string afterAcl = new DirectoryInfo(root)
+                .GetAccessControl(AccessControlSections.Access)
+                .GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+            Assert.Equal(beforeAcl, afterAcl);
             Assert.False(report.GetProperty("networkEgressDenialVerified").GetBoolean());
             Assert.False(report.GetProperty("realVideoExecutionAuthorized").GetBoolean());
             if (status == "file-boundary-observed")
