@@ -8,6 +8,14 @@ arbitrary archive path argument or general-purpose FFmpeg command runner.
 
 ## Current executable safety gate (2026-10-22)
 
+**Updated workflow:** WI-0188 now also provides a separate, default-off
+Settings-driven photo-first Archive video phase. That host uses the same
+bounded one-process tool adapter and source fences but runs only when the
+maintainer enables video in Settings and presses the ordinary Advance archive.
+Its acceptance is [manual local verification](video-processing-shared-archive-verification.md).
+The direct operator `video one-shot ... --apply` CLI hard stop below remains
+in place; no CLI argument bypass is introduced.
+
 **Real-media mutations remain disabled at the CLI boundary.** Following the
 synthetic AppContainer ACL feasibility work in merged PR #650, the source,
 tool-loader, network and storage boundaries are still not verified for a

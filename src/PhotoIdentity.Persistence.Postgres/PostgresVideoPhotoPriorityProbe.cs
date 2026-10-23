@@ -30,6 +30,9 @@ public sealed class PostgresVideoPhotoPriorityProbe(PostgresCatalogueDatabase da
         return await ReadAsync(connection, null, token);
     }
 
+    // 'video-processing' is set only by the shared archive worker AFTER its
+    // photo work classifier finds no remaining photo work. A new sync request
+    // or pending/running photo job is still a hard veto.
     internal static async Task<VideoPhotoPrioritySnapshot> ReadAsync(
         NpgsqlConnection connection, NpgsqlTransaction? transaction,
         CancellationToken token)
@@ -40,7 +43,9 @@ public sealed class PostgresVideoPhotoPriorityProbe(PostgresCatalogueDatabase da
             SELECT
                 EXISTS (
                     SELECT 1 FROM archive_advancement_control
-                    WHERE desired_state = 'running' OR sync_required
+                    WHERE sync_required OR
+                      (desired_state = 'running' AND
+                       runtime_state <> 'video-processing')
                 ),
                 EXISTS (
                     SELECT 1 FROM processing_runs

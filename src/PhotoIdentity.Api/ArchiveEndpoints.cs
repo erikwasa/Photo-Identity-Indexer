@@ -384,12 +384,15 @@ public static class ArchiveEndpoints
         IArchiveCoverageRepository coverageRepository,
         IArchiveStatusRepository archiveStatusRepository,
         IArchiveAdvancementControlRepository advancementControl,
+        VideoArchiveProcessingService videos,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         try
         {
+            // The same Pause archive button cancels any active video process.
+            videos.RequestPause();
             ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
             await advancementControl.PauseAsync(

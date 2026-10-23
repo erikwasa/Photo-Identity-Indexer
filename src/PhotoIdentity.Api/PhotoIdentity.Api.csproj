@@ -4,6 +4,7 @@
     <PackageReference Include="OpenCvSharp4.runtime.win" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../PhotoIdentity.Cli/PhotoIdentity.Cli.csproj" />
     <ProjectReference Include="../PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
     <ProjectReference Include="../PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />

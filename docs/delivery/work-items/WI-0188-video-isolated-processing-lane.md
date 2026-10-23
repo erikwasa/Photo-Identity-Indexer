@@ -10,32 +10,82 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 # WI-0188: Introduce an opt-in, isolated video processing lane
 
-## Objective
+## Objective (scope revised by maintainer 2026-10-22)
 
-Schedule on-demand heavy video jobs without disrupting ordinary photo ingestion, recognition, captioning, search or slideshow use.
+Process videos after normal photo archive work, on demand through the same
+Advance/Pause archive controls. The primary invariant is **never damage the
+existing photo archive, catalogue, person identities, searches or collections**.
+The user explicitly removed concurrent photo/video performance benchmarking and
+the mandatory AppContainer feasibility requirement from this work item.
 
-## In scope
+## In scope — revised
 
-- Default-off video enablement and separate visible queue for selected videos; existing photo workflows never silently queue full-video processing.
-- Limits for concurrent video jobs, CPU/GPU/IO, memory, hydrated source bytes/time, derived frames and local disk; photo work has priority and can pause video processing.
-- Cancellation, progress, restart/retry, bounded temp-file cleanup and resumable/idempotent work; avoid stale partial results.
-- Revision/model/preset/policy version identifiers; invalidate evidence after source change or exclusion while keeping originals immutable.
-- Explicit pause/stop, operator-visible failure diagnostics and aggregate resource metrics without logging personal media contents or paths.
+- Default-off **Process videos** switch in Settings, persisted across restarts.
+  Shared **Advance archive / Pause archive** controls run photos first, then
+  one eligible video at a time. Video can be disabled independently in Settings.
+- **Include online-only videos** is an independently controlled opt-in, default
+  off. Requests are bounded and do not hydrate by default. Only an
+  app-initiated download may be released using OneDrive's online-only request;
+  pre-existing local originals must remain local.
+- Supported already-local video revisions use a bounded, fixed-tool-hash
+  FFmpeg/FFprobe workflow. On unsupported codec, timeout or insufficient
+  machine capacity, record a recoverable failure or diagnostic for future
+  user review, including possible *separately designed* Azure processing.
+- Recover an interrupted job or restart from the beginning; no frame-exact
+  resumability required. Preserve immutable originals, fence stale
+  revisions/exclusions, avoid exposing partial derivatives, and clean only
+  owned scratch files.
+- Basic progress / queued / succeeded / failed visibility with safe CPU,
+  memory, wall-time, scratch byte and process-count caps. No configurable
+  multi-video concurrency; one active video maximum.
 
-## Out of scope
+## Out of scope — revised
 
-Proxy format implementation, caption/embedding inference, face assignment, cloud workers or a replacement photo-job framework.
+- Simultaneous photo/video throughput or search/slideshow latency benchmarking;
+  photos finish first and new photo work preempts videos.
+- Mandatory AppContainer proof, comprehensive network egress restriction,
+  kernel disk/IO quotas and GPU partitioning. Existing optional synthetic
+  AppContainer lab can remain, but it is not a release blocker.
+- Optional Azure compute fallback, advanced video proxy profile choices,
+  captions, frame embeddings, browser video serving, and extra scheduling UI:
+  these belong to later work items or separately scoped enhancements.
+- Automatic deletion of the cloud original. A verified OneDrive *online-only*
+  storage request is not deletion; a normal filesystem delete is forbidden.
 
-## Acceptance criteria
+## Acceptance criteria — revised
 
-- [ ] Video processing is off by default after upgrade and only runs when enabled and selected.
-- [ ] Concurrent photo/video benchmark records photo job throughput and search/slideshow latency against a photo-only baseline with WI-0150-agreed bounds.
-- [ ] Restart, cancellation, exclusions, online-only files and malformed video cannot leak partial derivatives or unlimited hydrated files.
-- [ ] Work is independently pausable/observable and obeys configurable concurrency/resource limits.
+- [ ] **Default off and visible control.** Processing can be enabled/disabled
+  in Settings, persists through restart, and shares normal Archive Advance/Pause
+  controls. Only one video runs after all outstanding photo work completes.
+- [ ] **Local-first with explicit hydration opt-in.** Offline placeholders are
+  skipped by default. When the online-only setting is enabled, one bounded
+  eligible source may be downloaded and subsequently requested online-only;
+  already-local videos are not unpinned by Photo Identity.
+- [ ] **Original/photo-data safety.** Video processing never opens originals
+  for write or modifies photo catalogue/face/search/collection state. Source
+  revision and exclusions are rechecked before durable derivative publication.
+  Maintainer verifies post-run original integrity and ordinary photo features.
+- [ ] **Failure recovery and cleanup.** Interrupted, failed, unsupported or
+  oversized video jobs remain diagnosable; restart/retry is safe, partial
+  outputs do not appear as complete, and owned temp data is bounded/cleaned.
+- [ ] **Simple operational limits.** One video at a time, bounded Windows
+  process resources and useful queue/failure counts; no mandatory AppContainer
+  acceptance or synthetic-performance thresholds.
 
-## Verification requirements
+## Verification requirements — revised
 
-Deterministic job lifecycle tests, plus real mixed-load CPU/GPU/IO and photo regression measurements.
+CI covers focused deterministic settings/guard/queue tests and build/package
+regressions. The maintainer explicitly accepts **manual local end-to-end
+verification** of real video execution, cancellation, restart, exclusions,
+OneDrive behavior, originals and ordinary photo features instead of elaborate
+brittle automated E2E rigs. Follow
+[the consolidated local verification runbook](../../operations/video-processing-shared-archive-verification.md).
+Until real-file local verification is reported, **none of the newly revised
+acceptance criteria is marked complete**.
+
+Older numbered checkpoints below record historical design and experiments.
+Their prior mandatory AppContainer, multi-job concurrency and mixed-load
+benchmark language has been **superseded by this user-approved scope**.
 
 ## Implementation checkpoints
 
@@ -1069,6 +1119,35 @@ Production activation remains prohibited until reviewed.
   No operator database migration, video encode or backup is requested by
   this checkpoint. See [current one-shot runbook](../../operations/video-scoped-one-shot-v37.md).
 
+
+### Consolidated functional checkpoint — shared archive processing (2026-10-22)
+
+- Default-off Settings preferences and online-only opt-in, persisted separately
+  from photo catalogue tables. Video queue and sanitized counts are visible.
+- Existing archive worker runs all available photo work first; only then
+  advances at most one supported video candidate via the fixed, bounded
+  FFmpeg/FFprobe adapter. Shared Pause interrupts the video token, and
+  disabling videos preserves queued work for future recovery.
+- Already-local sources are preferred. Explicitly opted-in OneDrive retrieval
+  is followed by a request to return **only app-initiated** hydrated originals
+  to online-only. Never delete or unpin already-local originals.
+- When previously inspected eligible videos are exhausted, the shared
+  archive incrementally discovers and registers one new MOV/MP4 inside
+  included coverage per cycle, always preferring local media and excluding
+  blocked source copies before opening bytes. OneDrive-only discovery is
+  opt-in and bound to one download at a time. Unsupported media is recorded
+  but never silently transcoded; local verification remains mandatory.
+- No schema change is requested beyond maintained v37. This checkpoint
+  replaces the older real-media CLI hard-stop with guarded in-app execution
+  subject to explicit Settings opt-in and archive start; direct operator
+  one-shot `--apply` stays blocked.
+- **Queued selection follow-up (PR #656):** queued online-only placeholders
+  cannot block a later local video, even when hydration is disabled. Previously
+  queued and newly inspected candidates are limited to current included
+  folders, and serialized PostgreSQL claims re-check current durable coverage
+  for the specifically selected job. Selection and claim have regression tests.
+- **CI and maintained-host verification are pending.** Documentation and
+  implementation are not acceptance by themselves.
 
 ## Completion notes
 

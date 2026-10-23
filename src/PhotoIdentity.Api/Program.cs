@@ -113,6 +113,8 @@ public partial class Program
             Path.Combine(defaultApplicationRoot, "quality-suggestions")));
         builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
         builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
+        builder.Services.AddSingleton<VideoProcessingPreferencesStore>();
+        builder.Services.AddSingleton<VideoArchiveProcessingService>();
         builder.Services.AddSingleton<IPhotoSearchRepository>(
             services => services.GetRequiredService<PostgresPhotoSearchRepository>());
 
@@ -321,6 +323,7 @@ public partial class Program
         app.MapArchiveItemFilterEndpoints();
         app.MapArchiveStorageEndpoints();
         app.MapVideoLibraryEndpoints();
+        app.MapVideoProcessingEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
