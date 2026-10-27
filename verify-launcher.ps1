@@ -203,6 +203,65 @@ function Assert-PostgresLauncherConfiguration {
         if (@(Get-LauncherServerProcesses).Count -ne 0) {
             throw "Video settings validation started a server."
         }
+
+        # Packaged video processing must be configurable without editing the
+        # replaceable app payload. Synthetic binaries here are never executed.
+        $syntheticToolRoot = Join-Path $artifactRoot "launcher-video-tools"
+        New-Item -ItemType Directory -Path $syntheticToolRoot -Force | Out-Null
+        $syntheticFfmpeg = Join-Path $syntheticToolRoot "ffmpeg.exe"
+        $syntheticFfprobe = Join-Path $syntheticToolRoot "ffprobe.exe"
+        [IO.File]::WriteAllBytes($syntheticFfmpeg, [byte[]](1, 2, 3))
+        [IO.File]::WriteAllBytes($syntheticFfprobe, [byte[]](4, 5, 6))
+        $syntheticFfmpegHash = (Get-FileHash -LiteralPath $syntheticFfmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+        $syntheticFfprobeHash = (Get-FileHash -LiteralPath $syntheticFfprobe -Algorithm SHA256).Hash.ToLowerInvariant()
+
+        $validVideoToolSettings = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__VideoProcessing__FfmpegPath = $syntheticFfmpeg
+                PhotoIdentity__VideoProcessing__FfmpegSha256 = $syntheticFfmpegHash
+                PhotoIdentity__VideoProcessing__FfprobePath = $syntheticFfprobe
+                PhotoIdentity__VideoProcessing__FfprobeSha256 = $syntheticFfprobeHash
+            }
+        }
+        $validVideoToolPath = Join-Path $artifactRoot "launcher-valid-video-tools.json"
+        $validVideoToolSettings | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $validVideoToolPath -Encoding UTF8
+        $toolOutput = @(& powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $validVideoToolPath -ValidateConfigurationOnly 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Launcher rejected complete validated video tool settings. Output: $($toolOutput -join [Environment]::NewLine)"
+        }
+        if (@(Get-LauncherServerProcesses).Count -ne 0) {
+            throw "Video tool settings validation started a server."
+        }
+
+        $partialTools = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__VideoProcessing__FfmpegPath = $syntheticFfmpeg
+            }
+        }
+        $partialToolsPath = Join-Path $artifactRoot "launcher-incomplete-video-tools.json"
+        $partialTools | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $partialToolsPath -Encoding UTF8
+        Invoke-LauncherExpectFailure -Path $partialToolsPath -ExpectedPattern "requires all four FFmpeg/FFprobe" -Description "incomplete video tool configuration"
+
+        $invalidHash = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__VideoProcessing__FfmpegPath = $syntheticFfmpeg
+                PhotoIdentity__VideoProcessing__FfmpegSha256 = "not-a-sha256"
+                PhotoIdentity__VideoProcessing__FfprobePath = $syntheticFfprobe
+                PhotoIdentity__VideoProcessing__FfprobeSha256 = $syntheticFfprobeHash
+            }
+        }
+        $invalidHashPath = Join-Path $artifactRoot "launcher-invalid-video-digest.json"
+        $invalidHash | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidHashPath -Encoding UTF8
+        Invoke-LauncherExpectFailure -Path $invalidHashPath -ExpectedPattern "lowercase SHA-256 digest" -Description "invalid executable digest"
     }
     finally {
         [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $previous, "Process")
