@@ -422,7 +422,7 @@ jobs:
         run: |
           # Match verify-postgres.ps1. The video maintenance/janitor fixtures also
           # create disposable databases but do not have 'Postgres' in their names.
-          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~Postgres|FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests|FullyQualifiedName~VideoDerivativeRecoveryJanitorTests"
+          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~Postgres|FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests|FullyQualifiedName~VideoDerivativeRecoveryJanitorTests|FullyQualifiedName~VideoScopedOneShotControlTests|FullyQualifiedName~VideoDerivativePublicationTests"
           exit $LASTEXITCODE
 
       - name: Run Windows package verification
