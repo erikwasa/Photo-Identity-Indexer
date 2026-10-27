@@ -95,6 +95,27 @@ the mandatory AppContainer feasibility requirement from this work item.
   the real video discovery and processing sequence. CI coverage alone
   cannot verify the maintainer's OneDrive archive.
 
+### Packaged launcher configuration follow-up (2026-10-27)
+
+- Operator preflight queried published JSON and the current PowerShell
+  environment; the two FFmpeg and FFprobe path/hash pairs were absent from
+  those sources. This alone cannot establish the live application's effective
+  process environment because its settings endpoint previously accepted
+  enabled video processing with four nonempty tool fields.
+- The packaged `Start-PhotoIdentity.ps1` launcher previously rejected
+  `PhotoIdentity__VideoProcessing__...` settings in the durable
+  `launcher.json` whitelist, although the WI-0188 runtime and documentation
+  require these approvals. A dedicated launcher fix now permits all four
+  tool path/digest settings together, plus an optional private cache root,
+  with early local path/link/hash-shape checks and continued runtime
+  executable SHA-256 and cache separation enforcement.
+- Added launcher verification for accepted complete pairs, missing values
+  and malformed digests; documented the persistent setup for maintained
+  Windows package deployments. No media reads or database changes occur.
+- WI-0188 real-video verification remains **open** until the operator
+  confirms the correct effective executable configuration and reports
+  actual local video discovery/execution and original/photo safety.
+
 ## Verification requirements — revised
 
 CI covers focused deterministic settings/guard/queue tests and build/package
