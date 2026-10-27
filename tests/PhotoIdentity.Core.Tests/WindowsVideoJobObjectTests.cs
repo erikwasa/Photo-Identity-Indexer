@@ -1,11 +1,28 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using PhotoIdentity.Core.Processing;
 using Xunit;
 
 namespace PhotoIdentity.Core.Tests;
 
+// This test collection temporarily changes the process-wide Windows error mode
+// while probing an unsupported native mitigation. Do not run it alongside
+// other test collections in the same xUnit test host.
+[CollectionDefinition("WindowsVideoJobObjectTests", DisableParallelization = true)]
+public sealed class WindowsVideoJobObjectTestsCollection { }
+
+[Collection("WindowsVideoJobObjectTests")]
 public sealed class WindowsVideoJobObjectTests
 {
+    private const uint SemFailCriticalErrors = 0x0001;
+    private const uint SemNoGpFaultErrorBox = 0x0002;
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetErrorMode();
+
+    [DllImport("kernel32.dll")]
+    private static extern uint SetErrorMode(uint errorMode);
+
     [Fact]
     public void Resource_limits_reject_unbounded_or_impractical_profiles()
     {
@@ -72,9 +89,15 @@ public sealed class WindowsVideoJobObjectTests
         if (!OperatingSystem.IsWindows()) return;
         string root = Path.Combine(Path.GetTempPath(),
             "wi0188-mitigated-video-tool-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
+        uint previousErrorMode = GetErrorMode();
         try
         {
+            // A child-process mitigation may cause STATUS_DLL_INIT_FAILED before
+            // cmd.exe starts. Suppress inherited Windows error dialogs so the
+            // test can observe the real nonzero exit code rather than hang.
+            // The xUnit collection is nonparallel because SetErrorMode is global.
+            _ = SetErrorMode(previousErrorMode | SemFailCriticalErrors | SemNoGpFaultErrorBox);
+            Directory.CreateDirectory(root);
             string cmd = Path.Combine(Environment.GetFolderPath(
                 Environment.SpecialFolder.System), "cmd.exe");
             await using FileStream file = File.OpenRead(cmd);
@@ -130,7 +153,11 @@ public sealed class WindowsVideoJobObjectTests
 
             Assert.Empty(Directory.EnumerateFileSystemEntries(root));
         }
-        finally { Directory.Delete(root, recursive: true); }
+        finally
+        {
+            _ = SetErrorMode(previousErrorMode);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

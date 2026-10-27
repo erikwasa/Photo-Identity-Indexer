@@ -415,14 +415,14 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Verify PostgreSQL persistence suite
+      - name: Verify PostgreSQL persistence and video derivative maintenance
         shell: pwsh
         env:
           PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=root
         run: |
-          # Run the same live PostgreSQL persistence filter as verify-postgres.ps1.
-          # Previous narrow filtering missed a stale fixed-schema assertion.
-          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~Postgres"
+          # Match verify-postgres.ps1. The video maintenance/janitor fixtures also
+          # create disposable databases but do not have 'Postgres' in their names.
+          dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~Postgres|FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests|FullyQualifiedName~VideoDerivativeRecoveryJanitorTests|FullyQualifiedName~VideoScopedOneShotControlTests|FullyQualifiedName~VideoDerivativePublicationTests"
           exit $LASTEXITCODE
 
       - name: Run Windows package verification
