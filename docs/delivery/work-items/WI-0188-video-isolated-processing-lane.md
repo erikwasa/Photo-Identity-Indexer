@@ -72,6 +72,29 @@ the mandatory AppContainer feasibility requirement from this work item.
   process resources and useful queue/failure counts; no mandatory AppContainer
   acceptance or synthetic-performance thresholds.
 
+## Local verification follow-up — preflight diagnostics (2026-10-27)
+
+- Maintainer started the published Windows app against schema v37 and enabled
+  video processing. Photo synchronization completed across 17 included folders
+  (30,777 enumerated files), but no video was analyzed.
+- The observed operator status and single sanitized runtime warning were
+  `video-safety-or-configuration-rejected`. The runtime rejected an
+  `InvalidOperationException` before it could establish a successful video
+  attempt; the supplied stdout does **not** identify which of the tool,
+  private-cache or later safety checks rejected the run. In particular, it
+  does not prove existing photo-only catalogue entries hide MOV/MP4 files.
+- Follow-up changes make preflight stages visible as fixed path-free codes
+  (`video-tool-configuration-rejected`,
+  `video-ffmpeg-approval-rejected`,
+  `video-ffprobe-approval-rejected`,
+  `video-cache-validation-rejected`), retaining the existing runtime
+  guards and fallback status for other failures. CI regression tests cover
+  the classification and privacy requirements; no real-media test is claimed.
+- Before accepting WI-0188, the operator must verify exact executable
+  paths and SHA-256 approvals, private cache ownership/separation, and retry
+  the real video discovery and processing sequence. CI coverage alone
+  cannot verify the maintainer's OneDrive archive.
+
 ## Verification requirements — revised
 
 CI covers focused deterministic settings/guard/queue tests and build/package
