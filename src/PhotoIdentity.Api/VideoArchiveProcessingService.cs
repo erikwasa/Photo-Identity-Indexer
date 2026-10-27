@@ -298,10 +298,10 @@ public sealed class VideoArchiveProcessingService(
     // or tool output. The same fail-closed runtime checks remain authoritative.
     internal static string ClassifyFailure(Exception exception, string preflightStage)
     {
-        if (preflightStage is "tool-configuration" or "ffmpeg-approval"
-            or "ffprobe-approval" or "cache-validation" &&
-            exception is InvalidOperationException or ArgumentException
-                or IOException or UnauthorizedAccessException)
+        if ((preflightStage is "tool-configuration" or "ffmpeg-approval"
+                or "ffprobe-approval" or "cache-validation") &&
+            (exception is InvalidOperationException or ArgumentException
+                or IOException or UnauthorizedAccessException))
         {
             return preflightStage switch
             {
