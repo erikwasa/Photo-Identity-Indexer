@@ -177,7 +177,7 @@ function Invoke-LivePostgresTest {
         Write-Host "Running PostgreSQL persistence and video derivative maintenance acceptance..."
         # Keep this filter aligned with the required package-verification CI gate.
         # Video derivative maintenance tests exercise PostgreSQL despite their names.
-        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --no-build --filter "FullyQualifiedName~Postgres|FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests|FullyQualifiedName~VideoDerivativeRecoveryJanitorTests" | Out-Host
+        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --no-build --filter "FullyQualifiedName~Postgres|FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests|FullyQualifiedName~VideoDerivativeRecoveryJanitorTests|FullyQualifiedName~VideoScopedOneShotControlTests|FullyQualifiedName~VideoDerivativePublicationTests" | Out-Host
         if ($LASTEXITCODE -ne 0) {
             return [int]$LASTEXITCODE
         }
