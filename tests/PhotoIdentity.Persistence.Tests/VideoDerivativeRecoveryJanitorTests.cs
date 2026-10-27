@@ -37,6 +37,8 @@ public sealed class VideoDerivativeRecoveryJanitorTests
             };
             await using PostgresCatalogueDatabase database = new(config.ConnectionString);
             await database.InitializeAsync();
+            // The janitor queries exclusions, which have a separate initializer.
+            await new PostgresSourceCopyExclusionRepository(database).EnsureReadyAsync();
             Assert.Equal(37, PostgresCatalogueDatabase.CurrentSchemaVersion);
             var janitor = new VideoDerivativeRecoveryJanitor(database);
             Guid source = Guid.NewGuid();
