@@ -45,6 +45,48 @@ are intentionally **placeholders**, not executable approvals:
 }
 ~~~
 
+### Packaged Windows launcher
+
+For the packaged `PhotoIdentity.cmd` / `Start-PhotoIdentity.ps1` workflow,
+store the approved tool **paths and lowercase SHA-256 digests** in the
+persistent `%LOCALAPPDATA%\\PhotoIdentity\\launcher.json` `settings` object
+(after updating to a launcher version that accepts the entries). Keep
+`postgresConnectionEnvironmentVariable`, URLs, mobile access and all
+existing settings unchanged. Add these four sibling entries:
+
+~~~json
+{
+  "settings": {
+    "PhotoIdentity__VideoProcessing__FfmpegPath": "C:\\APPROVED_TOOLS\\ffmpeg.exe",
+    "PhotoIdentity__VideoProcessing__FfmpegSha256": "REPLACE_WITH_ACTUAL_LOWERCASE_SHA256",
+    "PhotoIdentity__VideoProcessing__FfprobePath": "C:\\APPROVED_TOOLS\\ffprobe.exe",
+    "PhotoIdentity__VideoProcessing__FfprobeSha256": "REPLACE_WITH_ACTUAL_LOWERCASE_SHA256"
+  }
+}
+~~~
+
+The fragment is illustrative; merge the keys into your existing launcher
+configuration rather than replacing its contents. To calculate approved
+digests, use `(Get-FileHash -LiteralPath "C:\\APPROVED_TOOLS\\ffmpeg.exe" -Algorithm SHA256).Hash.ToLowerInvariant()`
+(and likewise for FFprobe). Only approve binaries whose provenance you trust.
+
+The launcher checks paths are existing local non-linked `.exe` files, that
+digests are lowercase 64-character hex values, and that the four fields
+are supplied together. The application **independently recomputes both
+file hashes** and verifies cache/source-root isolation at runtime; launcher
+validation does not authorize execution.
+
+An optional `PhotoIdentity__VideoProcessing__CacheRoot` may be supplied only
+for an already existing private app-owned cache directory, not an archive or
+OneDrive root. Normally **omit it** so the application creates its own fixed
+app-local cache. Restart the packaged app after configuration changes. The
+Settings toggles enable video processing only after the prerequisite tools
+have been approved; they do not install FFmpeg.
+
+If the executable configuration was written to `appsettings.Production.json`
+inside the published `app` directory, note that a subsequent package update
+may overwrite it. Persistent launcher settings are preferred.
+
 The Settings UI stores only the two Boolean choices in
 `%LOCALAPPDATA%\PhotoIdentity\video-processing-preferences.json`. If that
 file exists, it takes precedence over the appsettings defaults. The UI applies
