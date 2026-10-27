@@ -12,6 +12,27 @@ This document defines how Photo Identity should balance regression confidence, p
 
 WI-0070 starts from a measured baseline where `build-and-test` exceeded ten minutes and the sequential integration assembly dominated the critical path.
 
+## Local verification versus CI
+
+Routine local development does **not** require running the entire solution test suite.
+Use `./test.ps1 -Scope Fast` for the non-API-integration assemblies (the same
+filter as the CI fast gate), or invoke a specific changed test project/class with
+`dotnet test --filter`. This gives quick feedback but is **not** a substitute
+for the required GitHub PR checks. `./test.ps1` and `./test.ps1 -Scope Full`
+retain the complete local solution suite for diagnostics or broad changes.
+
+CI is responsible for full automated regression coverage. The PR workflow
+also starts an isolated PostgreSQL service for the required live persistence
+tests, including the video derivative maintenance and recovery janitor
+fixtures. The default fast test gate does not supply PostgreSQL admin credentials
+and cannot establish those database contracts on its own.
+
+Operator-local verification remains necessary when acceptance depends on
+real photo/video files, archive coverage, OneDrive hydration, the existing
+production catalogue, or actual playback hardware. Use explicit checklists
+and a backed-up catalogue; do not point disposable test-database creation
+at the production PostgreSQL server merely to reproduce CI.
+
 ## Test layers
 
 ### Fast tests
