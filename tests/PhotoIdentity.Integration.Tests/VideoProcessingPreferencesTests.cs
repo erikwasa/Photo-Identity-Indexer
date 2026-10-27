@@ -139,6 +139,38 @@ public sealed class VideoProcessingPreferencesTests
             false, Local));
     }
 
+    [Theory]
+    [InlineData("tool-configuration", "video-tool-configuration-rejected")]
+    [InlineData("ffmpeg-approval", "video-ffmpeg-approval-rejected")]
+    [InlineData("ffprobe-approval", "video-ffprobe-approval-rejected")]
+    [InlineData("cache-validation", "video-cache-validation-rejected")]
+    [InlineData("runtime", "video-safety-or-configuration-rejected")]
+    public void Video_failure_diagnostics_are_stage_specific_and_never_reveal_paths(
+        string stage, string expected)
+    {
+        var failure = new InvalidOperationException(
+            @"unsafe local input at C:\PrivateArchive\family-video.mp4");
+        string actual = VideoArchiveProcessingService.ClassifyFailure(failure, stage);
+        Assert.Equal(expected, actual);
+        Assert.DoesNotContain("PrivateArchive", actual);
+        Assert.DoesNotContain("family-video", actual);
+    }
+
+    [Fact]
+    public void Video_diagnostics_keep_cache_argument_errors_and_io_failures_safe()
+    {
+        Assert.Equal("video-cache-validation-rejected",
+            VideoArchiveProcessingService.ClassifyFailure(
+                new ArgumentException(@"unsafe cache C:\PrivateArchive"),
+                "cache-validation"));
+        Assert.Equal("video-ffprobe-approval-rejected",
+            VideoArchiveProcessingService.ClassifyFailure(
+                new IOException("Executable cannot be opened"), "ffprobe-approval"));
+        Assert.Equal("video-io-failure",
+            VideoArchiveProcessingService.ClassifyFailure(
+                new IOException("Original path not available"), "runtime"));
+    }
+
     [Fact]
     public void Shared_video_worker_uses_one_bounded_job()
     {
