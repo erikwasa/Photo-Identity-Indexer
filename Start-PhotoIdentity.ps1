@@ -30,7 +30,12 @@ $SupportedSettings = @(
     "PhotoIdentity__RepositoryRoot",
     "PhotoIdentity__ModelDirectory",
     "PhotoIdentity__VideoLibraryEnabled",
-    "PhotoIdentity__VideoPosterRoot"
+    "PhotoIdentity__VideoPosterRoot",
+    "PhotoIdentity__VideoProcessing__FfmpegPath",
+    "PhotoIdentity__VideoProcessing__FfmpegSha256",
+    "PhotoIdentity__VideoProcessing__FfprobePath",
+    "PhotoIdentity__VideoProcessing__FfprobeSha256",
+    "PhotoIdentity__VideoProcessing__CacheRoot"
 )
 
 function Get-LauncherEnvironmentValue {
@@ -57,6 +62,43 @@ function Assert-LauncherSettingValue {
         [Parameter(Mandatory = $true)]
         [string]$Value
     )
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__FfmpegSha256",
+        "PhotoIdentity__VideoProcessing__FfprobeSha256"
+    )) {
+        if ($Value -cnotmatch '^[0-9a-f]{64}$') {
+            throw "$Name must be a lowercase SHA-256 digest (64 hex characters)."
+        }
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__FfmpegPath",
+        "PhotoIdentity__VideoProcessing__FfprobePath",
+        "PhotoIdentity__VideoProcessing__CacheRoot"
+    )) {
+        $isCache = $Name -eq "PhotoIdentity__VideoProcessing__CacheRoot"
+        $kind = if ($isCache) { "Container" } else { "Leaf" }
+        if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+            -not (Test-Path -LiteralPath $Value -PathType $kind) -or
+            (-not $isCache -and [IO.Path]::GetExtension($Value) -ine ".exe")) {
+            throw "$Name must reference an existing local absolute path."
+        }
+        $cursor = [IO.Path]::GetFullPath($Value)
+        while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            if (((Get-Item -LiteralPath $cursor -Force).Attributes -band
+                [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "$Name must not use junctions or symbolic links."
+            }
+            $parent = Split-Path -Parent $cursor
+            if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+            $cursor = $parent
+        }
+        # The application's runtime preflight rechecks executable digests,
+        # cache ownership and separation from catalogue source roots.
+        return
+    }
 
     switch ($Name) {
         "PhotoIdentity__VideoLibraryEnabled" {
@@ -352,6 +394,18 @@ function Read-LauncherConfiguration {
                 $settings[$property.Name] = $value
             }
         }
+        $videoToolKeys = @(
+            "PhotoIdentity__VideoProcessing__FfmpegPath",
+            "PhotoIdentity__VideoProcessing__FfmpegSha256",
+            "PhotoIdentity__VideoProcessing__FfprobePath",
+            "PhotoIdentity__VideoProcessing__FfprobeSha256"
+        )
+        $specifiedVideoToolKeys = @($videoToolKeys | Where-Object { $settings.ContainsKey($_) })
+        if ($specifiedVideoToolKeys.Count -gt 0 -and
+            $specifiedVideoToolKeys.Count -ne $videoToolKeys.Count) {
+            throw "Launcher video processing requires all four FFmpeg/FFprobe path and SHA-256 settings together."
+        }
+
         if ($settings.ContainsKey("PhotoIdentity__VideoLibraryEnabled") -and
             $settings["PhotoIdentity__VideoLibraryEnabled"] -eq "true" -and
             -not $settings.ContainsKey("PhotoIdentity__VideoPosterRoot")) {
