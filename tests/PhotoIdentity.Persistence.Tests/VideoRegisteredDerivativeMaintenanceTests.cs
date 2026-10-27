@@ -204,6 +204,9 @@ public sealed class VideoRegisteredDerivativeMaintenanceTests
             };
             PostgresCatalogueDatabase db = new(dbConfig.ConnectionString);
             await db.InitializeAsync();
+            // The exclusion/tombstone table is initialized by its own repository,
+            // not by the core catalogue schema initializer.
+            await new PostgresSourceCopyExclusionRepository(db).EnsureReadyAsync();
             var f = new Fixture(admin, db, dbName, root);
             await f.SqlAsync("""
                 INSERT INTO sources(id,kind,root_locator,created_at_utc)
