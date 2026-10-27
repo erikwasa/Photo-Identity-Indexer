@@ -394,6 +394,18 @@ function Read-LauncherConfiguration {
                 $settings[$property.Name] = $value
             }
         }
+        $videoToolKeys = @(
+            "PhotoIdentity__VideoProcessing__FfmpegPath",
+            "PhotoIdentity__VideoProcessing__FfmpegSha256",
+            "PhotoIdentity__VideoProcessing__FfprobePath",
+            "PhotoIdentity__VideoProcessing__FfprobeSha256"
+        )
+        $specifiedVideoToolKeys = @($videoToolKeys | Where-Object { $settings.ContainsKey($_) })
+        if ($specifiedVideoToolKeys.Count -gt 0 -and
+            $specifiedVideoToolKeys.Count -ne $videoToolKeys.Count) {
+            throw "Launcher video processing requires all four FFmpeg/FFprobe path and SHA-256 settings together."
+        }
+
         if ($settings.ContainsKey("PhotoIdentity__VideoLibraryEnabled") -and
             $settings["PhotoIdentity__VideoLibraryEnabled"] -eq "true" -and
             -not $settings.ContainsKey("PhotoIdentity__VideoPosterRoot")) {
