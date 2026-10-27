@@ -76,6 +76,7 @@ public sealed class VideoArchiveProcessingService(
             active = _active;
         }
 
+        string preflightStage = "tool-configuration";
         try
         {
             CancellationToken token = active.Token;
@@ -88,9 +89,12 @@ public sealed class VideoArchiveProcessingService(
             if (!VideoDerivativeArtifactPath.IsHash(ffmpegHash) ||
                 !VideoDerivativeArtifactPath.IsHash(ffprobeHash))
                 throw new InvalidOperationException("Video executable approval is invalid.");
+            preflightStage = "ffmpeg-approval";
             await VerifyToolAsync(ffmpeg, ffmpegHash, token);
+            preflightStage = "ffprobe-approval";
             await VerifyToolAsync(ffprobe, ffprobeHash, token);
 
+            preflightStage = "cache-validation";
             string? configuredCache = configuration["PhotoIdentity:VideoProcessing:CacheRoot"];
             string cache = configuredCache
                 ?? Path.Combine(
@@ -111,6 +115,7 @@ public sealed class VideoArchiveProcessingService(
                     VideoDerivativeFilePublisher.CacheMarkerContents, token);
             }
             await VideoDerivativeCacheGuard.ValidateAsync(database, cache, token);
+            preflightStage = "runtime";
             var control = new PostgresVideoProcessingControlRepository(database);
             VideoProcessingControlState state = await control.GetAsync(token);
             if (!state.Enabled || state.Paused)
@@ -273,14 +278,7 @@ public sealed class VideoArchiveProcessingService(
         {
             // Fixed, path-free diagnostic codes: no source names, keys or
             // native exception messages are returned to clients or logs.
-            string code = exception switch
-            {
-                UnauthorizedAccessException => "filesystem-access-refused",
-                IOException => "video-io-failure",
-                InvalidDataException => "invalid-video-evidence",
-                InvalidOperationException => "video-safety-or-configuration-rejected",
-                _ => "video-attempt-failed"
-            };
+            string code = ClassifyFailure(exception, preflightStage);
             Volatile.Write(ref _lastResult, code);
             logger.LogWarning("Video processing ended with {Code}.", code);
             return false;
@@ -293,6 +291,36 @@ public sealed class VideoArchiveProcessingService(
             }
             active.Dispose();
         }
+    }
+
+    // Only an allowlisted stage and exception type affect public/logged codes.
+    // Never return exception.Message, executable paths, hashes, private source keys
+    // or tool output. The same fail-closed runtime checks remain authoritative.
+    internal static string ClassifyFailure(Exception exception, string preflightStage)
+    {
+        if (preflightStage is "tool-configuration" or "ffmpeg-approval"
+            or "ffprobe-approval" or "cache-validation" &&
+            exception is InvalidOperationException or ArgumentException
+                or IOException or UnauthorizedAccessException)
+        {
+            return preflightStage switch
+            {
+                "tool-configuration" => "video-tool-configuration-rejected",
+                "ffmpeg-approval" => "video-ffmpeg-approval-rejected",
+                "ffprobe-approval" => "video-ffprobe-approval-rejected",
+                "cache-validation" => "video-cache-validation-rejected",
+                _ => "video-safety-or-configuration-rejected"
+            };
+        }
+
+        return exception switch
+        {
+            UnauthorizedAccessException => "filesystem-access-refused",
+            IOException => "video-io-failure",
+            InvalidDataException => "invalid-video-evidence",
+            InvalidOperationException => "video-safety-or-configuration-rejected",
+            _ => "video-attempt-failed"
+        };
     }
 
     private string Required(string key)
