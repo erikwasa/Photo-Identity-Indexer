@@ -72,6 +72,41 @@ OneDrive hydration for one previously online-only video and return the
 app-initiated download to online-only afterwards. There is no bulk recall,
 and the one-file and available disk caps still apply.
 
+## Interpreting video preflight results
+
+The Settings UI accepts four nonempty tool configuration fields before saving
+the Process videos preference, but that is **not** executable approval. The
+runtime independently checks full local executable paths, strict SHA-256
+digests, private cache ownership, absence of directory links and source-root
+separation before looking for candidate videos. Previously these distinct
+rejections were all shown as `video-safety-or-configuration-rejected`.
+
+The runtime now reports these fixed, path-free stages in **Settings → Video
+processing → Last processing result**:
+
+- `video-tool-configuration-rejected`: a tool path/hash is missing or its hash
+  does not have the approved lowercase SHA-256 format.
+- `video-ffmpeg-approval-rejected`: the configured FFmpeg path, physical file
+  or SHA-256 approval is invalid.
+- `video-ffprobe-approval-rejected`: the corresponding FFprobe validation
+  failed.
+- `video-cache-validation-rejected`: the private derivative cache is not
+  a verified, physically local, marked, unlinked root separated from archive
+  sources.
+- `video-safety-or-configuration-rejected`: a different runtime video safety
+  gate rejected processing after basic preflight.
+
+Only stage codes are emitted. Neither operator source paths nor executable
+paths, digest values, media metadata, exception messages or child-process
+output are exposed. A preflight rejection is **not** evidence that previously
+indexed photo folders suppress video discovery; video enumeration has not run.
+
+If the published app uses an explicit `PhotoIdentity:VideoProcessing:CacheRoot`,
+it must already contain the exact app-owned marker documented above. If the
+setting is omitted, the dedicated default app-local cache may be created and
+marked automatically. Do not add an ownership marker to an arbitrary directory,
+change source locations or disable the guard to resolve a rejection.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37
