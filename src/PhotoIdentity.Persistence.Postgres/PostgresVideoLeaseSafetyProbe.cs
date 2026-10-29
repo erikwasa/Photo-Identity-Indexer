@@ -21,11 +21,18 @@ public sealed class PostgresVideoLeaseSafetyProbe(PostgresCatalogueDatabase data
 
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand command = connection.CreateCommand();
+        // Must match PostgresVideoPhotoPriorityProbe's shared-archive
+        // admission semantics: the archive worker is still desired=running
+        // while its runtime phase is video-processing. Any new sync request,
+        // different running photo phase, photo run or active photo job must
+        // immediately preempt an already-claimed video lease.
         command.CommandText = """
             SELECT control.enabled, control.paused, control.generation,
                    EXISTS (
                        SELECT 1 FROM archive_advancement_control
-                       WHERE desired_state='running' OR sync_required
+                       WHERE sync_required OR
+                         (desired_state='running' AND
+                          runtime_state <> 'video-processing')
                    ) OR EXISTS (
                        SELECT 1 FROM processing_runs
                        WHERE status IN ('pending', 'running')
