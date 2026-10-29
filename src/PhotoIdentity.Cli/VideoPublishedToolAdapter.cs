@@ -39,14 +39,46 @@ public sealed class VideoPublishedToolAdapter(
                     // job before committing the receipt and succeeded state.
                     string output = Path.Combine(workspace, "output.mp4");
                     if (validateBeforePublish is not null)
-                        await validateBeforePublish(output, publicationToken);
-                    committed = await new VideoDerivativeFilePublisher(database)
-                        .PublishAsync(lease, scratchRoot, output, publicationToken);
+                    {
+                        try { await validateBeforePublish(output, publicationToken); }
+                        catch (Exception error)
+                        {
+                            VideoAttemptFailureDiagnostics.Mark(error, "output-validation");
+                            throw;
+                        }
+                    }
+                    try
+                    {
+                        committed = await new VideoDerivativeFilePublisher(database)
+                            .PublishAsync(lease, scratchRoot, output, publicationToken);
+                    }
+                    catch (Exception error)
+                    {
+                        VideoAttemptFailureDiagnostics.Mark(error, "publication");
+                        throw;
+                    }
                 });
 
         // Even if a post-publication sampling tick observes a new photo job,
         // a committed receipt remains durable. The coordinator independently
         // verifies the receipt rather than trusting this in-memory flag.
-        return new(committed, !committed && result.Started);
+        if (committed)
+            return new(true, false);
+
+        // A nonzero FFmpeg exit and a guarded interruption previously
+        // collapsed into the same generic retry. Both are first-party,
+        // fixed labels; never return ffmpeg stderr or a media filename.
+        VideoAttemptFailureDiagnostic failure = result switch
+        {
+            { Started: false } =>
+                new("tool-execution", "execution-not-started"),
+            { ExitCode: not null and not 0 } =>
+                new("tool-execution", "tool-exit-nonzero",
+                    ToolExitCode: result.ExitCode),
+            { Completed: false } =>
+                new("tool-execution", "execution-interrupted"),
+            _ => new("publication", "not-committed")
+        };
+        return new(false, result.Started, failure);
     }
 }
