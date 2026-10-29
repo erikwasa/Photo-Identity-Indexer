@@ -78,11 +78,25 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         {
             // Lease will expire and be recovered; a database error is never
             // interpreted as valid authority or successful publication.
-            return new(true, false, "safety-observation-failed");
+            return new(true, false, "safety-observation-failed",
+                new("lease-safety", "observation-unavailable"));
         }
 
         if (!permit.Allowed)
-            return new(true, false, permit.ReasonCode);
+        {
+            // The lease probe returns first-party fixed reason codes. Never
+            // copy a future unrecognized reason into the operator surface.
+            string safeReason = permit.ReasonCode switch
+            {
+                "lease-invalid" or "control-unavailable" or
+                "video-disabled" or "video-paused" or
+                "control-generation-changed" or "photo-priority" or
+                "selected-authorization-expired" => permit.ReasonCode,
+                _ => "authorization-refused"
+            };
+            return new(true, false, permit.ReasonCode,
+                new("lease-safety", safeReason));
+        }
 
         // Bound cooperative adapter lifetime independently from the lease's
         // 60-second renewed heartbeats. Adapters MUST terminate their child
@@ -145,7 +159,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
         catch
         {
-            return new(true, false, "completion-observation-failed");
+            return new(true, false, "completion-observation-failed",
+                new("publication", "completion-observation-unavailable"));
         }
 
         if (state?.Status == "succeeded" && state.ProgressPercent == 100 &&
@@ -158,7 +173,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         await queue.TryFinishAttemptAsync(
             lease.Id, lease.LeaseToken, succeeded: false,
             retryable: false, token: token);
-        return new(true, false, "publication-required");
+        return new(true, false, "publication-required",
+            new("publication", "missing-durable-receipt"));
     }
 
     private static async Task<VideoWorkerCycleResult> RecordFailureAsync(
@@ -211,7 +227,7 @@ public static class VideoAttemptFailureDiagnostics
     private static readonly HashSet<string> AllowedStages =
     [
         "source-staging", "tool-execution", "output-validation",
-        "publication"
+        "publication", "lease-safety"
     ];
 
     public static void Mark(Exception exception, string stage)
