@@ -246,7 +246,8 @@ public sealed class VideoArchiveProcessingService(
                             requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
                 if (result.Failure is not null)
-                    Volatile.Write(ref _lastAttemptFailure, result.Failure);
+                    Volatile.Write(ref _lastAttemptFailure,
+                        VideoAttemptFailureDiagnostics.Sanitize(result.Failure));
                 return result.Claimed || candidate is not null || discovered;
             }
             finally
