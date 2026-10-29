@@ -109,8 +109,9 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
             // must not hang a worker that is supposed to be stopping.
             using CancellationTokenSource acknowledgment =
                 new(TimeSpan.FromSeconds(5));
-            return await RecordFailureAsync(
-                queue, lease, retryable: true, acknowledgment.Token);
+            return await RecordFailureAsync(queue, lease, retryable: true,
+                acknowledgment.Token,
+                new("tool-execution", "attempt-timeout"));
         }
         catch (Exception error)
         {
