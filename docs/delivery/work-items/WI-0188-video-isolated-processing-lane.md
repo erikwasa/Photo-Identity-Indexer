@@ -1224,6 +1224,38 @@ Production activation remains prohibited until reviewed.
   integrity before deciding whether a separate root-cause fix is needed.
   Do not bulk-retry or mark acceptance on synthetic results alone.
 
+### Maintained-host checkpoint — lease photo priority mismatch (2026-10-30)
+
+- After merging PR #661, the operator reported `lastAttemptFailure`
+  `stage=lease-safety`, `failureClass=photo-priority` while the shared archive
+  reported `lastResult=no-eligible-video`, `processing=false`,
+  `succeeded=0`, `failed=7`, and one running lease that subsequently
+  became expired. Seven jobs at the three-attempt limit cannot be assumed
+  to have identical historical causes.
+- Root cause of the observed rejection: the admission observer
+  `PostgresVideoPhotoPriorityProbe` correctly excludes the archive's
+  own `desired_state=running/runtime_state=video-processing/sync_required=false`
+  phase from photo work, but `PostgresVideoLeaseSafetyProbe` incorrectly
+  treated *any* `desired_state=running` as photo work. The worker could
+  claim an authorized video lease and then reject that lease as
+  `photo-priority` without running FFmpeg.
+- Fix aligns the lease's photo-work predicate with the existing photo-first
+  admission predicate. A new sync request, any other running archive phase,
+  any active photo run or photo job still interrupts a video lease. The
+  guard remains fail-closed; no job budget, original, cache or database schema
+  changes are made.
+- An isolated PostgreSQL regression checks admission and lease safety
+  agreement through shared video processing, new sync request, other archive
+  phase, and renewed video phase. Existing in-flight photo preemption, stop,
+  generation and lease fencing coverage is retained.
+- **Acceptance remains pending.** After a successful CI/merge and new
+  package installation, keep online-only hydration disabled, start the
+  archive to recover the expired lease and inspect the settings status.
+  Explicitly retry only one current, unexcluded failed video through the
+  existing operator UI if necessary. Verify at least one published proxy,
+  original-file integrity, and unchanged photo behavior before acceptance.
+  Never reset every failed job or manually edit lease/database state.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
