@@ -230,6 +230,56 @@ public static class VideoAttemptFailureDiagnostics
         "publication", "lease-safety"
     ];
 
+    private static readonly HashSet<string> ReportStages =
+    [
+        "source-staging", "tool-execution", "output-validation",
+        "publication", "lease-safety", "adapter-report",
+        "acknowledgement", "unclassified"
+    ];
+
+    private static readonly HashSet<string> ReportClasses =
+    [
+        "missing-attempt-report", "not-published", "attempt-timeout",
+        "observation-unavailable", "lease-invalid", "control-unavailable",
+        "video-disabled", "video-paused", "control-generation-changed",
+        "photo-priority", "selected-authorization-expired",
+        "authorization-refused", "completion-observation-unavailable",
+        "missing-durable-receipt", "acknowledgement-unavailable",
+        "execution-not-started", "tool-exit-nonzero",
+        "execution-interrupted", "not-committed",
+        "probe-not-started", "probe-preempted",
+        "probe-tool-nonzero", "probe-missing-output",
+        "native-process-setup", "timeout", "filesystem-access-denied",
+        "required-file-missing", "required-directory-missing",
+        "filesystem-io", "invalid-media-evidence", "configuration-rejected",
+        "execution-safety-rejected", "cancelled", "unexpected-failure"
+    ];
+
+    private static readonly HashSet<string> ReportCheckpoints =
+    [
+        "resource-profile-refused", "linked-executable",
+        "tool-digest-mismatch", "linked-tool-path",
+        "argument-preparation", "job-object-setup",
+        "suspended-process-launch", "process-observation",
+        "post-exit-validation", "scratch-entry-limit",
+        "scratch-linked-entry", "scratch-byte-limit",
+        "process-shutdown-unverified", "io-accounting-unavailable",
+        "io-budget-exceeded"
+    ];
+
+    public static VideoAttemptFailureDiagnostic Sanitize(
+        VideoAttemptFailureDiagnostic input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return new(
+            ReportStages.Contains(input.Stage) ? input.Stage : "unclassified",
+            ReportClasses.Contains(input.FailureClass)
+                ? input.FailureClass : "unexpected-failure",
+            input.SupervisorCheckpoint is string checkpoint &&
+                ReportCheckpoints.Contains(checkpoint) ? checkpoint : null,
+            input.ToolExitCode);
+    }
+
     public static void Mark(Exception exception, string stage)
     {
         ArgumentNullException.ThrowIfNull(exception);
