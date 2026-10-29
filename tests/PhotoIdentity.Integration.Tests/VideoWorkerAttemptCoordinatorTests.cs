@@ -36,6 +36,19 @@ public sealed class VideoWorkerAttemptCoordinatorTests
         Assert.Equal("execution-safety-rejected", toolDiagnostic.FailureClass);
         Assert.Equal("io-accounting-unavailable", toolDiagnostic.SupervisorCheckpoint);
         Assert.DoesNotContain("private", JsonSerializer.Serialize(toolDiagnostic));
+
+        // Even a future adapter reporting arbitrary strings cannot leak them
+        // through the settings endpoint's in-memory diagnostic.
+        var malformed = new VideoAttemptFailureDiagnostic(
+            @"C:\private\source.mov", @"ffmpeg says private-source",
+            @"C:\private\cache", 123);
+        VideoAttemptFailureDiagnostic scrubbed =
+            VideoAttemptFailureDiagnostics.Sanitize(malformed);
+        Assert.Equal("unclassified", scrubbed.Stage);
+        Assert.Equal("unexpected-failure", scrubbed.FailureClass);
+        Assert.Null(scrubbed.SupervisorCheckpoint);
+        Assert.Equal(123, scrubbed.ToolExitCode);
+        Assert.DoesNotContain("private", JsonSerializer.Serialize(scrubbed));
     }
 
     [Fact]
