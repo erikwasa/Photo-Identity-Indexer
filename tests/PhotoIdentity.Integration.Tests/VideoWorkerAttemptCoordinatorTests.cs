@@ -53,7 +53,6 @@ public sealed class VideoWorkerAttemptCoordinatorTests
 
     [Fact]
     public async Task Unsafe_configuration_and_default_off_refuse_before_any_database_access()
-    public async Task Unsafe_configuration_and_default_off_refuse_before_any_database_access()
     {
         await using PostgresCatalogueDatabase database = new(
             "Host=127.0.0.1;Port=1;Database=never_connect;Username=fixture;Pooling=false");
