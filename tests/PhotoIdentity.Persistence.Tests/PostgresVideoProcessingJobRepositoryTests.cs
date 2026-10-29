@@ -526,6 +526,69 @@ public sealed class PostgresVideoProcessingJobRepositoryTests
                 first, resumedLease.LeaseToken, 50));
             Assert.True((await probe.CheckAsync(resumedLease)).Allowed);
 
+            // The shared archive worker remains desired=running after photos
+            // drain, but explicitly sets its phase to video-processing. The
+            // lease safety check must agree with the claim priority probe:
+            // video may execute in that phase, and a new sync request or
+            // photo phase must immediately veto the same running lease.
+            var phasePriority = new PostgresVideoPhotoPriorityProbe(database);
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand archive = connection.CreateCommand())
+            {
+                archive.CommandText = """
+                    INSERT INTO archive_advancement_control(
+                        source_id, desired_state, runtime_state,
+                        sync_required, updated_at_utc)
+                    VALUES (@source, 'running', 'video-processing', false, now());
+                    """;
+                archive.Parameters.AddWithValue("source", source);
+                Assert.Equal(1, await archive.ExecuteNonQueryAsync());
+            }
+            Assert.False((await phasePriority.GetAsync()).PhotoWorkActive);
+            Assert.True((await probe.CheckAsync(resumedLease)).Allowed);
+
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand sync = connection.CreateCommand())
+            {
+                sync.CommandText = """
+                    UPDATE archive_advancement_control
+                    SET sync_required=true WHERE source_id=@source;
+                    """;
+                sync.Parameters.AddWithValue("source", source);
+                Assert.Equal(1, await sync.ExecuteNonQueryAsync());
+            }
+            Assert.True((await phasePriority.GetAsync()).PhotoWorkActive);
+            Assert.Equal("photo-priority",
+                (await probe.CheckAsync(resumedLease)).ReasonCode);
+
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand otherPhase = connection.CreateCommand())
+            {
+                otherPhase.CommandText = """
+                    UPDATE archive_advancement_control
+                    SET sync_required=false, runtime_state='running'
+                    WHERE source_id=@source;
+                    """;
+                otherPhase.Parameters.AddWithValue("source", source);
+                Assert.Equal(1, await otherPhase.ExecuteNonQueryAsync());
+            }
+            Assert.True((await phasePriority.GetAsync()).PhotoWorkActive);
+            Assert.Equal("photo-priority",
+                (await probe.CheckAsync(resumedLease)).ReasonCode);
+
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand backToVideo = connection.CreateCommand())
+            {
+                backToVideo.CommandText = """
+                    UPDATE archive_advancement_control
+                    SET runtime_state='video-processing' WHERE source_id=@source;
+                    """;
+                backToVideo.Parameters.AddWithValue("source", source);
+                Assert.Equal(1, await backToVideo.ExecuteNonQueryAsync());
+            }
+            Assert.False((await phasePriority.GetAsync()).PhotoWorkActive);
+            Assert.True((await probe.CheckAsync(resumedLease)).Allowed);
+
             // A photo-processing run starts after the video lease was claimed:
             // preemption must observe it without touching photo job state.
             Guid photoRun = Guid.NewGuid();

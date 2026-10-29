@@ -197,6 +197,35 @@ need to expire and be recovered by the next authorized archive pass before
 a new job becomes admissible. `expiredLeases=0` means only that none
 were expired at the instant the status was read.
 
+## Shared archive video phase and lease priority — 2026-10-30
+
+The maintainer observed `lastAttemptFailure.stage=lease-safety` and
+`failureClass=photo-priority` with `succeeded=0`, seven failed jobs,
+and a third-attempt running lease that later expired. This was traced to
+a mismatch: the photo-priority *admission* observer recognizes
+`runtime_state=video-processing` as the shared archive's own
+video phase (only when no sync or photo work remains), but the lease
+safety observer previously rejected every `desired_state=running`
+archive session. The guarded worker was thus allowed to claim a job
+and subsequently vetoed itself.
+
+The fix makes both authoritative photo observers use the same decision:
+`sync_required=true` **always** preempts, as does any
+`desired_state=running` with `runtime_state` other than
+`video-processing`, pending/running photo runs, or associated
+queued/running photo jobs. All original/exclusion/lease and publication
+guards remain unchanged. A new run may safely recover expired leases
+through the existing queue repository; terminal `attempt-limit` rows
+are **not** automatically reset.
+
+After installing the fixed build, leave online-only hydration disabled
+and start the shared archive once. Observe `running`,
+`expiredLeases`, `succeeded`, and `lastAttemptFailure`. If no video
+is pending, use the existing **Retry** control for exactly one
+eligible failed job (only if the original revision remains current),
+start the archive, and inspect the job and any derivative. Do not
+repeatedly retry all failed jobs or bypass photo-priority checks.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37
