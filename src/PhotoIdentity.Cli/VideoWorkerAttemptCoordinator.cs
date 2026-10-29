@@ -21,7 +21,8 @@ public interface IVideoPublishedDerivativeAdapter
 /// durable PostgreSQL job state; claiming success in memory isn't sufficient.
 /// </summary>
 public sealed record VideoDerivativeAttemptReport(
-    bool Published, bool Retryable);
+    bool Published, bool Retryable,
+    VideoAttemptFailureDiagnostic? Failure = null);
 
 /// <summary>
 /// A single bounded admission/attempt cycle. No hidden timer, service, hosted
@@ -111,17 +112,21 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
             return await RecordFailureAsync(
                 queue, lease, retryable: true, acknowledgment.Token);
         }
-        catch
+        catch (Exception error)
         {
-            // Do not expose source names, tool output or exception content.
-            return await RecordFailureAsync(
-                queue, lease, retryable: true, token);
+            // The adapter may attach only a known failure stage. Never expose
+            // its exception message, source path, or native tool output.
+            return await RecordFailureAsync(queue, lease, retryable: true,
+                token, VideoAttemptFailureDiagnostics.FromException(error));
         }
 
         if (report is null)
-            return await RecordFailureAsync(queue, lease, retryable: false, token);
+            return await RecordFailureAsync(queue, lease, retryable: false,
+                token, new("adapter-report", "missing-attempt-report"));
         if (!report.Published)
-            return await RecordFailureAsync(queue, lease, report.Retryable, token);
+            return await RecordFailureAsync(queue, lease, report.Retryable,
+                token, report.Failure ??
+                    new VideoAttemptFailureDiagnostic("adapter-report", "not-published"));
 
         // The adapter cannot authorize success by returning true. It must
         // have committed a durable revision/exclusion/lease-fenced result.
@@ -157,7 +162,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
 
     private static async Task<VideoWorkerCycleResult> RecordFailureAsync(
         PostgresVideoProcessingJobRepository queue, VideoProcessingJobLease lease,
-        bool retryable, CancellationToken token)
+        bool retryable, CancellationToken token,
+        VideoAttemptFailureDiagnostic? failure = null)
     {
         try
         {
@@ -166,7 +172,7 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
                 retryable: retryable, token: token);
             return new(true, false, recorded
                 ? (retryable ? "retry-pending" : "failed")
-                : "lease-revoked");
+                : "lease-revoked", failure);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -174,11 +180,69 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
         catch
         {
-            return new(true, false, "acknowledgement-unavailable");
+            return new(true, false, "acknowledgement-unavailable",
+                failure ?? new("acknowledgement", "acknowledgement-unavailable"));
         }
     }
 }
 
 /// <summary>No paths, identities, inputs, filenames or media content.</summary>
 public sealed record VideoWorkerCycleResult(
-    bool Claimed, bool Published, string ReasonCode);
+    bool Claimed, bool Published, string ReasonCode,
+    VideoAttemptFailureDiagnostic? Failure = null);
+
+/// <summary>
+/// Only first-party constant labels and numeric exit codes reach the API.
+/// There is no source file name, tool output, native message or exception text.
+/// In-memory evidence is retained for the current process only.
+/// </summary>
+public sealed record VideoAttemptFailureDiagnostic(
+    string Stage, string FailureClass,
+    string? SupervisorCheckpoint = null, int? ToolExitCode = null);
+
+/// <summary>
+/// Mark precisely which phase threw without wrapping the exception or changing
+/// its cancellation, cleanup, or lease-acknowledgement semantics.
+/// </summary>
+public static class VideoAttemptFailureDiagnostics
+{
+    private const string StageKey = "PhotoIdentity.VideoAttempt.SanitizedStage";
+    private static readonly HashSet<string> AllowedStages =
+    [
+        "source-staging", "tool-execution", "output-validation",
+        "publication"
+    ];
+
+    public static void Mark(Exception exception, string stage)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        if (!AllowedStages.Contains(stage))
+            throw new ArgumentException("Video failure stage is not allowlisted.");
+        if (!exception.Data.Contains(StageKey))
+            exception.Data[StageKey] = stage;
+    }
+
+    public static VideoAttemptFailureDiagnostic FromException(Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        string stage = error.Data[StageKey] is string marked &&
+            AllowedStages.Contains(marked) ? marked : "unclassified";
+        string failureClass = error switch
+        {
+            VideoProxyValidationException validation => validation.ReasonCode,
+            System.ComponentModel.Win32Exception => "native-process-setup",
+            TimeoutException => "timeout",
+            UnauthorizedAccessException => "filesystem-access-denied",
+            FileNotFoundException => "required-file-missing",
+            DirectoryNotFoundException => "required-directory-missing",
+            IOException => "filesystem-io",
+            InvalidDataException => "invalid-media-evidence",
+            ArgumentException => "configuration-rejected",
+            InvalidOperationException => "execution-safety-rejected",
+            OperationCanceledException => "cancelled",
+            _ => "unexpected-failure"
+        };
+        return new(stage, failureClass, VideoToolFailureEvidence.Read(error),
+            error is VideoProxyValidationException probe ? probe.ToolExitCode : null);
+    }
+}
