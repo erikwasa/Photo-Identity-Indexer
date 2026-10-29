@@ -149,6 +149,54 @@ setting is omitted, the dedicated default app-local cache may be created and
 marked automatically. Do not add an ownership marker to an arbitrary directory,
 change source locations or disable the guard to resolve a rejection.
 
+## Real-media worker failures after synthetic pilot passes (WI-0188)
+
+The local `video synthetic-proxy-pilot --apply` checks the fixed 720p
+encoder/probe contract under Windows constraints using transient generated
+inputs. A passing pilot **does not** test actual OneDrive staging,
+registered revision hashes, source-specific media, PostgreSQL lease fencing,
+real-file I/O limits, or derivative publication.
+
+An operator observed on 2026-10-29: the synthetic landscape/audio and
+portrait/no-audio runs both passed (`status=validated`, exit code 0);
+the live queue nonetheless had six `failed` jobs with three attempts each,
+plus a `queued` and a `running` job, with zero successes.
+The live `lastResult=no-admissible-job` is **not** the failure cause:
+one reserved running lease can prevent the sole worker from claiming the
+queued job. `attempt-limit` is the terminal database reason after three
+attempts, not the original low-level worker error.
+
+The settings response now also exposes `lastAttemptFailure` with only
+`stage`, `failureClass`, optional `supervisorCheckpoint` and optional
+numeric `toolExitCode`. The last failure stays available in memory even
+if the next archive pass reports `no-admissible-job`. It resets on
+application restart. Earlier attempt causes are not recoverable from
+`attempt-limit` rows without one new, explicitly authorized retry.
+The API does not return source paths, job input, tool stderr/stdout,
+exception messages, or operator configuration.
+
+**After installing this diagnostic build**, while online-only hydration
+remains off, inspect the current queue and the retained stage:
+
+```powershell
+$status = Invoke-RestMethod "http://127.0.0.1:5080/api/video-processing/settings"
+$status | Select-Object enabled, processing, lastResult,
+    queued, running, succeeded, failed, expiredLeases, lastAttemptFailure |
+    Format-List
+$status.recent | Select-Object jobId, status, attempts, progressPercent,
+    failureCode | Format-Table -AutoSize
+```
+
+If the new build has not seen a failing attempt yet, `lastAttemptFailure`
+will be null. Only when the operator chooses one still-current, unexcluded
+failed job, use its existing **Retry** action once, then **Advance archive**
+to exercise the worker again. Check counters and `lastAttemptFailure`
+afterwards; do not mass-retry, reset the PostgreSQL queue, delete the
+derivative cache, or bypass any stage guard. A previously running lease may
+need to expire and be recovered by the next authorized archive pass before
+a new job becomes admissible. `expiredLeases=0` means only that none
+were expired at the instant the status was read.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37

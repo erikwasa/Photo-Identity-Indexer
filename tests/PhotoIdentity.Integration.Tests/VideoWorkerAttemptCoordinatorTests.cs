@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Npgsql;
 using PhotoIdentity.Cli;
 using PhotoIdentity.Core.Identifiers;
@@ -9,6 +10,47 @@ namespace PhotoIdentity_Integration_Tests;
 
 public sealed class VideoWorkerAttemptCoordinatorTests
 {
+    [Fact]
+    public void Failure_stages_are_allowlisted_and_messages_never_leave_the_diagnostic()
+    {
+        var source = new IOException(@"C:\Users\private\OneDrive\family.mov");
+        VideoAttemptFailureDiagnostics.Mark(source, "source-staging");
+        VideoAttemptFailureDiagnostics.Mark(source, "tool-execution");
+        VideoAttemptFailureDiagnostic diagnostic =
+            VideoAttemptFailureDiagnostics.FromException(source);
+        Assert.Equal("source-staging", diagnostic.Stage);
+        Assert.Equal("filesystem-io", diagnostic.FailureClass);
+        Assert.Null(diagnostic.SupervisorCheckpoint);
+        Assert.Null(diagnostic.ToolExitCode);
+        Assert.DoesNotContain("OneDrive", JsonSerializer.Serialize(diagnostic));
+
+        Assert.Throws<ArgumentException>(() =>
+            VideoAttemptFailureDiagnostics.Mark(source, @"C:\sensitive.mov"));
+
+        var tool = new InvalidOperationException("path-and-arguments-private");
+        VideoToolFailureEvidence.Mark(tool, "io-accounting-unavailable");
+        VideoAttemptFailureDiagnostics.Mark(tool, "tool-execution");
+        VideoAttemptFailureDiagnostic toolDiagnostic =
+            VideoAttemptFailureDiagnostics.FromException(tool);
+        Assert.Equal("tool-execution", toolDiagnostic.Stage);
+        Assert.Equal("execution-safety-rejected", toolDiagnostic.FailureClass);
+        Assert.Equal("io-accounting-unavailable", toolDiagnostic.SupervisorCheckpoint);
+        Assert.DoesNotContain("private", JsonSerializer.Serialize(toolDiagnostic));
+
+        // Even a future adapter reporting arbitrary strings cannot leak them
+        // through the settings endpoint's in-memory diagnostic.
+        var malformed = new VideoAttemptFailureDiagnostic(
+            @"C:\private\source.mov", @"ffmpeg says private-source",
+            @"C:\private\cache", 123);
+        VideoAttemptFailureDiagnostic scrubbed =
+            VideoAttemptFailureDiagnostics.Sanitize(malformed);
+        Assert.Equal("unclassified", scrubbed.Stage);
+        Assert.Equal("unexpected-failure", scrubbed.FailureClass);
+        Assert.Null(scrubbed.SupervisorCheckpoint);
+        Assert.Equal(123, scrubbed.ToolExitCode);
+        Assert.DoesNotContain("private", JsonSerializer.Serialize(scrubbed));
+    }
+
     [Fact]
     public async Task Unsafe_configuration_and_default_off_refuse_before_any_database_access()
     {
@@ -132,6 +174,8 @@ public sealed class VideoWorkerAttemptCoordinatorTests
             Assert.True(retry.Claimed);
             Assert.False(retry.Published);
             Assert.Equal("retry-pending", retry.ReasonCode);
+            Assert.Equal("unclassified", retry.Failure?.Stage);
+            Assert.Equal("filesystem-io", retry.Failure?.FailureClass);
             Assert.Equal("queued", (await queue.GetAsync(retryId))?.Status);
             Assert.DoesNotContain("sensitive", retry.ReasonCode);
 

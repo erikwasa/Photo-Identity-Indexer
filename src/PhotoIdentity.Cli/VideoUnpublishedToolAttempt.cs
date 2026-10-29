@@ -51,6 +51,7 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
         // and subprocess execution. A heartbeat refusal is a mandatory
         // cancellation, never an invitation to continue.
         Task heartbeat = HeartbeatAsync(queue, lease, workToken);
+        string failureStage = "source-staging";
         try
         {
             VideoExecutionPermit initial = await safety.CheckAsync(lease, workToken.Token);
@@ -65,6 +66,7 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
             if (!afterStage.Allowed)
                 return new(false, false, afterStage.ReasonCode, null);
 
+            failureStage = "tool-execution";
             var guarded = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
             VideoGuardedToolExecutionResult execution = await guarded.RunAsync(
                 executablePath, lease.ToolSha256, scratchRoot,
@@ -78,6 +80,13 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
             // Do not call TryFinishAttemptAsync(success:true) from here:
             // no derivative is atomically persisted by WI-0188.
             return execution;
+        }
+        catch (Exception error)
+        {
+            // The more specific validation/publication marker (if present)
+            // takes precedence over this outer stage. Never log the error.
+            VideoAttemptFailureDiagnostics.Mark(error, failureStage);
+            throw;
         }
         finally
         {

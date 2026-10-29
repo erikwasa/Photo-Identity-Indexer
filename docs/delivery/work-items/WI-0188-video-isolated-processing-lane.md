@@ -1193,6 +1193,37 @@ Production activation remains prohibited until reviewed.
 - **CI and maintained-host verification are pending.** Documentation and
   implementation are not acceptance by themselves.
 
+### Maintained-host checkpoint — synthetic PASS, real-video attempts fail (2026-10-29)
+
+- The operator installed the merged PR #660 packaged launcher, using the
+  underlying physical WinGet FFmpeg/FFprobe binaries rather than their
+  rejected symbolic-link aliases. The application runs with PostgreSQL
+  schema v37 and video processing explicitly enabled.
+- Video discovery and registration progressed: the status API reported six
+  failed jobs, each with three attempts and `failureCode=attempt-limit`;
+  one further job was queued and one still marked running. At the reading,
+  `processing=false`, `lastResult=no-admissible-job`,
+  `expiredLeases=0`, and `succeeded=0`.
+- The controlled `video synthetic-proxy-pilot --apply` PASSED with exit
+  code 0: landscape with audio yielded 720×406/3s, portrait without audio
+  yielded 406×720/3s, and independent FFprobe validation succeeded. It
+  touched no original or PostgreSQL job and retained no derivative.
+- This proves only the synthetic codec/profile/process route. It does **not**
+  prove real-file staging, OneDrive safety, IO/lease capacity or durable
+  publication. The previous `attempt-limit` code discards the original
+  failure stage and `no-admissible-job` only indicates a claim refusal.
+- Follow-up implementation preserves a sanitized in-memory
+  `lastAttemptFailure` from worker attempt exceptions and unsuccessful
+  supervised executions, with allowlisted stage, failure class, optional
+  guard checkpoint and numeric tool exit code. It remains visible even if
+  the next archive cycle reports no admissible job. No PostgreSQL schema,
+  worker concurrency, originals, photo processing, or sandbox guard changes.
+- **Status remains in progress**: after a merged/installed diagnostic build,
+  locally retry **one** eligible failed job through the existing operator
+  action and record the new fixed-stage diagnostic, queue state and original
+  integrity before deciding whether a separate root-cause fix is needed.
+  Do not bulk-retry or mark acceptance on synthetic results alone.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,

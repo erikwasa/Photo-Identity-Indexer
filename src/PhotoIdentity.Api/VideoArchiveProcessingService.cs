@@ -28,7 +28,12 @@ public sealed class VideoArchiveProcessingService(
     private readonly object _activeLock = new();
     private CancellationTokenSource? _active;
     private string _lastResult = "not-run";
+    private VideoAttemptFailureDiagnostic? _lastAttemptFailure;
     public string LastResult => Volatile.Read(ref _lastResult);
+    // Deliberately not cleared by a later no-admissible-job cycle.
+    // In-memory only: restarting the API resets this diagnostic.
+    public VideoAttemptFailureDiagnostic? LastAttemptFailure =>
+        Volatile.Read(ref _lastAttemptFailure);
     public bool IsProcessing
     {
         get { lock (_activeLock) return _active is not null; }
@@ -240,6 +245,9 @@ public sealed class VideoArchiveProcessingService(
                             selectedJobId: selectedJobId,
                             requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
+                if (result.Failure is not null)
+                    Volatile.Write(ref _lastAttemptFailure,
+                        VideoAttemptFailureDiagnostics.Sanitize(result.Failure));
                 return result.Claimed || candidate is not null || discovered;
             }
             finally
