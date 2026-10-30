@@ -24,9 +24,26 @@ The maintainer explicitly moved that separate opted-in OneDrive
 verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 a new proposed M30 workitem dependent on WI-0188. This does not
 permit automatic hydration or alter locally available video behavior.
-WI-0189 local proxy cache retention is now **in progress** (PR #665);
+WI-0189 local proxy cache retention remains **in progress** (PRs #665,
+#666 merged; #667 open);
 other M30 playback, frame analysis, search and collection integrations
 remain separately proposed. **M30 is not complete.**
+
+## WI-0189 opt-in publication quota checkpoint 3 (2026-10-30)
+
+PR #667 adds a deliberately configured registered-byte publication
+fence to the **existing** shared Archive video lane: per-file cap checked
+before publication, aggregate receipt bytes checked under a serialized
+PostgreSQL success transaction, path-free non-retryable quota diagnostic
+and safe known-uncommitted output cleanup. Existing video preferences,
+originals, online-only hydration, poster and photo paths are unchanged.
+Without BOTH approved config keys, the original WI-0188 behavior applies.
+
+This **does not automatically evict** files, impose a hard physical
+filesystem quota, configure the encode profile from Settings or establish
+real MOV/MP4 quality/seek/audio acceptance. Checkpoint 3 tests are still
+pending CI and optional later local regression. WI-0189 remains in progress
+with all acceptance checkboxes open.
 
 ## WI-0189 retention checkpoint 2 (2026-10-30)
 
@@ -35,12 +52,11 @@ retention-policy tests passing on Windows after bypassing a NuGet Webcil
 conversion permission error via `WasmEnableWebcil=false`; the maintainer
 also reports running documentation validation and regeneration.
 
-PR #666 extends this with a **read-only** PostgreSQL-backed registered
+Merged PR #666 extends this with a **read-only** PostgreSQL-backed registered
 proxy inventory/retention preview, safe private-cache evidence checks,
 fail-closed incomplete inventory, and a non-mutating CLI command. The
 existing limited operator-only revocation maintenance remains unchanged.
-No real media or PostgreSQL result is claimed for PR #666 until its
-tests/CI run. No automatic eviction, persisted quota/profile Settings or
+No separate maintainer PostgreSQL result was supplied for PR #666. No automatic eviction, persisted quota/profile Settings or
 hard filesystem quota is enabled. See the
 [WI-0189 retention runbook](../../operations/video-proxy-retention-wi0189.md).
 
@@ -157,7 +173,7 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665, #666).
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665, #666 merged; #667 open).
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.
