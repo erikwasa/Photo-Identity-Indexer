@@ -4,19 +4,23 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**2026-10-30 M30 / WI-0189:** PRs #665/#666 merged.
-Maintainer ran 8/8 Windows retention policy tests for #665 successfully
-with `WasmEnableWebcil=false`; reported doc generation/validation,
-but no separate #666 PostgreSQL fixture outcome was supplied. PR #667
-on `feature/wi0189-atomic-publication-quota` adds optional opt-in
-registered-byte and per-file publication fences, serialized at the
-PostgreSQL success transaction with safe known-denied output cleanup.
-Tests/CI for this PR remain pending. No Settings quota UI, automatic
-eviction, hard filesystem capacity guarantee or real-media acceptance.
-Next develop lease-safe retention/eviction and configurable profile/
-retention settings, then bounded real local MOV/MP4 quality tests.
-WI-0189 remains `in_progress` (all acceptance boxes open).
-No online-only hydration; WI-0207 remains separate.
+**2026-10-30 M30 / WI-0189:** PRs #665–#667 merged;
+maintainer accepted 8/8 focused Windows tests for #665, ran docs
+validation/generation, and GitHub build for #667 passed. No separate
+maintainer Postgres test result for #666 and no representative WI-0189
+video-quality/size acceptance yet. PR #668 on
+`feature/wi0189-persisted-proxy-quota-settings` wires optional,
+validated, persisted per-file/total registered-byte limits into
+Video Settings and the existing archive publication fence; CI pending.
+Existing operator-only stopped-lane registered derivative maintenance
+already supports safe DB-first bounded eviction; don't duplicate
+its deletion path. Next develop safe, reviewed retention automation
+around the existing control/ownership/lease fences and configurable
+encoding profiles, then one batched Windows real-MOV/MP4 acceptance
+(size, quality, portrait, audio, seeking, immutable originals).
+WI-0189 remains `in_progress`; 0/4 full acceptance boxes signed.
+No automatically scheduled eviction or OneDrive hydration (WI-0207).
+
 
 **2026-10-22 repository-only planning / issue-retirement cleanup:**
 Audit all 33 surviving GitHub issues (12 open, 21 closed) and retire them
