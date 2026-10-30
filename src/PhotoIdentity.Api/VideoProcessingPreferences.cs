@@ -6,11 +6,6 @@ using Microsoft.Extensions.Configuration;
 namespace PhotoIdentity.Api;
 
 /// <summary>
-/// Persist only non-sensitive operator preferences, separately from the
-/// catalogue. Fail closed when the preferences file is invalid/unreadable.
-/// The Settings UI updates the in-memory snapshot without a host restart.
-/// </summary>
-/// <summary>
 /// Optional user preference overrides for the registered-byte publication
 /// fence. Null/null inherits the existing launcher/application configuration.
 /// Neither an inherited nor a user-configured quota enables auto eviction.
@@ -43,6 +38,11 @@ public sealed record VideoProcessingPreferences(
     }
 }
 
+/// <summary>
+/// Persist only non-sensitive operator preferences separately from the
+/// catalogue. Invalid/unreadable files fail closed; the Settings UI updates
+/// the active snapshot without a host restart.
+/// </summary>
 public sealed class VideoProcessingPreferencesStore
 {
     private readonly string _path;
