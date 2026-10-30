@@ -321,6 +321,7 @@ milestones:
   - WI-0190
   - WI-0191
   - WI-0202
+  - WI-0207
 - id: M31
   title: Bulk archive metadata enrichment
   status: completed
