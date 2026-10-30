@@ -36,7 +36,10 @@ H.264/AAC SDR software encode profile, retaining the existing exact
 720p preset and behavior as default. The same Settings checkpoint adds
 user-controlled **48-hour, 7-day or 30-day minimum retention age**
 for the already manually confirmed stopped-lane cleanup; legacy
-preferences retain 48 hours and no eviction runs automatically. Video Settings persists the
+preferences retain 48 hours and no eviction runs automatically.
+The browser preview/confirm retention endpoints are also restricted
+to direct loopback sockets on both sides, independent of optional
+trusted-LAN app exposure. Video Settings persists the
 profile and blocks changes while an attempt is active. Job identity,
 pending work and queued work now use the selected preset version
 and approved FFmpeg hash: old queued jobs are not processed under
