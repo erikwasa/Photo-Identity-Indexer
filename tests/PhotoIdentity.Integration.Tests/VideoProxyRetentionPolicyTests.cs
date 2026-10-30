@@ -60,8 +60,22 @@ public sealed class VideoProxyRetentionPolicyTests
         Assert.Equal("invalid-cache-inventory",
             VideoProxyRetentionPolicy.Plan(Limits, [Entry(1, -5, 0)], 100).Reason);
         Assert.Equal("invalid-cache-inventory",
-            VideoProxyRetentionPolicy.Plan(Limits,
-                [Entry(1, 800, 0), Entry(2, 800, 0)], 100).Reason);
+            VideoProxyRetentionPolicy.Plan(
+                new VideoProxyRetentionLimits(long.MaxValue, 100),
+                [Entry(1, long.MaxValue, 0), Entry(2, 1, 1)], 100).Reason);
+    }
+
+
+    [Fact]
+    public void Existing_over_quota_inventory_can_be_reclaimed_without_overflow()
+    {
+        var oldest = Entry(1, 800, 0);
+        var newer = Entry(2, 800, 1);
+        VideoProxyRetentionPlan plan = VideoProxyRetentionPolicy.Plan(
+            Limits, [newer, oldest], 100);
+        Assert.True(plan.Admitted);
+        Assert.Equal([oldest.DerivativeId], plan.EvictionIds);
+        Assert.Equal(900, plan.RemainingBytes);
     }
 
     [Fact]
