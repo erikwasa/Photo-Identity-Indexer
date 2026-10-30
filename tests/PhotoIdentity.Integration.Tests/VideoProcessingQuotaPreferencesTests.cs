@@ -157,6 +157,9 @@ public sealed class VideoProcessingQuotaPreferencesTests
         Assert.Throws<ArgumentException>(() =>
             new VideoProcessingSettingsUpdate(false, false, 1024, 128,
                 OverrideProxyLimits: false).MergeWith(existing));
+        Assert.Throws<ArgumentException>(() =>
+            new VideoProcessingSettingsUpdate(false, false,
+                OverrideProxyLimits: true).MergeWith(existing));
         Assert.Equal(1024, existing.MaximumCacheMiB);
     }
 
