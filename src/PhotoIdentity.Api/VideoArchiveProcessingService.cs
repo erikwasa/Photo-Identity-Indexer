@@ -122,9 +122,7 @@ public sealed class VideoArchiveProcessingService(
             await VideoDerivativeCacheGuard.ValidateAsync(database, cache, token);
             preflightStage = "quota-configuration";
             VideoProxyRetentionLimits? publicationQuota =
-                VideoProxyPublicationQuotaConfiguration.ParseOptional(
-                    configuration["PhotoIdentity:VideoProcessing:MaximumCacheMiB"],
-                    configuration["PhotoIdentity:VideoProcessing:MaximumProxyMiB"]);
+                preferences.Current.ResolvePublicationQuota(configuration);
             preflightStage = "runtime";
             var control = new PostgresVideoProcessingControlRepository(database);
             VideoProcessingControlState state = await control.GetAsync(token);
