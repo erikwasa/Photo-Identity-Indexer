@@ -45,7 +45,7 @@ public static class VideoProxyRetentionPolicy
         {
             if (item.DerivativeId == Guid.Empty || !seen.Add(item.DerivativeId) ||
                 item.Bytes <= 0 || item.Bytes > limits.MaximumCacheBytes ||
-                used > limits.MaximumCacheBytes - item.Bytes)
+                used > long.MaxValue - item.Bytes)
                 return new(false, Array.Empty<Guid>(), 0, "invalid-cache-inventory");
             used += item.Bytes;
         }
