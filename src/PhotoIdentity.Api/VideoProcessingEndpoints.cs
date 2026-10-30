@@ -36,6 +36,9 @@ public sealed record VideoProcessingSettingsUpdate(
             return new(Enabled, IncludeOnlineOnly);
         }
 
+        if (!MaximumCacheMiB.HasValue || !MaximumProxyMiB.HasValue)
+            throw new ArgumentException(
+                "Both quota limits are required when overriding launcher settings.");
         return new(Enabled, IncludeOnlineOnly, MaximumCacheMiB, MaximumProxyMiB);
     }
 }
