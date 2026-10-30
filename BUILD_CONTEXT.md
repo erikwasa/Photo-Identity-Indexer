@@ -4,6 +4,18 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-31 M30 / WI-0190 checkpoint 1:** After merged PR #672
+closed WI-0189, WI-0190 is in progress. The first source-free,
+deterministic interval/scene-balanced frame-sampling planner has
+bounded 24-frame / 48-second estimated decode reservation ceilings,
+short/long/many-scene synthetic tests and no filesystem, OneDrive,
+FFmpeg, model or catalogue integration. This is *planning only*, not
+runtime decoding enforcement. All four WI-0190 acceptance criteria
+remain open; next is a guarded opt-in extraction/model-compatibility
+pilot, then revision/model-specific persistence and evaluation. See
+`docs/operations/video-frame-evidence-sampling.md`. M30 is
+`in_progress`, not completed; online-only hydration remains WI-0207.
+
 **2026-10-30 M30 / WI-0189 FINAL ACCEPTANCE:** The maintainer
 accepted and closed WI-0189's bounded, already-local video proxy scope
 after PRs #665–#671 merged and successful GitHub Windows CI for #671.
