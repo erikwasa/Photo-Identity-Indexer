@@ -233,7 +233,13 @@ automatically deletes older copies, or changes source files.
 
 A legacy preferences file with only `Enabled` and
 `IncludeOnlineOnly` automatically inherits the launcher settings,
-without migration. Invalid/partial persisted limits are treated as
+without migration.
+Legacy API clients that PUT only `Enabled` and `IncludeOnlineOnly`
+also **preserve** any existing saved quota override. New clients must
+explicitly provide `overrideProxyLimits=true` with both numeric
+limits to create/change an override, or `overrideProxyLimits=false`
+with no limit values to clear it. Incomplete/ambiguous requests return
+a non-mutating bad-request response. Invalid/partial persisted limits are treated as
 invalid preferences: **video processing and online-only consent are
 disabled**, rather than guessing a budget or silently enabling work.
 On API updates, invalid limits are rejected before any video processing
