@@ -4,22 +4,23 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**2026-10-30 M30 / WI-0189:** PRs #665–#667 merged;
-maintainer accepted 8/8 focused Windows tests for #665, ran docs
-validation/generation, and GitHub build for #667 passed. No separate
-maintainer Postgres test result for #666 and no representative WI-0189
-video-quality/size acceptance yet. PR #668 on
-`feature/wi0189-persisted-proxy-quota-settings` wires optional,
-validated, persisted per-file/total registered-byte limits into
-Video Settings and the existing archive publication fence; CI pending.
-Existing operator-only stopped-lane registered derivative maintenance
-already supports safe DB-first bounded eviction; don't duplicate
-its deletion path. Next develop safe, reviewed retention automation
-around the existing control/ownership/lease fences and configurable
-encoding profiles, then one batched Windows real-MOV/MP4 acceptance
-(size, quality, portrait, audio, seeking, immutable originals).
-WI-0189 remains `in_progress`; 0/4 full acceptance boxes signed.
-No automatically scheduled eviction or OneDrive hydration (WI-0207).
+**2026-10-30 M30 / WI-0189:** PRs #665–#668 merged;
+maintainer accepted 8/8 focused Windows retention-policy tests for
+#665 and reported docs validation/generation. GitHub build CI passed
+#667 and #668; no separate maintainer PostgreSQL/real-media WI-0189
+acceptance yet. PR #669 on
+`feature/wi0189-confirmed-retention-reclaim` wires a bounded,
+operator-only, two-stage dry-run/confirmation to the pre-existing
+stopped-lane DB-first proxy maintenance. Eight-record SHA-verified
+preview uses a five-minute fingerprint; same control/source/receipt
+fences recheck before private unlink. No new auto deletion path or
+unattended scheduling. CI pending. Canonical+generated WI-0189 docs
+updated; status remains `in_progress`, all 4 acceptance boxes open.
+Next: opt-in safe automatic cache reclamation policy and bounded
+user-configurable encode profile, then one batched Windows already-local
+MOV/MP4 acceptance (seek/rotation/audio/quality/size/immutable
+originals) and manual cache recovery demonstration. WI-0207 separately
+owns any online-only OneDrive hydration and release verification.
 
 
 **2026-10-22 repository-only planning / issue-retirement cleanup:**
