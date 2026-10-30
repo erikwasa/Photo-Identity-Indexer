@@ -25,7 +25,7 @@ public sealed class VideoFrameExtractionProfileTests
         Assert.Contains("-an", args);
         Assert.Contains("-sn", args);
         Assert.Contains("-dn", args);
-        Assert.DoesNotContain("http", string.Join(' ', args));
+        Assert.DoesNotContain("http", string.Join(" ", args));
     }
 
     [Fact]
