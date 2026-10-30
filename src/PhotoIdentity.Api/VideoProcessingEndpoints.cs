@@ -4,9 +4,41 @@ using PhotoIdentity.Web;
 
 namespace PhotoIdentity.Api;
 
+/// <summary>
+/// A nullable override flag preserves compatibility with callers that update
+/// only the original Enabled/IncludeOnlineOnly settings. Clearing quotas must
+/// be explicit; missing fields never silently erase a stored override.
+/// </summary>
 public sealed record VideoProcessingSettingsUpdate(
     bool Enabled, bool IncludeOnlineOnly,
-    int? MaximumCacheMiB = null, int? MaximumProxyMiB = null);
+    int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
+    bool? OverrideProxyLimits = null)
+{
+    public VideoProcessingPreferences MergeWith(VideoProcessingPreferences existing)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+        if (OverrideProxyLimits is null)
+        {
+            if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
+                throw new ArgumentException(
+                    "An explicit quota override choice is required.");
+            return existing with
+            {
+                Enabled = Enabled,
+                IncludeOnlineOnly = IncludeOnlineOnly
+            };
+        }
+        if (OverrideProxyLimits is false)
+        {
+            if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
+                throw new ArgumentException(
+                    "Clearing quota overrides cannot supply quota limits.");
+            return new(Enabled, IncludeOnlineOnly);
+        }
+
+        return new(Enabled, IncludeOnlineOnly, MaximumCacheMiB, MaximumProxyMiB);
+    }
+}
 
 public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
@@ -57,11 +89,11 @@ public static class VideoProcessingEndpoints
         IConfiguration configuration,
         CancellationToken token)
     {
-        var requested = new VideoProcessingPreferences(
-            value.Enabled, value.IncludeOnlineOnly,
-            value.MaximumCacheMiB, value.MaximumProxyMiB);
+        VideoProcessingPreferences existing = preferences.Current;
+        VideoProcessingPreferences requested;
         try
         {
+            requested = value.MergeWith(existing);
             // Always allow operators to disable video processing, even
             // if inherited launcher settings are malformed. Only enabling
             // may consume the runtime quota configuration.
@@ -74,7 +106,6 @@ public static class VideoProcessingEndpoints
             return Results.BadRequest(new ArchiveErrorResponse(
                 "Specify both valid video proxy limits or neither; cache 64..16384 MiB, per-file 1..256 MiB and per-file <= cache."));
         }
-        VideoProcessingPreferences existing = preferences.Current;
         bool quotaChanged = existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
                             existing.MaximumProxyMiB != requested.MaximumProxyMiB;
         if (quotaChanged && processor.IsProcessing)
