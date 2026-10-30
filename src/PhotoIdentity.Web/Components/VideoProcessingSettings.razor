@@ -178,7 +178,8 @@
         string LastResult, IReadOnlyList<VideoJobRow> Recent);
     private sealed record VideoSettingsUpdate(
         bool Enabled, bool IncludeOnlineOnly,
-        int? MaximumCacheMiB, int? MaximumProxyMiB);
+        int? MaximumCacheMiB, int? MaximumProxyMiB,
+        bool OverrideProxyLimits);
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
@@ -260,7 +261,8 @@
                 "api/video-processing/settings",
                 new VideoSettingsUpdate(Enabled, IncludeOnlineOnly,
                     OverrideProxyLimits ? MaximumCacheMiB : null,
-                    OverrideProxyLimits ? MaximumProxyMiB : null));
+                    OverrideProxyLimits ? MaximumProxyMiB : null,
+                    OverrideProxyLimits));
             if (!response.IsSuccessStatusCode)
             {
                 ErrorResponse? failure = null;
