@@ -18,15 +18,27 @@ existing photo archive, catalogue, person identities, searches or collections**.
 The user explicitly removed concurrent photo/video performance benchmarking and
 the mandatory AppContainer feasibility requirement from this work item.
 
+## Final scope decision — maintainer, 2026-10-30
+
+**WI-0188 is the locally available video-processing lane.** Its
+previously planned online-only OneDrive hydration and release acceptance
+is moved to [WI-0207](WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+Every real video used to accept WI-0188 was already local, and no
+online-only original was hydrated or returned to online-only.
+The independently default-off online-only setting stays a safety guard,
+not evidence that the remote path passed verification.
+WI-0207 remains a proposed, separately opted-in M30 workitem.
+
 ## In scope — revised
 
 - Default-off **Process videos** switch in Settings, persisted across restarts.
   Shared **Advance archive / Pause archive** controls run photos first, then
   one eligible video at a time. Video can be disabled independently in Settings.
-- **Include online-only videos** is an independently controlled opt-in, default
-  off. Requests are bounded and do not hydrate by default. Only an
-  app-initiated download may be released using OneDrive's online-only request;
-  pre-existing local originals must remain local.
+- **Locally available originals only for WI-0188 acceptance.**
+  Online-only video retrieval remains independently default-off and is
+  never silently enabled; verification of explicit hydration, bounded
+  provider-controlled download and safe return-to-online-only is
+  deferred to WI-0207.
 - Supported already-local video revisions use a bounded, fixed-tool-hash
   FFmpeg/FFprobe workflow. On unsupported codec, timeout or insufficient
   machine capacity, record a recoverable failure or diagnostic for future
@@ -49,23 +61,25 @@ the mandatory AppContainer feasibility requirement from this work item.
 - Optional Azure compute fallback, advanced video proxy profile choices,
   captions, frame embeddings, browser video serving, and extra scheduling UI:
   these belong to later work items or separately scoped enhancements.
-- Automatic deletion of the cloud original. A verified OneDrive *online-only*
-  storage request is not deletion; a normal filesystem delete is forbidden.
+- Online-only video hydration and return-to-online-only release,
+  including their real-OneDrive operator acceptance (WI-0207). No
+  application path may delete cloud originals to reclaim disk.
 
 ## Acceptance criteria — revised
 
 - [x] **Default off and visible control.** Processing can be enabled/disabled
   in Settings, persists through restart, and shares normal Archive Advance/Pause
   controls. Only one video runs after all outstanding photo work completes.
-- [ ] **Local-first with explicit hydration opt-in.** Offline placeholders are
-  skipped by default. When the online-only setting is enabled, one bounded
-  eligible source may be downloaded and subsequently requested online-only;
-  already-local videos are not unpinned by Photo Identity.
+- [x] **Local-first without hydration.** Only eligible locally available
+  originals are processed; online-only retrieval remains separately
+  default-off, exclusions and archive coverage are respected, and
+  pre-existing local originals remain local. The unexercised
+  online-only opt-in, hydration and release behavior is WI-0207.
 - [x] **Original/photo-data safety.** Video processing never opens originals
   for write or modifies photo catalogue/face/search/collection state. Source
   revision and exclusions are rechecked before durable derivative publication.
   Maintainer verifies post-run original integrity and ordinary photo features.
-- [ ] **Failure recovery and cleanup.** Interrupted, failed, unsupported or
+- [x] **Failure recovery and cleanup.** Interrupted, failed, unsupported or
   oversized video jobs remain diagnosable; restart/retry is safe, partial
   outputs do not appear as complete, and owned temp data is bounded/cleaned.
 - [x] **Simple operational limits.** One video at a time, bounded Windows
@@ -1313,19 +1327,55 @@ jobs) and the Windows/integration resource-envelope tests, this accepts:
   has been demonstrated by a real-cloud local acceptance test. Preserve
   independent opt-in and do not assert that hydration/release passed.
 
-**Remaining local evidence:** unsupported/oversized-video rejection and
-owned temporary-file cleanup under controlled failure. The
-[consolidated verification runbook](../../operations/video-processing-shared-archive-verification.md)
-provides the exact isolated Windows test commands. Those tests prove
-the guard and cleanup behavior on synthetic inputs; they do not
-constitute a successful live OneDrive hydration test.
+**Final safety result (2026-10-30, maintainer-provided console output):**
+All five targeted Windows test groups passed: 8/8 admission/source
+budget checks, 2/2 codec/duration/output contract checks, 4/4
+subprocess failure/cancel/timeout/scratch-overage cleanup checks,
+2/2 staged-copy integrity/cleanup checks, and 1/1 fail-closed
+synthetic tool test. **Total: 17 passed, 0 failed, 0 skipped.**
+The isolated tests validate the guard/cleanup contracts with
+disposable fixtures, not a fabricated large file in the family
+archive. The maintained-host real-video publication, persistence,
+original/derivative integrity, controls/recovery, local-first/exclusions,
+and photo-feature regressions had previously passed. These satisfy the
+WI-0188 **local-media-only** acceptance scope.
+
+**Online-only hydration and release remain NOT EXERCISED;** no transfer
+was performed and no such acceptance is implied. The full opt-in
+verification moves to [WI-0207](WI-0207-opt-in-onedrive-video-hydration-and-release.md).
 
 The seven pre-fix `attempt-limit` rows are historical and remain
 undisturbed. Do not mass-retry, manually edit PostgreSQL lease state
 or hydrate cloud-only originals merely to produce a passing result.
-WI-0188 remains `in_progress`; do not mark all revised criteria
-accepted until the outstanding checks are explicitly verified or
-the maintainer revises the scope. **M30 also remains in progress.**
+**WI-0188 completed / maintainer accepted 2026-10-30 under the explicitly
+revised local-media-only scope.** The remote-only requirements are
+tracked independently by WI-0207; **M30 remains in progress** for
+that item and other video capabilities.
+
+## Final completion and acceptance — 2026-10-30
+
+**Decision: completed / maintainer-accepted.** The first live already-local
+video produced a durable revision-fenced private playable derivative
+(job succeeded on attempt 1 at 100%) with no queued/running/expired
+leases at the checkpoint. The maintainer confirmed restart persistence,
+original SHA/integrity, derivative receipt/integrity, controls and
+interrupted-job recovery, local-first coverage and exclusions, and
+unchanged photo Archive, People, searches, collections and slideshows.
+The final controlled invalid/oversized-media and private scratch
+verification ran five Release-targeted Windows test groups, **17/17
+passed, 0 failed, 0 skipped**, without invoking or hydrating
+family/OneDrive originals. CI and independent PostgreSQL test evidence
+support the worker/lease/publication contracts.
+
+Seven earlier `attempt-limit` failures are retained historical
+diagnostics and require no bulk retry or manual database reset.
+The synthetic test coverage is not misrepresented as processing real
+oversized media. Online-only video hydration, actual OneDrive
+release-to-online-only, and any consequent cloud-specific lifecycle
+hardening are expressly **NOT EXERCISED** and deferred to
+[WI-0207](WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+No source originals, data, cache, schema or deployed runtime were
+changed merely to record this completion. M30 is not yet complete.
 
 ## Completion notes
 
@@ -1353,5 +1403,8 @@ the maintainer revises the scope. **M30 also remains in progress.**
 - Checkpoint 10: unregistered one-attempt dispatch and durable-only success
   report gate; derivative publisher, activation, OS disk/I/O isolation
   and mixed-load local acceptance remain before closing WI-0188.
-- WI-0188 still requires a real resource-controlled worker and Windows
-  mixed-photo/video verification before acceptance.
+- **Historical checkpoint notes above are superseded by the 2026-10-22
+  revised acceptance and 2026-10-30 final local-file verification.**
+  Mandatory concurrent photo/video benchmarking and AppContainer proof
+  were explicitly removed. WI-0188 is completed; online-only video
+  hydration and release is separately tracked by WI-0207.
