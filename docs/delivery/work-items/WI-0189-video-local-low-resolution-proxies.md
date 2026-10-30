@@ -5,7 +5,7 @@ milestone: M30
 status_source: PhotoIdentity.Docs
 depends_on: [WI-0151, WI-0188]
 related_adrs: []
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persistence.Postgres, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Cli, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, docs]
 ---
 
 # WI-0189: Generate and retain bounded local low-resolution video proxies
