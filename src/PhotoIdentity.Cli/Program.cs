@@ -108,6 +108,10 @@ public static class Program
                     await VideoSyntheticProxyPilotCommandRunner.RunAsync(
                         VideoSyntheticProxyPilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "synthetic-frame-pilot" =>
+                    await VideoSyntheticFramePilotCommandRunner.RunAsync(
+                        VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "scratch-cleanup" =>
                     await VideoScratchCleanupCommandRunner.RunAsync(
                         VideoScratchCleanupOptions.Parse(args.Skip(2).ToArray()),
@@ -292,6 +296,14 @@ public static class Program
               video sandbox appcontainer-lab --scratch-root MARKED_TEMP_LAB [--apply]
                                               (synthetic-only disposable Windows profile;
                                                no database, originals or FFmpeg)
+              video synthetic-frame-pilot --scratch-root TEMP_CHILD_ROOT
+                                          --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
+                                          [--apply]
+                                          (WI-0190 synthetic-only, dry-run default;
+                                           4 sampled JPEG frames each from 2 generated
+                                           portrait/landscape fixtures; no originals,
+                                           database or model inference)
+
               video synthetic-proxy-pilot --scratch-root TEMP_CHILD_ROOT
                                           --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
                                           --ffprobe ABSOLUTE_EXE --ffprobe-sha256 HASH

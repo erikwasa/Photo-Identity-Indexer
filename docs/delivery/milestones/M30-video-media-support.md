@@ -37,6 +37,20 @@ proposed. **M30 is not complete**. See
 [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) and the
 [frame-sampling runbook](../../operations/video-frame-evidence-sampling.md).
 
+## WI-0190 synthetic frame-decoding and evidence contract (2026-10-31)
+
+WI-0190 remains `in_progress`. Its second checkpoint adds a fixed local
+SDR JPEG extraction profile and a disposable two-clip synthetic pilot using
+the existing hash-pinned, Windows-constrained FFmpeg runner. The output
+is validated through the existing photo JPEG/BGR24 decoder. An in-memory
+revision/model/policy/timestamp evidence validator rejects partial and stale
+batches. None of these operations activates video processing, accesses family
+videos, writes catalogue evidence, runs CLIP/caption models or serves search
+results. Four WI-0190 acceptance criteria stay open. The planned guarded
+real-frame worker, model compatibility, PostgreSQL atomic provenance and
+private quality/cost verification remain next. See
+[the operator runbook](../../operations/video-frame-evidence-sampling.md).
+
 ## WI-0189 final maintainer acceptance (2026-10-30)
 
 **Completed scope, 4/4 work-item acceptance criteria checked** under

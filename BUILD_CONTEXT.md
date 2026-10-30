@@ -4,6 +4,18 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-31 WI-0190 checkpoint 2 (pending PR CI):** After merged #673,
+the next development branch adds a fixed SDR-only timestamped JPEG frame
+extractor, an explicitly run, disposable Windows synthetic FFmpeg pilot
+and an in-memory frame evidence gate. This is NOT an activated Archive
+frame worker, actual photo caption/CLIP inference, PostgreSQL evidence
+publication or OneDrive hydration. Four WI-0190 acceptance boxes remain
+open; next step is a leased opt-in decoder + compatible model pilot,
+then transactionally fenced evidence storage and local quality/cost
+validation. Runbook: docs/operations/video-frame-evidence-sampling.md.
+
+
+
 **2026-10-31 M30 / WI-0190 checkpoint 1:** After merged PR #672
 closed WI-0189, WI-0190 is in progress. The first source-free,
 deterministic interval/scene-balanced frame-sampling planner has
