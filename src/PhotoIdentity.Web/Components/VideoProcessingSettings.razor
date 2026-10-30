@@ -125,7 +125,7 @@
                 paused, with no running jobs. Cleanup never runs automatically.
             </p>
             <button class="button secondary" type="button"
-                    disabled="@(Saving || Status.Enabled || Status.Processing)"
+                    disabled="@(Saving || Enabled || Status.Enabled || Status.Processing)"
                     @onclick="PreviewRetentionAsync">
                 Preview proxy cleanup
             </button>
@@ -148,7 +148,7 @@
                         revoked and removed, and regeneration may be required.
                     </label>
                     <button type="button" class="button secondary"
-                            disabled="@(Saving || !ConfirmRetention || Status.Enabled || Status.Processing)"
+                            disabled="@(Saving || !ConfirmRetention || Enabled || Status.Enabled || Status.Processing)"
                             @onclick="ApplyRetentionAsync">
                         Confirm removal of @plan.Planned generated copies
                     </button>
@@ -353,7 +353,8 @@
     private async Task ApplyRetentionAsync()
     {
         string? fingerprint = RetentionPreview?.PlanFingerprint;
-        if (!ConfirmRetention || RetentionPreview?.Planned is not > 0 ||
+        if (!ConfirmRetention || Enabled || Status?.Enabled != false ||
+            Status.Processing || RetentionPreview?.Planned is not > 0 ||
             fingerprint is null)
             return;
 
@@ -393,6 +394,10 @@
 
     private async Task SaveAsync()
     {
+        // A previous reviewed plan is never valid after a Settings submit.
+        RetentionPreview = null;
+        ConfirmRetention = false;
+        RetentionApplied = null;
         Error = null;
         Message = null;
         Saving = true;
