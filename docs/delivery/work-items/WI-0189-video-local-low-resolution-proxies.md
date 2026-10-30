@@ -16,7 +16,8 @@ Generate a smaller playable video copy to keep on the local machine, separate fr
 
 ## Implementation progress (2026-10-30)
 
-**In progress — PRs #665 and #666 merged; PR #667 under review.** The WI-0188 video
+**In progress — PRs #665, #666 and #667 merged (PR #667 CI succeeded);
+PR #668 adds persisted Settings controls.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -41,7 +42,7 @@ extends that foundation rather than enabling a second worker.
   Added focused CLI parse cases, over-quota recovery policy test and
   isolated PostgreSQL fixture scenarios (PR merged; no separate maintainer
   verification outcome has been supplied).
-- **Checkpoint 3, PR #667:** optional, explicit application-configuration
+- **Checkpoint 3, PR #667 merged:** optional, explicit application-configuration
   total registered-byte and per-proxy output caps (both required), validated
   before activating video work. The shared Archive worker propagates them
   through its approved tool adapter. Publication checks per-file size before
@@ -51,16 +52,28 @@ extends that foundation rather than enabling a second worker.
   source/revision/exclusion/lease fences. Quota denial is a path-free,
   non-retryable failure: existing proxies/originals are preserved and only
   the rejected app-owned uncommitted output is reclaimed. Added targeted
-  parser and synthetic PostgreSQL publication tests (pending CI).
+  parser and synthetic PostgreSQL publication tests (PR #667 GitHub CI
+  completed successfully; no maintainer real-video acceptance is claimed).
   **No Settings UI, automatic eviction, unregistered-file measurement or
   physical disk quota enforcement is claimed.**
+- **Checkpoint 4, PR #668:** add optional user-editable and locally
+  persisted per-proxy (1..256 MiB) and total registered-byte
+  (64..16384 MiB) override in Video Settings, using the already-approved
+  transaction-level quota fence. Both are required when overriding
+  launcher values; invalid/partial values fail closed before video control
+  changes, and malformed persisted settings disable video and cloud consent.
+  Historic two-boolean preference JSON remains backward compatible.
+  The UI does not delete any files or enable eviction; settings take
+  effect for the next video attempt without a restart. Focused persisted
+  preferences/precedence/legacy/invalidity tests added (CI pending).
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
-- **Not yet implemented:** Settings UI or persisted quota/profile choices,
-  automatic cache eviction and a true physical disk quota; the optional
-  publication fence guards only newly registered output bytes.
-  Measured size/quality acceptance, configurable encode profiles, and
-  expanded real-MOV/MP4 verification remain open.
+- **Not yet implemented:** user-configurable *encoding profile*, automatic
+  cache eviction, true physical disk quota and unregistered/orphan-byte
+  accounting. The optional, now user-editable publication quota still
+  guards only newly registered output bytes. Representative MOV/MP4
+  size/quality, compatibility and restart/retention workflow verification
+  remain open.
   No real-media or end-to-end local verification is claimed for this checkpoint.
   The acceptance checkboxes below remain open.
 
@@ -105,8 +118,13 @@ Integration lifecycle and representative private-file performance/quality tests,
   PostgreSQL registered receipt commit/publisher, video adapters and API
   runtime, CLI failure diagnostic, launcher configuration allowlist and
   synthetic regression tests, plus canonical/generated documentation.
-- Commands run: maintainer-confirmed PR #665 focused tests (8/8 passed),
-  maintainer-reported docs validation/generation; checkpoint 2 .NET/CI
-  tests and docs generation checks for PRs #666/#667 are **not yet
-  independently verified** in this connector-only environment.
-  Require CI before merging PR #667.
+- Checkpoint 4 changed files: VideoProcessingPreferences persistence and
+  validation, API response/update contracts, Video Settings Blazor UI,
+  shared Archive worker policy resolution, focused quota-preference tests,
+  CI filter, operations/runbook and canonical/generated delivery documentation.
+- Verified evidence: maintainer confirmed PR #665 focused tests **8/8** on
+  Windows and reported documentation commands; merged PR #667 GitHub
+  build workflow reported **success**. PR #666 merged; no separate
+  maintainer PostgreSQL fixture outcome supplied.
+- PR #668 tests and docs generation are **not verified** in the
+  GitHub-connector authoring environment. CI must pass before merge.
