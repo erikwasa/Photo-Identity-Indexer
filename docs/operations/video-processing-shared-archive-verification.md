@@ -260,16 +260,19 @@ published-derivative integrity, and existing photo feature regressions
 after the first successful real-video publication. Those checks need
 not be repeated solely to close the current checkpoint.
 
-**Still unverified in the maintained-host report:** default-off and
-persisted Settings behavior, Pause/cancel-and-retry with partial-file
-cleanup, local-first queue selection and source-coverage/exclusion
-fencing, online-only opt-in and app-initiated release safety, and
-unsupported/oversized-video rejection. Complete these separately
-with appropriate safe local media or clearly mark an unavailable
-scenario as *not exercised*. Never turn an unavailable OneDrive test
-into an implicit permission to hydrate arbitrary private originals.
-Existing CI guards support the implementation but are not a report
-of these local tests passing.
+**Further maintained-host PASS (2026-10-30):** Settings controls
+and recovery/retry, local-first operation and coverage/exclusion
+behavior. All exercised media have been locally available. **No
+online-only video hydration or return-to-online-only was exercised.**
+Do not interpret successful local-first operation as proof of that
+separately opted-in cloud behavior.
+
+**Outstanding:** a controlled unsupported/oversized-input refusal and
+owned temporary-file cleanup check. The targeted deterministic tests
+below can be run without enabling video processing, altering the
+PostgreSQL queue or opening any real archive media. If operator
+acceptance requires a real cloud-only test, record it as not exercised
+until one is separately authorized; do not silently opt in.
 
 ## Local verification session — operator driven
 
