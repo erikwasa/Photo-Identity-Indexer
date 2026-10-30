@@ -9,7 +9,7 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 remains in progress.** WI-0150 architecture and WI-0151
+**M30 is ready for further work, not completed.** WI-0150 architecture and WI-0151
 video metadata/SDR posters are completed. **WI-0188 completed
 following maintainer acceptance on 2026-10-30** for already-local,
 default-off, photo-first, bounded video processing and durable
