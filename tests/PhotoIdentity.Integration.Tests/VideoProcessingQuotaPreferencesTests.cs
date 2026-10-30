@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Api;
 using Xunit;
