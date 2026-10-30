@@ -9,18 +9,24 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 is now `in_progress` with WI-0188 started on 2026-10-19. The durable v37 queue, bounded Windows video tool adapter, revision-fenced publication and photo-priority foundations are implemented. The consolidated Settings-driven photo-first implementation has now passed its first durable real-video publication, restart persistence, original/derivative integrity and photo-feature regression checks on the maintained Windows machine. WI-0188 still awaits explicit local pause/cancellation, local-first/coverage/exclusion and opted-in OneDrive behavior acceptance before closure. The completed WI-0151 slice is unchanged, and playback, analysis, retrieval and collection integrations remain proposed. **M30 is not complete.**
+**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 is now `in_progress` with WI-0188 started on 2026-10-19. The durable v37 queue, bounded Windows video tool adapter, revision-fenced publication and photo-priority foundations are implemented. The consolidated Settings-driven photo-first implementation has now passed its first durable real-video publication, restart persistence, original/derivative integrity and photo-feature regression checks on the maintained Windows machine. WI-0188 has since passed operator-reported pause/recovery and local-first/exclusion checks. Controlled invalid-media and scratch-cleanup verification remains; online-only hydration/release has not been exercised and must not be represented as PASS. The completed WI-0151 slice is unchanged, and playback, analysis, retrieval and collection integrations remain proposed. **M30 is not complete.**
 
 ## WI-0188 maintained-host progress (2026-10-30)
 
 - **PASS:** first real-video `succeeded` receipt, persistence across
   restart, original/derivative integrity, existing photo features and
   bounded/sanitized queue execution.
-- **Not yet locally accepted:** Settings default-off and interruption
-  behavior, cancelled-job retry/owned-scratch cleanup, local-first
-  inclusion/exclusion/revision fencing, and optional OneDrive hydration
-  and release protections. These are explicit revised WI-0188 gates,
-  not reintroduced concurrency benchmarks or AppContainer requirements.
+- **PASS on maintained host:** Settings/default-off behavior,
+  Advance/Pause and recovery/retry, local-first selection and
+  included-folder/exclusion handling.
+- **Not exercised:** online-only video hydration or app-initiated
+  online-only release. All videos exercised so far were already local;
+  no cloud-original hydration is claimed.
+- **Final controlled verification requested:** unsupported/oversized-media
+  rejection and owned scratch cleanup using isolated fixture-based
+  Windows tests (runbook), not by modifying the family archive.
+  No concurrent workload benchmark or mandatory AppContainer proof
+  is being reintroduced.
 - Seven historical `attempt-limit` jobs remain untouched; there is no
   reason to reset the queue for closure. M30 still contains later
   proxy, frame analysis, search and playback workitems.
