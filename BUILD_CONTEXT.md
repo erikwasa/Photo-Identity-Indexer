@@ -14,9 +14,11 @@ versioned 540p preset, current-revision/lease/exclusion fences,
 SHA-checked DB-first private maintenance and loopback-only cleanup
 are implemented. New PR #671 on
 `feature/wi0189-compact-synthetic-preflight` extends the trusted
-source-free video pilot to exercise both profiles with cleanup,
-updates canonical/generated work-item docs and moves WI-0189
-to `in_review`. No actual media, tool, generator or CI pass for
+source-free video pilot to exercise both profiles with cleanup;
+also adds an optional one-video-step-per-Advance limit (default
+off) so user verification cannot accidentally process a long
+sequence of video candidates. The PR updates canonical/generated
+work-item docs and moves WI-0189 to `in_review`. No actual media, tool, generator or CI pass for
 #671 has been claimed yet. Next: after CI, the maintainer runs
 a marked-temp, approved Windows synthetic 720p/540p pilot;
 then **one bounded already-local** MOV/MP4 acceptance matrix
