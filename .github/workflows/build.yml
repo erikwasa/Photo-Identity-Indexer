@@ -109,13 +109,14 @@ jobs:
           dotnet test PhotoIdentity.slnx --configuration Release --no-build --filter "FullyQualifiedName!~PhotoIdentity_Integration_Tests&FullyQualifiedName!~PhotoIdentity.Integration.Tests" 2>&1 | Tee-Object -FilePath fast-test.log
           exit $LASTEXITCODE
 
-      # These tests exercise a pure policy/parser in the existing integration
-      # assembly, without starting an HTTP host or touching private media.
+      # These tests exercise pure policy, persisted settings and argument
+      # validation in the existing integration assembly, without starting
+      # an HTTP host or touching private media.
       # Keep them separate from the host-heavy integration suite.
       - name: Verify WI-0189 quota policy and configuration
         shell: pwsh
         run: |
-          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~VideoProxyRetentionPolicyTests|FullyQualifiedName~VideoProxyRetentionPreviewCommandTests|FullyQualifiedName~VideoProxyPublicationQuotaConfigurationTests" 2>&1 | Tee-Object -FilePath wi0189-quota-tests.log
+          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~VideoProxyRetentionPolicyTests|FullyQualifiedName~VideoProxyRetentionPreviewCommandTests|FullyQualifiedName~VideoProxyPublicationQuotaConfigurationTests|FullyQualifiedName~VideoProcessingQuotaPreferencesTests" 2>&1 | Tee-Object -FilePath wi0189-quota-tests.log
           exit $LASTEXITCODE
 
       - name: Upload WI-0189 focused test diagnostics
