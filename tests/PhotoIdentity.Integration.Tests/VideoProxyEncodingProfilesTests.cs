@@ -17,8 +17,8 @@ public sealed class VideoProxyEncodingProfilesTests
             VideoProxyEncodingProfiles.Resolve(VideoProxyEncodingProfiles.StandardKey);
         Assert.Equal(VideoProxyCandidateProfile.Version, standard.Version);
         Assert.Equal(720, standard.MaximumDimension);
-        Assert.Equal(VideoProxyCandidateProfile.BuildArguments(source, workspace),
-            standard.BuildArguments(source, workspace));
+        Assert.Equal(VideoProxyCandidateProfile.BuildArguments(source, workspace).ToArray(),
+            standard.BuildArguments(source, workspace).ToArray());
     }
 
     [Fact]
