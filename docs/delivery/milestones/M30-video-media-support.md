@@ -33,7 +33,10 @@ remain separately proposed. **M30 is not complete.**
 
 PR #670 introduces the second, strictly whitelisted compact **540p**
 H.264/AAC SDR software encode profile, retaining the existing exact
-720p preset and behavior as default. Video Settings persists the
+720p preset and behavior as default. The same Settings checkpoint adds
+user-controlled **48-hour, 7-day or 30-day minimum retention age**
+for the already manually confirmed stopped-lane cleanup; legacy
+preferences retain 48 hours and no eviction runs automatically. Video Settings persists the
 profile and blocks changes while an attempt is active. Job identity,
 pending work and queued work now use the selected preset version
 and approved FFmpeg hash: old queued jobs are not processed under
