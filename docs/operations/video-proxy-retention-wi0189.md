@@ -313,3 +313,103 @@ or mass archive run is necessary for this **Settings-only** smoke test.
   exercised or newly authorized by this checkpoint.
 
 **WI-0189 stays `in_progress`; no acceptance checkbox has been signed off.**
+
+## Checkpoint 5 — manually confirmed bounded proxy cleanup (PR #669)
+
+The existing **Video processing → Review local proxy cleanup** panel
+provides an explicit two-stage operator action:
+
+1. **Disable Process videos** in Settings, save, use the existing
+   **Pause archive** control, and verify no active video attempt or
+   running lease remains. The new workflow **never** disables or pauses
+   a worker automatically.
+2. With a configured publication quota (saved override or inherited
+   launcher pair), click **Preview proxy cleanup**. This is a bounded,
+   non-mutating inspection of **at most 8** registered receipts. The
+   maintenance service checks the application-owned private cache root,
+   canonical UUID paths, exclusion and current-revision status,
+   PostgreSQL stopped-control/zero-running-lease fence and actual
+   cached file SHA-256 for every inspected existing file.
+3. Review the **aggregate-only** counts of invalid, missing, corrupt,
+   and old over-quota receipts, plus estimated remaining registered
+   bytes. Newly registered valid copies are protected for at least
+   **48 hours**; invalid/excluded/corrupt records may be cleaned
+   earlier for privacy/integrity.
+4. To remove generated proxies, explicitly tick **I understand** and
+   click **Confirm removal**. No background job or implicit deletion
+   follows a preview. The server recomputes the same bounded plan
+   under PostgreSQL locks before any DB mutation, and rejects a
+   changed/expired plan.
+5. The existing maintenance logic **commits receipt revocation and
+   marks affected jobs failed before unlinking private files**.
+   A failed unlink leaves an invisible orphan for the pre-existing
+   stopped-lane recovery janitor. A recovery report never authorizes
+   deleting arbitrary/unregistered files. Restart or another review
+   requires deliberate operator action.
+
+### Confirmation safety
+
+- The dry run returns a SHA-256 **fingerprint**, not a list of source
+  paths or public media links. It covers cache root, quota/age/count/hash
+  settings, the registered-byte snapshot, exact selected receipt IDs
+  and hashes, and a five-minute UTC time bucket.
+- A changed file (including same-size corruption), receipt, quota,
+  selection, or expired window makes a previous confirmation invalid.
+  A second use after removal has changed the receipts and is refused.
+  The fingerprint is **not an authentication credential**.
+- The API accepts **no caller-specified cache root, media path, job ID,
+  file list or quota size**. It uses only the current persisted/launcher
+  configuration. It never creates the cache or hydrates OneDrive.
+- The API limits each confirmed foreground sweep to **8 receipts** and
+  fixes the minimum age at **48 hours** with SHA-256 verification. Any
+  remaining old files require another separately reviewed preview.
+- Invalidated, missing and corrupt registered receipts may also be
+  selected by the pre-existing maintenance policy, even when under the
+  configured quota; the UI shows their separate counts.
+- **No unattended eviction** or separate delete implementation is
+  registered. The independent older CLI `video derivatives maintain
+  --apply` is unchanged and remains an expert operator path that does
+  not require a UI confirmation token.
+
+### Checkpoint 5 automated verification
+
+GitHub's existing Windows isolated PostgreSQL test step includes
+`VideoRegisteredDerivativeMaintenanceTests`. PR #669 extends that
+class to cover expired/stale guesses, same-size content corruption,
+replayed confirmation rejection, DB-first receipt revocation,
+preservation of healthy private copies and unknown cache files, and
+no deletions when there are no eligible receipts. These synthetic tests
+do not read any family video or require a running app.
+
+```powershell
+# Set PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING to your
+# pre-existing approved isolated test PostgreSQL admin connection first.
+[bool]$env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING
+
+dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj `
+  --filter "FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests" `
+  -p:WasmEnableWebcil=false
+
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+Do not count tests that return early due to an unset PostgreSQL admin
+connection. **Do not run a confirmed deletion on the actual family
+archive merely to verify this development checkpoint.** If desired,
+the Settings-only **Preview** is non-mutating after verifying the lane
+is disabled and stopped; apply/delete verification can be deferred
+until the final combined maintained-host WI-0189 acceptance session
+with an approved test cache and backup. No source file or online-only
+hydration should be involved.
+
+### Remaining WI-0189 acceptance
+
+Automatic unattended retention/eviction with robust physical/orphan
+capacity accounting is **still not enabled**. The encode profile is
+still the fixed validated SDR 720p candidate; user-configurable
+presets need a separate reviewed implementation and revision/preset
+rebuild tests. The representative local MOV/MP4, rotated, silent,
+long, seekable, codec/size/quality and original-hash acceptance
+matrix is also outstanding. All four WI-0189 acceptance checkboxes
+remain open.
