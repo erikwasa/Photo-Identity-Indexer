@@ -5,16 +5,16 @@ using PhotoIdentity.Web;
 namespace PhotoIdentity.Api;
 
 /// <summary>
-/// A nullable override flag preserves compatibility with callers that update
-/// only the original Enabled/IncludeOnlineOnly settings. Clearing quotas must
-/// be explicit; missing fields never silently erase a stored override.
-/// </summary>
-/// <summary>
 /// A confirmation token is a short-lived snapshot fingerprint, not a
 /// credential or a filesystem path. The server rechecks the complete plan.
 /// </summary>
 public sealed record VideoProxyRetentionApplyRequest(string ConfirmationFingerprint);
 
+/// <summary>
+/// A nullable override flag preserves compatibility with callers that update
+/// only the original Enabled/IncludeOnlineOnly settings. Clearing quotas must
+/// be explicit; missing fields never silently erase a stored override.
+/// </summary>
 public sealed record VideoProcessingSettingsUpdate(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
