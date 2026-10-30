@@ -19,11 +19,20 @@ public sealed record VideoPublishedDerivativeReceipt(
 /// rename, leaving an invisible orphan for a future conservative janitor; no
 /// consumer may assume disk and PostgreSQL are one distributed transaction.
 /// </summary>
+/// <summary>
+/// A known, non-ambiguous registered-byte quota refusal. No receipt has
+/// committed; callers may safely discard their *owned* temporary output.
+/// This is not a hard filesystem quota or a signal to delete originals.
+/// </summary>
+public sealed class VideoProxyPublicationQuotaExceededException()
+    : InvalidOperationException("Video proxy publication exceeds its configured registered-byte quota.");
+
 public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogueDatabase database)
 {
     internal async Task<bool> TryCommitAsync(
         VideoProcessingJobLease lease, string artifactRelativePath,
-        string sha256, long encodedBytes, CancellationToken token = default)
+        string sha256, long encodedBytes, CancellationToken token = default,
+        VideoProxyRetentionLimits? publicationQuota = null)
     {
         ArgumentNullException.ThrowIfNull(lease);
         if (!VideoDerivativeArtifactPath.IsCanonical(artifactRelativePath,
@@ -32,6 +41,11 @@ public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogue
             encodedBytes < 1 || encodedBytes > 2147483648L ||
             encodedBytes > lease.TemporaryBytes)
             throw new ArgumentException("Video derivative evidence is not bounded or canonical.");
+
+        publicationQuota?.Validate();
+        if (publicationQuota is not null &&
+            encodedBytes > publicationQuota.MaximumProxyBytes)
+            throw new VideoProxyPublicationQuotaExceededException();
 
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token);
@@ -69,12 +83,32 @@ public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogue
                   AND (selected_job_id IS NULL OR
                        (selected_job_id=@job
                         AND authorization_expires_at_utc>now()))
-                FOR SHARE;
+                FOR UPDATE;
                 """;
             control.Parameters.AddWithValue("generation", lease.ControlGeneration);
             control.Parameters.AddWithValue("job", lease.Id);
             if (await control.ExecuteScalarAsync(token) is not long)
                 return false;
+        }
+
+        // The control-row exclusive lock serializes every registered proxy
+        // publisher (and stopped-lane maintenance). This sum includes stale
+        // receipts because their physical bytes may still be retained.
+        // A known quota refusal happens BEFORE job success/receipt insertion.
+        // Unknown unregistered/orphan files remain outside this policy.
+        if (publicationQuota is not null)
+        {
+            await using NpgsqlCommand occupied = connection.CreateCommand();
+            occupied.Transaction = transaction;
+            occupied.CommandText = """
+                SELECT COALESCE(SUM(encoded_bytes),0)::bigint
+                FROM video_published_derivatives;
+                """;
+            long registeredBytes = (long)(await occupied.ExecuteScalarAsync(token)
+                ?? throw new InvalidOperationException("Video registered-byte total unavailable."));
+            if (registeredBytes < 0 ||
+                registeredBytes > publicationQuota.MaximumCacheBytes - encodedBytes)
+                throw new VideoProxyPublicationQuotaExceededException();
         }
 
         // Source, cancellation, latest revision, inspection and lease are
