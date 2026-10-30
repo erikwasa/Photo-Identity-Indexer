@@ -12,14 +12,6 @@ public sealed record VideoPublishedDerivativeReceipt(
     Guid JobId, Guid RevisionId, string Sha256, long EncodedBytes);
 
 /// <summary>
-/// Transactional PostgreSQL success fence for an app-owned *already materialized*
-/// local artifact. Only this repository can mark a video job succeeded.
-/// Callers must first verify the output bytes and perform same-volume atomic
-/// rename into the private derivative root. Database commit can fail AFTER the
-/// rename, leaving an invisible orphan for a future conservative janitor; no
-/// consumer may assume disk and PostgreSQL are one distributed transaction.
-/// </summary>
-/// <summary>
 /// A known, non-ambiguous registered-byte quota refusal. No receipt has
 /// committed; callers may safely discard their *owned* temporary output.
 /// This is not a hard filesystem quota or a signal to delete originals.
@@ -32,6 +24,14 @@ public sealed class VideoProxyPublicationQuotaExceededException : InvalidOperati
     }
 }
 
+/// <summary>
+/// Transactional PostgreSQL success fence for an app-owned *already materialized*
+/// local artifact. Only this repository can mark a video job succeeded.
+/// Callers must first verify the output bytes and perform same-volume atomic
+/// rename into the private derivative root. Database commit can fail AFTER the
+/// rename, leaving an invisible orphan for a future conservative janitor; no
+/// consumer may assume disk and PostgreSQL are one distributed transaction.
+/// </summary>
 public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogueDatabase database)
 {
     internal async Task<bool> TryCommitAsync(
