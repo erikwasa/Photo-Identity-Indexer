@@ -4,6 +4,16 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-30 M30 / WI-0189:** Active development on
+`feature/wi0189-proxy-cache-retention-foundation`, PR #665.
+Checkpoint 1 introduces non-deleting, deterministic bounded proxy
+retention planning and isolated tests. Next: catalogue-backed ownership,
+lease-fenced safe eviction, configurable quota/profile and real MOV/MP4
+quality/integrity verification. Keep WI-0189 `in_progress` until full
+acceptance; WI-0207 online-only OneDrive hydration remains separately
+proposed and unverified. Run the docs generation/validation and focused
+tests in CI before merging this checkpoint.
+
 **2026-10-22 repository-only planning / issue-retirement cleanup:**
 Audit all 33 surviving GitHub issues (12 open, 21 closed) and retire them
 only after the canonical documentation PR merges and generated views validate.
