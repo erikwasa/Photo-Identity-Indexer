@@ -9,9 +9,9 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 is ready, not completed.** Its next work items are not yet actively
-in progress; the generated lifecycle recalculates to `ready` after
-WI-0189's completion. WI-0150 architecture and WI-0151
+**M30 is in progress, not completed.** WI-0190 has started a source-free
+frame-sampling foundation (2026-10-31); the lifecycle recalculates to
+`in_progress`. WI-0150 architecture and WI-0151
 video metadata/SDR posters are completed. **WI-0188 completed
 following maintainer acceptance on 2026-10-30** for already-local,
 default-off, photo-first, bounded video processing and durable
@@ -30,9 +30,12 @@ permit automatic hydration or alter locally available video behavior.
 PRs #665–#671 merged; Windows CI and the reported locally run synthetic
 and already-local MOV/MP4 checks passed for the agreed registered-byte
 quota and manually confirmed retention scope.
-Other M30 playback, frame analysis, search and collection integrations
-remain separately proposed. **M30 is not complete**; it is `ready` for
-its next work item.
+WI-0190 frame evidence is now **in progress** at a pure sampling planner
+checkpoint, with no video decoding, caption/embedding output or active job
+trigger. Other M30 playback, video search and collection integrations remain
+proposed. **M30 is not complete**. See
+[WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) and the
+[frame-sampling runbook](../../operations/video-frame-evidence-sampling.md).
 
 ## WI-0189 final maintainer acceptance (2026-10-30)
 

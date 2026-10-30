@@ -38,6 +38,24 @@ Audio transcription, general video action understanding, face recognition (WI-01
 
 Sampling, model evidence, failure, privacy and invalidation tests plus local relevance evaluation; no personal media/evidence committed.
 
+## Development checkpoint 1 — source-free bounded frame sampling (2026-10-31)
+
+A first opt-in-independent foundation introduces a deterministic
+`video-frame-sampling-v1` planner in Core. It produces interval or
+scene-balanced seek timestamps from *supplied inspected metadata*, enforces
+frame/estimated-decode reservation ceilings and handles short/many-scene/long
+clips without opening originals or activating video work. Synthetic unit
+tests cover bounds, scene distribution, timestamp monotonicity and malformed
+input. See [frame sampling runbook](../../operations/video-frame-evidence-sampling.md).
+
+**This is not a captioning or embedding pipeline.** There is no real frame
+decoding, model preprocessing reuse decision, PostgreSQL frame evidence table,
+search integration, runtime quota enforcement or maintainer media validation.
+All four acceptance criteria remain open. Next work: a strictly opt-in,
+locally verified worker-frame extraction and model compatibility pilot,
+followed by durable provenance/invalidation and maintained-host quality/cost
+verification. No online-only hydration is authorized by this checkpoint.
+
 ## Completion notes
 
 - Files changed:
