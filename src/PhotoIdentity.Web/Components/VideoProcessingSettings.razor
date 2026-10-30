@@ -52,6 +52,27 @@
                 </div>
             </div>
             <fieldset class="review-filter-panel">
+                <legend class="field-label">Video proxy encoding</legend>
+                <label class="field-label" for="video-processing-encoding-profile">
+                    Output quality and size
+                </label>
+                <select id="video-processing-encoding-profile"
+                        @bind="EncodingProfile" disabled="@Saving">
+                    <option value="standard-720p">Standard 720p — current default</option>
+                    <option value="compact-540p">Compact 540p — smaller picture / lower bitrate</option>
+                </select>
+                <p class="field-help">
+                    Both are bounded SDR H.264/AAC MP4 presets with fast-start
+                    seeking and automatic orientation. The compact preset may
+                    reduce file size and detail; actual quality and encoding
+                    time will be measured on local videos. Selecting a different
+                    preset creates a distinct durable job for that source
+                    revision; it never rewrites existing proxies or starts
+                    processing on its own. Pause active video processing
+                    before changing profiles.
+                </p>
+            </fieldset>
+            <fieldset class="review-filter-panel">
                 <legend class="field-label">Local video proxy storage</legend>
                 <label class="field-label" for="video-processing-quota-override">
                     <input id="video-processing-quota-override" type="checkbox"
@@ -229,7 +250,7 @@
     private sealed record VideoSettingsResponse(
         bool Enabled, bool IncludeOnlineOnly,
         int? MaximumCacheMiB, int? MaximumProxyMiB,
-        bool Processing, bool ToolsConfigured,
+        string EncodingProfile, bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
         string LastResult, IReadOnlyList<VideoJobRow> Recent);
@@ -243,7 +264,7 @@
     private sealed record VideoSettingsUpdate(
         bool Enabled, bool IncludeOnlineOnly,
         int? MaximumCacheMiB, int? MaximumProxyMiB,
-        bool OverrideProxyLimits);
+        bool OverrideProxyLimits, string EncodingProfile);
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
@@ -253,6 +274,7 @@
     private bool Enabled;
     private bool IncludeOnlineOnly;
     private bool OverrideProxyLimits;
+    private string EncodingProfile = "standard-720p";
     private int? MaximumCacheMiB = 1024;
     private int? MaximumProxyMiB = 256;
     private bool Loading = true;
@@ -282,6 +304,7 @@
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
+                EncodingProfile = Status.EncodingProfile;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
@@ -408,7 +431,7 @@
                 new VideoSettingsUpdate(Enabled, IncludeOnlineOnly,
                     OverrideProxyLimits ? MaximumCacheMiB : null,
                     OverrideProxyLimits ? MaximumProxyMiB : null,
-                    OverrideProxyLimits));
+                    OverrideProxyLimits, EncodingProfile));
             if (!response.IsSuccessStatusCode)
             {
                 ErrorResponse? failure = null;
@@ -422,6 +445,7 @@
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
+                EncodingProfile = Status.EncodingProfile;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
