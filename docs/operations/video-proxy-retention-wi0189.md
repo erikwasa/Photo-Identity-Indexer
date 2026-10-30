@@ -1,5 +1,59 @@
 # WI-0189 — local playable proxy retention checkpoints
 
+## Final accepted scope and maintainer results (2026-10-30)
+
+**WI-0189 completed.** PRs #665–#671 are merged; the maintainer
+reported successful local end-to-end checks and PostgreSQL safety tests.
+All four scoped acceptance criteria are checked in the canonical
+[work item](../delivery/work-items/WI-0189-video-local-low-resolution-proxies.md).
+This runbook's earlier checkpoint text, including statements that
+acceptance is pending, is retained as **history** and superseded here.
+
+| Evidence | Accepted outcome |
+| --- | --- |
+| Focused .NET tests; docs validate/generate | PASS |
+| Synthetic standard 720p | PASS landscape/audio and portrait/silent |
+| Synthetic compact 540p | PASS landscape/audio and portrait/silent |
+| Scratch cleanup | PASS |
+| Video Settings restart; bounded one-video Archive step | PASS |
+| Actual already-local MOV/MP4 proxies | 3 successful |
+| Compact 540p | 14.36 MiB source → 0.07 MiB copy; 99.5% smaller |
+| Standard 720p, case 1 | 2.36 MiB source → 1.53 MiB copy; 35.3% smaller |
+| Standard 720p, case 2 | 20.68 MiB source → 0.74 MiB copy; 96.4% smaller |
+| Seeking, orientation, audio | PASS |
+| Processing duration | Maintainer deemed acceptable; no numeric real timing |
+| Visual quality | Maintainer judged Compact 540p sufficient |
+| Revision/preset reuse and source hashes | PASS; originals unchanged |
+| PostgreSQL quota and manually confirmed retention safety tests | PASS; real cache was **not** deleted |
+| Online-only video hydration | 0 |
+
+**Explicit limitations.** These are three **different real sources**:
+size reductions cannot compare 720p and 540p on the same revision.
+Real encode time was reported qualitatively, not recorded numerically.
+The existing Standard 720p remains the default; Compact 540p is an
+approved **opt-in** option. Synthetic validation establishes the
+H.264/AAC fast-start MP4 browser-oriented format and safety,
+not in-app browser playback; WI-0152 owns video serving.
+No destructive confirmation was performed on the personal cache;
+isolated PostgreSQL tests cover old-plan refusal, quota denial,
+private revocation/cleanup, source exclusions and corruption.
+The publication budget covers **registered proxy bytes only**, not
+a hard disk limit for scratch/orphan files. The maintainer's explicit
+choice is manual preview-and-confirm retention, never unattended
+eviction. Actual OneDrive-only hydration/release remains WI-0207,
+and no video was hydrated during WI-0189 acceptance.
+
+**Operator posture after sign-off:** keep cloud-only inclusion off
+until WI-0207 is explicitly verified. Leave `standard-720p` as
+default; use `compact-540p` where lower resolution is acceptable.
+Return one-step Archive mode to the operator's preferred setting.
+Only perform retained-proxy deletion via the existing localhost
+Preview → Confirm with a stopped/paused video lane, not by directly
+unlinking cache files. No further WI-0189 test run is required
+solely for this accepted scope.
+
+---
+
 ## Maintainer evidence — checkpoint 1 (2026-10-30)
 
 PR #665 merged. The maintainer ran the focused Windows .NET 10 retention
