@@ -1349,8 +1349,8 @@ undisturbed. Do not mass-retry, manually edit PostgreSQL lease state
 or hydrate cloud-only originals merely to produce a passing result.
 **WI-0188 completed / maintainer accepted 2026-10-30 under the explicitly
 revised local-media-only scope.** The remote-only requirements are
-tracked independently by WI-0207; **M30 remains in progress** for
-that item and other video capabilities.
+tracked independently by WI-0207; **M30 is ready for its next
+workitem, not completed**.
 
 ## Final completion and acceptance — 2026-10-30
 
