@@ -72,8 +72,10 @@ public static class VideoProxyCandidateProfile
 
     /// <summary>Validate untrusted *bounded* ffprobe JSON; no media/user tags are returned.</summary>
     public static VideoProxyInspection ValidateOutputJson(
-        ReadOnlySpan<byte> utf8, long actualLength)
+        ReadOnlySpan<byte> utf8, long actualLength, int maximumDimension = 720)
     {
+        if (maximumDimension is not (540 or 720))
+            throw new ArgumentOutOfRangeException(nameof(maximumDimension));
         if (utf8.Length is < 20 or > 65536 || actualLength is < 128 or > MaximumOutputBytes)
             throw new InvalidDataException("Video candidate probe output is unbounded or incomplete.");
 
@@ -114,7 +116,8 @@ public static class VideoProxyCandidateProfile
                         !EqualsText(stream, "color_space", "bt709") ||
                         !TryInt(stream, "width", out width) ||
                         !TryInt(stream, "height", out height) ||
-                        width is < 16 or > 720 || height is < 16 or > 720 ||
+                        width < 16 || width > maximumDimension ||
+                        height < 16 || height > maximumDimension ||
                         width % 2 != 0 || height % 2 != 0 ||
                         !stream.TryGetProperty("r_frame_rate", out JsonElement rate) ||
                         !FrameRateAllowed(rate.GetString()))
