@@ -5,12 +5,12 @@ using PhotoIdentity.Persistence.Postgres;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
-/// Explicitly unregistered candidate for WI-0188/WI-0189 integration:
-/// selected/current SDR-only revision -> hash-pinned FFmpeg constrained by
-/// Windows Job Object -> independently constrained FFprobe -> lease-fenced
-/// private receipt. No API, operator activation, hosted service or scheduler.
-/// No source path is accepted from the caller; it comes from the existing
-/// revision-fenced staging boundary.
+/// Shared-Archive WI-0188/WI-0189 SDR playable-proxy adapter:
+/// revision-fenced staged video -> hash-pinned Windows-constrained FFmpeg ->
+/// independent FFprobe output validation -> lease-fenced private receipt.
+/// Only a separately approved, persisted fixed preset can be selected.
+/// No caller-supplied source path, free-form FFmpeg flags or new video
+/// scheduler is introduced; the existing photo-first Archive owns activation.
 /// </summary>
 public sealed class VideoExperimentalProxyAdapter(
     PostgresCatalogueDatabase database, string ffmpegPath,
@@ -26,6 +26,10 @@ public sealed class VideoExperimentalProxyAdapter(
         ArgumentNullException.ThrowIfNull(lease);
         VideoProxyEncodingProfile selected =
             encodingProfile ?? VideoProxyEncodingProfiles.Standard;
+        // Only trusted, reviewed static selections are admissible. A
+        // forged object with arbitrary fields must never reach FFmpeg.
+        if (!Equals(selected, VideoProxyEncodingProfiles.Resolve(selected.Key)))
+            throw new ArgumentException("An approved video profile is required.");
         // Never process a queued job using a different user's current
         // profile. Exact preset/version must match the leased identity.
         if (lease.DerivativeKind != "PlayableProxy" ||
