@@ -16,8 +16,9 @@ Generate a smaller playable video copy to keep on the local machine, separate fr
 
 ## Implementation progress (2026-10-30)
 
-**In progress — PRs #665–#669 merged (GitHub CI successful for
-#667–#669); PR #670 adds selectable, versioned encoding profiles.** The WI-0188 video
+**Implementation ready for review — PRs #665–#670 merged and #670
+Windows GitHub CI passed; PR #671 adds the isolated 540p/720p
+synthetic preflight and final operator acceptance handoff.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -83,7 +84,7 @@ extends that foundation rather than enabling a second worker.
   no automatic retention scheduler, full physical disk quota or
   orphan accounting is added. GitHub Windows CI passed for #669,
   but maintained-host actual deletion is not yet accepted.
-- **Checkpoint 6, PR #670:** add a bounded operator-selectable
+- **Checkpoint 6, PR #670 merged:** add a bounded operator-selectable
   `standard-720p` (unchanged WI-0188 preset/version and exact arguments)
   or `compact-540p` (new immutable v1 preset, lowered bitrate/CRF
   parameters) SDR H.264/AAC MP4 profile in persisted Video Settings.
@@ -105,36 +106,61 @@ extends that foundation rather than enabling a second worker.
   validation, idempotency and Settings/legacy persistence.
   **Actual relative size, quality, encode duration, orientation, audio
   and playback results remain pending maintained-host verification.**
+- **Checkpoint 7, PR #671:** extend the already accepted, hash-pinned,
+  source-free synthetic FFmpeg/FFprobe pilot with an optional strictly
+  allowlisted `compact-540p` profile. The existing `standard-720p`
+  remains the default. Both pilot profiles check temporary-file cleanup,
+  orientation and optional audio on disposable generated footage; no
+  PostgreSQL, original videos or hydration are used. Profile-specific
+  pilot durations and output sizes are synthetic diagnostic evidence,
+  not representative real-video acceptance.
+- **Maintainer decision (2026-10-30):** manually confirmed, stopped-lane,
+  SHA-verified database-first eviction **satisfies WI-0189 retention**.
+  Unattended eviction is no longer required and will not be implemented
+  for this item. The registered-byte admission quota is **not** a hard
+  physical disk quota; unregistered/orphan files remain bounded by the
+  existing conservative maintenance/recovery tooling, not auto-deleted.
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
-- **Not yet implemented:** automatic unattended cache eviction,
-  full physical disk quota and unregistered/orphan-byte accounting.
-  Two versioned bounded encoding choices are implemented but the
-  compact choice requires empirical default-profile assessment;
-  manual confirmed retention and user-editable quota limits exist,
-  the latter guarding only newly registered bytes. Representative MOV/MP4
-  size/quality, compatibility and restart/retention workflow verification
-  remain open.
-  No real-media or end-to-end local verification is claimed for this checkpoint.
-  The acceptance checkboxes below remain open.
+- **Development handoff:** the chosen scope (local, default-off,
+  photo-first processing; versioned selectable preset; registered-byte
+  quotas; manually confirmed retention/recovery) is implemented.
+  WI-0189 is now `in_review`, pending PR #671 CI, maintainer
+  Windows synthetic pilot, already-local MOV/MP4 comparative quality
+  measurements, revision/preset reuse and safe cleanup verification.
+  No real-media or end-to-end WI-0189 acceptance is claimed yet.
+  All acceptance checkboxes remain open until the results are supplied.
 
 ## In scope
 
 - Opt-in transcoding through the isolated lane after WI-0150 approves FFmpeg/deployment decisions; measure a browser-friendly profile such as bounded 720p H.264/AAC MP4 without assuming universal input compatibility.
 - Application-managed **local** derivative cache, never the original or OneDrive-synced folders. Store source revision, encoder/preset version, size, codec and creation status.
-- User-configurable profile, disk quota, per-file cap and retention/eviction; safe eviction affects only generated copies.
+- User-configurable bounded encoding profile, **registered-byte** quota,
+  per-file cap and retention age; eviction is manual, previewed and
+  explicitly confirmed, affecting only generated private copies.
+  Unattended deletion and strict physical filesystem quota are not
+  requirements for the maintainer-accepted scope.
 - Atomic temp-file publication, deduplication, cancellation cleanup, revision/preset invalidation, and exclusion/deletion privacy cleanup.
-- Bounded/manual hydration, explicit unsupported/corrupt-file errors and proxy availability after the original returns online-only where policy allows.
+- Preserve retained **already-local** proxy availability when an
+  original subsequently becomes online-only without triggering recall.
+  Online-only input must be skipped by default; actual opt-in hydration,
+  reversion to online-only and any related release tests are **WI-0207**,
+  not WI-0189.
 
 ## Out of scope
 
-Player/range API (WI-0152), editing/trimming, universal codec support, captioning and facial identification.
+Player/range API (WI-0152), automatic retention scheduling, strict
+physical filesystem quota, OneDrive-only hydration/release (WI-0207),
+editing/trimming, universal codec support, captioning and facial identification.
 
 ## Acceptance criteria
 
 - [ ] Representative MOV/MP4 clips produce smaller, seekable proxies; orientation, aspect and audio policy are correct, and originals remain bit-for-bit unchanged.
 - [ ] Repeated jobs reuse a valid revision/preset-matched proxy; changed revisions or policy invalidate correctly.
-- [ ] Quota, eviction, stopped jobs, corrupt input, exclusion and OneDrive-online-only cases are deterministic and do not leak temp files.
+- [ ] Registered-byte quota refusals, manually confirmed eviction,
+  stopped jobs, corrupt/unsupported input, exclusion and **default-off
+  online-only skipping** are deterministic and do not leak temporary
+  files; opt-in hydration/release is independently verified in WI-0207.
 - [ ] Report proxy size, encode time, browser compatibility and perceived quality to choose a default profile.
 
 ## Verification requirements
@@ -173,10 +199,17 @@ Integration lifecycle and representative private-file performance/quality tests,
   canonical/generated status and milestone/build context.
 - PR #668 and #669 GitHub build CI completed successfully. PR #669
   actual maintained-host removal/recovery is **not** accepted yet.
-- Checkpoint 6 changed: versioned FFmpeg profile registry, worker/output
-  validator, preset-scoped queue discovery and job identity, persisted
-  preferences/API/Settings UI (including 48h/7d/30d explicit retention
-  policy), operator cleanup age resolution, focused tests, Windows CI
-  filter and documentation/status views. PR #670 tests and generator **not run**
-  by the connector authoring environment; require successful CI
-  before merge.
+- Checkpoint 6: versioned FFmpeg profile registry, preset-scoped queue
+  discovery/idempotent identity, independent output validation,
+  persisted Settings for profile/48h–30d retention age and
+  loopback-only cleanup. PR #670 merged, GitHub Windows build CI
+  succeeded; local comparative media acceptance has not been run.
+- Checkpoint 7 (PR #671): optional compact-profile synthetic pilot,
+  parser/output-size/orientation/audio/cleanup regression coverage,
+  and repository-native verification handoff. No .NET tools or media
+  were executed in the GitHub connector authoring environment.
+- Acceptance pending: PR #671 CI, Windows isolated 720p/540p
+  pilot, bounded already-local representative media comparison,
+  original SHA-256 immutability, preset/revision reuse, quota
+  refusal, manual stopped-lane recovery and default profile decision.
+  No automatic OneDrive recall or release; WI-0207 owns that gate.
