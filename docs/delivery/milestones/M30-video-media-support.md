@@ -9,27 +9,46 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**Architecture gate WI-0150 approved on 2026-10-14.** The maintainer accepted [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md), the [survey-backed MOV/MP4 H.264/HEVC input candidates](../../operations/video-codec-survey-evidence-2026-10-14.md), and separately installed Winget/Gyan GPLv3+ FFmpeg with provided executable SHA-256 fingerprints. WI-0150 is completed and its activation PR #523 has merged. **WI-0151 is completed following maintainer real-file acceptance on 2026-10-19.** M30 is now `in_progress` with WI-0188 started on 2026-10-19. The durable v37 queue, bounded Windows video tool adapter, revision-fenced publication and photo-priority foundations are implemented. The consolidated Settings-driven photo-first implementation has now passed its first durable real-video publication, restart persistence, original/derivative integrity and photo-feature regression checks on the maintained Windows machine. WI-0188 has since passed operator-reported pause/recovery and local-first/exclusion checks. Controlled invalid-media and scratch-cleanup verification remains; online-only hydration/release has not been exercised and must not be represented as PASS. The completed WI-0151 slice is unchanged, and playback, analysis, retrieval and collection integrations remain proposed. **M30 is not complete.**
+**M30 remains in progress.** WI-0150 architecture and WI-0151
+video metadata/SDR posters are completed. **WI-0188 completed
+following maintainer acceptance on 2026-10-30** for already-local,
+default-off, photo-first, bounded video processing and durable
+proxy publication. The operator confirmed first real-video success,
+restart persistence, original/derivative integrity, Settings and
+Pause/recovery, local-first/exclusions, existing photo regressions,
+and **17/17 isolated Windows safety tests** for unsupported/oversized
+input guards and temporary-file cleanup.
 
-## WI-0188 maintained-host progress (2026-10-30)
+**Online-only video hydration/release has not been exercised.**
+The maintainer explicitly moved that separate opted-in OneDrive
+verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
+a new proposed M30 workitem dependent on WI-0188. This does not
+permit automatic hydration or alter locally available video behavior.
+Other M30 playback, proxy, frame analysis, search and collection
+integrations remain separately proposed. **M30 is not complete.**
 
-- **PASS:** first real-video `succeeded` receipt, persistence across
-  restart, original/derivative integrity, existing photo features and
-  bounded/sanitized queue execution.
-- **PASS on maintained host:** Settings/default-off behavior,
-  Advance/Pause and recovery/retry, local-first selection and
-  included-folder/exclusion handling.
-- **Not exercised:** online-only video hydration or app-initiated
-  online-only release. All videos exercised so far were already local;
-  no cloud-original hydration is claimed.
-- **Final controlled verification requested:** unsupported/oversized-media
-  rejection and owned scratch cleanup using isolated fixture-based
-  Windows tests (runbook), not by modifying the family archive.
-  No concurrent workload benchmark or mandatory AppContainer proof
-  is being reintroduced.
-- Seven historical `attempt-limit` jobs remain untouched; there is no
-  reason to reset the queue for closure. M30 still contains later
-  proxy, frame analysis, search and playback workitems.
+## WI-0188 final maintained-host acceptance (2026-10-30)
+
+- **PASS:** one live video derivative durably published on attempt 1,
+  persisted after restart, with original/source and derivative integrity
+  verified by the maintainer.
+- **PASS:** photo Archive, People, Visual/Caption/Combined search,
+  Smart/Creative Collections and slideshow compatibility, and guarded
+  photo-first video queue/Settings controls.
+- **PASS:** Advance/Pause and interrupted-job recovery/retry; local-first
+  selection, current included folders, exclusions and no unrequested
+  OneDrive hydration.
+- **PASS:** targeted Release test groups 8 + 2 + 4 + 2 + 1 =
+  **17 passed, 0 failed, 0 skipped**, covering unsupported/video
+  source-budget rejection, output validation and bounded scratch
+  cleanup after tool failure, cancellation and timeout.
+- **NOT EXERCISED / deferred to WI-0207:** actually hydrating an
+  online-only OneDrive video and safely returning only
+  app-initiated downloads to online-only. Every tested source was
+  already local.
+- Seven historical `attempt-limit` rows were not reset.
+  Concurrency benchmarks and mandatory AppContainer proof remain
+  explicitly out of scope as approved on 2026-10-22.
 
 ## WI-0188 scope adjustment (maintainer, 2026-10-22)
 
@@ -83,11 +102,12 @@ Support private family videos on local hardware without modifying originals, exp
 
 1. **Architecture gate — WI-0150:** inspect actual MOV/MP4 codecs and metadata; agree supported subset, FFprobe/FFmpeg packaging/security/license decision, media contracts, video toggle, processing budget, locally retained proxy policy, frame sampling, privacy and ADR.
 2. **Metadata/poster — WI-0151:** opt-in discovery; video kind, duration, dimensions/rotation, streams/camera/GPS/time where present; bounded still poster. No mass automatic model processing.
-3. **Isolation — WI-0188:** opt-in resource-limited queue for video analysis/encoding, with photo-priority, bounded hydration, cancellation, resumption and observability.
-4. **Local low-res video copy — WI-0189:** managed local transcode/cache independent of immutable originals and OneDrive, with disk quota, eviction, invalidation and configurable output profile.
-5. **Video visual evidence — WI-0190:** bounded timestamped frame sampling, caption generation and versioned CLIP-compatible embeddings when model suitability is confirmed; per-video/scene aggregation and uncertainty.
-6. **Video retrieval — WI-0191:** explicit Videos/Photos search scope, Visual/Caption/Combined ranking at video level, with meaningful matched timestamps and no changed photo-search defaults.
-7. **Face feasibility — WI-0155:** separately evaluate sampled face detection, temporal track deduplication and suggestions against *existing confirmed* identities; review burden, precision and compute/storage decide adopt/defer/no-go.
+3. **Isolated local video processing — WI-0188 (completed):** default-off, one-at-a-time, photo-first queue for already-local media, with guarded FFmpeg execution, durable derivative publication, cancellation, recovery and observability.
+4. **Online-only OneDrive video — WI-0207 (proposed):** explicitly opted-in bounded hydration and safe return-to-online-only, to be verified independently without modifying pre-existing local originals.
+5. **Local low-res video copy — WI-0189:** managed local transcode/cache independent of immutable originals and OneDrive, with disk quota, eviction, invalidation and configurable output profile.
+6. **Video visual evidence — WI-0190:** bounded timestamped frame sampling, caption generation and versioned CLIP-compatible embeddings when model suitability is confirmed; per-video/scene aggregation and uncertainty.
+7. **Video retrieval — WI-0191:** explicit Videos/Photos search scope, Visual/Caption/Combined ranking at video level, with meaningful matched timestamps and no changed photo-search defaults.
+8. **Face feasibility — WI-0155:** separately evaluate sampled face detection, temporal track deduplication and suggestions against *existing confirmed* identities; review burden, precision and compute/storage decide adopt/defer/no-go.
 
 **Later optional integrations:** WI-0152 viewer/range playback, WI-0153 manual metadata and mixed-media collections, WI-0154 slideshow playback and WI-0156 Live Photo pairing. They are not prerequisites for the standalone catalogue/analyze/search path.
 
@@ -107,7 +127,8 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) — design and explicit activation.
 - [WI-0151](../work-items/WI-0151-video-ingestion-metadata-posters.md) — metadata and still posters.
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
-- [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — isolated scheduling/limits.
+- [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
+- [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
 - [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — local playable proxies.
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
@@ -128,7 +149,7 @@ The maintainer completed all **11/11** consolidated PostgreSQL/schema, opt-in in
 - [x] WI-0150 architecture complete: ADR-0012 accepted, codec/build/hash evidence recorded, and PR #523 merged.
 - [x] WI-0151 initial video kind/metadata, revision-bound durable Rec.709 SDR still posters and read-only opt-in Videos library: consolidated maintainer real-file acceptance on 2026-10-19.
 - [ ] Metadata/poster, bounded local playback proxy, timestamped captions and embeddings work for a documented codec subset and do not mutate originals.
-- [ ] Video processing is opt-in, resource-limited, resumable and does not materially regress photo throughput or interactive behavior under measured local load.
+- [x] Initial locally available video processing is opt-in, photo-first, one-at-a-time, resource-limited, recoverable and accepted without photo functionality regressions under the maintainer-revised WI-0188 scope. Remote OneDrive-only hydration/release is separately pending as WI-0207; concurrent performance benchmarking was explicitly removed.
 - [ ] Video retrieval is useful and has explicit photo-only compatibility defaults.
 - [ ] Face processing gets an evidence-based adopt/defer/no-go and follows existing identity governance.
 - [ ] Optional viewer, collections, slideshows and Live Photo integrations are independently verified before introduction.
