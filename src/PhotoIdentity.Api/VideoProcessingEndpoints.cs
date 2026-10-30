@@ -18,11 +18,12 @@ public sealed record VideoProxyRetentionApplyRequest(string ConfirmationFingerpr
 public sealed record VideoProcessingSettingsUpdate(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
-    bool? OverrideProxyLimits = null)
+    bool? OverrideProxyLimits = null, string? EncodingProfile = null)
 {
     public VideoProcessingPreferences MergeWith(VideoProcessingPreferences existing)
     {
         ArgumentNullException.ThrowIfNull(existing);
+        string selectedProfile = EncodingProfile ?? existing.EncodingProfile;
         if (OverrideProxyLimits is null)
         {
             if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
@@ -31,7 +32,8 @@ public sealed record VideoProcessingSettingsUpdate(
             return existing with
             {
                 Enabled = Enabled,
-                IncludeOnlineOnly = IncludeOnlineOnly
+                IncludeOnlineOnly = IncludeOnlineOnly,
+                EncodingProfile = selectedProfile
             };
         }
         if (OverrideProxyLimits is false)
@@ -39,20 +41,22 @@ public sealed record VideoProcessingSettingsUpdate(
             if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
                 throw new ArgumentException(
                     "Clearing quota overrides cannot supply quota limits.");
-            return new(Enabled, IncludeOnlineOnly);
+            return new(Enabled, IncludeOnlineOnly,
+                EncodingProfile: selectedProfile);
         }
 
         if (!MaximumCacheMiB.HasValue || !MaximumProxyMiB.HasValue)
             throw new ArgumentException(
                 "Both quota limits are required when overriding launcher settings.");
-        return new(Enabled, IncludeOnlineOnly, MaximumCacheMiB, MaximumProxyMiB);
+        return new(Enabled, IncludeOnlineOnly,
+            MaximumCacheMiB, MaximumProxyMiB, selectedProfile);
     }
 }
 
 public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB, int? MaximumProxyMiB,
-    bool Processing, bool ToolsConfigured,
+    string EncodingProfile, bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
     long Cancelled, long ExpiredLeases, string LastResult,
     IReadOnlyList<VideoProcessingJobOperatorRow> Recent,
@@ -119,11 +123,14 @@ public static class VideoProcessingEndpoints
             return Results.BadRequest(new ArchiveErrorResponse(
                 "Specify both valid video proxy limits or neither; cache 64..16384 MiB, per-file 1..256 MiB and per-file <= cache."));
         }
-        bool quotaChanged = existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
-                            existing.MaximumProxyMiB != requested.MaximumProxyMiB;
-        if (quotaChanged && processor.IsProcessing)
+        bool quotaOrProfileChanged =
+            existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
+            existing.MaximumProxyMiB != requested.MaximumProxyMiB ||
+            !string.Equals(existing.EncodingProfile,
+                requested.EncodingProfile, StringComparison.Ordinal);
+        if (quotaOrProfileChanged && processor.IsProcessing)
             return Results.Conflict(new ArchiveErrorResponse(
-                "Pause archive processing before changing video proxy storage limits."));
+                "Pause archive processing before changing video proxy limits or encoding profile."));
 
         // Do not enable video work without explicit approved local tool
         // configuration. This also prevents the UI from advertising success
@@ -271,7 +278,7 @@ public static class VideoProcessingEndpoints
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
             settings.MaximumCacheMiB, settings.MaximumProxyMiB,
-            processing, configured, status.Queued, status.Running,
+            settings.EncodingProfile, processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
             status.ExpiredLeases, lastResult, recent, lastAttemptFailure);
 }
