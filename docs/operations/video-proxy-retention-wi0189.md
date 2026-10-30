@@ -521,3 +521,35 @@ policy require a separate explicit decision and safeguards; the
 current user-confirmed DB-first cleanup is safe but not a hard
 filesystem quota or background storage regulator. Keep all four
 formal WI-0189 acceptance boxes open until maintainer evidence.
+
+### Manually confirmed minimum retention age (PR #670)
+
+Video Settings → **Manual proxy retention** now offers exactly three
+approved, persisted age choices:
+
+| Minimum age | Intended behavior |
+|---|---|
+| **48 hours** (default) | Legacy WI-0189 behavior; consider oldest valid current registered copies only after two days |
+| **7 days** | Protect valid current copies for a week |
+| **30 days** | Protect valid current copies for a month |
+
+These are **minimum protection ages**, not a command to delete a file
+when it reaches the specified age. The same user-reviewed
+**Preview → Confirm** workflow still requires disabled+paused processing,
+zero running leases, an app-owned cache, SHA-256 verification, and a
+fresh fingerprint. Changing the retention age is a policy change and
+therefore invalidates the previous fingerprint. **Invalid, excluded,
+missing or corrupt registered copies can still be selected before
+that minimum age** for source privacy and integrity, as before.
+
+Legacy preference JSON (without `RetentionAgeHours`) defaults to
+48 hours. Older Settings API clients preserve the current retention
+choice; unsupported numeric values fail closed, without modifying
+saved settings. The standalone expert maintenance CLI retains its
+own independently supplied age option and safety fences.
+
+**No automatic eviction runs at 48 hours, 7 days or 30 days.**
+The user must perform a new preview and explicit confirmation.
+The registered-byte publication quota can refuse new copies while
+old protected copies are retained. If capacity is insufficient, the
+application does not bypass protection or delete source material.
