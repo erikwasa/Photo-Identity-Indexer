@@ -164,6 +164,87 @@ public sealed class VideoProcessingQuotaPreferencesTests
     }
 
     [Fact]
+    public async Task Selected_video_profile_persists_across_restart_and_legacy_JSON_defaults_to_720p()
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-profile-settings-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            File.WriteAllText(file,
+                """{"Enabled":false,"IncludeOnlineOnly":false}""");
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.Equal("standard-720p", store.Current.EncodingProfile);
+            Assert.False(store.Current.Enabled);
+
+            await store.SaveAsync(new(false, false,
+                EncodingProfile: "compact-540p"));
+            var reloaded = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.Equal("compact-540p", reloaded.Current.EncodingProfile);
+            Assert.False(reloaded.Current.Enabled);
+
+            await reloaded.SaveAsync(new(false, false,
+                EncodingProfile: "standard-720p"));
+            Assert.Equal("standard-720p",
+                new VideoProcessingPreferencesStore(file, new(false, false))
+                    .Current.EncodingProfile);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Theory]
+    [InlineData("arbitrary-432p")]
+    [InlineData("")]
+    [InlineData("Compact-540p")]
+    public async Task Malformed_or_unknown_video_profile_is_rejected_before_persisting(
+        string profile)
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-profile-invalid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            await store.SaveAsync(new(false, false));
+            string original = File.ReadAllText(file);
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                store.SaveAsync(new(true, true, EncodingProfile: profile)));
+            Assert.Equal(original, File.ReadAllText(file));
+            Assert.False(store.Current.Enabled);
+            File.WriteAllText(file,
+                "{\"Enabled\":true,\"IncludeOnlineOnly\":true,\"EncodingProfile\":"
+                + System.Text.Json.JsonSerializer.Serialize(profile) + "}");
+            var invalid = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.False(invalid.Current.Enabled);
+            Assert.False(invalid.Current.IncludeOnlineOnly);
+            Assert.Equal("standard-720p", invalid.Current.EncodingProfile);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void Legacy_two_field_settings_API_preserves_profile_and_explicit_profile_change_is_scoped()
+    {
+        var current = new VideoProcessingPreferences(
+            false, false, 1024, 128, "compact-540p");
+        var oldApi = new VideoProcessingSettingsUpdate(true, false);
+        var oldResult = oldApi.MergeWith(current);
+        Assert.Equal("compact-540p", oldResult.EncodingProfile);
+        Assert.Equal(1024, oldResult.MaximumCacheMiB);
+
+        var changed = new VideoProcessingSettingsUpdate(
+            false, false, EncodingProfile: "standard-720p").MergeWith(current);
+        Assert.Equal("standard-720p", changed.EncodingProfile);
+        Assert.Equal(1024, changed.MaximumCacheMiB);
+        Assert.Equal(128, changed.MaximumProxyMiB);
+        var invalid = new VideoProcessingSettingsUpdate(
+            false, false, EncodingProfile: "arbitrary");
+        Assert.Throws<ArgumentException>(() => invalid.MergeWith(current).Validate());
+    }
+
+    [Fact]
     public void Inherited_invalid_configuration_rejects_enabling_but_valid_override_wins()
     {
         var defaultSettings = new VideoProcessingPreferences(false, false);
