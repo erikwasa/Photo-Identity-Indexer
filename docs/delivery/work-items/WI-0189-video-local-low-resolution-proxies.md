@@ -14,6 +14,27 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 Generate a smaller playable video copy to keep on the local machine, separate from read-only originals and the OneDrive archive.
 
+## Implementation progress (2026-10-30)
+
+**In progress — PR #665, checkpoint 1 of multiple.** The WI-0188 video
+lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
+profile with local staging and atomic, revision-fenced publication. WI-0189
+extends that foundation rather than enabling a second worker.
+
+- Added `VideoProxyRetentionPolicy`, a pure quota/admission planner with
+  configurable **policy inputs** (total bytes and per-proxy cap), stable
+  oldest-unpinned-first selection, fail-closed malformed inventory handling,
+  and no filesystem side effects.
+- Added deterministic tests for fit, eviction order, pinned entries,
+  insufficient capacity, invalid sizes and duplicate/overfull inventory.
+- Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
+  with explicit remaining safety and verification gates.
+- **Not yet implemented:** Settings UI or persisted quota/profile choices,
+  catalogue-backed inventory, actual eviction, publication admission wiring,
+  measured size/quality acceptance, and expanded real-MOV/MP4 verification.
+  No real-media or end-to-end local verification is claimed for this checkpoint.
+  The acceptance checkboxes below remain open.
+
 ## In scope
 
 - Opt-in transcoding through the isolated lane after WI-0150 approves FFmpeg/deployment decisions; measure a browser-friendly profile such as bounded 720p H.264/AAC MP4 without assuming universal input compatibility.
@@ -39,7 +60,14 @@ Integration lifecycle and representative private-file performance/quality tests,
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed (checkpoint 1): `src/PhotoIdentity.Core/Processing/VideoProxyRetentionPolicy.cs`,
+  `tests/PhotoIdentity.Integration.Tests/VideoProxyRetentionPolicyTests.cs`,
+  `docs/operations/video-proxy-retention-wi0189.md`, and canonical/generated
+  delivery status documentation.
+- Trade-offs: start with side-effect-free, opaque-ID retention planning;
+  no file deletion until ownership, lease and revision fences can be enforced.
+- Deferred work: catalogue-backed quotas and eviction, configurable profile,
+  output quality/size evidence and private-file end-to-end verification.
+- Commands run: GitHub connector edits only; local `dotnet test`,
+  `PhotoIdentity.Docs validate`, and `generate --check` have **not** run
+  in this environment. CI validation is required before merge.
