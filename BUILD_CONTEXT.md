@@ -24,7 +24,9 @@ only passing isolated PostgreSQL tests. Publication quota is bounded
 registered bytes, **not** a hard physical disk quota for scratch/orphans.
 All 4 WI-0189 acceptance boxes are checked; the canonical status moves
 to archived `completed`; generated active index/registry updated.
-M30 remains `in_progress`; browser playback/range streaming is WI-0152;
+M30 recalculates to `ready` (not complete) after its final in-review item
+WI-0189 is archived. This matches PhotoIdentity.Docs lifecycle rules;
+browser playback/range streaming is WI-0152;
 no OneDrive-online-only hydration or release has been exercised—WI-0207
 owns that separately. Historical checkpoint notes are superseded by the
 final acceptance record in
