@@ -44,8 +44,54 @@ public sealed class VideoSyntheticProxyPilotTests
             VideoSyntheticProxyPilotOptions.Parse(Arguments(root));
         Assert.False(safe.Apply);
         Assert.Equal(root, safe.ScratchRoot);
+        Assert.Equal(VideoProxyEncodingProfiles.StandardKey, safe.EncodingProfile);
+        Assert.Equal(VideoProxyEncodingProfiles.CompactKey,
+            VideoSyntheticProxyPilotOptions.Parse(
+                [.. Arguments(root), "--profile", "compact-540p"]).EncodingProfile);
         Assert.True(VideoSyntheticProxyPilotOptions.Parse(
             [.. Arguments(root), "--apply"]).Apply);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("720p")]
+    [InlineData("COMPACT-540P")]
+    [InlineData("compact-540p;http://example.invalid")]
+    [InlineData("-vf=scale=w=9999")]
+    public void Unknown_or_injected_synthetic_profile_is_denied_before_tools(string profile)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "video-synthetic-test");
+        Assert.Throws<ArgumentException>(() =>
+            VideoSyntheticProxyPilotOptions.Parse(
+                [.. Arguments(root), "--profile", profile]));
+        Assert.Throws<ArgumentException>(() =>
+            VideoSyntheticProxyPilotOptions.Parse(
+                [.. Arguments(root), "--profile", "standard-720p",
+                    "--profile", "compact-540p"]));
+    }
+
+    [Fact]
+    public async Task Compact_profile_dry_run_has_no_media_side_effects()
+    {
+        string root = NewScratch();
+        try
+        {
+            var options = VideoSyntheticProxyPilotOptions.Parse(
+                [.. Arguments(root), "--profile", "compact-540p"]);
+            using StringWriter output = new();
+            Assert.Equal(0, await VideoSyntheticProxyPilotCommandRunner
+                .RunAsync(options, output));
+            using JsonDocument document = JsonDocument.Parse(output.ToString());
+            JsonElement fields = document.RootElement;
+            Assert.Equal("compact-540p", fields.GetProperty("profile").GetString());
+            Assert.Equal("not-run", fields.GetProperty("status").GetString());
+            Assert.True(fields.GetProperty("dryRun").GetBoolean());
+            Assert.False(fields.GetProperty("originalsOpened").GetBoolean());
+            Assert.False(fields.GetProperty("schemaUsed").GetBoolean());
+            Assert.Empty(fields.GetProperty("results").EnumerateArray());
+            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+        }
+        finally { Directory.Delete(root, recursive: true); }
     }
 
     [Fact]
@@ -158,35 +204,53 @@ public sealed class VideoSyntheticProxyPilotTests
         string root = NewScratch();
         try
         {
-            VideoSyntheticProxyPilotOptions options =
-                VideoSyntheticProxyPilotOptions.Parse(
-                [
-                    "--scratch-root", root,
-                    "--ffmpeg", ffmpeg!,
-                    "--ffmpeg-sha256", ffmpegHash!,
-                    "--ffprobe", ffprobe!,
-                    "--ffprobe-sha256", ffprobeHash!,
-                    "--apply"
-                ]);
-            using StringWriter output = new();
-            Assert.Equal(0, await VideoSyntheticProxyPilotCommandRunner
-                .RunAsync(options, output));
-            using JsonDocument report = JsonDocument.Parse(output.ToString());
-            JsonElement fields = report.RootElement;
-            Assert.Equal("validated", fields.GetProperty("status").GetString());
-            Assert.False(fields.GetProperty("dryRun").GetBoolean());
-            JsonElement rows = fields.GetProperty("results");
-            Assert.Equal(2, rows.GetArrayLength());
-            Assert.Equal("landscape", rows[0].GetProperty("orientation").GetString());
-            Assert.True(rows[0].GetProperty("hasAudio").GetBoolean());
-            Assert.Equal("portrait", rows[1].GetProperty("orientation").GetString());
-            Assert.False(rows[1].GetProperty("hasAudio").GetBoolean());
-            Assert.All(rows.EnumerateArray(), item =>
+            // The optional approved real-tool test exercises both immutable
+            // presets and verifies that the scratch root is clean after each.
+            foreach (string profile in new[]
+                     { VideoProxyEncodingProfiles.StandardKey,
+                       VideoProxyEncodingProfiles.CompactKey })
             {
-                Assert.True(item.GetProperty("encodedBytes").GetInt64() > 128);
-                Assert.True(item.GetProperty("encodeMilliseconds").GetInt64() > 0);
-            });
-            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+                VideoSyntheticProxyPilotOptions options =
+                    VideoSyntheticProxyPilotOptions.Parse(
+                    [
+                        "--scratch-root", root,
+                        "--ffmpeg", ffmpeg!,
+                        "--ffmpeg-sha256", ffmpegHash!,
+                        "--ffprobe", ffprobe!,
+                        "--ffprobe-sha256", ffprobeHash!,
+                        "--profile", profile, "--apply"
+                    ]);
+                using StringWriter output = new();
+                Assert.Equal(0, await VideoSyntheticProxyPilotCommandRunner
+                    .RunAsync(options, output));
+                using JsonDocument report = JsonDocument.Parse(output.ToString());
+                JsonElement fields = report.RootElement;
+                Assert.Equal(profile, fields.GetProperty("profile").GetString());
+                Assert.Equal("validated", fields.GetProperty("status").GetString());
+                Assert.False(fields.GetProperty("dryRun").GetBoolean());
+                JsonElement rows = fields.GetProperty("results");
+                Assert.Equal(2, rows.GetArrayLength());
+                Assert.Equal("landscape",
+                    rows[0].GetProperty("orientation").GetString());
+                Assert.True(rows[0].GetProperty("hasAudio").GetBoolean());
+                Assert.Equal("portrait",
+                    rows[1].GetProperty("orientation").GetString());
+                Assert.False(rows[1].GetProperty("hasAudio").GetBoolean());
+                int maxDimension = profile == VideoProxyEncodingProfiles.CompactKey
+                    ? 540 : 720;
+                Assert.All(rows.EnumerateArray(), item =>
+                {
+                    Assert.Equal(profile,
+                        item.GetProperty("encodingProfile").GetString());
+                    Assert.True(item.GetProperty("encodedBytes").GetInt64() > 128);
+                    Assert.True(item.GetProperty("encodeMilliseconds").GetInt64() > 0);
+                    Assert.InRange(item.GetProperty("width").GetInt32(), 16,
+                        maxDimension);
+                    Assert.InRange(item.GetProperty("height").GetInt32(), 16,
+                        maxDimension);
+                });
+                Assert.Single(Directory.EnumerateFileSystemEntries(root));
+            }
         }
         finally { Directory.Delete(root, recursive: true); }
     }
