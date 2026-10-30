@@ -13,7 +13,9 @@ strict second compact SDR 540p encode, preserving the exact default
 720p version/arguments. Version-specific, hash-pinned queue
 selection/FFprobe validation and persisted Video Settings profile
 prevent wrong-preset processing. Same PR adds strict 48h/7d/30d
-manual cleanup retention age (48h remains default). CI pending. No automatic cache
+manual cleanup retention age (48h remains default), and restricts
+retention preview/apply HTTP operations to direct loopback only,
+not optional LAN clients. CI pending. No automatic cache
 eviction or physical disk quota; operator-confirmed stopped-lane
 DB-first retention already exists. WI-0189 remains `in_progress`
 with all four acceptance criteria unchecked.
