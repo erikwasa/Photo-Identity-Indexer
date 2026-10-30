@@ -28,7 +28,8 @@ public sealed class VideoProxyValidationException : Exception
 /// Binary stdout/stderr and all source/media tags are discarded.
 /// </summary>
 public sealed class VideoProxyOutputValidator(
-    string ffprobePath, string ffprobeSha256, string scratchRoot)
+    string ffprobePath, string ffprobeSha256, string scratchRoot,
+    int maximumDimension = 720)
 {
     private static VideoToolExecutionBudget ProbeBudget => new(
         MaximumWallTime: TimeSpan.FromSeconds(15),
@@ -49,6 +50,8 @@ public sealed class VideoProxyOutputValidator(
         CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(inspect);
+        if (maximumDimension is not (540 or 720))
+            throw new ArgumentOutOfRangeException(nameof(maximumDimension));
         if (!OperatingSystem.IsWindows() ||
             !Path.IsPathFullyQualified(candidateFile) ||
             !File.Exists(candidateFile) ||
@@ -86,7 +89,8 @@ public sealed class VideoProxyOutputValidator(
                     new FileInfo(json).Length is < 20 or > 65536)
                     throw new InvalidDataException("Video probe output is absent or unbounded.");
                 byte[] data = await File.ReadAllBytesAsync(json, checkToken);
-                inspection = VideoProxyCandidateProfile.ValidateOutputJson(data, length);
+                inspection = VideoProxyCandidateProfile.ValidateOutputJson(
+                    data, length, maximumDimension);
             });
         if (!result.Started)
             throw new VideoProxyValidationException("probe-not-started");
