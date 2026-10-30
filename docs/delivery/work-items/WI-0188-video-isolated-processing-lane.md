@@ -61,14 +61,14 @@ the mandatory AppContainer feasibility requirement from this work item.
   skipped by default. When the online-only setting is enabled, one bounded
   eligible source may be downloaded and subsequently requested online-only;
   already-local videos are not unpinned by Photo Identity.
-- [ ] **Original/photo-data safety.** Video processing never opens originals
+- [x] **Original/photo-data safety.** Video processing never opens originals
   for write or modifies photo catalogue/face/search/collection state. Source
   revision and exclusions are rechecked before durable derivative publication.
   Maintainer verifies post-run original integrity and ordinary photo features.
 - [ ] **Failure recovery and cleanup.** Interrupted, failed, unsupported or
   oversized video jobs remain diagnosable; restart/retry is safe, partial
   outputs do not appear as complete, and owned temp data is bounded/cleaned.
-- [ ] **Simple operational limits.** One video at a time, bounded Windows
+- [x] **Simple operational limits.** One video at a time, bounded Windows
   process resources and useful queue/failure counts; no mandatory AppContainer
   acceptance or synthetic-performance thresholds.
 
@@ -1285,6 +1285,45 @@ Production activation remains prohibited until reviewed.
   remaining applicable pause/exclusion/restart/OneDrive opt-in guards.
   Preserve the default-off/hydration controls and do not regenerate
   failing media merely to obtain additional counters.
+
+### Maintained-host acceptance follow-up — persistence, integrity and photo regressions PASS (2026-10-30)
+
+The maintainer confirmed the documentation-only PR #663 merged, followed
+by **successful local persistence, integrity and regression checks** for
+the first real-video publication. Combined with the earlier operator
+status (`succeeded=1`, attempt 1, progress 100%; no queued/running
+jobs) and the Windows/integration resource-envelope tests, this accepts:
+
+- Transactional published-derivative receipt persisted after restart.
+- Read-only original-file integrity and private derivative integrity.
+- Normal photo Archive, People, searches, collections and slideshow
+  functionality remained unchanged.
+- One-at-a-time bounded video processing, sanitized queue results and
+  successful publication under the Windows resource envelope.
+
+**Remaining acceptance evidence, not yet reported as local PASS:**
+
+1. Default-off/persisted Settings controls and the shared
+   **Advance/Pause** interruption path, including interruption and safe
+   retry/recovery without a published partial artifact.
+2. Local-first and source-coverage/exclusion changes, especially that
+   a queued online-only placeholder never blocks a local candidate,
+   and excluded or stale revisions never publish.
+3. Independently opted-in bounded OneDrive-only hydration, safe
+   online-only release *only* for app-initiated downloads, and
+   no changes to already-local media. If no eligible online-only
+   test video exists, record that as **not exercised**, not PASS.
+4. Fail-closed unsupported/oversized media behavior and cleanup
+   after cancellation, where a safe representative scenario is available.
+   Automated tests exist for these fences but do not replace the
+   maintainer's explicitly requested local acceptance.
+
+The seven pre-fix `attempt-limit` rows are historical and remain
+undisturbed. Do not mass-retry, manually edit PostgreSQL lease state
+or hydrate cloud-only originals merely to produce a passing result.
+WI-0188 remains `in_progress`; do not mark all revised criteria
+accepted until the outstanding checks are explicitly verified or
+the maintainer revises the scope. **M30 also remains in progress.**
 
 ## Completion notes
 
