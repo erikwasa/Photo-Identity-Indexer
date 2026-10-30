@@ -103,7 +103,7 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0188-video-isolated-processing-lane.md
   started_at: 2026-10-19
-  last_updated_at: 2026-10-29
+  last_updated_at: 2026-10-30
   branch: agent/WI-0188-functional-settings-photo-first-lane
   blockers: []
   blocker_notes: []
