@@ -118,6 +118,97 @@ public sealed class VideoRegisteredDerivativeMaintenanceTests
     }
 
     [Fact]
+    public async Task Confirmed_retention_requires_exact_current_preview_and_rechecks_sha()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
+                "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING"))) return;
+
+        await using Fixture f = await Fixture.CreateAsync();
+        var maintenance = new VideoRegisteredDerivativeMaintenance(f.Db);
+        Guid excluded = await f.RegisterAsync('a', "excluded.mp4", [1, 2, 3, 4]);
+        Guid healthy = await f.RegisterAsync('b', "healthy.mp4", [5, 6, 7, 8]);
+        string unknown = Path.Combine(f.Root, "video-derivatives", "unknown.txt");
+        File.WriteAllText(unknown, "must remain");
+        await f.SqlAsync("""
+            INSERT INTO source_copy_exclusions(
+                source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+            VALUES (@source,'excluded.mp4',now(),'pending',now());
+            """);
+
+        VideoRegisteredMaintenanceReport preview = await maintenance.SweepAsync(
+            f.Root, maximumRecords: 8, quotaMiB: 64,
+            verifyHashes: true);
+        Assert.True(preview.DryRun);
+        Assert.Equal(1, preview.Planned);
+        Assert.Equal(1, preview.Invalid);
+        string fingerprint = Assert.IsType<string>(preview.PlanFingerprint);
+        Assert.Equal(64, fingerprint.Length);
+        Assert.True(File.Exists(f.PathFor(excluded)));
+
+        // No destructive operation follows a guessed or stale preview.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            maintenance.SweepAsync(f.Root, maximumRecords: 8, quotaMiB: 64,
+                verifyHashes: true, apply: true,
+                expectedPlanFingerprint: new string('a', 64)));
+        Assert.True(File.Exists(f.PathFor(excluded)));
+        Assert.Equal(2L, await f.ReceiptCountAsync());
+
+        // Same length but different bytes makes the original fingerprint stale.
+        File.WriteAllBytes(f.PathFor(excluded), [4, 3, 2, 1]);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            maintenance.SweepAsync(f.Root, maximumRecords: 8, quotaMiB: 64,
+                verifyHashes: true, apply: true,
+                expectedPlanFingerprint: fingerprint));
+        Assert.True(File.Exists(f.PathFor(excluded)));
+        Assert.Equal(2L, await f.ReceiptCountAsync());
+
+        VideoRegisteredMaintenanceReport refreshed = await maintenance.SweepAsync(
+            f.Root, maximumRecords: 8, quotaMiB: 64, verifyHashes: true);
+        Assert.NotEqual(fingerprint, refreshed.PlanFingerprint);
+        Assert.Equal(1, refreshed.Corrupt);
+        VideoRegisteredMaintenanceReport applied = await maintenance.SweepAsync(
+            f.Root, maximumRecords: 8, quotaMiB: 64, verifyHashes: true,
+            apply: true, expectedPlanFingerprint: refreshed.PlanFingerprint);
+        Assert.False(applied.DryRun);
+        Assert.Equal(1, applied.Revoked);
+        Assert.Equal(1, applied.FilesDeleted);
+        Assert.Equal(0, applied.DeleteFailures);
+        Assert.False(File.Exists(f.PathFor(excluded)));
+        Assert.True(File.Exists(f.PathFor(healthy)));
+        Assert.True(File.Exists(unknown));
+        Assert.Equal(1L, await f.ReceiptCountAsync());
+        Assert.Equal("failed", await f.StatusAsync(excluded));
+        Assert.Equal("succeeded", await f.StatusAsync(healthy));
+
+        // One-time use: a replay must fail after the DB receipts change.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            maintenance.SweepAsync(f.Root, maximumRecords: 8, quotaMiB: 64,
+                verifyHashes: true, apply: true,
+                expectedPlanFingerprint: refreshed.PlanFingerprint));
+    }
+
+    [Fact]
+    public async Task Retention_preview_with_no_victims_cannot_be_confirmed()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
+                "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING"))) return;
+        await using Fixture f = await Fixture.CreateAsync();
+        var maintenance = new VideoRegisteredDerivativeMaintenance(f.Db);
+        Guid recent = await f.RegisterAsync('a', "recent.mp4", [1, 2, 3, 4],
+            ageHours: 1);
+        VideoRegisteredMaintenanceReport preview = await maintenance.SweepAsync(
+            f.Root, maximumRecords: 8, quotaMiB: 64, verifyHashes: true);
+        Assert.Equal(0, preview.Planned);
+        Assert.Null(preview.PlanFingerprint);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            maintenance.SweepAsync(f.Root, maximumRecords: 8, quotaMiB: 64,
+                verifyHashes: true, apply: true,
+                expectedPlanFingerprint: new string('a', 64)));
+        Assert.True(File.Exists(f.PathFor(recent)));
+        Assert.Equal(1L, await f.ReceiptCountAsync());
+    }
+
+    [Fact]
     public async Task Disabled_paused_control_and_zero_running_lease_are_strict_preconditions()
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(

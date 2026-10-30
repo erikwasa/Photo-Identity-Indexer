@@ -114,6 +114,63 @@
             </div>
         }
 
+        <section class="review-filter-panel" aria-labelledby="video-retention-heading">
+            <h3 id="video-retention-heading">Review local proxy cleanup</h3>
+            <p class="field-help">
+                Only app-generated, registered video proxy copies are eligible.
+                The review checks up to 8 registered entries using their
+                stored SHA-256 hashes. Copies younger than 48 hours are
+                protected unless they are already invalid. Originals are
+                never deleted. The video lane must be fully disabled and
+                paused, with no running jobs. Cleanup never runs automatically.
+            </p>
+            <button class="button secondary" type="button"
+                    disabled="@(Saving || Enabled || Status.Enabled || Status.Processing)"
+                    @onclick="PreviewRetentionAsync">
+                Preview proxy cleanup
+            </button>
+            @if (RetentionPreview is { } plan)
+            {
+                <div class="field-help" role="status">
+                    Review: @plan.Planned registered copies eligible,
+                    @plan.QuotaSelected due to the configured quota,
+                    @plan.Invalid invalid, @plan.Missing missing and
+                    @plan.Corrupt corrupt; estimated registered bytes after:
+                    @plan.ProjectedBytesAfter.
+                    @(plan.MoreCandidates ? "Additional records may need another bounded review." : "")
+                </div>
+                @if (plan.Planned > 0 && plan.PlanFingerprint is not null)
+                {
+                    <label class="field-label" for="video-retention-confirm">
+                        <input id="video-retention-confirm" type="checkbox"
+                               @bind="ConfirmRetention" disabled="@Saving" />
+                        I understand that these generated proxy copies will be
+                        revoked and removed, and regeneration may be required.
+                    </label>
+                    <button type="button" class="button secondary"
+                            disabled="@(Saving || !ConfirmRetention || Enabled || Status.Enabled || Status.Processing)"
+                            @onclick="ApplyRetentionAsync">
+                        Confirm removal of @plan.Planned generated copies
+                    </button>
+                }
+                else
+                {
+                    <p class="field-help">No eligible registered copies in this bounded review.</p>
+                }
+                <p class="field-help">A preview expires after at most five minutes,
+                   and any changed plan must be previewed again.</p>
+            }
+            @if (RetentionApplied is { } completed)
+            {
+                <p class="field-help" role="status">
+                    Revoked @completed.Revoked registered receipts;
+                    deleted @completed.FilesDeleted private files;
+                    @completed.DeleteFailures deletions require recovery review.
+                    Originals were not selected for deletion.
+                </p>
+            }
+        </section>
+
         <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
         <h3>Video queue</h3>
         <div class="review-filter-grid">
@@ -176,6 +233,13 @@
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
         string LastResult, IReadOnlyList<VideoJobRow> Recent);
+    private sealed record VideoRetentionReport(
+        bool DryRun, int Inspected, int Planned, int Invalid, int Missing,
+        int Corrupt, int QuotaSelected, int Revoked, int FilesDeleted,
+        int DeleteFailures, long RegisteredBytesBefore,
+        long ProjectedBytesAfter, bool MoreCandidates, string? PlanFingerprint);
+    private sealed record VideoRetentionApplyRequest(string ConfirmationFingerprint);
+
     private sealed record VideoSettingsUpdate(
         bool Enabled, bool IncludeOnlineOnly,
         int? MaximumCacheMiB, int? MaximumProxyMiB,
@@ -183,6 +247,9 @@
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
+    private VideoRetentionReport? RetentionPreview;
+    private VideoRetentionReport? RetentionApplied;
+    private bool ConfirmRetention;
     private bool Enabled;
     private bool IncludeOnlineOnly;
     private bool OverrideProxyLimits;
@@ -205,6 +272,8 @@
     {
         Loading = true;
         Error = null;
+        RetentionPreview = null;
+        ConfirmRetention = false;
         try
         {
             Status = await Http.GetFromJsonAsync<VideoSettingsResponse>(
@@ -250,8 +319,85 @@
         finally { Saving = false; }
     }
 
+    private async Task PreviewRetentionAsync()
+    {
+        Error = null;
+        Message = null;
+        RetentionPreview = null;
+        RetentionApplied = null;
+        ConfirmRetention = false;
+        Saving = true;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsync(
+                "api/video-processing/retention/preview", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "Proxy cleanup needs configured limits and a fully stopped, disabled video lane. Verify that the private cache is valid.";
+                return;
+            }
+            RetentionPreview = await response.Content.ReadFromJsonAsync<VideoRetentionReport>();
+            if (RetentionPreview is null || !RetentionPreview.DryRun)
+            {
+                RetentionPreview = null;
+                Error = "The retention preview returned unexpected data.";
+            }
+        }
+        catch (Exception)
+        {
+            Error = "Video proxy retention preview failed. No removal was requested.";
+        }
+        finally { Saving = false; }
+    }
+
+    private async Task ApplyRetentionAsync()
+    {
+        string? fingerprint = RetentionPreview?.PlanFingerprint;
+        if (!ConfirmRetention || Enabled || Status?.Enabled != false ||
+            Status.Processing || RetentionPreview?.Planned is not > 0 ||
+            fingerprint is null)
+            return;
+
+        Saving = true;
+        Error = null;
+        Message = null;
+        // A confirmation is never silently reusable after an API failure.
+        RetentionPreview = null;
+        ConfirmRetention = false;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/video-processing/retention/apply",
+                new VideoRetentionApplyRequest(fingerprint));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "Cleanup was refused or could not fully complete. Review the stopped lane and run a new preview before retrying.";
+                return;
+            }
+            VideoRetentionReport? applied =
+                await response.Content.ReadFromJsonAsync<VideoRetentionReport>();
+            if (applied is null || applied.DryRun)
+            {
+                Error = "Cleanup did not return a final report. Review private cache maintenance before retrying.";
+                return;
+            }
+            await LoadAsync();
+            RetentionApplied = applied;
+            Message = "Generated proxy cleanup finished. Existing originals were not modified.";
+        }
+        catch (Exception)
+        {
+            Error = "Cleanup status is uncertain. Recheck the current cache before another attempt.";
+        }
+        finally { Saving = false; }
+    }
+
     private async Task SaveAsync()
     {
+        // A previous reviewed plan is never valid after a Settings submit.
+        RetentionPreview = null;
+        ConfirmRetention = false;
+        RetentionApplied = null;
         Error = null;
         Message = null;
         Saving = true;

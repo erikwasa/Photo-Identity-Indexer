@@ -5,6 +5,12 @@ using PhotoIdentity.Web;
 namespace PhotoIdentity.Api;
 
 /// <summary>
+/// A confirmation token is a short-lived snapshot fingerprint, not a
+/// credential or a filesystem path. The server rechecks the complete plan.
+/// </summary>
+public sealed record VideoProxyRetentionApplyRequest(string ConfirmationFingerprint);
+
+/// <summary>
 /// A nullable override flag preserves compatibility with callers that update
 /// only the original Enabled/IncludeOnlineOnly settings. Clearing quotas must
 /// be explicit; missing fields never silently erase a stored override.
@@ -66,6 +72,10 @@ public static class VideoProcessingEndpoints
         endpoints.MapPut("/api/video-processing/settings", UpdateAsync);
         endpoints.MapPost("/api/video-processing/jobs/{jobId:guid}/retry",
             RetryFailedAsync);
+        endpoints.MapPost("/api/video-processing/retention/preview",
+            PreviewRetentionAsync);
+        endpoints.MapPost("/api/video-processing/retention/apply",
+            ApplyRetentionAsync);
         return endpoints;
     }
 
@@ -140,6 +150,97 @@ public static class VideoProcessingEndpoints
         return Results.Ok(ToResponse(saved, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
             processor.LastResult, recent, processor.LastAttemptFailure));
+    }
+
+    private static async Task<IResult> PreviewRetentionAsync(
+        PostgresCatalogueDatabase database,
+        VideoProcessingPreferencesStore preferences,
+        VideoArchiveProcessingService processor,
+        IConfiguration configuration,
+        CancellationToken token)
+    {
+        try
+        {
+            VideoRegisteredMaintenanceReport report =
+                await new VideoProxyRetentionOperator(
+                    database, preferences, processor, configuration)
+                    .PreviewAsync(token);
+            return Results.Ok(report);
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "Retention preview requires configured limits, the video lane disabled and paused, and no running leases."));
+        }
+        catch (ArgumentException)
+        {
+            return Results.BadRequest(new ArchiveErrorResponse(
+                "Invalid video retention settings or private cache configuration."));
+        }
+        catch (InvalidDataException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The registered proxy evidence is inconsistent; no unverified cache cleanup is permitted."));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The owned private proxy cache could not be accessed."));
+        }
+        catch (IOException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The owned private proxy cache could not be verified."));
+        }
+    }
+
+    private static async Task<IResult> ApplyRetentionAsync(
+        VideoProxyRetentionApplyRequest value,
+        PostgresCatalogueDatabase database,
+        VideoProcessingPreferencesStore preferences,
+        VideoArchiveProcessingService processor,
+        IConfiguration configuration,
+        CancellationToken token)
+    {
+        if (value is null || string.IsNullOrWhiteSpace(value.ConfirmationFingerprint))
+            return Results.BadRequest(new ArchiveErrorResponse(
+                "Review a fresh proxy retention preview before confirming."));
+        try
+        {
+            VideoRegisteredMaintenanceReport report =
+                await new VideoProxyRetentionOperator(
+                    database, preferences, processor, configuration)
+                    .ApplyAsync(value.ConfirmationFingerprint, token);
+            return report.DeleteFailures == 0
+                ? Results.Ok(report)
+                : Results.Conflict(new ArchiveErrorResponse(
+                    "Some already revoked private files could not be deleted. Run a new preview and review recovery."));
+        }
+        catch (ArgumentException)
+        {
+            return Results.BadRequest(new ArchiveErrorResponse(
+                "Invalid proxy retention confirmation."));
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "Retention changed or expired, or processing has not fully stopped. Run a new preview."));
+        }
+        catch (InvalidDataException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The registered proxy evidence is inconsistent; no unverified cache cleanup is permitted."));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The owned private proxy cache could not be accessed."));
+        }
+        catch (IOException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The owned private proxy cache could not be verified."));
+        }
     }
 
     private static async Task<IResult> RetryFailedAsync(

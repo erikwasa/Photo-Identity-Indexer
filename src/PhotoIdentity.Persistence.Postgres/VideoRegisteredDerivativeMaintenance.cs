@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Globalization;
+using System.Text;
 using Npgsql;
 
 namespace PhotoIdentity.Persistence.Postgres;
@@ -11,7 +13,7 @@ public sealed record VideoRegisteredMaintenanceReport(
     bool DryRun, int Inspected, int Planned, int Invalid, int Missing,
     int Corrupt, int QuotaSelected, int Revoked, int FilesDeleted,
     int DeleteFailures, long RegisteredBytesBefore, long ProjectedBytesAfter,
-    bool MoreCandidates);
+    bool MoreCandidates, string? PlanFingerprint = null);
 
 /// <summary>
 /// Bounded, explicitly invoked registered-derivative maintenance. PostgreSQL
@@ -30,7 +32,8 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
     public async Task<VideoRegisteredMaintenanceReport> SweepAsync(
         string cacheRoot, int maximumRecords = 16, long? quotaMiB = null,
         TimeSpan? minimumQuotaAge = null, bool verifyHashes = false,
-        bool apply = false, CancellationToken token = default)
+        bool apply = false, CancellationToken token = default,
+        string? expectedPlanFingerprint = null)
     {
         TimeSpan minAge = minimumQuotaAge ?? TimeSpan.FromHours(48);
         if (maximumRecords is < 1 or > 32 ||
@@ -192,6 +195,24 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
             }
         }
 
+        // A confirmation is bound to the precise bounded victim set,
+        // registered-byte snapshot, quota parameters and cache root.
+        // Five-minute time-bucket expiry forces a new preview after delay.
+        // This is a stale-plan guard, not an authorization credential.
+        // Legacy operator CLI calls without a fingerprint keep their
+        // existing explicit --apply behavior; HTTP always requires one.
+        string? fingerprint = entries.Count > 0
+            ? Fingerprint(root, entries, maximumRecords, quota, minAge,
+                verifyHashes, total, projected, moreCandidates)
+            : null;
+        if (apply && expectedPlanFingerprint is not null &&
+            (!IsFingerprint(expectedPlanFingerprint) ||
+             fingerprint is null ||
+             !string.Equals(fingerprint, expectedPlanFingerprint,
+                 StringComparison.Ordinal)))
+            throw new InvalidOperationException(
+                "Video retention preview changed or expired; rerun the dry run.");
+
         // Dry run never changes a DB receipt or filesystem. When the budget
         // is exhausted callers may run another bounded sweep.
         if (!apply)
@@ -199,7 +220,7 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
             await transaction.CommitAsync(token);
             return new(true, inspected > maximumRecords ? maximumRecords : inspected,
                 entries.Count, invalid, missing, corrupt, quotaSelected, 0, 0, 0,
-                total, projected, moreCandidates);
+                total, projected, moreCandidates, fingerprint);
         }
 
         foreach (Entry entry in entries)
@@ -260,6 +281,48 @@ public sealed class VideoRegisteredDerivativeMaintenance(PostgresCatalogueDataba
         return new(false, inspected > maximumRecords ? maximumRecords : inspected,
             entries.Count, invalid, missing, corrupt, quotaSelected,
             entries.Count, deleted, failures, total, projected, moreCandidates);
+    }
+
+    private static bool IsFingerprint(string? fingerprint) =>
+        fingerprint is { Length: 64 } &&
+        fingerprint.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static string Fingerprint(
+        string root, IReadOnlyList<Entry> victims, int maximumRecords,
+        long? quota, TimeSpan minimumAge, bool verifyHashes, long total,
+        long projected, bool moreCandidates)
+    {
+        // Never put original paths or file names in the operator report.
+        // The hash binds exactly the DB receipt and file validation result
+        // observed by the existing stopped-lane maintenance scan.
+        var payload = new StringBuilder("wi0189-retention-reclaim-v1");
+        void Part(string part) => payload.Append('|').Append(part.Length)
+            .Append(':').Append(part);
+        Part(root);
+        Part(maximumRecords.ToString(CultureInfo.InvariantCulture));
+        Part(quota?.ToString(CultureInfo.InvariantCulture) ?? "none");
+        Part(minimumAge.Ticks.ToString(CultureInfo.InvariantCulture));
+        Part(verifyHashes ? "sha256" : "length");
+        Part(total.ToString(CultureInfo.InvariantCulture));
+        Part(projected.ToString(CultureInfo.InvariantCulture));
+        Part(moreCandidates ? "more" : "complete");
+        Part((DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 300)
+            .ToString(CultureInfo.InvariantCulture));
+        foreach (Entry e in victims)
+        {
+            Part(e.JobId.ToString("N"));
+            Part(e.RelativePath);
+            Part(e.Sha256);
+            Part(e.Bytes.ToString(CultureInfo.InvariantCulture));
+            Part(e.CreatedAtUtc.Ticks.ToString(CultureInfo.InvariantCulture));
+            Part(e.Current ? "current" : "stale");
+            Part(e.Missing ? "missing" : "present");
+            Part(e.Corrupt ? "corrupt" : "verified");
+            Part(e.SelectedQuota ? "quota" : "invalid");
+        }
+        return Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(payload.ToString())))
+            .ToLowerInvariant();
     }
 
     /// <summary>
