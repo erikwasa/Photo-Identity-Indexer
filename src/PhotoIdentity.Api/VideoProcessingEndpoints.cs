@@ -177,6 +177,16 @@ public static class VideoProcessingEndpoints
             return Results.BadRequest(new ArchiveErrorResponse(
                 "Invalid video retention settings or private cache configuration."));
         }
+        catch (InvalidDataException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The registered proxy evidence is inconsistent; no unverified cache cleanup is permitted."));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The owned private proxy cache could not be accessed."));
+        }
         catch (IOException)
         {
             return Results.Conflict(new ArchiveErrorResponse(
@@ -215,6 +225,16 @@ public static class VideoProcessingEndpoints
         {
             return Results.Conflict(new ArchiveErrorResponse(
                 "Retention changed or expired, or processing has not fully stopped. Run a new preview."));
+        }
+        catch (InvalidDataException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The registered proxy evidence is inconsistent; no unverified cache cleanup is permitted."));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Conflict(new ArchiveErrorResponse(
+                "The owned private proxy cache could not be accessed."));
         }
         catch (IOException)
         {
