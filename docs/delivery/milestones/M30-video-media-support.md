@@ -24,10 +24,28 @@ The maintainer explicitly moved that separate opted-in OneDrive
 verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 a new proposed M30 workitem dependent on WI-0188. This does not
 permit automatic hydration or alter locally available video behavior.
-WI-0189 local proxy cache retention remains **in progress** (PRs #665,
-#666 and #667 merged; PR #668 open);
+WI-0189 local proxy cache retention remains **in progress** (PRs #665–#668
+merged, PR #669 open);
 other M30 playback, frame analysis, search and collection integrations
 remain separately proposed. **M30 is not complete.**
+
+## WI-0189 confirmed, operator-only retention checkpoint 5 (2026-10-30)
+
+PR #669 adds a **manually confirmed**, small-batch proxy cleanup workflow
+under Video Settings. It reuses the existing stopped-lane DB-first
+registered-derivative maintenance, with independent checks for
+disabled+paused controls, no running leases, private cache ownership,
+recorded SHA-256 and canonical file path. The dry-run returns aggregate
+counts and a five-minute stale-plan fingerprint; confirmation re-evaluates
+the exact plan before PostgreSQL revocation and private unlinking.
+Existing originals and unrelated cache files are not selected.
+
+This is **not** a background retention service or hard disk quota.
+There is no unattended eviction, no original/OneDrive hydration, no
+new transcoding profile or real-media quality acceptance in this PR.
+Focused isolated database tests and docs checks await GitHub CI;
+maintainer-host deletion pilot is deferred to the combined WI-0189
+acceptance session.
 
 ## WI-0189 persisted Video Settings quota checkpoint 4 (2026-10-30)
 
@@ -38,7 +56,7 @@ compatible; null overrides retain launcher configuration. Invalid or
 partial values fail closed; changes while video is active require pausing,
 and new limits are read for subsequent video attempts. The controls do not
 evict, hydrate, open, or modify originals. No new encoding profiles are
-enabled. PR #668 CI and app-UI smoke verification are pending.
+enabled. PR #668 GitHub build CI passed; app-UI smoke remains unverified.
 
 ## WI-0189 opt-in publication quota checkpoint 3 (2026-10-30)
 
@@ -184,7 +202,7 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#667 merged; #668 open).
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#668 merged; #669 open).
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.
