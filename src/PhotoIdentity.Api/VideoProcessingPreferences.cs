@@ -14,11 +14,15 @@ namespace PhotoIdentity.Api;
 public sealed record VideoProcessingPreferences(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
-    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey)
+    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey,
+    int RetentionAgeHours = 48)
 {
     public void Validate()
     {
         _ = VideoProxyEncodingProfiles.Resolve(EncodingProfile);
+        if (RetentionAgeHours is not (48 or 168 or 720))
+            throw new ArgumentException(
+                "Video retention age must be 48 hours, 7 days or 30 days.");
         // Must reject partially persisted or caller-forged preferences;
         // there is never a silent "one limit disabled" interpretation.
         _ = VideoProxyPublicationQuotaConfiguration.ParseOptional(
