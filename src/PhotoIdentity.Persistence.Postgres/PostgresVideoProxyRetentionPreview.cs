@@ -159,7 +159,7 @@ public sealed class PostgresVideoProxyRetentionPreview(PostgresCatalogueDatabase
             VideoProxyRetentionPolicy.Plan(limits, entries, incomingBytes);
         if (!plan.Admitted) return Failed(plan.Reason);
 
-        long reclaimed = total + incomingBytes - plan.RemainingBytes;
+        long reclaimed = total - (plan.RemainingBytes - incomingBytes);
         return new(true, true, plan.Reason, entries.Count, pinned,
             total, incomingBytes, plan.EvictionIds.Count, reclaimed,
             plan.RemainingBytes);
