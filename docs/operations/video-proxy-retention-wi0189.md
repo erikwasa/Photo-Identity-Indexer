@@ -553,3 +553,17 @@ The user must perform a new preview and explicit confirmation.
 The registered-byte publication quota can refuse new copies while
 old protected copies are retained. If capacity is insufficient, the
 application does not bypass protection or delete source material.
+
+### Local-only confirmation boundary (PR #670)
+
+For safety, the existing browser **retention preview and apply**
+endpoints now require the actual local and remote HTTP socket addresses
+to both be loopback (IPv4, IPv6 or IPv4-mapped IPv6). An optionally
+enabled trusted-LAN/phone listener cannot directly invoke these
+maintenance actions; it receives HTTP 403. No
+`X-Forwarded-For` or other request header authorizes deletion.
+The operator must use the application through localhost on the
+maintained Windows machine for any confirmed cache cleanup. This
+does not change the normal video library or non-destructive viewing
+from the optional trusted LAN. It is a defense-in-depth restriction,
+not a substitute for local device access controls.
