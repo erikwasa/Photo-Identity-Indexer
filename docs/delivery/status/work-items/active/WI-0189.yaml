@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0189-video-local-low-resolution-proxies.md
 started_at: 2026-10-30
 last_updated_at: 2026-10-30
-branch: feature/wi0189-atomic-publication-quota
+branch: feature/wi0189-persisted-proxy-quota-settings
 blockers:
 - WI-0151
 - WI-0188
@@ -18,6 +18,8 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/666
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/667
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/668
 - type: maintainer_verification
   value: 2026-10-30 Windows focused WI-0189 retention policy tests 8 passed 0 failed 0 skipped with WasmEnableWebcil=false; maintainer also reports running docs validate and generation.
 - type: documentation

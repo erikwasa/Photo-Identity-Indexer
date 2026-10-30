@@ -25,13 +25,24 @@ verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-
 a new proposed M30 workitem dependent on WI-0188. This does not
 permit automatic hydration or alter locally available video behavior.
 WI-0189 local proxy cache retention remains **in progress** (PRs #665,
-#666 merged; #667 open);
+#666 and #667 merged; PR #668 open);
 other M30 playback, frame analysis, search and collection integrations
 remain separately proposed. **M30 is not complete.**
 
+## WI-0189 persisted Video Settings quota checkpoint 4 (2026-10-30)
+
+PR #668 adds optional **user-configured** registered-byte and per-proxy
+publication limits to the Videos Settings UI, saved in the existing
+application-local preferences file. Existing two-boolean files remain
+compatible; null overrides retain launcher configuration. Invalid or
+partial values fail closed; changes while video is active require pausing,
+and new limits are read for subsequent video attempts. The controls do not
+evict, hydrate, open, or modify originals. No new encoding profiles are
+enabled. PR #668 CI and app-UI smoke verification are pending.
+
 ## WI-0189 opt-in publication quota checkpoint 3 (2026-10-30)
 
-PR #667 adds a deliberately configured registered-byte publication
+Merged PR #667 adds a deliberately configured registered-byte publication
 fence to the **existing** shared Archive video lane: per-file cap checked
 before publication, aggregate receipt bytes checked under a serialized
 PostgreSQL success transaction, path-free non-retryable quota diagnostic
@@ -41,8 +52,8 @@ Without BOTH approved config keys, the original WI-0188 behavior applies.
 
 This **does not automatically evict** files, impose a hard physical
 filesystem quota, configure the encode profile from Settings or establish
-real MOV/MP4 quality/seek/audio acceptance. Checkpoint 3 tests are still
-pending CI and optional later local regression. WI-0189 remains in progress
+real MOV/MP4 quality/seek/audio acceptance. PR #667's GitHub build
+CI completed successfully; optional maintained-host regression remains. WI-0189 remains in progress
 with all acceptance checkboxes open.
 
 ## WI-0189 retention checkpoint 2 (2026-10-30)
@@ -173,7 +184,7 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665, #666 merged; #667 open).
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#667 merged; #668 open).
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.

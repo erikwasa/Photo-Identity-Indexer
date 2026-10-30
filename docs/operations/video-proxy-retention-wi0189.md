@@ -211,3 +211,105 @@ pause and immutable original hashes.
 - **Encode time, size, compatibility and quality report:** not yet measured
   on representative private videos; maintain original WI-0189 acceptance
   checkboxes as open until verified.
+
+## Checkpoint 4 — persisted Video Settings quota override (PR #668)
+
+The **Video processing → Local video proxy storage** panel now has
+an optional **Override launcher proxy limits** checkbox and two numeric
+limits. Enabling the override and saving writes only non-sensitive,
+bounded preferences to the existing application-local
+`video-processing-preferences.json` file:
+
+- Total registered proxies: **64..16384 MiB**.
+- Maximum one newly published proxy: **1..256 MiB**, not exceeding the total.
+
+Both are required when the override is enabled. They apply to new
+publication attempts via the existing transactionally checked WI-0189
+fence. No persisted override means the existing launcher keys (if any)
+continue to apply; no launcher limits means the prior WI-0188
+unrestricted-*registered-byte* behavior, still subject to pre-existing
+scratch/file/OS limits. The toggle **never** starts video processing,
+automatically deletes older copies, or changes source files.
+
+A legacy preferences file with only `Enabled` and
+`IncludeOnlineOnly` automatically inherits the launcher settings,
+without migration.
+Legacy API clients that PUT only `Enabled` and `IncludeOnlineOnly`
+also **preserve** any existing saved quota override. New clients must
+explicitly provide `overrideProxyLimits=true` with both numeric
+limits to create/change an override, or `overrideProxyLimits=false`
+with no limit values to clear it. Incomplete/ambiguous requests return
+a non-mutating bad-request response. Invalid/partial persisted limits are treated as
+invalid preferences: **video processing and online-only consent are
+disabled**, rather than guessing a budget or silently enabling work.
+On API updates, invalid limits are rejected before any video processing
+control changes. If a video attempt is currently active, Settings refuses
+a quota change; use the existing **Pause archive** control first. New
+settings are used for subsequent attempts without restarting the host.
+The system does not retroactively revoke existing derivatives if the
+new total is lower than the already registered total; future
+publication is refused until there is sufficient registered capacity.
+
+### Checkpoint 4 CI verification
+
+```powershell
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
+  --filter "FullyQualifiedName~VideoProcessingQuotaPreferencesTests|FullyQualifiedName~VideoProxyPublicationQuotaConfigurationTests" `
+  -p:WasmEnableWebcil=false
+
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+The repository's Windows build workflow now includes the new focused
+preferences tests, covering legacy preference JSON, restart, saved
+overrides vs launcher limits, clearing the override, invalid input,
+orphan temp-file absence and fail-closed corrupt persisted data.
+These are development tests, **not** proof that the browser controls
+were visually accepted or that real video proxy capacity is managed.
+
+### Optional UI-only maintained-host smoke test
+
+This can be deferred and combined with the remaining WI-0189 acceptance
+tests after profile selection and retention work is finished. If tested
+separately, **disable Process videos and Pause archive first**. Do not
+enable any new processing, OneDrive hydration or apply a deletion.
+
+1. Note existing video settings and any configured launcher quota.
+2. Open Video processing Settings, select **Override launcher proxy
+   limits**, enter e.g. `1024` and `256`, and Save.
+3. Reload Settings and restart the app: the same override and both
+   numbers should persist, with Process videos still disabled.
+4. Uncheck **Override launcher proxy limits** and Save; the panel
+   should return to launcher-inherited behavior. Restart to verify.
+5. Optionally, while the app is running on its usual loopback port,
+   inspect only the non-sensitive Settings response:
+
+   ```powershell
+   Invoke-RestMethod 'http://127.0.0.1:5080/api/video-processing/settings' |
+     Select-Object enabled, includeOnlineOnly, maximumCacheMiB, maximumProxyMiB
+   ```
+
+   The two quota fields should be null when not overridden. The existing
+   CLI/launcher values, if any, remain outside this local preferences file.
+
+No private-video output, original hashes, cloud recall, file deletion
+or mass archive run is necessary for this **Settings-only** smoke test.
+
+## Updated WI-0189 acceptance inventory (checkpoint 4)
+
+- Representative smaller/seekable MOV/MP4, orientation/audio/original
+  hashes: **not yet accepted** (one WI-0188 real-video publication already
+  accepted, but not WI-0189 quality matrix).
+- Revision/preset reuse, invalidation and cache persistence lifecycle:
+  **partially implemented**, end-to-end verification pending.
+- Quota/eviction: pure planner, read-only registered inventory, atomic
+  optional quota refusal and persisted UI overrides implemented.
+  Operator-only stopped-lane, DB-first maintenance exists; unattended
+  safe eviction and **hard physical** cache quota not implemented.
+- Report encode time, output size, browser compatibility and perceived
+  quality: **not yet completed**; later already-local MOV/MP4 checks.
+- Online-only OneDrive-only hydration and release: **WI-0207**, not
+  exercised or newly authorized by this checkpoint.
+
+**WI-0189 stays `in_progress`; no acceptance checkbox has been signed off.**

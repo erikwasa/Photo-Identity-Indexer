@@ -4,11 +4,48 @@ using PhotoIdentity.Web;
 
 namespace PhotoIdentity.Api;
 
+/// <summary>
+/// A nullable override flag preserves compatibility with callers that update
+/// only the original Enabled/IncludeOnlineOnly settings. Clearing quotas must
+/// be explicit; missing fields never silently erase a stored override.
+/// </summary>
 public sealed record VideoProcessingSettingsUpdate(
-    bool Enabled, bool IncludeOnlineOnly);
+    bool Enabled, bool IncludeOnlineOnly,
+    int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
+    bool? OverrideProxyLimits = null)
+{
+    public VideoProcessingPreferences MergeWith(VideoProcessingPreferences existing)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+        if (OverrideProxyLimits is null)
+        {
+            if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
+                throw new ArgumentException(
+                    "An explicit quota override choice is required.");
+            return existing with
+            {
+                Enabled = Enabled,
+                IncludeOnlineOnly = IncludeOnlineOnly
+            };
+        }
+        if (OverrideProxyLimits is false)
+        {
+            if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
+                throw new ArgumentException(
+                    "Clearing quota overrides cannot supply quota limits.");
+            return new(Enabled, IncludeOnlineOnly);
+        }
+
+        if (!MaximumCacheMiB.HasValue || !MaximumProxyMiB.HasValue)
+            throw new ArgumentException(
+                "Both quota limits are required when overriding launcher settings.");
+        return new(Enabled, IncludeOnlineOnly, MaximumCacheMiB, MaximumProxyMiB);
+    }
+}
 
 public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
+    int? MaximumCacheMiB, int? MaximumProxyMiB,
     bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
     long Cancelled, long ExpiredLeases, string LastResult,
@@ -55,6 +92,29 @@ public static class VideoProcessingEndpoints
         IConfiguration configuration,
         CancellationToken token)
     {
+        VideoProcessingPreferences existing = preferences.Current;
+        VideoProcessingPreferences requested;
+        try
+        {
+            requested = value.MergeWith(existing);
+            // Always allow operators to disable video processing, even
+            // if inherited launcher settings are malformed. Only enabling
+            // may consume the runtime quota configuration.
+            requested.Validate();
+            if (requested.Enabled)
+                _ = requested.ResolvePublicationQuota(configuration);
+        }
+        catch (ArgumentException)
+        {
+            return Results.BadRequest(new ArchiveErrorResponse(
+                "Specify both valid video proxy limits or neither; cache 64..16384 MiB, per-file 1..256 MiB and per-file <= cache."));
+        }
+        bool quotaChanged = existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
+                            existing.MaximumProxyMiB != requested.MaximumProxyMiB;
+        if (quotaChanged && processor.IsProcessing)
+            return Results.Conflict(new ArchiveErrorResponse(
+                "Pause archive processing before changing video proxy storage limits."));
+
         // Do not enable video work without explicit approved local tool
         // configuration. This also prevents the UI from advertising success
         // when no executable path/hash was ever configured.
@@ -73,7 +133,7 @@ public static class VideoProcessingEndpoints
             await controls.EnableAsync(token);
         }
         VideoProcessingPreferences saved = await preferences.SaveAsync(
-            new(value.Enabled, value.IncludeOnlineOnly), token);
+            requested, token);
         var inspector = new PostgresVideoProcessingQueueInspector(database);
         var overview = await inspector.GetOverviewAsync(token);
         var recent = await inspector.ListRecentAsync(12, token);
@@ -109,6 +169,7 @@ public static class VideoProcessingEndpoints
         IReadOnlyList<VideoProcessingJobOperatorRow> recent,
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
+            settings.MaximumCacheMiB, settings.MaximumProxyMiB,
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
             status.ExpiredLeases, lastResult, recent, lastAttemptFailure);
