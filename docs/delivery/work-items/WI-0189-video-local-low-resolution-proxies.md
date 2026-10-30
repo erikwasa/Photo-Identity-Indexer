@@ -16,8 +16,8 @@ Generate a smaller playable video copy to keep on the local machine, separate fr
 
 ## Implementation progress (2026-10-30)
 
-**In progress — PRs #665, #666 and #667 merged (PR #667 CI succeeded);
-PR #668 adds persisted Settings controls.** The WI-0188 video
+**In progress — PRs #665–#668 merged (PRs #667 and #668 passed CI);
+PR #669 adds confirmed operator-only cache reclamation.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -56,7 +56,7 @@ extends that foundation rather than enabling a second worker.
   completed successfully; no maintainer real-video acceptance is claimed).
   **No Settings UI, automatic eviction, unregistered-file measurement or
   physical disk quota enforcement is claimed.**
-- **Checkpoint 4, PR #668:** add optional user-editable and locally
+- **Checkpoint 4, PR #668 merged:** add optional user-editable and locally
   persisted per-proxy (1..256 MiB) and total registered-byte
   (64..16384 MiB) override in Video Settings, using the already-approved
   transaction-level quota fence. Both are required when overriding
@@ -65,13 +65,30 @@ extends that foundation rather than enabling a second worker.
   Historic two-boolean preference JSON remains backward compatible.
   The UI does not delete any files or enable eviction; settings take
   effect for the next video attempt without a restart. Focused persisted
-  preferences/precedence/legacy/invalidity tests added (CI pending).
+  preferences/precedence/legacy/invalidity tests added (PR #668 CI
+  passed; optional maintainer UI-only smoke remains unverified).
+- **Checkpoint 5, PR #669:** add explicit Video Settings
+  **Preview proxy cleanup → Confirm removal** workflow using the
+  pre-existing stopped-lane, DB-first registered derivative maintenance,
+  not a second unlink implementation. A bounded scan (at most 8
+  receipts, SHA-256 verified) requires the video lane disabled+paused
+  and zero running leases. An opaque five-minute plan fingerprint
+  binds the candidate IDs/paths/receipt evidence, quota and cache root;
+  apply re-evaluates these checks and rejects stale/replayed plans.
+  Only approved private cache outputs are selected; source originals
+  and unknown cache files remain out of scope. Synthetic isolated
+  PostgreSQL cases cover same-size corruption, stale/replayed
+  confirmation, cleanup and unchanged healthy/unknown files.
+  **This is manual, explicitly confirmed eviction only**:
+  no automatic retention scheduler, full physical disk quota or
+  orphan accounting is added. PR #669 CI pending.
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
 - **Not yet implemented:** user-configurable *encoding profile*, automatic
-  cache eviction, true physical disk quota and unregistered/orphan-byte
-  accounting. The optional, now user-editable publication quota still
-  guards only newly registered output bytes. Representative MOV/MP4
+  unattended cache eviction, true physical disk quota and
+  unregistered/orphan-byte accounting. Manual confirmed retention
+  and user-editable publication limits are implemented; the latter
+  still guards only newly registered output bytes. Representative MOV/MP4
   size/quality, compatibility and restart/retention workflow verification
   remain open.
   No real-media or end-to-end local verification is claimed for this checkpoint.
@@ -126,5 +143,11 @@ Integration lifecycle and representative private-file performance/quality tests,
   Windows and reported documentation commands; merged PR #667 GitHub
   build workflow reported **success**. PR #666 merged; no separate
   maintainer PostgreSQL fixture outcome supplied.
-- PR #668 tests and docs generation are **not verified** in the
-  GitHub-connector authoring environment. CI must pass before merge.
+- Checkpoint 5 changed files: registered maintenance fingerprint,
+  explicit API operator service/endpoints, Videos Settings preview/confirm
+  controls, isolated PostgreSQL regression cases, operations runbook,
+  canonical/generated status and milestone/build context.
+- PR #668 GitHub build CI completed successfully. PR #669 .NET tests
+  and docs generator have **not** run in this GitHub connector authoring
+  environment; require GitHub Windows CI before merge. Do not claim
+  maintained-host deletion/recovery accepted until later local pilot.
