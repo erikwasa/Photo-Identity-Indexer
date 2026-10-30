@@ -13,7 +13,7 @@ Current work items: **20**. Archived terminal items: **185**.
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
 | [WI-0186](../work-items/WI-0186-scoped-semantic-caption-search.md) Scope visual and caption search with Smart Collection criteria | M36 | in_review | ai-agent | [YAML](work-items/active/WI-0186.yaml) |
 | [WI-0187](../work-items/WI-0187-search-creative-anchors.md) Use semantic and caption search results as Creative Collection anchors | M36 | in_review | ai-agent | [YAML](work-items/active/WI-0187.yaml) |
-| [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) Generate and retain bounded local low-resolution video proxies | M30 | in_progress | ai-agent | [YAML](work-items/active/WI-0189.yaml) |
+| [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) Generate and retain bounded local low-resolution video proxies | M30 | in_review | ai-agent | [YAML](work-items/active/WI-0189.yaml) |
 | [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) Extract timestamped video-frame captions and visual embeddings | M30 | proposed | unassigned | [YAML](work-items/active/WI-0190.yaml) |
 | [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) Offer opt-in semantic and caption search over indexed videos | M30 | proposed | unassigned | [YAML](work-items/active/WI-0191.yaml) |
 | [WI-0196](../work-items/WI-0196-tv-portrait-benchmark-framing.md) Define TV portrait-viewing benchmark and safe-framing rules | M38 | ready | unassigned | [YAML](work-items/active/WI-0196.yaml) |
