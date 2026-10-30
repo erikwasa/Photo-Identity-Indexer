@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Npgsql;
 using PhotoIdentity.Persistence.Postgres;
+using PhotoIdentity.Core.Processing;
 using Xunit;
 
 namespace PhotoIdentity.Persistence.Tests;
@@ -164,6 +165,87 @@ public sealed class VideoRegisteredDerivativeMaintenanceTests
                 minimumQuotaAge: TimeSpan.FromHours(23)));
         await Assert.ThrowsAsync<ArgumentException>(() =>
             lifecycle.RequeueRevokedAsync(Guid.Empty));
+    }
+
+    [Fact]
+    public async Task Read_only_proxy_retention_preview_uses_current_registered_inventory()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
+                "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING"))) return;
+        await using Fixture f = await Fixture.CreateAsync();
+        Guid old = await f.RegisterAsync('a', "old.mp4", new byte[40], ageHours: 120);
+        Guid newer = await f.RegisterAsync('b', "newer.mp4", new byte[40], ageHours: 96);
+        Guid recent = await f.RegisterAsync('c', "recent.mp4", new byte[10], ageHours: 1);
+
+        var planner = new PostgresVideoProxyRetentionPreview(f.Db);
+        VideoProxyRetentionPreviewReport report = await planner.PreviewAsync(
+            f.Root, new VideoProxyRetentionLimits(100, 50), incomingBytes: 40);
+
+        Assert.True(report.DryRun);
+        Assert.True(report.Admitted);
+        Assert.Equal("admitted", report.Reason);
+        Assert.Equal(3, report.RegisteredRecords);
+        Assert.Equal(1, report.PinnedRecords);
+        Assert.Equal(90, report.RegisteredBytesBefore);
+        Assert.Equal(1, report.PlannedEvictions);
+        Assert.Equal(40, report.PlannedReclaimedBytes);
+        Assert.Equal(90, report.ProjectedRegisteredBytes);
+        Assert.True(File.Exists(f.PathFor(old)));
+        Assert.True(File.Exists(f.PathFor(newer)));
+        Assert.True(File.Exists(f.PathFor(recent)));
+        Assert.Equal(3L, await f.ReceiptCountAsync());
+        Assert.Equal("succeeded", await f.StatusAsync(old));
+    }
+
+    [Fact]
+    public async Task Retention_preview_fails_closed_on_stale_or_missing_receipts()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
+                "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING"))) return;
+        await using Fixture f = await Fixture.CreateAsync();
+        Guid stale = await f.RegisterAsync('a', "stale.mp4", [1, 2, 3, 4]);
+        Guid missing = await f.RegisterAsync('b', "missing.mp4", [5, 6, 7, 8]);
+        File.Delete(f.PathFor(missing));
+        await f.SqlAsync("""
+            INSERT INTO source_copy_exclusions(
+                source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+            VALUES (@source,'stale.mp4',now(),'pending',now());
+            """);
+
+        var planner = new PostgresVideoProxyRetentionPreview(f.Db);
+        VideoProxyRetentionPreviewReport result = await planner.PreviewAsync(
+            f.Root, new VideoProxyRetentionLimits(100, 50), 20);
+        Assert.False(result.Admitted);
+        Assert.Equal("unverifiable-registered-inventory", result.Reason);
+        Assert.Equal(0, result.PlannedEvictions);
+        Assert.True(File.Exists(f.PathFor(stale)));
+        Assert.Equal(2L, await f.ReceiptCountAsync());
+    }
+
+    [Fact]
+    public async Task Retention_preview_requires_stopped_lane_and_complete_inventory()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
+                "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING"))) return;
+        await using Fixture f = await Fixture.CreateAsync();
+        Guid first = await f.RegisterAsync('a', "first.mp4", [1, 2, 3, 4]);
+        await f.RegisterAsync('b', "second.mp4", [5, 6, 7, 8]);
+        var planner = new PostgresVideoProxyRetentionPreview(f.Db);
+        VideoProxyRetentionPreviewReport truncated = await planner.PreviewAsync(
+            f.Root, new VideoProxyRetentionLimits(100, 50), 10,
+            maximumRecords: 1);
+        Assert.False(truncated.Admitted);
+        Assert.Equal("inventory-limit-exceeded", truncated.Reason);
+        Assert.Equal(0, truncated.PlannedEvictions);
+
+        await f.SqlAsync("""
+            UPDATE video_processing_control SET enabled=true, paused=false
+            WHERE singleton_id=1;
+            """);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            planner.PreviewAsync(f.Root, new VideoProxyRetentionLimits(100, 50), 10));
+        Assert.Equal(2L, await f.ReceiptCountAsync());
+        Assert.True(File.Exists(f.PathFor(first)));
     }
 
     private sealed class Fixture : IAsyncDisposable
