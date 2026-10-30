@@ -16,7 +16,7 @@ Generate a smaller playable video copy to keep on the local machine, separate fr
 
 ## Implementation progress (2026-10-30)
 
-**In progress — PR #665, checkpoint 1 of multiple.** The WI-0188 video
+**In progress — PR #665 merged, PR #666 open.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -26,11 +26,24 @@ extends that foundation rather than enabling a second worker.
   oldest-unpinned-first selection, fail-closed malformed inventory handling,
   and no filesystem side effects.
 - Added deterministic tests for fit, eviction order, pinned entries,
-  insufficient capacity, invalid sizes and duplicate/overfull inventory.
+  insufficient capacity, invalid sizes and duplicate/overflow inventory.
+  **Maintainer Windows verification (2026-10-30):** PR #665 merged,
+  8 passed / 0 failed / 0 skipped; build succeeded with
+  `-p:WasmEnableWebcil=false` to bypass local Webcil permission failure.
+  Maintainer also reports running documentation validation/generation,
+  without separate command outputs in the record.
+- **Checkpoint 2, PR #666:** read-only, bounded PostgreSQL snapshot of
+  registered, current, revision/exclusion-fenced proxy receipts; checked
+  canonical app-owned cache bytes; fail-closed incomplete/inconsistent
+  inventory; deterministic hypothetical quota/age planning and an
+  operator-only `video derivatives retention-plan` command. It has
+  no `--apply` option and never modifies files, jobs or originals.
+  Added focused CLI parse cases, over-quota recovery policy test and
+  isolated PostgreSQL fixture scenarios (unverified pending CI/local run).
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
 - **Not yet implemented:** Settings UI or persisted quota/profile choices,
-  catalogue-backed inventory, actual eviction, publication admission wiring,
+  actual automatic eviction/enforcement, publication admission wiring,
   measured size/quality acceptance, and expanded real-MOV/MP4 verification.
   No real-media or end-to-end local verification is claimed for this checkpoint.
   The acceptance checkboxes below remain open.
@@ -68,6 +81,11 @@ Integration lifecycle and representative private-file performance/quality tests,
   no file deletion until ownership, lease and revision fences can be enforced.
 - Deferred work: catalogue-backed quotas and eviction, configurable profile,
   output quality/size evidence and private-file end-to-end verification.
-- Commands run: GitHub connector edits only; local `dotnet test`,
-  `PhotoIdentity.Docs validate`, and `generate --check` have **not** run
-  in this environment. CI validation is required before merge.
+- Checkpoint 2 changed files: `src/PhotoIdentity.Persistence.Postgres/PostgresVideoProxyRetentionPreview.cs`,
+  `src/PhotoIdentity.Cli/VideoProxyRetentionPreviewCommand.cs`,
+  CLI dispatch/help, fixture and argument tests, pure planner correction,
+  runbook and canonical/generated documentation.
+- Commands run: maintainer-confirmed PR #665 focused tests (8/8 passed),
+  maintainer-reported docs validation/generation; checkpoint 2 .NET/CI
+  tests and docs generation checks are **not yet verified** in this
+  connector-only environment. Require CI before merge.
