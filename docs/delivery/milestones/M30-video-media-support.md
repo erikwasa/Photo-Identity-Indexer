@@ -39,9 +39,16 @@ quota and per-file publication fences, configurable protection age
 (48 hours / 7 days / 30 days), and stopped-lane, database-first
 recovery remain the required scope. The quota is registered-byte
 accounting, not a physical filesystem limit; no hard disk-quota
-guarantee is claimed.
+guarantee is claimed. The maintainer's decision pertains only
+to *manual versus unattended deletion*, not to accepting physical
+space accounting as equivalent; the known capacity limitation
+remains an explicit review item.
 
-PR #670 merged with successful GitHub Windows CI. PR #671 adds
+PR #670 merged with successful GitHub Windows CI. PR #671 adds a default-off **Stop after one video step per
+Archive advance** option (one inspection or one queued attempt,
+after ordinary photo-first work). This preserves old behavior
+unless explicitly configured, and avoids uncontrolled multi-video
+acceptance runs. The PR also adds
 `--profile compact-540p` to the existing synthetic,
 source-free/temporary-only Windows FFmpeg+FFprobe pilot so both
 presets can be preflighted before any personal media is used.
