@@ -4,29 +4,27 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**2026-10-30 M30 / WI-0189:** PRs #665–#669 merged; GitHub
-Windows build CI passed #667–#669 and maintainer locally verified
-the #665 pure retention tests 8/8. No separately accepted
-maintained-host real proxy or manual cleanup evidence for WI-0189
-yet. PR #670 on `feature/wi0189-bounded-proxy-profiles` adds a
-strict second compact SDR 540p encode, preserving the exact default
-720p version/arguments. Version-specific, hash-pinned queue
-selection/FFprobe validation and persisted Video Settings profile
-prevent wrong-preset processing. Same PR adds strict 48h/7d/30d
-manual cleanup retention age (48h remains default), and restricts
-retention preview/apply HTTP operations to direct loopback only,
-not optional LAN clients. CI pending. No automatic cache
-eviction or physical disk quota; operator-confirmed stopped-lane
-DB-first retention already exists. WI-0189 remains `in_progress`
-with all four acceptance criteria unchecked.
-Next: decide whether bounded automatic retention is needed or
-whether explicitly confirmed operator retention satisfies scope,
-then run one controlled Windows already-local MOV/MP4 matrix
-(profile size, speed, compatibility, portrait/rotation, silent/audio,
-seekability, revision/preset reuse, immutability, private cache
-recovery) and update acceptance. No online-only hydration: WI-0207
-is independent.
-
+**2026-10-30 M30 / WI-0189:** PRs #665–#670 merged; CI
+passed #667–#670 and the maintainer previously ran 8/8 focused
+retention policy tests. The maintainer explicitly accepts **manual
+preview-and-confirm private cache eviction**: no unattended
+scheduler/hard filesystem quota is required. Registered-byte
+admission, profile/retention Settings, exact 720p baseline and
+versioned 540p preset, current-revision/lease/exclusion fences,
+SHA-checked DB-first private maintenance and loopback-only cleanup
+are implemented. New PR #671 on
+`feature/wi0189-compact-synthetic-preflight` extends the trusted
+source-free video pilot to exercise both profiles with cleanup,
+updates canonical/generated work-item docs and moves WI-0189
+to `in_review`. No actual media, tool, generator or CI pass for
+#671 has been claimed yet. Next: after CI, the maintainer runs
+a marked-temp, approved Windows synthetic 720p/540p pilot;
+then **one bounded already-local** MOV/MP4 acceptance matrix
+(size, encode time, quality, orientation/audio/seek, immutable
+original hashes, revision/preset reuse, quota/manual recovery),
+and reports aggregate results. WI-0189 acceptance 0/4
+until the user verifies. No online-only original hydration
+or release here: WI-0207 owns that separately.
 
 **2026-10-22 repository-only planning / issue-retirement cleanup:**
 Audit all 33 surviving GitHub issues (12 open, 21 closed) and retire them
