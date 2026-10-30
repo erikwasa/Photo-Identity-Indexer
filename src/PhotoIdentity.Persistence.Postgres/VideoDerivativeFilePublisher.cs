@@ -26,9 +26,11 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
     /// </summary>
     public async Task<bool> PublishAsync(
         VideoProcessingJobLease lease, string privateCacheRoot,
-        string completedToolOutput, CancellationToken token = default)
+        string completedToolOutput, CancellationToken token = default,
+        VideoProxyRetentionLimits? publicationQuota = null)
     {
         ArgumentNullException.ThrowIfNull(lease);
+        publicationQuota?.Validate();
         if (lease.DerivativeKind != "PlayableProxy")
             throw new ArgumentException("Only approved playable-proxy contracts may use this publisher.");
         string root = await VideoDerivativeCacheGuard.ValidateAsync(
@@ -63,6 +65,9 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
         long size = locked.Length;
         if (size is < 1 or > 2147483648L || size > lease.TemporaryBytes)
             throw new InvalidOperationException("Video derivative exceeds its bounded output reservation.");
+        if (publicationQuota is not null &&
+            size > publicationQuota.MaximumProxyBytes)
+            throw new VideoProxyPublicationQuotaExceededException();
         string sha = Convert.ToHexString(
             await SHA256.HashDataAsync(locked, token)).ToLowerInvariant();
         token.ThrowIfCancellationRequested();
@@ -80,7 +85,19 @@ public sealed class VideoDerivativeFilePublisher(PostgresCatalogueDatabase datab
         try
         {
             committed = await new PostgresVideoPublishedDerivativeRepository(database)
-                .TryCommitAsync(lease, relative, sha, size, token);
+                .TryCommitAsync(lease, relative, sha, size, token,
+                    publicationQuota);
+        }
+        catch (VideoProxyPublicationQuotaExceededException)
+        {
+            // The PostgreSQL transaction has definitely NOT committed a
+            // receipt. This exact owned destination may safely be reclaimed.
+            // A different DB exception may have an ambiguous commit outcome,
+            // and must instead preserve bytes for the stopped-lane janitor.
+            EnsureNoReparse(directory);
+            EnsureNoReparse(destination);
+            File.Delete(destination);
+            throw;
         }
         catch
         {
