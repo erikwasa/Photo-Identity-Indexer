@@ -16,15 +16,20 @@ public sealed class VideoExperimentalProxyAdapter(
     PostgresCatalogueDatabase database, string ffmpegPath,
     string ffprobePath, string ffprobeSha256,
     string privateCacheRoot, VideoToolExecutionBudget budget,
-    VideoProxyRetentionLimits? publicationQuota = null)
+    VideoProxyRetentionLimits? publicationQuota = null,
+    VideoProxyEncodingProfile? encodingProfile = null)
     : IVideoPublishedDerivativeAdapter
 {
     public async Task<VideoDerivativeAttemptReport> ProcessAsync(
         VideoProcessingJobLease lease, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(lease);
+        VideoProxyEncodingProfile selected =
+            encodingProfile ?? VideoProxyEncodingProfiles.Standard;
+        // Never process a queued job using a different user's current
+        // profile. Exact preset/version must match the leased identity.
         if (lease.DerivativeKind != "PlayableProxy" ||
-            lease.PresetVersion != VideoProxyCandidateProfile.Version ||
+            lease.PresetVersion != selected.Version ||
             !OperatingSystem.IsWindows() ||
             budget.WindowsJobLimits?.MaximumProcesses != 1 ||
             budget.MaximumTemporaryBytes > VideoProxyCandidateProfile.MaximumOutputBytes)
@@ -40,10 +45,11 @@ public sealed class VideoExperimentalProxyAdapter(
         // embedded in the DB lease. The separate FFprobe executable is also
         // checked against an independently operator-approved digest.
         var validator = new VideoProxyOutputValidator(
-            ffprobePath, ffprobeSha256, privateCacheRoot);
+            ffprobePath, ffprobeSha256, privateCacheRoot,
+            selected.MaximumDimension);
         var worker = new VideoPublishedToolAdapter(
             database, ffmpegPath, privateCacheRoot, budget,
-            VideoProxyCandidateProfile.BuildArguments,
+            (staged, workspace) => selected.BuildArguments(staged, workspace),
             async (output, checkToken) =>
             {
                 var liveSafety = new PostgresVideoLeaseSafetyProbe(database);
