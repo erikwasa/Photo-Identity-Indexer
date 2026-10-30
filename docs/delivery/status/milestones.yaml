@@ -306,7 +306,7 @@ milestones:
   - WI-0149
 - id: M30
   title: Video media support
-  status: in_progress
+  status: ready
   document: ../milestones/M30-video-media-support.md
   work_items:
   - WI-0150
@@ -321,6 +321,7 @@ milestones:
   - WI-0190
   - WI-0191
   - WI-0202
+  - WI-0207
 - id: M31
   title: Bulk archive metadata enrichment
   status: completed

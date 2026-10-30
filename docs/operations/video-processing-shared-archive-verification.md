@@ -7,6 +7,13 @@ preserve existing photos/catalogue/originals and recover interrupted work.
 
 ## User controls
 
+**WI-0188 scope (accepted 2026-10-30):** locally available
+videos only. Existing optional online-only setting is independently
+default-off; testing its transfer/release behavior is deferred to
+[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+No online-only originals were hydrated in WI-0188 acceptance.
+
+
 1. Settings → **Video processing** → **Process videos** (off by default).
 2. Optional **Include online-only videos** (off by default).
 3. Use the existing **Advance archive** to process all pending photos first
@@ -253,6 +260,110 @@ acceptance checks. Do not share personal media paths or original hashes
 in public PR comments. An already completed single-video run does not
 by itself establish all the protective regression gates.
 
+## Maintainer acceptance progress — 2026-10-30
+
+The maintainer confirms **PASS** for restart persistence, original and
+published-derivative integrity, and existing photo feature regressions
+after the first successful real-video publication. Those checks need
+not be repeated solely to close the current checkpoint.
+
+**Further maintained-host PASS (2026-10-30):** Settings controls
+and recovery/retry, local-first operation and coverage/exclusion
+behavior. All exercised media have been locally available. **No
+online-only video hydration or return-to-online-only was exercised.**
+Do not interpret successful local-first operation as proof of that
+separately opted-in cloud behavior.
+
+**Final targeted safety result:** the maintainer ran the five
+isolated Windows test groups below. All **17/17 tests passed** with
+**0 failed and 0 skipped**: 8 admission/budget, 2 unsupported codec/
+duration/output profile, 4 subprocess failure/cancellation/timeout/
+scratch overage, 2 staging integrity/cleanup, and 1 fail-closed
+synthetic tool test. These verify disposable-fixture guards and
+cleanup; they did not access original family media or cloud data.
+An actual online-only hydration and safe online-only release was
+**not exercised** and is now [WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+
+## Controlled rejection and temporary-cleanup verification — Windows
+
+This procedure was the final local verification after the maintainer's
+PASS for controls/recovery, local-first/exclusion, persistence, integrity
+and photo regression. **It passed in full on 2026-10-30 (17/17).** **Do not add fabricated, oversized or damaged videos
+to the family archive or a OneDrive folder.** The existing isolated
+test fixtures exercise the policy and guard boundaries without opening
+archive originals, changing the maintained PostgreSQL queue, invoking
+app-driven hydration or publishing any real derivative. These results
+are *fixture-based guard evidence*, not proof of a live OneDrive-only
+retrieval/release scenario.
+
+From PowerShell in the repository checkout on Windows, run:
+
+```powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer"
+
+function Invoke-VideoSafetyTests {
+    param([string]$Project, [string]$Filter)
+    dotnet test $Project -c Release --filter $Filter
+    if ($LASTEXITCODE -ne 0) {
+        throw "WI-0188 isolated safety tests failed: $Project"
+    }
+}
+
+# Rejection at admission: unsupported inspection, over-budget source,
+# and other fail-closed guards. Pure tests; no real source file.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Core.Tests\PhotoIdentity.Core.Tests.csproj" `
+    "FullyQualifiedName~VideoProcessingAdmissionPolicyTests.Each_explicit_guard_denies_admission"
+
+# Unsupported codec/HDR/rotation/audio and duration > 600 s;
+# strict output rejection. Uses in-memory inspection/probe evidence.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj" `
+    "FullyQualifiedName~VideoProxyCandidateProfileTests.Unrecognized_codec_duration_rotation_and_audio_are_not_admitted|FullyQualifiedName~VideoProxyCandidateProfileTests.Probe_rejects_unsupported_codec_color_tracks_and_dimensions"
+
+# Bounded child process: successful/nonzero exit cleans workspace;
+# scratch overage preserves unrelated files; cancel/timeout cleanup.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Core.Tests\PhotoIdentity.Core.Tests.csproj" `
+    "FullyQualifiedName~VideoToolProcessSupervisorTests.Runs_trusted_command_with_discarded_output_and_cleans_scratch|FullyQualifiedName~VideoToolProcessSupervisorTests.Scratch_overage_fails_and_removes_only_its_temporary_child|FullyQualifiedName~VideoToolProcessSupervisorTests.Cancelled_external_process_is_terminated_and_scratch_cleaned|FullyQualifiedName~VideoToolProcessSupervisorTests.Timed_out_external_process_is_killed_and_cleans_temporary_data"
+
+# Failure during local staging must leave scratch empty and source unchanged;
+# disposal of a successful staged copy must also remove the private copy.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Source.Tests\PhotoIdentity.Source.Tests.csproj" `
+    "FullyQualifiedName~OneDriveVideoLocalStagerTests.Missing_or_changed_hash_and_revoked_permission_leave_no_scratch|FullyQualifiedName~OneDriveVideoLocalStagerTests.Copies_only_local_revision_bytes_and_removes_private_copy"
+
+# Deliberately absent synthetic executable: fail closed, no worker/DB,
+# no original opened, only the fixture marker remains in scratch.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj" `
+    "FullyQualifiedName~VideoSyntheticProxyPilotTests.Missing_external_tool_produces_private_safe_first_stage_failure"
+```
+
+**Expected:** all commands exit with code 0 and show nonzero passed
+test counts, with zero failures. The admission tests assert
+`unsupported-video` and `source-budget` (source size greater
+than the configured budget); proxy-profile tests reject an
+unsupported codec and a duration of 650 seconds against the
+600-second cap. Test assertions check that nonzero exit, timeout,
+cancellation and a scratch-budget excess do **not** leave an owned
+working directory; unrelated scratch-root content is preserved.
+Staging tests assert that hash mismatch or revoked permission leaves
+no staged input and that the original fixture's bytes remain intact.
+The absent-tool synthetic case asserts `pilot-failed` with no
+originals, database or active worker and only its marker in scratch.
+
+**Interpretation:** These tests use a small in-memory source budget to
+verify the over-limit decision; they do not allocate a 257 MiB file.
+The maintained worker's `MaximumSourceBytes` is 256 MiB, and its
+independent inspection cap is 600 seconds. There is no need to create
+a giant test file to prove the same admission comparison. Tests
+delete only their own randomly named temporary fixtures; do not
+manually delete the application's derivative cache, existing
+successful proxy, or the seven historical failed jobs.
+
+**Maintainer result (2026-10-30):** all five listed commands passed;
+reported totals 8/8, 2/2, 4/4, 2/2 and 1/1; **17 passed,
+0 failed, 0 skipped**. No additional invalid-media reproduction is
+needed to complete WI-0188's local-file acceptance.
+Online-only hydration/release is **NOT EXERCISED** and is separately
+tracked by WI-0207; do not hydrate cloud-only media implicitly.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37
@@ -286,11 +397,11 @@ production catalogue state.
 6. Compare original video SHA-256 before and after a successful run.
    Verify the archive photo files and existing photo functions remain
    unchanged. No video processing step opens originals for writing.
-7. Only for an already-catalogued online-only video, explicitly turn on
-   **Include online-only videos**, verify one bounded OneDrive hydration
-   request and eventual online-only release. If release fails or OneDrive
-   is unavailable, the app reports/retains the file; **never delete the
-   OneDrive original to reclaim disk**.
+7. **Deferred to WI-0207:** online-only video hydration and
+   return-to-online-only release need separate explicit opt-in and
+   controlled real-OneDrive verification; they were not exercised
+   during WI-0188. Do not enable this setting to repeat WI-0188
+   acceptance; never delete an original to reclaim space.
 8. Verify a malformed/unsupported/oversized clip never publishes an
    apparently valid result. Failed jobs or observed tool capacity limits
    remain visible for later local troubleshooting or an independently
@@ -313,5 +424,13 @@ open cloud workers or copy private originals to Azure.
   hydration can be reverted to OneDrive online-only.
 - No automatic Azure upload.
 
-**Status:** awaiting Windows CI and local end-to-end verification. Do not
-mark WI-0188 accepted until the operator reports the results.
+**Final status (2026-10-30): WI-0188 completed / maintainer-accepted
+for already-local video processing.** Live publication, restart
+persistence, original/derivative integrity, controls/recovery,
+local-first/exclusion behavior, photo regressions and all
+17/17 isolated invalid-media and owned-scratch tests passed.
+The remote-only OneDrive hydration/release path was **not exercised**,
+and its opt-in lifecycle is a separately proposed M30 workitem,
+[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+The seven historical attempt-limit job rows are untouched.
+M30 remains in progress.
