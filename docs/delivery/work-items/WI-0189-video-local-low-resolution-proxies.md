@@ -16,8 +16,8 @@ Generate a smaller playable video copy to keep on the local machine, separate fr
 
 ## Implementation progress (2026-10-30)
 
-**In progress — PRs #665–#668 merged (PRs #667 and #668 passed CI);
-PR #669 adds confirmed operator-only cache reclamation.** The WI-0188 video
+**In progress — PRs #665–#669 merged (GitHub CI successful for
+#667–#669); PR #670 adds selectable, versioned encoding profiles.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -67,7 +67,7 @@ extends that foundation rather than enabling a second worker.
   effect for the next video attempt without a restart. Focused persisted
   preferences/precedence/legacy/invalidity tests added (PR #668 CI
   passed; optional maintainer UI-only smoke remains unverified).
-- **Checkpoint 5, PR #669:** add explicit Video Settings
+- **Checkpoint 5, PR #669 merged:** add explicit Video Settings
   **Preview proxy cleanup → Confirm removal** workflow using the
   pre-existing stopped-lane, DB-first registered derivative maintenance,
   not a second unlink implementation. A bounded scan (at most 8
@@ -81,14 +81,38 @@ extends that foundation rather than enabling a second worker.
   confirmation, cleanup and unchanged healthy/unknown files.
   **This is manual, explicitly confirmed eviction only**:
   no automatic retention scheduler, full physical disk quota or
-  orphan accounting is added. PR #669 CI pending.
+  orphan accounting is added. GitHub Windows CI passed for #669,
+  but maintained-host actual deletion is not yet accepted.
+- **Checkpoint 6, PR #670:** add a bounded operator-selectable
+  `standard-720p` (unchanged WI-0188 preset/version and exact arguments)
+  or `compact-540p` (new immutable v1 preset, lowered bitrate/CRF
+  parameters) SDR H.264/AAC MP4 profile in persisted Video Settings.
+  Also add a strictly bounded user-configurable minimum retention
+  age for manually confirmed cleanup (48 hours, 7 days or 30 days),
+  preserving the 48-hour default on legacy preference files.
+  Changes in retention choice invalidate older fingerprinted previews;
+  they do not launch or schedule any eviction. The maintenance
+  preview/apply HTTP boundary now requires **both socket endpoints
+  to be loopback**, preventing direct trusted-LAN clients from
+  accessing proxy deletion even when phone viewing is enabled.
+  Strict whitelist only: no arbitrary FFmpeg flags, external codec, GPU
+  dependency or online-only hydration. New profile selection changes
+  the immutable idempotency identity and filters queued work by exact
+  selected preset and FFmpeg digest. Independent FFprobe output checks
+  enforce the profile's maximum dimension. Old jobs, receipts and
+  copies are **not** silently converted or deleted; switching back
+  reuses matching existing identity. Tests cover argument compatibility,
+  validation, idempotency and Settings/legacy persistence.
+  **Actual relative size, quality, encode duration, orientation, audio
+  and playback results remain pending maintained-host verification.**
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
-- **Not yet implemented:** user-configurable *encoding profile*, automatic
-  unattended cache eviction, true physical disk quota and
-  unregistered/orphan-byte accounting. Manual confirmed retention
-  and user-editable publication limits are implemented; the latter
-  still guards only newly registered output bytes. Representative MOV/MP4
+- **Not yet implemented:** automatic unattended cache eviction,
+  full physical disk quota and unregistered/orphan-byte accounting.
+  Two versioned bounded encoding choices are implemented but the
+  compact choice requires empirical default-profile assessment;
+  manual confirmed retention and user-editable quota limits exist,
+  the latter guarding only newly registered bytes. Representative MOV/MP4
   size/quality, compatibility and restart/retention workflow verification
   remain open.
   No real-media or end-to-end local verification is claimed for this checkpoint.
@@ -147,7 +171,12 @@ Integration lifecycle and representative private-file performance/quality tests,
   explicit API operator service/endpoints, Videos Settings preview/confirm
   controls, isolated PostgreSQL regression cases, operations runbook,
   canonical/generated status and milestone/build context.
-- PR #668 GitHub build CI completed successfully. PR #669 .NET tests
-  and docs generator have **not** run in this GitHub connector authoring
-  environment; require GitHub Windows CI before merge. Do not claim
-  maintained-host deletion/recovery accepted until later local pilot.
+- PR #668 and #669 GitHub build CI completed successfully. PR #669
+  actual maintained-host removal/recovery is **not** accepted yet.
+- Checkpoint 6 changed: versioned FFmpeg profile registry, worker/output
+  validator, preset-scoped queue discovery and job identity, persisted
+  preferences/API/Settings UI (including 48h/7d/30d explicit retention
+  policy), operator cleanup age resolution, focused tests, Windows CI
+  filter and documentation/status views. PR #670 tests and generator **not run**
+  by the connector authoring environment; require successful CI
+  before merge.

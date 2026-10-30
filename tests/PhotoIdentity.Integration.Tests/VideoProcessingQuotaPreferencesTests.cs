@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Api;
 using Xunit;
@@ -161,6 +162,190 @@ public sealed class VideoProcessingQuotaPreferencesTests
             new VideoProcessingSettingsUpdate(false, false,
                 OverrideProxyLimits: true).MergeWith(existing));
         Assert.Equal(1024, existing.MaximumCacheMiB);
+    }
+
+    [Fact]
+    public async Task Selected_video_profile_persists_across_restart_and_legacy_JSON_defaults_to_720p()
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-profile-settings-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            File.WriteAllText(file,
+                """{"Enabled":false,"IncludeOnlineOnly":false}""");
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.Equal("standard-720p", store.Current.EncodingProfile);
+            Assert.False(store.Current.Enabled);
+
+            await store.SaveAsync(new(false, false,
+                EncodingProfile: "compact-540p"));
+            var reloaded = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.Equal("compact-540p", reloaded.Current.EncodingProfile);
+            Assert.False(reloaded.Current.Enabled);
+
+            await reloaded.SaveAsync(new(false, false,
+                EncodingProfile: "standard-720p"));
+            Assert.Equal("standard-720p",
+                new VideoProcessingPreferencesStore(file, new(false, false))
+                    .Current.EncodingProfile);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Theory]
+    [InlineData("arbitrary-432p")]
+    [InlineData("")]
+    [InlineData("Compact-540p")]
+    public async Task Malformed_or_unknown_video_profile_is_rejected_before_persisting(
+        string profile)
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-profile-invalid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            await store.SaveAsync(new(false, false));
+            string original = File.ReadAllText(file);
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                store.SaveAsync(new(true, true, EncodingProfile: profile)));
+            Assert.Equal(original, File.ReadAllText(file));
+            Assert.False(store.Current.Enabled);
+            File.WriteAllText(file,
+                "{\"Enabled\":true,\"IncludeOnlineOnly\":true,\"EncodingProfile\":"
+                + System.Text.Json.JsonSerializer.Serialize(profile) + "}");
+            var invalid = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.False(invalid.Current.Enabled);
+            Assert.False(invalid.Current.IncludeOnlineOnly);
+            Assert.Equal("standard-720p", invalid.Current.EncodingProfile);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Retention_age_is_persisted_and_old_preferences_default_to_48_hours()
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-retention-age-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            File.WriteAllText(file,
+                """{"Enabled":false,"IncludeOnlineOnly":false}""");
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.Equal(48, store.Current.RetentionAgeHours);
+            await store.SaveAsync(new(false, false,
+                RetentionAgeHours: 168));
+            Assert.Equal(168,
+                new VideoProcessingPreferencesStore(file, new(false, false))
+                    .Current.RetentionAgeHours);
+
+            await store.SaveAsync(new(false, false,
+                RetentionAgeHours: 720));
+            Assert.Equal(720,
+                new VideoProcessingPreferencesStore(file, new(false, false))
+                    .Current.RetentionAgeHours);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(24)]
+    [InlineData(47)]
+    [InlineData(49)]
+    [InlineData(169)]
+    [InlineData(721)]
+    public async Task Unsupported_retention_age_is_rejected_without_mutating_settings(
+        int hours)
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-retention-invalid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            await store.SaveAsync(new(false, false,
+                EncodingProfile: "compact-540p", RetentionAgeHours: 168));
+            string original = File.ReadAllText(file);
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                store.SaveAsync(new(true, true, RetentionAgeHours: hours)));
+            Assert.Equal(original, File.ReadAllText(file));
+            Assert.Equal(168, store.Current.RetentionAgeHours);
+
+            File.WriteAllText(file,
+                "{\"Enabled\":true,\"IncludeOnlineOnly\":true,"
+                + "\"RetentionAgeHours\":" + hours + "}");
+            var invalid = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.False(invalid.Current.Enabled);
+            Assert.False(invalid.Current.IncludeOnlineOnly);
+            Assert.Equal(48, invalid.Current.RetentionAgeHours);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void Legacy_API_preserves_retention_age_and_explicit_change_updates_only_age()
+    {
+        var existing = new VideoProcessingPreferences(false, false,
+            1024, 128, "compact-540p", 168);
+        var legacy = new VideoProcessingSettingsUpdate(true, false)
+            .MergeWith(existing);
+        Assert.Equal(168, legacy.RetentionAgeHours);
+        Assert.Equal("compact-540p", legacy.EncodingProfile);
+        var changed = new VideoProcessingSettingsUpdate(
+            false, false, RetentionAgeHours: 720)
+            .MergeWith(existing);
+        changed.Validate();
+        Assert.Equal(720, changed.RetentionAgeHours);
+        Assert.Equal("compact-540p", changed.EncodingProfile);
+        Assert.Equal(1024, changed.MaximumCacheMiB);
+        Assert.Equal(128, changed.MaximumProxyMiB);
+    }
+
+    [Fact]
+    public void Legacy_two_field_settings_API_preserves_profile_and_explicit_profile_change_is_scoped()
+    {
+        var current = new VideoProcessingPreferences(
+            false, false, 1024, 128, "compact-540p");
+        var oldApi = new VideoProcessingSettingsUpdate(true, false);
+        var oldResult = oldApi.MergeWith(current);
+        Assert.Equal("compact-540p", oldResult.EncodingProfile);
+        Assert.Equal(1024, oldResult.MaximumCacheMiB);
+
+        var changed = new VideoProcessingSettingsUpdate(
+            false, false, EncodingProfile: "standard-720p").MergeWith(current);
+        Assert.Equal("standard-720p", changed.EncodingProfile);
+        Assert.Equal(1024, changed.MaximumCacheMiB);
+        Assert.Equal(128, changed.MaximumProxyMiB);
+        var invalid = new VideoProcessingSettingsUpdate(
+            false, false, EncodingProfile: "arbitrary");
+        Assert.Throws<ArgumentException>(() => invalid.MergeWith(current).Validate());
+    }
+
+    [Fact]
+    public void Retention_preview_and_apply_can_only_use_direct_loopback_sockets()
+    {
+        Assert.True(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Loopback, IPAddress.Loopback));
+        Assert.True(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.IPv6Loopback, IPAddress.IPv6Loopback));
+        Assert.True(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Parse("::ffff:127.0.0.1"), IPAddress.IPv6Loopback));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Parse("192.168.1.100"), IPAddress.Loopback));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Loopback, IPAddress.Parse("192.168.1.5")));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            null, IPAddress.Loopback));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Loopback, null));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(null, null));
     }
 
     [Fact]

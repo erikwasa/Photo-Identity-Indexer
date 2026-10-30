@@ -116,7 +116,7 @@ jobs:
       - name: Verify WI-0189 quota policy and configuration
         shell: pwsh
         run: |
-          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~VideoProxyRetentionPolicyTests|FullyQualifiedName~VideoProxyRetentionPreviewCommandTests|FullyQualifiedName~VideoProxyPublicationQuotaConfigurationTests|FullyQualifiedName~VideoProcessingQuotaPreferencesTests" 2>&1 | Tee-Object -FilePath wi0189-quota-tests.log
+          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --configuration Release --no-build --filter "FullyQualifiedName~VideoProxyRetentionPolicyTests|FullyQualifiedName~VideoProxyRetentionPreviewCommandTests|FullyQualifiedName~VideoProxyPublicationQuotaConfigurationTests|FullyQualifiedName~VideoProcessingQuotaPreferencesTests|FullyQualifiedName~VideoProxyEncodingProfilesTests" 2>&1 | Tee-Object -FilePath wi0189-quota-tests.log
           exit $LASTEXITCODE
 
       - name: Upload WI-0189 focused test diagnostics

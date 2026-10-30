@@ -1,3 +1,4 @@
+using System.Net;
 using PhotoIdentity.Cli;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Web;
@@ -18,11 +19,14 @@ public sealed record VideoProxyRetentionApplyRequest(string ConfirmationFingerpr
 public sealed record VideoProcessingSettingsUpdate(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
-    bool? OverrideProxyLimits = null)
+    bool? OverrideProxyLimits = null, string? EncodingProfile = null,
+    int? RetentionAgeHours = null)
 {
     public VideoProcessingPreferences MergeWith(VideoProcessingPreferences existing)
     {
         ArgumentNullException.ThrowIfNull(existing);
+        string selectedProfile = EncodingProfile ?? existing.EncodingProfile;
+        int retentionAge = RetentionAgeHours ?? existing.RetentionAgeHours;
         if (OverrideProxyLimits is null)
         {
             if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
@@ -31,7 +35,9 @@ public sealed record VideoProcessingSettingsUpdate(
             return existing with
             {
                 Enabled = Enabled,
-                IncludeOnlineOnly = IncludeOnlineOnly
+                IncludeOnlineOnly = IncludeOnlineOnly,
+                EncodingProfile = selectedProfile,
+                RetentionAgeHours = retentionAge
             };
         }
         if (OverrideProxyLimits is false)
@@ -39,19 +45,23 @@ public sealed record VideoProcessingSettingsUpdate(
             if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
                 throw new ArgumentException(
                     "Clearing quota overrides cannot supply quota limits.");
-            return new(Enabled, IncludeOnlineOnly);
+            return new(Enabled, IncludeOnlineOnly,
+                EncodingProfile: selectedProfile,
+                RetentionAgeHours: retentionAge);
         }
 
         if (!MaximumCacheMiB.HasValue || !MaximumProxyMiB.HasValue)
             throw new ArgumentException(
                 "Both quota limits are required when overriding launcher settings.");
-        return new(Enabled, IncludeOnlineOnly, MaximumCacheMiB, MaximumProxyMiB);
+        return new(Enabled, IncludeOnlineOnly,
+            MaximumCacheMiB, MaximumProxyMiB, selectedProfile, retentionAge);
     }
 }
 
 public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB, int? MaximumProxyMiB,
+    string EncodingProfile, int RetentionAgeHours,
     bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
     long Cancelled, long ExpiredLeases, string LastResult,
@@ -117,13 +127,17 @@ public static class VideoProcessingEndpoints
         catch (ArgumentException)
         {
             return Results.BadRequest(new ArchiveErrorResponse(
-                "Specify both valid video proxy limits or neither; cache 64..16384 MiB, per-file 1..256 MiB and per-file <= cache."));
+                "Choose an approved video profile and retention age (48 hours, 7 days or 30 days); quota override requires valid paired limits."));
         }
-        bool quotaChanged = existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
-                            existing.MaximumProxyMiB != requested.MaximumProxyMiB;
-        if (quotaChanged && processor.IsProcessing)
+        bool quotaOrProfileChanged =
+            existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
+            existing.MaximumProxyMiB != requested.MaximumProxyMiB ||
+            !string.Equals(existing.EncodingProfile,
+                requested.EncodingProfile, StringComparison.Ordinal) ||
+            existing.RetentionAgeHours != requested.RetentionAgeHours;
+        if (quotaOrProfileChanged && processor.IsProcessing)
             return Results.Conflict(new ArchiveErrorResponse(
-                "Pause archive processing before changing video proxy storage limits."));
+                "Pause archive processing before changing video proxy limits, encoding profile or retention policy."));
 
         // Do not enable video work without explicit approved local tool
         // configuration. This also prevents the UI from advertising success
@@ -153,12 +167,15 @@ public static class VideoProcessingEndpoints
     }
 
     private static async Task<IResult> PreviewRetentionAsync(
-        PostgresCatalogueDatabase database,
+        HttpContext context, PostgresCatalogueDatabase database,
         VideoProcessingPreferencesStore preferences,
         VideoArchiveProcessingService processor,
         IConfiguration configuration,
         CancellationToken token)
     {
+        if (!IsDirectLoopback(context.Connection.RemoteIpAddress,
+                context.Connection.LocalIpAddress))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         try
         {
             VideoRegisteredMaintenanceReport report =
@@ -195,13 +212,16 @@ public static class VideoProcessingEndpoints
     }
 
     private static async Task<IResult> ApplyRetentionAsync(
-        VideoProxyRetentionApplyRequest value,
+        HttpContext context, VideoProxyRetentionApplyRequest value,
         PostgresCatalogueDatabase database,
         VideoProcessingPreferencesStore preferences,
         VideoArchiveProcessingService processor,
         IConfiguration configuration,
         CancellationToken token)
     {
+        if (!IsDirectLoopback(context.Connection.RemoteIpAddress,
+                context.Connection.LocalIpAddress))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         if (value is null || string.IsNullOrWhiteSpace(value.ConfirmationFingerprint))
             return Results.BadRequest(new ArchiveErrorResponse(
                 "Review a fresh proxy retention preview before confirming."));
@@ -243,6 +263,23 @@ public static class VideoProcessingEndpoints
         }
     }
 
+    /// <summary>
+    /// Restrict operator-triggered proxy deletion to direct loopback,
+    /// independent of an optional trusted-LAN listener or any HTTP headers.
+    /// Remote and local socket addresses must BOTH be loopback.
+    /// </summary>
+    public static bool IsDirectLoopback(IPAddress? remote, IPAddress? local)
+    {
+        static bool Local(IPAddress? address)
+        {
+            if (address is null) return false;
+            IPAddress checkedAddress = address.IsIPv4MappedToIPv6
+                ? address.MapToIPv4() : address;
+            return IPAddress.IsLoopback(checkedAddress);
+        }
+        return Local(remote) && Local(local);
+    }
+
     private static async Task<IResult> RetryFailedAsync(
         Guid jobId, PostgresCatalogueDatabase database,
         CancellationToken token)
@@ -271,6 +308,7 @@ public static class VideoProcessingEndpoints
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
             settings.MaximumCacheMiB, settings.MaximumProxyMiB,
+            settings.EncodingProfile, settings.RetentionAgeHours,
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
             status.ExpiredLeases, lastResult, recent, lastAttemptFailure);

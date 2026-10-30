@@ -209,6 +209,44 @@ public sealed class VideoRegisteredDerivativeMaintenanceTests
     }
 
     [Fact]
+    public async Task User_selected_minimum_retention_age_protects_recent_current_proxies()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(
+                "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING"))) return;
+        await using Fixture f = await Fixture.CreateAsync();
+        Guid threeDaysOld = await f.RegisterAsync(
+            'a', "three-days.mp4", new byte[4],
+            encodedBytes: 40L * 1024 * 1024, ageHours: 72);
+        Guid veryRecent = await f.RegisterAsync(
+            'b', "recent.mp4", new byte[4],
+            encodedBytes: 40L * 1024 * 1024, ageHours: 1);
+        var maintenance = new VideoRegisteredDerivativeMaintenance(f.Db);
+
+        VideoRegisteredMaintenanceReport twoDays = await maintenance.SweepAsync(
+            f.Root, quotaMiB: 64,
+            minimumQuotaAge: TimeSpan.FromHours(48),
+            verifyHashes: true);
+        Assert.True(twoDays.DryRun);
+        Assert.Equal(1, twoDays.Planned);
+        Assert.Equal(1, twoDays.QuotaSelected);
+
+        VideoRegisteredMaintenanceReport oneWeek = await maintenance.SweepAsync(
+            f.Root, quotaMiB: 64,
+            minimumQuotaAge: TimeSpan.FromHours(168),
+            verifyHashes: true);
+        Assert.True(oneWeek.DryRun);
+        Assert.Equal(0, oneWeek.Planned);
+        Assert.Equal(0, oneWeek.QuotaSelected);
+        Assert.Equal(80L * 1024 * 1024, oneWeek.ProjectedBytesAfter);
+
+        Assert.True(File.Exists(f.PathFor(threeDaysOld)));
+        Assert.True(File.Exists(f.PathFor(veryRecent)));
+        Assert.Equal(2L, await f.ReceiptCountAsync());
+        Assert.Equal("succeeded", await f.StatusAsync(threeDaysOld));
+        Assert.Equal("succeeded", await f.StatusAsync(veryRecent));
+    }
+
+    [Fact]
     public async Task Disabled_paused_control_and_zero_running_lease_are_strict_preconditions()
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(

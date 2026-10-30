@@ -24,10 +24,34 @@ The maintainer explicitly moved that separate opted-in OneDrive
 verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 a new proposed M30 workitem dependent on WI-0188. This does not
 permit automatic hydration or alter locally available video behavior.
-WI-0189 local proxy cache retention remains **in progress** (PRs #665–#668
-merged, PR #669 open);
+WI-0189 local proxy cache retention remains **in progress** (PRs #665–#669
+merged, PR #670 under review);
 other M30 playback, frame analysis, search and collection integrations
 remain separately proposed. **M30 is not complete.**
+
+## WI-0189 versioned bounded video proxy profiles (PR #670, 2026-10-30)
+
+PR #670 introduces the second, strictly whitelisted compact **540p**
+H.264/AAC SDR software encode profile, retaining the existing exact
+720p preset and behavior as default. The same Settings checkpoint adds
+user-controlled **48-hour, 7-day or 30-day minimum retention age**
+for the already manually confirmed stopped-lane cleanup; legacy
+preferences retain 48 hours and no eviction runs automatically.
+The browser preview/confirm retention endpoints are also restricted
+to direct loopback sockets on both sides, independent of optional
+trusted-LAN app exposure. Video Settings persists the
+profile and blocks changes while an attempt is active. Job identity,
+pending work and queued work now use the selected preset version
+and approved FFmpeg hash: old queued jobs are not processed under
+the wrong profile, and old completed proxies are never silently
+rewritten or deleted. Independent FFprobe validation bounds output
+dimensions to the selected profile; all archive/photo priority,
+revision/exclusion/lease and original immutability boundaries remain.
+
+GitHub CI and maintained-host representative media acceptance for
+PR #670 are pending. The compact profile is a candidate only; no
+claims are made that it achieves better quality/size/performance.
+Automatic retention and hard physical disk quota are still absent.
 
 ## WI-0189 confirmed, operator-only retention checkpoint 5 (2026-10-30)
 
@@ -43,7 +67,7 @@ Existing originals and unrelated cache files are not selected.
 This is **not** a background retention service or hard disk quota.
 There is no unattended eviction, no original/OneDrive hydration, no
 new transcoding profile or real-media quality acceptance in this PR.
-Focused isolated database tests and docs checks await GitHub CI;
+GitHub Windows build CI passed for PR #669;
 maintainer-host deletion pilot is deferred to the combined WI-0189
 acceptance session.
 
@@ -202,7 +226,7 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#668 merged; #669 open).
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#669 merged; #670 under review).
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.

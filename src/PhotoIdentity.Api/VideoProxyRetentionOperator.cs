@@ -18,7 +18,8 @@ public sealed class VideoProxyRetentionOperator(
     // One short foreground request. The older operator-only CLI retains
     // independent configurable limits for maintenance specialists.
     public const int MaximumRecords = 8;
-    public static readonly TimeSpan MinimumAge = TimeSpan.FromHours(48);
+    // Allowed ages come exclusively from validated persisted preferences.
+    // The UI still requires a stopped lane and explicit confirmation.
 
     public async Task<VideoRegisteredMaintenanceReport> PreviewAsync(
         CancellationToken token = default) =>
@@ -42,7 +43,9 @@ public sealed class VideoProxyRetentionOperator(
                 "Disable video processing and wait for the active attempt to stop.");
         // The PostgreSQL transaction enforces BOTH enabled=false/paused=true
         // and zero running leases independently of these UI-level checks.
-        VideoProxyRetentionLimits limits = preferences.Current
+        VideoProcessingPreferences settings = preferences.Current;
+        settings.Validate();
+        VideoProxyRetentionLimits limits = settings
             .ResolvePublicationQuota(configuration)
             ?? throw new InvalidOperationException(
                 "Configure a video proxy quota before previewing retention.");
@@ -59,7 +62,7 @@ public sealed class VideoProxyRetentionOperator(
             .SweepAsync(root,
                 maximumRecords: MaximumRecords,
                 quotaMiB: limits.MaximumCacheBytes / (1024L * 1024),
-                minimumQuotaAge: MinimumAge,
+                minimumQuotaAge: TimeSpan.FromHours(settings.RetentionAgeHours),
                 verifyHashes: true,
                 apply: apply,
                 token: token,

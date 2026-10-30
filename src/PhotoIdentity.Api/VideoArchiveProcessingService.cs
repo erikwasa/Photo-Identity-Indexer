@@ -123,6 +123,9 @@ public sealed class VideoArchiveProcessingService(
             preflightStage = "quota-configuration";
             VideoProxyRetentionLimits? publicationQuota =
                 preferences.Current.ResolvePublicationQuota(configuration);
+            VideoProxyEncodingProfile encodingProfile =
+                VideoProxyEncodingProfiles.Resolve(
+                    preferences.Current.EncodingProfile);
             preflightStage = "runtime";
             var control = new PostgresVideoProcessingControlRepository(database);
             VideoProcessingControlState state = await control.GetAsync(token);
@@ -149,8 +152,10 @@ public sealed class VideoArchiveProcessingService(
             VideoArchiveCandidate? candidate =
                 await VideoArchiveCandidateSelector.SelectLocalFirstAsync(
                     preferences.Current.IncludeOnlineOnly,
-                    include => FindOldestQueuedAsync(coverage, include, token),
-                    include => FindPendingAsync(coverage, ffmpegHash, include, token));
+                    include => FindOldestQueuedAsync(coverage, include,
+                        encodingProfile.Version, ffmpegHash, token),
+                    include => FindPendingAsync(coverage, ffmpegHash, include,
+                        encodingProfile.Version, token));
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
@@ -161,7 +166,9 @@ public sealed class VideoArchiveProcessingService(
                     coverage, ffprobe, token);
                 if (discovered)
                     candidate = await FindPendingAsync(
-                        coverage, ffmpegHash, preferences.Current.IncludeOnlineOnly, token);
+                        coverage, ffmpegHash,
+                        preferences.Current.IncludeOnlineOnly,
+                        encodingProfile.Version, token);
             }
             if (candidate is null)
             {
@@ -228,7 +235,7 @@ public sealed class VideoArchiveProcessingService(
                     var identity = new VideoDerivativeJobIdentity(
                         AssetRevisionId.From(candidate.RevisionId),
                         VideoDerivativeKind.PlayableProxy, "wi0188-v1",
-                        VideoProxyCandidateProfile.Version, ffmpegHash);
+                        encodingProfile.Version, ffmpegHash);
                     var admission = new VideoProcessingCandidate(
                         IsCurrentRevision: true, IsExcluded: false,
                         IsLocallyAvailable: true, HasSupportedInspection: true,
@@ -242,7 +249,7 @@ public sealed class VideoArchiveProcessingService(
 
                 var adapter = new VideoExperimentalProxyAdapter(
                     database, ffmpeg, ffprobe, ffprobeHash, cache, ToolBudget,
-                    publicationQuota);
+                    publicationQuota, encodingProfile);
                 VideoWorkerCycleResult result =
                     await new VideoWorkerAttemptCoordinator(database)
                         .RunOneAsync(JobBudget, adapter, token,
@@ -552,7 +559,8 @@ public sealed class VideoArchiveProcessingService(
     /// cannot block an already-local queued video.
     /// </summary>
     private async Task<VideoArchiveCandidate?> FindOldestQueuedAsync(
-        ArchiveCoverageState coverage, bool includeOnlineOnly, CancellationToken token)
+        ArchiveCoverageState coverage, bool includeOnlineOnly,
+        string presetVersion, string toolSha256, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
@@ -565,6 +573,9 @@ public sealed class VideoArchiveProcessingService(
             JOIN sources source ON source.id=asset.source_id
             JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
             WHERE job.status='queued'
+              AND job.derivative_kind='PlayableProxy'
+              AND job.policy_version='wi0188-v1'
+              AND job.preset_version=@preset AND job.tool_sha256=@tool
               AND job.cancellation_requested_at_utc IS NULL
               AND job.attempt_count<3 AND job.available_at_utc<=now()
               AND revision.media_kind='video' AND asset.media_kind='video'
@@ -584,6 +595,8 @@ public sealed class VideoArchiveProcessingService(
             ORDER BY job.requested_at_utc, job.id;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
+        query.Parameters.AddWithValue("preset", presetVersion);
+        query.Parameters.AddWithValue("tool", toolSha256);
         List<VideoArchiveCandidate> candidates = [];
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
         {
@@ -598,7 +611,7 @@ public sealed class VideoArchiveProcessingService(
 
     private async Task<VideoArchiveCandidate?> FindPendingAsync(
         ArchiveCoverageState coverage, string toolSha256,
-        bool includeOnlineOnly, CancellationToken token)
+        bool includeOnlineOnly, string presetVersion, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
@@ -639,7 +652,7 @@ public sealed class VideoArchiveProcessingService(
             ORDER BY metadata.duration_seconds, revision.id;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
-        query.Parameters.AddWithValue("preset", VideoProxyCandidateProfile.Version);
+        query.Parameters.AddWithValue("preset", presetVersion);
         query.Parameters.AddWithValue("tool", toolSha256);
         List<VideoArchiveCandidate> candidates = [];
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))

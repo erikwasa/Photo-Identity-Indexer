@@ -413,3 +413,157 @@ rebuild tests. The representative local MOV/MP4, rotated, silent,
 long, seekable, codec/size/quality and original-hash acceptance
 matrix is also outstanding. All four WI-0189 acceptance checkboxes
 remain open.
+
+## Checkpoint 6 — versioned selectable software encoding profile (PR #670)
+
+Video Processing Settings now offers an approved **Output quality and size**
+choice, independent of the quota override and of the Process videos switch:
+
+| Choice | Durable preset version | Encoder limits | Intended evaluation |
+|---|---|---|---|
+| **Standard 720p** (default) | `wi0188-sdr-h264-aac-720p-pilot-v1` | Existing exact 720x720 max-axis, H.264 CRF 24, 2500k maxrate, 96k AAC | Unchanged WI-0188 baseline |
+| **Compact 540p** | `wi0189-sdr-h264-aac-540p-compact-v1` | 540x540 max-axis, H.264 CRF 26, 1400k maxrate, 80k AAC | Candidate to compare output size, encode time and visible detail |
+
+Both presets remain software-only, bounded SDR bt709 H.264/AAC,
+`yuv420p`, <=30 fps, fast-start MP4, with optional single AAC audio
+track and FFmpeg autorotation. Both retain the existing restricted
+FFmpeg protocol, source/lease/size/job-object and original-file guards.
+HDR, unsupported codecs/rotation, arbitrary filter strings and other
+user-entered FFmpeg arguments remain rejected. The independent
+FFprobe validator enforces the chosen output dimension and container
+properties. The **256 MiB** absolute encoded-output safety cap and
+separately configurable per-file publication cap still apply.
+
+**Compatibility and persistence:** Older preference JSON files (without
+an `EncodingProfile` property) use the exact historical 720p preset.
+The Settings API returns `encodingProfile` and accepts one of
+`standard-720p` or `compact-540p`. Older boolean-only Settings PUT
+requests preserve the prior choice. Unknown strings or malformed saved
+values fail closed. Changing profiles while a processing attempt is
+active is rejected; Save by itself never starts a video worker or
+requests cloud hydration.
+
+**Revision/preset reuse:** Selected pending and queued jobs are
+filtered by exact approved preset *and* FFmpeg digest; job identity
+includes source revision, policy, preset and digest. A matching
+completed job is reused rather than re-encoded. A changed revision,
+selected profile or approved executable digest creates an independent
+identity. Other profile jobs and private files are retained as
+separate records; they are **not** silently re-encoded, marked current
+for the new profile, or deleted. Switch back to the original preset
+to reuse its existing current-revision identity, subject to the
+normal exclusion, revision and maintenance fences. This checkpoint
+does not alter the independent operator one-shot pilot CLI, which
+continues using its own historical fixed 720p path.
+
+### Automated pre-merge checks
+
+The Windows build workflow's existing focused test step includes
+`VideoProxyEncodingProfilesTests`. It verifies default argument
+compatibility, strict allowed profile choice and no injected FFmpeg
+options, output dimension verification, distinct and repeatable
+revision/preset idempotency, legacy Settings migration, profile
+persistence across restart, and fail-closed malformed values. This
+is a **no-media** test layer and does not measure comparative speed
+or visual quality.
+
+```powershell
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
+  --filter "FullyQualifiedName~VideoProxyEncodingProfilesTests|FullyQualifiedName~VideoProcessingQuotaPreferencesTests|FullyQualifiedName~VideoProxyCandidateProfileTests" `
+  -p:WasmEnableWebcil=false
+
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+Run these only on current `main` after PR #670 merges. Isolated
+PostgreSQL fixtures remain in the existing required Windows CI
+suite. Do not claim a private-media acceptance from passing
+synthetic tests.
+
+### Later combined Windows profile and cache acceptance (not yet run)
+
+The final WI-0189 verification must compare **the same already-local
+MOV/MP4 clips** under both approved presets, without online-only
+downloads or processing the entire archive. Include at least one
+portrait/rotated file, a silent clip, an audio clip, a long but supported
+clip and a deliberately unsupported/oversized control. Preserve
+original SHA-256 hashes before and after; use the existing bounded
+Archive advance/pause flow, not direct freeform FFmpeg on an archive
+original. Record the following non-private aggregate observations:
+
+- Input type, dimensions, orientation and whether an audio track exists
+  (do not publish names or footage).
+- Per-preset elapsed encoding time, output bytes, percentage reduction,
+  max output dimensions, playback on the intended browser/TV,
+  seeking, displayed orientation/aspect and audio correctness.
+- Human visual comparison of details, including portrait footage;
+  note any visible blur, banding or compression artifacts.
+- Repeat with the same preset without new encoding; switch presets,
+  confirm distinct jobs; switch back, confirm the prior valid identity
+  is reused. Verify a revision change/exclusion is not exposed.
+- Confirm configured registered-byte quotas, non-destructive
+  retention previews, stopped-lane recovery, temporary-file and
+  unknown-file safety. Any actual cleanup must use a separately
+  approved **test** private cache with backup and explicit confirmation.
+
+The default remains 720p until that quality/size/time decision is
+recorded. **This checkpoint neither establishes that compact encoding
+is smaller for every source nor authorizes online-only OneDrive
+hydration/release (separate WI-0207).**
+
+## WI-0189 remaining scope after checkpoint 6
+
+The work item still lacks accepted representative on-device video
+metrics and full revision/preset/retention recovery demonstration.
+Physical cache/orphan accounting and any **unattended** retention
+policy require a separate explicit decision and safeguards; the
+current user-confirmed DB-first cleanup is safe but not a hard
+filesystem quota or background storage regulator. Keep all four
+formal WI-0189 acceptance boxes open until maintainer evidence.
+
+### Manually confirmed minimum retention age (PR #670)
+
+Video Settings → **Manual proxy retention** now offers exactly three
+approved, persisted age choices:
+
+| Minimum age | Intended behavior |
+|---|---|
+| **48 hours** (default) | Legacy WI-0189 behavior; consider oldest valid current registered copies only after two days |
+| **7 days** | Protect valid current copies for a week |
+| **30 days** | Protect valid current copies for a month |
+
+These are **minimum protection ages**, not a command to delete a file
+when it reaches the specified age. The same user-reviewed
+**Preview → Confirm** workflow still requires disabled+paused processing,
+zero running leases, an app-owned cache, SHA-256 verification, and a
+fresh fingerprint. Changing the retention age is a policy change and
+therefore invalidates the previous fingerprint. **Invalid, excluded,
+missing or corrupt registered copies can still be selected before
+that minimum age** for source privacy and integrity, as before.
+
+Legacy preference JSON (without `RetentionAgeHours`) defaults to
+48 hours. Older Settings API clients preserve the current retention
+choice; unsupported numeric values fail closed, without modifying
+saved settings. The standalone expert maintenance CLI retains its
+own independently supplied age option and safety fences.
+
+**No automatic eviction runs at 48 hours, 7 days or 30 days.**
+The user must perform a new preview and explicit confirmation.
+The registered-byte publication quota can refuse new copies while
+old protected copies are retained. If capacity is insufficient, the
+application does not bypass protection or delete source material.
+
+### Local-only confirmation boundary (PR #670)
+
+For safety, the existing browser **retention preview and apply**
+endpoints now require the actual local and remote HTTP socket addresses
+to both be loopback (IPv4, IPv6 or IPv4-mapped IPv6). An optionally
+enabled trusted-LAN/phone listener cannot directly invoke these
+maintenance actions; it receives HTTP 403. No
+`X-Forwarded-For` or other request header authorizes deletion.
+The operator must use the application through localhost on the
+maintained Windows machine for any confirmed cache cleanup. This
+does not change the normal video library or non-destructive viewing
+from the optional trusted LAN. It is a defense-in-depth restriction,
+not a substitute for local device access controls.
