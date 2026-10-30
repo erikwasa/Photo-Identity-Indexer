@@ -81,6 +81,8 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/662
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/663
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/664
 - type: documentation
   value: docs/operations/video-processing-shared-archive-verification.md
 - type: documentation
