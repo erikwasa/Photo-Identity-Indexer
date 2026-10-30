@@ -14,11 +14,11 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Cli, PhotoIdentity.Api, Pho
 
 Generate a smaller playable video copy to keep on the local machine, separate from read-only originals and the OneDrive archive.
 
-## Implementation progress (2026-10-30)
+## Implementation and maintained-host acceptance (2026-10-30)
 
-**Implementation ready for review — PRs #665–#670 merged and #670
-Windows GitHub CI passed; PR #671 adds the isolated 540p/720p
-synthetic preflight and final operator acceptance handoff.** The WI-0188 video
+**Completed and maintainer-accepted for the explicitly bounded, already-local
+video scope. PRs #665–#671 merged; PR #671 GitHub Windows build passed and
+the maintainer reported local verification.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -106,7 +106,7 @@ extends that foundation rather than enabling a second worker.
   validation, idempotency and Settings/legacy persistence.
   **Actual relative size, quality, encode duration, orientation, audio
   and playback results remain pending maintained-host verification.**
-- **Checkpoint 7, PR #671:** add a persistent, default-off
+- **Checkpoint 7, PR #671 merged:** add a persistent, default-off
   **Stop each Archive advance after one video step** setting, so
   acceptance tests need not trigger an unbounded sequence of
   video processing; a step may be inspection or one queued attempt.
@@ -126,19 +126,27 @@ extends that foundation rather than enabling a second worker.
   Unattended eviction is no longer required and will not be implemented
   for this item. The registered-byte admission quota is **not** a hard
   physical disk quota; unregistered/orphan files are handled only by
-  conservative operator maintenance/recovery. This physical-capacity
-  limitation must be explicitly assessed at acceptance; the maintainer
-  has **not** separately waived hard disk-capacity guarantees.
+  conservative operator maintenance/recovery. The final acceptance
+  explicitly records that **registered-byte publication limits are not a
+  hard physical filesystem quota**; no claim that all scratch/orphan bytes
+  are capped is made. The implemented registered-byte + manual retention
+  scope is accepted, not any new physical-capacity guarantee.
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
-- **Development handoff:** the chosen scope (local, default-off,
-  photo-first processing; versioned selectable preset; registered-byte
-  quotas; manually confirmed retention/recovery) is implemented.
-  WI-0189 is now `in_review`, pending PR #671 CI, maintainer
-  Windows synthetic pilot, already-local MOV/MP4 comparative quality
-  measurements, revision/preset reuse and safe cleanup verification.
-  No real-media or end-to-end WI-0189 acceptance is claimed yet.
-  All acceptance checkboxes remain open until the results are supplied.
+- **Final maintainer acceptance (2026-10-30):** local focused .NET tests,
+  docs validation/generation, both two-case synthetic encoder profiles,
+  temporary cleanup, persisted Settings, one-video-step limit,
+  original-file integrity, profile/revision reuse, seeking/rotation/audio
+  and isolated PostgreSQL maintenance tests were reported PASS.
+  Three distinct current-revision MOV/MP4 proxies were successfully
+  published and all were smaller than their inputs. **Zero online-only
+  videos were hydrated.** The maintainer judged processing times
+  acceptable and the compact 540p visual quality sufficient. No actual
+  proxy eviction was performed on personal media. Quantitative
+  same-revision 720p-vs-540p or numeric real encoding times were not
+  supplied; these are recorded as evidence limitations, not invented.
+  WI-0189's accepted delivery scope is therefore complete; M30 and
+  WI-0152/WI-0207 remain separate.
 
 ## In scope
 
@@ -168,17 +176,75 @@ registered-byte admission budget as equivalent.
 
 ## Acceptance criteria
 
-- [ ] Representative MOV/MP4 clips produce smaller, seekable proxies; orientation, aspect and audio policy are correct, and originals remain bit-for-bit unchanged.
-- [ ] Repeated jobs reuse a valid revision/preset-matched proxy; changed revisions or policy invalidate correctly.
-- [ ] Registered-byte quota refusals, manually confirmed eviction,
+- [x] Representative MOV/MP4 clips produce smaller, seekable proxies; orientation, aspect and audio policy are correct, and originals remain bit-for-bit unchanged.
+- [x] Repeated jobs reuse a valid revision/preset-matched proxy; changed revisions or policy invalidate correctly.
+- [x] Registered-byte quota refusals, manually confirmed eviction,
   stopped jobs, corrupt/unsupported input, exclusion and **default-off
   online-only skipping** are deterministic and do not leak temporary
   files; opt-in hydration/release is independently verified in WI-0207.
-- [ ] Report proxy size, encode time, browser compatibility and perceived quality to choose a default profile.
+  Maintainer PostgreSQL safety tests passed; destructive eviction was
+  deliberately **not performed on personal media**.
+- [x] Report proxy size, encode time, browser compatibility and perceived quality to choose a default profile.
+  The maintainer approved perceived 540p quality and characterized processing
+  duration as acceptable (no numeric real duration provided). Both profiles
+  passed actual synthetic FFmpeg/FFprobe codec/container verification; app
+  browser streaming is owned by WI-0152. **Retain Standard 720p as the safe
+  default** until a same-revision quantitative A/B case supports promoting
+  Compact 540p; the latter remains an opt-in, visually acceptable option.
+
+## Maintainer acceptance evidence — 2026-10-30
+
+The user reported completion on the maintained Windows host. Aggregate
+evidence intentionally omits source identifiers, cache paths, revision IDs,
+checksums, account credentials and other private media metadata.
+
+| Scenario | Maintainer result |
+| --- | --- |
+| Focused .NET tests; documentation validate/generate check | PASS; PASS |
+| Synthetic Standard 720p | PASS landscape/audio and portrait/silent |
+| Synthetic Compact 540p | PASS landscape/audio and portrait/silent |
+| Synthetic temporary-file cleanup | PASS |
+| Settings persisted across restart; one-video-step Archive limit | PASS; PASS |
+| Real already-local MOV/MP4 proxy publishing | 3 successful |
+| Real proxy A, Compact 540p | 14.36 MiB input → 0.07 MiB output; 99.5% smaller |
+| Real proxy B, Standard 720p | 2.36 MiB input → 1.53 MiB output; 35.3% smaller |
+| Real proxy C, Standard 720p | 20.68 MiB input → 0.74 MiB output; 96.4% smaller |
+| Seeking, orientation, audio policy | PASS |
+| Perceived visual quality | Maintainer found 540p sufficient |
+| Processing time | Maintainer reported acceptable; no numeric real duration captured |
+| Revision/preset reuse; original-file hashes | PASS; PASS (unchanged) |
+| PostgreSQL quota/retention safety tests | PASS; actual deletion not run |
+| Online-only videos hydrated | 0 |
+
+**Evidence boundaries and disposition.** Each real profile result is for a
+different revision; the percentages **are not** a matched-source quality or
+speed comparison. No numeric real encoding times or separate real long-video
+performance figures were reported; the bounded runtime and duration limits
+remain covered by automated safety checks and operator qualitative acceptance.
+Synthetic profile output was hash-pinned and independently validated for
+browser-oriented H.264/AAC fast-start MP4; **the in-app browser video
+player/range endpoint is not delivered here** (WI-0152). A manual retention
+*deletion* was not attempted on the real cache; the PostgreSQL isolated
+tests cover revocation, quota, stale plan, corruption, source exclusion,
+replay refusal and file integrity. No hard filesystem quota for
+unregistered/orphan bytes is claimed. No cloud hydration/release was
+tested or permitted; WI-0207 remains the separate follow-up.
+
+**Default profile decision.** Keep the existing `standard-720p` as the
+default to avoid changing every installation based on different-source
+size figures. `compact-540p` remains opt-in and judged visually sufficient
+by the maintainer. No further WI-0189 code or routine local testing is
+required solely to close this explicitly accepted scope. A future
+like-for-like profile A/B may inform a later default change without
+reopening this feature's privacy and retention acceptance.
 
 ## Verification requirements
 
-Integration lifecycle and representative private-file performance/quality tests, including long/rotated/no-audio clips.
+Maintainer already-local MOV/MP4 and synthetic profile checks were
+accepted together with prior WI-0188 long/unsupported/oversized media,
+revision/exclusion and temporary-cleanup safety tests. Real long-video
+performance and a same-revision two-profile A/B were not separately
+recorded; do not infer their measurements from this closeout.
 
 ## Completion notes
 
@@ -221,8 +287,14 @@ Integration lifecycle and representative private-file performance/quality tests,
   parser/output-size/orientation/audio/cleanup regression coverage,
   and repository-native verification handoff. No .NET tools or media
   were executed in the GitHub connector authoring environment.
-- Acceptance pending: PR #671 CI, Windows isolated 720p/540p
-  pilot, bounded already-local representative media comparison,
-  original SHA-256 immutability, preset/revision reuse, quota
-  refusal, manual stopped-lane recovery and default profile decision.
+- **Final result:** PR #671 merged; CI passed. Maintainer Windows
+  synthetic and already-local real-video validation was reported PASS
+  as summarized above. Three successful proxies achieved 35.3–99.5%
+  file-size reduction for their respective inputs; all four scoped
+  acceptance criteria are checked with the recorded limitations.
+  No manual destructive cleanup of personal copies was requested.
+  Default remains 720p; compact 540p remains an opt-in alternative.
   No automatic OneDrive recall or release; WI-0207 owns that gate.
+- **Historical checkpoint caveat:** earlier comments stating that CI,
+  local samples, or acceptance were pending describe their checkpoint
+  dates and are superseded by this final maintainer review.
