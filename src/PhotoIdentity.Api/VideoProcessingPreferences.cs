@@ -15,7 +15,8 @@ public sealed record VideoProcessingPreferences(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
     string EncodingProfile = VideoProxyEncodingProfiles.StandardKey,
-    int RetentionAgeHours = 48)
+    int RetentionAgeHours = 48,
+    bool StopAfterOneVideoStepPerAdvance = false)
 {
     public void Validate()
     {
