@@ -1,15 +1,16 @@
 id: WI-0189
 title: Generate and retain bounded local low-resolution video proxies
 milestone: M30
-status: in_review
+status: completed
 owner: ai-agent
+completed_at: 2026-10-30
+verified_at: 2026-10-30
+verified_by: maintainer
 document: ../work-items/WI-0189-video-local-low-resolution-proxies.md
 started_at: 2026-10-30
 last_updated_at: 2026-10-30
-branch: feature/wi0189-compact-synthetic-preflight
-blockers:
-- WI-0151
-- WI-0188
+branch: docs/wi0189-acceptance-closeout
+blockers: []
 blocker_notes: []
 evidence:
 - type: pull_request
@@ -32,3 +33,7 @@ evidence:
   value: 2026-10-30 Windows focused WI-0189 retention policy tests 8 passed 0 failed 0 skipped with WasmEnableWebcil=false; maintainer also reports running docs validate and generation.
 - type: documentation
   value: docs/operations/video-proxy-retention-wi0189.md
+- type: maintainer-acceptance
+  value: '2026-10-30 Europe/Stockholm: maintainer reported PASS focused .NET tests, docs validate/generate, four synthetic 720p/540p landscape/portrait with optional audio, temporary cleanup, Settings persistence, single-video-step Archive, seeking/orientation/audio, same revision/preset reuse, immutable original hashes and isolated PostgreSQL quota/retention tests. Three already-local MOV/MP4 proxies were successful with anonymous 14.36->0.07 MiB (540p, 99.5%), 2.36->1.53 MiB (720p, 35.3%), 20.68->0.74 MiB (720p, 96.4%). Qualitative performance acceptable and 540p perceived quality sufficient. Zero online-only hydrations. No destructive removal from personal cache. Differences between real 720p and 540p sources prevent matched A/B; numeric real encode times not measured; default stays 720p, compact is opt-in. Only registered-byte quota, not strict physical disk bound. OneDrive hydration/release WI-0207, browser streaming WI-0152, manual eviction sufficient.'
+- type: documentation
+  value: docs/delivery/work-items/WI-0189-video-local-low-resolution-proxies.md

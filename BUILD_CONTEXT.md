@@ -4,29 +4,34 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**2026-10-30 M30 / WI-0189:** PRs #665–#670 merged; CI
-passed #667–#670 and the maintainer previously ran 8/8 focused
-retention policy tests. The maintainer explicitly accepts **manual
-preview-and-confirm private cache eviction**: no unattended
-scheduler/hard filesystem quota is required. Registered-byte
-admission, profile/retention Settings, exact 720p baseline and
-versioned 540p preset, current-revision/lease/exclusion fences,
-SHA-checked DB-first private maintenance and loopback-only cleanup
-are implemented. New PR #671 on
-`feature/wi0189-compact-synthetic-preflight` extends the trusted
-source-free video pilot to exercise both profiles with cleanup;
-also adds an optional one-video-step-per-Advance limit (default
-off) so user verification cannot accidentally process a long
-sequence of video candidates. The PR updates canonical/generated
-work-item docs and moves WI-0189 to `in_review`. No actual media, tool, generator or CI pass for
-#671 has been claimed yet. Next: after CI, the maintainer runs
-a marked-temp, approved Windows synthetic 720p/540p pilot;
-then **one bounded already-local** MOV/MP4 acceptance matrix
-(size, encode time, quality, orientation/audio/seek, immutable
-original hashes, revision/preset reuse, quota/manual recovery),
-and reports aggregate results. WI-0189 acceptance 0/4
-until the user verifies. No online-only original hydration
-or release here: WI-0207 owns that separately.
+**2026-10-30 M30 / WI-0189 FINAL ACCEPTANCE:** The maintainer
+accepted and closed WI-0189's bounded, already-local video proxy scope
+after PRs #665–#671 merged and successful GitHub Windows CI for #671.
+They reported passing local .NET/docs checks; synthetic Standard 720p
+and Compact 540p landscape/portrait/audio cases; private temp cleanup;
+persisted Settings/one-video-step Archive control; 3 successful real
+MOV/MP4 proxies; seeking/rotation/audio; revision-preset reuse; unchanged
+original hashes; PostgreSQL quota/manual-retention safety tests;
+zero online-only video hydrations. Real sizes, without source identifiers:
+540p 14.36→0.07 MiB (99.5% reduction); 720p 2.36→1.53 MiB (35.3%)
+and 20.68→0.74 MiB (96.4%). Times were deemed acceptable but
+not numerically recorded; 540p was visually sufficient, but these were
+different real source files, not an A/B comparison of the same revision.
+Keep Standard 720p default and offer 540p opt-in. Manually confirmed
+DB-first, loopback-only private proxy eviction is sufficient by
+maintainer decision; no deletion was executed on the personal cache,
+only passing isolated PostgreSQL tests. Publication quota is bounded
+registered bytes, **not** a hard physical disk quota for scratch/orphans.
+All 4 WI-0189 acceptance boxes are checked; the canonical status moves
+to archived `completed`; generated active index/registry updated.
+M30 recalculates to `ready` (not complete) after its final in-review item
+WI-0189 is archived. This matches PhotoIdentity.Docs lifecycle rules;
+browser playback/range streaming is WI-0152;
+no OneDrive-online-only hydration or release has been exercised—WI-0207
+owns that separately. Historical checkpoint notes are superseded by the
+final acceptance record in
+`docs/delivery/work-items/WI-0189-video-local-low-resolution-proxies.md`
+and the operations runbook.
 
 **2026-10-22 repository-only planning / issue-retirement cleanup:**
 Audit all 33 surviving GitHub issues (12 open, 21 closed) and retire them

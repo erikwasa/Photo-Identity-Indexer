@@ -9,7 +9,9 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 is in progress, not completed.** WI-0150 architecture and WI-0151
+**M30 is ready, not completed.** Its next work items are not yet actively
+in progress; the generated lifecycle recalculates to `ready` after
+WI-0189's completion. WI-0150 architecture and WI-0151
 video metadata/SDR posters are completed. **WI-0188 completed
 following maintainer acceptance on 2026-10-30** for already-local,
 default-off, photo-first, bounded video processing and durable
@@ -24,11 +26,49 @@ The maintainer explicitly moved that separate opted-in OneDrive
 verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 a new proposed M30 workitem dependent on WI-0188. This does not
 permit automatic hydration or alter locally available video behavior.
-WI-0189 is **in review** after PRs #665–#670 merged and
-PR #670 GitHub Windows CI passed; PR #671 adds the last isolated
-profile preflight and the Windows acceptance handoff.
-other M30 playback, frame analysis, search and collection integrations
-remain separately proposed. **M30 is not complete.**
+**WI-0189 is completed and maintainer-accepted as of 2026-10-30**:
+PRs #665–#671 merged; Windows CI and the reported locally run synthetic
+and already-local MOV/MP4 checks passed for the agreed registered-byte
+quota and manually confirmed retention scope.
+Other M30 playback, frame analysis, search and collection integrations
+remain separately proposed. **M30 is not complete**; it is `ready` for
+its next work item.
+
+## WI-0189 final maintainer acceptance (2026-10-30)
+
+**Completed scope, 4/4 work-item acceptance criteria checked** under
+[WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md).
+
+- Maintainer reported PASS: focused .NET tests and docs generation/check;
+  Standard 720p and Compact 540p synthetic landscape/portrait runs with
+  optional audio and clean scratch; Settings restart persistence; one-video-step
+  Archive limit; supported video seeking, aspect/rotation and audio; original
+  SHA-256 immutability; revision/preset reuse; PostgreSQL quota/retention tests;
+  **zero online-only hydrations**.
+- Three real already-local MOV/MP4 proxies completed. Anonymous sizes:
+  540p **14.36 → 0.07 MiB (99.5% smaller)**; 720p
+  **2.36 → 1.53 MiB (35.3%)** and **20.68 → 0.74 MiB (96.4%)**.
+  The maintainer judged processing time satisfactory and 540p visually
+  sufficient. The three inputs differ, so these figures do **not** support a
+  paired-source profile comparison. Numeric real encode latency was not
+  captured.
+- Keep **Standard 720p as the shipped default**. Compact 540p is an accepted
+  opt-in choice. This avoids treating unmatched size data as proof that 540p
+  should become the universal default. Both browser-oriented H.264/AAC MP4
+  presets passed the approved synthetic FFmpeg/FFprobe checks; in-app
+  video streaming/range playback remains WI-0152.
+- The maintainer accepts **manual preview-and-confirm eviction** in lieu of
+  unattended deletion. No actual removal was performed against the personal
+  cache; isolated PostgreSQL revocation/selection/integrity tests passed.
+  Registered-byte quota enforcement is not a hard physical filesystem quota
+  for unregistered/orphan files, which remains an explicitly documented
+  limitation rather than an asserted guarantee.
+- Actual OneDrive-online-only video hydration/release was never exercised
+  and is excluded here; WI-0207 owns those opt-in tests separately.
+
+The subsequent checkpoint sections document historical implementation states.
+Earlier references to pending PR #671 CI or open WI-0189 acceptance are
+superseded by this final maintained-host acceptance.
 
 ## WI-0189 maintainer-selected retention closure and review handoff (2026-10-30)
 
@@ -52,12 +92,10 @@ acceptance runs. The PR also adds
 `--profile compact-540p` to the existing synthetic,
 source-free/temporary-only Windows FFmpeg+FFprobe pilot so both
 presets can be preflighted before any personal media is used.
-WI-0189 moves to `in_review` for PR #671 CI plus one bounded
-maintainer-run **already-local** MOV/MP4 comparison and safe
-maintenance/reuse verification. All four acceptance checkboxes
-stay open until evidence. WI-0207 independently owns actual
-OneDrive-only hydration/release; it cannot block WI-0189's
-locally available proxy scope.
+At this checkpoint WI-0189 entered `in_review`; the subsequent
+maintainer evidence summarized above completed its bounded local
+scope. WI-0207 independently owns OneDrive-only hydration/release,
+and does not block the accepted already-local proxy requirements.
 
 ## WI-0189 versioned bounded video proxy profiles (PR #670, 2026-10-30)
 
@@ -231,7 +269,7 @@ Support private family videos on local hardware without modifying originals, exp
 2. **Metadata/poster — WI-0151:** opt-in discovery; video kind, duration, dimensions/rotation, streams/camera/GPS/time where present; bounded still poster. No mass automatic model processing.
 3. **Isolated local video processing — WI-0188 (completed):** default-off, one-at-a-time, photo-first queue for already-local media, with guarded FFmpeg execution, durable derivative publication, cancellation, recovery and observability.
 4. **Online-only OneDrive video — WI-0207 (proposed):** explicitly opted-in bounded hydration and safe return-to-online-only, to be verified independently without modifying pre-existing local originals.
-5. **Local low-res video copy — WI-0189 (in progress):** managed local transcode/cache independent of immutable originals and OneDrive, with disk quota, eviction, invalidation and configurable output profile.
+5. **Local low-res video copy — WI-0189 (completed):** maintainer-accepted revision/preset-versioned local playable proxies, unchanged originals, bounded **registered-byte** publication quota, explicitly confirmed operator cleanup, and selectable Standard 720p / Compact 540p. No unattended eviction or hard filesystem cap is claimed.
 6. **Video visual evidence — WI-0190:** bounded timestamped frame sampling, caption generation and versioned CLIP-compatible embeddings when model suitability is confirmed; per-video/scene aggregation and uncertainty.
 7. **Video retrieval — WI-0191:** explicit Videos/Photos search scope, Visual/Caption/Combined ranking at video level, with meaningful matched timestamps and no changed photo-search defaults.
 8. **Face feasibility — WI-0155:** separately evaluate sampled face detection, temporal track deduplication and suggestions against *existing confirmed* identities; review burden, precision and compute/storage decide adopt/defer/no-go.
@@ -256,7 +294,7 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#669 merged; #670 under review).
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — **completed** local playable proxy publishing and manual retention, all four scoped acceptance criteria accepted 2026-10-30 (PRs #665–#671 merged).
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.
