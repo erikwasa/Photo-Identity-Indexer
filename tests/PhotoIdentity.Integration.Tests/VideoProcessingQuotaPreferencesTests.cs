@@ -349,6 +349,60 @@ public sealed class VideoProcessingQuotaPreferencesTests
     }
 
     [Fact]
+    public async Task Bounded_one_video_step_setting_is_persisted_and_legacy_JSON_is_unlimited()
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-video-step-limit-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "video-processing-preferences.json");
+        try
+        {
+            File.WriteAllText(file,
+                """{"Enabled":false,"IncludeOnlineOnly":false}""");
+            var store = new VideoProcessingPreferencesStore(file, new(false, false));
+            Assert.False(store.Current.StopAfterOneVideoStepPerAdvance);
+            await store.SaveAsync(new(false, false,
+                StopAfterOneVideoStepPerAdvance: true));
+            Assert.True(new VideoProcessingPreferencesStore(file, new(false, false))
+                .Current.StopAfterOneVideoStepPerAdvance);
+            await store.SaveAsync(new(false, false));
+            Assert.False(new VideoProcessingPreferencesStore(file, new(false, false))
+                .Current.StopAfterOneVideoStepPerAdvance);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void Bounded_video_step_setting_preserves_legacy_API_and_end_session_rule()
+    {
+        VideoProcessingPreferences existing = new(false, false, 1024, 128,
+            "compact-540p", 168, StopAfterOneVideoStepPerAdvance: true);
+        var legacy = new VideoProcessingSettingsUpdate(true, false)
+            .MergeWith(existing);
+        Assert.True(legacy.StopAfterOneVideoStepPerAdvance);
+        Assert.Equal("compact-540p", legacy.EncodingProfile);
+        Assert.Equal(168, legacy.RetentionAgeHours);
+
+        var disabled = new VideoProcessingSettingsUpdate(false, false,
+            StopAfterOneVideoStepPerAdvance: false).MergeWith(existing);
+        disabled.Validate();
+        Assert.False(disabled.StopAfterOneVideoStepPerAdvance);
+        Assert.Equal("compact-540p", disabled.EncodingProfile);
+
+        // The old behavior still runs another video step after work.
+        Assert.True(ArchiveAdvancementHostedService.ContinueAfterVideoStep(
+            stepDidWork: true, stopAfterOneVideoStep: false));
+        // A bounded test ends the Archive session after the first
+        // video discovery or queue attempt, with no second video cycle.
+        Assert.False(ArchiveAdvancementHostedService.ContinueAfterVideoStep(
+            stepDidWork: true, stopAfterOneVideoStep: true));
+        Assert.False(ArchiveAdvancementHostedService.ContinueAfterVideoStep(
+            stepDidWork: false, stopAfterOneVideoStep: false));
+        Assert.False(ArchiveAdvancementHostedService.ContinueAfterVideoStep(
+            stepDidWork: false, stopAfterOneVideoStep: true));
+    }
+
+    [Fact]
     public void Inherited_invalid_configuration_rejects_enabling_but_valid_override_wins()
     {
         var defaultSettings = new VideoProcessingPreferences(false, false);
