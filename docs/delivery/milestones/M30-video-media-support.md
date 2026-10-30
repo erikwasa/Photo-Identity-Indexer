@@ -24,10 +24,33 @@ The maintainer explicitly moved that separate opted-in OneDrive
 verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 a new proposed M30 workitem dependent on WI-0188. This does not
 permit automatic hydration or alter locally available video behavior.
-WI-0189 local proxy cache retention remains **in progress** (PRs #665–#669
-merged, PR #670 under review);
+WI-0189 is **in review** after PRs #665–#670 merged and
+PR #670 GitHub Windows CI passed; PR #671 adds the last isolated
+profile preflight and the Windows acceptance handoff.
 other M30 playback, frame analysis, search and collection integrations
 remain separately proposed. **M30 is not complete.**
+
+## WI-0189 maintainer-selected retention closure and review handoff (2026-10-30)
+
+The maintainer confirms that **manual, explicit, preview-and-confirm
+proxy eviction is sufficient**, so WI-0189 does **not** require an
+unattended eviction scheduler. The existing private registered-byte
+quota and per-file publication fences, configurable protection age
+(48 hours / 7 days / 30 days), and stopped-lane, database-first
+recovery remain the required scope. The quota is registered-byte
+accounting, not a physical filesystem limit; no hard disk-quota
+guarantee is claimed.
+
+PR #670 merged with successful GitHub Windows CI. PR #671 adds
+`--profile compact-540p` to the existing synthetic,
+source-free/temporary-only Windows FFmpeg+FFprobe pilot so both
+presets can be preflighted before any personal media is used.
+WI-0189 moves to `in_review` for PR #671 CI plus one bounded
+maintainer-run **already-local** MOV/MP4 comparison and safe
+maintenance/reuse verification. All four acceptance checkboxes
+stay open until evidence. WI-0207 independently owns actual
+OneDrive-only hydration/release; it cannot block WI-0189's
+locally available proxy scope.
 
 ## WI-0189 versioned bounded video proxy profiles (PR #670, 2026-10-30)
 
@@ -48,8 +71,8 @@ rewritten or deleted. Independent FFprobe validation bounds output
 dimensions to the selected profile; all archive/photo priority,
 revision/exclusion/lease and original immutability boundaries remain.
 
-GitHub CI and maintained-host representative media acceptance for
-PR #670 are pending. The compact profile is a candidate only; no
+PR #670 passed GitHub CI; maintained-host representative
+media acceptance is still pending. The compact profile is a candidate only; no
 claims are made that it achieves better quality/size/performance.
 Automatic retention and hard physical disk quota are still absent.
 
