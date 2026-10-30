@@ -22,7 +22,7 @@ public sealed class VideoProxyRetentionOperator(
 
     public async Task<VideoRegisteredMaintenanceReport> PreviewAsync(
         CancellationToken token = default) =>
-        await ScanAsync(apply: false, expectedFingerprint: null, token);
+        await ScanAsync(apply: false, expectedFingerprint: null, token: token);
 
     public async Task<VideoRegisteredMaintenanceReport> ApplyAsync(
         string expectedFingerprint, CancellationToken token = default)
@@ -31,7 +31,7 @@ public sealed class VideoProxyRetentionOperator(
             !expectedFingerprint.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
             throw new ArgumentException(
                 "A valid current maintenance preview is required.");
-        return await ScanAsync(apply: true, expectedFingerprint, token);
+        return await ScanAsync(apply: true, expectedFingerprint: expectedFingerprint, token: token);
     }
 
     private async Task<VideoRegisteredMaintenanceReport> ScanAsync(
