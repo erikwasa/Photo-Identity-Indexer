@@ -226,6 +226,33 @@ eligible failed job (only if the original revision remains current),
 start the archive, and inspect the job and any derivative. Do not
 repeatedly retry all failed jobs or bypass photo-priority checks.
 
+## First successful published video — operator observation (2026-10-30)
+
+After PR #662, the status API reported `succeeded=1`, `failed=7`,
+`queued=0`, `running=0`, `expiredLeases=0`,
+`lastResult=no-eligible-video`, and no retained
+`lastAttemptFailure`. The succeeded job completed on attempt 1 at
+100% progress. This passes the live video-worker durable publication
+checkpoint: the PostgreSQL publisher commits the private artifact receipt
+and the succeeded job state together. No reset/retry is needed to repeat
+this already-proven outcome. The seven terminal `attempt-limit`
+rows are historical and need not be cleared.
+
+Do not treat `no-eligible-video` as a failure; it means the current
+advance pass found no further eligible input. A blank last failure is
+process-local and does not invalidate the historical failed rows.
+
+Before workitem acceptance, verify separately and report: (1) a
+previously-local original video still matches its authoritative
+catalogue/baseline digest without changing OneDrive hydration, (2) the
+private published derivative exists and its bytes match the receipt,
+(3) the existing photo Archive, People, searches, collections and
+slideshows remain unchanged, and (4) outstanding applicable
+pause/cancel, inclusion/exclusion, restart and OneDrive opt-in
+acceptance checks. Do not share personal media paths or original hashes
+in public PR comments. An already completed single-video run does not
+by itself establish all the protective regression gates.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37
