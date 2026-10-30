@@ -1256,6 +1256,36 @@ Production activation remains prohibited until reviewed.
   original-file integrity, and unchanged photo behavior before acceptance.
   Never reset every failed job or manually edit lease/database state.
 
+### Maintained-host checkpoint — first durable real-video success (2026-10-30)
+
+- After installing the fix for shared-archive video self-preemption
+  (PR #662), the maintainer observed one video job at
+  `status=succeeded`, `attempts=1`, `progressPercent=100`,
+  with no queued or running video jobs and no expired leases.
+  The settings API returned `succeeded=1`, `failed=7`,
+  `lastResult=no-eligible-video` and an empty
+  `lastAttemptFailure`.
+- This **passes the first real-media publication checkpoint**. The
+  `PostgresVideoPublishedDerivativeRepository` transitions a job to
+  `succeeded` and inserts the private derivative receipt within the
+  same PostgreSQL transaction after the worker has validated and moved
+  its output. This status therefore evidences the durable-commit path,
+  not only a successful FFmpeg process exit.
+- The seven `failed/attempt-limit` jobs remain historical terminal
+  failures from prior runs. The empty in-memory failure diagnostic
+  means no failure was retained by the current process; it does not
+  explain or erase the earlier attempts. No bulk retries, queue reset
+  or scratch/cache removal are necessary.
+- **WI-0188 remains `in_progress` pending maintained-host acceptance**:
+  the operator still needs to confirm an already-local original remains
+  byte-identical (using its recorded/pre-run digest or authoritative
+  catalogue revision digest), the finished private derivative is
+  present/readable and matches its recorded receipt, unchanged photo
+  Archive/People/search/collections/slideshow behavior, and the
+  remaining applicable pause/exclusion/restart/OneDrive opt-in guards.
+  Preserve the default-off/hydration controls and do not regenerate
+  failing media merely to obtain additional counters.
+
 ## Completion notes
 
 - Files changed: Core admission/identity contracts and tests; v34 schema,
