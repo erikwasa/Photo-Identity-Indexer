@@ -62,9 +62,12 @@ public static class VideoProcessingEndpoints
             value.MaximumCacheMiB, value.MaximumProxyMiB);
         try
         {
-            // Validate both preferences and inherited launcher fallback
-            // BEFORE touching DB controls or persisted operator settings.
-            _ = requested.ResolvePublicationQuota(configuration);
+            // Always allow operators to disable video processing, even
+            // if inherited launcher settings are malformed. Only enabling
+            // may consume the runtime quota configuration.
+            requested.Validate();
+            if (requested.Enabled)
+                _ = requested.ResolvePublicationQuota(configuration);
         }
         catch (ArgumentException)
         {
