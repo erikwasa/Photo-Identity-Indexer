@@ -24,8 +24,13 @@ public sealed record VideoPublishedDerivativeReceipt(
 /// committed; callers may safely discard their *owned* temporary output.
 /// This is not a hard filesystem quota or a signal to delete originals.
 /// </summary>
-public sealed class VideoProxyPublicationQuotaExceededException()
-    : InvalidOperationException("Video proxy publication exceeds its configured registered-byte quota.");
+public sealed class VideoProxyPublicationQuotaExceededException : InvalidOperationException
+{
+    public VideoProxyPublicationQuotaExceededException()
+        : base("Video proxy publication exceeds its configured registered-byte quota.")
+    {
+    }
+}
 
 public sealed class PostgresVideoPublishedDerivativeRepository(PostgresCatalogueDatabase database)
 {
