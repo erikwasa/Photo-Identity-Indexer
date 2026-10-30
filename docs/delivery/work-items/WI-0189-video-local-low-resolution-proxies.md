@@ -106,7 +106,14 @@ extends that foundation rather than enabling a second worker.
   validation, idempotency and Settings/legacy persistence.
   **Actual relative size, quality, encode duration, orientation, audio
   and playback results remain pending maintained-host verification.**
-- **Checkpoint 7, PR #671:** extend the already accepted, hash-pinned,
+- **Checkpoint 7, PR #671:** add a persistent, default-off
+  **Stop each Archive advance after one video step** setting, so
+  acceptance tests need not trigger an unbounded sequence of
+  video processing; a step may be inspection or one queued attempt.
+  Older preferences and Settings clients preserve unlimited
+  behavior unless the operator explicitly enables this option.
+  Add persistence, API and pure archive-continuation tests.
+  Also extend the already accepted, hash-pinned,
   source-free synthetic FFmpeg/FFprobe pilot with an optional strictly
   allowlisted `compact-540p` profile. The existing `standard-720p`
   remains the default. Both pilot profiles check temporary-file cleanup,
@@ -118,8 +125,10 @@ extends that foundation rather than enabling a second worker.
   SHA-verified database-first eviction **satisfies WI-0189 retention**.
   Unattended eviction is no longer required and will not be implemented
   for this item. The registered-byte admission quota is **not** a hard
-  physical disk quota; unregistered/orphan files remain bounded by the
-  existing conservative maintenance/recovery tooling, not auto-deleted.
+  physical disk quota; unregistered/orphan files are handled only by
+  conservative operator maintenance/recovery. This physical-capacity
+  limitation must be explicitly assessed at acceptance; the maintainer
+  has **not** separately waived hard disk-capacity guarantees.
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
 - **Development handoff:** the chosen scope (local, default-off,
@@ -138,8 +147,10 @@ extends that foundation rather than enabling a second worker.
 - User-configurable bounded encoding profile, **registered-byte** quota,
   per-file cap and retention age; eviction is manual, previewed and
   explicitly confirmed, affecting only generated private copies.
-  Unattended deletion and strict physical filesystem quota are not
-  requirements for the maintainer-accepted scope.
+  Unattended deletion is excluded by the maintainer's decision.
+  The registered-byte budget cannot guarantee a strict physical
+  filesystem cap; that limitation must be included in the final
+  quota acceptance assessment.
 - Atomic temp-file publication, deduplication, cancellation cleanup, revision/preset invalidation, and exclusion/deletion privacy cleanup.
 - Preserve retained **already-local** proxy availability when an
   original subsequently becomes online-only without triggering recall.
@@ -149,9 +160,11 @@ extends that foundation rather than enabling a second worker.
 
 ## Out of scope
 
-Player/range API (WI-0152), automatic retention scheduling, strict
-physical filesystem quota, OneDrive-only hydration/release (WI-0207),
-editing/trimming, universal codec support, captioning and facial identification.
+Player/range API (WI-0152), automatic retention scheduling,
+OneDrive-only hydration/release (WI-0207), editing/trimming, universal
+codec support, captioning and facial identification. A hard physical
+filesystem quota is **not implemented**; do not silently treat a
+registered-byte admission budget as equivalent.
 
 ## Acceptance criteria
 
