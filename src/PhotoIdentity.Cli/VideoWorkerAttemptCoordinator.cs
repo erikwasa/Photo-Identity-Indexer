@@ -131,7 +131,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         {
             // The adapter may attach only a known failure stage. Never expose
             // its exception message, source path, or native tool output.
-            return await RecordFailureAsync(queue, lease, retryable: true,
+            return await RecordFailureAsync(queue, lease,
+                retryable: error is not VideoProxyPublicationQuotaExceededException,
                 token, VideoAttemptFailureDiagnostics.FromException(error));
         }
 
@@ -246,7 +247,7 @@ public static class VideoAttemptFailureDiagnostics
         "authorization-refused", "completion-observation-unavailable",
         "missing-durable-receipt", "acknowledgement-unavailable",
         "execution-not-started", "tool-exit-nonzero",
-        "execution-interrupted", "not-committed",
+        "execution-interrupted", "not-committed", "proxy-quota-exceeded",
         "probe-not-started", "probe-preempted",
         "probe-tool-nonzero", "probe-missing-output",
         "native-process-setup", "timeout", "filesystem-access-denied",
@@ -296,6 +297,7 @@ public static class VideoAttemptFailureDiagnostics
             AllowedStages.Contains(marked) ? marked : "unclassified";
         string failureClass = error switch
         {
+            VideoProxyPublicationQuotaExceededException => "proxy-quota-exceeded",
             VideoProxyValidationException validation => validation.ReasonCode,
             System.ComponentModel.Win32Exception => "native-process-setup",
             TimeoutException => "timeout",
