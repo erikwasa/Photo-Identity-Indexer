@@ -91,7 +91,10 @@ extends that foundation rather than enabling a second worker.
   age for manually confirmed cleanup (48 hours, 7 days or 30 days),
   preserving the 48-hour default on legacy preference files.
   Changes in retention choice invalidate older fingerprinted previews;
-  they do not launch or schedule any eviction.
+  they do not launch or schedule any eviction. The maintenance
+  preview/apply HTTP boundary now requires **both socket endpoints
+  to be loopback**, preventing direct trusted-LAN clients from
+  accessing proxy deletion even when phone viewing is enabled.
   Strict whitelist only: no arbitrary FFmpeg flags, external codec, GPU
   dependency or online-only hydration. New profile selection changes
   the immutable idempotency identity and filters queued work by exact
