@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Globalization;
 using PhotoIdentity.Core.Processing;
+using PhotoIdentity.Cli;
 using Microsoft.Extensions.Configuration;
 
 namespace PhotoIdentity.Api;
@@ -12,10 +13,12 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed record VideoProcessingPreferences(
     bool Enabled, bool IncludeOnlineOnly,
-    int? MaximumCacheMiB = null, int? MaximumProxyMiB = null)
+    int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
+    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey)
 {
     public void Validate()
     {
+        _ = VideoProxyEncodingProfiles.Resolve(EncodingProfile);
         // Must reject partially persisted or caller-forged preferences;
         // there is never a silent "one limit disabled" interpretation.
         _ = VideoProxyPublicationQuotaConfiguration.ParseOptional(
