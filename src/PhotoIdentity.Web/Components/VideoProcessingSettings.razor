@@ -51,6 +51,48 @@
                        Videos already stored locally are left as they were.</p>
                 </div>
             </div>
+            <fieldset class="review-filter-panel">
+                <legend class="field-label">Local video proxy storage</legend>
+                <label class="field-label" for="video-processing-quota-override">
+                    <input id="video-processing-quota-override" type="checkbox"
+                           @bind="OverrideProxyLimits" disabled="@Saving" />
+                    Override launcher proxy limits
+                </label>
+                <p class="field-help">
+                    Optional. When unchecked, the application uses its existing
+                    launcher configuration, if any. Quotas affect newly published
+                    video proxies only; they do not delete existing proxies,
+                    measure temporary files, or change original photos/videos.
+                </p>
+                <div class="review-filter-grid">
+                    <div>
+                        <label class="field-label" for="video-processing-cache-mib">
+                            Total registered proxies (MiB, 64–16384)
+                        </label>
+                        <input id="video-processing-cache-mib" type="number"
+                               min="64" max="16384" step="1"
+                               @bind="MaximumCacheMiB"
+                               disabled="@(Saving || !OverrideProxyLimits)"
+                               required="@OverrideProxyLimits" />
+                    </div>
+                    <div>
+                        <label class="field-label" for="video-processing-proxy-mib">
+                            Maximum single proxy (MiB, 1–256)
+                        </label>
+                        <input id="video-processing-proxy-mib" type="number"
+                               min="1" max="256" step="1"
+                               @bind="MaximumProxyMiB"
+                               disabled="@(Saving || !OverrideProxyLimits)"
+                               required="@OverrideProxyLimits" />
+                    </div>
+                </div>
+                <p class="field-help">
+                    These limits take effect for the next video attempt.
+                    If the configured space is unavailable, publication is
+                    rejected; automatic eviction is not enabled. Pause the
+                    Archive run before changing the limits.
+                </p>
+            </fieldset>
             <div class="card-actions">
                 <button class="button primary" type="submit" disabled="@Saving">
                     @(Saving ? "Saving…" : "Save video settings")
@@ -129,16 +171,22 @@
         bool CancellationRequested, string? FailureCode);
     private sealed record VideoSettingsResponse(
         bool Enabled, bool IncludeOnlineOnly,
+        int? MaximumCacheMiB, int? MaximumProxyMiB,
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
         string LastResult, IReadOnlyList<VideoJobRow> Recent);
-    private sealed record VideoSettingsUpdate(bool Enabled, bool IncludeOnlineOnly);
+    private sealed record VideoSettingsUpdate(
+        bool Enabled, bool IncludeOnlineOnly,
+        int? MaximumCacheMiB, int? MaximumProxyMiB);
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
     private bool Enabled;
     private bool IncludeOnlineOnly;
+    private bool OverrideProxyLimits;
+    private int? MaximumCacheMiB = 1024;
+    private int? MaximumProxyMiB = 256;
     private bool Loading = true;
     private bool Saving;
     private string? Error;
@@ -164,6 +212,10 @@
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
+                OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
+                                      Status.MaximumProxyMiB.HasValue;
+                MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
+                MaximumProxyMiB = Status.MaximumProxyMiB ?? 256;
             }
         }
         catch (Exception)
@@ -206,7 +258,9 @@
         {
             using HttpResponseMessage response = await Http.PutAsJsonAsync(
                 "api/video-processing/settings",
-                new VideoSettingsUpdate(Enabled, IncludeOnlineOnly));
+                new VideoSettingsUpdate(Enabled, IncludeOnlineOnly,
+                    OverrideProxyLimits ? MaximumCacheMiB : null,
+                    OverrideProxyLimits ? MaximumProxyMiB : null));
             if (!response.IsSuccessStatusCode)
             {
                 ErrorResponse? failure = null;
@@ -220,6 +274,10 @@
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
+                OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
+                                      Status.MaximumProxyMiB.HasValue;
+                MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
+                MaximumProxyMiB = Status.MaximumProxyMiB ?? 256;
             }
             Message = "Video settings saved.";
         }
