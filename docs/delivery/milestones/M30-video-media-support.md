@@ -266,7 +266,7 @@ Support private family videos on local hardware without modifying originals, exp
 2. **Metadata/poster — WI-0151:** opt-in discovery; video kind, duration, dimensions/rotation, streams/camera/GPS/time where present; bounded still poster. No mass automatic model processing.
 3. **Isolated local video processing — WI-0188 (completed):** default-off, one-at-a-time, photo-first queue for already-local media, with guarded FFmpeg execution, durable derivative publication, cancellation, recovery and observability.
 4. **Online-only OneDrive video — WI-0207 (proposed):** explicitly opted-in bounded hydration and safe return-to-online-only, to be verified independently without modifying pre-existing local originals.
-5. **Local low-res video copy — WI-0189 (in progress):** managed local transcode/cache independent of immutable originals and OneDrive, with disk quota, eviction, invalidation and configurable output profile.
+5. **Local low-res video copy — WI-0189 (completed):** maintainer-accepted revision/preset-versioned local playable proxies, unchanged originals, bounded **registered-byte** publication quota, explicitly confirmed operator cleanup, and selectable Standard 720p / Compact 540p. No unattended eviction or hard filesystem cap is claimed.
 6. **Video visual evidence — WI-0190:** bounded timestamped frame sampling, caption generation and versioned CLIP-compatible embeddings when model suitability is confirmed; per-video/scene aggregation and uncertainty.
 7. **Video retrieval — WI-0191:** explicit Videos/Photos search scope, Visual/Caption/Combined ranking at video level, with meaningful matched timestamps and no changed photo-search defaults.
 8. **Face feasibility — WI-0155:** separately evaluate sampled face detection, temporal track deduplication and suggestions against *existing confirmed* identities; review burden, precision and compute/storage decide adopt/defer/no-go.
@@ -291,7 +291,7 @@ Support private family videos on local hardware without modifying originals, exp
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
 - [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — in-progress local playable proxy retention (PRs #665–#669 merged; #670 under review).
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — **completed** local playable proxy publishing and manual retention, all four scoped acceptance criteria accepted 2026-10-30 (PRs #665–#671 merged).
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.
