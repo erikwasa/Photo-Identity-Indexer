@@ -188,8 +188,15 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                             "video-processing", syncRequired: false,
                             "Processing enabled videos after photos.",
                             _timeProvider.GetUtcNow(), stoppingToken);
-                        if (await _videos.AdvanceOnceAsync(coverage, stoppingToken))
+                        bool stepDidWork = await _videos.AdvanceOnceAsync(
+                            coverage, stoppingToken);
+                        if (ContinueAfterVideoStep(stepDidWork,
+                                _videoPreferences.Current.StopAfterOneVideoStepPerAdvance))
                             continue;
+                        // In bounded mode a video step is counted whether it
+                        // inspected a single new candidate or attempted one
+                        // queued proxy. The existing Archive session finishes
+                        // normally, rather than looping over the whole library.
                     }
                     await _control.CompleteAsync(coverage.Source.SourceId,
                         _timeProvider.GetUtcNow(), stoppingToken);
@@ -263,6 +270,15 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             }
         }
     }
+
+    /// <summary>
+    /// Pure session-selection rule. Default false retains the existing
+    /// multi-video Archive behavior. The optional verification setting
+    /// stops after one video *step* (discovery or claimed job), not after
+    /// an unbounded batch of video candidates.
+    /// </summary>
+    public static bool ContinueAfterVideoStep(bool stepDidWork,
+        bool stopAfterOneVideoStep) => stepDidWork && !stopAfterOneVideoStep;
 
     private async Task DrainPurgeWorkAsync(CancellationToken cancellationToken)
     {

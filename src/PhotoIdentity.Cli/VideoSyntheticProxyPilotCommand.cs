@@ -13,7 +13,8 @@ namespace PhotoIdentity.Cli;
 /// </summary>
 public sealed record VideoSyntheticProxyPilotOptions(
     string ScratchRoot, string Ffmpeg, string FfmpegSha256,
-    string Ffprobe, string FfprobeSha256, bool Apply)
+    string Ffprobe, string FfprobeSha256, bool Apply,
+    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey)
 {
     public static VideoSyntheticProxyPilotOptions Parse(string[] args)
     {
@@ -27,7 +28,8 @@ public sealed record VideoSyntheticProxyPilotOptions(
                 continue;
             }
             if (args[i] is not ("--scratch-root" or "--ffmpeg" or "--ffmpeg-sha256" or
-                               "--ffprobe" or "--ffprobe-sha256") ||
+                               "--ffprobe" or "--ffprobe-sha256" or
+                               "--profile") ||
                 i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(args[i], args[++i]))
                 throw new ArgumentException("Invalid, repeated or incomplete synthetic video pilot argument.");
@@ -48,8 +50,11 @@ public sealed record VideoSyntheticProxyPilotOptions(
             !IsHash(encodeHash) || !IsHash(probeHash))
             throw new ArgumentException(
                 "Video pilot needs absolute tool/scratch paths and lowercase approved SHA-256 values.");
+        string profile = values.TryGetValue("--profile", out string? requested)
+            ? requested : VideoProxyEncodingProfiles.StandardKey;
+        _ = VideoProxyEncodingProfiles.Resolve(profile);
         return new(Path.GetFullPath(root), Path.GetFullPath(ffmpeg), encodeHash,
-            Path.GetFullPath(ffprobe), probeHash, apply);
+            Path.GetFullPath(ffprobe), probeHash, apply, profile);
     }
 
     private static bool IsHash(string value) =>
@@ -58,7 +63,8 @@ public sealed record VideoSyntheticProxyPilotOptions(
 
 public sealed record VideoSyntheticProxyPilotCase(
     string Orientation, int Width, int Height, bool HasAudio,
-    double DurationSeconds, long EncodedBytes, long EncodeMilliseconds);
+    double DurationSeconds, long EncodedBytes, long EncodeMilliseconds,
+    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey);
 
 /// <summary>
 /// Generates bounded 3-second camera-like synthetic inputs via a trusted
@@ -93,9 +99,11 @@ public static class VideoSyntheticProxyPilotCommandRunner
         // beneath the OS temp directory, never a source archive, OneDrive
         // collection, conventional derivatives folder or network share.
         string root = ValidateRoot(options.ScratchRoot);
+        VideoProxyEncodingProfile profile = VideoProxyEncodingProfiles.Resolve(
+            options.EncodingProfile);
         if (!options.Apply)
         {
-            Write(output, true, "not-run", []);
+            Write(output, true, "not-run", [], profile: profile.Key);
             return 0;
         }
         if (!OperatingSystem.IsWindows())
@@ -104,7 +112,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
 
         var encoder = new VideoToolProcessSupervisor();
         var validator = new VideoProxyOutputValidator(
-            options.Ffprobe, options.FfprobeSha256, root);
+            options.Ffprobe, options.FfprobeSha256, root,
+            profile.MaximumDimension);
         List<VideoSyntheticProxyPilotCase> observations = [];
         // Only predetermined, public phase identifiers are reported. Tool
         // stderr, executable locations and private workspace names are never
@@ -142,7 +151,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
                         VideoToolExecutionResult transcode = await encoder.RunAsync(
                             options.Ffmpeg, options.FfmpegSha256, root,
                             encodeWorkspace =>
-                                VideoProxyCandidateProfile.BuildArguments(input, encodeWorkspace),
+                                profile.BuildArguments(input, encodeWorkspace),
                             EncodeBudget, generatedToken,
                             afterSuccessfulExit: async (encodeWorkspace, encodeToken) =>
                             {
@@ -165,7 +174,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
                                 long bytes = new FileInfo(candidate).Length;
                                 observed = new(orientation, valid.Width, valid.Height,
                                     valid.HasAudio, valid.DurationSeconds, bytes,
-                                    (long)clock.Elapsed.TotalMilliseconds);
+                                    (long)clock.Elapsed.TotalMilliseconds,
+                                    profile.Key);
                             });
                         if (transcode.ExitCode != 0)
                         {
@@ -190,7 +200,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
                 observations.Add(observed);
             }
 
-            Write(output, false, "validated", observations);
+            Write(output, false, "validated", observations, profile: profile.Key);
             return 0;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -208,7 +218,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
                     (error is VideoProxyValidationException probe
                         ? probe.ToolExitCode : null),
                 error is Win32Exception native ? native.NativeErrorCode : null,
-                VideoToolFailureEvidence.Read(error));
+                VideoToolFailureEvidence.Read(error),
+                profile: profile.Key);
             return 1;
         }
     }
@@ -319,12 +330,13 @@ public static class VideoSyntheticProxyPilotCommandRunner
         IReadOnlyList<VideoSyntheticProxyPilotCase> results,
         string? failureStage = null, string? failureOrientation = null,
         string? failureClass = null, int? toolExitCode = null,
-        int? nativeErrorCode = null, string? failureCheckpoint = null)
+        int? nativeErrorCode = null, string? failureCheckpoint = null,
+        string profile = VideoProxyEncodingProfiles.StandardKey)
     {
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0188-synthetic-proxy-pilot-v1",
-            dryRun, status, schemaUsed = false, originalsOpened = false,
+            profile, dryRun, status, schemaUsed = false, originalsOpened = false,
             videoWorkersActivated = false, derivativesRetained = false,
             failureStage, failureOrientation, failureClass,
             toolExitCode, nativeErrorCode, failureCheckpoint, results
