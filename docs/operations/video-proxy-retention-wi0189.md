@@ -635,8 +635,12 @@ New-Item -ItemType Directory -Path $lab -ErrorAction Stop | Out-Null
     'wi0188-synthetic-video-lab-v1'
 )
 
+# Compile once so stdout from each invocation is only the JSON report.
+dotnet build src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Video CLI build failed.' }
+
 $results = foreach ($profile in @('standard-720p','compact-540p')) {
-    $json = & dotnet run --project src/PhotoIdentity.Cli -- `
+    $json = & dotnet run --project src/PhotoIdentity.Cli -c Release --no-build -- `
         video synthetic-proxy-pilot --scratch-root $lab `
         --ffmpeg $ffmpeg --ffmpeg-sha256 $ffmpegHash `
         --ffprobe $ffprobe --ffprobe-sha256 $ffprobeHash `
@@ -681,6 +685,8 @@ Before an actual archive run:
    multi-video processing behavior.
 3. Check that **photos and archive sync work are drained** and the
    application's existing approved tool/cache settings are valid.
+   An Archive run remains allowed to advance photo work before reaching
+   its one-video-step limit; the limit is **not** a photo-work limit.
    A single video step can be metadata discovery *or* one queued
    derivative attempt. If it only inspects a video, a later, separately
    authorized Advance may be needed to encode it.
