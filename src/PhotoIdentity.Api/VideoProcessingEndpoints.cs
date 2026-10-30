@@ -1,3 +1,4 @@
+using System.Net;
 using PhotoIdentity.Cli;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Web;
@@ -166,12 +167,15 @@ public static class VideoProcessingEndpoints
     }
 
     private static async Task<IResult> PreviewRetentionAsync(
-        PostgresCatalogueDatabase database,
+        HttpContext context, PostgresCatalogueDatabase database,
         VideoProcessingPreferencesStore preferences,
         VideoArchiveProcessingService processor,
         IConfiguration configuration,
         CancellationToken token)
     {
+        if (!IsDirectLoopback(context.Connection.RemoteIpAddress,
+                context.Connection.LocalIpAddress))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         try
         {
             VideoRegisteredMaintenanceReport report =
@@ -208,13 +212,16 @@ public static class VideoProcessingEndpoints
     }
 
     private static async Task<IResult> ApplyRetentionAsync(
-        VideoProxyRetentionApplyRequest value,
+        HttpContext context, VideoProxyRetentionApplyRequest value,
         PostgresCatalogueDatabase database,
         VideoProcessingPreferencesStore preferences,
         VideoArchiveProcessingService processor,
         IConfiguration configuration,
         CancellationToken token)
     {
+        if (!IsDirectLoopback(context.Connection.RemoteIpAddress,
+                context.Connection.LocalIpAddress))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         if (value is null || string.IsNullOrWhiteSpace(value.ConfirmationFingerprint))
             return Results.BadRequest(new ArchiveErrorResponse(
                 "Review a fresh proxy retention preview before confirming."));
@@ -254,6 +261,23 @@ public static class VideoProcessingEndpoints
             return Results.Conflict(new ArchiveErrorResponse(
                 "The owned private proxy cache could not be verified."));
         }
+    }
+
+    /// <summary>
+    /// Restrict operator-triggered proxy deletion to direct loopback,
+    /// independent of an optional trusted-LAN listener or any HTTP headers.
+    /// Remote and local socket addresses must BOTH be loopback.
+    /// </summary>
+    public static bool IsDirectLoopback(IPAddress? remote, IPAddress? local)
+    {
+        static bool Local(IPAddress? address)
+        {
+            if (address is null) return false;
+            IPAddress checkedAddress = address.IsIPv4MappedToIPv6
+                ? address.MapToIPv4() : address;
+            return IPAddress.IsLoopback(checkedAddress);
+        }
+        return Local(remote) && Local(local);
     }
 
     private static async Task<IResult> RetryFailedAsync(
