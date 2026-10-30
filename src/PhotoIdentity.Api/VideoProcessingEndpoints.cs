@@ -18,12 +18,14 @@ public sealed record VideoProxyRetentionApplyRequest(string ConfirmationFingerpr
 public sealed record VideoProcessingSettingsUpdate(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB = null, int? MaximumProxyMiB = null,
-    bool? OverrideProxyLimits = null, string? EncodingProfile = null)
+    bool? OverrideProxyLimits = null, string? EncodingProfile = null,
+    int? RetentionAgeHours = null)
 {
     public VideoProcessingPreferences MergeWith(VideoProcessingPreferences existing)
     {
         ArgumentNullException.ThrowIfNull(existing);
         string selectedProfile = EncodingProfile ?? existing.EncodingProfile;
+        int retentionAge = RetentionAgeHours ?? existing.RetentionAgeHours;
         if (OverrideProxyLimits is null)
         {
             if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
@@ -33,7 +35,8 @@ public sealed record VideoProcessingSettingsUpdate(
             {
                 Enabled = Enabled,
                 IncludeOnlineOnly = IncludeOnlineOnly,
-                EncodingProfile = selectedProfile
+                EncodingProfile = selectedProfile,
+                RetentionAgeHours = retentionAge
             };
         }
         if (OverrideProxyLimits is false)
@@ -42,21 +45,23 @@ public sealed record VideoProcessingSettingsUpdate(
                 throw new ArgumentException(
                     "Clearing quota overrides cannot supply quota limits.");
             return new(Enabled, IncludeOnlineOnly,
-                EncodingProfile: selectedProfile);
+                EncodingProfile: selectedProfile,
+                RetentionAgeHours: retentionAge);
         }
 
         if (!MaximumCacheMiB.HasValue || !MaximumProxyMiB.HasValue)
             throw new ArgumentException(
                 "Both quota limits are required when overriding launcher settings.");
         return new(Enabled, IncludeOnlineOnly,
-            MaximumCacheMiB, MaximumProxyMiB, selectedProfile);
+            MaximumCacheMiB, MaximumProxyMiB, selectedProfile, retentionAge);
     }
 }
 
 public sealed record VideoProcessingSettingsResponse(
     bool Enabled, bool IncludeOnlineOnly,
     int? MaximumCacheMiB, int? MaximumProxyMiB,
-    string EncodingProfile, bool Processing, bool ToolsConfigured,
+    string EncodingProfile, int RetentionAgeHours,
+    bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
     long Cancelled, long ExpiredLeases, string LastResult,
     IReadOnlyList<VideoProcessingJobOperatorRow> Recent,
@@ -121,16 +126,17 @@ public static class VideoProcessingEndpoints
         catch (ArgumentException)
         {
             return Results.BadRequest(new ArchiveErrorResponse(
-                "Select an approved Standard 720p or Compact 540p video profile and, when overriding limits, set both valid values (total 64..16384 MiB; per-file 1..256 MiB)."));
+                "Choose an approved video profile and retention age (48 hours, 7 days or 30 days); quota override requires valid paired limits."));
         }
         bool quotaOrProfileChanged =
             existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
             existing.MaximumProxyMiB != requested.MaximumProxyMiB ||
             !string.Equals(existing.EncodingProfile,
-                requested.EncodingProfile, StringComparison.Ordinal);
+                requested.EncodingProfile, StringComparison.Ordinal) ||
+            existing.RetentionAgeHours != requested.RetentionAgeHours;
         if (quotaOrProfileChanged && processor.IsProcessing)
             return Results.Conflict(new ArchiveErrorResponse(
-                "Pause archive processing before changing video proxy limits or encoding profile."));
+                "Pause archive processing before changing video proxy limits, encoding profile or retention policy."));
 
         // Do not enable video work without explicit approved local tool
         // configuration. This also prevents the UI from advertising success
@@ -278,7 +284,8 @@ public static class VideoProcessingEndpoints
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
             settings.MaximumCacheMiB, settings.MaximumProxyMiB,
-            settings.EncodingProfile, processing, configured, status.Queued, status.Running,
+            settings.EncodingProfile, settings.RetentionAgeHours,
+            processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
             status.ExpiredLeases, lastResult, recent, lastAttemptFailure);
 }
