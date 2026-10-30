@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Api;
 using Xunit;
@@ -325,6 +326,26 @@ public sealed class VideoProcessingQuotaPreferencesTests
         var invalid = new VideoProcessingSettingsUpdate(
             false, false, EncodingProfile: "arbitrary");
         Assert.Throws<ArgumentException>(() => invalid.MergeWith(current).Validate());
+    }
+
+    [Fact]
+    public void Retention_preview_and_apply_can_only_use_direct_loopback_sockets()
+    {
+        Assert.True(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Loopback, IPAddress.Loopback));
+        Assert.True(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.IPv6Loopback, IPAddress.IPv6Loopback));
+        Assert.True(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Parse("::ffff:127.0.0.1"), IPAddress.IPv6Loopback));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Parse("192.168.1.100"), IPAddress.Loopback));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Loopback, IPAddress.Parse("192.168.1.5")));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            null, IPAddress.Loopback));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(
+            IPAddress.Loopback, null));
+        Assert.False(VideoProcessingEndpoints.IsDirectLoopback(null, null));
     }
 
     [Fact]
