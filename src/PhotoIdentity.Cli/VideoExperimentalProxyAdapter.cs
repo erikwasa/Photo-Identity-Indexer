@@ -15,7 +15,8 @@ namespace PhotoIdentity.Cli;
 public sealed class VideoExperimentalProxyAdapter(
     PostgresCatalogueDatabase database, string ffmpegPath,
     string ffprobePath, string ffprobeSha256,
-    string privateCacheRoot, VideoToolExecutionBudget budget)
+    string privateCacheRoot, VideoToolExecutionBudget budget,
+    VideoProxyRetentionLimits? publicationQuota = null)
     : IVideoPublishedDerivativeAdapter
 {
     public async Task<VideoDerivativeAttemptReport> ProcessAsync(
@@ -49,7 +50,7 @@ public sealed class VideoExperimentalProxyAdapter(
                 _ = await validator.ValidateAsync(output,
                     inspectToken => liveSafety.CheckAsync(lease, inspectToken),
                     checkToken);
-            });
+            }, publicationQuota);
         return await worker.ProcessAsync(lease, token);
     }
 }
