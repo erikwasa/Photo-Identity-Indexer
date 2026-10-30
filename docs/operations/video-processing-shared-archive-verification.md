@@ -7,6 +7,13 @@ preserve existing photos/catalogue/originals and recover interrupted work.
 
 ## User controls
 
+**WI-0188 scope (accepted 2026-10-30):** locally available
+videos only. Existing optional online-only setting is independently
+default-off; testing its transfer/release behavior is deferred to
+[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+No online-only originals were hydrated in WI-0188 acceptance.
+
+
 1. Settings → **Video processing** → **Process videos** (off by default).
 2. Optional **Include online-only videos** (off by default).
 3. Use the existing **Advance archive** to process all pending photos first
@@ -267,18 +274,21 @@ online-only video hydration or return-to-online-only was exercised.**
 Do not interpret successful local-first operation as proof of that
 separately opted-in cloud behavior.
 
-**Outstanding:** a controlled unsupported/oversized-input refusal and
-owned temporary-file cleanup check. The targeted deterministic tests
-below can be run without enabling video processing, altering the
-PostgreSQL queue or opening any real archive media. If operator
-acceptance requires a real cloud-only test, record it as not exercised
-until one is separately authorized; do not silently opt in.
+**Final targeted safety result:** the maintainer ran the five
+isolated Windows test groups below. All **17/17 tests passed** with
+**0 failed and 0 skipped**: 8 admission/budget, 2 unsupported codec/
+duration/output profile, 4 subprocess failure/cancellation/timeout/
+scratch overage, 2 staging integrity/cleanup, and 1 fail-closed
+synthetic tool test. These verify disposable-fixture guards and
+cleanup; they did not access original family media or cloud data.
+An actual online-only hydration and safe online-only release was
+**not exercised** and is now [WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
 
 ## Controlled rejection and temporary-cleanup verification — Windows
 
-This is the remaining local verification following the maintainer's
+This procedure was the final local verification after the maintainer's
 PASS for controls/recovery, local-first/exclusion, persistence, integrity
-and photo regression. **Do not add fabricated, oversized or damaged videos
+and photo regression. **It passed in full on 2026-10-30 (17/17).** **Do not add fabricated, oversized or damaged videos
 to the family archive or a OneDrive folder.** The existing isolated
 test fixtures exercise the policy and guard boundaries without opening
 archive originals, changing the maintained PostgreSQL queue, invoking
@@ -347,11 +357,12 @@ delete only their own randomly named temporary fixtures; do not
 manually delete the application's derivative cache, existing
 successful proxy, or the seven historical failed jobs.
 
-Report the passed counts and any failed test names. If a test fails,
-preserve the printed test failure (redact personal paths if any) and
-leave WI-0188 open. Online-only hydration/release remains
-**NOT EXERCISED** regardless of these results; it requires a separate
-explicit operator decision if the workitem must cover that path.
+**Maintainer result (2026-10-30):** all five listed commands passed;
+reported totals 8/8, 2/2, 4/4, 2/2 and 1/1; **17 passed,
+0 failed, 0 skipped**. No additional invalid-media reproduction is
+needed to complete WI-0188's local-file acceptance.
+Online-only hydration/release is **NOT EXERCISED** and is separately
+tracked by WI-0207; do not hydrate cloud-only media implicitly.
 
 ## Local verification session — operator driven
 
@@ -386,11 +397,11 @@ production catalogue state.
 6. Compare original video SHA-256 before and after a successful run.
    Verify the archive photo files and existing photo functions remain
    unchanged. No video processing step opens originals for writing.
-7. Only for an already-catalogued online-only video, explicitly turn on
-   **Include online-only videos**, verify one bounded OneDrive hydration
-   request and eventual online-only release. If release fails or OneDrive
-   is unavailable, the app reports/retains the file; **never delete the
-   OneDrive original to reclaim disk**.
+7. **Deferred to WI-0207:** online-only video hydration and
+   return-to-online-only release need separate explicit opt-in and
+   controlled real-OneDrive verification; they were not exercised
+   during WI-0188. Do not enable this setting to repeat WI-0188
+   acceptance; never delete an original to reclaim space.
 8. Verify a malformed/unsupported/oversized clip never publishes an
    apparently valid result. Failed jobs or observed tool capacity limits
    remain visible for later local troubleshooting or an independently
@@ -413,8 +424,13 @@ open cloud workers or copy private originals to Azure.
   hydration can be reverted to OneDrive online-only.
 - No automatic Azure upload.
 
-**Status:** durable publication, restart persistence, original/derivative
-integrity and photo regressions accepted on the maintained Windows host.
-The remaining operator safety/recovery scenarios above are pending;
-WI-0188 stays in progress until they pass or its scope is explicitly
-revised by the maintainer.
+**Final status (2026-10-30): WI-0188 completed / maintainer-accepted
+for already-local video processing.** Live publication, restart
+persistence, original/derivative integrity, controls/recovery,
+local-first/exclusion behavior, photo regressions and all
+17/17 isolated invalid-media and owned-scratch tests passed.
+The remote-only OneDrive hydration/release path was **not exercised**,
+and its opt-in lifecycle is a separately proposed M30 workitem,
+[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+The seven historical attempt-limit job rows are untouched.
+M30 remains in progress.
