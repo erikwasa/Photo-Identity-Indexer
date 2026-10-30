@@ -295,6 +295,7 @@ public static class Program
               video synthetic-proxy-pilot --scratch-root TEMP_CHILD_ROOT
                                           --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
                                           --ffprobe ABSOLUTE_EXE --ffprobe-sha256 HASH
+                                          [--profile standard-720p|compact-540p]
                                           [--apply]
                                           (synthetic-only, database-free, dry-run
                                            default; makes two transient test clips,
