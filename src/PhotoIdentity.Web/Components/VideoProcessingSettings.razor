@@ -52,6 +52,24 @@
                 </div>
             </div>
             <fieldset class="review-filter-panel">
+                <legend class="field-label">Bounded video verification</legend>
+                <label class="field-label" for="video-processing-one-step">
+                    <input id="video-processing-one-step" type="checkbox"
+                           @bind="StopAfterOneVideoStepPerAdvance"
+                           disabled="@Saving" />
+                    Stop each Archive advance after one video step
+                </label>
+                <p class="field-help">
+                    Optional. After the normal photo-first processing completes,
+                    a video step may inspect one new video or attempt one queued
+                    proxy. This setting ends that Archive advance after its
+                    first such step instead of continuing through the remaining
+                    videos. It does not change video eligibility, start a run,
+                    recall online-only files, or delete old proxies. Leave it
+                    enabled during a small acceptance test.
+                </p>
+            </fieldset>
+            <fieldset class="review-filter-panel">
                 <legend class="field-label">Video proxy encoding</legend>
                 <label class="field-label" for="video-processing-encoding-profile">
                     Output quality and size
@@ -269,6 +287,7 @@
         bool Enabled, bool IncludeOnlineOnly,
         int? MaximumCacheMiB, int? MaximumProxyMiB,
         string EncodingProfile, int RetentionAgeHours,
+        bool StopAfterOneVideoStepPerAdvance,
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
@@ -284,7 +303,7 @@
         bool Enabled, bool IncludeOnlineOnly,
         int? MaximumCacheMiB, int? MaximumProxyMiB,
         bool OverrideProxyLimits, string EncodingProfile,
-        int RetentionAgeHours);
+        int RetentionAgeHours, bool StopAfterOneVideoStepPerAdvance);
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
@@ -296,6 +315,7 @@
     private bool OverrideProxyLimits;
     private string EncodingProfile = "standard-720p";
     private int RetentionAgeHours = 48;
+    private bool StopAfterOneVideoStepPerAdvance;
     private int? MaximumCacheMiB = 1024;
     private int? MaximumProxyMiB = 256;
     private bool Loading = true;
@@ -327,6 +347,8 @@
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
                 EncodingProfile = Status.EncodingProfile;
                 RetentionAgeHours = Status.RetentionAgeHours;
+                StopAfterOneVideoStepPerAdvance =
+                    Status.StopAfterOneVideoStepPerAdvance;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
@@ -454,7 +476,7 @@
                     OverrideProxyLimits ? MaximumCacheMiB : null,
                     OverrideProxyLimits ? MaximumProxyMiB : null,
                     OverrideProxyLimits, EncodingProfile,
-                    RetentionAgeHours));
+                    RetentionAgeHours, StopAfterOneVideoStepPerAdvance));
             if (!response.IsSuccessStatusCode)
             {
                 ErrorResponse? failure = null;
@@ -470,6 +492,8 @@
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
                 EncodingProfile = Status.EncodingProfile;
                 RetentionAgeHours = Status.RetentionAgeHours;
+                StopAfterOneVideoStepPerAdvance =
+                    Status.StopAfterOneVideoStepPerAdvance;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
