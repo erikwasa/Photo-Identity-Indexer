@@ -121,7 +121,7 @@ public static class VideoProcessingEndpoints
         catch (ArgumentException)
         {
             return Results.BadRequest(new ArchiveErrorResponse(
-                "Specify both valid video proxy limits or neither; cache 64..16384 MiB, per-file 1..256 MiB and per-file <= cache."));
+                "Select an approved Standard 720p or Compact 540p video profile and, when overriding limits, set both valid values (total 64..16384 MiB; per-file 1..256 MiB)."));
         }
         bool quotaOrProfileChanged =
             existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
