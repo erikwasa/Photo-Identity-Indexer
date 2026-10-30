@@ -274,6 +274,85 @@ PostgreSQL queue or opening any real archive media. If operator
 acceptance requires a real cloud-only test, record it as not exercised
 until one is separately authorized; do not silently opt in.
 
+## Controlled rejection and temporary-cleanup verification — Windows
+
+This is the remaining local verification following the maintainer's
+PASS for controls/recovery, local-first/exclusion, persistence, integrity
+and photo regression. **Do not add fabricated, oversized or damaged videos
+to the family archive or a OneDrive folder.** The existing isolated
+test fixtures exercise the policy and guard boundaries without opening
+archive originals, changing the maintained PostgreSQL queue, invoking
+app-driven hydration or publishing any real derivative. These results
+are *fixture-based guard evidence*, not proof of a live OneDrive-only
+retrieval/release scenario.
+
+From PowerShell in the repository checkout on Windows, run:
+
+```powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer"
+
+function Invoke-VideoSafetyTests {
+    param([string]$Project, [string]$Filter)
+    dotnet test $Project -c Release --filter $Filter
+    if ($LASTEXITCODE -ne 0) {
+        throw "WI-0188 isolated safety tests failed: $Project"
+    }
+}
+
+# Rejection at admission: unsupported inspection, over-budget source,
+# and other fail-closed guards. Pure tests; no real source file.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Core.Tests\PhotoIdentity.Core.Tests.csproj" `
+    "FullyQualifiedName~VideoProcessingAdmissionPolicyTests.Each_explicit_guard_denies_admission"
+
+# Unsupported codec/HDR/rotation/audio and duration > 600 s;
+# strict output rejection. Uses in-memory inspection/probe evidence.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj" `
+    "FullyQualifiedName~VideoProxyCandidateProfileTests.Unrecognized_codec_duration_rotation_and_audio_are_not_admitted|FullyQualifiedName~VideoProxyCandidateProfileTests.Probe_rejects_unsupported_codec_color_tracks_and_dimensions"
+
+# Bounded child process: successful/nonzero exit cleans workspace;
+# scratch overage preserves unrelated files; cancel/timeout cleanup.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Core.Tests\PhotoIdentity.Core.Tests.csproj" `
+    "FullyQualifiedName~VideoToolProcessSupervisorTests.Runs_trusted_command_with_discarded_output_and_cleans_scratch|FullyQualifiedName~VideoToolProcessSupervisorTests.Scratch_overage_fails_and_removes_only_its_temporary_child|FullyQualifiedName~VideoToolProcessSupervisorTests.Cancelled_external_process_is_terminated_and_scratch_cleaned|FullyQualifiedName~VideoToolProcessSupervisorTests.Timed_out_external_process_is_killed_and_cleans_temporary_data"
+
+# Failure during local staging must leave scratch empty and source unchanged;
+# disposal of a successful staged copy must also remove the private copy.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Source.Tests\PhotoIdentity.Source.Tests.csproj" `
+    "FullyQualifiedName~OneDriveVideoLocalStagerTests.Missing_or_changed_hash_and_revoked_permission_leave_no_scratch|FullyQualifiedName~OneDriveVideoLocalStagerTests.Copies_only_local_revision_bytes_and_removes_private_copy"
+
+# Deliberately absent synthetic executable: fail closed, no worker/DB,
+# no original opened, only the fixture marker remains in scratch.
+Invoke-VideoSafetyTests ".\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj" `
+    "FullyQualifiedName~VideoSyntheticProxyPilotTests.Missing_external_tool_produces_private_safe_first_stage_failure"
+```
+
+**Expected:** all commands exit with code 0 and show nonzero passed
+test counts, with zero failures. The admission tests assert
+`unsupported-video` and `source-budget` (source size greater
+than the configured budget); proxy-profile tests reject an
+unsupported codec and a duration of 650 seconds against the
+600-second cap. Test assertions check that nonzero exit, timeout,
+cancellation and a scratch-budget excess do **not** leave an owned
+working directory; unrelated scratch-root content is preserved.
+Staging tests assert that hash mismatch or revoked permission leaves
+no staged input and that the original fixture's bytes remain intact.
+The absent-tool synthetic case asserts `pilot-failed` with no
+originals, database or active worker and only its marker in scratch.
+
+**Interpretation:** These tests use a small in-memory source budget to
+verify the over-limit decision; they do not allocate a 257 MiB file.
+The maintained worker's `MaximumSourceBytes` is 256 MiB, and its
+independent inspection cap is 600 seconds. There is no need to create
+a giant test file to prove the same admission comparison. Tests
+delete only their own randomly named temporary fixtures; do not
+manually delete the application's derivative cache, existing
+successful proxy, or the seven historical failed jobs.
+
+Report the passed counts and any failed test names. If a test fails,
+preserve the printed test failure (redact personal paths if any) and
+leave WI-0188 open. Online-only hydration/release remains
+**NOT EXERCISED** regardless of these results; it requires a separate
+explicit operator decision if the workitem must cover that path.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37
