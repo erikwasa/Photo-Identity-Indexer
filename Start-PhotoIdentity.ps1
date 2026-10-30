@@ -35,7 +35,9 @@ $SupportedSettings = @(
     "PhotoIdentity__VideoProcessing__FfmpegSha256",
     "PhotoIdentity__VideoProcessing__FfprobePath",
     "PhotoIdentity__VideoProcessing__FfprobeSha256",
-    "PhotoIdentity__VideoProcessing__CacheRoot"
+    "PhotoIdentity__VideoProcessing__CacheRoot",
+    "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
+    "PhotoIdentity__VideoProcessing__MaximumProxyMiB"
 )
 
 function Get-LauncherEnvironmentValue {
@@ -97,6 +99,23 @@ function Assert-LauncherSettingValue {
         }
         # The application's runtime preflight rechecks executable digests,
         # cache ownership and separation from catalogue source roots.
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
+        "PhotoIdentity__VideoProcessing__MaximumProxyMiB"
+    )) {
+        [long]$parsed = 0
+        if (-not [long]::TryParse($Value, [ref]$parsed) -or
+            ($Name -eq "PhotoIdentity__VideoProcessing__MaximumCacheMiB" -and
+             ($parsed -lt 64 -or $parsed -gt 16384)) -or
+            ($Name -eq "PhotoIdentity__VideoProcessing__MaximumProxyMiB" -and
+             ($parsed -lt 1 -or $parsed -gt 256))) {
+            throw "$Name is outside its approved integer MiB range."
+        }
+        # The application separately requires BOTH settings and validates
+        # the per-proxy cap against the total cap before enabling the worker.
         return
     }
 

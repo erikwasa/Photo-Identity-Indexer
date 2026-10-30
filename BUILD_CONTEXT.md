@@ -4,17 +4,19 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
-**2026-10-30 M30 / WI-0189:** PR #665 merged; maintainer ran
-8/8 Windows-focused pure retention tests successfully with
-`WasmEnableWebcil=false` and reports validating/regenerating docs.
-PR #666 on `feature/wi0189-postgres-retention-preview` adds the
-registered-only, **read-only** PostgreSQL retention preview, CLI and
-isolation tests; tests/CI still pending. Next: safely integrate
-catalogue ownership, lease-fenced eviction/physical capacity, persisted
-profile/quota settings and real already-local MOV/MP4 quality evidence.
-WI-0189 remains `in_progress` and all acceptance boxes open.
-No automatic deletion or online-only hydration; WI-0207 owns the latter.
-
+**2026-10-30 M30 / WI-0189:** PRs #665/#666 merged.
+Maintainer ran 8/8 Windows retention policy tests for #665 successfully
+with `WasmEnableWebcil=false`; reported doc generation/validation,
+but no separate #666 PostgreSQL fixture outcome was supplied. PR #667
+on `feature/wi0189-atomic-publication-quota` adds optional opt-in
+registered-byte and per-file publication fences, serialized at the
+PostgreSQL success transaction with safe known-denied output cleanup.
+Tests/CI for this PR remain pending. No Settings quota UI, automatic
+eviction, hard filesystem capacity guarantee or real-media acceptance.
+Next develop lease-safe retention/eviction and configurable profile/
+retention settings, then bounded real local MOV/MP4 quality tests.
+WI-0189 remains `in_progress` (all acceptance boxes open).
+No online-only hydration; WI-0207 remains separate.
 
 **2026-10-22 repository-only planning / issue-retirement cleanup:**
 Audit all 33 surviving GitHub issues (12 open, 21 closed) and retire them

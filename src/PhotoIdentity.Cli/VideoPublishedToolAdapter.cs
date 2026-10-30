@@ -14,7 +14,8 @@ public sealed class VideoPublishedToolAdapter(
     PostgresCatalogueDatabase database, string executablePath, string scratchRoot,
     VideoToolExecutionBudget budget,
     Func<string, string, IReadOnlyList<string>> approvedArguments,
-    Func<string, CancellationToken, Task>? validateBeforePublish = null)
+    Func<string, CancellationToken, Task>? validateBeforePublish = null,
+    VideoProxyRetentionLimits? publicationQuota = null)
     : IVideoPublishedDerivativeAdapter
 {
     public async Task<VideoDerivativeAttemptReport> ProcessAsync(
@@ -50,7 +51,8 @@ public sealed class VideoPublishedToolAdapter(
                     try
                     {
                         committed = await new VideoDerivativeFilePublisher(database)
-                            .PublishAsync(lease, scratchRoot, output, publicationToken);
+                            .PublishAsync(lease, scratchRoot, output,
+                                publicationToken, publicationQuota);
                     }
                     catch (Exception error)
                     {

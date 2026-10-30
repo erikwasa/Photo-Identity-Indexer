@@ -152,6 +152,45 @@ public sealed class VideoDerivativePublicationTests
                 lease.Id, lease.LeaseToken, succeeded: true, retryable: false));
             Assert.Null(await queue.TryClaimNextAsync(budget)); // no remaining work
 
+            // WI-0189: an opt-in byte cap must reject without committing
+            // any receipt, changing job success, or deleting older proxies.
+            // Size cap denial happens before moving tool bytes; aggregate
+            // cap denial happens under the publication transaction lock.
+            Guid quotaId = await Enqueue("synthetic-quota");
+            VideoProcessingJobLease quotaLease = Assert.IsType<VideoProcessingJobLease>(
+                await queue.TryClaimNextAsync(budget));
+            string quotaStage = VideoScratchOwnership.Create(root, "video-tool");
+            string quotaOutput = Path.Combine(quotaStage, "output.mp4");
+            await File.WriteAllBytesAsync(quotaOutput, new byte[12]);
+            await Assert.ThrowsAsync<VideoProxyPublicationQuotaExceededException>(() =>
+                filePublisher.PublishAsync(quotaLease, root, quotaOutput,
+                    publicationQuota: new VideoProxyRetentionLimits(32, 8)));
+            Assert.True(File.Exists(quotaOutput)); // per-file check did not move bytes
+            await Assert.ThrowsAsync<VideoProxyPublicationQuotaExceededException>(() =>
+                filePublisher.PublishAsync(quotaLease, root, quotaOutput,
+                    publicationQuota: new VideoProxyRetentionLimits(16, 16)));
+            Assert.False(File.Exists(quotaOutput)); // known-uncommitted bytes reclaimed
+            Assert.False(File.Exists(Path.Combine(root,
+                VideoDerivativeArtifactPath.ForLease(quotaLease)
+                    .Replace('/', Path.DirectorySeparatorChar))));
+            Assert.Null(await published.GetCurrentAsync(quotaId));
+            Assert.Equal("running", (await queue.GetAsync(quotaId))?.Status);
+            Assert.True(File.Exists(Path.Combine(root,
+                VideoDerivativeArtifactPath.ForLease(lease)
+                    .Replace('/', Path.DirectorySeparatorChar))));
+
+            // A second attempt with sufficient configured budget may commit
+            // under the very same current lease. No old copy was evicted.
+            string allowedStage = VideoScratchOwnership.Create(root, "video-tool");
+            string allowedOutput = Path.Combine(allowedStage, "output.mp4");
+            await File.WriteAllBytesAsync(allowedOutput, new byte[12]);
+            Assert.True(await filePublisher.PublishAsync(quotaLease, root,
+                allowedOutput,
+                publicationQuota: new VideoProxyRetentionLimits(32, 16)));
+            Assert.NotNull(await published.GetCurrentAsync(quotaId));
+            Assert.Equal("succeeded", (await queue.GetAsync(quotaId))?.Status);
+            Assert.NotNull(await published.GetCurrentAsync(jobId));
+
             // An expired/revoked generation may not record success or leave
             // a published file visible, even if fake output bytes exist.
             Guid deniedId = await Enqueue("synthetic-b");

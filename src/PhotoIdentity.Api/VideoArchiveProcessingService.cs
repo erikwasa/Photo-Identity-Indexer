@@ -120,6 +120,11 @@ public sealed class VideoArchiveProcessingService(
                     VideoDerivativeFilePublisher.CacheMarkerContents, token);
             }
             await VideoDerivativeCacheGuard.ValidateAsync(database, cache, token);
+            preflightStage = "quota-configuration";
+            VideoProxyRetentionLimits? publicationQuota =
+                VideoProxyPublicationQuotaConfiguration.ParseOptional(
+                    configuration["PhotoIdentity:VideoProcessing:MaximumCacheMiB"],
+                    configuration["PhotoIdentity:VideoProcessing:MaximumProxyMiB"]);
             preflightStage = "runtime";
             var control = new PostgresVideoProcessingControlRepository(database);
             VideoProcessingControlState state = await control.GetAsync(token);
@@ -238,7 +243,8 @@ public sealed class VideoArchiveProcessingService(
                 }
 
                 var adapter = new VideoExperimentalProxyAdapter(
-                    database, ffmpeg, ffprobe, ffprobeHash, cache, ToolBudget);
+                    database, ffmpeg, ffprobe, ffprobeHash, cache, ToolBudget,
+                    publicationQuota);
                 VideoWorkerCycleResult result =
                     await new VideoWorkerAttemptCoordinator(database)
                         .RunOneAsync(JobBudget, adapter, token,
@@ -307,7 +313,8 @@ public sealed class VideoArchiveProcessingService(
     internal static string ClassifyFailure(Exception exception, string preflightStage)
     {
         if ((preflightStage is "tool-configuration" or "ffmpeg-approval"
-                or "ffprobe-approval" or "cache-validation") &&
+                or "ffprobe-approval" or "cache-validation"
+                or "quota-configuration") &&
             (exception is InvalidOperationException or ArgumentException
                 or IOException or UnauthorizedAccessException))
         {
@@ -317,6 +324,7 @@ public sealed class VideoArchiveProcessingService(
                 "ffmpeg-approval" => "video-ffmpeg-approval-rejected",
                 "ffprobe-approval" => "video-ffprobe-approval-rejected",
                 "cache-validation" => "video-cache-validation-rejected",
+                "quota-configuration" => "video-proxy-quota-config-rejected",
                 _ => "video-safety-or-configuration-rejected"
             };
         }

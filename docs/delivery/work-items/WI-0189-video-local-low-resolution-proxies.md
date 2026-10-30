@@ -16,7 +16,7 @@ Generate a smaller playable video copy to keep on the local machine, separate fr
 
 ## Implementation progress (2026-10-30)
 
-**In progress — PR #665 merged, PR #666 open.** The WI-0188 video
+**In progress — PRs #665 and #666 merged; PR #667 under review.** The WI-0188 video
 lane already provides a bounded, validated SDR H.264/AAC MP4 candidate
 profile with local staging and atomic, revision-fenced publication. WI-0189
 extends that foundation rather than enabling a second worker.
@@ -32,19 +32,35 @@ extends that foundation rather than enabling a second worker.
   `-p:WasmEnableWebcil=false` to bypass local Webcil permission failure.
   Maintainer also reports running documentation validation/generation,
   without separate command outputs in the record.
-- **Checkpoint 2, PR #666:** read-only, bounded PostgreSQL snapshot of
+- **Checkpoint 2, PR #666 merged:** read-only, bounded PostgreSQL snapshot of
   registered, current, revision/exclusion-fenced proxy receipts; checked
   canonical app-owned cache bytes; fail-closed incomplete/inconsistent
   inventory; deterministic hypothetical quota/age planning and an
   operator-only `video derivatives retention-plan` command. It has
   no `--apply` option and never modifies files, jobs or originals.
   Added focused CLI parse cases, over-quota recovery policy test and
-  isolated PostgreSQL fixture scenarios (unverified pending CI/local run).
+  isolated PostgreSQL fixture scenarios (PR merged; no separate maintainer
+  verification outcome has been supplied).
+- **Checkpoint 3, PR #667:** optional, explicit application-configuration
+  total registered-byte and per-proxy output caps (both required), validated
+  before activating video work. The shared Archive worker propagates them
+  through its approved tool adapter. Publication checks per-file size before
+  moving bytes and checks the total of all registered proxy receipts inside
+  the same PostgreSQL transaction that records success. A single exclusive
+  video-control row lock serializes competing publication commits, preserving
+  source/revision/exclusion/lease fences. Quota denial is a path-free,
+  non-retryable failure: existing proxies/originals are preserved and only
+  the rejected app-owned uncommitted output is reclaimed. Added targeted
+  parser and synthetic PostgreSQL publication tests (pending CI).
+  **No Settings UI, automatic eviction, unregistered-file measurement or
+  physical disk quota enforcement is claimed.**
 - Added the [retention checkpoint runbook](../../operations/video-proxy-retention-wi0189.md)
   with explicit remaining safety and verification gates.
 - **Not yet implemented:** Settings UI or persisted quota/profile choices,
-  actual automatic eviction/enforcement, publication admission wiring,
-  measured size/quality acceptance, and expanded real-MOV/MP4 verification.
+  automatic cache eviction and a true physical disk quota; the optional
+  publication fence guards only newly registered output bytes.
+  Measured size/quality acceptance, configurable encode profiles, and
+  expanded real-MOV/MP4 verification remain open.
   No real-media or end-to-end local verification is claimed for this checkpoint.
   The acceptance checkboxes below remain open.
 
@@ -85,7 +101,12 @@ Integration lifecycle and representative private-file performance/quality tests,
   `src/PhotoIdentity.Cli/VideoProxyRetentionPreviewCommand.cs`,
   CLI dispatch/help, fixture and argument tests, pure planner correction,
   runbook and canonical/generated documentation.
+- Checkpoint 3 changed files: Core strict opt-in quota configuration,
+  PostgreSQL registered receipt commit/publisher, video adapters and API
+  runtime, CLI failure diagnostic, launcher configuration allowlist and
+  synthetic regression tests, plus canonical/generated documentation.
 - Commands run: maintainer-confirmed PR #665 focused tests (8/8 passed),
   maintainer-reported docs validation/generation; checkpoint 2 .NET/CI
-  tests and docs generation checks are **not yet verified** in this
-  connector-only environment. Require CI before merge.
+  tests and docs generation checks for PRs #666/#667 are **not yet
+  independently verified** in this connector-only environment.
+  Require CI before merging PR #667.
