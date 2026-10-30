@@ -54,7 +54,7 @@ the mandatory AppContainer feasibility requirement from this work item.
 
 ## Acceptance criteria — revised
 
-- [ ] **Default off and visible control.** Processing can be enabled/disabled
+- [x] **Default off and visible control.** Processing can be enabled/disabled
   in Settings, persists through restart, and shares normal Archive Advance/Pause
   controls. Only one video runs after all outstanding photo work completes.
 - [ ] **Local-first with explicit hydration opt-in.** Offline placeholders are
@@ -1301,22 +1301,24 @@ jobs) and the Windows/integration resource-envelope tests, this accepts:
 - One-at-a-time bounded video processing, sanitized queue results and
   successful publication under the Windows resource envelope.
 
-**Remaining acceptance evidence, not yet reported as local PASS:**
+**Additional maintained-host acceptance (2026-10-30, operator-reported):**
 
-1. Default-off/persisted Settings controls and the shared
-   **Advance/Pause** interruption path, including interruption and safe
-   retry/recovery without a published partial artifact.
-2. Local-first and source-coverage/exclusion changes, especially that
-   a queued online-only placeholder never blocks a local candidate,
-   and excluded or stale revisions never publish.
-3. Independently opted-in bounded OneDrive-only hydration, safe
-   online-only release *only* for app-initiated downloads, and
-   no changes to already-local media. If no eligible online-only
-   test video exists, record that as **not exercised**, not PASS.
-4. Fail-closed unsupported/oversized media behavior and cleanup
-   after cancellation, where a safe representative scenario is available.
-   Automated tests exist for these fences but do not replace the
-   maintainer's explicitly requested local acceptance.
+- **PASS — Settings and recovery:** default-off/persisted controls,
+  Advance/Pause, interrupted-job recovery and safe retry.
+- **PASS — local-first execution and exclusions:** already-local video
+  selection, coverage/exclusion behavior and original safety.
+- **NOT EXERCISED — online-only retrieval:** every media file used so far
+  was already local. No online-only video has been hydrated, and neither
+  app-initiated online-only release nor placeholder selection behavior
+  has been demonstrated by a real-cloud local acceptance test. Preserve
+  independent opt-in and do not assert that hydration/release passed.
+
+**Remaining local evidence:** unsupported/oversized-video rejection and
+owned temporary-file cleanup under controlled failure. The
+[consolidated verification runbook](../../operations/video-processing-shared-archive-verification.md)
+provides the exact isolated Windows test commands. Those tests prove
+the guard and cleanup behavior on synthetic inputs; they do not
+constitute a successful live OneDrive hydration test.
 
 The seven pre-fix `attempt-limit` rows are historical and remain
 undisturbed. Do not mass-retry, manually edit PostgreSQL lease state
