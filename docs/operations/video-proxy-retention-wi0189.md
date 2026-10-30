@@ -567,3 +567,182 @@ maintained Windows machine for any confirmed cache cleanup. This
 does not change the normal video library or non-destructive viewing
 from the optional trusted LAN. It is a defense-in-depth restriction,
 not a substitute for local device access controls.
+
+## WI-0189 final development handoff — safe Windows verification (PR #671)
+
+**Maintainer choice (2026-10-30):** the existing explicit
+Preview → Confirm manual eviction is sufficient. There is no
+automatic eviction schedule to implement or test. The registered-byte
+publication quota and guarded private cache recovery remain; **a hard
+physical filesystem quota is not implemented** and should not be
+claimed as verified. Actual online-only OneDrive hydration and
+release are isolated in WI-0207; keep **Include online-only videos**
+off throughout this WI-0189 review.
+
+### 1. Run focused local tests after merging the PR
+
+In an up-to-date Windows PowerShell checkout:
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer'
+git pull --ff-only
+
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
+  --filter "FullyQualifiedName~VideoSyntheticProxyPilotTests|FullyQualifiedName~VideoProxyEncodingProfilesTests|FullyQualifiedName~VideoProcessingQuotaPreferencesTests" `
+  -p:WasmEnableWebcil=false
+
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+Expected: build succeeds, zero failed tests; documentation validation
+and generated-file checks pass. If any step fails, **stop and report
+the exact failure**, without proceeding to personal video processing.
+
+### 2. Verify both real FFmpeg preset argument paths on GENERATED data
+
+This step uses only two synthetic 3-second sources per profile and a
+dedicated marked directory below Windows TEMP. It does not open
+archive originals, connect to PostgreSQL, activate the app video
+worker, or recall cloud placeholders. Obtain the **already approved**
+tool paths and digests from the app's persistent packaged-launcher
+configuration (or populate the four variables using the equivalent
+approved local configuration if using a developer build).
+
+```powershell
+$launcherFile = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\launcher.json'
+if (-not (Test-Path -LiteralPath $launcherFile)) {
+    throw 'No launcher file: use your existing approved local FFmpeg/FFprobe tool configuration.'
+}
+$approved = (Get-Content -LiteralPath $launcherFile -Raw |
+    ConvertFrom-Json).settings
+$ffmpeg = [string]$approved.PhotoIdentity__VideoProcessing__FfmpegPath
+$ffprobe = [string]$approved.PhotoIdentity__VideoProcessing__FfprobePath
+$ffmpegHash = [string]$approved.PhotoIdentity__VideoProcessing__FfmpegSha256
+$ffprobeHash = [string]$approved.PhotoIdentity__VideoProcessing__FfprobeSha256
+
+foreach ($pair in @(@($ffmpeg,$ffmpegHash), @($ffprobe,$ffprobeHash))) {
+    if (-not $pair[0] -or -not (Test-Path -LiteralPath $pair[0] -PathType Leaf) -or
+        ((Get-FileHash -LiteralPath $pair[0] -Algorithm SHA256).Hash.ToLowerInvariant() -cne $pair[1])) {
+        throw 'An approved tool path or pinned SHA-256 is missing or mismatched.'
+    }
+}
+
+$lab = Join-Path $env:TEMP ("photoidentity-wi0189-lab-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $lab -ErrorAction Stop | Out-Null
+[System.IO.File]::WriteAllText(
+    (Join-Path $lab '.photoidentity-synthetic-video-lab'),
+    'wi0188-synthetic-video-lab-v1'
+)
+
+$results = foreach ($profile in @('standard-720p','compact-540p')) {
+    $json = & dotnet run --project src/PhotoIdentity.Cli -- `
+        video synthetic-proxy-pilot --scratch-root $lab `
+        --ffmpeg $ffmpeg --ffmpeg-sha256 $ffmpegHash `
+        --ffprobe $ffprobe --ffprobe-sha256 $ffprobeHash `
+        --profile $profile --apply
+    if ($LASTEXITCODE -ne 0) {
+        throw "Synthetic $profile pilot failed. Keep the lab for inspection."
+    }
+    $report = $json | ConvertFrom-Json
+    if ($report.status -ne 'validated' -or $report.results.Count -ne 2 -or
+        $report.profile -cne $profile -or $report.originalsOpened -or
+        $report.schemaUsed) {
+        throw "Synthetic $profile pilot did not satisfy the source-free contract."
+    }
+    $report.results | Select-Object encodingProfile, orientation, width,
+        height, hasAudio, durationSeconds, encodedBytes, encodeMilliseconds
+}
+
+$results | Format-Table -AutoSize
+Get-ChildItem -LiteralPath $lab -Force | Select-Object Name, Length
+```
+
+Expect four non-private synthetic rows (landscape/audio and
+portrait/silent for both profiles), each with positive output bytes
+and encoding duration, correct orientation and at most 720p/540p.
+The scratch root should contain **only**
+`.photoidentity-synthetic-video-lab` afterward. If unexpected files
+remain, **do not recursively delete them**; report the failure for
+investigation. The elapsed times are from synthetic input, **not**
+representative real-video encoding measurements.
+
+### 3. Prepare one bounded real-media acceptance session
+
+Before an actual archive run:
+
+1. Keep **Include online-only videos = off** throughout. Select only
+   clips that are **already locally available**, with no need to
+   change OneDrive pinning or fetch placeholders. Do not hash or open
+   online-only originals.
+2. Use **Video Settings → Stop each Archive advance after one video
+   step**. Save and reload to confirm the setting persisted. This is
+   intentionally **opt-in**; disabling it returns to the prior normal
+   multi-video processing behavior.
+3. Check that **photos and archive sync work are drained** and the
+   application's existing approved tool/cache settings are valid.
+   A single video step can be metadata discovery *or* one queued
+   derivative attempt. If it only inspects a video, a later, separately
+   authorized Advance may be needed to encode it.
+4. Confirm the included archive coverage has a **known and acceptable
+   already-local candidate set**. The ordinary Advance workflow
+   selects the next eligible video, not an arbitrary filename given
+   by the operator. If you cannot identify a suitably bounded set,
+   **do not start an uncontrolled real-media test**; first report that
+   limitation for a scoped selection safeguard.
+5. Take a **current PostgreSQL backup** as required by existing
+   review procedures. Record private baseline hashes of the selected
+   already-local originals on your own machine. Do not post paths
+   or hashes in the PR or chat.
+6. Test **Standard 720p** first. Advance archive once and let the
+   bounded session stop. Then review video Settings status on localhost:
+
+   ```powershell
+   $status = Invoke-RestMethod 'http://127.0.0.1:5080/api/video-processing/settings'
+   $status | Select-Object enabled, includeOnlineOnly, encodingProfile,
+       stopAfterOneVideoStepPerAdvance, queued, running, succeeded, failed,
+       lastResult, lastAttemptFailure | Format-List
+   $status.recent |
+       Select-Object jobId, status, attempts, progressPercent, failureCode |
+       Format-Table -AutoSize
+   ```
+
+7. With no active Archive attempt, switch to **Compact 540p**,
+   Save, and perform **one more separately authorized Advance** on
+   an eligible, already-local clip. Compare outputs using a locally
+   approved MP4-capable player. Video streaming/range playback through
+   the web app is a **separate WI-0152** and cannot be inferred here.
+8. Confirm changing back to the same revision+preset+FFmpeg digest
+   doesn't create another successful duplicate; changed revisions
+   and exclusions must not remain visible as current copies.
+   The queue uses exact preset identity; switching profile retains
+   (does not silently delete) prior receipts.
+9. Stop video processing and pause Archive. Test a **dry-run Preview**
+   of manual retention, only from localhost, with a configured
+   registered-byte quota. Actual **Confirm removal** deletes
+   generated private copies and should be tested **only on an
+   explicitly approved, backed-up test cache**, not automatically
+   against the personal archive. Use the isolated PostgreSQL
+   maintenance tests for cancellation/replay/exclusion/corruption.
+10. Check original hashes still equal the baselines, source placeholders
+    were not recalled, existing photo features still work, no
+    processing lease is running and no unexpected scratch files persist.
+
+The application does **not** expose exact media input/output paths
+or original hashes in its status response. Keep detailed pairing,
+hashes and visual judgments private. Share only aggregated results:
+
+| Check | Record |
+|---|---|
+| Cases | count of local MOV/MP4, portrait/rotated, silent, audio, long/unsupported |
+| Each profile | successful proxies, output size vs input, elapsed time, max dimension, fast-start/seek |
+| Quality | browser/TV or local-player compatibility; visible detail, banding, audio and orientation |
+| Reuse | same revision/preset no new encode; different version new identity; exclusions safe |
+| Safety | originals unchanged; online-only recall zero; quota refusals; private recovery/cleanup |
+| Recommendation | standard 720p or compact 540p, with observed reasons |
+
+**Acceptance must not be claimed from synthetic data alone.** Existing
+WI-0188 17/17 isolated safety tests and first real 720p publication
+are prior evidence, not proof of a representative WI-0189 sample.
+All four WI-0189 acceptance criteria stay open until the maintainer
+records actual outcomes.
