@@ -50,7 +50,7 @@ public sealed class PostgresVideoProxyRetentionPreview(PostgresCatalogueDatabase
             control.Transaction = transaction;
             control.CommandText = """
                 SELECT NOT enabled AND paused FROM video_processing_control
-                WHERE singleton_id=1;
+                WHERE singleton_id=1 FOR SHARE;
                 """;
             if (await control.ExecuteScalarAsync(token) is not true)
                 throw new InvalidOperationException(
