@@ -253,6 +253,24 @@ acceptance checks. Do not share personal media paths or original hashes
 in public PR comments. An already completed single-video run does not
 by itself establish all the protective regression gates.
 
+## Maintainer acceptance progress — 2026-10-30
+
+The maintainer confirms **PASS** for restart persistence, original and
+published-derivative integrity, and existing photo feature regressions
+after the first successful real-video publication. Those checks need
+not be repeated solely to close the current checkpoint.
+
+**Still unverified in the maintained-host report:** default-off and
+persisted Settings behavior, Pause/cancel-and-retry with partial-file
+cleanup, local-first queue selection and source-coverage/exclusion
+fencing, online-only opt-in and app-initiated release safety, and
+unsupported/oversized-video rejection. Complete these separately
+with appropriate safe local media or clearly mark an unavailable
+scenario as *not exercised*. Never turn an unavailable OneDrive test
+into an implicit permission to hydrate arbitrary private originals.
+Existing CI guards support the implementation but are not a report
+of these local tests passing.
+
 ## Local verification session — operator driven
 
 Use only your previously approved local executables and existing v37
@@ -313,5 +331,8 @@ open cloud workers or copy private originals to Azure.
   hydration can be reverted to OneDrive online-only.
 - No automatic Azure upload.
 
-**Status:** awaiting Windows CI and local end-to-end verification. Do not
-mark WI-0188 accepted until the operator reports the results.
+**Status:** durable publication, restart persistence, original/derivative
+integrity and photo regressions accepted on the maintained Windows host.
+The remaining operator safety/recovery scenarios above are pending;
+WI-0188 stays in progress until they pass or its scope is explicitly
+revised by the maintainer.
