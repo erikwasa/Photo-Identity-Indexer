@@ -90,6 +90,11 @@ public static class Program
                             args[2], args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "derivatives" && args[2] == "retention-plan" =>
+                    await VideoProxyRetentionPreviewCommandRunner.RunAsync(
+                        VideoProxyRetentionPreviewOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "derivatives" && args[2] == "recover" =>
                     await VideoDerivativeRecoveryCommandRunner.RunAsync(
                         VideoDerivativeRecoveryOptions.Parse(args.Skip(3).ToArray()),
@@ -260,6 +265,16 @@ public static class Program
                                          (dry run by default; requires a stopped
                                           lane and zero running leases; DB-first
                                           receipt revocation, then private unlink)
+              video derivatives retention-plan --postgres-connection-env NAME
+                                               --database DB --cache-root PRIVATE_ROOT
+                                               [--quota-mib TOTAL (64..16384)]
+                                               [--max-proxy-mib SIZE (1..256)]
+                                               [--incoming-mib RESERVATION (1..256)]
+                                               [--min-age-hours HOURS (24..720)]
+                                               [--max-records COUNT (1..2048)]
+                                               (read-only registered-only quota preview;
+                                                requires stopped lane and zero running jobs;
+                                                NO --apply or deletion; no original reads)
               video derivatives requeue --postgres-connection-env NAME --database DB
                                         --job-id UUID [--apply]
                                         (explicitly requeue ONLY a current,
