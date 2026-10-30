@@ -87,6 +87,11 @@ extends that foundation rather than enabling a second worker.
   `standard-720p` (unchanged WI-0188 preset/version and exact arguments)
   or `compact-540p` (new immutable v1 preset, lowered bitrate/CRF
   parameters) SDR H.264/AAC MP4 profile in persisted Video Settings.
+  Also add a strictly bounded user-configurable minimum retention
+  age for manually confirmed cleanup (48 hours, 7 days or 30 days),
+  preserving the 48-hour default on legacy preference files.
+  Changes in retention choice invalidate older fingerprinted previews;
+  they do not launch or schedule any eviction.
   Strict whitelist only: no arbitrary FFmpeg flags, external codec, GPU
   dependency or online-only hydration. New profile selection changes
   the immutable idempotency identity and filters queued work by exact
@@ -167,7 +172,8 @@ Integration lifecycle and representative private-file performance/quality tests,
   actual maintained-host removal/recovery is **not** accepted yet.
 - Checkpoint 6 changed: versioned FFmpeg profile registry, worker/output
   validator, preset-scoped queue discovery and job identity, persisted
-  preferences/API/Settings UI, focused tests, Windows CI filter and
-  documentation/status views. PR #670 tests and generator **not run**
+  preferences/API/Settings UI (including 48h/7d/30d explicit retention
+  policy), operator cleanup age resolution, focused tests, Windows CI
+  filter and documentation/status views. PR #670 tests and generator **not run**
   by the connector authoring environment; require successful CI
   before merge.
