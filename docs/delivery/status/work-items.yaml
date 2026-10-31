@@ -250,3 +250,12 @@ work_items:
   - WI-0188
   blocker_notes: []
   evidence: []
+- id: WI-0208
+  title: Bound PostgreSQL restore-verification storage and cleanup
+  milestone: M41
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0208-postgres-restore-storage-lifecycle.md
+  blockers: []
+  blocker_notes: []
+  evidence: []
