@@ -119,9 +119,24 @@ request, and includes failed inference time in aggregate `modelMs`.
 Tests exercise timeout, successful slower-than-decode model work and
 overall cancellation without contacting personal media or Azure.
 
-The private one-proxy Azure/CLIP verification must be **repeated after
-this repair merges**; this checkpoint is NOT yet accepted. All 4
-formal acceptance boxes remain open. See the [registered-proxy runbook](../../operations/video-registered-proxy-frame-pilot.md).
+**Maintainer verification update (same day):** With the Azure bridge
+already warmed, the *pre-fix checkout* successfully completed a
+two-frame registered-proxy run: `status=validated-not-published`,
+`frames=2`, `jpegBytes=36213`, `decodingMs=128`,
+`modelMs=2551`, `errorCode=null`, exit code 0. Only the original
+scratch ownership marker remained; report flags confirm no originals,
+OneDrive hydration, jobs, schema changes or evidence persistence.
+The previous 121.9-second Azure request and this fast warmed run show
+why inference requires a separate deadline. The latter establishes
+successful real-video CLIP/caption inference and temporary cleanup on
+the maintained Windows host, **not** that the subsequently merged
+PR #677's cold-start fix was exercised in that particular run. PR #677
+merged with all Windows CI jobs passing. A post-merge `main` run is
+recommended to specifically accept the corrected deadline boundary.
+
+This verifies checkpoint 3's manual inference proof without satisfying
+the complete WI-0190 requirements: **0/4 formal acceptance boxes remain
+checked**. See the [registered-proxy runbook](../../operations/video-registered-proxy-frame-pilot.md).
 
 **Next:** native `FrameEvidence` job registration/execution, versioned
 transactional PostgreSQL frame evidence with current-lease/exclusion
