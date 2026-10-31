@@ -592,6 +592,57 @@ privacy gate, **not** verified live relevance, and WI-0190 remains
 `in_progress`, **0/4 full acceptance**. No local media work or
 repeating the accepted two-frame audit is needed to review this PR.
 
+## Development checkpoint 12 — local-current frame relevance without vector exports (2026-11-01)
+
+After merged PR #690, the checkpoint 11 offline private-vector
+evaluation instrument is in main and Windows CI passed. This checkpoint
+adds the missing **private current-v38 PostgreSQL** data path:
+`video frames evaluate-live` consumes an operator-provided private
+JSON file containing only selected FrameEvidence **job UUIDs**, bounded
+text queries and manually judged relevant job UUIDs. It generates
+compatible text embeddings with the reviewed **local CLIP ONNX dual
+encoder**, explicitly SHA-256 pins the model, tokenizer vocabulary and
+merges, and requires the stored frames' provenance to match that
+verified model ID/digest and image preprocessing version.
+
+In one loopback **repeatable-read, read-only** transaction, it
+validates current succeeded full v38 frame batches for different
+video assets (same gates as the previously successful read-only
+audit: latest SDR, local source, not excluded, ordered frames, valid
+lengths and timestamps). It selects only stored embedding bytes into
+private memory, not captions, original file paths or media. Any
+missing/stale/excluded/unsupported/cross-model/duplicate-source
+batch fails the whole study without partial results. It reuses the
+existing three WI-0190 scoring policies and checkpoint 11 corpus
+Hit@K, MRR@K, Recall@K, MAP@K, nDCG@K calculation, returning **only
+aggregate numeric metrics** and wall-time components for pinning,
+local text encoding, snapshot reads and evaluation. It neither
+migrates the schema nor creates video jobs, calls FFmpeg, Ollama or
+Azure or introduces an application search API.
+
+The new CLI uses strict absolute physical local-file validation
+(including refusing Windows UNC/reparse traversal), bounded manifest
+and vector counts, and sanitizes private input and database failure
+exceptions to avoid echoing content or source paths. Core human-
+judgment validation and disposable PostgreSQL integration regressions
+cover valid current batches, model digest mismatch, unsupported and
+excluded sources, numeric comparison and invalid labels. The
+[checkpoint 12 runbook](../../operations/video-frame-live-retrieval-evaluation.md)
+explains safe setup and the required human evaluation.
+
+**Important limitations:** v38 does not store a tokenizer digest,
+so token file approval is operator-reviewed and locally pinned, not
+independently proved by the catalogue. Snapshot correctness means
+current *at the read transaction*, not forever. The existing maintained
+host has **one** accepted frame-evidence job; this real multi-video
+retrieval study requires at least **two different real videos** with
+current evidence and independent judgments, so it is **not** yet
+locally verified. No new media run is needed for this PR review,
+and do not repeat checkpoint 8's accepted audit. Representative
+sampling/missed-scene, CPU/GPU/real Azure cost, and maintained-host
+interruption/recovery acceptance still remain. Formal WI-0190
+status is `in_progress` and **0/4 full acceptance**.
+
 ## Completion notes
 
 - Files changed:
