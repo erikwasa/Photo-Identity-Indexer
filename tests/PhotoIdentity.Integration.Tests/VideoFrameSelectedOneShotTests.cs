@@ -197,6 +197,78 @@ public sealed class VideoFrameSelectedOneShotTests
                 Assert.False(reader.GetBoolean(1));
                 Assert.True(reader.GetBoolean(2));
             }
+
+            // No FFmpeg/media/model request is permitted for unsupported
+            // inspection: the preflight must reject before a job is created.
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand unsupported = conn.CreateCommand())
+            {
+                unsupported.CommandText = """
+                    UPDATE video_revision_metadata
+                    SET inspection_status='unsupported'
+                    WHERE asset_revision_id=@revision;
+                    """;
+                unsupported.Parameters.AddWithValue("revision", revision);
+                await unsupported.ExecuteNonQueryAsync();
+            }
+            using (StringWriter rejected = new())
+            {
+                Assert.Equal(1, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested, rejected));
+                Assert.Contains("\"reasonCode\":\"unsupported-video\"", rejected.ToString());
+            }
+
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand oversize = conn.CreateCommand())
+            {
+                oversize.CommandText = """
+                    UPDATE video_revision_metadata
+                    SET inspection_status='supported'
+                    WHERE asset_revision_id=@revision;
+                    UPDATE video_published_derivatives
+                    SET encoded_bytes=300000000 WHERE job_id=@job;
+                    """;
+                oversize.Parameters.AddWithValue("revision", revision);
+                oversize.Parameters.AddWithValue("job", proxyJob);
+                await oversize.ExecuteNonQueryAsync();
+            }
+            using (StringWriter rejected = new())
+            {
+                Assert.Equal(1, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested, rejected));
+                Assert.Contains("\"published\":false", rejected.ToString());
+            }
+
+            // Exclusions make a registered proxy unavailable before staged
+            // copies or disclosure; v38 also purges earlier private evidence.
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand exclude = conn.CreateCommand())
+            {
+                exclude.CommandText = """
+                    INSERT INTO source_copy_exclusions(
+                        source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+                    VALUES (@source,'fixture.mp4',now(),'pending',now());
+                    """;
+                exclude.Parameters.AddWithValue("source", source);
+                await exclude.ExecuteNonQueryAsync();
+            }
+            using (StringWriter rejected = new())
+            {
+                Assert.Equal(1, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested, rejected));
+                Assert.Contains("\"published\":false", rejected.ToString());
+            }
+            Assert.Equal(new[] { VideoFrameEvidenceScratchGuard.MarkerName },
+                Directory.GetFileSystemEntries(scratch).Select(Path.GetFileName).ToArray());
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand verify = conn.CreateCommand())
+            {
+                verify.CommandText = """
+                    SELECT COUNT(*) FROM video_processing_jobs
+                    WHERE derivative_kind='FrameEvidence';
+                    """;
+                Assert.Equal(0L, (long)(await verify.ExecuteScalarAsync())!);
+            }
         }
         finally
         {
