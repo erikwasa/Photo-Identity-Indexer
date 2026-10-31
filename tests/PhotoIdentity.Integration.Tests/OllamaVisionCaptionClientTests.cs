@@ -56,6 +56,28 @@ public sealed class OllamaVisionCaptionClientTests
         Assert.All(handler.Requests, uri => Assert.True(uri.IsLoopback));
     }
 
+    [Fact]
+    public async Task Sampled_video_frame_uses_a_distinct_versioned_prompt_with_no_motion_claims()
+    {
+        RecordingHandler handler = new();
+        using HttpClient http = new(handler);
+        OllamaVisionCaptionClient client = new(http,
+            new Uri("http://127.0.0.1:11434/"), "qwen2.5vl:3b");
+        LocalVisionCaptionResult result = await client.CaptionAsync(
+            new byte[] { 0xff, 0xd8, 0xff, 0x00 },
+            CancellationToken.None, sampledVideoFrame: true);
+        Assert.NotNull(result.Content);
+        Assert.Equal("wi0190-visible-video-frame-v1",
+            OllamaVisionCaptionClient.VideoFramePromptVersion);
+        Assert.Contains("single sampled frame", handler.ChatRequestBody,
+            StringComparison.Ordinal);
+        Assert.Contains("Do not claim motion over time", handler.ChatRequestBody,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Caption this private family photo",
+            handler.ChatRequestBody, StringComparison.Ordinal);
+        Assert.All(handler.Requests, uri => Assert.True(uri.IsLoopback));
+    }
+
     private sealed class RecordingHandler : HttpMessageHandler
     {
         public List<Uri> Requests { get; } = [];
