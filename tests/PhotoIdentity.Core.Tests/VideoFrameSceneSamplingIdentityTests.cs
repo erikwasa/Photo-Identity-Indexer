@@ -44,6 +44,17 @@ public sealed class VideoFrameSceneSamplingIdentityTests
         Assert.NotEqual(cutsA, cutsB);
         Assert.NotEqual(cutsA, oneFrame);
         Assert.NotEqual(VideoFrameSamplingPlanner.PolicyVersion, cutsA);
+        // The existing VideoDerivativeJobIdentity ceiling is 80 characters.
+        // Six maximal-width cut offsets fit without silently truncating
+        // a private annotation or colliding with another job identity.
+        string maximum = VideoFrameSceneSamplingIdentity.Create(
+            2, [1000000L, 1400000L, 1800000L, 2200000L, 2600000L, 3000000L],
+            3600000);
+        Assert.Equal(80, maximum.Length);
+        Assert.True(VideoFrameSceneSamplingIdentity.TryParse(
+            maximum, out _, out long[] recovered));
+        Assert.Equal(6, recovered.Length);
+
         Assert.True(VideoFrameSceneSamplingIdentity.TryParse(cutsB, out _, out long[] cuts));
         Assert.Equal(new long[] { 3001, 6000 }, cuts);
     }
