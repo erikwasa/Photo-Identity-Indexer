@@ -26,7 +26,7 @@ $productionDb = 'REPLACE_WITH_CONFIRMED_PRODUCTION_DB'
 $backupPath = Join-Path $env:LOCALAPPDATA ('PhotoIdentity\backups\postgresql\pre-video-v33-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.dump')
 
 .\backup-postgres-catalogue.ps1 -DatabaseName $productionDb -OutputPath $backupPath
-.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
 
 $restoreReportPath = "$backupPath.restore-verification.json"
 $restoreReport = Get-Content $restoreReportPath -Raw | ConvertFrom-Json
@@ -35,7 +35,7 @@ $rehearsalDb = [string]$restoreReport.verificationDatabase
 $rehearsalDb
 ~~~
 
-This restore verifier creates a unique database named photoidentity_restore_* and retains it for inspection. The report contains the source and restored database names, original schema and per-table counts.
+The restore verifier now removes successful verification databases by default. This rehearsal passes -RetainRestoredDatabase explicitly because the schema rehearsal needs the actual isolated database. After the rehearsal has been reviewed, retire that exact owned copy using manage-postgres-restores.ps1 as described in the PostgreSQL operations runbook. The report contains the source and restored database names, original schema and per-table counts.
 
 ## Select the local PostgreSQL credentials without rewriting the database
 
