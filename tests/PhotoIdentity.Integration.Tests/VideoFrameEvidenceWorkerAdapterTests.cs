@@ -304,10 +304,10 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
             Assert.Null(await reader.GetCurrentAsync(photoPreemptedJob));
             Assert.True((await new PostgresVideoPhotoPriorityProbe(database)
                 .GetAsync()).PhotoWorkActive);
-            // Photo-priority revocation likewise leaves a fenced in-flight
-            // lease; do not mistake this for an immediately freed worker.
-            await ExpireAndRecoverFixtureLeaseAsync(photoPreemptedJob);
-            Assert.Equal("queued",
+            // Unlike pause/generation changes or explicit cancellation,
+            // photo priority vetoes publication but allows the adapter's
+            // ordinary failed-attempt acknowledgement to release the lease.
+            Assert.Equal("failed",
                 (await queue.GetAsync(photoPreemptedJob))?.Status);
 
             // A committed caption/vector is physically purged by an
