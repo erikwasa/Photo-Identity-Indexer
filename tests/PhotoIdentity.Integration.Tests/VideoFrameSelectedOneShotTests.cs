@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using Npgsql;
 using PhotoIdentity.Cli;
+using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -77,4 +80,131 @@ public sealed class VideoFrameSelectedOneShotTests
         }
         finally { Directory.Delete(root, recursive: true); }
     }
+    [Fact]
+    public async Task Current_proxy_dry_run_does_not_enqueue_or_arm_control()
+    {
+        string? admin = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(admin) || !OperatingSystem.IsWindows()) return;
+        string dbName = "photoidentity_frame_preflight_" + Guid.NewGuid().ToString("N");
+        string temp = Path.GetTempPath();
+        string cache = Path.Combine(temp, "photoidentity-frame-cache-" +
+            Guid.NewGuid().ToString("N"));
+        string scratch = Path.Combine(temp, "photoidentity-frame-evidence-" +
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(cache);
+        Directory.CreateDirectory(scratch);
+        File.WriteAllText(Path.Combine(cache, VideoDerivativeFilePublisher.CacheMarker),
+            VideoDerivativeFilePublisher.CacheMarkerContents);
+        File.WriteAllText(Path.Combine(scratch, VideoFrameEvidenceScratchGuard.MarkerName),
+            VideoFrameEvidenceScratchGuard.MarkerContents);
+
+        string envName = "PHOTOIDENTITY_WI0190_ONE_SHOT_FIXTURE";
+        string? previous = Environment.GetEnvironmentVariable(envName);
+        await using NpgsqlConnection administrator = new(
+            new NpgsqlConnectionStringBuilder(admin) { Pooling = false }.ConnectionString);
+        await administrator.OpenAsync();
+        await using (NpgsqlCommand create = administrator.CreateCommand())
+        {
+            create.CommandText = $"CREATE DATABASE \"{dbName}\";";
+            await create.ExecuteNonQueryAsync();
+        }
+        try
+        {
+            var config = new NpgsqlConnectionStringBuilder(admin)
+            { Database = dbName, Pooling = false };
+            Environment.SetEnvironmentVariable(envName, config.ConnectionString);
+            await using PostgresCatalogueDatabase db = new(config.ConnectionString);
+            await db.InitializeAsync();
+            Guid source = Guid.NewGuid(), asset = Guid.NewGuid();
+            Guid revision = Guid.NewGuid(), proxyJob = Guid.NewGuid();
+            await using (NpgsqlConnection connection = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand seed = connection.CreateCommand())
+            {
+                seed.CommandText = """
+                    INSERT INTO sources(id,kind,root_locator,created_at_utc)
+                    VALUES (@source,'local-folder','synthetic-root',now());
+                    INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
+                    VALUES (@asset,@source,'fixture.mp4',now(),'video');
+                    INSERT INTO asset_revisions(id,asset_id,content_sha256,
+                        size_bytes,observed_at_utc,media_type,media_kind)
+                    VALUES (@revision,@asset,repeat('a',64),4000,
+                        now(),'video/mp4','video');
+                    INSERT INTO video_revision_metadata(asset_revision_id,
+                        inspection_status,duration_seconds,color_transfer,
+                        inspected_at_utc,tool_sha256,inspection_profile_id)
+                    VALUES (@revision,'supported',10,'bt709',now(),repeat('a',64),'fixture');
+                    INSERT INTO video_processing_jobs(id,asset_revision_id,
+                        idempotency_key,derivative_kind,policy_version,
+                        preset_version,tool_sha256,source_bytes,
+                        reserved_temporary_bytes,requested_frames,
+                        status,progress_percent,completed_at_utc)
+                    VALUES (@proxyJob,@revision,repeat('b',64),
+                        'PlayableProxy','proxy-policy','proxy-preset',
+                        repeat('c',64),4000,20000,1,
+                        'succeeded',100,now());
+                    INSERT INTO video_published_derivatives(job_id,asset_revision_id,
+                        artifact_relative_path,content_sha256,encoded_bytes)
+                    VALUES (@proxyJob,@revision,@path,repeat('d',64),12345);
+                    """;
+                seed.Parameters.AddWithValue("source", source);
+                seed.Parameters.AddWithValue("asset", asset);
+                seed.Parameters.AddWithValue("revision", revision);
+                seed.Parameters.AddWithValue("proxyJob", proxyJob);
+                seed.Parameters.AddWithValue("path",
+                    "video-derivatives/" + proxyJob.ToString("N") + "/" +
+                    Guid.NewGuid().ToString("N") + ".mp4");
+                await seed.ExecuteNonQueryAsync();
+            }
+            string exe = typeof(VideoFrameSelectedOneShotTests).Assembly.Location;
+            string hash = Convert.ToHexString(
+                await SHA256.HashDataAsync(File.OpenRead(exe))).ToLowerInvariant();
+            string[] input = Valid(temp);
+            var requested = VideoFrameSelectedOneShotOptions.Parse(
+                [.. input.Take(0),
+                "--postgres-connection-env", envName,
+                "--database", dbName,
+                "--proxy-job-id", proxyJob.ToString(),
+                "--cache-root", cache, "--scratch-root", scratch,
+                "--ffmpeg", exe, "--ffmpeg-sha256", hash,
+                "--clip-model", Path.Combine(temp, "unused.onnx"),
+                "--clip-model-sha256", new string('b', 64),
+                "--clip-vocab", Path.Combine(temp, "unused-vocab.json"),
+                "--clip-merges", Path.Combine(temp, "unused-merges.txt"),
+                "--ollama-sha256", new string('c', 64),
+                "--max-frames", "2"]);
+            using StringWriter report = new();
+            Assert.Equal(0, await VideoFrameSelectedOneShotCommandRunner
+                .RunAsync(requested, report));
+            Assert.Contains("\"reasonCode\":\"preflight-only\"", report.ToString());
+            Assert.Contains("\"dryRun\":true", report.ToString());
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand verify = conn.CreateCommand())
+            {
+                verify.CommandText = """
+                    SELECT (SELECT COUNT(*) FROM video_processing_jobs
+                            WHERE derivative_kind='FrameEvidence'),
+                           (SELECT enabled FROM video_processing_control
+                            WHERE singleton_id=1),
+                           (SELECT selected_job_id IS NULL
+                            FROM video_processing_control WHERE singleton_id=1);
+                    """;
+                await using NpgsqlDataReader reader = await verify.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(0L, reader.GetInt64(0));
+                Assert.False(reader.GetBoolean(1));
+                Assert.True(reader.GetBoolean(2));
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(envName, previous);
+            await using NpgsqlCommand drop = administrator.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS \"{dbName}\" WITH (FORCE);";
+            await drop.ExecuteNonQueryAsync();
+            Directory.Delete(cache, recursive: true);
+            Directory.Delete(scratch, recursive: true);
+        }
+    }
+
 }
