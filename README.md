@@ -2,9 +2,9 @@
 
 Photo Identity Indexer is a private, local-first system for detecting, reviewing and finding people in a personal photo archive.
 
-The maintainer-controlled Windows computer is the trusted application/control environment. It runs the application and model processing, accesses Personal OneDrive through the Windows sync client, and keeps personal photos and derived biometric data under local control. PostgreSQL running on the maintainer's hardware is the sole writable production catalogue.
+The maintainer-controlled Windows computer is the trusted application/control environment. It runs the normal workflow, accesses Personal OneDrive through the Windows sync client, and owns canonical identities, review history and private data. PostgreSQL on the maintainer's hardware is the sole writable production catalogue. Deliberately selected inference inputs may temporarily leave the machine for approved operator-controlled Azure processing.
 
-The current strategy is local production execution. Historical portable-bundle/Azure material remains in the repository as reference, but Azure is not a planned processing target; see [ADR-0010](docs/decisions/ADR-0010-local-production-execution.md).
+Local processing is the standard workflow. [ADR-0013](docs/decisions/ADR-0013-optional-operator-controlled-remote-compute.md) permits manually attached, bounded inference on applications/models operated within our Azure resources—not unvetted third-party black-box services. [ADR-0011](docs/decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) covers the existing photo-caption bridge; Azure video-frame offload still requires implementation and verification. The retired Azure VM/checkpointing roadmap remains historical.
 
 ## Start here
 

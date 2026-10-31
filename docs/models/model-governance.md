@@ -121,6 +121,6 @@ Unclear provenance blocks production promotion even when local experiments are t
 
 Portable bundles include the exact model manifests required by a worker. The worker validates local model bytes before processing and returns exact provenance with results.
 
-Azure or another worker environment cannot choose a replacement revision implicitly. Consistency differences between local and remote execution are evaluation evidence and may create a new governed runtime/model revision when material.
+Azure or another operator-managed environment cannot choose replacement model bytes implicitly, and opaque third-party inference is not approved by hosting within Azure (ADR-0013). Consistency differences between local and remote execution are evaluation evidence and may create a new governed runtime/model revision when material. For video frames, model, prompts, context, image dimensions, sampling and preprocessing must be separately evaluated and versioned rather than silently inheriting photo-caption defaults. Transport alone is audit metadata, not a changed model digest.
 
 See [Baseline models](baseline-models.md), [Candidate models](candidate-models.md), [Recognition and identity matching](../architecture/identity-matching.md) and the [Glossary](../glossary.md).

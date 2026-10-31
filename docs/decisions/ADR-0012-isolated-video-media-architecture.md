@@ -19,7 +19,7 @@ Photo Identity is a local Windows/OneDrive-sync modular monolith with a PostgreS
 
 Videos differ in probe cost, size, codec support, timeline, transcoding and face repetition. Extending photo workers by merely adding `.mov` to an image extension list would produce incorrect contracts and unexpected source hydration.
 
-This ADR complements [ADR-0007](ADR-0007-permanent-archive-bounded-storage.md) (permanent source and bounded hydration), [ADR-0008](ADR-0008-source-copy-exclusion-and-purge.md) (source-copy exclusion), [ADR-0010](ADR-0010-local-production-execution.md) (local execution) and [ADR-0006](ADR-0006-canonical-auto-assignment.md) (governed person assignments). ADR-0011's remote caption burst does **not** authorize off-host video processing.
+This ADR complements [ADR-0007](ADR-0007-permanent-archive-bounded-storage.md) (permanent source and bounded hydration), [ADR-0008](ADR-0008-source-copy-exclusion-and-purge.md) (source-copy exclusion), [ADR-0010](ADR-0010-local-production-execution.md) (local execution) and [ADR-0006](ADR-0006-canonical-auto-assignment.md) (governed person assignments). At this ADR's original acceptance, ADR-0011's caption bridge did **not** authorize video processing. The later [ADR-0013](ADR-0013-optional-operator-controlled-remote-compute.md) permits a **separately implemented**, operator-authorized Azure inference route for video frames while retaining local control, opt-in jobs and exclusion/revision fences.
 
 ## Accepted decision
 
@@ -68,7 +68,7 @@ References: https://ffmpeg.org/legal.html ; https://www.gyan.dev/ffmpeg/builds/ 
 
 A future WI-0152 viewer serves authorized playable proxies through guarded HTTP endpoints supporting range requests (206/416), cancellation and bounded seek/read; do not expose local cache paths or allow arbitrary file serving. Applying exclusion gates before serving, hydration or model retrieval is mandatory. A missing proxy does not automatically hydrate an online-only original.
 
-No personal frame images, identifying tags, embeddings, filenames, source paths or codec-survey raw output are committed. Video processing remains local unless a **new** specific ADR authorizes an exception.
+No personal frame images, identifying tags, embeddings, filenames, source paths or codec-survey raw output are committed. Video processing stays local by default. ADR-0013 subsequently authorizes optional, purpose-scoped operator-controlled Azure **inference**, but no off-host video-frame worker, full-video upload or remote catalogue is enabled by this ADR alone.
 
 ## Alternatives considered
 
@@ -77,7 +77,7 @@ No personal frame images, identifying tags, embeddings, filenames, source paths 
 - One video embedding only (single frame or average): small index but misses multi-scene moments. **Defer** until sampled-frame relevance measurements.
 - Full video-action/audio transcription model from day one: potentially richer search but substantial cost/model complexity; not needed for metadata/proxy/frame search. **Defer.**
 - Managed framework-only metadata decoding: avoids FFmpeg packaging but inconsistent MOV/HEVC/rotation support across archive inputs. **Keep as a measured fallback**, not assume universal support.
-- Cloud processing: violates local-first intent without a new decision and disclosure contract. **Reject for M30.**
+- Cloud processing: **rejected for the initial M30 gate** without a separate decision and disclosure contract. Later ADR-0013 authorizes optional controlled inference, not automatic cloud video processing or reinstatement of the old Azure plan.
 
 ## Initial evidence — maintained archive, 2026-10-14
 

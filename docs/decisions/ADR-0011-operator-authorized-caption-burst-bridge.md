@@ -49,3 +49,7 @@ This exception applies only to temporary generated-photo-caption inference. It d
 - Exact model digest verification is required before a burst intended to continue the same caption policy.
 - Remote endpoint failure remains visible as ordinary Ollama transport failure; there is no automatic fallback.
 - Azure or another provider may supply the temporary Ollama-compatible GPU endpoint, but provider infrastructure is operator-managed and does not become application architecture.
+
+## Later policy clarification (2026-10-31)
+
+[ADR-0013](ADR-0013-optional-operator-controlled-remote-compute.md) allows separately implemented and authorized video-frame or other inference on operator-managed Azure compute. This ADR remains the working **photo-caption** bridge procedure. Its 480x320 request and bounded Ollama parameters must not be applied to video frames without independent evaluation; no new video remote endpoint is implemented by this clarification.

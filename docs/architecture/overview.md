@@ -20,7 +20,7 @@ Trusted Windows application/control environment
         └── exact model manifests and installed ONNX files
 ```
 
-Production processing is local. [ADR-0010](../decisions/ADR-0010-local-production-execution.md) supersedes the earlier disposable-Azure plan. Portable bundle support remains as an isolation/file-transfer contract, but no active roadmap milestone assumes Azure or another remote worker.
+Production control, catalogue and normal processing remain local. [ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md) supersedes ADR-0010's blanket local-only rule and allows optional, deliberately authorized inference on maintainer-managed Azure apps. [ADR-0011](../decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) documents the working photo-caption bridge; video remote inference is not automatically implemented, and the retired Azure VM/checkpoint plan remains retired.
 
 ## Runtime applications
 
@@ -83,7 +83,7 @@ Originals are hydrated only through explicit governed access/preparation paths; 
 
 Portable job bundles contain explicitly selected neutral inputs, exact model manifests and checksums. Result bundles contain derived processing results and checkpoints. The retained worker path processes bundles without catalogue access.
 
-The portable worker contract has no access to OneDrive credentials, people, assignments, rejections or the authoritative catalogue. It is retained for isolation/offline transfer, not as a currently planned cloud deployment path. See [Portable processing bundles](portable-bundles.md).
+The portable worker contract has no access to OneDrive credentials, people, assignments, rejections or the authoritative catalogue. It is retained for isolation/offline transfer and could support a separately implemented, authorized Azure worker under ADR-0013; no general remote bundle worker is currently enabled. See [Portable processing bundles](portable-bundles.md).
 
 ## Deployment and trust
 
