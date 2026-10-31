@@ -20,7 +20,12 @@ hydration, PostgreSQL migration, job claim or persisted/searchable evidence.
    Recheck currentness before each frame and after model inference.
 4. Cap work to **1–4 frames** and at most 10 minutes for the entire command,
    with independently bounded, hash-pinned FFmpeg processes under Windows
-   Job Objects. Source is never passed to FFmpeg; the input is the disposable
+   Job Objects (**60-second limit per extraction**). A separately bounded
+   **180-second limit per frame** governs CLIP/caption inference *after* the
+   supervised process has exited and the JPEG is validated; Azure cold-start
+   time cannot consume the FFmpeg deadline. The Ollama HTTP timeout is 200
+   seconds, with the shorter inference and overall limits taking precedence.
+   Source is never passed to FFmpeg; the input is the disposable
    *proxy snapshot*. Auto-rotation and JPEG geometry/sizes use the fixed
    `wi0190-sdr-frame-jpeg-v1` extraction contract.
 5. Feed each BGR24 image into the **same ONNX CLIP image encoder and image
@@ -112,6 +117,36 @@ Ollama endpoint is fixed to loopback.
 directory listing, and any fixed `errorCode`. Do not share private media,
 prompts, paths, hashes, GUIDs, or generated captions. A successful pilot
 says `validated-not-published`, NOT accepted searchable evidence.
+
+### Azure bridge cold start and model timeout (2026-10-31)
+
+Maintainer Windows verification: the synthetic frame pilot passed 4/4
+landscape (640×360) and 4/4 portrait (360×640) frames with complete
+cleanup. The registered-proxy pilot successfully decoded the first JPEG
+(`jpegBytes=18065`, `decodingMs=333`) but reported
+`local-caption-and-clip:timeout` at `frames=0`; the operator-controlled
+Azure bridge subsequently logged `POST /api/chat -> 200 (121.9s)`.
+
+**Root cause:** checkpoint 3 mistakenly invoked CLIP and Ollama inside the
+FFmpeg supervisor's post-exit callback, causing the **60-second FFmpeg clock
+to cancel model inference**. The corrected command retains the decoder
+budget, performs inference separately under a **180-second per-frame**
+clock (still within the 10-minute aggregate cap), and records `modelMs`
+even when inference fails. The 180-second cap is a bound, not a guarantee
+that a cold Azure model will finish. Recheck the registered current revision
+immediately before forwarding extracted JPEG pixels as well as afterward.
+
+After merging the correction, update `main`, re-create `$pilotArgs` as in
+this runbook, and rerun the one-proxy test. Use an operator-controlled
+loopback bridge if Azure is intentionally selected; the pilot itself has
+no automatic Azure fallback. **The bridge forwards the selected frame JPEGs
+to Azure,** even though the CLI reports `originalsOpened=false`. Do not
+send originals or video proxies to Azure; the maintainer must explicitly
+authorize frame disclosure under ADR-0013. Record both the bridge's
+`POST /api/chat -> 200` evidence and the pilot aggregate JSON
+(`status`, `frames`, `jpegBytes`, `decodingMs`, `modelMs`,
+`errorCode`) and check that only the scratch ownership marker remains.
+No failed or partial model result is published or persisted.
 
 ### Safe default/no-database tests
 

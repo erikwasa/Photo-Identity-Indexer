@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Recognition.Onnx.Semantic;
@@ -162,7 +163,7 @@ public static class VideoRegisteredFramePilotCommandRunner
                 options.ClipModel, options.ClipVocabulary, options.ClipMerges);
             using HttpClient http = new()
             {
-                Timeout = TimeSpan.FromSeconds(150)
+                Timeout = TimeSpan.FromSeconds(200)
             };
             var captionClient = new OllamaVisionCaptionClient(
                 http, OllamaVisionCaptionClient.DefaultBaseUri, options.OllamaModel);
@@ -192,6 +193,11 @@ public static class VideoRegisteredFramePilotCommandRunner
                     throw new InvalidOperationException("Registered video proxy was revoked.");
 
                 stage = "bounded-frame-extraction";
+                // Keep only bounded JPEG validation/decoding inside the
+                // supervisor callback. Its 60-second timer is for FFmpeg,
+                // NOT slow CLIP initialization or an Azure Ollama cold start.
+                ImageFrame? image = null;
+                byte[]? encoded = null;
                 VideoToolExecutionResult result = await supervisor.RunAsync(
                     options.Ffmpeg, options.FfmpegSha256, root,
                     frameWorkspace => VideoFrameExtractionProfile.BuildArguments(
@@ -202,25 +208,47 @@ public static class VideoRegisteredFramePilotCommandRunner
                         string jpeg = Path.Combine(frameWorkspace,
                             VideoFrameExtractionProfile.OutputName);
                         long started = Stopwatch.GetTimestamp();
-                        var image = await VideoFrameExtractionProfile.ReadValidatedFrameAsync(
+                        image = await VideoFrameExtractionProfile.ReadValidatedFrameAsync(
                             jpeg, frameToken);
                         decodeMilliseconds += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
-                        byte[] encoded = await File.ReadAllBytesAsync(jpeg, frameToken);
+                        encoded = await File.ReadAllBytesAsync(jpeg, frameToken);
                         totalJpegBytes += encoded.LongLength;
-
-                        stage = "local-caption-and-clip";
-                        started = Stopwatch.GetTimestamp();
-                        var embedding = encoder.EncodeImage(image, frameToken);
-                        LocalVisionCaptionResult caption =
-                            await captionClient.CaptionAsync(encoded, frameToken);
-                        inferenceMilliseconds += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
-                        items.Add(new VideoFrameEvidenceItem(
-                            frame.TimestampMilliseconds, frame.SceneIndex,
-                            caption.Content, embedding.Vector.ToArray()));
                     });
                 if (result.ExitCode != 0)
                     throw new InvalidDataException("Bounded frame extraction failed.");
-                produced++;
+                if (image is null || encoded is null)
+                    throw new InvalidDataException("Validated frame was not captured.");
+
+                // Recheck before sending extracted frame pixels to Ollama.
+                // The source can be revoked while FFmpeg is running.
+                stage = "currentness-before-model";
+                if (!await proxy.StillCurrentAsync(options.JobId,
+                        snapshot.RevisionId, deadline.Token))
+                    throw new InvalidOperationException("Registered video proxy was revoked.");
+
+                stage = "local-caption-and-clip";
+                long modelStarted = Stopwatch.GetTimestamp();
+                try
+                {
+                    VideoFrameEvidenceItem item =
+                        await VideoFrameModelInferenceBudget.RunAsync(async modelToken =>
+                        {
+                            var embedding = encoder.EncodeImage(image, modelToken);
+                            LocalVisionCaptionResult caption =
+                                await captionClient.CaptionAsync(encoded, modelToken);
+                            return new VideoFrameEvidenceItem(
+                                frame.TimestampMilliseconds, frame.SceneIndex,
+                                caption.Content, embedding.Vector.ToArray());
+                        }, deadline.Token);
+                    items.Add(item);
+                    produced++;
+                }
+                finally
+                {
+                    // Even a timeout must show time spent waiting on inference.
+                    inferenceMilliseconds +=
+                        (long)Stopwatch.GetElapsedTime(modelStarted).TotalMilliseconds;
+                }
             }
 
             stage = "currentness-and-provenance";
@@ -254,6 +282,12 @@ public static class VideoRegisteredFramePilotCommandRunner
         {
             throw;
         }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            Write(output, false, "pilot-failed", produced, totalJpegBytes,
+                decodeMilliseconds, inferenceMilliseconds, stage + ":timeout", null);
+            return 1;
+        }
         catch (Exception error)
         {
             // Aggregate-only. Never log private path, job ID, model caption,
@@ -286,5 +320,43 @@ public static class VideoRegisteredFramePilotCommandRunner
             videoJobsEnqueued = false, schemaChanged = false,
             evidencePersisted = false, captionsReturned = false
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+    }
+}
+
+
+/// <summary>
+/// Independent, bounded caption/embedding clock. Unlike the FFmpeg supervisor
+/// this clock starts AFTER the validated JPEG has left the tool workspace.
+/// Each frame is capped at 3 minutes, while the caller retains its separate
+/// 10-minute limit for the complete registered-proxy pilot.
+/// </summary>
+public static class VideoFrameModelInferenceBudget
+{
+    public static readonly TimeSpan MaximumPerFrame = TimeSpan.FromMinutes(3);
+
+    public static async Task<T> RunAsync<T>(
+        Func<CancellationToken, Task<T>> infer,
+        CancellationToken overallCancellation,
+        TimeSpan? maximumTime = null)
+    {
+        ArgumentNullException.ThrowIfNull(infer);
+        TimeSpan limit = maximumTime ?? MaximumPerFrame;
+        if (limit < TimeSpan.FromMilliseconds(10) || limit > MaximumPerFrame)
+            throw new ArgumentOutOfRangeException(nameof(maximumTime),
+                "Frame model inference must remain bounded to three minutes.");
+
+        using CancellationTokenSource frameDeadline =
+            CancellationTokenSource.CreateLinkedTokenSource(overallCancellation);
+        frameDeadline.CancelAfter(limit);
+        try
+        {
+            return await infer(frameDeadline.Token);
+        }
+        catch (OperationCanceledException) when (
+            frameDeadline.IsCancellationRequested &&
+            !overallCancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException("Frame inference exceeded the per-frame time budget.");
+        }
     }
 }

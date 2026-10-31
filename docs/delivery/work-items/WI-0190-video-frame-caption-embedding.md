@@ -98,6 +98,31 @@ implementation gap toward acceptance criteria 1, 3 and 4, but not
 their maintained-host evidence or durable acceptance; criteria **0/4
 checked**. See [the registered-proxy pilot runbook](../../operations/video-registered-proxy-frame-pilot.md).
 
+### Checkpoint 3 maintained-host verification and timeout correction (2026-10-31)
+
+The maintainer confirmed the approved FFmpeg 9.0.2 executable, pinned
+CLIP model/tokenizer, current local PostgreSQL video proxy, owned scratch
+marker and operator-controlled Azure Ollama bridge. The synthetic frame
+pilot **passed** with four 640×360 landscape and four 360×640 portrait
+JPEGs, and scratch cleanup. The registered-proxy pilot dry-run passed;
+the first real 12.3-second registered-proxy attempt extracted a valid
+18,065-byte JPEG in 333 ms but terminated before accepting any frame:
+`local-caption-and-clip:timeout`. Independently, the Azure bridge
+finished the first `POST /api/chat` with HTTP 200 after 121.9 seconds.
+
+The implementation fault was a **single shared 60-second supervisor
+deadline for both FFmpeg and its model-inference callback**. The repair
+preserves 60 seconds for extraction, adds an independent 180-second
+per-frame model-inference deadline within the original 10-minute
+global cap, performs another current-revision check before any caption
+request, and includes failed inference time in aggregate `modelMs`.
+Tests exercise timeout, successful slower-than-decode model work and
+overall cancellation without contacting personal media or Azure.
+
+The private one-proxy Azure/CLIP verification must be **repeated after
+this repair merges**; this checkpoint is NOT yet accepted. All 4
+formal acceptance boxes remain open. See the [registered-proxy runbook](../../operations/video-registered-proxy-frame-pilot.md).
+
 **Next:** native `FrameEvidence` job registration/execution, versioned
 transactional PostgreSQL frame evidence with current-lease/exclusion
 and incomplete/stale fences, real-video retrieval quality/cost and
