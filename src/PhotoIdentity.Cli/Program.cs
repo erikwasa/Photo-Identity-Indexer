@@ -120,6 +120,10 @@ public static class Program
                     await VideoFrameEvidenceAuditCommandRunner.RunAsync(
                         VideoFrameEvidenceAuditOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "coverage" =>
+                    await VideoFrameSceneCoverageCommandRunner.RunAsync(
+                        VideoFrameSceneCoverageOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "selected-one-shot" =>
                     await VideoFrameSelectedOneShotCommandRunner.RunAsync(
                         VideoFrameSelectedOneShotOptions.Parse(args.Skip(3).ToArray()),
@@ -317,6 +321,12 @@ public static class Program
               video sandbox appcontainer-lab --scratch-root MARKED_TEMP_LAB [--apply]
                                               (synthetic-only disposable Windows profile;
                                                no database, originals or FFmpeg)
+              video frames coverage --postgres-connection-env NAME --database DB
+                                    --job-id FRAME_EVIDENCE_UUID
+                                    --scene-boundaries-ms CUT1,CUT2,... | none
+                                    (read-only current evidence; human-annotated cuts;
+                                     numeric missed-scene audit and counterfactual plans;
+                                     no FFmpeg, caption/vector output, or scene detection)
               video frames audit --postgres-connection-env NAME --database DB
                                  --job-id FRAME_EVIDENCE_JOB_UUID
                                  (read-only currentness/completeness and numeric storage

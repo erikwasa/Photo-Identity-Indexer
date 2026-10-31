@@ -159,6 +159,20 @@ public sealed class VideoFrameEvidenceAuditTests
                 return (exit, JsonDocument.Parse(writer.ToString()));
             }
 
+            async Task<(int ExitCode, JsonDocument Report)> Coverage(string cuts)
+            {
+                using StringWriter writer = new();
+                int exit = await VideoFrameSceneCoverageCommandRunner.RunAsync(
+                    new VideoFrameSceneCoverageOptions(options,
+                        VideoFrameSceneCoverageOptions.Parse([
+                            "--postgres-connection-env", env,
+                            "--database", name, "--job-id", job.ToString(),
+                            "--scene-boundaries-ms", cuts
+                        ]).SceneCutsMs),
+                    writer);
+                return (exit, JsonDocument.Parse(writer.ToString()));
+            }
+
             var first = await Audit();
             using (first.Report)
             {
@@ -172,6 +186,26 @@ public sealed class VideoFrameEvidenceAuditTests
                     first.Report.RootElement.GetProperty("embeddingBytes").GetInt64());
                 Assert.DoesNotContain("Synthetic frame", first.Report.RootElement.ToString());
                 Assert.DoesNotContain("audit-fixture", first.Report.RootElement.ToString());
+            }
+
+            var currentCoverage = await Coverage("3000,5000,7000");
+            using (currentCoverage.Report)
+            {
+                Assert.Equal(0, currentCoverage.ExitCode);
+                var report = currentCoverage.Report.RootElement;
+                Assert.True(report.GetProperty("readOnly").GetBoolean());
+                Assert.True(report.GetProperty("current").GetBoolean());
+                Assert.Equal(4, report.GetProperty("actual")
+                    .GetProperty("totalScenes").GetInt32());
+                Assert.Equal(2, report.GetProperty("actual")
+                    .GetProperty("missedScenes").GetInt32());
+                Assert.Equal(50, report.GetProperty("actual")
+                    .GetProperty("coveragePercent").GetDouble());
+                Assert.True(report.GetProperty(
+                    "observedPositionsMatchIntervalPlan").GetBoolean());
+                Assert.False(report.GetProperty("sceneDetectionPerformed").GetBoolean());
+                Assert.DoesNotContain("Synthetic frame", report.ToString());
+                Assert.DoesNotContain("audit-fixture", report.ToString());
             }
 
             await using (NpgsqlConnection conn = await database.OpenConnectionAsync())
@@ -196,6 +230,16 @@ public sealed class VideoFrameEvidenceAuditTests
                 Assert.False(stale.Report.RootElement.GetProperty("current").GetBoolean());
             }
 
+            var staleCoverage = await Coverage("3000");
+            using (staleCoverage.Report)
+            {
+                Assert.Equal(1, staleCoverage.ExitCode);
+                Assert.Equal("stale-revision",
+                    staleCoverage.Report.RootElement.GetProperty("reasonCode").GetString());
+                Assert.False(staleCoverage.Report.RootElement.GetProperty("current").GetBoolean());
+                Assert.False(staleCoverage.Report.RootElement.TryGetProperty("actual", out _));
+            }
+
             await using (NpgsqlConnection conn = await database.OpenConnectionAsync())
             await using (NpgsqlCommand exclude = conn.CreateCommand())
             {
@@ -214,6 +258,14 @@ public sealed class VideoFrameEvidenceAuditTests
                 Assert.Equal("source-excluded",
                     excluded.Report.RootElement.GetProperty("reasonCode").GetString());
                 Assert.Equal(0, excluded.Report.RootElement.GetProperty("durableFrames").GetInt32());
+            }
+            var excludedCoverage = await Coverage("3000");
+            using (excludedCoverage.Report)
+            {
+                Assert.Equal(1, excludedCoverage.ExitCode);
+                Assert.Equal("source-excluded",
+                    excludedCoverage.Report.RootElement.GetProperty("reasonCode").GetString());
+                Assert.False(excludedCoverage.Report.RootElement.TryGetProperty("actual", out _));
             }
         }
         finally

@@ -120,6 +120,37 @@ public static class VideoFrameEvidenceAuditCommandRunner
                     "Frame audit requires an already-rehearsed current PostgreSQL schema.");
         }
 
+        VideoFrameEvidenceAuditSnapshot? result =
+            await ReadSnapshotAsync(connection, transaction, options.JobId, token);
+        await transaction.CommitAsync(token);
+
+        string reason = VideoFrameEvidenceAuditPolicy.Classify(result);
+        bool current = reason == "current-complete";
+        output.WriteLine(JsonSerializer.Serialize(new
+        {
+            protocol = "wi0190-frame-evidence-audit-v1",
+            readOnly = true, current, reasonCode = reason,
+            expectedFrames = result?.ExpectedFrames ?? 0,
+            durableFrames = result?.FrameRows ?? 0,
+            embeddingDimensions = result?.Dimensions ?? 0,
+            captionUtf8Bytes = result?.CaptionBytes ?? 0,
+            embeddingBytes = result?.VectorBytes ?? 0,
+            evidencePayloadBytes = (result?.CaptionBytes ?? 0) + (result?.VectorBytes ?? 0),
+            firstTimestampMs = current ? result!.FirstTimestampMs : (long?)null,
+            lastTimestampMs = current ? result!.LastTimestampMs : (long?)null,
+            durationMs = current ? (long)(result!.DurationSeconds * 1000m) : (long?)null,
+            originalsOpened = false, oneDriveHydrationRequested = false,
+            captionsReturned = false, embeddingsReturned = false,
+            videoJobsEnqueued = false, schemaChanged = false
+        }));
+        return current ? 0 : 1;
+    }
+    // Reused by the operator's read-only scene coverage command. Both the
+    // completeness gate and timestamp observations share ONE PG snapshot.
+    internal static async Task<VideoFrameEvidenceAuditSnapshot?> ReadSnapshotAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction,
+        Guid jobId, CancellationToken token)
+    {
         // This query does NOT SELECT source_key, root_locator, any caption,
         // embedding_le_f32 or model string. The server calculates byte lengths
         // and frame ordering; only numeric/bool metadata crosses the connection.
@@ -181,7 +212,7 @@ public static class VideoFrameEvidenceAuditCommandRunner
             ) f ON true
             WHERE job.id=@job;
             """;
-        query.Parameters.AddWithValue("job", options.JobId);
+        query.Parameters.AddWithValue("job", jobId);
         VideoFrameEvidenceAuditSnapshot? result = null;
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
         {
@@ -195,27 +226,7 @@ public static class VideoFrameEvidenceAuditCommandRunner
                     reader.GetInt64(15), reader.GetInt32(16), reader.GetInt32(17),
                     reader.GetBoolean(18), reader.GetBoolean(19));
         }
-        await transaction.CommitAsync(token);
-
-        string reason = VideoFrameEvidenceAuditPolicy.Classify(result);
-        bool current = reason == "current-complete";
-        output.WriteLine(JsonSerializer.Serialize(new
-        {
-            protocol = "wi0190-frame-evidence-audit-v1",
-            readOnly = true, current, reasonCode = reason,
-            expectedFrames = result?.ExpectedFrames ?? 0,
-            durableFrames = result?.FrameRows ?? 0,
-            embeddingDimensions = result?.Dimensions ?? 0,
-            captionUtf8Bytes = result?.CaptionBytes ?? 0,
-            embeddingBytes = result?.VectorBytes ?? 0,
-            evidencePayloadBytes = (result?.CaptionBytes ?? 0) + (result?.VectorBytes ?? 0),
-            firstTimestampMs = current ? result!.FirstTimestampMs : (long?)null,
-            lastTimestampMs = current ? result!.LastTimestampMs : (long?)null,
-            durationMs = current ? (long)(result!.DurationSeconds * 1000m) : (long?)null,
-            originalsOpened = false, oneDriveHydrationRequested = false,
-            captionsReturned = false, embeddingsReturned = false,
-            videoJobsEnqueued = false, schemaChanged = false
-        }));
-        return current ? 0 : 1;
+        return result;
     }
+
 }

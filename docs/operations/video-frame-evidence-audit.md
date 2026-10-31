@@ -118,7 +118,15 @@ the DB portion is skipped and **does not** certify a live PostgreSQL test.
 
 Checkpoint 7's maintained-host durable two-frame publication remains
 accepted. Checkpoint 8 adds an audit/testing instrument and one-shot wall
-time only; it has **not** yet been run on the maintained catalogue. It does
+time only; the maintainer **successfully ran the read-only audit** on the
+published two-frame batch on 2026-10-31. It returned
+`current-complete`, 2/2 durable frames, 512 dimensions, 151 caption UTF-8
+bytes and 4,096 vector bytes (4,247 combined payload bytes), with sampled
+timestamps 3,075 and 9,225 milliseconds within 12,300 milliseconds.
+No originals, OneDrive hydration, caption/vector return, queue write or schema
+change was reported. This is currentness/storage verification only; it is
+not CPU/GPU accounting, retrieval quality or representative clip coverage.
+See the [separate scene coverage command](video-frame-scene-coverage.md). It does
 not grant permission to enable automatic video work, resume OneDrive
 online-only hydration or dispatch to Azure. Remaining WI-0190 acceptance:
 disturbance/cancellation/preemption tests, explicit unsupported/oversized
