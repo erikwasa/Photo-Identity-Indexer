@@ -4,7 +4,8 @@ param(
     [string]$BackupPath,
     [string]$VerificationDatabaseName,
     [switch]$ApplicationStopped,
-    [switch]$ResumeRestoredDatabase
+    [switch]$ResumeRestoredDatabase,
+    [switch]$RetainRestoredDatabase
 )
 
 Set-StrictMode -Version Latest
@@ -68,6 +69,11 @@ if ($null -eq $podman) {
 $composeDirectory = Join-Path $PSScriptRoot "deploy\postgres"
 $containerBackupPath = $null
 $containerId = $null
+$restoreCreated = $false
+$verificationPassed = $false
+$ownershipMarker = $null
+$reportPath = "$BackupPath.restore-verification.json"
+. (Join-Path $PSScriptRoot 'postgres-restore-lifecycle.ps1')
 
 function Invoke-DatabaseQuery {
     param(
@@ -146,20 +152,33 @@ try {
     if ([string]::IsNullOrWhiteSpace($VerificationDatabaseName)) {
         $VerificationDatabaseName = "photoidentity_restore_$((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss'))_$([Guid]::NewGuid().ToString('N').Substring(0, 6))"
     }
-    if ($VerificationDatabaseName -notmatch '^[a-z][a-z0-9_]{0,62}$') {
-        throw "Verification database name must contain only lowercase letters, digits and underscores and fit PostgreSQL's 63-character identifier limit."
+    if (-not (Test-GeneratedRestoreName $VerificationDatabaseName)) {
+        throw 'Verification database must use the exact generated photoidentity_restore_YYYYMMDDHHMMSS_xxxxxx naming convention.'
     }
     if ($VerificationDatabaseName -eq $sourceDatabase) {
         throw "The verification database must not be the production source database."
     }
 
     $sourceEvidence = Get-CatalogueEvidence -ContainerId $containerId -Database $sourceDatabase
+    $sourceSize = @(Invoke-DatabaseQuery -ContainerId $containerId -Database $sourceDatabase -Sql 'SELECT pg_database_size(current_database());')
+    if ($sourceSize.Count -ne 1) { throw 'Cannot determine approximate PostgreSQL restore space requirement.' }
+    $sourceDatabaseBytes = [long]$sourceSize[0]
+    Write-Host ("Approximate source database size: {0:N2} GiB; a full isolated restore may need similar additional PostgreSQL volume space." -f ($sourceDatabaseBytes / 1GB))
 
     if ($ResumeRestoredDatabase) {
-        Write-Host "Resuming verification of retained restored database '$VerificationDatabaseName'..."
-        # In resume mode, never create or restore a database.
+        Write-Host "Resuming read-only verification of retained restored database '$VerificationDatabaseName'..."
+        # Resume is deliberately non-destructive even after a passing comparison.
+        $existing = Get-RestoreDatabaseDetails -Name $VerificationDatabaseName
+        if ($null -eq $existing) {
+            throw "Retained verification database '$VerificationDatabaseName' does not exist."
+        }
+        $ownershipMarker = if ($existing.Owned) { $existing.Marker } else { $null }
     }
     else {
+        $previousOwned = @(Find-ExistingOwnedRestoresForHash -BackupSha256 $actualHash)
+        if ($previousOwned.Count -gt 0) {
+            throw "Owned restored database(s) for this exact backup already exist: $($previousOwned -join ', '). Resume or explicitly retire the existing copy before creating a second one."
+        }
         $exists = @(
             & $podman.Source exec `
                 -e "VERIFY_DATABASE=$VerificationDatabaseName" `
@@ -182,6 +201,11 @@ try {
             throw "Could not create the isolated restore-verification database."
         }
 
+        $restoreCreated = $true
+        $ownershipMarker = "photoidentity-restore:v1:$([Guid]::NewGuid().ToString('N')):$actualHash"
+        # Mark before copy/restore: interrupted or failed runs remain identifiable.
+        Set-RestoreDatabaseOwnership -Name $VerificationDatabaseName -Marker $ownershipMarker
+        Write-Host "Restore ownership recorded for '$VerificationDatabaseName'."
         $containerBackupPath = "/tmp/photoidentity-restore-$([Guid]::NewGuid().ToString('N')).dump"
         $containerDestination = "$containerId`:$containerBackupPath"
         & $podman.Source cp $BackupPath $containerDestination | Out-Null
@@ -220,6 +244,10 @@ try {
         }
     }
 
+    $restoredDetails = Get-RestoreDatabaseDetails -Name $VerificationDatabaseName
+    if ($null -eq $restoredDetails) { throw 'The verified restore disappeared before report publication.' }
+    $verificationPassed = $true
+    $retained = $ResumeRestoredDatabase -or $RetainRestoredDatabase
     $report = [ordered]@{
         capturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
         backupPath = $BackupPath
@@ -229,17 +257,71 @@ try {
         passed = $true
         sourceEvidence = $sourceEvidence
         restoredEvidence = $restoredEvidence
-        cleanupRequired = $true
-        privacyNote = "Credentials and connection strings are omitted. The isolated verification database is intentionally retained until the maintainer finishes inspection."
+        restoreOwnershipMarker = $ownershipMarker
+        sourceDatabaseBytes = $sourceDatabaseBytes
+        restoredDatabaseBytes = $restoredDetails.Bytes
+        cleanupStatus = $(if ($retained) { 'retained' } else { 'pending' })
+        cleanupRequired = [bool]$retained
+        privacyNote = 'The backup and its SHA-256/report remain intact. Only owned, isolated restore databases may be cleaned up.'
     }
-    $reportPath = "$BackupPath.restore-verification.json"
-    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+    # A durable passed report must exist before any destructive cleanup.
+    Write-RestoreVerificationReport -Path $reportPath -Report $report
 
-    Write-Host "PostgreSQL isolated restore verification passed."
+    if (-not $retained) {
+        try {
+            Remove-OwnedRestoreDatabase -Name $VerificationDatabaseName -ExpectedMarker $ownershipMarker -SourceDatabase $sourceDatabase
+        }
+        catch {
+            $cleanupError = $_.Exception.Message
+            $report.cleanupStatus = 'failed'
+            $report.cleanupRequired = $true
+            $report['cleanupError'] = $cleanupError
+            try {
+                Write-RestoreVerificationReport -Path $reportPath -Report $report
+            }
+            catch {
+                Write-Warning 'Cleanup failed and the failure report could not be saved; inspect the database manually.'
+            }
+            throw "Verification passed but cleanup failed for '$VerificationDatabaseName': $cleanupError"
+        }
+        $report.cleanupStatus = 'removed'
+        $report.cleanupRequired = $false
+        try {
+            Write-RestoreVerificationReport -Path $reportPath -Report $report
+        }
+        catch {
+            throw "Owned restore '$VerificationDatabaseName' was removed, but the final cleanup report could not be written. The previously published report has cleanupStatus=pending."
+        }
+    }
+
+    Write-Host 'PostgreSQL isolated restore verification passed.'
     Write-Host "source database: $sourceDatabase"
     Write-Host "verification database: $VerificationDatabaseName"
     Write-Host "report: $reportPath"
-    Write-Host "The verification database was retained intentionally. Follow the operations runbook to remove it after review."
+    Write-Host "cleanup: $($report.cleanupStatus)"
+}
+catch {
+    if ($restoreCreated -and -not $verificationPassed) {
+        $failureReport = [ordered]@{
+            capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+            backupSha256 = $actualHash
+            sourceDatabase = $sourceDatabase
+            verificationDatabase = $VerificationDatabaseName
+            restoreOwnershipMarker = $ownershipMarker
+            passed = $false
+            cleanupStatus = 'retained-failure'
+            cleanupRequired = $true
+            privacyNote = 'Partial/failed restore preserved for diagnosis. Do not delete without exact ownership validation.'
+        }
+        try {
+            Write-RestoreVerificationReport -Path $reportPath -Report $failureReport
+        }
+        catch {
+            Write-Warning 'Failure report could not be published; the isolated database was retained.'
+        }
+        Write-Warning "Retained failed/partial verification database '$VerificationDatabaseName'. Use -ResumeRestoredDatabase or the operator inventory tool."
+    }
+    throw
 }
 finally {
     if (-not [string]::IsNullOrWhiteSpace($containerBackupPath) -and -not [string]::IsNullOrWhiteSpace($containerId)) {
