@@ -546,6 +546,52 @@ several component-level safety and persistence checkpoints are
 successfully verified. No new local media run is required merely
 for PR review; defer costly local tests to a consolidated acceptance.
 
+## Development checkpoint 11 — offline CLIP retrieval quality gate (2026-11-01)
+
+After merged PR #689, both the approved interval two-frame real-video
+batch and the human-annotated scene-balanced production mode are
+represented in the current branch. **Only the prior interval happy path
+and batch audit were locally accepted**; actual annotated-scene quality
+and broad multi-clip throughput are still open.
+
+This checkpoint introduces `VideoFrameRetrievalEvaluation`, a pure
+bounded in-memory evaluator of the **already existing** max-cosine,
+top-k mean-cosine and deduplicated-pooled CLIP retrieval diagnostics.
+It evaluates each policy against the **same manually judged relevant
+clip identities**, reporting corpus-aggregate Hit@K, MRR@K, Recall@K,
+MAP@K and nDCG@K, with deterministic UUID ties and six-decimal metrics.
+It requires explicit matching finite nonzero vectors and complete,
+unique, corpus-internal relevance identifiers and validates a
+self-declared, consistent CLIP model fingerprint and preprocessing
+version. The manifest contract allows at most 32 clips, 32 queries,
+24 frames per clip, 2048 dimensions and a 16MiB input file.
+No production ranking policy is selected or activated.
+
+A new strictly offline `video frames evaluate-retrieval` CLI reads
+one operator-supplied **private local JSON manifest**, reports
+**numeric aggregates only**, and refuses UNC/reparse-point inputs,
+malformed or oversized JSON, unrecognized keys, invalid vectors or
+unjudged references. It never reads video originals, proxies,
+PostgreSQL, captions, inference models or Azure, and does not print
+private query/clip UUIDs, embeddings, filenames, model digests or
+manifest paths. Tests exercise a dataset where the three scoring
+policies disagree, correctness of top-1/top-2 ranking metrics, fixed
+tie behavior, malformed vector and provenance inputs, and safe
+redaction on invalid JSON. See the
+[checkpoint 11 runbook](../../operations/video-frame-retrieval-evaluation.md).
+
+**Scope honesty:** The manifest's model provenance is **operator
+self-reported**; this command neither generates text vectors from the
+approved CLIP model nor securely loads current vector batches from
+local PostgreSQL. Real quality assessment still needs a reviewed
+**read-only live-catalogue** evaluator to eliminate manual vector
+export, verified text/image model compatibility, representative
+human judgments, diverse scene coverage and CPU/GPU/Azure cost
+instrumentation. This development adds the reusable evaluation and
+privacy gate, **not** verified live relevance, and WI-0190 remains
+`in_progress`, **0/4 full acceptance**. No local media work or
+repeating the accepted two-frame audit is needed to review this PR.
+
 ## Completion notes
 
 - Files changed:
