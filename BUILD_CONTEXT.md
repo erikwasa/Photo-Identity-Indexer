@@ -3,7 +3,7 @@
 **2026-11-01 WI-0190 checkpoint 10 (new PR):** PR #687 merged.
 The maintained-host checkpoint 8 read-only two-frame audit is accepted;
 do not ask to repeat it. New work implements **actual selected-scene
-durable frame evidence**, using 1–8 privately human-annotated scene
+durable frame evidence**, using 1–6 privately human-annotated scene
 cuts, canonical regenerable job policy, independent idempotency,
 the existing current locally published SDR proxy, supervised FFmpeg,
 CLIP and controlled loopback caption inference. Default interval
