@@ -1,5 +1,22 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 10 (new PR):** PR #687 merged.
+The maintained-host checkpoint 8 read-only two-frame audit is accepted;
+do not ask to repeat it. New work implements **actual selected-scene
+durable frame evidence**, using 1–8 privately human-annotated scene
+cuts, canonical regenerable job policy, independent idempotency,
+the existing current locally published SDR proxy, supervised FFmpeg,
+CLIP and controlled loopback caption inference. Default interval
+path and explicit apply/2 acknowledgments unchanged. Core, one-shot
+preflight and synthetic PostgreSQL tests cover provenance, distinct
+jobs, complete indexed frames and zero-write refusal. No migration
+or automatic scene detection/worker/cloud fallback. CI unverified
+until Windows jobs complete. WI-0190 stays in_progress, 0/4 full
+formal acceptance; remaining broad clips, actual quality and
+CPU/GPU/Azure/throughput costs, interruption, and retrieval
+evaluation should be bundled for consolidated operator acceptance.
+See docs/operations/video-frame-evidence-annotated-one-shot.md.
+
 **2026-10-31 WI-0190 checkpoint 9 (PR #687):** The maintainer completed
 checkpoint 8's read-only PostgreSQL audit successfully: current-complete,
 2/2 durable frames, 512 dimensions, 151 caption bytes, 4096 vector bytes,
