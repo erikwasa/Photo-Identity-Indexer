@@ -20,6 +20,8 @@ public sealed class VideoExperimentalProxyAdapter(
     VideoProxyEncodingProfile? encodingProfile = null)
     : IVideoPublishedDerivativeAdapter
 {
+    public string? RequiredDerivativeKind => "PlayableProxy";
+
     public async Task<VideoDerivativeAttemptReport> ProcessAsync(
         VideoProcessingJobLease lease, CancellationToken token)
     {

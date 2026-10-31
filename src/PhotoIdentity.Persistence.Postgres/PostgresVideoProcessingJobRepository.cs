@@ -238,8 +238,11 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
     public async Task<VideoProcessingJobLease?> TryClaimNextAsync(
         VideoProcessingBudget budget, bool photoWorkActive,
         CancellationToken token = default, Guid? selectedJobId = null,
-        bool requireArchiveCoverage = false)
+        bool requireArchiveCoverage = false,
+        string? requiredDerivativeKind = null)
     {
+        if (requiredDerivativeKind is not null and not ("PlayableProxy" or "FrameEvidence" or "FaceEvidence"))
+            throw new ArgumentException("Only an approved derivative kind can restrict a claim.", nameof(requiredDerivativeKind));
         ArgumentNullException.ThrowIfNull(budget);
         budget.Validate();
         if (!budget.Enabled || budget.Paused || photoWorkActive ||
@@ -341,6 +344,7 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 WHERE job.status = 'queued' AND job.cancellation_requested_at_utc IS NULL
                   AND job.attempt_count < 3 AND job.available_at_utc <= now()
                   AND (NOT @restrict_job OR job.id=@selected_job)
+                  AND (NOT @restrict_kind OR job.derivative_kind=@required_kind)
                   AND (NOT @require_archive_coverage OR EXISTS (
                       SELECT 1 FROM archive_configuration archive
                       JOIN archive_included_folders included
@@ -376,6 +380,8 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                 ORDER BY job.requested_at_utc, job.id
                 LIMIT 1 FOR UPDATE OF job SKIP LOCKED;
                 """;
+            select.Parameters.AddWithValue("restrict_kind", requiredDerivativeKind is not null);
+            select.Parameters.AddWithValue("required_kind", requiredDerivativeKind ?? string.Empty);
             select.Parameters.AddWithValue("restrict_job", selectedJobId.HasValue);
             select.Parameters.AddWithValue("selected_job", selectedJobId ?? Guid.Empty);
             select.Parameters.AddWithValue("require_archive_coverage", requireArchiveCoverage);

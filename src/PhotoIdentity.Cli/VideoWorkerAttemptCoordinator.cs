@@ -12,6 +12,10 @@ namespace PhotoIdentity.Cli;
 /// </summary>
 public interface IVideoPublishedDerivativeAdapter
 {
+    // Null preserves legacy synthetic adapters; production adapters should
+    // specify an exact type so a worker never consumes an unrelated job.
+    string? RequiredDerivativeKind => null;
+
     Task<VideoDerivativeAttemptReport> ProcessAsync(
         VideoProcessingJobLease lease, CancellationToken token);
 }
@@ -60,7 +64,8 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         var queue = new PostgresVideoProcessingJobRepository(database);
         VideoProcessingJobLease? lease = await queue.TryClaimNextAsync(
             budget, photoWorkActive: false, token: token,
-            selectedJobId: selectedJobId, requireArchiveCoverage: requireArchiveCoverage);
+            selectedJobId: selectedJobId, requireArchiveCoverage: requireArchiveCoverage,
+            requiredDerivativeKind: adapter.RequiredDerivativeKind);
         if (lease is null)
             return new(false, false, "no-admissible-job");
 
@@ -147,12 +152,25 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         // The adapter cannot authorize success by returning true. It must
         // have committed a durable revision/exclusion/lease-fenced result.
         VideoProcessingJobState? state;
-        VideoPublishedDerivativeReceipt? receipt;
+        bool receiptCurrent;
         try
         {
             state = await queue.GetAsync(lease.Id, token);
-            receipt = await new PostgresVideoPublishedDerivativeRepository(database)
-                .GetCurrentAsync(lease.Id, token);
+            // A successful adapter report must match the durable receipt
+            // belonging to the claimed derivative kind. Frame evidence has
+            // no MP4 publication receipt, and must never be rejected for
+            // not having one (nor accepted based only on in-memory success).
+            receiptCurrent = lease.DerivativeKind switch
+            {
+                "PlayableProxy" => (await new PostgresVideoPublishedDerivativeRepository(database)
+                    .GetCurrentAsync(lease.Id, token)) is { } proxy &&
+                    proxy.RevisionId == lease.RevisionId.Value,
+                "FrameEvidence" => (await new PostgresVideoFrameEvidenceRepository(database)
+                    .GetCurrentAsync(lease.Id, token)) is { } evidence &&
+                    evidence.Provenance.RevisionId == lease.RevisionId &&
+                    evidence.Items.Count == lease.RequestedFrames,
+                _ => false
+            };
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -165,8 +183,7 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
         }
 
         if (state?.Status == "succeeded" && state.ProgressPercent == 100 &&
-            !state.CancellationRequested && receipt is not null &&
-            receipt.RevisionId == lease.RevisionId.Value)
+            !state.CancellationRequested && receiptCurrent)
             return new(true, true, "published");
 
         // Never grant a successful result to an adapter that forgot or

@@ -194,6 +194,59 @@ evaluation are still open. **0/4 formal WI-0190 acceptance criteria checked**
 because no real-video evidence is yet published through this new path.
 See [v38 operations gate](../../operations/video-frame-evidence-v38.md).
 
+## Maintainer local database verification — accepted evidence (2026-10-31)
+
+The maintainer explicitly reported **successful local database migration
+verification** for checkpoint 4's v37→v38 gate, following the isolated
+backup/restore rehearsal instructions. The precise database counts and
+individual command output were not supplied with this report, so they are
+**not** invented here. This confirms the operator's local migration
+checkpoint has passed; it does not by itself certify any real-video
+FrameEvidence publication, worker activation or private-media quality.
+No need to repeat the Azure/CLIP pilot solely for this migration milestone.
+
+## Development checkpoint 5 — lease-monitored frame evidence worker boundary (2026-10-31)
+
+The existing video queue and one-shot coordinator now have a **derivative-kind
+claim filter** so a FrameEvidence adapter never accidentally claims an
+older PlayableProxy or FaceEvidence job. The existing approved playable-proxy
+adapters explicitly declare PlayableProxy; existing synthetic coordinator
+tests retain their legacy generic adapter behavior.
+
+A new **unregistered** `VideoFrameEvidenceWorkerAdapter` accepts a
+complete timestamped frame batch from a separate, future reviewed
+`IVideoFrameEvidenceProducer`. For an already-claimed bounded FrameEvidence
+job, it checks lease/source/control/photo-priority before production and
+before commit, renews the lease on a bounded timer, propagates cancellation,
+runs exact plan/revision/frame-count validation and invokes v38's atomic
+PostgreSQL publisher. Monitoring is awaited on every outcome. The coordinator
+now verifies the durable **FrameEvidence batch receipt** and completed job,
+rather than incorrectly requiring an MP4 playable-proxy receipt or believing
+an adapter's in-memory success claim.
+
+Disposable PostgreSQL integration tests supply only synthetic in-memory
+captions/vectors, and cover correct-kind selection with an older proxy job
+queued, successful atomic publication, incomplete-batch denial, forged
+success denial, operator pause, and physical exclusion purge. No personal
+media, model server, cloud access, FFmpeg, original file, online-only
+hydration, web API or unattended worker is involved.
+
+**What is not implemented or authorized:** a concrete media producer
+that securely stages a registered video proxy and uses supervised FFmpeg,
+CLIP and optional operator-controlled Azure captions while honoring live
+lease cancellation. The project continues to keep real-video one-shot CLI
+execution blocked by its independent media-isolation gate. This checkpoint
+adds the reusable **job/persistence** half, not activation. Next work should
+build and independently validate a bounded producer using the already
+verified read-only registered-proxy pilot, then connect it only under
+explicitly approved opt-in operator control.
+
+**Formal WI-0190 status remains in progress, 0/4 full acceptance.** The
+maintained-host v38 migration gate and transient Azure/CLIP pilot are
+verified; end-to-end persistent *real-video* frame evidence and full
+representative-media evaluation are still required. See
+[checkpoint 5 operations](../../operations/video-frame-evidence-worker-boundary.md).
+
 ## Completion notes
 
 - Files changed:

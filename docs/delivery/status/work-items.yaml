@@ -104,7 +104,7 @@ work_items:
   document: ../work-items/WI-0190-video-frame-caption-embedding.md
   started_at: 2026-10-31
   last_updated_at: 2026-10-31
-  branch: agent/WI-0190-v38-atomic-frame-evidence-foundation
+  branch: agent/WI-0190-frame-evidence-lease-worker-boundary
   blockers:
   - WI-0151
   - WI-0188
@@ -114,6 +114,10 @@ work_items:
     value: docs/operations/video-frame-evidence-sampling.md
   - type: documentation
     value: docs/operations/video-registered-proxy-frame-pilot.md
+  - type: documentation
+    value: docs/operations/video-frame-evidence-v38.md
+  - type: documentation
+    value: docs/operations/video-frame-evidence-worker-boundary.md
 - id: WI-0191
   title: Offer opt-in semantic and caption search over indexed videos
   milestone: M30
