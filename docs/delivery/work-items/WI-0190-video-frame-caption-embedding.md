@@ -156,6 +156,12 @@ frame count and embedding dimensions. Each child frame stores its exact
 timestamp, optional scene index, bounded caption, and portable
 little-endian float32 vector bytes.
 
+A source-copy exclusion INSERT now physically deletes matching private frame
+batches (and cascades to their captions/vectors), serialized against the
+publisher's source lock. Deletion of a revision also cascades through foreign
+keys. Worker cancellation/purge integration and retention auditing remain
+future work.
+
 An explicit, **unregistered** `PostgresVideoFrameEvidenceRepository`
 publishes only fully validated caption+embedding batches under an existing
 `FrameEvidence` job's live lease. Within **one PostgreSQL transaction**
@@ -182,8 +188,8 @@ this slice adds no API and no automatic `FrameEvidence` worker.
 **Progress:** The maintained Windows Azure+CLIP pilot produced two complete
 transient frames successfully. v38 now defines and fences their **future
 durable storage**. An actual production worker/lease heartbeat, opt-in
-queue wiring, cancellation/recovery, physical exclusion purge, searchable
-current-evidence API, HDR/multi-scene/low-light coverage and quality/cost
+queue wiring, cancellation/recovery, end-to-end exclusion/purge orchestration,
+searchable current-evidence API, HDR/multi-scene/low-light coverage and quality/cost
 evaluation are still open. **0/4 formal WI-0190 acceptance criteria checked**
 because no real-video evidence is yet published through this new path.
 See [v38 operations gate](../../operations/video-frame-evidence-v38.md).
