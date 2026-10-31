@@ -346,7 +346,7 @@ public static class Program
                   (default dry-run; apply queues/claims at most one current
                    locally published proxy's frame evidence, scoped 15m,
                    persists to PostgreSQL v38, disarms after one attempt;
-                   optional 1..8 manual scene cuts use a distinct regenerable
+                   optional 1..6 manual scene cuts use a distinct regenerable
                    private job sampling identity; interval remains default;
                    JPEG pixels may go to operator-selected loopback Ollama bridge)
 
