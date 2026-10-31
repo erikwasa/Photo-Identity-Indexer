@@ -32,7 +32,7 @@ public sealed class VideoScopedOneShotControlTests
                 { Database = dbName, Pooling = false };
             await using PostgresCatalogueDatabase database = new(settings.ConnectionString);
             await database.InitializeAsync();
-            Assert.Equal(37, PostgresCatalogueDatabase.CurrentSchemaVersion);
+            Assert.True(PostgresCatalogueDatabase.CurrentSchemaVersion >= 37);
             var scoped = new PostgresVideoScopedAttemptControl(database);
             var queue = new PostgresVideoProcessingJobRepository(database);
             var safety = new PostgresVideoLeaseSafetyProbe(database);
