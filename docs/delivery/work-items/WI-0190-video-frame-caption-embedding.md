@@ -437,6 +437,54 @@ does not activate unattended workers, implement scene detection or
 authorize Azure inference. WI-0190 remains `in_progress` and formal
 acceptance remains **0/4**.
 
+## Maintainer verification — checkpoint 8 metadata-only batch audit (2026-10-31)
+
+The maintainer **successfully ran** `video frames audit` for the actual
+published FrameEvidence UUID after PR #685 merged. Sanitized result:
+`readOnly=true`, `current=true`, `reasonCode=current-complete`,
+expected/durable frames **2/2**, embedding dimensions **512**, caption
+UTF-8 payload **151 bytes**, vector bytes **4,096**, combined payload
+**4,247 bytes**, first/last sampled timestamps **3,075 / 9,225 ms**
+within a **12,300 ms** inspected duration. Report flags confirmed no
+original opened, no OneDrive hydration, no captions/embeddings returned,
+no video job enqueued and no schema change. This is accepted **local
+currentness and payload-baseline evidence**, not local relevance,
+scene recall, motion/audio claims or CPU/GPU/billing evidence.
+No need to repeat this read-only audit solely for checkpoint 8.
+
+## Development checkpoint 9 — read-only human-annotated scene coverage (2026-10-31)
+
+Add `video frames coverage`, a strict **read-only**, local PostgreSQL
+v38 audit for one already-published FrameEvidence job. Given numeric
+scene boundary timestamps **manually annotated** by an authorized
+operator, it reuses checkpoint 8's complete/current/exclusion/revision
+predicate **in the same repeatable-read read-only transaction**, reads
+only persisted numeric frame ordinals and timestamps and calculates the
+number and indices of covered/missed scenes. It also computes purely
+hypothetical interval and scene-balanced sampling at the **same frame
+count** to make sampling trade-offs measurable; none of these simulations
+publish, decode, or replace the original frames.
+
+The policy is pure and bounded: 1–24 stored frames, up to 128 strictly
+increasing scene cuts, valid clip duration, seek positions and
+scene-start boundary assignment; coverage reports are numeric only.
+Synthetic tests cover malformed inputs, short/long clips and missed
+scenes, and disposable PostgreSQL tests cover a current batch and
+fail-closed stale/excluded batches. The maintainer's exact real-video
+annotation and multi-clip scene-recall/quality evaluation **remain
+local verification**, not synthetic CI certification. See
+[scene coverage operations](../../operations/video-frame-scene-coverage.md).
+
+**No automatic scene detection, scene-aware actual frame extraction,
+unattended worker, OneDrive hydration, Azure dispatch, new schema or
+new production search ranking** is introduced. The selected one-shot
+still caps at two interval samples. This provides a measurement
+instrument toward criterion 3, but **all four full acceptance criteria
+remain open** until varied maintained-host samples, retrieval quality,
+resource costs and disruption checks are evidenced. Checkpoint 8's
+successful audit does not change WI-0190's `in_progress`/0-of-4 formal
+acceptance state.
+
 ## Completion notes
 
 - Files changed:
