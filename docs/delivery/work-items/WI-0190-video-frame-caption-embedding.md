@@ -399,6 +399,42 @@ and local verification; no automatic worker or Azure fallback was enabled.
 **WI-0190 stays in_progress with 0/4 full acceptance criteria checked.**
 Checkpoint 7 is accepted; the work item is **not** complete.
 
+## Development checkpoint 8 — read-only frame evidence audit and bounded cost baseline (2026-10-31)
+
+Added a strict, **read-only** `video frames audit` CLI requiring the opaque
+FrameEvidence **job UUID** (not the original/source path or PlayableProxy UUID).
+Against an already-current local PostgreSQL v38 catalogue it uses a repeatable-
+read, read-only transaction. Server-side metadata queries report currentness,
+source exclusion, latest revision, supported SDR inspection, succeeded job,
+complete ordered timestamps, vector lengths, frame count, caption/vector
+**byte counts only**, and a sanitized reason code. No source paths,
+originals, OneDrive, FFmpeg, network inference, captions or embeddings are
+read or returned; no migration or queue/control write is possible. This
+gives the operator a repeatable way to prove a successful two-frame batch is
+still current and to measure a partial per-clip storage payload baseline.
+
+The explicit selected-one-shot's JSON now includes a numeric
+`executionWallMs` for the attempted worker cycle plus disarm so the
+maintainer can begin recording throughput across representative inputs.
+This is **not** GPU/CPU consumption or billed Azure cost. The batch audit
+counts caption/vector payload only and excludes PostgreSQL page/index/WAL
+overhead and registered proxy storage.
+
+Parser/fail-closed unit tests and disposable PostgreSQL integration tests
+cover valid two-frame evidence, a newer revision making evidence stale, and
+source-copy exclusion physically purging evidence. These test cases are
+synthetic and have **not** been run on the maintainer's environment.
+[Checkpoint 8 operator procedure](../../operations/video-frame-evidence-audit.md).
+
+**Next development/local gates:** actual cancellation/photo-preemption/
+disarm-under-failure regression, unsupported and oversized rejection,
+short/multi-scene/long/rotated/low-light sampling benchmark and human
+relevance judgment, and measured CPU/GPU/throughput/real storage costs.
+Two-frame interval sampling remains intentionally limited. The new audit
+does not activate unattended workers, implement scene detection or
+authorize Azure inference. WI-0190 remains `in_progress` and formal
+acceptance remains **0/4**.
+
 ## Completion notes
 
 - Files changed:
