@@ -184,6 +184,29 @@ jobs:
           }
           Write-Host 'Offline and manual-review runners parse and expose expected parameters.'
 
+      - name: Verify WI-0208 restore-copy ownership guards
+        shell: pwsh
+        run: |
+          $scripts = @(
+            'postgres-restore-lifecycle.ps1',
+            'verify-postgres-backup-restore.ps1',
+            'manage-postgres-restores.ps1',
+            'tests/PowerShell/postgres-restore-lifecycle.tests.ps1',
+            'tests/PowerShell/fake-podman-restore.ps1',
+            'tests/PowerShell/postgres-restore-verifier.integration.ps1',
+            'tests/PowerShell/postgres-restore-disposable.integration.ps1'
+          )
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path -LiteralPath $script).Path, [ref]$tokens, [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) { throw "PowerShell parser rejected $script : $($errors -join '; ')" }
+          }
+          ./tests/PowerShell/postgres-restore-lifecycle.tests.ps1
+          ./tests/PowerShell/postgres-restore-verifier.integration.ps1
+
       - name: Run quarantined integration diagnostics
         id: flaky-integration-diagnostics
         continue-on-error: true
