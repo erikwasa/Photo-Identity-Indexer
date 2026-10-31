@@ -4,7 +4,7 @@ title: Extract timestamped video-frame captions and visual embeddings
 milestone: M30
 status_source: PhotoIdentity.Docs
 depends_on: [WI-0151, WI-0188]
-related_adrs: []
+related_adrs: [ADR-0012, ADR-0013]
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Recognition.Onnx, docs]
 ---
 
@@ -17,7 +17,7 @@ Analyze selected clips through bounded frames/scenes and store versioned visual 
 ## In scope
 
 - Compare interval and scene/keyframe sampling; cap decoded duration, sampled frames and frames per scene, including on long videos.
-- Reuse local still-image caption/CLIP processing only after verifying preprocessing/model compatibility; no mandatory video-specific foundation model.
+- Reuse existing still-image caption/CLIP processing only after verifying preprocessing/model compatibility; no mandatory video-specific foundation model. Local is the default, but ADR-0013 permits a **separately implemented** opt-in operator-managed Azure inference route. Frame resolution, prompt/context, sampling and inference bounds must be evaluated for video, not silently inherited from photo-caption defaults.
 - Persist timestamp/interval, frame policy, source revision, model/checksum, preprocessing version, generated caption and vector with provenance and optional conservative per-video summary.
 - Evaluate top-k/max similarity versus pooled/deduplicated frame evidence for later clip-level retrieval; report coverage and cost.
 - Explain that sampled frames cannot prove motion between frames, speech, sound or precise events; generated descriptions are not verified manual tags.

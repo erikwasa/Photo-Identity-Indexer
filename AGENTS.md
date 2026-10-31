@@ -15,7 +15,7 @@
 - Keep the solution a modular monolith until an accepted ADR says otherwise.
 - Core/domain code must not expose EF Core, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
 - Personal OneDrive is accessed through the Windows sync client, not Microsoft Graph.
-- Production model execution and archive processing run on maintainer-controlled local hardware; ADR-0010 supersedes the earlier disposable-Azure strategy.
+- Local processing is the normal default; ADR-0013 allows purpose-scoped opt-in inference on operator-managed Azure resources, not unvetted opaque AI services. PostgreSQL, OneDrive access, source/privacy decisions and canonical authority remain local.
 - PostgreSQL is the sole writable production catalogue. The SQLite implementation and executable compatibility paths are retired; preserved SQLite material is historical migration evidence only unless a future ADR changes that authority boundary.
 - Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
@@ -29,7 +29,7 @@
 - A contract change must be explicit and documented.
 - Avoid unrelated refactoring.
 - Keep model preprocessing beside the relevant adapter.
-- Do not revive Azure/cloud execution work from historical documents; a future remote-compute path requires a new ADR and newly scoped work.
+- Do not revive the retired M09–M11 Azure VM/checkpoint roadmap. ADR-0013 authorizes optional operator-controlled inference; any new remote implementation beyond the existing caption bridge needs scoped repository work, documented safety controls and verification.
 
 ## Privacy
 

@@ -1,10 +1,10 @@
 ---
 id: ADR-0010
 title: Keep production processing on local hardware
-status: accepted
+status: superseded
 date: 2026-09-12
 supersedes: [ADR-0004]
-superseded_by: []
+superseded_by: [ADR-0013]
 ---
 
 # ADR-0010: Keep production processing on local hardware
@@ -32,3 +32,7 @@ A future cloud or remote-compute path would require a new architecture decision 
 - Full-archive operation is judged on the local production system. M24/WI-0106 provides the accepted archive-scale catch-up and daily-increment evidence.
 - No Azure-specific checkpointing, VM lifecycle, Blob/SAS or local/cloud numerical-consistency work is required for the current roadmap.
 - Portable job bundles remain useful as a compute-isolation/file-transfer contract, but they no longer imply planned Azure execution.
+
+## Supersession (2026-10-31)
+
+[ADR-0013](ADR-0013-optional-operator-controlled-remote-compute.md) replaces the general local-only inference rule with local-first default plus explicitly operator-authorized inference on maintainer-managed Azure resources. The retired M09–M11 roadmap and local PostgreSQL/control authority remain unchanged.

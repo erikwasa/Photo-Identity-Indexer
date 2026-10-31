@@ -64,7 +64,7 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Identity-free execution](azure/identity-free-execution.md)
 - [Cost controls](azure/cost-controls.md)
 
-Most Azure documentation is retained as historical design/reference material. [ADR-0010](decisions/ADR-0010-local-production-execution.md) establishes maintainer-controlled local hardware as the normal production execution strategy. [ADR-0011](decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) adds one narrow operator-authorized exception for temporary generated-caption inference through a localhost bridge; it does not revive general Azure archive processing.
+The retired Azure VM/checkpoint strategy remains historical. [ADR-0013](decisions/ADR-0013-optional-operator-controlled-remote-compute.md) keeps normal processing local while allowing deliberate inference in operator-controlled Azure apps, not unvetted third-party black-box services. [ADR-0011](decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) is the existing photo-caption bridge; video offload requires its own implementation.
 
 ## Delivery
 

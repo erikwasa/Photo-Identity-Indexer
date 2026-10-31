@@ -1,14 +1,15 @@
 # Security and privacy
 
-Face crops, embeddings and identity labels are sensitive biometric data.
+Face crops, embeddings and identity labels are sensitive biometric data. Photos and video frames can also contain private content.
 
 Requirements:
 
 - Personal OneDrive authentication remains inside the official Windows client.
 - No OneDrive password or personal account token enters the application or Azure.
-- Azure receives only explicit bundles; full originals are uploaded only when required.
+- Azure may receive only explicitly operator-authorized, purpose-scoped input to vetted, maintainer-operated application/model endpoints (including bounded photo thumbnails or video frames). **Do not use unvetted third-party black-box AI/vision services, including Microsoft/Azure managed inference APIs.** Review runtime dependencies, model weights and platform privacy before use.
+- Original photos/videos, face data, paths, location/identity metadata or whole archives are not implicitly transferred; additional sensitive input requires a separately approved task-specific need and retention policy. Verify source exclusion and revision before export and before local publication.
 - Prefer crop-only bundles for embedding comparisons.
-- Protect bundles during transfer and keep temporary storage private.
+- Protect remote inputs during authenticated encrypted transport and keep temporary storage private; restrict endpoint/network access, minimize platform/runtime logs and define remote retention, deletion and scale-to-zero controls.
 - Short-lived SAS credentials, when used, must be narrowly scoped and never logged.
 - Protect SSH keys locally.
 - Delete temporary Azure inputs after verified result import.

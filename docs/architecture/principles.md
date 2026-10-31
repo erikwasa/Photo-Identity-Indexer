@@ -2,7 +2,7 @@
 
 ## Local ownership and execution
 
-The local system owns assets, revisions, face occurrences, crops, model definitions, embeddings, people, assignments, rejections, suggestions, evaluations and processing history. Production model execution and archive processing run on maintainer-controlled local hardware; see ADR-0010.
+The local system owns assets, revisions, face occurrences, crops, model definitions, embeddings, people, assignments, rejections, suggestions, evaluations and processing history. Normal model execution and archive processing run locally; ADR-0013 permits explicitly authorized, bounded inference on operator-managed Azure infrastructure without transferring catalogue/control authority.
 
 The authoritative PostgreSQL catalogue, private source access, review history and derived biometric data remain local. Personal OneDrive is accessed through the Windows sync client rather than a cloud API.
 
@@ -24,7 +24,7 @@ Use enforceable module boundaries without premature distributed services.
 
 Use C# for orchestration, inference, persistence, APIs, UI and bundles. Isolate Python behind neutral files when it provides a material advantage.
 
-Portable bundle contracts may support offline transfer or isolated processing, but no cloud execution target is currently planned. A future remote/cloud architecture requires a new ADR.
+Portable bundles can support offline or isolated processing. ADR-0013 permits optional operator-controlled Azure inference; any new remote integration still requires separately scoped work, safeguards and acceptance evidence.
 
 ## Read-only photo archive
 

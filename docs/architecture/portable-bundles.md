@@ -86,12 +86,10 @@ Choose the least revealing profile that still supports the accepted task. All pr
 
 ## Current execution strategy
 
-ADR-0010 establishes local production execution. Portable bundles no longer imply a planned Azure scale-out path. The earlier Azure use described by ADR-0004 is historical and the associated M09/M10 work is retired.
-
-A future remote/cloud processing target would require a new architecture decision covering trust, transfer, recovery and operating cost before portable bundles are used that way.
+ADR-0013 keeps local processing as the normal default while permitting operator-controlled Azure inference with explicit task approval, privacy, transfer, provenance, recovery, cleanup and cost boundaries. Portable bundles could support a later verified remote worker, but no general Azure bundle worker is enabled today. The former M09/M10 Azure VM/checkpoint roadmap remains retired.
 
 ## Retention
 
 Delete temporary transfer archives and remote/local copies after validated import and required diagnostics. Keep private bundles outside Git and protect them as biometric processing data.
 
-See [Architecture overview](overview.md), [Module boundaries](module-boundaries.md), [Canonical data model](data-model.md), [ADR-0010](../decisions/ADR-0010-local-production-execution.md) and the [Glossary](../glossary.md).
+See [Architecture overview](overview.md), [Module boundaries](module-boundaries.md), [Canonical data model](data-model.md), [ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md) and the [Glossary](../glossary.md).

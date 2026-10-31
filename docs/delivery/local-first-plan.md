@@ -4,7 +4,7 @@ Local operation is the durable product strategy.
 
 The maintainer-controlled Windows computer is the trusted application/control environment. It owns the normal Photo Identity runtime, private configuration, model execution and access to Personal OneDrive through the Windows sync client. PostgreSQL running on the maintainer's hardware is the sole writable production catalogue. Personal photos, derived biometric data and review history remain under local control.
 
-[ADR-0010](../decisions/ADR-0010-local-production-execution.md) supersedes the earlier disposable-Azure execution plan. Azure is not a planned processing target. Existing Azure and portable-bundle documentation may remain as historical design/reference material, but current delivery work does not depend on a cloud pilot, cloud checkpointing or local/cloud consistency evidence.
+[ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md) preserves local-first production while allowing deliberate, bounded inference on operator-controlled Azure applications. It prohibits unvetted black-box third-party inference; it does not revive the retired M09–M11 Azure VM/checkpointing/model-selection roadmap.
 
 ## Current operating shape
 
@@ -36,7 +36,7 @@ M09, M10 and M11 are closed as retired planning work:
 - M10/WI-0021 — Azure checkpointing: not executed and no longer needed.
 - M11/WI-0022 — Azure-dependent production-model selection contract: replaced by the governed local production configuration.
 
-A future remote/cloud execution path would require a new ADR and new work items.
+ADR-0013 authorizes optional operator-managed Azure inference. Any new remote integration beyond the already accepted ADR-0011 caption bridge requires scoped repository-native work, controls, and acceptance evidence.
 
 ## Delivery rule
 
