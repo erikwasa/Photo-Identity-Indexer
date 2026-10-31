@@ -141,6 +141,61 @@ public sealed class VideoScopedOneShotControlTests
             Assert.True(control.Paused);
             Assert.Null(control.SelectedJobId);
             Assert.Null(control.AuthorizationExpiresAtUtc);
+
+            // The previous cancelled PlayableProxy lease is deliberately
+            // still running until expiry recovery. A second job MUST NOT
+            // be armed while that global slot is occupied.
+            await using (NpgsqlConnection recoveryConnection =
+                await database.OpenConnectionAsync())
+            await using (NpgsqlCommand expireLease =
+                recoveryConnection.CreateCommand())
+            {
+                expireLease.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET leased_until_utc=now()-interval '1 second'
+                    WHERE id=@job AND status='running';
+                    """;
+                expireLease.Parameters.AddWithValue("job", selectedJob);
+                Assert.Equal(1, await expireLease.ExecuteNonQueryAsync());
+            }
+            Assert.Equal(1, await queue.RecoverExpiredAsync());
+            Assert.Equal("cancelled", (await queue.GetAsync(selectedJob))?.Status);
+
+            // The v37 default grant still cannot claim FrameEvidence.
+            // Only a separate operator-selected FrameEvidence grant can
+            // arm that kind; its one-job selection remains SQL fenced.
+            string framePreset = "wi0190-sdr-frame-jpeg-v1";
+            Guid frameJob = await queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    AssetRevisionId.From(selectedRevision),
+                    VideoDerivativeKind.FrameEvidence,
+                    VideoFrameSamplingPlanner.PolicyVersion, framePreset,
+                    FfmpegHash), budget, candidate with { RequestedFrames = 1 });
+            Assert.Null(await scoped.ArmAsync(frameJob, FfmpegHash,
+                framePreset, TimeSpan.FromMinutes(2)));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                scoped.ArmAsync(frameJob, FfmpegHash,
+                    framePreset, TimeSpan.FromMinutes(2),
+                    derivativeKind: "FaceEvidence"));
+            VideoScopedAttemptGrant frameGrant =
+                Assert.IsType<VideoScopedAttemptGrant>(
+                    await scoped.ArmAsync(frameJob, FfmpegHash,
+                        framePreset, TimeSpan.FromMinutes(2),
+                        derivativeKind: "FrameEvidence"));
+            Assert.Equal(frameJob, frameGrant.JobId);
+            VideoProcessingJobLease frameLease =
+                Assert.IsType<VideoProcessingJobLease>(
+                    await queue.TryClaimNextAsync(
+                        budget, photoWorkActive: false,
+                        selectedJobId: frameJob,
+                        requiredDerivativeKind: "FrameEvidence"));
+            Assert.Equal("FrameEvidence", frameLease.DerivativeKind);
+            Assert.Equal(frameJob, frameLease.Id);
+            Assert.True((await safety.CheckAsync(frameLease)).Allowed);
+            Assert.True(await scoped.DisarmAsync(frameGrant));
+            Assert.False((await safety.CheckAsync(frameLease)).Allowed);
+            Assert.False((await new PostgresVideoProcessingControlRepository(database)
+                .GetAsync()).Enabled);
         }
         finally
         {

@@ -15,9 +15,11 @@ public sealed class PostgresVideoScopedAttemptControl(PostgresCatalogueDatabase 
 {
     public async Task<VideoScopedAttemptGrant?> ArmAsync(
         Guid jobId, string expectedToolSha256, string expectedPreset,
-        TimeSpan authorizationWindow, CancellationToken token = default)
+        TimeSpan authorizationWindow, CancellationToken token = default,
+        string derivativeKind = "PlayableProxy")
     {
-        if (jobId == Guid.Empty || !VideoDerivativeArtifactPath.IsHash(expectedToolSha256) ||
+        if (derivativeKind is not ("PlayableProxy" or "FrameEvidence") ||
+            jobId == Guid.Empty || !VideoDerivativeArtifactPath.IsHash(expectedToolSha256) ||
             string.IsNullOrWhiteSpace(expectedPreset) ||
             authorizationWindow < TimeSpan.FromMinutes(1) ||
             authorizationWindow > TimeSpan.FromMinutes(15))
@@ -80,7 +82,7 @@ public sealed class PostgresVideoScopedAttemptControl(PostgresCatalogueDatabase 
                   JOIN video_revision_metadata metadata
                     ON metadata.asset_revision_id=revision.id
                   WHERE job.id=@job AND job.status='queued'
-                    AND job.derivative_kind='PlayableProxy'
+                    AND job.derivative_kind=@kind
                     AND job.tool_sha256=@tool AND job.preset_version=@preset
                     AND job.attempt_count < 3
                     AND job.available_at_utc<=now()
@@ -101,6 +103,7 @@ public sealed class PostgresVideoScopedAttemptControl(PostgresCatalogueDatabase 
                 );
                 """;
             selected.Parameters.AddWithValue("job", jobId);
+            selected.Parameters.AddWithValue("kind", derivativeKind);
             selected.Parameters.AddWithValue("tool", expectedToolSha256);
             selected.Parameters.AddWithValue("preset", expectedPreset);
             if (await selected.ExecuteScalarAsync(token) is not true)
