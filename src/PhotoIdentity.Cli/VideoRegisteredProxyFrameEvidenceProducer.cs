@@ -128,7 +128,8 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
             throw new InvalidOperationException(
                 "Frame scratch cannot overlap the private derivative cache.");
         VideoScratchCapacityGuard.EnsureCapacity(root,
-            Math.Min(lease.TemporaryBytes, 256L * 1024 * 1024));
+            PostgresVideoFrameProxyPilotSource.MaximumPilotProxyBytes +
+            FrameBudget.MaximumTemporaryBytes);
 
         // Unique app-created folder. The direct scratch root must have been
         // empty and marker-owned; no user file can be removed by this method.
@@ -253,6 +254,14 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                     proxyJobId.Value, snapshot.RevisionId, token))
                 throw new InvalidOperationException(
                     "The registered proxy was revoked before publication.");
+            // A model replacement during a long run must not be mislabeled
+            // with the initially observed Ollama digest.
+            LocalVisionModelDescriptor finishedModel =
+                await captions.GetInstalledModelAsync(token);
+            if (finishedModel.Name != descriptor.Name ||
+                finishedModel.Digest != descriptor.Digest)
+                throw new InvalidOperationException(
+                    "Caption model changed during frame evidence production.");
             // Do not publish to PostgreSQL here: the lease-monitored adapter
             // and v38 transactional repository are the ONLY commit boundary.
             return new(plan, new VideoFrameEvidenceBatch(provenance, items));
