@@ -1,5 +1,8 @@
 # WI-0190 checkpoint 7 — selected, opt-in FrameEvidence one-shot
 
+**Checkpoint 10 update (2026-11-01):** The existing interval default is unchanged. A separately documented optional manual scene-cut mode now persists scene-balanced evidence with a distinct regenerable sampling job identity. See the [annotated-scene one-shot](video-frame-evidence-annotated-one-shot.md). The existing verification of the interval happy path remains accepted; new mode requires its own end-to-end acceptance before WI-0190 closure.
+
+
 **Maintainer happy-path verification accepted (2026-10-31).**
 After the stopped maintained catalogue was migrated to PostgreSQL v38,
 the operator completed an explicit two-frame one-shot using a physical
