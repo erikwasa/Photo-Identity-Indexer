@@ -500,7 +500,7 @@ remains authoritative. These tests do **not** establish actual scene
 quality or GPU cost.
 
 The explicit opt-in `video frames selected-one-shot` is extended
-with optional `--scene-boundaries-ms`, accepting 1–8 strictly increasing
+with optional `--scene-boundaries-ms`, accepting 1–6 strictly increasing
 integer cut positions from a **private human annotation**. The default
 is still two-frame-or-less interval sampling. For scene mode, a new
 Core `VideoFrameSceneSamplingIdentity` encodes the **exact annotated
