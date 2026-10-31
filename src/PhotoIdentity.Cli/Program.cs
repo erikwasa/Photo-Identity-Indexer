@@ -116,6 +116,10 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "selected-one-shot" =>
+                    await VideoFrameSelectedOneShotCommandRunner.RunAsync(
+                        VideoFrameSelectedOneShotOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "registered-proxy-pilot" =>
                     await VideoRegisteredFramePilotCommandRunner.RunAsync(
                         VideoRegisteredFramePilotOptions.Parse(args.Skip(3).ToArray()),
@@ -309,6 +313,20 @@ public static class Program
               video sandbox appcontainer-lab --scratch-root MARKED_TEMP_LAB [--apply]
                                               (synthetic-only disposable Windows profile;
                                                no database, originals or FFmpeg)
+              video frames selected-one-shot
+                  --postgres-connection-env NAME --database DB --proxy-job-id GUID
+                  --cache-root REGISTERED_CACHE --scratch-root OWNED_EMPTY_FRAME_TEMP
+                  --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 SHA256
+                  --clip-model ABSOLUTE_ONNX --clip-vocab ABSOLUTE_JSON
+                  --clip-merges ABSOLUTE_TXT [--ollama-model NAME]
+                  --max-frames 1..2
+                  [--apply --acknowledge-isolated-v38-rehearsal
+                   --acknowledge-frame-disclosure]
+                  (default dry-run; apply queues/claims at most one current
+                   locally published proxy's frame evidence, scoped 15m,
+                   persists to PostgreSQL v38, disarms after one attempt;
+                   JPEG pixels may go to operator-selected loopback Ollama bridge)
+
               video frames registered-proxy-pilot
                   --postgres-connection-env NAME --database DB --job-id GUID
                   --cache-root REGISTERED_CACHE --scratch-root MARKED_EMPTY_TEMP
