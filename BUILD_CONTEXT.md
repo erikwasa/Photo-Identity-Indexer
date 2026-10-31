@@ -1,5 +1,19 @@
 # Build context
 
+**2026-10-31 WI-0190 checkpoint 9 (PR pending):** The maintainer completed
+checkpoint 8's read-only PostgreSQL audit successfully: current-complete,
+2/2 durable frames, 512 dimensions, 151 caption bytes, 4096 vector bytes,
+4247 total payload, timestamps 3075/9225 ms of 12300 ms. No media access,
+hydration, caption/vector disclosure, jobs or schema changes. New work
+adds a **read-only human-annotated scene coverage audit** comparing current
+timestamp coverage with counterfactual interval/scene-balanced sampling.
+This measures potentially missed scenes but does not detect scenes,
+change actual extraction, activate automatic work or prove model quality.
+CI remains pending; maintained-host annotations, representative media,
+caption/search quality, CPU/GPU/Azure costs and disruption remain. Formal
+0/4 WI-0190 acceptance unchanged. See
+docs/operations/video-frame-scene-coverage.md.
+
 **2026-10-31 WI-0190 checkpoint 8 (PR pending):** After PR #684
 merged, maintainer-accepted checkpoint 7 has a real two-frame, v38,
 Azure-bridge-backed durable publication and clean scratch. New work
