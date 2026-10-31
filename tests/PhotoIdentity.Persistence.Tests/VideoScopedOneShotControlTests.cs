@@ -141,6 +141,42 @@ public sealed class VideoScopedOneShotControlTests
             Assert.True(control.Paused);
             Assert.Null(control.SelectedJobId);
             Assert.Null(control.AuthorizationExpiresAtUtc);
+
+            // The v37 default grant still cannot claim FrameEvidence.
+            // Only a separate operator-selected FrameEvidence grant can
+            // arm that kind; its one-job selection remains SQL fenced.
+            string framePreset = "wi0190-sdr-frame-jpeg-v1";
+            Guid frameJob = await queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    AssetRevisionId.From(selectedRevision),
+                    VideoDerivativeKind.FrameEvidence,
+                    VideoFrameSamplingPlanner.PolicyVersion, framePreset,
+                    FfmpegHash), budget, candidate with { RequestedFrames = 1 });
+            Assert.Null(await scoped.ArmAsync(frameJob, FfmpegHash,
+                framePreset, TimeSpan.FromMinutes(2)));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                scoped.ArmAsync(frameJob, FfmpegHash,
+                    framePreset, TimeSpan.FromMinutes(2),
+                    derivativeKind: "FaceEvidence"));
+            VideoScopedAttemptGrant frameGrant =
+                Assert.IsType<VideoScopedAttemptGrant>(
+                    await scoped.ArmAsync(frameJob, FfmpegHash,
+                        framePreset, TimeSpan.FromMinutes(2),
+                        derivativeKind: "FrameEvidence"));
+            Assert.Equal(frameJob, frameGrant.JobId);
+            VideoProcessingJobLease frameLease =
+                Assert.IsType<VideoProcessingJobLease>(
+                    await queue.TryClaimNextAsync(
+                        budget, photoWorkActive: false,
+                        selectedJobId: frameJob,
+                        requiredDerivativeKind: "FrameEvidence"));
+            Assert.Equal("FrameEvidence", frameLease.DerivativeKind);
+            Assert.Equal(frameJob, frameLease.Id);
+            Assert.True((await safety.CheckAsync(frameLease)).Allowed);
+            Assert.True(await scoped.DisarmAsync(frameGrant));
+            Assert.False((await safety.CheckAsync(frameLease)).Allowed);
+            Assert.False((await new PostgresVideoProcessingControlRepository(database)
+                .GetAsync()).Enabled);
         }
         finally
         {
