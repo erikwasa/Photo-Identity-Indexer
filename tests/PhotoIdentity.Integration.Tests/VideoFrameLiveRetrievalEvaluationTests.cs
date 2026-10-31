@@ -182,6 +182,38 @@ public sealed class VideoFrameLiveRetrievalEvaluationTests
             }
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 Read(new string('d',64)));
+
+            // A newer revision must make the older completed batch stale,
+            // even though its original caption and vectors still exist.
+            Guid newest = Guid.NewGuid();
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand newer = conn.CreateCommand())
+            {
+                newer.CommandText = """
+                    UPDATE video_revision_metadata
+                    SET inspection_status='supported'
+                    WHERE asset_revision_id=@revision;
+                    INSERT INTO asset_revisions(id,asset_id,content_sha256,
+                        size_bytes,observed_at_utc,media_type,media_kind)
+                    VALUES (@newer,@asset,repeat('f',64),5000,
+                        now()+interval '1 minute','video/mp4','video');
+                    """;
+                newer.Parameters.AddWithValue("revision", revisions[0]);
+                newer.Parameters.AddWithValue("newer", newest);
+                newer.Parameters.AddWithValue("asset", assets[0]);
+                await newer.ExecuteNonQueryAsync();
+            }
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                Read(new string('d',64)));
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand removeNewer = conn.CreateCommand())
+            {
+                removeNewer.CommandText =
+                    "DELETE FROM asset_revisions WHERE id=@newer;";
+                removeNewer.Parameters.AddWithValue("newer", newest);
+                await removeNewer.ExecuteNonQueryAsync();
+            }
+
             await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
             await using (NpgsqlCommand exclude = conn.CreateCommand())
             {
