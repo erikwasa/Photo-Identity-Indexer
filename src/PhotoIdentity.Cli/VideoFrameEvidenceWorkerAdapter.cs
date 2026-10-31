@@ -36,7 +36,8 @@ public sealed class VideoFrameEvidenceWorkerAdapter(
     {
         ArgumentNullException.ThrowIfNull(lease);
         if (lease.DerivativeKind != "FrameEvidence" ||
-            lease.PolicyVersion != VideoFrameSamplingPlanner.PolicyVersion ||
+            !VideoFrameSceneSamplingIdentity.Permits(
+                lease.PolicyVersion, lease.RequestedFrames) ||
             lease.PresetVersion != VideoFrameExtractionProfile.Version ||
             lease.RequestedFrames is < 1 or > 4)
             return new(false, false,
