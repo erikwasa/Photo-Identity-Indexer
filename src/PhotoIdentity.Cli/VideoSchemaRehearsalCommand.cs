@@ -48,7 +48,7 @@ public static class VideoSchemaRehearsalCommandRunner
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
-        if (expectedRestoredSchemaVersion is not (32 or 33 or 34))
+        if (expectedRestoredSchemaVersion is not (32 or 33 or 34 or 37))
             throw new ArgumentOutOfRangeException(nameof(expectedRestoredSchemaVersion));
 
         string? connectionString = Environment.GetEnvironmentVariable(
@@ -139,6 +139,37 @@ public static class VideoSchemaRehearsalCommandRunner
 
         if (await SchemaVersionAsync(beforeConnection, token) != PostgresCatalogueDatabase.CurrentSchemaVersion)
             throw new InvalidDataException("Rehearsal did not record the current schema version.");
+
+        if (expectedRestoredSchemaVersion == 37)
+        {
+            // A current maintained v37 catalogue may have real video jobs,
+            // completed proxy receipts and non-default operator controls.
+            // Never require the original v34 empty/default-state assertions.
+            // The restore report's table counts were independently verified
+            // before and after migration above.
+            await using NpgsqlCommand frameSchema = beforeConnection.CreateCommand();
+            frameSchema.CommandText = """
+                SELECT
+                    (SELECT COUNT(*) FROM photo_identity_schema_migrations
+                     WHERE version=38 AND name='transactional-video-frame-evidence'),
+                    (SELECT COUNT(*) FROM video_frame_evidence_batches),
+                    (SELECT COUNT(*) FROM video_frame_evidence_frames),
+                    (SELECT COUNT(*) FROM video_processing_control
+                     WHERE singleton_id=1);
+                """;
+            await using NpgsqlDataReader evidence = await frameSchema.ExecuteReaderAsync(token);
+            if (!await evidence.ReadAsync(token) ||
+                evidence.GetInt64(0) != 1 || evidence.GetInt64(1) != 0 ||
+                evidence.GetInt64(2) != 0 || evidence.GetInt64(3) != 1)
+                throw new InvalidDataException(
+                    "v38 frame evidence migration was not empty, complete and isolated.");
+            output.WriteLine("Schema v37 -> v38 rehearsal passed on the isolated restored database.");
+            output.WriteLine($"Rehearsal database: {restoredName}");
+            output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
+            output.WriteLine("Frame evidence tables empty; existing photo/video table counts and control row preserved.");
+            output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
+            return 0;
+        }
 
         await using NpgsqlCommand verify = beforeConnection.CreateCommand();
         verify.CommandText = """
