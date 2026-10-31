@@ -17,7 +17,8 @@ namespace PhotoIdentity.Cli;
 public sealed record VideoFrameSelectedOneShotOptions(
     string ConnectionEnv, string DatabaseName, Guid ProxyJobId,
     VideoRegisteredProxyFrameProducerOptions Producer, int Frames,
-    bool Apply, bool AcknowledgeV38, bool AcknowledgeDisclosure)
+    bool Apply, bool AcknowledgeV38, bool AcknowledgeDisclosure,
+    IReadOnlyList<long>? SceneCutsMs = null)
 {
     public static VideoFrameSelectedOneShotOptions Parse(string[] args)
     {
@@ -41,7 +42,8 @@ public sealed record VideoFrameSelectedOneShotOptions(
                 "--ffmpeg" or "--ffmpeg-sha256" or
                 "--clip-model" or "--clip-model-sha256" or "--clip-vocab" or "--clip-merges" or
                 "--ollama-sha256" or
-                "--ollama-model" or "--max-frames") ||
+                "--ollama-model" or "--max-frames" or
+                "--scene-boundaries-ms") ||
                 i+1 >= args.Length || args[i+1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(key, args[++i]))
                 throw new ArgumentException(
@@ -71,6 +73,32 @@ public sealed record VideoFrameSelectedOneShotOptions(
                     "Selected frame job paths must be absolute and local.");
             return Path.GetFullPath(path);
         }
+        IReadOnlyList<long>? sceneCuts = null;
+        if (values.TryGetValue("--scene-boundaries-ms", out string? annotations))
+        {
+            string[] parts = annotations.Split(',');
+            if (parts.Length is < 1 or > VideoFrameSceneSamplingIdentity.MaximumCuts)
+                throw new ArgumentException(
+                    "Scene sampling requires one to eight bounded cuts.");
+            long[] cuts = new long[parts.Length];
+            long previous = 0;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i].Length is < 1 or > 7 ||
+                    parts[i][0] == '0' ||
+                    !long.TryParse(parts[i], System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out long cut) ||
+                    cut <= previous || cut >= 3_600_000 ||
+                    parts[i] != cut.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture))
+                    throw new ArgumentException(
+                        "Scene cuts must be canonical increasing positive milliseconds.");
+                cuts[i] = cut;
+                previous = cut;
+            }
+            sceneCuts = cuts;
+        }
         var producer = new VideoRegisteredProxyFrameProducerOptions(
             Absolute("--cache-root"), Absolute("--scratch-root"),
             Absolute("--ffmpeg"), Required("--ffmpeg-sha256"),
@@ -81,7 +109,8 @@ public sealed record VideoFrameSelectedOneShotOptions(
             Required("--clip-model-sha256"), Required("--ollama-sha256"),
             SelectedProxyJobId: id);
         producer.Validate();
-        return new(env, database, id, producer, frames, apply, v38, disclosure);
+        return new(env, database, id, producer, frames, apply, v38, disclosure,
+            sceneCuts);
     }
 }
 
@@ -146,7 +175,8 @@ public static class VideoFrameSelectedOneShotCommandRunner
                 .GetCurrentAsync(options.ProxyJobId, token);
         if (receipt is null)
         {
-            Write(output, !options.Apply, false, false, "proxy-not-current");
+            Write(output, !options.Apply, false, false, "proxy-not-current",
+                sceneAnnotated: options.SceneCutsMs is not null);
             return 1;
         }
         long originalBytes;
@@ -169,19 +199,38 @@ public static class VideoFrameSelectedOneShotCommandRunner
             await using NpgsqlDataReader reader = await metadata.ExecuteReaderAsync(token);
             if (!await reader.ReadAsync(token))
             {
-                Write(output, !options.Apply, false, false, "unsupported-video");
+                Write(output, !options.Apply, false, false, "unsupported-video",
+                sceneAnnotated: options.SceneCutsMs is not null);
                 return 1;
             }
             originalBytes = reader.GetInt64(0);
             duration = reader.GetDecimal(1);
         }
+        string samplingPolicy;
+        try
+        {
+            samplingPolicy = options.SceneCutsMs is null
+                ? VideoFrameSamplingPlanner.PolicyVersion
+                : VideoFrameSceneSamplingIdentity.Create(
+                    options.Frames, options.SceneCutsMs,
+                    (long)decimal.Round(duration * 1000m, 0,
+                        MidpointRounding.AwayFromZero));
+            if (VideoFrameSceneSamplingIdentity.BuildPlan(
+                duration, options.Frames, samplingPolicy).Samples.Count != options.Frames)
+                throw new ArgumentException("Sampling plan is incomplete.");
+        }
+        catch (ArgumentException)
+        {
+            Write(output, !options.Apply, false, false,
+                "invalid-sampling-plan", sceneAnnotated: options.SceneCutsMs is not null);
+            return 1;
+        }
         if (originalBytes is < 1 or > MaxSource ||
             receipt.EncodedBytes is < 100 or
-                > PostgresVideoFrameProxyPilotSource.MaximumPilotProxyBytes ||
-            VideoFrameSamplingPlanner.Plan(new VideoFrameSamplingRequest(
-                duration, MaximumFrames: options.Frames)).Samples.Count != options.Frames)
+                > PostgresVideoFrameProxyPilotSource.MaximumPilotProxyBytes)
         {
-            Write(output, !options.Apply, false, false, "bounded-candidate-rejected");
+            Write(output, !options.Apply, false, false,
+                "bounded-candidate-rejected", sceneAnnotated: options.SceneCutsMs is not null);
             return 1;
         }
 
@@ -201,7 +250,8 @@ public static class VideoFrameSelectedOneShotCommandRunner
             control.SelectedJobId is not null || otherJobRunning ||
             priority.PhotoWorkActive)
         {
-            Write(output, !options.Apply, false, false, "operator-or-photo-busy");
+            Write(output, !options.Apply, false, false, "operator-or-photo-busy",
+                sceneAnnotated: options.SceneCutsMs is not null);
             return 1;
         }
 
@@ -209,7 +259,8 @@ public static class VideoFrameSelectedOneShotCommandRunner
         // that might wake or bill the operator-controlled Azure application.
         if (!options.Apply)
         {
-            Write(output, true, true, false, "preflight-only");
+            Write(output, true, true, false, "preflight-only",
+                sceneAnnotated: options.SceneCutsMs is not null);
             return 0;
         }
 
@@ -237,7 +288,7 @@ public static class VideoFrameSelectedOneShotCommandRunner
             true, false, true, true, originalBytes, MaxScratch, options.Frames);
         var identity = new VideoDerivativeJobIdentity(
             AssetRevisionId.From(receipt.RevisionId), VideoDerivativeKind.FrameEvidence,
-            VideoFrameSamplingPlanner.PolicyVersion, VideoFrameExtractionProfile.Version,
+            samplingPolicy, VideoFrameExtractionProfile.Version,
             options.Producer.FfmpegSha256);
         Guid job = await new PostgresVideoProcessingJobRepository(db)
             .EnqueueAsync(identity, budget, candidate, token);
@@ -247,7 +298,8 @@ public static class VideoFrameSelectedOneShotCommandRunner
             TimeSpan.FromMinutes(15), token, derivativeKind: "FrameEvidence");
         if (grant is null)
         {
-            Write(output, false, false, false, "selected-job-not-queued");
+            Write(output, false, false, false, "selected-job-not-queued",
+                sceneAnnotated: options.SceneCutsMs is not null);
             return 1;
         }
 
@@ -281,16 +333,19 @@ public static class VideoFrameSelectedOneShotCommandRunner
         bool success = cycle?.Published == true;
         Write(output, false, cycle?.Claimed == true, success,
             success ? "published" : cycle?.ReasonCode ?? "execution-unavailable",
-            (long)Stopwatch.GetElapsedTime(executionStarted).TotalMilliseconds);
+            (long)Stopwatch.GetElapsedTime(executionStarted).TotalMilliseconds,
+            sceneAnnotated: options.SceneCutsMs is not null);
         return success ? 0 : 1;
     }
 
     private static void Write(TextWriter output, bool dryRun, bool admitted,
-        bool published, string reasonCode, long? executionWallMs = null) =>
+        bool published, string reasonCode, long? executionWallMs = null,
+        bool sceneAnnotated = false) =>
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0190-selected-frame-evidence-v1",
             dryRun, admitted, published, reasonCode,
+            samplingMode = sceneAnnotated ? "annotated-scene" : "interval",
             originalsOpened = false, oneDriveHydrationRequested = false,
             maximumConcurrentJobs = 1, maximumFrames = 2,
             executionWallMs,
