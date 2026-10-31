@@ -167,6 +167,21 @@ public sealed class VideoFrameEvidencePublicationTests
                 await exclude.ExecuteNonQueryAsync();
             }
             Assert.Null(await repository.GetCurrentAsync(jobId));
+            // Source-copy exclusion must physically purge private captions
+            // and embeddings through v38 FK cascade, not only hide them.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand count = connection.CreateCommand())
+            {
+                count.CommandText = """
+                    SELECT
+                      (SELECT COUNT(*) FROM video_frame_evidence_batches),
+                      (SELECT COUNT(*) FROM video_frame_evidence_frames);
+                    """;
+                await using NpgsqlDataReader reader = await count.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(0L, reader.GetInt64(0));
+                Assert.Equal(0L, reader.GetInt64(1));
+            }
         }
         finally
         {
