@@ -1,5 +1,22 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 11 (PR pending):** PR #689 merged,
+adding manual scene-annotated real two-frame publication with distinct
+regenerable policy and existing opt-in safety fences. Previously
+accepted interval two-frame PostgreSQL audit remains authoritative.
+Current work adds a bounded offline local-JSON retrieval evaluator
+that compares max/top-k/pooled CLIP policies against independently
+judged relevant clip UUIDs via aggregate Hit/MRR/Recall/MAP/nDCG.
+No video, DB, model, Azure, hydration or output of private manifest
+data. Core and CLI safety tests plus operations guide added; CI
+pending. This is an offline **evaluation instrument**, not actual
+live-PostgreSQL query encoding, model-provenance verification or
+human retrieval relevance validation. Follow-up: current batch
+read-only evaluation using local pinned CLIP (avoid vector export),
+plus resource budgets, representative diverse clips and real
+interruption acceptance. Formal WI-0190 in_progress, 0/4.
+See docs/operations/video-frame-retrieval-evaluation.md.
+
 **2026-11-01 WI-0190 checkpoint 10 (new PR):** PR #687 merged.
 The maintained-host checkpoint 8 read-only two-frame audit is accepted;
 do not ask to repeat it. New work implements **actual selected-scene
