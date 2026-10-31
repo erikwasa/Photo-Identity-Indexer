@@ -97,8 +97,8 @@ public static class VideoFrameRetrievalEvaluationCommandRunner
             throw;
         }
         catch (Exception error) when (
-            error is IOException or UnauthorizedAccessException or JsonException
-                or NotSupportedException)
+            error is IOException or InvalidDataException or UnauthorizedAccessException
+                or JsonException or NotSupportedException)
         {
             // Never print a private manifest path or content excerpt supplied
             // by native/JSON parser exceptions.
