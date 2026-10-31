@@ -18,6 +18,8 @@ public sealed class VideoPublishedToolAdapter(
     VideoProxyRetentionLimits? publicationQuota = null)
     : IVideoPublishedDerivativeAdapter
 {
+    public string? RequiredDerivativeKind => "PlayableProxy";
+
     public async Task<VideoDerivativeAttemptReport> ProcessAsync(
         VideoProcessingJobLease lease, CancellationToken token)
     {
