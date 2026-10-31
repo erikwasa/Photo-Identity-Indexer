@@ -174,7 +174,8 @@ Isolated disposable PostgreSQL tests cover commit/read round-trip,
 wrong lease estimates, incomplete batches, consumed leases, operator
 pause and exclusion invisibility. The migration is **not authorization to
 run the maintained Windows catalogue**: do a fresh authoritative backup,
-verified isolated restore and v37→v38 rehearsal first. CI uses only
+verified isolated restore and the newly added guarded `catalogue rehearse-v38`
+command against that restore first. CI uses only
 ephemeral databases. The normal app still processes photos as before;
 this slice adds no API and no automatic `FrameEvidence` worker.
 
