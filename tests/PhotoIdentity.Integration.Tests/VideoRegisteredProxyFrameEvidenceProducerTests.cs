@@ -48,7 +48,8 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducerTests
             Path.Combine(local, "model.onnx"), Path.Combine(local, "vocab.json"),
             Path.Combine(local, "merges.txt"),
             ExpectedClipSha256: new string('c', 64),
-            ExpectedOllamaSha256: new string('d', 64));
+            ExpectedOllamaSha256: new string('d', 64),
+            SelectedProxyJobId: Guid.NewGuid());
         options.Validate();
         Assert.Throws<ArgumentException>(() =>
             (options with { FfmpegSha256 = "not-approved" }).Validate());
