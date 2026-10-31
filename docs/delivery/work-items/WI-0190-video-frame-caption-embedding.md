@@ -77,6 +77,34 @@ PostgreSQL persistence implementation and actual reuse of verified photo
 caption/CLIP preprocessing. Scene detection, HDR/HLG handling and private
 quality/cost benchmarks are still required. **0/4 acceptance boxes checked**.
 
+## Development checkpoint 3 — actual local models, registered proxy only (2026-10-31)
+
+An explicit, **read-only** pilot now resolves one already-published current,
+unexcluded **SDR video proxy** by its opaque PostgreSQL job UUID; it never
+opens originals or hydrates OneDrive. The source-row lock spans snapshot
+copying and SHA verification into owned, marked temporary space. A strict
+four-frame cap, hash-pinned Windows FFmpeg job processes, existing JPEG
+decoder, existing still-photo **CLIP ONNX model/preprocessor and loopback
+Ollama caption client** now form a model-powered transient pipeline.
+Before/after checks refuse stale/revoked registrations; the in-memory
+provenance contract validates both model hashes, caption prompt,
+frame positions, vector shapes and completeness.
+
+Optional CLIP text query diagnostics compute max/top-k/pooled cosine
+and near-duplicate frame counts, with **numeric aggregate output only**.
+The pilot does not write PostgreSQL, register a worker, publish captions,
+affect photo search or decide a video-ranking policy. This closes a large
+implementation gap toward acceptance criteria 1, 3 and 4, but not
+their maintained-host evidence or durable acceptance; criteria **0/4
+checked**. See [the registered-proxy pilot runbook](../../operations/video-registered-proxy-frame-pilot.md).
+
+**Next:** native `FrameEvidence` job registration/execution, versioned
+transactional PostgreSQL frame evidence with current-lease/exclusion
+and incomplete/stale fences, real-video retrieval quality/cost and
+short/multi-scene/long/rotated/low-light benchmarks. New migrations
+must be rehearsed on isolated restored PostgreSQL before local install.
+Online-only video remains WI-0207.
+
 ## Completion notes
 
 - Files changed:

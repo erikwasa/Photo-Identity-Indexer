@@ -4,6 +4,27 @@ Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the targe
 
 ## Current focus
 
+**2026-10-31 WI-0190 checkpoint 3 (new PR, CI not yet verified):**
+After #674 merged, implement one explicit read-only real-model
+evaluation of **already published local video proxies only**.
+The pipeline verifies an unexcluded current PostgreSQL receipt, copies
+registered bytes (max 256 MiB) under source lock into owned marked
+scratch, verifies SHA-256, extracts up to 4 JPEG frames through
+approved hash-pinned Windows FFmpeg and runs existing photo CLIP
+ONNX + loopback Ollama caption. An in-memory batch checks both model
+digests, timestamps and completion; optional CLIP max/top-k/pooled
+diagnostics return scores but **no** media, caption, vectors, paths
+or identifiers. No originals, online-only hydration, Archive worker,
+schema migration, DB writes or published search index. WI-0190
+acceptance **0/4** until representative maintained-host evidence and
+real durable FrameEvidence publication are delivered. Pilot procedure:
+docs/operations/video-registered-proxy-frame-pilot.md.
+Next: atomic revision/lease/exclusion-fenced PostgreSQL
+FrameEvidence job/persistence with isolated-migration rehearsal.
+M30 remains in_progress.
+
+
+
 **2026-10-31 WI-0190 checkpoint 2 (pending PR CI):** After merged #673,
 the next development branch adds a fixed SDR-only timestamped JPEG frame
 extractor, an explicitly run, disposable Windows synthetic FFmpeg pilot

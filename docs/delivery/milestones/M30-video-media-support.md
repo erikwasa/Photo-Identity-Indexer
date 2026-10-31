@@ -37,6 +37,20 @@ proposed. **M30 is not complete**. See
 [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) and the
 [frame-sampling runbook](../../operations/video-frame-evidence-sampling.md).
 
+## WI-0190 registered-proxy model pilot (2026-10-31)
+
+A third checkpoint offers an **explicit opt-in, read-only** evaluation
+of one previously registered and SHA-verified WI-0189 *already-local*
+SDR proxy. It executes the existing CLIP image encoder and local Ollama
+caption client for at most four timestamped frames, captures model and
+policy provenance, and can compare max/top-k/pooled CLIP scores without
+printing caption, vectors, private query, source paths or media identifiers.
+No originals/OneDrive, PostgreSQL updates, new job or background processing
+are involved. **WI-0190 0/4 acceptance boxes** remain open; local model
+compatibility/cost evidence is pending a bounded maintainer pilot after CI.
+Permanent FrameEvidence job publication and invalidation are not delivered.
+See [pilot procedure](../../operations/video-registered-proxy-frame-pilot.md).
+
 ## WI-0190 synthetic frame-decoding and evidence contract (2026-10-31)
 
 WI-0190 remains `in_progress`. Its second checkpoint adds a fixed local
