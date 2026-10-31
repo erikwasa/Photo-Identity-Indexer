@@ -340,11 +340,14 @@ public static class Program
                   --clip-vocab ABSOLUTE_JSON --clip-merges ABSOLUTE_TXT
                   --ollama-sha256 SHA256 [--ollama-model NAME]
                   --max-frames 1..2
+                  [--scene-boundaries-ms 3000,6000,9000]
                   [--apply --acknowledge-isolated-v38-rehearsal
                    --acknowledge-frame-disclosure]
                   (default dry-run; apply queues/claims at most one current
                    locally published proxy's frame evidence, scoped 15m,
                    persists to PostgreSQL v38, disarms after one attempt;
+                   optional 1..8 manual scene cuts use a distinct regenerable
+                   private job sampling identity; interval remains default;
                    JPEG pixels may go to operator-selected loopback Ollama bridge)
 
               video frames registered-proxy-pilot
