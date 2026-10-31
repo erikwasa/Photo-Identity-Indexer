@@ -1,5 +1,18 @@
 # WI-0190 checkpoint 7 — selected, opt-in FrameEvidence one-shot
 
+**Maintainer happy-path verification accepted (2026-10-31).**
+After the stopped maintained catalogue was migrated to PostgreSQL v38,
+the operator completed an explicit two-frame one-shot using a physical
+approved FFmpeg executable, local CLIP and a controlled Azure Ollama bridge.
+It returned published=true, exit 0. PostgreSQL showed two durable
+FrameEvidence rows with 512-dimensional embeddings. Only the original
+scratch marker remained; video controls returned to disabled, paused and
+unselected; photo/video work stayed idle. The operator reported bridge
+shutdown and Azure scale-down. This verifies the checkpoint 7 happy path,
+**not** the four full WI-0190 acceptance criteria. See the
+[work-item verification record](../delivery/work-items/WI-0190-video-frame-caption-embedding.md).
+
+
 **State: Requires maintained-host acceptance.** A single operator-selected
 **already-local, already-published SDR playable proxy** can now be sampled,
 captioned, embedded and published into the private PostgreSQL v38 frame
@@ -39,18 +52,23 @@ gate is NOT changed.
 
 ## Windows PowerShell procedure
 
-Start in `C:\Kod\codex\Photo Identity Indexer` on current `main`.
-The script assumes the same working variables established by the
-previous successful Azure/CLIP pilot: `$ffmpeg`, `$ffmpegSha`,
-`$cacheRoot`, `$clip.ModelPath`,
-`$clip.TokenizerVocabularyPath` and
-`$clip.TokenizerMergesPath`.
+Start at the repository root on current main. Reuse the existing private
+proxy cache root and pinned CLIP files from the previous successful pilot.
+**Load FFmpeg and FFprobe paths/hashes from the persistent launcher
+approval**, not Get-Command or a WinGet alias. See the
+[approved pinned video tools guide](ffmpeg-approved-video-tools.md).
 Keep database credentials exclusively in the process environment;
 never paste connection strings, original paths or captions into a PR.
 
 ```powershell
 git switch main
 git pull --ff-only origin main
+
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
+$ffmpeg = $approved.FfmpegPath
+$ffmpegSha = $approved.FfmpegSha256
+$ffprobe = $approved.FfprobePath
+$ffprobeSha = $approved.FfprobeSha256
 
 # A new, dedicated root. Do not reuse the synthetic pilot scratch.
 $frameScratch = Join-Path ([IO.Path]::GetTempPath()) (
