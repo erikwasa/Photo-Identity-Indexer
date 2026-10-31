@@ -304,6 +304,56 @@ limitations, storage/clip, mixed photo load and retrieval quality remain.
 **Formal WI-0190 acceptance stays 0/4**. See the
 [checkpoint 6 runbook](../../operations/video-registered-proxy-frame-producer.md).
 
+## Development checkpoint 7 — operator-selected durable FrameEvidence one-shot (2026-10-31)
+
+An explicit, **default-dry-run** `video frames selected-one-shot` CLI
+now joins the already-verified local playable-proxy producer with the
+checkpoint 5 lease-monitored adapter and v38 atomic PostgreSQL
+publisher. The operator selects a **current PlayableProxy job UUID**
+and explicitly supplies a local cache, dedicated owned empty frame
+scratch, physically pinned FFmpeg, CLIP files and approved SHA-256
+digests for **both** CLIP and Ollama; no original file path or arbitrary
+model server URL is accepted. The independent still-photo processing
+and older original-video one-shot media-isolation hard stop remain
+unchanged.
+
+A read-only preflight verifies authoritative schema v38, exact current
+published proxy, supported SDR revision, local cache/scratch ownership,
+FFmpeg digest, quiet photo queue and disabled/paused/unselected video
+control. It cannot queue a job, arm control or disclose image pixels.
+The sole execution path requires `--apply`, explicit
+`--acknowledge-isolated-v38-rehearsal` and
+`--acknowledge-frame-disclosure`. It enqueues one idempotent
+`FrameEvidence` job for the proxy's exact revision and runs a single
+at-most-**two-frame** attempt. The v37 selected-job grant was extended
+to `FrameEvidence` **only when the caller explicitly selects that
+derivative kind**, preserving PlayableProxy default behavior. The
+15-minute absolute PostgreSQL grant, 13-minute attempt, job lease
+heartbeat, photo-priority veto and independent per-frame decoder/model
+budgets remain in force. Disarm runs under a separate bounded cleanup
+deadline even when the attempt fails. No automatic retry or hosted
+worker is enabled.
+
+CI tests cover default dry-run option parsing, refusal of arbitrary
+source paths, mandatory distinct acknowledgements, marker isolation,
+and SQL-serialized exact `FrameEvidence` grant/claim/disarm without
+widening the legacy proxy grant. The selected command reports only
+sanitized status and never returns captions, identities, source paths
+or embeddings in JSON.
+
+**Maintainer acceptance now required** after all CI jobs pass and PR
+merges: the already verified current proxy and operator-managed Azure
+bridge can be used to run the read-only preflight, then **one
+explicitly authorized two-frame publication**. Verify durable frame
+count and embedding dimensions in v38, photo/lease control restored,
+the original scratch marker alone remains and no unexpected hydration
+or original-file accesses occur. Runbook:
+[checkpoint 7 selected one-shot](../../operations/video-frame-evidence-selected-one-shot.md).
+Separate local disruption/exclusion/oversized-media tests and
+representative-video benchmark still remain. Do **not** mark WI-0190
+accepted solely on a two-frame successful publication. **0/4 formal
+criteria accepted** until end-to-end and quality gates are fulfilled.
+
 ## Completion notes
 
 - Files changed:
