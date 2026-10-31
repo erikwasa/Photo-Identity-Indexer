@@ -8,6 +8,28 @@ namespace PhotoIdentity.Persistence.Postgres;
 public sealed partial class PostgresCatalogueDatabase
 {
     private const string VideoFrameEvidenceSchemaMigration = """
+        -- Earlier releases create this authority lazily from the exclusion
+        -- repository. From v38 onward it must exist before the purge trigger.
+        -- Keep the exact column and FK contract; the old EnsureReadyAsync
+        -- remains idempotent for upgraded and fresh catalogues.
+        CREATE TABLE IF NOT EXISTS source_copy_exclusions (
+            source_id uuid NOT NULL,
+            source_key text NOT NULL CHECK (btrim(source_key) <> ''),
+            excluded_at_utc timestamptz NOT NULL,
+            last_seen_at_utc timestamptz NULL,
+            purge_state text NOT NULL
+                CHECK (purge_state IN ('pending', 'attempting', 'failed', 'completed')),
+            purge_error_code text NULL,
+            purge_updated_at_utc timestamptz NOT NULL,
+            PRIMARY KEY (source_id, source_key),
+            CONSTRAINT fk_source_copy_exclusions_source
+                FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+            CHECK (purge_state = 'failed' OR purge_error_code IS NULL)
+        );
+        CREATE INDEX IF NOT EXISTS ix_source_copy_exclusions_purge_state
+            ON source_copy_exclusions
+                (purge_state, purge_updated_at_utc, source_id, source_key);
+
         CREATE TABLE video_frame_evidence_batches (
             job_id uuid PRIMARY KEY
                 REFERENCES video_processing_jobs(id) ON DELETE CASCADE,
