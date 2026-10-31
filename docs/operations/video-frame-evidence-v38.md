@@ -49,19 +49,58 @@ isolated PostgreSQL instance.
 3. Run `verify-postgres-backup-restore.ps1` with
    `-ApplicationStopped`. Require `passed=true`, source schema 37,
    a different isolated restore database, and original row counts intact.
-4. Rehearse schema v37→v38 **only on that isolated restore**. Use the
-   repository's supported schema rehearsal command and ensure that it
-   validates all v38 tables, empty frame evidence rows and unchanged old
-   table counts before allowing the maintained instance to migrate.
-5. Only then deploy a v38-built app to the maintained catalogue; recheck
-   application health schema 38 and that video controls remain disabled/
-   paused when expected, with ordinary photo workflows unchanged.
+4. Rehearse schema v37→v38 **only on that isolated restore**. The
+   `catalogue rehearse-v38` command accepts only a verified successful
+   `photoidentity_restore_*` target whose source version is exactly 37.
+   It checks all pre-upgrade table counts against the restore report,
+   applies the latest schema twice for idempotency, preserves the existing
+   table counts except the migration-history increment, verifies the
+   v38 migration record, both empty frame-evidence tables and singleton
+   video control retention.
+5. Only after the rehearsal passes, deploy a v38-built app to the
+   maintained catalogue; recheck health schema 38, existing photo
+   features, video job/derivative counts, operator control settings, and
+   no new OneDrive hydration or media writes.
 
-This checkpoint does not yet add a dedicated automated v38 restore
-rehearsal command. Until one is added and passes the above gates,
-**do not migrate the maintained catalogue solely to test this library**.
-Do not execute `dotnet run` against the maintained database using
-a v38 build as a substitute for the rehearsal.
+PowerShell commands from the repository root, with the application stopped:
+
+```powershell
+$databaseName = "photoidentity_main"
+$backupPath = Join-Path $env:LOCALAPPDATA (
+    "PhotoIdentity\\backups\\postgresql\\pre-wi0190-v38-" +
+    (Get-Date -Format "yyyyMMdd-HHmmss") + ".dump"
+)
+.\\backup-postgres-catalogue.ps1 -DatabaseName $databaseName -OutputPath $backupPath
+.\\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+
+$reportPath = "$backupPath.restore-verification.json"
+$report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+if (-not $report.passed -or [int]$report.restoredEvidence.schemaVersion -ne 37 -or
+    $report.sourceDatabase -ne $databaseName -or
+    $report.verificationDatabase -eq $databaseName) {
+    throw "Isolated v37 restore verification did not pass."
+}
+
+# Supply an existing LOCAL administrator/maintainer connection string
+# through an environment variable; never echo it or paste credentials.
+# The command ignores the database in the connection string and uses
+# ONLY the verified isolated restore target from $report.
+$env:PHOTOIDENTITY_WI0190_REHEARSAL = $env:PHOTOIDENTITY_WI0190_CONN
+if (-not $env:PHOTOIDENTITY_WI0190_REHEARSAL) {
+    throw "Set the existing local PostgreSQL connection variable first."
+}
+dotnet run --project src/PhotoIdentity.Cli -c Release -- catalogue rehearse-v38 `
+    --postgres-connection-env PHOTOIDENTITY_WI0190_REHEARSAL `
+    --restore-report $reportPath
+if ($LASTEXITCODE -ne 0) { throw "Isolated v37-to-v38 rehearsal failed." }
+Remove-Item Env:PHOTOIDENTITY_WI0190_REHEARSAL -ErrorAction SilentlyContinue
+```
+
+**Important:** Running `dotnet run` against the maintained catalogue with
+the new build before this isolated verification can trigger automatic
+schema initialization. Do not substitute an application startup for this
+rehearsal. Confirm the backup and restore scripts' available parameters
+with `Get-Help` if your installation differs.
 
 ## Remaining acceptance work
 
