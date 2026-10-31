@@ -193,7 +193,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
             {
                 CaptionModelId = descriptor.Name,
                 CaptionModelSha256 = descriptor.Digest,
-                CaptionPromptVersion = OllamaVisionCaptionClient.PromptVersion
+                CaptionPromptVersion = OllamaVisionCaptionClient.VideoFramePromptVersion
             };
 
             var supervisor = new VideoToolProcessSupervisor();
@@ -241,7 +241,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                     {
                         var embedding = encoder.EncodeImage(image, inferenceToken);
                         LocalVisionCaptionResult caption = await captions.CaptionAsync(
-                            jpeg, inferenceToken);
+                            jpeg, inferenceToken, sampledVideoFrame: true);
                         return new VideoFrameEvidenceItem(
                             frame.TimestampMilliseconds, frame.SceneIndex,
                             caption.Content, embedding.Vector.ToArray());
