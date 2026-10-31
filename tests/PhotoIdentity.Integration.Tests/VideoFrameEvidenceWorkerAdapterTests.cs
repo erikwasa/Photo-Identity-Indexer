@@ -180,6 +180,55 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
             Assert.NotEqual("succeeded", (await queue.GetAsync(revokedJob))?.Status);
             Assert.Null(await reader.GetCurrentAsync(revokedJob));
 
+            // A cancellation requested while the producer is running must
+            // suppress the complete synthetic output and never publish a
+            // completed FrameEvidence receipt.
+            await controls.ResumeAsync();
+            Guid cancelledJob = await Enqueue(VideoDerivativeKind.FrameEvidence, '3');
+            var cancelledAdapter = new VideoFrameEvidenceWorkerAdapter(database,
+                new SyntheticProducer(async (lease, _) =>
+                {
+                    Assert.Equal(cancelledJob, lease.Id);
+                    Assert.True(await queue.RequestCancellationAsync(lease.Id));
+                    return Good(revision);
+                }));
+            VideoWorkerCycleResult cancelled = await coordinator.RunOneAsync(
+                budget, cancelledAdapter);
+            Assert.True(cancelled.Claimed);
+            Assert.False(cancelled.Published);
+            Assert.NotEqual("succeeded", (await queue.GetAsync(cancelledJob))?.Status);
+            Assert.Null(await reader.GetCurrentAsync(cancelledJob));
+
+            // A new photo sync request arising while synthetic frame
+            // production is in flight must preempt publication immediately,
+            // independent of the 10-second heartbeat interval.
+            Guid photoPreemptedJob = await Enqueue(VideoDerivativeKind.FrameEvidence, '4');
+            var preemptedAdapter = new VideoFrameEvidenceWorkerAdapter(database,
+                new SyntheticProducer(async (lease, _) =>
+                {
+                    Assert.Equal(photoPreemptedJob, lease.Id);
+                    await using NpgsqlConnection connection =
+                        await database.OpenConnectionAsync();
+                    await using NpgsqlCommand activate = connection.CreateCommand();
+                    activate.CommandText = """
+                        INSERT INTO archive_advancement_control(
+                            source_id,desired_state,runtime_state,
+                            sync_required,updated_at_utc)
+                        VALUES (@source,'running','video-processing',true,now());
+                        """;
+                    activate.Parameters.AddWithValue("source", source);
+                    Assert.Equal(1, await activate.ExecuteNonQueryAsync());
+                    return Good(revision);
+                }));
+            VideoWorkerCycleResult preempted = await coordinator.RunOneAsync(
+                budget, preemptedAdapter);
+            Assert.True(preempted.Claimed);
+            Assert.False(preempted.Published);
+            Assert.NotEqual("succeeded", (await queue.GetAsync(photoPreemptedJob))?.Status);
+            Assert.Null(await reader.GetCurrentAsync(photoPreemptedJob));
+            Assert.True((await new PostgresVideoPhotoPriorityProbe(database)
+                .GetAsync()).PhotoWorkActive);
+
             // A committed caption/vector is physically purged by an
             // exclusion, rather than merely excluded from current reads.
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
