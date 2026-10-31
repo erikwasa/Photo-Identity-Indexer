@@ -34,6 +34,8 @@ public sealed class VideoFrameSelectedOneShotTests
         Assert.False(options.AcknowledgeV38);
         Assert.False(options.AcknowledgeDisclosure);
         Assert.Equal(2, options.Frames);
+        Assert.Equal(Guid.Parse("9d20dafa-282e-4240-914c-4cc5328185a4"),
+            options.Producer.SelectedProxyJobId);
         Assert.Equal(new string('b', 64), options.Producer.ExpectedClipSha256);
         Assert.Equal(new string('c', 64), options.Producer.ExpectedOllamaSha256);
         Assert.True(VideoFrameSelectedOneShotOptions.Parse(
