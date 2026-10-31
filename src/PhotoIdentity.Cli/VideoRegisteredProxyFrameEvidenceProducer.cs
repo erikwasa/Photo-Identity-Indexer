@@ -120,7 +120,8 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 "Frame processing requires Windows Job Object containment.");
         if (options.SelectedProxyJobId == Guid.Empty ||
             lease.DerivativeKind != "FrameEvidence" ||
-            lease.PolicyVersion != VideoFrameSamplingPlanner.PolicyVersion ||
+            !VideoFrameSceneSamplingIdentity.Permits(
+                lease.PolicyVersion, lease.RequestedFrames) ||
             lease.PresetVersion != VideoFrameExtractionProfile.Version ||
             !VideoDerivativeArtifactPath.IsHash(lease.ToolSha256) ||
             lease.ToolSha256 != options.FfmpegSha256 ||
@@ -167,9 +168,9 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 throw new InvalidOperationException(
                     "Proxy snapshot violates revision or leased scratch budget.");
 
-            VideoFrameSamplingPlan plan = VideoFrameSamplingPlanner.Plan(
-                new VideoFrameSamplingRequest(snapshot.DurationSeconds,
-                    MaximumFrames: lease.RequestedFrames));
+            VideoFrameSamplingPlan plan = VideoFrameSceneSamplingIdentity.BuildPlan(
+                snapshot.DurationSeconds, lease.RequestedFrames,
+                lease.PolicyVersion);
             if (plan.Samples.Count != lease.RequestedFrames)
                 throw new InvalidDataException(
                     "The media duration cannot satisfy the leased frame count.");
