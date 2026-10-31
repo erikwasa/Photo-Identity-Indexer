@@ -317,8 +317,9 @@ public static class Program
                   --postgres-connection-env NAME --database DB --proxy-job-id GUID
                   --cache-root REGISTERED_CACHE --scratch-root OWNED_EMPTY_FRAME_TEMP
                   --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 SHA256
-                  --clip-model ABSOLUTE_ONNX --clip-vocab ABSOLUTE_JSON
-                  --clip-merges ABSOLUTE_TXT [--ollama-model NAME]
+                  --clip-model ABSOLUTE_ONNX --clip-model-sha256 SHA256
+                  --clip-vocab ABSOLUTE_JSON --clip-merges ABSOLUTE_TXT
+                  --ollama-sha256 SHA256 [--ollama-model NAME]
                   --max-frames 1..2
                   [--apply --acknowledge-isolated-v38-rehearsal
                    --acknowledge-frame-disclosure]
