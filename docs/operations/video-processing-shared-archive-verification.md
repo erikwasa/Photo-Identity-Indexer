@@ -73,7 +73,11 @@ existing settings unchanged. Add these four sibling entries:
 ~~~
 
 The fragment is illustrative; merge the keys into your existing launcher
-configuration rather than replacing its contents. To calculate approved
+configuration rather than replacing its contents. For a persistent
+non-linked WinGet-safe installation, follow the
+[approved pinned FFmpeg and FFprobe runbook](ffmpeg-approved-video-tools.md).
+Future CLI verification should load paths and hashes through
+Get-PhotoIdentityApprovedVideoTools.ps1, not Get-Command. To calculate approved
 digests, use `(Get-FileHash -LiteralPath "C:\\APPROVED_TOOLS\\ffmpeg.exe" -Algorithm SHA256).Hash.ToLowerInvariant()`
 (and likewise for FFprobe). Only approve binaries whose provenance you trust.
 
