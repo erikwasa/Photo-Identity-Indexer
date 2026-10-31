@@ -142,6 +142,25 @@ public sealed class VideoScopedOneShotControlTests
             Assert.Null(control.SelectedJobId);
             Assert.Null(control.AuthorizationExpiresAtUtc);
 
+            // The previous cancelled PlayableProxy lease is deliberately
+            // still running until expiry recovery. A second job MUST NOT
+            // be armed while that global slot is occupied.
+            await using (NpgsqlConnection recoveryConnection =
+                await database.OpenConnectionAsync())
+            await using (NpgsqlCommand expireLease =
+                recoveryConnection.CreateCommand())
+            {
+                expireLease.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET leased_until_utc=now()-interval '1 second'
+                    WHERE id=@job AND status='running';
+                    """;
+                expireLease.Parameters.AddWithValue("job", selectedJob);
+                Assert.Equal(1, await expireLease.ExecuteNonQueryAsync());
+            }
+            Assert.Equal(1, await queue.RecoverExpiredAsync());
+            Assert.Equal("cancelled", (await queue.GetAsync(selectedJob))?.Status);
+
             // The v37 default grant still cannot claim FrameEvidence.
             // Only a separate operator-selected FrameEvidence grant can
             // arm that kind; its one-job selection remains SQL fenced.
