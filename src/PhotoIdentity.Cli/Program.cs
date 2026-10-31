@@ -112,6 +112,10 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "registered-proxy-pilot" =>
+                    await VideoRegisteredFramePilotCommandRunner.RunAsync(
+                        VideoRegisteredFramePilotOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "scratch-cleanup" =>
                     await VideoScratchCleanupCommandRunner.RunAsync(
                         VideoScratchCleanupOptions.Parse(args.Skip(2).ToArray()),
@@ -296,6 +300,16 @@ public static class Program
               video sandbox appcontainer-lab --scratch-root MARKED_TEMP_LAB [--apply]
                                               (synthetic-only disposable Windows profile;
                                                no database, originals or FFmpeg)
+              video frames registered-proxy-pilot
+                  --postgres-connection-env NAME --database DB --job-id GUID
+                  --cache-root REGISTERED_CACHE --scratch-root MARKED_EMPTY_TEMP
+                  --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 SHA256
+                  --clip-model ABSOLUTE_ONNX --clip-vocab ABSOLUTE_JSON
+                  --clip-merges ABSOLUTE_TXT [--ollama-model NAME]
+                  [--max-frames 1..4] [--query TEXT] [--apply]
+                  (read-only one already-registered local proxy; actual
+                   CLIP + loopback Ollama, no original/hydration/catalogue write)
+
               video synthetic-frame-pilot --scratch-root TEMP_CHILD_ROOT
                                           --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
                                           [--apply]

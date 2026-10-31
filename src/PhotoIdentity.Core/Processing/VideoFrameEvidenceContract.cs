@@ -14,7 +14,12 @@ public sealed record VideoFrameEvidenceProvenance(
     string ExtractionProfileVersion,
     string ModelId,
     string ModelSha256,
-    string PreprocessingVersion);
+    string PreprocessingVersion)
+{
+    public string? CaptionModelId { get; init; }
+    public string? CaptionModelSha256 { get; init; }
+    public string? CaptionPromptVersion { get; init; }
+}
 
 public sealed record VideoFrameEvidenceItem(
     long TimestampMilliseconds,
@@ -56,7 +61,12 @@ public static class VideoFrameEvidenceContract
             !SafeVersion(p.ExtractionProfileVersion) ||
             !SafeVersion(p.PreprocessingVersion) ||
             !SafeVersion(p.ModelId) ||
-            !IsDigest(p.ModelSha256))
+            !IsDigest(p.ModelSha256) ||
+            (p.CaptionModelId is not null || p.CaptionModelSha256 is not null ||
+             p.CaptionPromptVersion is not null) &&
+            (!SafeModelId(p.CaptionModelId) ||
+             !IsDigest(p.CaptionModelSha256) ||
+             !SafeVersion(p.CaptionPromptVersion)))
             return Reject("provenance-invalid");
         if (plan.Samples.Count is < 1 or > VideoFrameSamplingPlanner.HardMaximumFrames ||
             batch.Items.Count != plan.Samples.Count)
@@ -107,6 +117,13 @@ public static class VideoFrameEvidenceContract
         value[0] is not ('.' or '/') &&
         value.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9'
             or '-' or '_' or '.' or '/');
+
+    private static bool SafeModelId(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= 100 &&
+        !value.Contains("..", StringComparison.Ordinal) &&
+        value[0] is not ('.' or '/') &&
+        value.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9'
+            or '-' or '_' or '.' or '/' or ':');
 
     private static bool IsDigest(string? digest) =>
         digest is { Length: 64 } &&

@@ -110,3 +110,12 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 All WI-0190 acceptance criteria remain open: no real-video extraction, model
 inference, persistence, scene detection, transactional invalidation, private
 caption quality, storage/clip or CPU/GPU throughput evidence is claimed.
+
+## Checkpoint 3 — actual existing photo models against registered proxies
+
+A separate, manually authorized **read-only** pilot of previously published
+WI-0189 local SDR proxies now exercises the existing CLIP and Ollama models
+in a transient, model-provenance-checked sequence; it reports aggregate
+processing and uncalibrated ranking diagnostics. It does not analyze
+originals or persist new evidence. See
+[registered proxy frame pilot](video-registered-proxy-frame-pilot.md).
