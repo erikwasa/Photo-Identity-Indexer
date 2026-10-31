@@ -58,7 +58,7 @@ public sealed partial class PostgresCatalogueDatabase
         -- hide it from current-evidence reads. The source row lock in the
         -- publisher serializes with the exclusion's source FK lock.
         CREATE OR REPLACE FUNCTION photo_identity_purge_video_frame_evidence_exclusion()
-        RETURNS trigger LANGUAGE plpgsql AS $
+        RETURNS trigger LANGUAGE plpgsql AS $video_frame_purge$
         BEGIN
             DELETE FROM video_frame_evidence_batches batch
             USING asset_revisions revision, assets asset
@@ -68,7 +68,7 @@ public sealed partial class PostgresCatalogueDatabase
               AND asset.source_key=NEW.source_key;
             RETURN NEW;
         END;
-        $;
+        $video_frame_purge$;
 
         CREATE TRIGGER trg_source_exclusion_purge_video_frames
             AFTER INSERT ON source_copy_exclusions
