@@ -411,8 +411,9 @@ milestones:
   - WI-0205
   - WI-0206
 - id: M41
-  title: PostgreSQL verification storage lifecycle
+  title: PostgreSQL backup and verification storage lifecycle
   status: ready
   document: ../milestones/M41-postgresql-verification-storage-lifecycle.md
   work_items:
   - WI-0208
+  - WI-0209
