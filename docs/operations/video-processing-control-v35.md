@@ -37,7 +37,7 @@ $backupPath = Join-Path $env:LOCALAPPDATA (
   (Get-Date -Format 'yyyyMMdd-HHmmss') + '.dump'
 )
 .\backup-postgres-catalogue.ps1 -DatabaseName $databaseName -OutputPath $backupPath
-.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
 
 $restoreReportPath = "$backupPath.restore-verification.json"
 $report = Get-Content -LiteralPath $restoreReportPath -Raw | ConvertFrom-Json
@@ -126,3 +126,6 @@ Older `catalogue rehearse-v33` and `rehearse-v34` command names remain
 available for historical *isolated* v32 and v33 restores. Current source
 initialization always advances through all newer migrations, including v35,
 so do not use these older names to rehearse the maintained v34 database.
+
+
+> WI-0208: this rehearsal deliberately uses `-RetainRestoredDatabase` because the next CLI step needs the existing restored database. Successful standalone verification normally deletes its owned restored copy. After the rehearsal, use the exact-name, ownership-validated `manage-postgres-restores.ps1` procedure in [PostgreSQL operations](postgresql-operations.md); do not delete production or backup dumps.
