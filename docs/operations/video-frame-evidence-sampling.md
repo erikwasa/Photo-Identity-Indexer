@@ -80,8 +80,9 @@ Run after CI passes on a Windows checkout. Reuse the same operator-approved
 FFmpeg executable and SHA-256 from earlier WI-0189 trials. PowerShell:
 
 ```powershell
-$ffmpeg = (Get-Command ffmpeg.exe).Source
-$sha = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
+$ffmpeg = $approved.FfmpegPath
+$sha = $approved.FfmpegSha256
 $root = Join-Path $env:TEMP ("photoidentity-wi0190-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $root | Out-Null
 Set-Content -LiteralPath (Join-Path $root ".photoidentity-synthetic-video-lab") -Value "wi0188-synthetic-video-lab-v1" -NoNewline -Encoding ascii
