@@ -23,6 +23,16 @@ internal sealed record LocalVisionCaptionResult(
 internal sealed class OllamaVisionCaptionClient
 {
     public const string PromptVersion = "wi-0128-neutral-visible-caption-v1";
+    // Explicit frame-only prompt for video. A single image must never imply
+    // temporal motion, audio, or an event outside the sampled moment.
+    public const string VideoFramePromptVersion = "wi0190-visible-video-frame-v1";
+    internal const string VideoFrameCaptionPrompt =
+        "Describe only what is directly visible in this single sampled frame from a private video. " +
+        "Write one short neutral sentence of at most 20 words about visible people, objects and setting. " +
+        "Do not identify any person or infer age, emotion, relationship, occasion, date or exact location. " +
+        "Do not claim motion over time, speech, sounds, actions before or after the frame, or what happens next. " +
+        "If an appearance is uncertain, omit it. Return only the sentence.";
+
     public const string DefaultModel = "qwen2.5vl:3b";
     public static readonly Uri DefaultBaseUri = new("http://127.0.0.1:11434/");
 
@@ -110,7 +120,7 @@ internal sealed class OllamaVisionCaptionClient
 
     public async Task<LocalVisionCaptionResult> CaptionAsync(
         ReadOnlyMemory<byte> imageBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool sampledVideoFrame = false)
     {
         if (imageBytes.IsEmpty)
         {
@@ -127,7 +137,7 @@ internal sealed class OllamaVisionCaptionClient
                 new
                 {
                     role = "user",
-                    content = CaptionPrompt,
+                    content = sampledVideoFrame ? VideoFrameCaptionPrompt : CaptionPrompt,
                     images = new[] { Convert.ToBase64String(imageBytes.Span) },
                 },
             },
