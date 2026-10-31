@@ -18,6 +18,11 @@ catalogue before a fresh PostgreSQL backup and isolated upgrade rehearsal.
   succeeded job state, batch and every frame.
 - `GetCurrentAsync`: private current-only read; guards against incomplete
   rows, excluded/deleted/stale revisions and unsupported metadata.
+- A v38 source-copy exclusion trigger physically deletes matching
+  private evidence batches and their frame rows (FK cascade) within the
+  exclusion transaction; source locks serialize publication with exclusion.
+  Revision deletion also cascades. Worker-layer purge/retention auditing is
+  not yet wired.
 
 The migration only creates tables and indexes; it does not backfill old
 video jobs, enable video execution, upload frames or rewrite legacy data.
