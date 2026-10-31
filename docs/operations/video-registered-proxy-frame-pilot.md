@@ -77,8 +77,9 @@ $cacheRoot = "<existing-WI0189-private-video-cache-root>"
 $clipModel = "<path-to-existing-CLIP-ONNX-model>"
 $clipVocab = "<path-to-existing-CLIP-vocabulary-json>"
 $clipMerges = "<path-to-existing-CLIP-merges-txt>"
-$ffmpeg = (Get-Command ffmpeg.exe).Source
-$ffmpegSha = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
+$ffmpeg = $approved.FfmpegPath
+$ffmpegSha = $approved.FfmpegSha256
 $root = Join-Path $env:TEMP ("photoidentity-wi0190-registered-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $root | Out-Null
 Set-Content -LiteralPath (Join-Path $root ".photoidentity-synthetic-video-lab") -Value "wi0188-synthetic-video-lab-v1" -NoNewline -Encoding ascii
