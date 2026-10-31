@@ -145,7 +145,7 @@ public static class VideoFrameEvidenceAuditCommandRunner
                        SELECT 1 FROM source_copy_exclusions e
                        WHERE e.source_id=asset.source_id AND e.source_key=asset.source_key),
                    COALESCE(metadata.duration_seconds,0),
-                   f.rows, f.vector_bytes, f.caption_bytes, f.first_ms, f.last_ms,
+                   f.frame_rows, f.vector_bytes, f.caption_bytes, f.first_ms, f.last_ms,
                    f.first_ordinal, f.last_ordinal, f.valid_vectors, f.increasing
             FROM video_processing_jobs job
             LEFT JOIN video_frame_evidence_batches b ON b.job_id=job.id
@@ -155,7 +155,7 @@ public static class VideoFrameEvidenceAuditCommandRunner
             LEFT JOIN video_revision_metadata metadata
                    ON metadata.asset_revision_id=revision.id
             LEFT JOIN LATERAL (
-                SELECT COUNT(*)::integer AS rows,
+                SELECT COUNT(*)::integer AS frame_rows,
                        COALESCE(SUM(octet_length(frame.embedding_le_f32)),0)::bigint
                            AS vector_bytes,
                        COALESCE(SUM(octet_length(frame.caption)),0)::bigint
