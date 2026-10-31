@@ -25,6 +25,53 @@ public sealed class PostgresVideoFrameProxyPilotSource(PostgresCatalogueDatabase
             Regex.IsMatch(parts[2], @"^[0-9a-f]{32}[.]mp4$", RegexOptions.CultureInvariant);
     }
 
+    /// <summary>
+    /// Resolve a current local playable-proxy receipt by the FrameEvidence
+    /// lease's exact asset revision, never by a media source path. The
+    /// subsequent CopyCurrentProxyAsync independently rechecks currentness,
+    /// physically verifies the staged SHA, and locks its source.
+    /// </summary>
+    public async Task<Guid?> FindCurrentProxyJobAsync(
+        Guid revisionId, CancellationToken token = default)
+    {
+        if (revisionId == Guid.Empty) return null;
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT receipt.job_id
+            FROM video_published_derivatives receipt
+            JOIN video_processing_jobs job ON job.id=receipt.job_id
+            JOIN asset_revisions revision ON revision.id=receipt.asset_revision_id
+            JOIN assets asset ON asset.id=revision.asset_id
+            JOIN sources source ON source.id=asset.source_id
+            JOIN video_revision_metadata metadata
+              ON metadata.asset_revision_id=revision.id
+            WHERE receipt.asset_revision_id=@revision
+              AND job.status='succeeded' AND job.derivative_kind='PlayableProxy'
+              AND job.asset_revision_id=revision.id
+              AND revision.media_kind='video' AND asset.media_kind='video'
+              AND asset.deleted_at_utc IS NULL AND source.kind='local-folder'
+              AND metadata.inspection_status='supported'
+              AND metadata.color_transfer='bt709'
+              AND metadata.duration_seconds BETWEEN 0.2 AND 3600
+              AND receipt.encoded_bytes BETWEEN 100 AND @max_bytes
+              AND revision.id=(
+                  SELECT latest.id FROM asset_revisions latest
+                  WHERE latest.asset_id=asset.id AND latest.media_kind='video'
+                  ORDER BY latest.observed_at_utc DESC, latest.id DESC LIMIT 1)
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_copy_exclusions excluded
+                  WHERE excluded.source_id=asset.source_id
+                    AND excluded.source_key=asset.source_key)
+            ORDER BY receipt.created_at_utc DESC, receipt.job_id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("revision", revisionId);
+        command.Parameters.AddWithValue("max_bytes", MaximumPilotProxyBytes);
+        object? found = await command.ExecuteScalarAsync(token);
+        return found is Guid selected ? selected : null;
+    }
+
     public async Task<VideoFrameProxySnapshot?> CopyCurrentProxyAsync(
         Guid jobId, string cacheRoot, string stagedCopyPath,
         CancellationToken token = default)
