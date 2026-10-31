@@ -215,7 +215,7 @@ public sealed class VideoFrameSelectedOneShotTests
             {
                 Assert.Equal(1, await VideoFrameSelectedOneShotCommandRunner
                     .RunAsync(requested, rejected));
-                Assert.Contains("\"reasonCode\":\"unsupported-video\"", rejected.ToString());
+                Assert.Contains("\"reasonCode\":\"proxy-not-current\"", rejected.ToString());
             }
 
             await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
