@@ -11,9 +11,9 @@ namespace PhotoIdentity.Core.Processing;
 public static class VideoFrameSceneSamplingIdentity
 {
     public const string Prefix = "video-frame-sampling-scene-v1-n";
-    public const int MaximumCuts = 8;
+    public const int MaximumCuts = 6;
     public const int MaximumFrames = 4;
-    public const int MaximumPolicyLength = 100;
+    public const int MaximumPolicyLength = 80;
 
     public static string Create(int frames, IReadOnlyList<long> cutsMs,
         long durationMs)
