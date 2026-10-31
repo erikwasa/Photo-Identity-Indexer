@@ -116,6 +116,10 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "evaluate-live" =>
+                    await VideoFrameLiveRetrievalCommandRunner.RunAsync(
+                        VideoFrameLiveRetrievalOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "evaluate-retrieval" =>
                     await VideoFrameRetrievalEvaluationCommandRunner.RunAsync(
                         VideoFrameRetrievalEvaluationOptions.Parse(args.Skip(3).ToArray()),
@@ -331,6 +335,15 @@ public static class Program
                                     (read-only current evidence; human-annotated cuts;
                                      numeric missed-scene audit and counterfactual plans;
                                      no FFmpeg, caption/vector output, or scene detection)
+              video frames evaluate-live --postgres-connection-env NAME --database DB
+                                         --judgments ABS_LOCAL_JSON
+                                         --clip-model ABS_LOCAL_ONNX --clip-model-sha256 HEX
+                                         --tokenizer-vocab ABS_LOCAL_JSON --tokenizer-vocab-sha256 HEX
+                                         --tokenizer-merges ABS_LOCAL_TXT --tokenizer-merges-sha256 HEX
+                                         [--frame-top-k 1..24] [--rank-k 1..32]
+                                         (local CLIP text inference + private v38 read-only
+                                          current evidence; numeric retrieval quality only)
+
               video frames evaluate-retrieval --manifest ABS_LOCAL_JSON
                                               [--frame-top-k 1..24] [--rank-k 1..32]
                                               (private offline CLIP vector benchmark,
