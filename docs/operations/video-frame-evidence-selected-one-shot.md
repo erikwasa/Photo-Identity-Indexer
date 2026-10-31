@@ -12,8 +12,7 @@ shutdown and Azure scale-down. This verifies the checkpoint 7 happy path,
 **not** the four full WI-0190 acceptance criteria. See the
 [work-item verification record](../delivery/work-items/WI-0190-video-frame-caption-embedding.md).
 
-
-**State: Requires maintained-host acceptance.** A single operator-selected
+**State: Maintained-host happy path accepted; broader WI-0190 acceptance remains open.** A single operator-selected
 **already-local, already-published SDR playable proxy** can now be sampled,
 captioned, embedded and published into the private PostgreSQL v38 frame
 evidence tables. The command never opens an original, hydrates OneDrive,
