@@ -23,6 +23,7 @@ PostgreSQL production operations own the current backup/restore procedure.
 
 - [FrameEvidence currentness and payload audit (WI-0190)](video-frame-evidence-audit.md) — safe read-only PostgreSQL inspection of a single frame batch, stale/exclusion detection and private cost-baseline guidance.
 - [Human-annotated video scene coverage (WI-0190)](video-frame-scene-coverage.md) — read-only comparison of saved frame timestamps against operator scene boundaries, with numeric missed-scene counts and hypothetical interval/scene-balanced schedules.
+- [Opt-in annotated-scene FrameEvidence one-shot (WI-0190)](video-frame-evidence-annotated-one-shot.md) — persisted scene-balanced evidence on a selected current local proxy; manual cuts encoded in private regenerable sampling policy; operator disclosure required.
 - [Approved pinned FFmpeg/FFprobe on Windows](ffmpeg-approved-video-tools.md) — persistent physical tool paths, digest verification, WinGet alias/reparse-point troubleshooting and read-only CLI helper.
 - [Azure caption burst through a localhost bridge](azure-caption-burst-bridge.md) — operator-authorized temporary GPU acceleration for a generated-caption backlog while Photo Identity itself remains loopback-only; includes exact-digest checks, benchmark, production enable/monitor, inspection, shutdown/scale-to-zero and later reactivation.
 - [Testing and CI strategy](testing-and-ci-strategy.md) — engineering policy for test-layer choice, integration-host isolation, flaky-test handling, PR gates and timing evidence.
