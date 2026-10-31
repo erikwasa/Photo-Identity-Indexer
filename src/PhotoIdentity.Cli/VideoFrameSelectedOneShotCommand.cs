@@ -79,7 +79,7 @@ public sealed record VideoFrameSelectedOneShotOptions(
             string[] parts = annotations.Split(',');
             if (parts.Length is < 1 or > VideoFrameSceneSamplingIdentity.MaximumCuts)
                 throw new ArgumentException(
-                    "Scene sampling requires one to eight bounded cuts.");
+                    "Scene sampling requires one to six bounded cuts.");
             long[] cuts = new long[parts.Length];
             long previous = 0;
             for (int i = 0; i < parts.Length; i++)
