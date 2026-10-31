@@ -34,6 +34,10 @@ public sealed class VideoFrameSelectedOneShotTests
         Assert.False(options.AcknowledgeV38);
         Assert.False(options.AcknowledgeDisclosure);
         Assert.Equal(2, options.Frames);
+        Assert.Null(options.SceneCutsMs);
+        Assert.Equal(new long[] { 3000, 6000 },
+            VideoFrameSelectedOneShotOptions.Parse(
+                [.. Valid(root), "--scene-boundaries-ms", "3000,6000"]).SceneCutsMs);
         Assert.Equal(Guid.Parse("9d20dafa-282e-4240-914c-4cc5328185a4"),
             options.Producer.SelectedProxyJobId);
         Assert.Equal(new string('b', 64), options.Producer.ExpectedClipSha256);
@@ -53,6 +57,15 @@ public sealed class VideoFrameSelectedOneShotTests
             new[] { "--original-path", @"C:\private\family.mov" },
             new[] { "--online-only", "yes" },
             new[] { "--max-frames", "3" },
+            new[] { "--scene-boundaries-ms", "none" },
+            new[] { "--scene-boundaries-ms", "0" },
+            new[] { "--scene-boundaries-ms", "3000,3000" },
+            new[] { "--scene-boundaries-ms", "5000,1000" },
+            new[] { "--scene-boundaries-ms", "03000" },
+            new[] { "--scene-boundaries-ms", "3000.5" },
+            new[] { "--scene-boundaries-ms", "1000, 2000" },
+            new[] { "--scene-boundaries-ms", "1000,2000,3000,4000,5000,6000,7000,8000,9000" },
+            new[] { "--scene-boundaries-ms", "3000", "--scene-boundaries-ms", "6000" },
             new[] { "--max-frames", "0" },
             new[] { "--max-frames", "2" },
             new[] { "--ollama-sha256", new string('d', 64) },
@@ -196,6 +209,42 @@ public sealed class VideoFrameSelectedOneShotTests
                 Assert.Equal(0L, reader.GetInt64(0));
                 Assert.False(reader.GetBoolean(1));
                 Assert.True(reader.GetBoolean(2));
+            }
+
+            // Annotated-scene preview must remain read-only and be clearly
+            // distinct from the default interval mode; invalid private
+            // annotations fail before queue/control/model/media work.
+            using (StringWriter annotated = new())
+            {
+                Assert.Equal(0, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested with { SceneCutsMs = [3000L, 6000L] },
+                        annotated));
+                Assert.Contains("\"samplingMode\":\"annotated-scene\"",
+                    annotated.ToString());
+                Assert.Contains("\"reasonCode\":\"preflight-only\"",
+                    annotated.ToString());
+            }
+            using (StringWriter outOfDuration = new())
+            {
+                Assert.Equal(1, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested with { SceneCutsMs = [11000L] },
+                        outOfDuration));
+                Assert.Contains("\"reasonCode\":\"invalid-sampling-plan\"",
+                    outOfDuration.ToString());
+            }
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand unchanged = conn.CreateCommand())
+            {
+                unchanged.CommandText = """
+                    SELECT (SELECT COUNT(*) FROM video_processing_jobs
+                            WHERE derivative_kind='FrameEvidence'),
+                           (SELECT enabled FROM video_processing_control
+                            WHERE singleton_id=1);
+                    """;
+                await using NpgsqlDataReader state = await unchanged.ExecuteReaderAsync();
+                Assert.True(await state.ReadAsync());
+                Assert.Equal(0L, state.GetInt64(0));
+                Assert.False(state.GetBoolean(1));
             }
 
             // No FFmpeg/media/model request is permitted for unsupported
