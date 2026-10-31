@@ -129,9 +129,18 @@ The verifier:
 4. creates a uniquely named isolated PostgreSQL database;
 5. restores the custom-format backup there with `pg_restore --single-transaction`;
 6. compares the complete public-table set and exact row counts with the stopped source; and
-7. writes an identity-safe restore-verification JSON report.
+7. writes a durable restore-verification JSON report **before** any cleanup;
+8. unless explicitly retained, validates its exact generated name and database ownership marker, confirms no sessions are connected, removes **only its own** successful isolated restore, and publishes the final cleanup outcome.
 
-The isolated verification database is intentionally retained after success or failure. This keeps restore evidence available for maintainer inspection instead of deleting it automatically.
+A passing fresh run normally reports `passed=true`, `cleanupStatus=removed`, and `cleanupRequired=false`. The backup `.dump`, SHA-256 manifest and comparison JSON remain intact. Restore failures, comparison failures, interrupted runs and report-publishing failures retain the isolated database for investigation. Any cleanup failure is reported and causes the verifier to fail even when `passed=true`; do not treat `passed` alone as proof that storage was reclaimed.
+
+For a subsequent migration/schema rehearsal that **needs the actual restored database**, opt in to retention:
+
+~~~powershell
+.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
+~~~
+
+The report then records `cleanupStatus=retained` and `cleanupRequired=true`. Rehearsal runbooks must use this switch, and then retire their retained restore with the protected inventory command below. A read-only `-ResumeRestoredDatabase` invocation always retains the copy after verification so it remains available for explicit recovery/disposal. A fresh invocation now refuses to create a second owned restore for the **same backup SHA-256** while an earlier owned copy remains; resume or explicitly retire the existing copy first.
 
 ### Resume a retained restore after verification fails
 
@@ -151,15 +160,33 @@ Replace that placeholder with the **exact** name from the previous attempt. The 
 
 **Safety:** Keep Photo Identity stopped during count-stable restore verification. The verifier cannot by itself establish that a backup was taken from the current maintained production authority; confirm the selected source from the launcher or database activity before using this as a production migration gate.
 
-After the report has been reviewed and its verification database name has been copied, remove **only that isolated verification database**, never the production database:
+### Inspect and explicitly retire retained restores
 
-```powershell
-Push-Location .\deploy\postgres
-$container = (podman compose ps -q postgres).Trim()
-$verifyDb = "<exact-verification-database-name-from-report>"
-podman exec -e "VERIFY_DATABASE=$verifyDb" $container sh -lc 'dropdb -U "$POSTGRES_USER" --if-exists "$VERIFY_DATABASE"'
-Pop-Location
-```
+List exact generated restore names, size, active sessions and ownership without modifying anything:
+
+~~~powershell
+.\manage-postgres-restores.ps1 | Format-Table Name, SizeGiB, Sessions, Ownership
+~~~
+
+Only post-WI-0208 copies with a database ownership marker (`owned`) can be retired by the tool. **Older, unmarked legacy copies are inventory-only:** a matching name or timestamp alone is not proof of ownership. Investigate their source/role with the PostgreSQL administrator; do not bypass the safety gate with a wildcard, `--force`, direct arbitrary `dropdb` or a volume reset.
+
+When a retained/recovered copy is genuinely disposable, use its **exact** report values and confirm the active production database separately from the launcher or observed activity:
+
+~~~powershell
+$report = Get-Content -LiteralPath "$backupPath.restore-verification.json" -Raw | ConvertFrom-Json
+$productionDb = '<confirmed-current-production-database>'
+.\manage-postgres-restores.ps1 `
+  -RemoveDatabase $report.verificationDatabase `
+  -ExpectedMarker $report.restoreOwnershipMarker `
+  -ProductionDatabaseName $productionDb `
+  -ConfirmRemoval
+~~~
+
+The command refuses missing/mismatched markers, production-name matches, active sessions and non-generated names. It never terminates connections. If the stored report was overwritten by a later check, inventory displays the current ownership marker; re-establish that the exact copy is disposable before any confirmed removal. On any ambiguity, do nothing.
+
+### Windows/Podman storage behavior
+
+Dropping a restored database releases PostgreSQL-managed space inside the Podman VM. **Windows free space need not increase** because the WSL/Podman VHDX may retain its allocated size. For maintenance evidence, record SQL sizes (`pg_database_size` and inventory) and separately measure Windows volume free bytes before/after. Optional VHDX compaction requires a verified recovery backup, a fully stopped Photo Identity/PostgreSQL/Podman machine, an offline/detached virtual disk and a supported Windows disk-management method; never compact a mounted live VHDX or delete the production Podman volume. This is not part of routine verification and is not automated by WI-0208.
 
 The maintainer completed this acceptance successfully on 2026-09-12 from a stopped production source. The custom-format dump was hash-recorded, restored into an isolated database, and passed schema/table/count/constraint comparison before that isolated database was explicitly removed.
 

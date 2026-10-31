@@ -84,7 +84,7 @@ $backupPath = Join-Path $env:LOCALAPPDATA (
   (Get-Date -Format 'yyyyMMdd-HHmmss') + '.dump'
 )
 .\backup-postgres-catalogue.ps1 -DatabaseName $databaseName -OutputPath $backupPath
-.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
 $restoreReportPath = "$backupPath.restore-verification.json"
 $report = Get-Content -LiteralPath $restoreReportPath -Raw | ConvertFrom-Json
 if (-not $report.passed -or [int]$report.restoredEvidence.schemaVersion -ne 34) {
@@ -177,3 +177,6 @@ no-recall behavior; real media quality, audio/orientation and seeking;
 source exclusion and revocation; photo throughput plus search/slideshow
 latency against baseline; and private orphan recovery/eviction. Never paste
 media paths, connection strings, hashes or source IDs into public issues.
+
+
+> WI-0208: this rehearsal deliberately uses `-RetainRestoredDatabase` because the next CLI step needs the existing restored database. Successful standalone verification normally deletes its owned restored copy. After the rehearsal, use the exact-name, ownership-validated `manage-postgres-restores.ps1` procedure in [PostgreSQL operations](postgresql-operations.md); do not delete production or backup dumps.

@@ -55,7 +55,7 @@ The existing verifier `verify-postgres-backup-restore.ps1` intentionally retains
 
 Use disposable PostgreSQL test databases and non-personal fixtures for automated destructive-path tests. On a maintained system, confirm active production database from the application/connection, maintain a verified logical backup, record the intended generated restore name, and require explicit maintainer authorization before retiring previously retained copies. Collect only aggregate storage/count/status evidence in the repository; never commit database dumps, identities, photos, connection strings, private local paths, or full table contents.
 
-References: [PostgreSQL operations](../../operations/postgresql-operations.md), [WI-0106](WI-0106-postgresql-operations-and-archive-catchup.md), and `verify-postgres-backup-restore.ps1`.
+References: [PostgreSQL operations](../../operations/postgresql-operations.md), [WI-0208 Windows acceptance commands](../../operations/postgres-wi0208-verification.md), [WI-0106](WI-0106-postgresql-operations-and-archive-catchup.md), and `verify-postgres-backup-restore.ps1`.
 
 ## Separation from backup retention
 
@@ -63,4 +63,6 @@ This workitem only disposes of isolated PostgreSQL **restore-verification databa
 
 ## Current status
 
-**Ready / not implemented (2026-10-31).** This workitem records the recurring storage problem and agreed scope. The previous manual cleanup and VHDX compaction do not constitute acceptance of the new automatic lifecycle behavior.
+**In progress, implementation pending CI and maintained-host verification (2026-10-31).** The verifier now creates an ownership-marked isolated database, preserves failures and read-only resumes, commits a passing comparison report before default cleanup, records the exact cleanup outcome, and leaves a copy only with explicit retention. A separate read-only inventory and exact-name, marker-validated disposal tool refuses unmarked legacy copies, live sessions, arbitrary names and production source matches. Schema rehearsal runbooks explicitly request retention. A PowerShell source-free regression suite is integrated into Windows CI; an opt-in isolated real-Podman/real-PostgreSQL fixture is available but has not been run; maintained Windows verification remains outstanding.
+
+**Remaining acceptance evidence:** run CI parser/synthetic tests and docs checks, disposable real PostgreSQL restore success/failed-restore/resume/retention/cleanup refusal paths, then the maintainer's actual backup verification with before/after SQL database/volume sizes. No destructive maintenance on old unmarked databases or Windows VHDX is authorized by this implementation. Do not check off work-item acceptance until these results are observed.
