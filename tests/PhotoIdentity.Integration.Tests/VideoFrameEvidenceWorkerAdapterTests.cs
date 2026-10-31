@@ -17,10 +17,12 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
     private static readonly VideoFrameSamplingPlan Plan = VideoFrameSamplingPlanner.Plan(
         new VideoFrameSamplingRequest(8m, MaximumFrames: 2));
 
-    private static VideoFrameEvidenceProduction Good(Guid revision)
+    private static VideoFrameEvidenceProduction Good(
+        Guid revision, VideoFrameSamplingPlan? selectedPlan = null)
     {
+        VideoFrameSamplingPlan samplePlan = selectedPlan ?? Plan;
         var provenance = new VideoFrameEvidenceProvenance(
-            AssetRevisionId.From(revision), Plan.PolicyVersion,
+            AssetRevisionId.From(revision), samplePlan.PolicyVersion,
             VideoFrameExtractionProfile.Version,
             "openai/clip-vit-base-patch32", new string('a', 64),
             "clip-image-preprocessing-v1")
@@ -29,8 +31,8 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
             CaptionModelSha256 = new string('b', 64),
             CaptionPromptVersion = "ollama-caption-v1"
         };
-        return new(Plan, new(provenance,
-            Plan.Samples.Select((f, i) => new VideoFrameEvidenceItem(
+        return new(samplePlan, new(provenance,
+            samplePlan.Samples.Select((f, i) => new VideoFrameEvidenceItem(
                 f.TimestampMilliseconds, f.SceneIndex,
                 "Synthetic frame " + i + ".",
                 new float[] { 0.1f, 0.4f, -0.6f })).ToArray()));
@@ -133,6 +135,51 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
             VideoWorkerCycleResult none = await coordinator.RunOneAsync(budget, adapter);
             Assert.False(none.Claimed);
             Assert.Equal("no-admissible-job", none.ReasonCode);
+
+            // Different human-annotated cuts have independent idempotency
+            // keys, even at the same source revision, tool and frame count.
+            // Both must be publishable with exact scene indices and
+            // regenerable timestamp positions (not the old interval plan).
+            string scenePolicyA = VideoFrameSceneSamplingIdentity.Create(
+                2, [2000L, 4000L], 8000);
+            string scenePolicyB = VideoFrameSceneSamplingIdentity.Create(
+                2, [3000L, 6000L], 8000);
+            Task<Guid> EnqueueScene(string policy) => queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    AssetRevisionId.From(revision), VideoDerivativeKind.FrameEvidence,
+                    policy, VideoFrameExtractionProfile.Version, new string('9', 64)),
+                budget, candidate);
+            Guid sceneA = await EnqueueScene(scenePolicyA);
+            Guid sceneB = await EnqueueScene(scenePolicyB);
+            Assert.NotEqual(sceneA, sceneB);
+            Assert.NotEqual(sceneA, frameJob);
+            Assert.Equal(sceneA, await EnqueueScene(scenePolicyA));
+
+            foreach (Guid selected in new[] { sceneA, sceneB })
+            {
+                var sceneAdapter = new VideoFrameEvidenceWorkerAdapter(database,
+                    new SyntheticProducer((lease, _) =>
+                    {
+                        Assert.Equal(selected, lease.Id);
+                        VideoFrameSamplingPlan scenePlan =
+                            VideoFrameSceneSamplingIdentity.BuildPlan(
+                                8m, lease.RequestedFrames, lease.PolicyVersion);
+                        Assert.Equal(VideoFrameSamplingMode.SceneBoundaries,
+                            scenePlan.Mode);
+                        return Task.FromResult(Good(revision, scenePlan));
+                    }));
+                VideoWorkerCycleResult publishedScene =
+                    await coordinator.RunOneAsync(
+                        budget, sceneAdapter, selectedJobId: selected);
+                Assert.True(publishedScene.Published);
+                var evidence = Assert.IsType<VideoFrameEvidenceBatch>(
+                    await reader.GetCurrentAsync(selected));
+                Assert.Equal(2, evidence.Items.Count);
+                Assert.All(evidence.Items,
+                    frame => Assert.NotNull(frame.SceneIndex));
+                Assert.Equal(selected == sceneA ? scenePolicyA : scenePolicyB,
+                    evidence.Provenance.SamplingPolicyVersion);
+            }
 
             // A partial returned batch must not reach the PG publication path.
             Guid invalidJob = await Enqueue(VideoDerivativeKind.FrameEvidence, 'f');
