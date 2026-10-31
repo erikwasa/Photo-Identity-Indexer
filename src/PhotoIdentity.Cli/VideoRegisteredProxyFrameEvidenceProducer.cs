@@ -18,7 +18,8 @@ public sealed record VideoRegisteredProxyFrameProducerOptions(
     string FfmpegPath, string FfmpegSha256,
     string ClipModelPath, string ClipVocabularyPath, string ClipMergesPath,
     string OllamaModel = OllamaVisionCaptionClient.DefaultModel,
-    string ExpectedClipSha256 = "", string ExpectedOllamaSha256 = "")
+    string ExpectedClipSha256 = "", string ExpectedOllamaSha256 = "",
+    Guid SelectedProxyJobId = default)
 {
     public void Validate()
     {
@@ -115,7 +116,8 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
         if (!OperatingSystem.IsWindows())
             throw new InvalidOperationException(
                 "Frame processing requires Windows Job Object containment.");
-        if (lease.DerivativeKind != "FrameEvidence" ||
+        if (options.SelectedProxyJobId == Guid.Empty ||
+            lease.DerivativeKind != "FrameEvidence" ||
             lease.PolicyVersion != VideoFrameSamplingPlanner.PolicyVersion ||
             lease.PresetVersion != VideoFrameExtractionProfile.Version ||
             !VideoDerivativeArtifactPath.IsHash(lease.ToolSha256) ||
@@ -152,15 +154,12 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
 
             await RequirePermit(token);
             var proxy = new PostgresVideoFrameProxyPilotSource(database);
-            Guid? proxyJobId = await proxy.FindCurrentProxyJobAsync(
-                lease.RevisionId.Value, token);
-            if (proxyJobId is null)
-                throw new InvalidOperationException(
-                    "No eligible locally published playable proxy is current.");
-
+            // The operator selected this exact published proxy UUID. Do
+            // not silently substitute another preset of the same revision.
+            Guid proxyJobId = options.SelectedProxyJobId;
             string staged = Path.Combine(workspace, "registered-proxy.mp4");
             VideoFrameProxySnapshot? snapshot = await proxy.CopyCurrentProxyAsync(
-                proxyJobId.Value, options.CacheRoot, staged, token);
+                proxyJobId, options.CacheRoot, staged, token);
             if (snapshot is null || snapshot.RevisionId != lease.RevisionId.Value ||
                 snapshot.ProxyBytes > lease.TemporaryBytes - FrameBudget.MaximumTemporaryBytes)
                 throw new InvalidOperationException(
@@ -213,7 +212,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 token.ThrowIfCancellationRequested();
                 await RequirePermit(token);
                 if (!await proxy.StillCurrentAsync(
-                        proxyJobId.Value, snapshot.RevisionId, token))
+                        proxyJobId, snapshot.RevisionId, token))
                     throw new InvalidOperationException(
                         "The registered proxy is no longer current.");
 
@@ -242,7 +241,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 // or third-party endpoint is configurable here.
                 await RequirePermit(token);
                 if (!await proxy.StillCurrentAsync(
-                        proxyJobId.Value, snapshot.RevisionId, token))
+                        proxyJobId, snapshot.RevisionId, token))
                     throw new InvalidOperationException(
                         "The registered proxy was revoked before captioning.");
 
@@ -261,7 +260,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
 
             await RequirePermit(token);
             if (!await proxy.StillCurrentAsync(
-                    proxyJobId.Value, snapshot.RevisionId, token))
+                    proxyJobId, snapshot.RevisionId, token))
                 throw new InvalidOperationException(
                     "The registered proxy was revoked before publication.");
             // A model replacement during a long run must not be mislabeled
