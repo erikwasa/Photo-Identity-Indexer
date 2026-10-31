@@ -77,7 +77,8 @@ public sealed record VideoFrameSelectedOneShotOptions(
             Absolute("--clip-merges"),
             values.GetValueOrDefault("--ollama-model") ??
                 OllamaVisionCaptionClient.DefaultModel,
-            Required("--clip-model-sha256"), Required("--ollama-sha256"));
+            Required("--clip-model-sha256"), Required("--ollama-sha256"),
+            SelectedProxyJobId: id);
         producer.Validate();
         return new(env, database, id, producer, frames, apply, v38, disclosure);
     }
