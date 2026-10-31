@@ -53,5 +53,27 @@ public sealed partial class PostgresCatalogueDatabase
             PRIMARY KEY(job_id, ordinal),
             UNIQUE(job_id, timestamp_ms)
         );
+
+        -- Exclusions must purge private caption/vector content, not merely
+        -- hide it from current-evidence reads. The source row lock in the
+        -- publisher serializes with the exclusion's source FK lock.
+        CREATE OR REPLACE FUNCTION photo_identity_purge_video_frame_evidence_exclusion()
+        RETURNS trigger LANGUAGE plpgsql AS $
+        BEGIN
+            DELETE FROM video_frame_evidence_batches batch
+            USING asset_revisions revision, assets asset
+            WHERE batch.asset_revision_id=revision.id
+              AND revision.asset_id=asset.id
+              AND asset.source_id=NEW.source_id
+              AND asset.source_key=NEW.source_key;
+            RETURN NEW;
+        END;
+        $;
+
+        CREATE TRIGGER trg_source_exclusion_purge_video_frames
+            AFTER INSERT ON source_copy_exclusions
+            FOR EACH ROW
+            EXECUTE FUNCTION photo_identity_purge_video_frame_evidence_exclusion();
+
         """;
 }
