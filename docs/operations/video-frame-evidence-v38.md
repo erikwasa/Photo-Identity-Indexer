@@ -24,7 +24,9 @@ catalogue before a fresh PostgreSQL backup and isolated upgrade rehearsal.
   Revision deletion also cascades. Worker-layer purge/retention auditing is
   not yet wired.
 
-The migration only creates tables and indexes; it does not backfill old
+The migration creates private frame tables, ensures the exact existing
+source-copy exclusion table contract is present (it was lazily initialized
+in v37), and adds an exclusion-purge trigger. It does not backfill old
 video jobs, enable video execution, upload frames or rewrite legacy data.
 Readiness defaults unchanged. PostgreSQL remains the only writable store.
 
