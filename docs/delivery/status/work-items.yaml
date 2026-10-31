@@ -112,7 +112,8 @@ work_items:
   evidence:
   - type: documentation
     value: docs/operations/video-frame-evidence-sampling.md
-- type: documentation\n  value: docs/operations/video-registered-proxy-frame-pilot.md
+  - type: documentation
+    value: docs/operations/video-registered-proxy-frame-pilot.md
 - id: WI-0191
   title: Offer opt-in semantic and caption search over indexed videos
   milestone: M30
