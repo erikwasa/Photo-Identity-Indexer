@@ -86,7 +86,9 @@ public sealed class VideoOneShotEnvironmentCommandTests
             root.GetProperty("protocol").GetString());
         Assert.True(root.GetProperty("passed").GetBoolean());
         Assert.True(root.GetProperty("dryRun").GetBoolean());
-        // The preflight reports the live schema contract, not a fixed v37 fixture.\n        Assert.Equal(PostgresCatalogueDatabase.CurrentSchemaVersion,\n            root.GetProperty("schemaVersion").GetInt32());
+        // The preflight reports the live schema contract, not a fixed v37 fixture.
+        Assert.Equal(PostgresCatalogueDatabase.CurrentSchemaVersion,
+            root.GetProperty("schemaVersion").GetInt32());
         Assert.False(root.GetProperty("jobsEnqueued").GetBoolean());
         Assert.False(root.GetProperty("originalsOpened").GetBoolean());
         Assert.False(root.GetProperty("oneDriveHydrationRequested").GetBoolean());
