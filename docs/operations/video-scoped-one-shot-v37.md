@@ -393,12 +393,13 @@ $connectionVariable = 'REPLACE_WITH_EXISTING_POSTGRES_CONNECTION_ENV_NAME'
 $revisionId = 'REPLACE_WITH_SELECTED_ALREADY_LOCAL_VIDEO_REVISION_UUID'
 $privateRoot = 'C:\REPLACE_WITH_MARKED_PRIVATE_VIDEO_CACHE'
 
-# Operator-approved, separately installed binaries (never download via CLI)
-$ffmpeg = (Get-Command ffmpeg.exe -ErrorAction Stop).Source
-$ffprobe = (Get-Command ffprobe.exe -ErrorAction Stop).Source
-$ffmpegHash = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
-$ffprobeHash = (Get-FileHash -LiteralPath $ffprobe -Algorithm SHA256).Hash.ToLowerInvariant()
-# Independently compare both hashes to accepted tool approvals before use.
+# Operator-approved, physically pinned binaries (no downloads in this CLI).
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
+$ffmpeg = $approved.FfmpegPath
+$ffprobe = $approved.FfprobePath
+$ffmpegHash = $approved.FfmpegSha256
+$ffprobeHash = $approved.FfprobeSha256
+# See ffmpeg-approved-video-tools.md for approval and upgrades.
 
 dotnet run --project src/PhotoIdentity.Cli -c Release -- video one-shot enqueue `
   --postgres-connection-env $connectionVariable --database $db `
