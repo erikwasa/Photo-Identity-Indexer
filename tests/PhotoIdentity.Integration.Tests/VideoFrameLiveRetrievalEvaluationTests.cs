@@ -207,4 +207,33 @@ public sealed class VideoFrameLiveRetrievalEvaluationTests
             await drop.ExecuteNonQueryAsync();
         }
     }
+
+    [Fact]
+    public async Task Private_malformed_judgments_are_sanitized_before_database_or_model_access()
+    {
+        string directory = Path.Combine(Path.GetTempPath(),
+            "pi-live-eval-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string file = Path.Combine(directory, "private-personal-judgments.json");
+        try
+        {
+            await File.WriteAllTextAsync(file,
+                "{ \"privateVideo\": \"UNPUBLISHED_PRIVATE_MOVIE.mov\" }");
+            var options = new VideoFrameLiveRetrievalOptions(
+                "MISSING_ENV", "photoidentity_test", file,
+                file, new string('a', 64), file, new string('b', 64),
+                file, new string('c', 64));
+            using StringWriter output = new();
+            InvalidOperationException failure =
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    VideoFrameLiveRetrievalCommandRunner.RunAsync(options, output));
+            Assert.DoesNotContain("UNPUBLISHED_PRIVATE_MOVIE", failure.Message);
+            Assert.DoesNotContain(file, failure.Message);
+            Assert.Empty(output.ToString());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
 }
