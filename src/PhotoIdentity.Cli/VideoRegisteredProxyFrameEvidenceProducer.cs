@@ -36,6 +36,8 @@ public sealed record VideoRegisteredProxyFrameProducerOptions(
                     "Frame evidence tools and storage must have local absolute paths.");
         }
 
+        if (SelectedProxyJobId == Guid.Empty)
+            throw new ArgumentException("A selected published proxy job UUID is required.");
         if (!VideoDerivativeArtifactPath.IsHash(FfmpegSha256) ||
             !VideoDerivativeArtifactPath.IsHash(ExpectedClipSha256) ||
             !VideoDerivativeArtifactPath.IsHash(ExpectedOllamaSha256) ||
