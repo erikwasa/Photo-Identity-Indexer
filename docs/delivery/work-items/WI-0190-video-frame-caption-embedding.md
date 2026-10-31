@@ -422,7 +422,9 @@ overhead and registered proxy storage.
 
 Parser/fail-closed unit tests and disposable PostgreSQL integration tests
 cover valid two-frame evidence, a newer revision making evidence stale, and
-source-copy exclusion physically purging evidence. These test cases are
+source-copy exclusion physically purging evidence. The preflight fixture
+additionally checks unsupported inspection, oversized published proxy and
+excluded source refusal, without staging any file or creating a video job. These test cases are
 synthetic and have **not** been run on the maintainer's environment.
 [Checkpoint 8 operator procedure](../../operations/video-frame-evidence-audit.md).
 
