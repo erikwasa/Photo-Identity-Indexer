@@ -88,4 +88,54 @@ public sealed class VideoRegisteredFramePilotTests
         }
         finally { Directory.Delete(root, recursive: true); }
     }
+    [Fact]
+    public async Task Frame_model_budget_is_independent_and_can_outlast_short_decode_work()
+    {
+        // This exercises a model-only clock without FFmpeg, Ollama, or media.
+        // The production frame decoder retains its own 60-second tool budget.
+        int value = await VideoFrameModelInferenceBudget.RunAsync(
+            async token =>
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100), token);
+                return 42;
+            },
+            CancellationToken.None,
+            TimeSpan.FromSeconds(1));
+        Assert.Equal(42, value);
+    }
+
+    [Fact]
+    public async Task Frame_model_timeout_is_classified_as_timeout_without_unbounded_fallback()
+    {
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            VideoFrameModelInferenceBudget.RunAsync(
+                async token =>
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    return 0;
+                },
+                CancellationToken.None,
+                TimeSpan.FromMilliseconds(35)));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            VideoFrameModelInferenceBudget.RunAsync(
+                _ => Task.FromResult(1),
+                CancellationToken.None,
+                TimeSpan.FromMinutes(4)));
+    }
+
+    [Fact]
+    public async Task Overall_pilot_cancellation_is_not_misreported_as_per_frame_timeout()
+    {
+        using CancellationTokenSource overall = new();
+        overall.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            VideoFrameModelInferenceBudget.RunAsync(
+                async token =>
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                    return 0;
+                }, overall.Token));
+    }
+
 }
