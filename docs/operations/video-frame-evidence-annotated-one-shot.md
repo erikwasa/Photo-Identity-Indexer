@@ -7,7 +7,7 @@ not detected. Interval sampling remains the default.
 
 ## Sampling identity, provenance and gates
 
-Supply an optional --scene-boundaries-ms parameter with 1–8 canonical
+Supply an optional --scene-boundaries-ms parameter with 1–6 canonical
 positive, strictly increasing integer millisecond cut positions strictly
 inside the inspected clip duration, e.g. 3000,6000,9000.
 
@@ -16,8 +16,8 @@ job from idempotency collisions, the private FrameEvidence job policy
 encodes the exact annotated offsets and frame count, for example
 video-frame-sampling-scene-v1-n2-3000_6000_9000. The producer
 reconstructs that exact plan from the leased job policy; another set
-of annotations creates a **different job**. The fixed database bound
-is 100 characters. Selected frames store exact timestamps and
+of annotations creates a **different job**. The underlying video job identity permits at most
+80 characters (six 7-digit cuts fit exactly). Selected frames store exact timestamps and
 scene_index plus model, sampling, tool and revision provenance.
 
 No new migration, worker, original or OneDrive hydration path is
