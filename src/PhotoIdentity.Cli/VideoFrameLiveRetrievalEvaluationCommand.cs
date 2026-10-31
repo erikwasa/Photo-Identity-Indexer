@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -235,7 +236,7 @@ public static class VideoFrameLiveRetrievalCommandRunner
             throw;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or
-            ArgumentException or JsonException or InvalidDataException)
+            ArgumentException or JsonException or NotSupportedException)
         {
             throw new InvalidOperationException("Private retrieval judgments are invalid or unavailable.");
         }
@@ -250,13 +251,16 @@ public static class VideoFrameLiveRetrievalCommandRunner
 
         // Pin all three local files before inference. The stored frame
         // evidence independently pins the image/dual ONNX model digest.
+        long preflightStarted = Stopwatch.GetTimestamp();
         await CheckDigestAsync(options.ClipModel, options.ClipModelSha256,
             2L * 1024 * 1024 * 1024, token);
         await CheckDigestAsync(options.Vocabulary, options.VocabularySha256,
             128L * 1024 * 1024, token);
         await CheckDigestAsync(options.Merges, options.MergesSha256,
             128L * 1024 * 1024, token);
+        long preflightWallMs = (long)Stopwatch.GetElapsedTime(preflightStarted).TotalMilliseconds;
 
+        long textStarted = Stopwatch.GetTimestamp();
         float[][] queries = new float[judgments.Queries.Length][];
         try
         {
@@ -275,6 +279,8 @@ public static class VideoFrameLiveRetrievalCommandRunner
             throw new InvalidOperationException("Pinned local CLIP text inference failed.");
         }
 
+        long textInferenceWallMs = (long)Stopwatch.GetElapsedTime(textStarted).TotalMilliseconds;
+        long snapshotStarted = Stopwatch.GetTimestamp();
         VideoFrameRetrievalEvaluationClip[] clips;
         try
         {
@@ -311,6 +317,7 @@ public static class VideoFrameLiveRetrievalCommandRunner
                 "Current complete and compatible video evidence could not be verified.");
         }
 
+        long snapshotReadWallMs = (long)Stopwatch.GetElapsedTime(snapshotStarted).TotalMilliseconds;
         var manifest = new VideoFrameRetrievalEvaluationManifest(
             VideoFrameRetrievalEvaluation.ManifestProtocol,
             options.ClipModelSha256,
@@ -321,6 +328,7 @@ public static class VideoFrameLiveRetrievalCommandRunner
                 new VideoFrameRetrievalEvaluationQuery(
                     q.QueryId, queries[i], q.RelevantJobIds)).ToArray());
 
+        long evaluationStarted = Stopwatch.GetTimestamp();
         VideoFrameRetrievalEvaluationResult metrics;
         try
         {
@@ -333,6 +341,7 @@ public static class VideoFrameLiveRetrievalCommandRunner
                 "Live retrieval vectors and judgments are incompatible.");
         }
 
+        long evaluationWallMs = (long)Stopwatch.GetElapsedTime(evaluationStarted).TotalMilliseconds;
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0190-live-retrieval-evaluation-v1",
@@ -340,12 +349,15 @@ public static class VideoFrameLiveRetrievalCommandRunner
             localTextInference = true,
             modelDigestMatched = true,
             humanJudgments = true,
+            modelPreflightWallMs = preflightWallMs,
+            textInferenceWallMs, snapshotReadWallMs, evaluationWallMs,
             result = metrics,
             originalsOpened = false, oneDriveHydrationRequested = false,
             mediaDecoded = false, captionsReturned = false,
             embeddingsReturned = false, rawQueryTextReturned = false,
             videoJobsEnqueued = false, schemaChanged = false,
-            networkRequestsMade = false
+            externalNetworkRequestsMade = false,
+            loopbackPostgresReadPerformed = true
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
         return 0;
     }
