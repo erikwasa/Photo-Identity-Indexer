@@ -116,7 +116,7 @@ public sealed class VideoFrameLiveRetrievalEvaluationTests
                             preset_version,tool_sha256,source_bytes,
                             reserved_temporary_bytes,requested_frames,status,
                             progress_percent,completed_at_utc)
-                        VALUES (@job,@revision,repeat('b',64),'FrameEvidence',
+                        VALUES (@job,@revision,@idempotency,'FrameEvidence',
                             'video-frame-sampling-v1','wi0190-sdr-frame-jpeg-v1',
                             repeat('c',64),4000,20000,2,'succeeded',100,now());
                         INSERT INTO video_frame_evidence_batches(job_id,asset_revision_id,
@@ -140,6 +140,8 @@ public sealed class VideoFrameLiveRetrievalEvaluationTests
                     insert.Parameters.AddWithValue("asset", assets[i]);
                     insert.Parameters.AddWithValue("revision", revisions[i]);
                     insert.Parameters.AddWithValue("job", jobs[i]);
+                    insert.Parameters.AddWithValue("idempotency",
+                        new string(i == 0 ? 'b' : 'f', 64));
                     await insert.ExecuteNonQueryAsync();
                 }
             }
