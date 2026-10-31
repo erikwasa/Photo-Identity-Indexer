@@ -35,7 +35,7 @@ The existing verifier `verify-postgres-backup-restore.ps1` intentionally retains
 ## Out of scope
 
 - Vacuuming, truncating, changing schema, or deleting tables/indexes in the actual `photoidentity_main` production database.
-- Automatically removing PostgreSQL logical backup files or changing their retention policy (separate task if needed).
+- Removing, rotating, or changing retention of PostgreSQL logical backup `.dump` files. [WI-0209](WI-0209-simple-postgres-backup-retention.md) separately owns short-lived pre-change backups and the single durable recovery checkpoint; successful cleanup here must **not** delete backup files or their integrity/verification evidence.
 - Removing unrelated development databases, Podman volumes, OneDrive files, source originals, or photo/video derivatives.
 - Automatically compacting a running Podman/WSL VHDX, replacing the production volume, or claiming disk-space recovery without measuring Windows free space.
 - Changing the backup's verified restore integrity requirements or treating a successful restore alone as migration approval.
@@ -56,6 +56,10 @@ The existing verifier `verify-postgres-backup-restore.ps1` intentionally retains
 Use disposable PostgreSQL test databases and non-personal fixtures for automated destructive-path tests. On a maintained system, confirm active production database from the application/connection, maintain a verified logical backup, record the intended generated restore name, and require explicit maintainer authorization before retiring previously retained copies. Collect only aggregate storage/count/status evidence in the repository; never commit database dumps, identities, photos, connection strings, private local paths, or full table contents.
 
 References: [PostgreSQL operations](../../operations/postgresql-operations.md), [WI-0106](WI-0106-postgresql-operations-and-archive-catchup.md), and `verify-postgres-backup-restore.ps1`.
+
+## Separation from backup retention
+
+This workitem only disposes of isolated PostgreSQL **restore-verification databases**. Even after a successful restore check, the input backup and its SHA-256/report remain untouched. [WI-0209](WI-0209-simple-postgres-backup-retention.md) addresses the maintainer's distinct local pre-change and off-disk recovery-backup needs without blocking WI-0208.
 
 ## Current status
 
