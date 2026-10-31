@@ -490,6 +490,62 @@ resource costs and disruption checks are evidenced. Checkpoint 8's
 successful audit does not change WI-0190's `in_progress`/0-of-4 formal
 acceptance state.
 
+## Development checkpoint 10 — scene-balanced real FrameEvidence with regenerable annotations (2026-11-01)
+
+After merged PR #687, checkpoint 9 provides a successful bounded
+read-only human-annotated scene coverage measurement instrument and
+synthetic in-flight cancellation/photo-priority regression tests.
+Checkpoint 8's previously accepted maintained-host two-frame audit
+remains authoritative. These tests do **not** establish actual scene
+quality or GPU cost.
+
+The explicit opt-in `video frames selected-one-shot` is extended
+with optional `--scene-boundaries-ms`, accepting 1–8 strictly increasing
+integer cut positions from a **private human annotation**. The default
+is still two-frame-or-less interval sampling. For scene mode, a new
+Core `VideoFrameSceneSamplingIdentity` encodes the **exact annotated
+cuts and frame count** in a bounded private PostgreSQL job policy
+(`video-frame-sampling-scene-v1-n2-3000_6000_9000` is illustrative).
+This permits deterministic regeneration **without** a v39 migration
+or a forgotten private sidecar, and differentiates annotations
+and selected frame counts from existing interval job idempotency.
+
+The scene-enabled concrete worker strictly recognizes the leased policy,
+regenerates its scene-balanced seek timestamps from the inspected
+already-current locally published SDR proxy, and retains the existing
+Windows-contained FFmpeg, pinned CLIP, explicit loopback caption
+disclosure, cancellation, lease/source, exclusion and photo-priority
+checks. Its complete per-frame captions/vectors and **scene indexes**
+are atomically published through the unchanged v38 boundary. The
+standalone read-only coverage command and audit can inspect the
+result without reading its private captions or vectors.
+
+New Core tests validate canonical policy/round-trip, distinct identity,
+invalid/out-of-duration and too-close plans. Selected one-shot
+integration tests enforce preview no-write and invalid annotation
+refusal before media/model access. Disposable PostgreSQL worker
+tests publish two different synthetic scene annotation batches on
+the same revision with distinct jobs and retained scene-indexed rows.
+The new CLI flag is not authorization to process originals or hydrate
+online-only OneDrive files; **every** real execution still requires
+explicit apply and both operator acknowledgements, one selected
+already-published local proxy, and the existing protected local
+processing environment. See
+[checkpoint 10 runbook](../../operations/video-frame-evidence-annotated-one-shot.md).
+
+**Remaining requirements**: real diverse representative clip sampling
+(short, long, many-scene, rotated, low-light), automatic scene detection
+if desired beyond manual annotations, caption and retrieval relevance
+quality assessment, per-clip CPU/GPU/Azure/throughput/storage costs,
+and maintained-Windows cancellation/subprocess interruption and
+cleanup evidence. Scene-based current production still has a
+**two-frame cap**, so this adds a real alternative rather than
+acceptance-level coverage of all scenes. The work item remains
+`in_progress` and **0/4 complete formal acceptance**, while
+several component-level safety and persistence checkpoints are
+successfully verified. No new local media run is required merely
+for PR review; defer costly local tests to a consolidated acceptance.
+
 ## Completion notes
 
 - Files changed:
