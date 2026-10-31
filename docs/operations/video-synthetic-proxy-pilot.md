@@ -57,15 +57,16 @@ In PowerShell from the repository root:
 ~~~powershell
 $ErrorActionPreference = "Stop"
 
-# Confirm these point to your separately installed, previously approved
-# binaries; no installers or downloads are part of this procedure.
-$ffmpeg = (Get-Command ffmpeg.exe -ErrorAction Stop).Source
-$ffprobe = (Get-Command ffprobe.exe -ErrorAction Stop).Source
-$ffmpegHash = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
-$ffprobeHash = (Get-FileHash -LiteralPath $ffprobe -Algorithm SHA256).Hash.ToLowerInvariant()
+# Read the independently approved physical executable paths and digests
+# from persistent launcher settings; never use WinGet aliases.
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
+$ffmpeg = $approved.FfmpegPath
+$ffprobe = $approved.FfprobePath
+$ffmpegHash = $approved.FfmpegSha256
+$ffprobeHash = $approved.FfprobeSha256
 
-# Independently compare both hashes with the accepted ADR-0012 fingerprints.
-# Stop and review any mismatch before using the --apply switch.
+# Review provenance/accepted ADR-0012 fingerprints before --apply.
+# See ffmpeg-approved-video-tools.md for pinning and upgrades.
 
 $lab = Join-Path $env:TEMP ("photoidentity-video-lab-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $lab | Out-Null
