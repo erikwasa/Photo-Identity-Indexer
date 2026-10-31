@@ -157,11 +157,11 @@ public sealed class VideoFrameSelectedOneShotTests
                 await seed.ExecuteNonQueryAsync();
             }
             string exe = typeof(VideoFrameSelectedOneShotTests).Assembly.Location;
+            await using FileStream binary = File.OpenRead(exe);
             string hash = Convert.ToHexString(
-                await SHA256.HashDataAsync(File.OpenRead(exe))).ToLowerInvariant();
-            string[] input = Valid(temp);
+                await SHA256.HashDataAsync(binary)).ToLowerInvariant();
             var requested = VideoFrameSelectedOneShotOptions.Parse(
-                [.. input.Take(0),
+                [
                 "--postgres-connection-env", envName,
                 "--database", dbName,
                 "--proxy-job-id", proxyJob.ToString(),
