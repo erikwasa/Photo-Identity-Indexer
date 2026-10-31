@@ -247,6 +247,63 @@ verified; end-to-end persistent *real-video* frame evidence and full
 representative-media evaluation are still required. See
 [checkpoint 5 operations](../../operations/video-frame-evidence-worker-boundary.md).
 
+## Development checkpoint 6 — concrete registered-proxy frame producer (2026-10-31)
+
+Added an **unregistered concrete** `VideoRegisteredProxyFrameEvidenceProducer`
+implementing checkpoint 5's `IVideoFrameEvidenceProducer`. A valid claimed
+FrameEvidence lease must exactly match the pinned FFmpeg SHA-256,
+`video-frame-sampling-v1` sampling identity, the fixed
+`wi0190-sdr-frame-jpeg-v1` extraction profile and a 1–4 frame limit.
+
+The producer resolves an existing, current **PlayableProxy receipt by
+exact leased video revision**, not a source file path. It uses the existing
+source-locked and SHA-verified local proxy snapshot copier; originals and
+OneDrive placeholders are never opened or hydrated. A separately
+operator-created, marker-owned and initially empty root immediately below
+OS temp holds a unique private workspace. The producer reserves sufficient
+free space for a bounded 256 MiB proxy and extraction scratch, rejects linked
+and overlapping directories, and cleans up its own workspace on every
+ordinary completion/failure.
+
+Every frame uses the existing fixed 640-pixel SDR extraction with a
+60-second Windows Job Object process budget, followed by the already
+verified still-photo BGR24/CLIP ONNX embedding path. Ollama caption
+inference is separately bounded to 180 seconds per frame, reachable only
+through loopback. It may be routed to **operator-controlled Azure** by an
+explicit operator-managed bridge under ADR-0013; the producer has **no**
+configurable third-party processing endpoint. A new versioned
+`wi0190-visible-video-frame-v1` prompt describes only directly visible
+content and explicitly disallows inference of motion between frames, audio,
+speech, people identities or events. The original still-photo caption
+prompt remains unchanged.
+
+The producer rechecks the live job lease/photo priority before staging,
+each extraction, each image disclosure and return, and rechecks both the
+registered proxy and Ollama model digest before returning the complete
+in-memory batch. It does **not** write PostgreSQL itself: checkpoint 5's
+adapter and v38 fenced transactional publisher remain the sole commit
+boundary. No API endpoint, scheduled worker, CLI activation, job enqueue,
+schema v39 or automatic cloud dispatch is introduced.
+
+CI tests check isolated scratch ownership/refusal, invalid model/tool
+configuration, a forged lease's early refusal, and PostgreSQL selection
+of exact current proxy receipts with source-copy exclusions. Loopback
+HTTP tests confirm the distinct versioned video prompt without real
+personal media. Real-model execution and durable real-media publication
+**remain subject to the future explicitly authorized one-shot integration
+verification**. The separate media-isolation gate in the existing
+video one-shot command has not been bypassed.
+
+**Progress:** The previously verified real-video transient Azure/CLIP pilot,
+successful maintained Windows v37→v38 migration rehearsal, and now the
+concrete producer/lease/persistence layers cover the technical building
+blocks of acceptance criterion 1 and much of criterion 2. However, no
+operator-facing safe integration workflow has yet demonstrated real-video
+durable publication; benchmark coverage, HDR handling, sampled-scene
+limitations, storage/clip, mixed photo load and retrieval quality remain.
+**Formal WI-0190 acceptance stays 0/4**. See the
+[checkpoint 6 runbook](../../operations/video-registered-proxy-frame-producer.md).
+
 ## Completion notes
 
 - Files changed:
