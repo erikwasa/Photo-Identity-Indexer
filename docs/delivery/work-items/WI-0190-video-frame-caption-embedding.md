@@ -145,6 +145,48 @@ short/multi-scene/long/rotated/low-light benchmarks. New migrations
 must be rehearsed on isolated restored PostgreSQL before local install.
 Online-only video remains WI-0207.
 
+
+## Development checkpoint 4 — PostgreSQL v38 atomic frame evidence foundation (2026-10-31)
+
+Added an **append-only v38 migration** with private
+`video_frame_evidence_batches` and `video_frame_evidence_frames`.
+Batches carry the source revision, sampling/extraction versions, exact CLIP
+model hash and preprocessing identity, caption model hash/prompt version,
+frame count and embedding dimensions. Each child frame stores its exact
+timestamp, optional scene index, bounded caption, and portable
+little-endian float32 vector bytes.
+
+An explicit, **unregistered** `PostgresVideoFrameEvidenceRepository`
+publishes only fully validated caption+embedding batches under an existing
+`FrameEvidence` job's live lease. Within **one PostgreSQL transaction**
+it serializes the source row, operator control generation and job row,
+rechecks latest/current local SDR revision, exclusion, cancellation,
+lease expiration, photo-priority and exact job/sampling/tool identity,
+then commits **job success + batch receipt + every frame row together**.
+A failed/partial/forged/revoked publication returns refusal without any
+successful job or receipt. Its private read enforces a succeeded matching
+job, complete ordered frame count, consistent vector dimensions,
+supported current revision and unexcluded source; old revisions remain
+invisible to the consumer. The repository does not start workers or
+contact FFmpeg, Ollama, OneDrive or the internet.
+
+Isolated disposable PostgreSQL tests cover commit/read round-trip,
+wrong lease estimates, incomplete batches, consumed leases, operator
+pause and exclusion invisibility. The migration is **not authorization to
+run the maintained Windows catalogue**: do a fresh authoritative backup,
+verified isolated restore and v37→v38 rehearsal first. CI uses only
+ephemeral databases. The normal app still processes photos as before;
+this slice adds no API and no automatic `FrameEvidence` worker.
+
+**Progress:** The maintained Windows Azure+CLIP pilot produced two complete
+transient frames successfully. v38 now defines and fences their **future
+durable storage**. An actual production worker/lease heartbeat, opt-in
+queue wiring, cancellation/recovery, physical exclusion purge, searchable
+current-evidence API, HDR/multi-scene/low-light coverage and quality/cost
+evaluation are still open. **0/4 formal WI-0190 acceptance criteria checked**
+because no real-video evidence is yet published through this new path.
+See [v38 operations gate](../../operations/video-frame-evidence-v38.md).
+
 ## Completion notes
 
 - Files changed:
