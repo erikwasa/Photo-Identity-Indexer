@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Npgsql;
@@ -250,6 +251,7 @@ public static class VideoFrameSelectedOneShotCommandRunner
             return 1;
         }
 
+        long executionStarted = Stopwatch.GetTimestamp();
         VideoWorkerCycleResult? cycle = null;
         try
         {
@@ -278,18 +280,20 @@ public static class VideoFrameSelectedOneShotCommandRunner
         }
         bool success = cycle?.Published == true;
         Write(output, false, cycle?.Claimed == true, success,
-            success ? "published" : cycle?.ReasonCode ?? "execution-unavailable");
+            success ? "published" : cycle?.ReasonCode ?? "execution-unavailable",
+            (long)Stopwatch.GetElapsedTime(executionStarted).TotalMilliseconds);
         return success ? 0 : 1;
     }
 
     private static void Write(TextWriter output, bool dryRun, bool admitted,
-        bool published, string reasonCode) =>
+        bool published, string reasonCode, long? executionWallMs = null) =>
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0190-selected-frame-evidence-v1",
             dryRun, admitted, published, reasonCode,
             originalsOpened = false, oneDriveHydrationRequested = false,
             maximumConcurrentJobs = 1, maximumFrames = 2,
+            executionWallMs,
             automaticallyEnabled = false, captionsReturned = false
         }));
 }
