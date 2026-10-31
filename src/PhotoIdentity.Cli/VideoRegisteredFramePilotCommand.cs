@@ -322,3 +322,41 @@ public static class VideoRegisteredFramePilotCommandRunner
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 }
+
+
+/// <summary>
+/// Independent, bounded caption/embedding clock. Unlike the FFmpeg supervisor
+/// this clock starts AFTER the validated JPEG has left the tool workspace.
+/// Each frame is capped at 3 minutes, while the caller retains its separate
+/// 10-minute limit for the complete registered-proxy pilot.
+/// </summary>
+public static class VideoFrameModelInferenceBudget
+{
+    public static readonly TimeSpan MaximumPerFrame = TimeSpan.FromMinutes(3);
+
+    public static async Task<T> RunAsync<T>(
+        Func<CancellationToken, Task<T>> infer,
+        CancellationToken overallCancellation,
+        TimeSpan? maximumTime = null)
+    {
+        ArgumentNullException.ThrowIfNull(infer);
+        TimeSpan limit = maximumTime ?? MaximumPerFrame;
+        if (limit < TimeSpan.FromMilliseconds(10) || limit > MaximumPerFrame)
+            throw new ArgumentOutOfRangeException(nameof(maximumTime),
+                "Frame model inference must remain bounded to three minutes.");
+
+        using CancellationTokenSource frameDeadline =
+            CancellationTokenSource.CreateLinkedTokenSource(overallCancellation);
+        frameDeadline.CancelAfter(limit);
+        try
+        {
+            return await infer(frameDeadline.Token);
+        }
+        catch (OperationCanceledException) when (
+            frameDeadline.IsCancellationRequested &&
+            !overallCancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException("Frame inference exceeded the per-frame time budget.");
+        }
+    }
+}
