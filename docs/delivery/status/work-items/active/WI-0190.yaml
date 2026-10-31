@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0190-video-frame-caption-embedding.md
 started_at: 2026-10-31
 last_updated_at: 2026-11-01
-branch: agent/WI-0190-scene-aware-persistent-evidence
+branch: agent/WI-0190-offline-retrieval-quality-gate
 blockers:
 - WI-0151
 - WI-0188
@@ -30,3 +30,5 @@ evidence:
   value: docs/operations/video-frame-scene-coverage.md
 - type: documentation
   value: docs/operations/video-frame-evidence-annotated-one-shot.md
+- type: documentation
+  value: docs/operations/video-frame-retrieval-evaluation.md
