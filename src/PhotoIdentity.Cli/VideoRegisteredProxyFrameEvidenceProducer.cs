@@ -17,7 +17,8 @@ public sealed record VideoRegisteredProxyFrameProducerOptions(
     string CacheRoot, string ScratchRoot,
     string FfmpegPath, string FfmpegSha256,
     string ClipModelPath, string ClipVocabularyPath, string ClipMergesPath,
-    string OllamaModel = OllamaVisionCaptionClient.DefaultModel)
+    string OllamaModel = OllamaVisionCaptionClient.DefaultModel,
+    string ExpectedClipSha256 = "", string ExpectedOllamaSha256 = "")
 {
     public void Validate()
     {
@@ -35,6 +36,8 @@ public sealed record VideoRegisteredProxyFrameProducerOptions(
         }
 
         if (!VideoDerivativeArtifactPath.IsHash(FfmpegSha256) ||
+            !VideoDerivativeArtifactPath.IsHash(ExpectedClipSha256) ||
+            !VideoDerivativeArtifactPath.IsHash(ExpectedOllamaSha256) ||
             string.IsNullOrWhiteSpace(OllamaModel) ||
             OllamaModel.Length > 100 || OllamaModel.Any(char.IsControl))
             throw new ArgumentException("Frame evidence model/tool identity is invalid.");
@@ -176,6 +179,9 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
             string clipSha = Convert.ToHexString(
                 await SHA256.HashDataAsync(model, token)).ToLowerInvariant();
+            if (clipSha != options.ExpectedClipSha256)
+                throw new InvalidOperationException(
+                    "Local CLIP model digest does not match operator authorization.");
             using ClipEmbeddingEncoder encoder = new(
                 options.ClipModelPath, options.ClipVocabularyPath,
                 options.ClipMergesPath);
@@ -184,6 +190,10 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 OllamaVisionCaptionClient.DefaultBaseUri, options.OllamaModel);
             LocalVisionModelDescriptor descriptor =
                 await captions.GetInstalledModelAsync(token);
+
+            if (descriptor.Digest != options.ExpectedOllamaSha256)
+                throw new InvalidOperationException(
+                    "Ollama model digest does not match operator authorization.");
 
             VideoFrameEvidenceProvenance provenance = new(
                 lease.RevisionId, plan.PolicyVersion,
