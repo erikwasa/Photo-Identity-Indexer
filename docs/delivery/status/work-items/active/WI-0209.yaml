@@ -1,0 +1,9 @@
+id: WI-0209
+title: Keep one durable PostgreSQL recovery backup and retire temporary change backups
+milestone: M41
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0209-simple-postgres-backup-retention.md
+blockers: []
+blocker_notes: []
+evidence: []
