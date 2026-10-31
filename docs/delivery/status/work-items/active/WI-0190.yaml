@@ -24,3 +24,5 @@ evidence:
   value: docs/operations/video-registered-proxy-frame-producer.md
 - type: documentation
   value: docs/operations/video-frame-evidence-selected-one-shot.md
+- type: documentation
+  value: docs/operations/video-frame-evidence-audit.md

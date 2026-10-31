@@ -122,6 +122,8 @@ work_items:
     value: docs/operations/video-registered-proxy-frame-producer.md
   - type: documentation
     value: docs/operations/video-frame-evidence-selected-one-shot.md
+  - type: documentation
+    value: docs/operations/video-frame-evidence-audit.md
 - id: WI-0191
   title: Offer opt-in semantic and caption search over indexed videos
   milestone: M30

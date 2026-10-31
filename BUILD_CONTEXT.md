@@ -1,5 +1,21 @@
 # Build context
 
+**2026-10-31 WI-0190 checkpoint 8 (PR pending):** After PR #684
+merged, maintainer-accepted checkpoint 7 has a real two-frame, v38,
+Azure-bridge-backed durable publication and clean scratch. New work
+adds a strictly read-only, metadata-only `video frames audit` for
+one opaque FrameEvidence job, stale/exclusion/completeness checks and
+caption/vector byte totals. The selected-one-shot includes numeric
+`executionWallMs` for local benchmark records. Disposable PostgreSQL
+tests cover current evidence, a newer revision and actual exclusion
+purge. No new migration, source access, model disclosure or worker
+activation. CI and maintained-host audit are **not yet verified**.
+WI-0190 stays in_progress, 0/4 full acceptance; next implement
+disturbance/preemption/unsupported bounds and representative media,
+resource and relevance verification. Procedure:
+docs/operations/video-frame-evidence-audit.md. Older focus entries
+below are historical and should not override this latest handoff.
+
 Formal lifecycle status is resolved through `PhotoIdentity.Docs`; read the target shard and linked document before continuing.
 
 ## Current focus

@@ -21,6 +21,7 @@ PostgreSQL production operations own the current backup/restore procedure.
 
 ## Conditional maintenance and engineering procedures
 
+- [FrameEvidence currentness and payload audit (WI-0190)](video-frame-evidence-audit.md) — safe read-only PostgreSQL inspection of a single frame batch, stale/exclusion detection and private cost-baseline guidance.
 - [Approved pinned FFmpeg/FFprobe on Windows](ffmpeg-approved-video-tools.md) — persistent physical tool paths, digest verification, WinGet alias/reparse-point troubleshooting and read-only CLI helper.
 - [Azure caption burst through a localhost bridge](azure-caption-burst-bridge.md) — operator-authorized temporary GPU acceleration for a generated-caption backlog while Photo Identity itself remains loopback-only; includes exact-digest checks, benchmark, production enable/monitor, inspection, shutdown/scale-to-zero and later reactivation.
 - [Testing and CI strategy](testing-and-ci-strategy.md) — engineering policy for test-layer choice, integration-host isolation, flaky-test handling, PR gates and timing evidence.
