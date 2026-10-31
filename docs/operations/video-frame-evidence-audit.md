@@ -108,7 +108,9 @@ Tests validate the strict parser, fail-closed audit classification and,
 when `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` exists, create
 and drop a **disposable isolated** PostgreSQL database. Synthetic rows
 exercise a current two-frame batch, an observed newer video revision and
-an actual source-copy exclusion that removes the private batch. No personal
+an actual source-copy exclusion that removes the private batch. The existing
+selected-one-shot preflight test also checks unsupported, oversized and
+excluded proxy refusal without temporary media or queue mutation. No personal
 media, model server or FFmpeg is used. Missing test-admin connection means
 the DB portion is skipped and **does not** certify a live PostgreSQL test.
 
