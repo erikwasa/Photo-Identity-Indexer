@@ -60,8 +60,9 @@ The first successful survey sampled 18/1,309 enumerated MOV/MP4 videos, with no 
 Check **both** installed commands on the maintained machine without submitting personal paths or video content:
 
 ```powershell
-$ffprobe = (Get-Command ffprobe).Source
-$ffmpeg = (Get-Command ffmpeg).Source
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
+$ffprobe = $approved.FfprobePath
+$ffmpeg = $approved.FfmpegPath
 
 & $ffprobe -version | Select-Object -First 4
 & $ffmpeg -version | Select-Object -First 4
