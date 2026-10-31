@@ -354,6 +354,51 @@ representative-video benchmark still remain. Do **not** mark WI-0190
 accepted solely on a two-frame successful publication. **0/4 formal
 criteria accepted** until end-to-end and quality gates are fulfilled.
 
+## Maintainer acceptance — checkpoint 7 durable real-video evidence (2026-10-31)
+
+**Checkpoint 7's maintained-host happy-path verification is accepted.**
+The maintainer reported the following sanitized Windows results; no personal
+media or caption text is included in the repository:
+
+- A previously successful isolated v37-to-v38 migration rehearsal preceded
+  the maintained-catalogue deployment. Starting the current application
+  upgraded the authoritative photoidentity_main catalogue to **schema 38**,
+  with both FrameEvidence tables present. The app was stopped again before
+  the one-shot verification.
+- Video controls were disabled, paused and unselected; all observed photo
+  priority and active video-job flags were false. Read-only selected-proxy
+  preflight returned dryRun=true, admitted=true, reasonCode=preflight-only
+  and exit **0**.
+- The operator-managed **Azure Ollama bridge on loopback port 11434**
+  successfully served the approved qwen2.5vl:3b model digest. Explicit
+  one-shot apply with both disclosure and rehearsal acknowledgments returned
+  dryRun=false, admitted=true, published=true, reasonCode=published,
+  originalsOpened=false and oneDriveHydrationRequested=false, exit **0**.
+- A private PostgreSQL aggregate showed **FrameEvidence / succeeded**,
+  frame_count=2, durable_frames=2 and embedding_dimensions=512. The
+  scratch directory contained only its original ownership marker.
+  Afterwards the video control was disabled/paused/unselected and the four
+  observed photo/video activity flags were false. The maintainer reported
+  stopping the Azure bridge and scaling down the Container App.
+- Initial local setup encountered the recurring preflight error
+  "Approved video tool is missing or linked": the installed FFmpeg
+  command was exposed through a WinGet/reparse-point alias. Using the
+  physical approved executable passed the final read-only preflight. The
+  [pinned FFmpeg/FFprobe operations guide](../../operations/ffmpeg-approved-video-tools.md)
+  and shared read-only launcher helper now prevent runbooks from
+  rediscovering linked commands through PATH.
+
+**Scope limitation:** This is one selected **already-local SDR proxy's**
+two-frame happy path, durable persistence, normal scratch cleanup and restored
+controls. It does not demonstrate cancellation under disruption, photo
+preemption, stale/excluded revision behavior, oversized/unsupported rejection,
+representative short/multi-scene/long/rotated/low-light coverage, retrieval
+quality or resource costs. Those acceptance gates still need development
+and local verification; no automatic worker or Azure fallback was enabled.
+
+**WI-0190 stays in_progress with 0/4 full acceptance criteria checked.**
+Checkpoint 7 is accepted; the work item is **not** complete.
+
 ## Completion notes
 
 - Files changed:
