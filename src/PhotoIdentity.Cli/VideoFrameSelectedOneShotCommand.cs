@@ -38,7 +38,8 @@ public sealed record VideoFrameSelectedOneShotOptions(
                 "--postgres-connection-env" or "--database" or
                 "--proxy-job-id" or "--cache-root" or "--scratch-root" or
                 "--ffmpeg" or "--ffmpeg-sha256" or
-                "--clip-model" or "--clip-vocab" or "--clip-merges" or
+                "--clip-model" or "--clip-model-sha256" or "--clip-vocab" or "--clip-merges" or
+                "--ollama-sha256" or
                 "--ollama-model" or "--max-frames") ||
                 i+1 >= args.Length || args[i+1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(key, args[++i]))
@@ -75,7 +76,8 @@ public sealed record VideoFrameSelectedOneShotOptions(
             Absolute("--clip-model"), Absolute("--clip-vocab"),
             Absolute("--clip-merges"),
             values.GetValueOrDefault("--ollama-model") ??
-                OllamaVisionCaptionClient.DefaultModel);
+                OllamaVisionCaptionClient.DefaultModel,
+            Required("--clip-model-sha256"), Required("--ollama-sha256"));
         producer.Validate();
         return new(env, database, id, producer, frames, apply, v38, disclosure);
     }
