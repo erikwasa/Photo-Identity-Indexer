@@ -54,7 +54,7 @@ isolated PostgreSQL instance.
 2. Take a **new, verified authoritative backup** with
    `backup-postgres-catalogue.ps1`.
 3. Run `verify-postgres-backup-restore.ps1` with
-   `-ApplicationStopped`. Require `passed=true`, source schema 37,
+   `-ApplicationStopped` and `-RetainRestoredDatabase`. Require `passed=true`, source schema 37,
    a different isolated restore database, and original row counts intact.
 4. Rehearse schema v37→v38 **only on that isolated restore**. The
    `catalogue rehearse-v38` command accepts only a verified successful
@@ -78,7 +78,7 @@ $backupPath = Join-Path $env:LOCALAPPDATA (
     (Get-Date -Format "yyyyMMdd-HHmmss") + ".dump"
 )
 .\\backup-postgres-catalogue.ps1 -DatabaseName $databaseName -OutputPath $backupPath
-.\\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+.\\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
 
 $reportPath = "$backupPath.restore-verification.json"
 $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
@@ -119,3 +119,6 @@ retrieval quality; then provide locally verifiable v38 deployment steps.
 A sampled caption cannot establish motion, audio, speech or unsupported
 events between captured frames. Keep originals and personal evidence
 outside the repository.
+
+
+> WI-0208: this rehearsal deliberately uses `-RetainRestoredDatabase` because the next CLI step needs the existing restored database. Successful standalone verification normally deletes its owned restored copy. After the rehearsal, use the exact-name, ownership-validated `manage-postgres-restores.ps1` procedure in [PostgreSQL operations](postgresql-operations.md); do not delete production or backup dumps.

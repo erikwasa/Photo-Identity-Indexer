@@ -21,7 +21,7 @@ $backupPath = Join-Path $env:LOCALAPPDATA (
   'PhotoIdentity\backups\postgresql\pre-wi0188-v34-' +
   (Get-Date -Format 'yyyyMMdd-HHmmss') + '.dump')
 .\backup-postgres-catalogue.ps1 -DatabaseName $databaseName -OutputPath $backupPath
-.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
 
 $restoreReportPath = "$backupPath.restore-verification.json"
 $report = Get-Content -LiteralPath $restoreReportPath -Raw | ConvertFrom-Json
@@ -73,3 +73,6 @@ Once the verified backup and isolated rehearsal pass, package/restart normally a
 ### Limits of checkpoint 2
 
 The durable job table stores revision IDs, deterministic hashes, bounded estimates, lease, retry/cancel and sanitized status only. Existing photo processing_jobs and processing_runs are untouched. A lease is NOT authorization to read source bytes or publish artifacts: future execution must independently verify local availability, current revision and exclusions, enforce CPU/GPU/IO/memory/time/temp quotas and atomically publish or clean up derivatives. The maintained Windows mixed-load benchmark remains an WI-0188 acceptance gate.
+
+
+> WI-0208: this rehearsal deliberately uses `-RetainRestoredDatabase` because the next CLI step needs the existing restored database. Successful standalone verification normally deletes its owned restored copy. After the rehearsal, use the exact-name, ownership-validated `manage-postgres-restores.ps1` procedure in [PostgreSQL operations](postgresql-operations.md); do not delete production or backup dumps.
