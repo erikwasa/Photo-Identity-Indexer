@@ -1,5 +1,7 @@
 # Build context
 
+**2026-10-31 M41 / WI-0208 development:** The restore verifier now records PostgreSQL database-comment ownership, publishes verification evidence before exact-owned automatic cleanup, retains failed/partial/rehearsal copies, and reports cleanup status. Operator inventory/exact-name disposal, synthetic safety and verifier tests, plus the updated operations/rehearsal runbooks are on the WI-0208 PR branch. CI and the maintained Windows/Podman acceptance have NOT yet passed; do not mark WI-0208 completed. Review the work-item and PostgreSQL runbook for the two remaining gates. WI-0209 separately owns backup-file retirement and has not been implemented. Continue WI-0190 separately from M41.
+
 **2026-10-31 WI-0190 checkpoint 9 (PR #687):** The maintainer completed
 checkpoint 8's read-only PostgreSQL audit successfully: current-complete,
 2/2 durable frames, 512 dimensions, 151 caption bytes, 4096 vector bytes,
