@@ -470,7 +470,12 @@ increasing scene cuts, valid clip duration, seek positions and
 scene-start boundary assignment; coverage reports are numeric only.
 Synthetic tests cover malformed inputs, short/long clips and missed
 scenes, and disposable PostgreSQL tests cover a current batch and
-fail-closed stale/excluded batches. The maintainer's exact real-video
+fail-closed stale/excluded batches.
+The existing FrameEvidence worker's disposable PostgreSQL integration
+fixture now additionally induces an in-flight cancellation and a new
+photo sync request during production, confirming that neither can create
+a published batch. These are synthetic, not maintained-host interruption
+or measured FFmpeg/job-object shutdown evidence. The maintainer's exact real-video
 annotation and multi-clip scene-recall/quality evaluation **remain
 local verification**, not synthetic CI certification. See
 [scene coverage operations](../../operations/video-frame-scene-coverage.md).
