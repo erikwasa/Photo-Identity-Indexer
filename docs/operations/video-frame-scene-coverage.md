@@ -113,6 +113,8 @@ The pure tests cover strict annotations, cut-boundary assignment,
 short/long/many-scene limits, duplicate timestamps and policy failures.
 The disposable PostgreSQL test also checks the successful two-frame
 sample and stale/latest-revision and exclusion-purge fail-closed behavior,
+while the worker fixture tests cancellation requested mid-production and
+a new photo sync request preempting publication,
 without any media, FFmpeg or model execution. As with prior tests, the
 database portion needs `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING`
 and is **skipped if absent**. Windows CI must pass before merging.
