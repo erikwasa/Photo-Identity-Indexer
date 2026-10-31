@@ -56,6 +56,27 @@ locally verified worker-frame extraction and model compatibility pilot,
 followed by durable provenance/invalidation and maintained-host quality/cost
 verification. No online-only hydration is authorized by this checkpoint.
 
+## Development checkpoint 2 — fixed frame JPEG and uncommitted evidence contract (2026-10-31)
+
+A synthetic-only CLI now uses the existing hash-pinned constrained FFmpeg
+supervisor to generate disposable portrait/landscape video fixtures and
+extract four interval-sampled frames per fixture. Its fixed SDR JPEG profile
+enforces accurate timestamps, rotation handling, output-size and geometry
+bounds; frames are decoded using the same still-image BGR24 path as photos.
+All outputs are temporary; no original, OneDrive placeholder, PostgreSQL
+database, real-video job or model is accessed. CI exercises argument,
+authorization-surface and data-contract tests; optional marked-temp Windows
+FFmpeg execution is documented in the [frame evidence runbook](../../operations/video-frame-evidence-sampling.md).
+
+A separate **in-memory only** evidence validator now enforces exact frame
+count/timestamps, a caller-supplied expected revision/model/sampling/extraction
+identity, safe captions, finite same-dimension embeddings and fail-closed
+incomplete/excluded/stale decisions. The validator **cannot** authorize a
+database commit: production needs a revision/lease/exclusion-fenced
+PostgreSQL persistence implementation and actual reuse of verified photo
+caption/CLIP preprocessing. Scene detection, HDR/HLG handling and private
+quality/cost benchmarks are still required. **0/4 acceptance boxes checked**.
+
 ## Completion notes
 
 - Files changed:

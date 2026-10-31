@@ -42,3 +42,71 @@ read/write fencing, exclusion/stale/partial-result handling, synthetic and
 maintained-host decode/relevance/cost evidence. The work item's four acceptance
 criteria remain **open**. No personal media, paths, model results or private
 evidence belong in the PR.
+
+## Checkpoint 2 — supervised *synthetic* SDR frame extraction and evidence gate
+
+An explicit `video synthetic-frame-pilot` CLI command generates two public
+3-second test clips (landscape with audio, portrait without) using the already
+approved synthetic-proxy fixture builder. It passes the sampling plan to a
+**fixed** FFmpeg JPEG extraction argument profile, runs each process through
+the existing SHA-pinned Windows Job Object supervisor, and decodes the bounded
+result using the **same OpenCvImageDecoder BGR24 contract used for photos**.
+The tool uses a 640px maximum long edge, accurate post-input seek,
+`-autorotate`, no audio/subtitle/data maps, 2 MiB per JPEG, and independent
+image dimensions/format validation. Temporary files disappear with the
+supervisor's workspace even when a process fails or is cancelled. No file
+path for a real media source can be passed to this command.
+
+This *tests the shared image decode boundary*, **not** ONNX CLIP inference,
+Ollama caption generation, caption/embedding quality, matching preprocess
+version or model weight approval. The exact photo CLIP image preprocessing
+contract is `ClipZeroShotTagger.ImagePreprocessingVersion`, and captions use
+`PhotoCaptionPrompt.VersionFor(language)`; a later guarded worker must
+apply them rather than silently substituting defaults.
+
+`VideoFrameEvidenceContract.Validate` checks an in-memory complete batch
+against the explicit expected revision/model hash, sampling policy, extraction
+and preprocessing identities and exact planned timestamps. It rejects stale,
+excluded or partial batches, non-finite/dimension-mismatched vectors,
+invalid captions and missing evidence. **It does not read/write PostgreSQL or
+prove its caller's authorization.** A future durable publisher must repeat
+the checks inside a revision/exclusion/control-generation/lease-fenced
+transaction before making results visible. No video search reads these
+in-memory batches.
+
+### Local synthetic pilot (optional; no personal media or database)
+
+Run after CI passes on a Windows checkout. Reuse the same operator-approved
+FFmpeg executable and SHA-256 from earlier WI-0189 trials. PowerShell:
+
+```powershell
+$ffmpeg = (Get-Command ffmpeg.exe).Source
+$sha = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+$root = Join-Path $env:TEMP ("photoidentity-wi0190-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $root | Out-Null
+Set-Content -LiteralPath (Join-Path $root ".photoidentity-synthetic-video-lab") -Value "wi0188-synthetic-video-lab-v1" -NoNewline -Encoding ascii
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video synthetic-frame-pilot `
+  --scratch-root $root --ffmpeg $ffmpeg --ffmpeg-sha256 $sha
+
+# Only after reviewing the dry-run root and verifying it contains just the marker:
+dotnet run --project src/PhotoIdentity.Cli -c Release -- video synthetic-frame-pilot `
+  --scratch-root $root --ffmpeg $ffmpeg --ffmpeg-sha256 $sha --apply
+
+# Expect status=validated, 2 cases, 4 frames each, imagesPersisted=false.
+# Confirm only the ownership marker remains. Do not delete an unverified root.
+Get-ChildItem -LiteralPath $root -Force
+```
+
+Tests without FFmpeg or media:
+
+```powershell
+dotnet test tests/PhotoIdentity.Core.Tests/PhotoIdentity.Core.Tests.csproj -c Release --filter "FullyQualifiedName~VideoFrameEvidenceContractTests|FullyQualifiedName~VideoFrameSamplingPlannerTests"
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter "FullyQualifiedName~VideoFrameExtractionProfileTests|FullyQualifiedName~VideoSyntheticFramePilotTests"
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+All WI-0190 acceptance criteria remain open: no real-video extraction, model
+inference, persistence, scene detection, transactional invalidation, private
+caption quality, storage/clip or CPU/GPU throughput evidence is claimed.
