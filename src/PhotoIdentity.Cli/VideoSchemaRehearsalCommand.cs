@@ -157,10 +157,10 @@ public static class VideoSchemaRehearsalCommandRunner
                     (SELECT COUNT(*) FROM video_processing_control
                      WHERE singleton_id=1);
                 """;
-            await using NpgsqlDataReader evidence = await frameSchema.ExecuteReaderAsync(token);
-            if (!await evidence.ReadAsync(token) ||
-                evidence.GetInt64(0) != 1 || evidence.GetInt64(1) != 0 ||
-                evidence.GetInt64(2) != 0 || evidence.GetInt64(3) != 1)
+            await using NpgsqlDataReader frameRows = await frameSchema.ExecuteReaderAsync(token);
+            if (!await frameRows.ReadAsync(token) ||
+                frameRows.GetInt64(0) != 1 || frameRows.GetInt64(1) != 0 ||
+                frameRows.GetInt64(2) != 0 || frameRows.GetInt64(3) != 1)
                 throw new InvalidDataException(
                     "v38 frame evidence migration was not empty, complete and isolated.");
             output.WriteLine("Schema v37 -> v38 rehearsal passed on the isolated restored database.");
