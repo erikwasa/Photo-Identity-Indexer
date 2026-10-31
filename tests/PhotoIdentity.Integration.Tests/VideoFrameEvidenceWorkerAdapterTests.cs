@@ -211,6 +211,26 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
             Assert.Equal("failed", (await queue.GetAsync(fakeJob))?.Status);
             Assert.Null(await reader.GetCurrentAsync(fakeJob));
 
+            // Test-only clock advancement. A paused, cancelled or photo-
+            // preempted producer must NOT silently clear its in-flight lease:
+            // the stale lease is fenced and ordinary recovery handles it
+            // after its 60-second deadline. Expire it only in this isolated
+            // synthetic database to avoid waiting for wall-clock time.
+            async Task ExpireAndRecoverFixtureLeaseAsync(Guid interruptedJob)
+            {
+                await using NpgsqlConnection conn =
+                    await database.OpenConnectionAsync();
+                await using NpgsqlCommand expire = conn.CreateCommand();
+                expire.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET leased_until_utc=now()-interval '1 second'
+                    WHERE id=@job AND status='running';
+                    """;
+                expire.Parameters.AddWithValue("job", interruptedJob);
+                Assert.Equal(1, await expire.ExecuteNonQueryAsync());
+                Assert.Equal(1, await queue.RecoverExpiredAsync());
+            }
+
             // Revocation during production prohibits publication and must
             // not manufacture completed evidence or job success.
             Guid revokedJob = await Enqueue(VideoDerivativeKind.FrameEvidence, '2');
@@ -226,6 +246,11 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
             Assert.False(revoked.Published);
             Assert.NotEqual("succeeded", (await queue.GetAsync(revokedJob))?.Status);
             Assert.Null(await reader.GetCurrentAsync(revokedJob));
+            // A pause changes control generation. Failure acknowledgement is
+            // rightly fenced, leaving a running lease until expiration.
+            // Recover before trying another job under single-job concurrency.
+            await ExpireAndRecoverFixtureLeaseAsync(revokedJob);
+            Assert.Equal("queued", (await queue.GetAsync(revokedJob))?.Status);
 
             // A cancellation requested while the producer is running must
             // suppress the complete synthetic output and never publish a
@@ -240,11 +265,15 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
                     return Good(revision);
                 }));
             VideoWorkerCycleResult cancelled = await coordinator.RunOneAsync(
-                budget, cancelledAdapter);
+                budget, cancelledAdapter, selectedJobId: cancelledJob);
             Assert.True(cancelled.Claimed);
             Assert.False(cancelled.Published);
             Assert.NotEqual("succeeded", (await queue.GetAsync(cancelledJob))?.Status);
             Assert.Null(await reader.GetCurrentAsync(cancelledJob));
+            // Cancellation-intent leases are intentionally not completed as
+            // success or ordinary failure; recovery converts to cancelled.
+            await ExpireAndRecoverFixtureLeaseAsync(cancelledJob);
+            Assert.Equal("cancelled", (await queue.GetAsync(cancelledJob))?.Status);
 
             // A new photo sync request arising while synthetic frame
             // production is in flight must preempt publication immediately,
@@ -268,13 +297,18 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
                     return Good(revision);
                 }));
             VideoWorkerCycleResult preempted = await coordinator.RunOneAsync(
-                budget, preemptedAdapter);
+                budget, preemptedAdapter, selectedJobId: photoPreemptedJob);
             Assert.True(preempted.Claimed);
             Assert.False(preempted.Published);
             Assert.NotEqual("succeeded", (await queue.GetAsync(photoPreemptedJob))?.Status);
             Assert.Null(await reader.GetCurrentAsync(photoPreemptedJob));
             Assert.True((await new PostgresVideoPhotoPriorityProbe(database)
                 .GetAsync()).PhotoWorkActive);
+            // Photo-priority revocation likewise leaves a fenced in-flight
+            // lease; do not mistake this for an immediately freed worker.
+            await ExpireAndRecoverFixtureLeaseAsync(photoPreemptedJob);
+            Assert.Equal("queued",
+                (await queue.GetAsync(photoPreemptedJob))?.Status);
 
             // A committed caption/vector is physically purged by an
             // exclusion, rather than merely excluded from current reads.
