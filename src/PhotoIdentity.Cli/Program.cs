@@ -116,6 +116,10 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "evaluate-retrieval" =>
+                    await VideoFrameRetrievalEvaluationCommandRunner.RunAsync(
+                        VideoFrameRetrievalEvaluationOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "audit" =>
                     await VideoFrameEvidenceAuditCommandRunner.RunAsync(
                         VideoFrameEvidenceAuditOptions.Parse(args.Skip(3).ToArray()),
@@ -327,6 +331,12 @@ public static class Program
                                     (read-only current evidence; human-annotated cuts;
                                      numeric missed-scene audit and counterfactual plans;
                                      no FFmpeg, caption/vector output, or scene detection)
+              video frames evaluate-retrieval --manifest ABS_LOCAL_JSON
+                                              [--frame-top-k 1..24] [--rank-k 1..32]
+                                              (private offline CLIP vector benchmark,
+                                               aggregate Hit/MRR/Recall/MAP/nDCG only;
+                                               no DB, media, models or network)
+
               video frames audit --postgres-connection-env NAME --database DB
                                  --job-id FRAME_EVIDENCE_JOB_UUID
                                  (read-only currentness/completeness and numeric storage
