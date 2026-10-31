@@ -46,12 +46,18 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducerTests
         VideoRegisteredProxyFrameProducerOptions options = new(
             local, local, Path.Combine(local, "ffmpeg.exe"), new string('a', 64),
             Path.Combine(local, "model.onnx"), Path.Combine(local, "vocab.json"),
-            Path.Combine(local, "merges.txt"));
+            Path.Combine(local, "merges.txt"),
+            ExpectedClipSha256: new string('c', 64),
+            ExpectedOllamaSha256: new string('d', 64));
         options.Validate();
         Assert.Throws<ArgumentException>(() =>
             (options with { FfmpegSha256 = "not-approved" }).Validate());
         Assert.Throws<ArgumentException>(() =>
             (options with { CacheRoot = "relative" }).Validate());
+        Assert.Throws<ArgumentException>(() =>
+            (options with { ExpectedOllamaSha256 = "bad" }).Validate());
+        Assert.Throws<ArgumentException>(() =>
+            (options with { ExpectedClipSha256 = "" }).Validate());
 
         await using PostgresCatalogueDatabase db = new(
             "Host=127.0.0.1;Port=1;Database=never_connect;Username=fixture;Pooling=false");
