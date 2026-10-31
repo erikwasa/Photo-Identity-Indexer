@@ -148,6 +148,39 @@ authorize frame disclosure under ADR-0013. Record both the bridge's
 `errorCode`) and check that only the scratch ownership marker remains.
 No failed or partial model result is published or persisted.
 
+### Maintained-host Azure/CLIP result: warm-model PASS (2026-10-31)
+
+The operator retried the read-only, two-frame registered proxy on the
+**pre-PR #677 checkout after the Azure Ollama model had warmed up**:
+
+| Aggregate field | Observed |
+| --- | --- |
+| `status` | `validated-not-published` |
+| `frames` | 2 |
+| `jpegBytes` | 36213 |
+| `decodingMs` | 128 |
+| `modelMs` | 2551 |
+| `errorCode` | `null` |
+| Process exit code | 0 |
+| Scratch after execution | Only the original ownership marker |
+
+The output flags were all `false` for original access, OneDrive
+hydration, video jobs, schema change, evidence persistence and returned
+caption content. Neither private media nor identifiers were retained in
+the repository. This confirms that an already-registered local video
+proxy, existing CLIP model and operator-managed Azure Ollama can
+complete the read-only frame model pilot without publishing evidence.
+
+**Scope of proof:** This successful invocation preceded pulling merged
+PR #677, so it **does not establish** that the corrected separate 180s
+inference deadline survives an Azure cold start. Windows CI for the merged
+PR #677 passed. A post-merge `main` rerun is the direct regression check,
+preferably after allowing Azure to become cold again if the goal is to
+observe a slow first caption. Do not force a cold restart solely to meet
+this nonproduction pilot. For any Azure-backed test, verify the bridge
+received actual `POST /api/chat` responses, and scale Azure GPU back to
+zero when finished.
+
 ### Safe default/no-database tests
 
 ```powershell
