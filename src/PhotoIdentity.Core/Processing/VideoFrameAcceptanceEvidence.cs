@@ -6,10 +6,13 @@ namespace PhotoIdentity.Core.Processing;
 /// Caller must first enforce current v38 batch provenance and same-snapshot
 /// data access; this type has no authority to declare WI-0190 accepted.
 /// </summary>
+public sealed record VideoFrameAcceptanceSceneCoverage(
+    int SampledFrames, int TotalScenes, int CoveredScenes, int MissedScenes);
+
 public sealed record VideoFrameAcceptanceObservation(
     Guid JobId, IReadOnlyList<string> Categories,
     int Frames, long DurationMs, long EvidencePayloadBytes,
-    VideoFrameSceneCoverageSummary? AnnotatedCoverage,
+    VideoFrameAcceptanceSceneCoverage? AnnotatedCoverage,
     long? ExecutionWallMs, long? CpuTimeMs,
     long? GpuTimeMs, long? AzureCostMinorUnits,
     int? CaptionsJudged, int? CaptionsAccurate);
@@ -47,7 +50,7 @@ public static class VideoFrameAcceptanceEvidence
         HashSet<Guid> identities = [];
         var counts = RequiredCategories.ToDictionary(x => x, _ => 0,
             StringComparer.Ordinal);
-        long totalPayload = 0, totalDuration = 0, wall = 0, cpu = 0, gpu = 0, azure = 0;
+        long totalPayload = 0, wall = 0, cpu = 0, gpu = 0, azure = 0;
         int frames = 0, timedFrames = 0, annotatedClips = 0, scenes = 0, covered = 0;
         int timed = 0, cpuMeasured = 0, gpuMeasured = 0, azureMeasured = 0;
         int judgedClips = 0, judged = 0, accurate = 0;
@@ -78,7 +81,6 @@ public static class VideoFrameAcceptanceEvidence
             {
                 frames += item.Frames;
                 totalPayload += item.EvidencePayloadBytes;
-                totalDuration += item.DurationMs;
             }
             minDuration = Math.Min(minDuration, item.DurationMs);
             maxDuration = Math.Max(maxDuration, item.DurationMs);
