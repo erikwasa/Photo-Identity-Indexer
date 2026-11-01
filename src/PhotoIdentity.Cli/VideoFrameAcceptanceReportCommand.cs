@@ -60,7 +60,8 @@ public static class VideoFrameAcceptanceReportCommandRunner
             if (item is null || item.JobId == Guid.Empty ||
                 !jobs.Add(item.JobId) ||
                 item.Categories is null ||
-                item.Categories.Length is < 1 or > VideoFrameAcceptanceEvidence.RequiredCategories.Count ||
+                (item.Categories.Length < 1 ||
+                    item.Categories.Length > VideoFrameAcceptanceEvidence.RequiredCategories.Count) ||
                 item.Categories.Any(c => !VideoFrameAcceptanceEvidence.RequiredCategories.Contains(c)) ||
                 item.Categories.Distinct(StringComparer.Ordinal).Count() != item.Categories.Length ||
                 (item.SceneCutsMs is { } sceneLimits &&
