@@ -382,7 +382,7 @@ public static class Program
                   --clip-model ABSOLUTE_ONNX --clip-model-sha256 SHA256
                   --clip-vocab ABSOLUTE_JSON --clip-merges ABSOLUTE_TXT
                   --ollama-sha256 SHA256 [--ollama-model NAME]
-                  --max-frames 1..2
+                  --max-frames 1..4
                   [--scene-boundaries-ms 3000,6000,9000]
                   [--apply --acknowledge-isolated-v38-rehearsal
                    --acknowledge-frame-disclosure]
