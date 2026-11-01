@@ -19,7 +19,8 @@ public sealed record VideoRegisteredProxyFrameProducerOptions(
     string ClipModelPath, string ClipVocabularyPath, string ClipMergesPath,
     string OllamaModel = OllamaVisionCaptionClient.DefaultModel,
     string ExpectedClipSha256 = "", string ExpectedOllamaSha256 = "",
-    Guid SelectedProxyJobId = default)
+    Guid SelectedProxyJobId = default,
+    Uri? OllamaBaseUri = null)
 {
     public void Validate()
     {
@@ -44,6 +45,12 @@ public sealed record VideoRegisteredProxyFrameProducerOptions(
             string.IsNullOrWhiteSpace(OllamaModel) ||
             OllamaModel.Length > 100 || OllamaModel.Any(char.IsControl))
             throw new ArgumentException("Frame evidence model/tool identity is invalid.");
+        if (OllamaBaseUri is { } uri &&
+            (!uri.IsAbsoluteUri || !uri.IsLoopback ||
+             uri.Scheme is not ("http" or "https") ||
+             uri.AbsolutePath != "/" || uri.UserInfo.Length > 0 ||
+             uri.Query.Length > 0 || uri.Fragment.Length > 0))
+            throw new ArgumentException("Frame inference must use a credential-free loopback HTTP(S) origin.");
     }
 }
 
@@ -207,7 +214,8 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 options.ClipMergesPath);
             using HttpClient http = new() { Timeout = TimeSpan.FromSeconds(200) };
             var captions = new OllamaVisionCaptionClient(http,
-                OllamaVisionCaptionClient.DefaultBaseUri, options.OllamaModel);
+                options.OllamaBaseUri ?? OllamaVisionCaptionClient.DefaultBaseUri,
+                options.OllamaModel);
             LocalVisionModelDescriptor descriptor =
                 await captions.GetInstalledModelAsync(token);
 
