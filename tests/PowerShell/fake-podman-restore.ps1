@@ -71,6 +71,17 @@ if ($envFlags.ContainsKey('PHOTOIDENTITY_SQL')) {
 }
 if ($envFlags.ContainsKey('RESTORE_SQL')) {
     $sql = $envFlags.RESTORE_SQL
+    if ($sql.StartsWith("SELECT 'activity|'")) {
+        if ($global:FakeRestore.Exists -and $global:FakeRestore.LastObservedSessionCount -gt 0) {
+            "activity|autovacuum worker|internal|other|$($global:FakeRestore.LastObservedSessionCount)"
+            'analyze|progress|internal|active|1'
+        }
+        else {
+            'analyze|progress|internal|active|0'
+        }
+        'vacuum|progress|internal|active|0'
+        return
+    }
     if ($sql -match '^SELECT kind \|\| ') {
         if ($global:FakeRestore.Exists -and $global:FakeRestore.Sessions -gt 0) {
             "client backend|$($global:FakeRestore.Sessions)"
@@ -92,6 +103,7 @@ if ($envFlags.ContainsKey('RESTORE_SQL')) {
                 $global:FakeRestore.TransientSessionsRemaining--
                 $sessions = 1
             }
+            $global:FakeRestore.LastObservedSessionCount = $sessions
             "$($global:FakeRestore.Marker)|8192|$sessions"
         }
         return
