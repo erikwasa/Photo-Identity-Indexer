@@ -71,7 +71,7 @@ if ($envFlags.ContainsKey('PHOTOIDENTITY_SQL')) {
 }
 if ($envFlags.ContainsKey('RESTORE_SQL')) {
     $sql = $envFlags.RESTORE_SQL
-    if ($sql -like 'SELECT kind || '*') {
+    if ($sql -match '^SELECT kind \|\| ') {
         if ($global:FakeRestore.Exists -and $global:FakeRestore.Sessions -gt 0) {
             "client backend|$($global:FakeRestore.Sessions)"
         }
