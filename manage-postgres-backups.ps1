@@ -190,8 +190,7 @@ Assert-NoReparse $script:root
 $script:statePath = Join-Path $script:root 'retention-state.json'
 $state = Read-State
 
-$actions = @($RegisterPreChange, $SetRecoveryCheckpoint, $RemovePreChange, $RemoveSuperseded | Where-Object { $_ })
-# Avoid PowerShell's array pipeline precedence ambiguity: exactly one mode.
+# Exactly one mutating mode is permitted.
 $count = [int]$RegisterPreChange.IsPresent + [int]$SetRecoveryCheckpoint.IsPresent +
     [int]$RemovePreChange.IsPresent + [int]$RemoveSuperseded.IsPresent
 if ($count -gt 1) { throw 'Select exactly one backup-management action.' }
