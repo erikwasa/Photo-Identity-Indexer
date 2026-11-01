@@ -210,6 +210,21 @@ function Invoke-RestoreDrop {
     }
 }
 
+# Only automatic verification is allowed to wait for maintenance. It must
+# observe *exclusively* autovacuum worker sessions on every extended check.
+# Classification is read-only; the zero-session guard still controls drop.
+function Test-RestoreAutovacuumOnly {
+    param([Parameter(Mandatory = $true)]$Snapshot)
+    $activity = @($Snapshot.activity)
+    if ($activity.Count -eq 0) { return $false }
+    foreach ($entry in $activity) {
+        if ($entry.backendType -cne 'autovacuum worker' -or $entry.sessions -le 0) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function Remove-OwnedRestoreDatabase {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -217,7 +232,9 @@ function Remove-OwnedRestoreDatabase {
         [Parameter(Mandatory = $true)][string]$SourceDatabase,
         [ValidateRange(1, 20)][int]$SessionWaitAttempts = 1,
         [ValidateRange(0, 5000)][int]$SessionWaitMilliseconds = 0,
-        [System.Collections.IList]$BusyDiagnostics
+        [System.Collections.IList]$BusyDiagnostics,
+        [ValidateRange(0, 120)][int]$AutovacuumWaitAttempts = 0,
+        [ValidateRange(0, 30000)][int]$AutovacuumWaitMilliseconds = 10000
     )
     if (-not (Test-GeneratedRestoreName $Name) -or
         -not (Test-RestoreOwnershipMarker $ExpectedMarker) -or
@@ -226,52 +243,77 @@ function Remove-OwnedRestoreDatabase {
         throw 'Restore cleanup protection failed (name, marker, or source database).'
     }
 
-    # A finished pg_restore may briefly leave a PostgreSQL connection or
-    # background worker visible. Automatic cleanup can wait for it to exit,
-    # but every observation must recheck exact ownership. Operator cleanup
-    # retains the original immediate refusal (one attempt by default).
-    for ($attempt = 1; $attempt -le $SessionWaitAttempts; $attempt++) {
+    # All paths (including operator removal) validate name, exact marker and
+    # current session count before non-force drop. Normal clients get only
+    # the pre-existing short wait. Only positively classified autovacuum
+    # workers can extend automatic cleanup, never production or operator drop.
+    $totalAttempts = $SessionWaitAttempts + $AutovacuumWaitAttempts
+    for ($attempt = 1; $attempt -le $totalAttempts; $attempt++) {
         $details = Get-RestoreDatabaseDetails -Name $Name
         if ($null -eq $details -or -not $details.Owned -or $details.Marker -cne $ExpectedMarker) {
             throw "Database '$Name' is absent or has missing/mismatched ownership; no drop was attempted."
         }
         if ($details.Sessions -eq 0) {
-            # dropdb independently refuses sessions that arrive after this
-            # observation. Never terminate connections or use --force.
+            # PostgreSQL itself refuses a late-arriving session. No --force,
+            # no connection termination, no guessed cleanup permission.
             Invoke-RestoreDrop -Name $Name
             if ($null -ne (Get-RestoreDatabaseDetails -Name $Name)) {
                 throw "PostgreSQL still reports isolated restore database '$Name' after cleanup."
             }
             return
         }
-        # Classify sessions on every busy observation, including the final
-        # one. Diagnostic collection must never override the safety result.
-        if ($null -ne $BusyDiagnostics) {
-            try {
-                $snapshot = Get-RestoreBusyDiagnostic -Name $Name
-                [void]$BusyDiagnostics.Add([pscustomobject]@{
-                    attempt = $attempt
-                    sessionsAtOwnershipCheck = $details.Sessions
-                    snapshot = $snapshot
-                })
-            }
-            catch {
-                [void]$BusyDiagnostics.Add([pscustomobject]@{
-                    attempt = $attempt
-                    sessionsAtOwnershipCheck = $details.Sessions
-                    diagnosticUnavailable = $true
-                })
+
+        # A diagnostic snapshot is mandatory for *extended* autovacuum wait,
+        # and optional (best-effort) during the original short wait.
+        $snapshot = $null
+        $diagnosticUnavailable = $false
+        if ($null -ne $BusyDiagnostics -or $AutovacuumWaitAttempts -gt 0) {
+            try { $snapshot = Get-RestoreBusyDiagnostic -Name $Name }
+            catch { $diagnosticUnavailable = $true }
+            if ($null -ne $BusyDiagnostics) {
+                if ($diagnosticUnavailable) {
+                    [void]$BusyDiagnostics.Add([pscustomobject]@{
+                        attempt = $attempt
+                        sessionsAtOwnershipCheck = $details.Sessions
+                        diagnosticUnavailable = $true
+                    })
+                }
+                else {
+                    [void]$BusyDiagnostics.Add([pscustomobject]@{
+                        attempt = $attempt
+                        sessionsAtOwnershipCheck = $details.Sessions
+                        snapshot = $snapshot
+                    })
+                }
             }
         }
-        if ($attempt -lt $SessionWaitAttempts) {
-            if ($attempt -eq 1) {
-                Write-Host "Restore cleanup detected active sessions; waiting briefly for them to exit (no connections will be terminated)."
+
+        if ($attempt -ge $SessionWaitAttempts) {
+            if ($AutovacuumWaitAttempts -eq 0 -or
+                $diagnosticUnavailable -or $null -eq $snapshot -or
+                -not (Test-RestoreAutovacuumOnly -Snapshot $snapshot)) {
+                throw "Database '$Name' has active or unclassified sessions after $attempt checks; no connections were terminated and no drop was attempted."
             }
-            Start-Sleep -Milliseconds $SessionWaitMilliseconds
         }
+
+        if ($attempt -ge $totalAttempts) {
+            throw "Database '$Name' still has autovacuum workers after $attempt bounded checks; no connections were terminated and no drop was attempted."
+        }
+
+        if ($attempt -eq 1) {
+            Write-Host 'Restore cleanup detected active sessions; waiting briefly for them to exit (no connections will be terminated).'
+        }
+        if ($attempt -eq $SessionWaitAttempts -and $AutovacuumWaitAttempts -gt 0) {
+            Write-Host 'Only PostgreSQL autovacuum workers are active; allowing bounded maintenance completion before safe cleanup.'
+        }
+        Start-Sleep -Milliseconds $(if ($attempt -lt $SessionWaitAttempts) {
+                $SessionWaitMilliseconds
+            } else {
+                $AutovacuumWaitMilliseconds
+            })
     }
-    throw "Database '$Name' has active sessions after $SessionWaitAttempts checks; no connections were terminated and no drop was attempted."
 }
+
 
 function Write-RestoreVerificationReport {
     param(

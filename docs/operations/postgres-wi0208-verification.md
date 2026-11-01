@@ -68,13 +68,19 @@ if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf) -or
 ~~~
 
 
-The verifier makes 11 bounded checks at two-second intervals. Any failed cleanup leaves its owned verification copy intact, with `passed=true`, `cleanupStatus=failed` and `cleanupRequired=true`. It never terminates connections or uses force. Both earlier full-size runs passed the integrity comparison but had busy sessions through the entire cleanup window; the sessions later disappeared without operator intervention. The backend category during those busy checks was not captured, so **do not infer the cause from their later disappearance**.
+The verified-maintained-host root cause is **autovacuum on the restored database**. A third representative full-sized restore on 2026-11-01 passed the integrity comparison, while **all 11 cleanup observations** recorded only active `autovacuum worker` sessions (one or two per snapshot), corresponding to `VACUUM` and occasional `ANALYZE` progress. There were no client backends in any busy snapshot; those sessions later disappeared without intervention. PostgreSQL 18 autovacuum is cluster-managed, so **do not disable autovacuum for production** or rely on `ALLOW_CONNECTIONS false` to exclude maintenance workers.
 
-### One consolidated diagnosis instead of repeated trial restores
+### Maintenance-aware automatic cleanup
 
-**Only once the follow-up diagnostics PR and CI are accepted**, perform one real restore from a fresh stopped-source backup using the commands in section 2. The verifier now captures an aggregate diagnostic snapshot **for every busy cleanup attempt**, including backend type, recognized client kind (`psql`, `pg_restore`, unnamed or other), activity state, and the number of ongoing `ANALYZE` and `VACUUM` operations. Each sample is recorded in the same durable `*.restore-verification.json`, whether cleanup eventually succeeds or fails. Categories are deliberately limited; no backend PID, user, SQL statement, media, address or original application name is included.
+For a *fresh successful* verification, the ordinary short grace remains 11 checks separated by 2 seconds. If the sessions at its end are classified as **exclusively autovacuum workers**, automatic cleanup may continue for at most **60 additional checks at 10-second intervals** (plus diagnostic-query execution time). The verifier must revalidate the exact database name, matching ownership marker and zero sessions on each check before it attempts **ordinary non-force** `dropdb`. Other client/backend types, missing diagnostics, changed provenance and persistent maintenance beyond the bound continue to fail safely; `-RetainRestoredDatabase`, read-only resume and operator-confirmed removal are unchanged.
 
-Inspect all samples from **that one run**:
+The maintenance-aware fix does not retrospectively change the prior failed reports. It is not accepted until a new maintained-host full-sized verification returns `passed=true`, `cleanupStatus=removed`, `cleanupRequired=false`, with no restored copy left in inventory, and the backup plus manifest preserved.
+
+### Preserved one-run diagnosis
+
+The verifier captures an aggregate diagnostic snapshot **for every busy cleanup attempt**, including backend type, recognized client kind (`psql`, `pg_restore`, unnamed or other), activity state, and the number of ongoing `ANALYZE` and `VACUUM` operations. Each sample is recorded in the same durable `*.restore-verification.json`, whether cleanup eventually succeeds or fails. No backend PID, user, SQL statement, media, address or original application name is included.
+
+Inspect samples from **that one run**:
 
 ~~~powershell
 $report = Get-Content -LiteralPath "$backupPath.restore-verification.json" -Raw | ConvertFrom-Json

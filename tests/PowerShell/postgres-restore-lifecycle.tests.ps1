@@ -216,4 +216,89 @@ $script:diagnosticRows = @(
 )
 Assert-Throws { Get-RestoreBusyDiagnostic -Name $script:validName } 'missing maintenance diagnostics rejected'
 
+# Extended automatic cleanup is reserved for autovacuum only. Use
+# millisecond-scale synthetic retries; never wait minutes during CI.
+$script:diagnosticRows = @(
+    'activity|autovacuum worker|internal|active|1',
+    'analyze|progress|internal|active|0',
+    'vacuum|progress|internal|active|1'
+)
+Reset-Record
+$script:transientBusyChecks = 5
+$autovacuumSamples = [System.Collections.ArrayList]::new()
+Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+    -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+    -AutovacuumWaitAttempts 5 -AutovacuumWaitMilliseconds 1 `
+    -BusyDiagnostics $autovacuumSamples
+Assert-Condition ($script:dropCalls -eq 1) 'autovacuum-only workers clear after regular wait'
+Assert-Condition ($autovacuumSamples.Count -eq 5) 'all extended worker observations were captured'
+
+Reset-Record
+$script:record.Sessions = 1
+$script:diagnosticRows = @(
+    'activity|autovacuum worker|internal|active|1',
+    'analyze|progress|internal|active|0',
+    'vacuum|progress|internal|active|1'
+)
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+        -AutovacuumWaitAttempts 2 -AutovacuumWaitMilliseconds 1
+} 'persistent autovacuum is bounded'
+Assert-Condition ($script:dropCalls -eq 0 -and $script:detailChecks -eq 4) 'maintenance bound never terminates or drops'
+
+Reset-Record
+$script:record.Sessions = 1
+$script:diagnosticRows = @(
+    'activity|client backend|psql|idle|1',
+    'analyze|progress|internal|active|0',
+    'vacuum|progress|internal|active|0'
+)
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+        -AutovacuumWaitAttempts 5 -AutovacuumWaitMilliseconds 1
+} 'client backend never earns extended wait'
+Assert-Condition ($script:dropCalls -eq 0 -and $script:detailChecks -eq 2) 'client backend fails at original deadline'
+
+Reset-Record
+$script:record.Sessions = 1
+$script:diagnosticRows = @(
+    'activity|autovacuum worker|internal|active|1',
+    'activity|client backend|psql|idle|1',
+    'analyze|progress|internal|active|0',
+    'vacuum|progress|internal|active|1'
+)
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+        -AutovacuumWaitAttempts 5 -AutovacuumWaitMilliseconds 1
+} 'mixed client and autovacuum must not extend cleanup'
+Assert-Condition ($script:dropCalls -eq 0) 'mixed sessions cannot cause drop'
+
+Reset-Record
+$script:record.Sessions = 1
+$script:diagnosticRows = @('malformed diagnostic')
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+        -AutovacuumWaitAttempts 5 -AutovacuumWaitMilliseconds 1
+} 'unavailable backend classification fails closed'
+Assert-Condition ($script:dropCalls -eq 0) 'invalid diagnostic never authorizes drop'
+
+Reset-Record
+$script:record.Sessions = 1
+$script:markerFlipAfterChecks = 2
+$script:diagnosticRows = @(
+    'activity|autovacuum worker|internal|active|1',
+    'analyze|progress|internal|active|0',
+    'vacuum|progress|internal|active|1'
+)
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+        -AutovacuumWaitAttempts 5 -AutovacuumWaitMilliseconds 1
+} 'ownership change in extended wait fails immediately'
+Assert-Condition ($script:dropCalls -eq 0 -and $script:detailChecks -eq 3) 'provenance remains authoritative in extended window'
+
 Write-Host "WI-0208 synthetic safety/report assertions: $script:checked passed."

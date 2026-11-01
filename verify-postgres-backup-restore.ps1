@@ -272,12 +272,14 @@ try {
         # All values are aggregate categories; no SQL, PIDs or identities.
         $cleanupBusyDiagnostics = [System.Collections.ArrayList]::new()
         try {
-            # A full restore can finish while a transient PostgreSQL session
-            # is still visible. Revalidate ownership and idleness for at
-            # most 20 seconds; persistent sessions still fail closed.
+            # Normal clients get the original short grace window. Only
+            # confirmed autovacuum workers may extend the cleanup wait for
+            # 60 * 10 seconds (bounded); every check revalidates ownership
+            # and ordinary non-force drop still requires zero sessions.
             Remove-OwnedRestoreDatabase -Name $VerificationDatabaseName `
                 -ExpectedMarker $ownershipMarker -SourceDatabase $sourceDatabase `
                 -SessionWaitAttempts 11 -SessionWaitMilliseconds 2000 `
+                -AutovacuumWaitAttempts 60 -AutovacuumWaitMilliseconds 10000 `
                 -BusyDiagnostics $cleanupBusyDiagnostics
         }
         catch {
