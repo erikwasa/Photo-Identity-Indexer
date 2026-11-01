@@ -262,7 +262,7 @@ if ($InspectBackup) {
         RestorePassed = [bool]$restorePassed
         CleanupStatus = if ($restoreExists) { [string]$verification.cleanupStatus } else { 'missing' }
         EligibleForCheckpointPromotion = [bool]($restorePassed -and $cleanupRemoved)
-        RemoteCopyIndependentlyConfirmed = [bool]($role -eq 'recovery-checkpoint')
+        RemoteConfirmationRecorded = [bool]($role -eq 'recovery-checkpoint')
     }
     return
 }
