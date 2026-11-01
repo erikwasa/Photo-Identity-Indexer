@@ -76,7 +76,7 @@
         </div>
 
         <p class="field-help">
-            Caption generation uses only the configured durable review proxy, reduced to a temporary 480×320 image, and sends it only to the local loopback Ollama runtime.
+            Caption generation uses only the configured durable review proxy, reduced to a temporary 480×320 image, and sends it to a loopback Ollama endpoint. If an operator deliberately starts an authorized Azure bridge at that endpoint, the thumbnail is forwarded to that controlled Azure service.
             Generated captions are versioned derived photo evidence. Smart Collections, slideshows and future features may consume that evidence, but they do not trigger generation.
         </p>
     }
