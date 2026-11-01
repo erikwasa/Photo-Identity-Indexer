@@ -49,11 +49,11 @@ Avoid accumulating PostgreSQL logical backup files while keeping a dependable wa
 
 ## Acceptance criteria
 
-- [ ] Operators can clearly identify a short-lived pre-change backup and the single protected recovery checkpoint, without new scheduling or retention machinery.
+- [x] Operators can clearly identify short-lived pre-change backups and the single protected recovery checkpoint, without scheduling or retention machinery. The current checkpoint is registered and independently inspected.
 - [ ] After successful **change** verification, an explicit bounded action removes the selected temporary backup and its related sidecars; failure or missing acceptance leaves it intact.
-- [ ] Exactly one confirmed, restore-capable recovery checkpoint can be retained off the production disk (preferably on OneDrive), with documented confirmation of upload/remote availability and matching integrity evidence.
+- [x] Exactly one restore-verified recovery checkpoint is registered and independently available on OneDrive, with upload, separate browser download and matching SHA-256 verified by the maintainer on 2026-11-01.
 - [ ] Replacing that checkpoint can temporarily keep two backups; the old checkpoint is not retired until the new one is verified and independently available. Failed refresh does not lose the old recovery point.
-- [ ] Tests prove protection of the only recovery copy, ambiguous/unclassified paths, incomplete transfers, bad hashes, missing verification evidence and cleanup failure.
+- [x] Source-free disposable tests prove protection of the only recovery copy, ambiguous/unclassified paths, incomplete transfers, bad hashes, missing verification evidence and cleanup refusal (49 local assertions passed after PR #702).
 - [ ] Windows operator documentation remains concise; `PhotoIdentity.Docs validate` and `generate --check` pass, followed by maintainer verification of the practical workflow.
 
 ## Relationship to WI-0208
@@ -72,4 +72,10 @@ Avoid accumulating PostgreSQL logical backup files while keeping a dependable wa
 
 **Follow-up hardening:** add a true read-only `-InspectBackup` for an existing unclassified candidate, verifying dump hash/manifest and whether its restore-report comparison and automatic cleanup passed. Keep remote independence strictly separate: a recorded remote attestation is not a live OneDrive check. Correct the partial-deletion order so a Windows-locked dump refuses deletion **without discarding its manifest and restore evidence first**, with isolated regression coverage. This follow-up is still pending CI and must not be interpreted as local off-disk checkpoint verification.
 
-**Still required before acceptance:** test the operator workflow locally with a small disposable backup and actual post-change approval; select one real restore-verified recovery dump and independently confirm the OneDrive/off-disk copy (and matching hash) before promotion. Verify old-checkpoint replacement while preserving at least one confirmed recovery point, refusal paths in the maintained environment, and successful exact cleanup. No deletion of the user's existing unclassified archive backups should happen during development.
+**Maintainer confirmation of independently usable recovery checkpoint — 2026-11-01:** PR #702 was merged. The maintainer ran the updated disposable test suite with **49 assertions passed**. Read-only inspection of the previously accepted `wi0208-acceptance-20261101-142600.dump` confirmed: source `photoidentity_main`, exact 2,398,115,284-byte dump, SHA-256 `5d743b0821b6bdcbc72ee5c6e2d749ffb592ef5f01331ab2566efb83a163f759`, matching size/hash manifest, passing full-size restore report and `cleanupStatus=removed`. It initially had no remote confirmation.
+
+The maintainer then **uploaded that dump to OneDrive, retrieved it again into a separate local folder, independently SHA-256-hashed the retrieved bytes, and confirmed the download matched the original fingerprint**. The `-SetRecoveryCheckpoint -ExpectedSha256 ... -RemoteSha256 ... -RemoteConfirmation ... -ConfirmIndependentCopy` operation succeeded. Subsequent `-InspectBackup` returned `Role=recovery-checkpoint`, `EligibleForCheckpointPromotion=True` and `RemoteConfirmationRecorded=True`. This is an **operator-confirmed independent copy**, not an automated OneDrive API health check; future remote durability should not be assumed without rechecking. No additional full-size PostgreSQL restore was required and no other existing backups were deleted or reclassified.
+
+**Remaining local acceptance:** use a small disposable, separately approved backup root to rehearse actual post-change acceptance, exact-file read-only plan and one confirmed deletion; confirm unaccepted/unclassified backup refusals and unchanged protected recovery checkpoint. Check replacement/superseded behavior in the disposable test root; do not put the real sole checkpoint or real unclassified dumps at risk. Maintain `in_progress` until this final practical workflow is reviewed and accepted.
+
+**Outstanding verification from the original implementation plan:** the independent OneDrive copy and checkpoint promotion are **now satisfied** as recorded above. Practical operator-authorized cleanup and disposable replacement/protection rehearsal remain. Do not delete existing real unclassified backups as part of development.
