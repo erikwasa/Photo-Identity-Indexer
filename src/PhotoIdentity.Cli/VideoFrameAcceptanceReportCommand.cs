@@ -63,7 +63,8 @@ public static class VideoFrameAcceptanceReportCommandRunner
                 item.Categories.Length is < 1 or > VideoFrameAcceptanceEvidence.RequiredCategories.Count ||
                 item.Categories.Any(c => !VideoFrameAcceptanceEvidence.RequiredCategories.Contains(c)) ||
                 item.Categories.Distinct(StringComparer.Ordinal).Count() != item.Categories.Length ||
-                item.SceneCutsMs is { Length: > VideoFrameSamplingPlanner.HardMaximumSceneBoundaries } ||
+                (item.SceneCutsMs is { } sceneLimits &&
+                    sceneLimits.Length > VideoFrameSamplingPlanner.HardMaximumSceneBoundaries) ||
                 item.SceneCutsMs is { } cuts && cuts.Where((v, i) =>
                     v <= 0 || (i > 0 && v <= cuts[i - 1])).Any() ||
                 item.ExecutionWallMs is < 1 or > 86_400_000 ||
