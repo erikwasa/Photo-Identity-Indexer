@@ -1,6 +1,12 @@
 # Build context
 
 **2026-11-01 WI-0190 checkpoint 15 (PR pending):** PR #694 merged.
+Frame-count-specific interval job IDs now avoid key collision
+with an existing succeeded two-frame interval batch: 1/3/4
+use versioned interval-v2-nN, while legacy two-frame policy
+stays unchanged and old evidence still regenerates. Pure tests
+assert distinct idempotency keys.
+
 The CLI's selected FrameEvidence one-shot now accepts explicitly
 requested **1–4** bounded frames rather than 1–2; the existing
 regenerable scene policy and producer already supported four. The
