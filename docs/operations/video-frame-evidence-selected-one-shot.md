@@ -56,7 +56,7 @@ gate is NOT changed.
 
 Start at the repository root on current main. Reuse the existing private
 proxy cache root and pinned CLIP files from the previous successful pilot.
-**Load FFmpeg and FFprobe paths/hashes from the persistent launcher
+**Load FFmpeg/FFprobe and model paths/hashes from the persistent launcher
 approval**, not Get-Command or a WinGet alias. See the
 [approved pinned video tools guide](ffmpeg-approved-video-tools.md).
 Keep database credentials exclusively in the process environment;
@@ -82,24 +82,14 @@ New-Item -ItemType Directory -Path $frameScratch | Out-Null
     "wi0190-registered-proxy-frames-v1"
 )
 
-$clipSha = (Get-FileHash -LiteralPath $clip.ModelPath -Algorithm SHA256).
-    Hash.ToLowerInvariant()
+# Read approved model files, pinned digests and the same loopback Ollama
+# origin used by the API; GET /api/tags verifies the installed identity.
+# This check sends no thumbnail. It can reach Azure through an already
+# running, explicitly authorized localhost bridge.
+$inference = .\Get-PhotoIdentityApprovedInference.ps1 -VerifyOllama
 
 # Known-good existing current local proxy UUID from prior read-only pilot.
 $proxyJob = "9d20dafa-282e-4240-914c-4cc5328185a4"
-
-# Confirm the operator-approved Ollama model digest independently.
-# For local Ollama or an authorized Azure bridge, the inventory is loopback.
-$models = Invoke-RestMethod "http://127.0.0.1:11434/api/tags"
-$model = $models.models | Where-Object {
-    $_.name -eq "qwen2.5vl:3b" -or $_.model -eq "qwen2.5vl:3b"
-} | Select-Object -First 1
-if (-not $model) { throw "Approved Ollama model is unavailable." }
-$ollamaSha = ([string]$model.digest -replace '^sha256:', '').ToLowerInvariant()
-if ($ollamaSha -ne
-    "fb90415cde1ef08aa669ae74b082d49b158729b6db1ab183c941417d507e71a1") {
-    throw "Ollama digest changed; review model before disclosure."
-}
 
 $frameArgs = @(
   "run", "--project", "src/PhotoIdentity.Cli", "-c", "Release", "--",
@@ -111,12 +101,13 @@ $frameArgs = @(
   "--scratch-root", $frameScratch,
   "--ffmpeg", $ffmpeg,
   "--ffmpeg-sha256", $ffmpegSha,
-  "--clip-model", $clip.ModelPath,
-  "--clip-model-sha256", $clipSha,
-  "--clip-vocab", $clip.TokenizerVocabularyPath,
-  "--clip-merges", $clip.TokenizerMergesPath,
-  "--ollama-model", "qwen2.5vl:3b",
-  "--ollama-sha256", $ollamaSha,
+  "--clip-model", $inference.ClipModelPath,
+  "--clip-model-sha256", $inference.ClipModelSha256,
+  "--clip-vocab", $inference.ClipVocabularyPath,
+  "--clip-merges", $inference.ClipMergesPath,
+  "--ollama-model", $inference.OllamaModel,
+  "--ollama-base-url", $inference.OllamaBaseUrl,
+  "--ollama-sha256", $inference.OllamaSha256,
   "--max-frames", "2"
 )
 
