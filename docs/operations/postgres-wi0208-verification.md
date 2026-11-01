@@ -1,6 +1,28 @@
 # WI-0208 maintained Windows / Podman acceptance
 
-Run from a PowerShell 7 window in the repository root after the PR is merged. This procedure does **not** delete backup files or production data. It exercises one actual, complete restore and may temporarily consume approximately the size of the catalogue inside the Podman virtual disk. Confirm there is adequate space before running; do not use Windows VHDX compaction to make room for a still-running restore.
+## Maintainer acceptance — PASSED (2026-11-01)
+
+The final PostgreSQL 18 / Windows / Podman maintained-host run verified and automatically removed a full-size restored copy using PR #699's bounded **autovacuum-only** waiting policy. The application API was stopped, source `photoidentity_main` was approximately **17.86 GiB**, and ownership-fenced cleanup completed after PostgreSQL's background maintenance finished; neither user/client sessions nor production data were terminated.
+
+| Evidence | Maintainer result |
+|---|---|
+| Source-free safety/report assertions | 59 passed |
+| Synthetic process-boundary scenarios | 10 passed |
+| Backup | `wi0208-acceptance-20261101-142600.dump` |
+| SHA-256 | `5d743b0821b6bdcbc72ee5c6e2d749ffb592ef5f01331ab2566efb83a163f759` |
+| Exact restored database | `photoidentity_restore_20261101132922_afb037` |
+| Restore and integrity comparison | `passed=true` |
+| Cleanup outcome | `cleanupStatus=removed`; `cleanupRequired=false` |
+| Subsequent inventory | 0 copies of that generated restore database |
+| Backup and manifest preservation | Both present |
+
+The previous failed-cleanup results remain part of the historical evidence that established PostgreSQL **autovacuum worker** activity as the blocker. The successful run confirms that maintenance-aware waiting resolves this case without `--force`, process termination or ownership bypass. The unrelated, unmarked 12.79 GiB legacy restore remains intentionally inventoried and **must not be automatically deleted**.
+
+The final console evidence did **not** include paired Podman-volume and Windows-VHDX before/after measurements; do not claim a corresponding Windows disk-size reduction. That storage-mapping observation is independent of the verified restored-database deletion. WI-0208 is completed; WI-0209 separately owns backup-file retention and recovery-checkpoint policy.
+
+## Reusable acceptance procedure
+
+When rerunning the procedure, use a PowerShell 7 window in the repository root with the required verifier changes merged. This procedure does **not** delete backup files or production data. It exercises one actual, complete restore and may temporarily consume approximately the size of the catalogue inside the Podman virtual disk. Confirm there is adequate space before running; do not use Windows VHDX compaction to make room for a still-running restore.
 
 ## 1. Preconditions and baseline
 
@@ -166,5 +188,7 @@ For simulated restore, comparison, report-write, cleanup failure and read-only r
 ## 4. Acceptance results to report
 
 Record the CI/synthetic test result; real backup/hash/row-comparison success; `passed` and `cleanupStatus`; name absence in inventory; source/restore sizes; Podman disk/volume observations; Windows free space before/after; and whether explicit retention/removal was tested or skipped for capacity. Do **not** share actual dump contents, private catalogue paths, connection strings, usernames, identities or photos.
+
+This procedure was accepted on 2026-11-01. For any future verification run, publish the independently checked cleanup and backup results before considering the new restore copy disposed. 
 
 No VHDX compaction is required to accept automatic restored-database cleanup. Existing unmarked copies are not an excuse for wildcard deletion or termination of running PostgreSQL sessions. WI-0209 separately handles when to retire local backup **files**.
