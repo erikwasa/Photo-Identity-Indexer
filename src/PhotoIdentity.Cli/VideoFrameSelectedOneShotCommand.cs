@@ -42,7 +42,7 @@ public sealed record VideoFrameSelectedOneShotOptions(
                 "--ffmpeg" or "--ffmpeg-sha256" or
                 "--clip-model" or "--clip-model-sha256" or "--clip-vocab" or "--clip-merges" or
                 "--ollama-sha256" or
-                "--ollama-model" or "--max-frames" or
+                "--ollama-model" or "--ollama-base-url" or "--max-frames" or
                 "--scene-boundaries-ms") ||
                 i+1 >= args.Length || args[i+1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(key, args[++i]))
@@ -99,6 +99,10 @@ public sealed record VideoFrameSelectedOneShotOptions(
             }
             sceneCuts = cuts;
         }
+        Uri? ollamaBaseUri = null;
+        if (values.TryGetValue("--ollama-base-url", out string? baseText) &&
+            !Uri.TryCreate(baseText, UriKind.Absolute, out ollamaBaseUri))
+            throw new ArgumentException("Ollama URL must be an absolute loopback origin.");
         var producer = new VideoRegisteredProxyFrameProducerOptions(
             Absolute("--cache-root"), Absolute("--scratch-root"),
             Absolute("--ffmpeg"), Required("--ffmpeg-sha256"),
@@ -107,7 +111,7 @@ public sealed record VideoFrameSelectedOneShotOptions(
             values.GetValueOrDefault("--ollama-model") ??
                 OllamaVisionCaptionClient.DefaultModel,
             Required("--clip-model-sha256"), Required("--ollama-sha256"),
-            SelectedProxyJobId: id);
+            SelectedProxyJobId: id, OllamaBaseUri: ollamaBaseUri);
         producer.Validate();
         return new(env, database, id, producer, frames, apply, v38, disclosure,
             sceneCuts);
