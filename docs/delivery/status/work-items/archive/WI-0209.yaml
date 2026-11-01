@@ -1,0 +1,25 @@
+id: WI-0209
+title: Keep one durable PostgreSQL recovery backup and retire temporary change backups
+milestone: M41
+status: completed
+owner: ai-agent
+started_at: 2026-11-01
+completed_at: 2026-11-01
+verified_at: 2026-11-01
+verified_by: maintainer
+last_updated_at: 2026-11-01
+branch: agent/WI-0209-operator-backup-lifecycle-20261101
+document: ../work-items/WI-0209-simple-postgres-backup-retention.md
+blockers: []
+blocker_notes: []
+evidence:
+- type: documentation
+  value: docs/operations/postgres-wi0209-backup-retention.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/701
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/702
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/703
+- type: maintainer-acceptance
+  value: '2026-11-01: 49 source-free Windows PowerShell assertions passed using a disposable temporary root, including actual synthetic pre-change acceptance-controlled exact deletion, sidecar removal, read-only planning, current checkpoint refusal, two-checkpoint overlap, missing replacement protection, superseded retirement, locked file refusal, tampered hash and incomplete remote/restore evidence. Separately, the accepted 2,398,115,284-byte wi0208-acceptance-20261101-142600.dump for photoidentity_main was uploaded to OneDrive, independently downloaded, SHA-256 matched 5d743b0821b6bdcbc72ee5c6e2d749ffb592ef5f01331ab2566efb83a163f759, registered as protected recovery-checkpoint and inspected with RemoteConfirmationRecorded=True. Docs validate and generate --check passed. No real unclassified backup was deleted, no new PostgreSQL restore required and no claim of automated remote monitoring.'
