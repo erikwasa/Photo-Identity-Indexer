@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0190-video-frame-caption-embedding.md
 started_at: 2026-10-31
 last_updated_at: 2026-11-01
-branch: agent/WI-0190-four-frame-scene-capped-one-shot
+branch: agent/WI-0190-acceptance-measure-interrupt
 blockers:
 - WI-0151
 - WI-0188
@@ -41,3 +41,5 @@ evidence:
   value: docs/operations/video-frame-scratch-crash-recovery.md
 - type: documentation
   value: docs/operations/video-frame-four-scene-selected-one-shot.md
+- type: documentation
+  value: docs/operations/video-frame-consolidated-acceptance-session.md
