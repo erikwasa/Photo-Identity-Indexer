@@ -47,8 +47,8 @@ public sealed class VideoFrameSceneSamplingIdentityTests
         Assert.NotEqual(Key(one), Key(legacyTwo));
         // Old publications remain interpretable from the separate persisted
         // requested_frames count, even when the old policy had no suffix.
-        Assert.Equal(1, VideoFrameSceneSamplingIdentity.BuildPlan(
-            12.3m, 1, legacyTwo).Samples.Count);
+        Assert.Single(VideoFrameSceneSamplingIdentity.BuildPlan(
+            12.3m, 1, legacyTwo).Samples);
     }
 
     [Fact]
