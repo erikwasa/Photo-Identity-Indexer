@@ -4,7 +4,7 @@
 The one real two-frame v38 audit is already accepted; do not ask to
 repeat it. This checkpoint closes a mechanical abnormal-exit gap:
 new private frame scratch workspaces have an ownership marker and
-held OS-exclusive lock; an explicit operator-only, age-gated
+held OS-exclusive lock; FFmpeg supervisor scratch is nested inside the same owned child, not an orphan sibling. An explicit operator-only, age-gated
 `video frames scratch-recover` can enumerate and (only with
 apply+ack) remove aged, unlocked, exact owned children without
 touching media originals, cache, DB, Azure or OneDrive. Unknown,
