@@ -84,6 +84,8 @@ dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ~~~
 
-For maintained-host acceptance, exercise **one small disposable** pre-change dump within an explicitly approved test root, inspect its role, confirm that removal before change acceptance fails and that exact confirmed retirement succeeds. Independently verify the remote copy of a real restore-verified candidate before promoting it to checkpoint; during replacement keep both copies until independent remote verification succeeds and demonstrate the old copy is protected if the replacement is missing or corrupt. **Never use the sole real recovery dump for deletion testing.**
+**Maintainer verification, 2026-11-01:** The existing WI-0208 full-size accepted dump was uploaded to OneDrive, then downloaded independently to a separate local directory. Its SHA-256 matched the verified original; the operator registered it as the sole protected `recovery-checkpoint`, and subsequent read-only inspection reported `EligibleForCheckpointPromotion=True` and `RemoteConfirmationRecorded=True`. There is no need to re-upload or restore it merely to repeat this acceptance. The recorded attestation does not provide ongoing cloud monitoring.
+
+**Still needed for WI-0209 acceptance:** exercise **one small disposable** pre-change dump within a separately approved test root, inspect its role, confirm that retirement without post-change acceptance is refused and that exact confirmed retirement succeeds. Demonstrate two-copy overlap and old-checkpoint preservation on a failed replacement in that disposable root. **Never use the sole real recovery dump for deletion testing.** Existing unclassified real backups remain untouched.
 
 No PostgreSQL production data, archived legacy restore databases, OneDrive objects, Podman volumes or Windows VHDX are modified by the helper.
