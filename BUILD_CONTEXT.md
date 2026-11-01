@@ -1,5 +1,20 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 14 (new PR):** PR #692 merged.
+The one real two-frame v38 audit is already accepted; do not ask to
+repeat it. This checkpoint closes a mechanical abnormal-exit gap:
+new private frame scratch workspaces have an ownership marker and
+held OS-exclusive lock; an explicit operator-only, age-gated
+`video frames scratch-recover` can enumerate and (only with
+apply+ack) remove aged, unlocked, exact owned children without
+touching media originals, cache, DB, Azure or OneDrive. Unknown,
+linked, oversized, active or too-young directories are never
+automatically deleted. CI and synthetic Windows filesystem tests
+pending. Formal WI-0190 0/4 remains: still needs real diverse
+media, human quality, CPU/GPU/Azure cost and a real maintained-host
+interrupt/cancel+cleanup acceptance. Runbook
+docs/operations/video-frame-scratch-crash-recovery.md.
+
 **2026-11-01 WI-0190 checkpoint 13 (PR pending):** PR #691 merged,
 bringing private current-v38 multi-video CLIP retrieval quality.
 Current work adds a bounded read-only **representative acceptance
