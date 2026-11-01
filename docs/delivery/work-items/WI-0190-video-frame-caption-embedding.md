@@ -643,6 +643,61 @@ sampling/missed-scene, CPU/GPU/real Azure cost, and maintained-host
 interruption/recovery acceptance still remain. Formal WI-0190
 status is `in_progress` and **0/4 full acceptance**.
 
+## Development checkpoint 13 — representative current-frame evidence without media disclosure (2026-11-01)
+
+After merged PR #691, the maintained-host audit's completeness gate
+is now reusable in an opt-in private live-catalogue CLIP relevance
+evaluator, but **real multiple-clip quality evidence is not yet
+collected**. This checkpoint adds `video frames acceptance-report`,
+a strict **read-only** comparison instrument for a bounded collection
+of up to 32 distinct current FrameEvidence video assets. An
+operator-only private local JSON manifest supplies fixed representative
+labels (short, multi-scene, long, rotated, low-light), optional
+human-annotated scene cuts and optional **measured** per-clip
+wall/CPU/GPU/Azure costs and manually judged caption correctness.
+
+A single PostgreSQL `REPEATABLE READ, READ ONLY` transaction applies
+the already-rehearsed frame-audit's supported-SDR, current-latest-
+revision, source-exclusion, complete frames, valid timestamps,
+embedding-length and succeeded-job checks **for every clip**, before
+reporting **any** aggregates. It refuses multiple jobs for the same
+underlying asset, which would otherwise artificially inflate
+representative coverage. Only numeric metadata, aggregate frame
+timestamps and private job identities are read; no source path,
+original, stored caption text or embedding bytes, CLIP model, FFmpeg,
+Azure or OneDrive hydration is accessed. A private annotation is
+checked against the inspected duration and the actual durable
+timestamps in the same snapshot via existing scene-coverage policy.
+
+The report contains numeric **caption/vector payload bytes** per
+current clip (mean and total, excluding PG overhead and proxies),
+minimum/maximum clip duration, frame counts, category frequency
+and **missing** categories, annotated scene weighted coverage,
+observed throughput only for wall-timed clips, and *counts* of
+CPU/GPU/Azure cost data actually supplied. Null measurements
+remain unknown, never zero. Human caption judgments are likewise
+optional and explicitly self-reported. No raw UUID, scene-cut
+positions, resource private manifest, caption or vector is emitted.
+The report **always says `fullAcceptanceEstablished=false`**.
+
+New Core pure tests check coverage weighting, correct denominators,
+missing-data treatment, category gaps, duplication and impossible
+human/CPU data. Disposable PostgreSQL tests verify read-only current
+reporting, stale revision and source-exclusion refusal, sanitized
+input handling and no partial results. Full details in the
+[checkpoint 13 runbook](../../operations/video-frame-acceptance-evidence-report.md).
+
+**Scope:** The tool aggregates evidence; it does **not** independently
+measure CPU/GPU, determine real Azure costs, detect scene changes,
+verify human category accuracy, inspect captions or generate additional
+FrameEvidence jobs. The existing one-job maintained-host audit is
+accepted but does not represent multiple video types. Run an optional
+**consolidated** quality/cost/scene study on real private videos after
+the development series; real Windows interruption remains separately
+required. Formal WI-0190 stays `in_progress`, **0/4 full criteria
+accepted**, and **no new local video work is needed merely to review
+this PR**.
+
 ## Completion notes
 
 - Files changed:
