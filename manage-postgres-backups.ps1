@@ -8,6 +8,7 @@ param(
     [switch]$RemovePreChange,
     [switch]$RemoveSuperseded,
     [switch]$PlanRemoval,
+    [switch]$InspectBackup,
     [string]$ChangeReference,
     [string]$ChangeAcceptanceEvidence,
     [switch]$ConfirmChangeAccepted,
@@ -166,12 +167,13 @@ function Remove-SelectedBackup {
     if ((Get-Evidence -Backup $Backup) -cne $Hash) {
         throw 'Exact expected SHA-256 no longer matches; nothing deleted.'
     }
-    # Delete metadata first, dump last. Any failure is surfaced immediately;
-    # state is deliberately not updated until all files have been removed.
+    # Delete the dump first: if Windows refuses removal because it is locked,
+    # do not orphan the manifest and restore evidence. Failure to remove a
+    # later sidecar still fails loudly and leaves state for manual recovery.
+    Remove-Item -LiteralPath $Backup.Path -Force -ErrorAction Stop
     foreach ($path in $sidecars) {
         if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force -ErrorAction Stop }
     }
-    Remove-Item -LiteralPath $Backup.Path -Force -ErrorAction Stop
 }
 
 if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
@@ -191,14 +193,14 @@ Assert-NoReparse $script:root
 $script:statePath = Join-Path $script:root 'retention-state.json'
 # Exactly one mutating mode is permitted.
 $count = [int]$RegisterPreChange.IsPresent + [int]$SetRecoveryCheckpoint.IsPresent +
-    [int]$RemovePreChange.IsPresent + [int]$RemoveSuperseded.IsPresent + [int]$PlanRemoval.IsPresent
+    [int]$RemovePreChange.IsPresent + [int]$RemoveSuperseded.IsPresent + [int]$PlanRemoval.IsPresent + [int]$InspectBackup.IsPresent
 if ($count -gt 1) { throw 'Select exactly one backup-management action.' }
 
 # One operator transition at a time. Read-only inventory/plan creates no
 # lockfile and never writes; a concurrent mutation fails without modifying
 # registry state, role assignments or any dump.
 $mutationLock = $null
-if ($count -gt 0 -and -not $PlanRemoval) {
+if ($count -gt 0 -and -not ($PlanRemoval -or $InspectBackup)) {
     $lockPath = Join-Path $script:root 'retention-state.lock'
     Assert-NoReparse $lockPath
     try {
@@ -234,8 +236,38 @@ if ($count -eq 0) {
 
 if ([string]::IsNullOrWhiteSpace($BackupPath)) { throw 'Select exactly one backup using -BackupPath.' }
 $backup = Resolve-Backup -Path $BackupPath
-$expected = Assert-Sha $ExpectedSha256
 $role = Get-Role -State $state -Name $backup.Name
+
+if ($InspectBackup) {
+    # Read-only assessment of an existing dump including ones not yet
+    # classified. A passing local report is necessary, not proof of remote
+    # availability or of a current independently protected checkpoint.
+    $hash = Get-Evidence -Backup $backup
+    $manifest = Read-Json "$($backup.Path).json"
+    $restorePath = "$($backup.Path).restore-verification.json"
+    $restoreExists = Test-FileHere $restorePath
+    $verification = if ($restoreExists) { Read-Json $restorePath } else { $null }
+    $restorePassed = $restoreExists -and $verification.passed -eq $true
+    $cleanupRemoved = $restoreExists -and
+        $verification.cleanupStatus -ceq 'removed' -and
+        $verification.cleanupRequired -eq $false
+    [pscustomobject]@{
+        Name = $backup.Name
+        Role = $role
+        SourceDatabase = [string]$manifest.sourceDatabase
+        BackupSha256 = $hash
+        BackupBytes = [long]$manifest.backupBytes
+        ManifestHashAndSizeValid = $true
+        RestoreReportPresent = [bool]$restoreExists
+        RestorePassed = [bool]$restorePassed
+        CleanupStatus = if ($restoreExists) { [string]$verification.cleanupStatus } else { 'missing' }
+        EligibleForCheckpointPromotion = [bool]($restorePassed -and $cleanupRemoved)
+        RemoteCopyIndependentlyConfirmed = [bool]($role -eq 'recovery-checkpoint')
+    }
+    return
+}
+
+$expected = Assert-Sha $ExpectedSha256
 $hash = Get-Evidence -Backup $backup -RequireRestore:$SetRecoveryCheckpoint
 if ($hash -cne $expected) { throw 'Operator-expected backup SHA-256 does not match the file.' }
 
