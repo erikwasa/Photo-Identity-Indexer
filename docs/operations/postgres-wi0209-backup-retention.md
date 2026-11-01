@@ -55,7 +55,7 @@ $remoteSha = '<SHA-256-of-independently-retrieved-remote-file>'
 
 The tool verifies local hash, manifest, successful restore report, supplied remote SHA-256 and **explicit operator attestation**. It never accesses OneDrive APIs or claims to have verified off-device availability itself. If independent confirmation fails, do not promote or retire anything.
 
-To replace a checkpoint, create and fully verify a new backup (with a different fingerprint), confirm its remote copy, then repeat -SetRecoveryCheckpoint using the new file. The former checkpoint is **marked superseded but not deleted**. Only when the replacement remains verified and protected:
+To replace a checkpoint, create and fully verify a separately named backup, confirm its remote copy, then repeat -SetRecoveryCheckpoint using the new file. The former checkpoint is **marked superseded but not deleted**. Only when the replacement remains verified and protected:
 
 ~~~powershell
 .\manage-postgres-backups.ps1 | Format-Table Name, Role, ManifestPresent, RestoreReportPresent
