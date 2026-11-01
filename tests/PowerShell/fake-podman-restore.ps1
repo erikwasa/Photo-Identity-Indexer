@@ -65,6 +65,12 @@ if ($envFlags.ContainsKey('PHOTOIDENTITY_SQL')) {
 }
 if ($envFlags.ContainsKey('RESTORE_SQL')) {
     $sql = $envFlags.RESTORE_SQL
+    if ($sql -like 'SELECT CASE WHEN backend_type IN (*') {
+        if ($global:FakeRestore.Exists -and $global:FakeRestore.Sessions -gt 0) {
+            "client backend|$($global:FakeRestore.Sessions)"
+        }
+        return
+    }
     if ($sql -like 'COMMENT ON DATABASE *') {
         if (-not $global:FakeRestore.Exists) { $global:LASTEXITCODE = 1; return }
         $match = [regex]::Match($sql, " IS '([^']+)';$")
