@@ -1,5 +1,29 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 15 (PR pending):** PR #694 merged.
+Frame-count-specific interval job IDs now avoid key collision
+with an existing succeeded two-frame interval batch: 1/3/4
+use versioned interval-v2-nN, while legacy two-frame policy
+stays unchanged and old evidence still regenerates. Pure tests
+assert distinct idempotency keys.
+
+The CLI's selected FrameEvidence one-shot now accepts explicitly
+requested **1–4** bounded frames rather than 1–2; the existing
+regenerable scene policy and producer already supported four. The
+global **13m attempt**, **15m absolute v37 grant**, 320MiB scratch,
+per-frame FFmpeg/model windows, one-job guard, local-only proxy
+source and v38 atomic currentness/exclusion fencing are unchanged.
+A four-frame request may time out on a slow model rather than
+publish partial results or extend disclosure authority. Synthetic
+Windows preflight tests and PG four-scene complete/partial
+publication regressions added; all canonical status and runbooks
+updated. Existing real two-frame audit is accepted (do not
+repeat). WI-0190 in_progress **0/4 full acceptance**; still needs
+real multi-scene/rotated/low-light/long clips, operator human
+caption/retrieval relevance, CPU/GPU/Azure costs and real Windows
+interruption. See
+docs/operations/video-frame-four-scene-selected-one-shot.md.
+
 **2026-11-01 WI-0190 checkpoint 14 (new PR):** PR #692 merged.
 The one real two-frame v38 audit is already accepted; do not ask to
 repeat it. This checkpoint closes a mechanical abnormal-exit gap:

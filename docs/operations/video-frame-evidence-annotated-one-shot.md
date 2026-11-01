@@ -21,7 +21,8 @@ of annotations creates a **different job**. The underlying video job identity pe
 scene_index plus model, sampling, tool and revision provenance.
 
 No new migration, worker, original or OneDrive hydration path is
-introduced. Existing limits remain: one selected job, **1–2 frames**,
+introduced. The original checkpoint allowed **1–2 frames**; checkpoint 15
+now supports **1–4 explicitly selected frames** (same grant/attempt caps),
 15-minute grant, 13-minute attempt, supervised FFmpeg and separate
 model timeouts, SHA-verified proxy and tools, and operator control,
 photo-priority, cancellation, revision and exclusion fences.
@@ -110,8 +111,8 @@ zero writes for valid/invalid cuts. Database fixture tests require
 PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING; otherwise they
 skip and do not count as database coverage.
 
-This does not implement automatic scene detection, more than two
-frame extraction per real one-shot, private multi-scene/rotated/
+This does not implement automatic scene detection, more than four
+frames per real one-shot, private multi-scene/rotated/
 low-light quality validation, GPU/CPU/Azure cost measurement,
 retrieval relevance or real-process interruption testing. These
 remain in the consolidated WI-0190 acceptance plan. No additional

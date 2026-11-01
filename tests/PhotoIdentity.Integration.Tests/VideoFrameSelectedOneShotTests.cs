@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Npgsql;
 using PhotoIdentity.Cli;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
@@ -34,6 +35,17 @@ public sealed class VideoFrameSelectedOneShotTests
         Assert.False(options.AcknowledgeV38);
         Assert.False(options.AcknowledgeDisclosure);
         Assert.Equal(2, options.Frames);
+        // Expanded operator-selected scope remains opt-in. The CLI still
+        // defaults to a preview, without activating models or any job.
+        string[] fourArgs = Valid(root);
+        fourArgs[^1] = "4";
+        var four = VideoFrameSelectedOneShotOptions.Parse(fourArgs);
+        Assert.Equal(4, four.Frames);
+        Assert.False(four.Apply);
+        Assert.Equal(VideoFrameSceneSamplingIdentity.MaximumFrames,
+            VideoFrameSelectedOneShotCommandRunner.MaximumFrames);
+        Assert.NotNull(VideoFrameSelectedOneShotOptions.Parse(
+            [.. fourArgs, "--scene-boundaries-ms", "2000,4000,6000"]).SceneCutsMs);
         Assert.Null(options.SceneCutsMs);
         Assert.Equal(new long[] { 3000, 6000 },
             VideoFrameSelectedOneShotOptions.Parse(
@@ -56,6 +68,7 @@ public sealed class VideoFrameSelectedOneShotTests
             new[] { "--source", @"C:\private\family.mov" },
             new[] { "--original-path", @"C:\private\family.mov" },
             new[] { "--online-only", "yes" },
+            new[] { "--max-frames", "5" },
             new[] { "--max-frames", "3" },
             new[] { "--scene-boundaries-ms", "none" },
             new[] { "--scene-boundaries-ms", "0" },
@@ -214,6 +227,39 @@ public sealed class VideoFrameSelectedOneShotTests
             // Annotated-scene preview must remain read-only and be clearly
             // distinct from the default interval mode; invalid private
             // annotations fail before queue/control/model/media work.
+            // Four-scene preflight is strictly read-only and reports the
+            // new bound. Neither valid nor impossible four-frame plans
+            // are allowed to create/claim jobs or contact caption models.
+            using (StringWriter fourFramePreview = new())
+            {
+                Assert.Equal(0, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested with
+                    {
+                        Frames = 4,
+                        SceneCutsMs = [2000L, 4000L, 6000L]
+                    }, fourFramePreview));
+                Assert.Contains("\"reasonCode\":\"preflight-only\"",
+                    fourFramePreview.ToString());
+                Assert.Contains("\"maximumFrames\":4",
+                    fourFramePreview.ToString());
+                Assert.Contains("\"samplingMode\":\"annotated-scene\"",
+                    fourFramePreview.ToString());
+            }
+            using (StringWriter impossibleFour = new())
+            {
+                Assert.Equal(1, await VideoFrameSelectedOneShotCommandRunner
+                    .RunAsync(requested with
+                    {
+                        Frames = 4,
+                        SceneCutsMs = [100L, 200L, 300L]
+                    }, impossibleFour));
+                Assert.Contains("\"reasonCode\":\"invalid-sampling-plan\"",
+                    impossibleFour.ToString());
+            }
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+                VideoFrameSelectedOneShotCommandRunner.RunAsync(
+                    requested with { Frames = 5 }, new StringWriter()));
+
             using (StringWriter annotated = new())
             {
                 Assert.Equal(0, await VideoFrameSelectedOneShotCommandRunner
