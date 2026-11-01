@@ -2,6 +2,8 @@
 
 This runbook documents the operator procedure proven on the maintained Windows catalogue on 2026-10-01 for temporarily accelerating Photo Identity generated captions with an Azure-hosted NVIDIA T4 while leaving Photo Identity itself unchanged and loopback-only.
 
+**Current operator configuration:** Use [approved inference configuration](approved-inference-configuration.md) for the active launcher model name/hash, caption loopback origin and operator-only Azure upstream URL. The values in this historical accepted-burst record are evidence, not a replacement for current approval. Configuring the upstream URL alone never starts the bridge or allows inference. The Azure resource state file remains separately useful on the Azure management PC.
+
 The architecture exception is defined by [ADR-0011](../decisions/ADR-0011-operator-authorized-caption-burst-bridge.md). Normal day-to-day operation remains the local path in [Local operator guide](local-operator-guide.md) and [Local caption and narration evaluation](local-caption-narration-evaluation.md).
 
 ## Proven result
