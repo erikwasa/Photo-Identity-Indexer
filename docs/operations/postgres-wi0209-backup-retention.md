@@ -33,6 +33,12 @@ A passing backup or isolated restore **does not establish that the subsequent da
 .\manage-postgres-backups.ps1 -RemovePreChange -BackupPath $backup -ExpectedSha256 $sha -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'passed-post-change-verification-reference' -ConfirmRemoval
 ~~~
 
+Before removal, review a **read-only exact-file plan**; it validates the selected backup and enumerates only the files that would be targeted, without deleting anything:
+
+~~~powershell
+.\manage-postgres-backups.ps1 -PlanRemoval -BackupPath $backup -ExpectedSha256 $sha | Format-List
+~~~
+
 This verifies the exact dump SHA-256 and manifest before deleting its dump and only its related JSON manifest and optional restore-verification sidecar. No wildcard, automatic age-based deletion or implicit acceptance. Failures report an incomplete operation and retain the classification for investigation. If a sidecar was already deleted during a failed operation, manual recovery may be needed; never use a wildcard retry.
 
 ## B. One protected recovery checkpoint and replacement
