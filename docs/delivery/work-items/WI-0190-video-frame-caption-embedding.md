@@ -726,7 +726,7 @@ names, source paths or model inputs. The production workspace
 remains exclusively local; no database, Azure, FFmpeg, media, model,
 hydration or job work occurs during recovery.
 
-Normal success/cancel still closes the lock then cleans its child
+The supervised FFmpeg temporary child is now nested inside that same held workspace, so an abnormal exit cannot leave unmarked FFmpeg sibling directories at the scratch root.\n\nNormal success/cancel still closes the lock then cleans its child
 workspace. A hard crash leaves an aged, unlocked, owned orphan that
 can be safely reclaimed **manually** without authorizing a new
 video run. Synthetic filesystem tests cover active-lock refusal,
