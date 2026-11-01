@@ -181,6 +181,38 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
                     evidence.Provenance.SamplingPolicyVersion);
             }
 
+            // The exact-count interval identity must create a DIFFERENT
+            // durable job from the existing successful two-frame interval
+            // on the same source revision/tool/preset.
+            string intervalFourPolicy =
+                VideoFrameSceneSamplingIdentity.CreateInterval(4);
+            Guid intervalFourJob = await queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    AssetRevisionId.From(revision), VideoDerivativeKind.FrameEvidence,
+                    intervalFourPolicy, VideoFrameExtractionProfile.Version,
+                    new string('e', 64)),
+                budget, candidate with { RequestedFrames = 4 });
+            Assert.NotEqual(frameJob, intervalFourJob);
+            var intervalFourAdapter = new VideoFrameEvidenceWorkerAdapter(database,
+                new SyntheticProducer((lease, _) =>
+                {
+                    Assert.Equal(4, lease.RequestedFrames);
+                    VideoFrameSamplingPlan intervalPlan =
+                        VideoFrameSceneSamplingIdentity.BuildPlan(
+                            8m, lease.RequestedFrames, lease.PolicyVersion);
+                    Assert.Equal(intervalFourPolicy, intervalPlan.PolicyVersion);
+                    Assert.All(intervalPlan.Samples,
+                        frame => Assert.Null(frame.SceneIndex));
+                    return Task.FromResult(Good(revision, intervalPlan));
+                }));
+            Assert.True((await coordinator.RunOneAsync(
+                budget, intervalFourAdapter,
+                selectedJobId: intervalFourJob)).Published);
+            Assert.Equal(4,
+                (await reader.GetCurrentAsync(intervalFourJob))?.Items.Count);
+            Assert.Equal(2,
+                (await reader.GetCurrentAsync(frameJob))?.Items.Count);
+
             // The expanded operator-only four-frame budget must publish an
             // all-or-nothing annotated scene batch, with four distinct
             // persisted scene indices and fully regenerable private policy.
