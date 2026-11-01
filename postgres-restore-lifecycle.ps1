@@ -56,6 +56,30 @@ function Get-RestoreDatabaseDetails {
     }
 }
 
+# Diagnostic-only metadata: backend kinds and aggregate counts, never PID,
+# role, application name, SQL text, file path, or catalogue contents.
+# This function neither blocks, terminates nor changes a connection.
+function Get-RestoreSessionSummary {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    if (-not (Test-GeneratedRestoreName $Name)) {
+        throw 'Only exact generated restore names may be inspected.'
+    }
+    # Categories are fixed on the server before any diagnostic values are
+    # returned. Unrecognized extension worker labels collapse to 'other'.
+    $sql = "SELECT CASE WHEN backend_type IN ('client backend','autovacuum worker','parallel worker','background worker','logical replication worker') THEN backend_type ELSE 'other' END || '|' || COUNT(*)::text FROM pg_stat_activity WHERE datname = '$Name' GROUP BY 1 ORDER BY 1;"
+    $rows = @(Invoke-RestoreAdminSql -Sql $sql)
+    foreach ($line in $rows) {
+        $parts = @(([string]$line).Split('|'))
+        $count = [int]0
+        if ($parts.Count -ne 2 -or
+            $parts[0] -cnotin @('client backend','autovacuum worker','parallel worker','background worker','logical replication worker','other') -or
+            -not [int]::TryParse($parts[1], [ref]$count) -or $count -le 0) {
+            throw 'Unexpected PostgreSQL session summary; no identities were returned.'
+        }
+        [pscustomobject]@{ backendType = $parts[0]; sessions = $count }
+    }
+}
+
 function Set-RestoreDatabaseOwnership {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
