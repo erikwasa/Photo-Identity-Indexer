@@ -207,6 +207,11 @@ jobs:
           ./tests/PowerShell/postgres-restore-lifecycle.tests.ps1
           ./tests/PowerShell/postgres-restore-verifier.integration.ps1
 
+      - name: Verify WI-0209 PostgreSQL backup retention
+        shell: pwsh
+        run: |
+          ./tests/PowerShell/postgres-backup-retention.tests.ps1
+
       - name: Run quarantined integration diagnostics
         id: flaky-integration-diagnostics
         continue-on-error: true
