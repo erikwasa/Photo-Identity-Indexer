@@ -230,11 +230,11 @@ if ($PlanRemoval) {
         Role = $role
         Sha256 = $hash
         RemovalRequiresConfirmation = $true
-        Files = @(
+        Files = @(@(
             $backup.Path,
             "$($backup.Path).json",
             "$($backup.Path).restore-verification.json"
-        ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+        ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
     }
     return
 }
