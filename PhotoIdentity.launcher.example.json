@@ -9,6 +9,10 @@
     "PhotoIdentity__ArchiveAnalysisOutputRoot": "C:\\PhotoIdentity\\analysis",
     "PhotoIdentity__ReviewProxyRoot": "C:\\PhotoIdentity\\review-proxies",
     "PhotoIdentity__VideoLibraryEnabled": "false",
+    "PhotoIdentity__CaptionEnrichment__OllamaBaseUrl": "http://127.0.0.1:11434/",
+    "PhotoIdentity__CaptionEnrichment__Model": "qwen2.5vl:3b",
+    "PhotoIdentity__CaptionEnrichment__ContextTokens": "1024",
+    "PhotoIdentity__CaptionEnrichment__TimeoutSeconds": "600",
     "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled": "true",
     "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds": "30000",
     "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds": "5000"
