@@ -39,7 +39,8 @@ public sealed record VideoFrameAcceptanceHarnessOptions(
                 acknowledge = true;
                 continue;
             }
-            if (args[i] is "--mode" or "--terminate-after-seconds" &&
+            if ((args[i] == "--mode" ||
+                 args[i] == "--terminate-after-seconds") &&
                 i + 1 < separator)
             {
                 string key = args[i++];
@@ -190,7 +191,7 @@ public static class VideoFrameAcceptanceHarnessCommandRunner
     {
         ArgumentNullException.ThrowIfNull(info);
         if (mode is not ("measure" or "interrupt") ||
-            mode == "interrupt" && terminateAfterSeconds is < 5 or > 600 ||
+            (mode == "interrupt" && terminateAfterSeconds is < 5 or > 600) ||
             info.UseShellExecute || !info.RedirectStandardOutput ||
             !info.RedirectStandardError)
             throw new ArgumentException(
