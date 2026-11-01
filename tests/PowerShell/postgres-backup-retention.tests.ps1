@@ -55,6 +55,7 @@ try {
     Check (@($list | Where-Object Role -ne 'unclassified').Count -eq 0) 'legacy/unknown files are not classified implicitly'
     Check ((Test-Path -LiteralPath $a.Path) -and -not (Test-Path -LiteralPath (Join-Path $root 'retention-state.json'))) 'inventory makes no writes'
 
+    Refuse { & $tool -BackupRoot $root -PlanRemoval -BackupPath $unknown.Path -ExpectedSha256 $unknown.Sha } 'unclassified file does not get a deletion plan'
     Refuse { & $tool -BackupRoot $root -RemovePreChange -BackupPath $unknown.Path -ExpectedSha256 $unknown.Sha -ConfirmRemoval -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'accepted' } 'unknown dump deletion'
     Refuse { & $tool -BackupRoot $root -RegisterPreChange -BackupPath $a.Path -ExpectedSha256 ('0' * 64) -ChangeReference 'migration-1' } 'mismatched backup fingerprint'
     Refuse { & $tool -BackupRoot $root -RegisterPreChange -BackupPath (Join-Path $root '..\escape.dump') -ExpectedSha256 $a.Sha -ChangeReference 'migration-1' } 'path traversal outside root'
@@ -64,6 +65,9 @@ try {
     & $tool -BackupRoot $root -RegisterPreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ChangeReference 'migration-1'
     $list = @(& $tool -BackupRoot $root)
     Check (@($list | Where-Object { $_.Name -eq 'prechange-a.dump' -and $_.Role -eq 'pre-change' }).Count -eq 1) 'operator registration classified exact pre-change dump'
+    $plan = & $tool -BackupRoot $root -PlanRemoval -BackupPath $a.Path -ExpectedSha256 $a.Sha
+    Check ($plan.Role -eq 'pre-change' -and $plan.RemovalRequiresConfirmation) 'read-only exact-file prechange plan'
+    Check (@($plan.Files).Count -eq 3 -and (Test-Path -LiteralPath $a.Path)) 'plan shows precisely three files and does not delete'
     Refuse { & $tool -BackupRoot $root -RegisterPreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ChangeReference 'migration-2' } 'duplicate pre-change classification'
     Refuse { & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmRemoval -ChangeAcceptanceEvidence 'accepted' } 'change acceptance switch missing'
     Refuse { & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'accepted' } 'explicit removal confirmation missing'
