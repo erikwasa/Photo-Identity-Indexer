@@ -11,6 +11,16 @@ $backupRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\backups\postgresql'
 .\manage-postgres-backups.ps1 | Format-Table Name, Role, MiB, ManifestPresent, RestoreReportPresent, ReparsePoint
 ~~~
 
+For an **individual already-existing backup**, inspect its *actual bytes* and restore report without changing its classification or retention state:
+
+~~~powershell
+$backupRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\backups\postgresql'
+$candidate = Join-Path $backupRoot 'wi0208-acceptance-20261101-142600.dump'
+.\manage-postgres-backups.ps1 -InspectBackup -BackupPath $candidate | Format-List
+~~~
+
+The inspection checks the dump hash/size, original manifest and any restore report. `EligibleForCheckpointPromotion=true` establishes only **local restore evidence**; it does not establish that an independent remote copy exists. `RemoteConfirmationRecorded=true` means an operator previously registered an attestation, **not** a live check of OneDrive availability. Promotion still requires independently retrieving and hashing the off-disk copy. A mismatched manifest or restore fingerprint causes inspection to fail.
+
 The inventory does not change files. Previously existing dumps are **unclassified** until individually registered; unclassified backups are never eligible for cleanup. The tool requires direct children of the approved backup directory, rejecting nested paths, traversal, links/junctions and reparse files (including online-only placeholders). Explicit -BackupRoot is for intentionally approved alternate directories; review that scope before using it.
 
 The only state file is local **retention-state.json** beside the backup files; it records pre-change, protected recovery checkpoint and superseded checkpoint roles. Never publish this private file, a dump, personal identifiers or remote evidence to the repository. Do not manually edit registry roles.
