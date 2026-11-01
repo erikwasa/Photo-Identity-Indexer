@@ -240,7 +240,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 ImageFrame? image = null;
                 byte[]? jpeg = null;
                 VideoToolExecutionResult decoded = await supervisor.RunAsync(
-                    options.FfmpegPath, options.FfmpegSha256, root,
+                    options.FfmpegPath, options.FfmpegSha256, workspace,
                     ffWorkspace => VideoFrameExtractionProfile.BuildArguments(
                         staged, ffWorkspace, frame, plan.DurationMilliseconds),
                     FrameBudget, token,
