@@ -129,6 +129,14 @@ try {
     Check (-not (Test-Path -LiteralPath "$($b.Path).restore-verification.json")) 'superseded restore report deleted'
     Check (Test-Path -LiteralPath $c.Path) 'new checkpoint remains protected'
 
+    if ($IsWindows) {
+        $held = [IO.File]::Open($a.Path, 'Open', 'Read', 'None')
+        try {
+            Refuse { & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmRemoval -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'passed' } 'locked dump'
+            Check ((Test-Path -LiteralPath "$($a.Path).json") -and (Test-Path -LiteralPath "$($a.Path).restore-verification.json")) 'evidence remains after failed locked dump removal'
+        }
+        finally { $held.Dispose() }
+    }
     & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmRemoval -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'migration-1 post-change application and schema verification passed'
     Check (-not (Test-Path -LiteralPath $a.Path)) 'accepted pre-change dump explicitly retired'
     Check (-not (Test-Path -LiteralPath "$($a.Path).json")) 'accepted pre-change manifest explicitly retired'
