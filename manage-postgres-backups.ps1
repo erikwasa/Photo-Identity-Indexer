@@ -189,12 +189,30 @@ if ([IO.Path]::GetPathRoot($script:root) -eq $script:root) {
 }
 Assert-NoReparse $script:root
 $script:statePath = Join-Path $script:root 'retention-state.json'
-$state = Read-State
-
 # Exactly one mutating mode is permitted.
 $count = [int]$RegisterPreChange.IsPresent + [int]$SetRecoveryCheckpoint.IsPresent +
     [int]$RemovePreChange.IsPresent + [int]$RemoveSuperseded.IsPresent + [int]$PlanRemoval.IsPresent
 if ($count -gt 1) { throw 'Select exactly one backup-management action.' }
+
+# One operator transition at a time. Read-only inventory/plan creates no
+# lockfile and never writes; a concurrent mutation fails without modifying
+# registry state, role assignments or any dump.
+$mutationLock = $null
+if ($count -gt 0 -and -not $PlanRemoval) {
+    $lockPath = Join-Path $script:root 'retention-state.lock'
+    Assert-NoReparse $lockPath
+    try {
+        $mutationLock = [IO.File]::Open(
+            $lockPath, [IO.FileMode]::OpenOrCreate,
+            [IO.FileAccess]::ReadWrite, [IO.FileShare]::None
+        )
+    }
+    catch {
+        throw 'Another backup-retention operation holds the registry lock; no action was taken.'
+    }
+}
+try {
+$state = Read-State
 
 if ($count -eq 0) {
     foreach ($item in @(Get-ChildItem -LiteralPath $script:root -Filter '*.dump' -File -ErrorAction Stop)) {
@@ -305,3 +323,8 @@ elseif ($RemoveSuperseded) {
 else { throw 'Unknown operation.' }
 Save-State $state
 Write-Host "Removed only explicitly selected backup '$($backup.Name)' and related metadata; active recovery checkpoint remains protected."
+
+}
+finally {
+    if ($null -ne $mutationLock) { $mutationLock.Dispose() }
+}
