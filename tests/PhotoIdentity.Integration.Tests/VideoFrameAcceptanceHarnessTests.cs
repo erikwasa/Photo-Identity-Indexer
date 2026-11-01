@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using Npgsql;
 using PhotoIdentity.Cli;
+using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -99,7 +101,7 @@ public sealed class VideoFrameAcceptanceHarnessTests
             Assert.Contains("\"reasonCode\":\"preview-only\"", report);
             Assert.DoesNotContain(root, report);
             Assert.DoesNotContain(options.Selected.ProxyJobId.ToString(), report);
-            Assert.Equal(1, Directory.GetFileSystemEntries(root).Length);
+            Assert.Single(Directory.GetFileSystemEntries(root));
         }
         finally { Directory.Delete(root, true); }
     }
@@ -181,6 +183,124 @@ public sealed class VideoFrameAcceptanceHarnessTests
         Assert.True(observed.TerminationRequested);
         Assert.Equal("owned-child-terminated", observed.ReasonCode);
         Assert.True(observed.WallTimeMs >= 4500);
+    }
+
+    [Fact]
+    public async Task Disposable_postgres_interruption_audit_is_read_only_and_detects_undisarmed_scope()
+    {
+        string? admin = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(admin) || !OperatingSystem.IsWindows()) return;
+
+        string dbName = "photoidentity_frame_interrupt_" + Guid.NewGuid().ToString("N");
+        string env = "PHOTOIDENTITY_WI0190_INTERRUPT_FIXTURE";
+        string? previous = Environment.GetEnvironmentVariable(env);
+        string scratch = Path.Combine(Path.GetTempPath(),
+            "photoidentity-frame-evidence-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        File.WriteAllText(Path.Combine(scratch,
+            VideoFrameEvidenceScratchGuard.MarkerName),
+            VideoFrameEvidenceScratchGuard.MarkerContents);
+        await using NpgsqlConnection administrator = new(
+            new NpgsqlConnectionStringBuilder(admin) { Pooling = false }.ConnectionString);
+        await administrator.OpenAsync();
+        await using (NpgsqlCommand create = administrator.CreateCommand())
+        {
+            create.CommandText = $"CREATE DATABASE \\"{dbName}\\";";
+            await create.ExecuteNonQueryAsync();
+        }
+        try
+        {
+            var connection = new NpgsqlConnectionStringBuilder(admin)
+            { Database = dbName, Pooling = false };
+            Environment.SetEnvironmentVariable(env, connection.ConnectionString);
+            await using PostgresCatalogueDatabase db = new(connection.ConnectionString);
+            await db.InitializeAsync();
+            Guid source = Guid.NewGuid(), asset = Guid.NewGuid();
+            Guid revision = Guid.NewGuid(), job = Guid.NewGuid();
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand seed = conn.CreateCommand())
+            {
+                seed.CommandText = """
+                    INSERT INTO sources(id,kind,root_locator,created_at_utc)
+                    VALUES (@source,'local-folder','frame-interruption-fixture',now());
+                    INSERT INTO assets(id,source_id,source_key,media_kind,created_at_utc)
+                    VALUES (@asset,@source,'synthetic-video.mp4','video',now());
+                    INSERT INTO asset_revisions(id,asset_id,content_sha256,size_bytes,
+                        observed_at_utc,media_type,media_kind)
+                    VALUES (@revision,@asset,repeat('a',64),4000,now(),
+                        'video/mp4','video');
+                    INSERT INTO video_processing_jobs(id,asset_revision_id,
+                        idempotency_key,derivative_kind,policy_version,
+                        preset_version,tool_sha256,source_bytes,
+                        reserved_temporary_bytes,requested_frames,
+                        status,completed_at_utc)
+                    VALUES (@job,@revision,repeat('b',64),'FrameEvidence',
+                        'video-frame-sampling-v1','wi0190-sdr-frame-jpeg-v1',
+                        repeat('c',64),4000,32000,2,'cancelled',now());
+                    """;
+                seed.Parameters.AddWithValue("source", source);
+                seed.Parameters.AddWithValue("asset", asset);
+                seed.Parameters.AddWithValue("revision", revision);
+                seed.Parameters.AddWithValue("job", job);
+                await seed.ExecuteNonQueryAsync();
+            }
+            var options = new VideoFrameInterruptionAuditOptions(
+                env, dbName, job, scratch);
+            using (StringWriter output = new())
+            {
+                Assert.Equal(0, await VideoFrameInterruptionAuditCommandRunner
+                    .RunAsync(options, output));
+                Assert.Contains("\\"recoveryComplete\\":true", output.ToString());
+                Assert.Contains("\\"noPartialEvidence\\":true", output.ToString());
+                Assert.DoesNotContain(job.ToString(), output.ToString());
+                Assert.DoesNotContain(scratch, output.ToString());
+            }
+
+            // A concurrently selected grant is not silently interpreted as
+            // disarmed: refusal is reported without updating the control row.
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand arm = conn.CreateCommand())
+            {
+                arm.CommandText = """
+                    UPDATE video_processing_control
+                    SET enabled=true,paused=false, selected_job_id=@job,
+                        authorization_expires_at_utc=now()+interval '2 minutes',
+                        generation=generation+1,last_action='arm-selected'
+                    WHERE singleton_id=1;
+                    """;
+                arm.Parameters.AddWithValue("job", job);
+                await arm.ExecuteNonQueryAsync();
+            }
+            using (StringWriter output = new())
+            {
+                Assert.Equal(1, await VideoFrameInterruptionAuditCommandRunner
+                    .RunAsync(options, output));
+                Assert.Contains("\\"reasonCode\\":\\"grant-still-active\\"",
+                    output.ToString());
+            }
+            await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
+            await using (NpgsqlCommand verify = conn.CreateCommand())
+            {
+                verify.CommandText = """
+                    SELECT enabled, selected_job_id=@job
+                    FROM video_processing_control WHERE singleton_id=1;
+                    """;
+                verify.Parameters.AddWithValue("job", job);
+                await using NpgsqlDataReader row = await verify.ExecuteReaderAsync();
+                Assert.True(await row.ReadAsync());
+                Assert.True(row.GetBoolean(0));
+                Assert.True(row.GetBoolean(1));
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(env, previous);
+            await using NpgsqlCommand drop = administrator.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS \\"{dbName}\\" WITH (FORCE);";
+            await drop.ExecuteNonQueryAsync();
+            Directory.Delete(scratch, true);
+        }
     }
 
     private static readonly VideoFrameScratchRecoveryResult CleanScratch =
