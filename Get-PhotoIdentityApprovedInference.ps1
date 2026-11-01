@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$ConfigurationPath,
-    [switch]$VerifyOllama
+    [switch]$VerifyOllama,
+    [switch]$AzureUpstreamOnly
 )
 
 # Read-only operator bridge from launcher.json to ad hoc scripts and explicit
@@ -83,6 +84,35 @@ function Assert-ApprovedFile {
     return $resolved
 }
 
+$azureUpstream = $null
+if ($null -ne $config.PSObject.Properties["operator"] -and $null -ne $config.operator) {
+    if ($config.operator -isnot [pscustomobject]) {
+        throw "operator must be a JSON object."
+    }
+    $property = $config.operator.PSObject.Properties["azureOllamaUpstreamUrl"]
+    if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+        [uri]$upstreamUri = $null
+        if (-not [uri]::TryCreate(([string]$property.Value).Trim(),
+            [UriKind]::Absolute, [ref]$upstreamUri) -or
+            $upstreamUri.Scheme -ne "https" -or $upstreamUri.IsLoopback -or
+            $upstreamUri.UserInfo -or $upstreamUri.Query -or
+            $upstreamUri.Fragment -or $upstreamUri.AbsolutePath -ne "/") {
+            throw "operator.azureOllamaUpstreamUrl must be a credential-free remote HTTPS origin."
+        }
+        $azureUpstream = $upstreamUri.AbsoluteUri.TrimEnd('/')
+    }
+}
+
+if ($AzureUpstreamOnly) {
+    if ($VerifyOllama) {
+        throw "AzureUpstreamOnly cannot be combined with VerifyOllama."
+    }
+    if ([string]::IsNullOrWhiteSpace($azureUpstream)) {
+        throw "An operator-approved Azure upstream origin is not configured."
+    }
+    return [pscustomobject]@{ AzureOllamaUpstreamUrl = $azureUpstream }
+}
+
 $modelDirectory = Read-Setting "PhotoIdentity__SemanticSearch__ModelDirectory"
 $modelSha = Read-Setting "PhotoIdentity__SemanticSearch__ModelSha256"
 $vocabSha = Read-Setting "PhotoIdentity__SemanticSearch__VocabularySha256"
@@ -110,25 +140,6 @@ $timeoutSeconds = [int](Read-Setting "PhotoIdentity__CaptionEnrichment__TimeoutS
 if ($contextTokens -lt 256 -or $contextTokens -gt 32768 -or
     $timeoutSeconds -lt 30 -or $timeoutSeconds -gt 1800) {
     throw "Caption inference limits are outside approved ranges."
-}
-
-$azureUpstream = $null
-if ($null -ne $config.PSObject.Properties["operator"] -and $null -ne $config.operator) {
-    if ($config.operator -isnot [pscustomobject]) {
-        throw "operator must be a JSON object."
-    }
-    $property = $config.operator.PSObject.Properties["azureOllamaUpstreamUrl"]
-    if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
-        [uri]$upstreamUri = $null
-        if (-not [uri]::TryCreate(([string]$property.Value).Trim(),
-            [UriKind]::Absolute, [ref]$upstreamUri) -or
-            $upstreamUri.Scheme -ne "https" -or $upstreamUri.IsLoopback -or
-            $upstreamUri.UserInfo -or $upstreamUri.Query -or
-            $upstreamUri.Fragment -or $upstreamUri.AbsolutePath -ne "/") {
-            throw "operator.azureOllamaUpstreamUrl must be a credential-free remote HTTPS origin."
-        }
-        $azureUpstream = $upstreamUri.AbsoluteUri.TrimEnd('/')
-    }
 }
 
 $verified = $false
