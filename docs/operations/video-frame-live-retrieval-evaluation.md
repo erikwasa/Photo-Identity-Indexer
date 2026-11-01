@@ -78,32 +78,227 @@ metrics will be misleading. Binary relevance makes a binary nDCG
 rather than an ordinal human rating. Small or cherry-picked test
 sets are not representative acceptance evidence.
 
-## Windows invocation
+## Maintained-host baseline (2026-11-02)
 
-Use a locally approved CLIP ONNX dual encoder, its exact vocabulary
-JSON and merges TXT, and their SHA-256 digests. **Do not** paste
-the queries, manifest, original paths or vectors in PRs, test
-attachments or chats. Ensure your private JSON file and CLIP files
-are ordinary local files (UNC, symlink/reparse files **or any
-symlink/reparse parent directory** are refused).
+Two different approved local SDR videos now have four persisted
+current FrameEvidence rows each. Both independent read-only frame
+audits and the two-video acceptance report exited 0; the latter
+verified eight frames, 16,996 caption/vector payload bytes,
+and 266,321 ms observed execution wall time. Human frame-by-frame
+caption review judged 7/8 accurate, with one low-visibility
+invented held-object claim. **Those checks do not establish
+live text-to-video retrieval quality.**
+
+| Private video label | Current FrameEvidence job UUID | Frames |
+| --- | --- | ---: |
+| Run 1 | Look up locally in Step 2 | 4 |
+| Run 2 | Look up locally in Step 2 | 4 |
+
+Use the FrameEvidence UUIDs above, **not the PlayableProxy IDs**.
+This two-video cohort is a limited first retrieval baseline,
+not representative quality acceptance.
+
+## Windows maintained-host live retrieval — exact steps
+
+### Step 1 — Independently choose queries and relevance labels
+
+Review the two already-published local MP4 proxies, which were
+previously used for human caption review; no original-media or
+OneDrive-only file is needed. Write at least two *different*
+short text queries that describe **actually visible sampled-frame
+content**, preferably one distinctive to each video. Do not
+assume sound, invisible movement, identity or event type.
+
+For **every query**, independently judge relevance against
+**both** videos: Run 1, Run 2, or both if genuinely relevant.
+A query must have at least one relevant video; if neither
+matches, choose a different query rather than fabricating a
+label. The CLIP model must not supply its own ground truth.
+Keep the real queries, filenames, descriptions and private
+judgments out of repository files, PRs and chat.
+
+### Step 2 — Create a physical private JSON manifest (PowerShell)
+
+Run the following **read-only SQL locally** against
+photoidentity_main before choosing the two FrameEvidence job IDs.
+The result shows opaque frame-job identities and their underlying
+asset identities, with no source paths or caption text. Select
+the two previously audited four-frame jobs, and confirm that
+their asset IDs differ; do not choose the PlayableProxy job IDs.
+
+~~~sql
+SELECT
+    b.job_id AS frame_job_id,
+    revision.asset_id,
+    j.status,
+    b.frame_count,
+    MIN(f.timestamp_ms) AS first_frame_ms,
+    MAX(f.timestamp_ms) AS last_frame_ms,
+    b.published_at_utc
+FROM video_frame_evidence_batches b
+JOIN video_processing_jobs j ON j.id = b.job_id
+JOIN asset_revisions revision ON revision.id = b.asset_revision_id
+JOIN video_frame_evidence_frames f ON f.job_id = b.job_id
+WHERE j.derivative_kind = 'FrameEvidence'
+GROUP BY b.job_id, revision.asset_id, j.status,
+         b.frame_count, b.published_at_utc
+ORDER BY b.published_at_utc DESC
+LIMIT 12;
+~~~
+
+Use those two locally copied UUIDs in PowerShell.
+Run 1 has four timestamps beginning near 6,171 ms and ending
+near 43,196 ms; Run 2 begins near 5,186 ms and ends near
+36,300 ms. These numeric timestamps can help identify the
+right two published jobs without printing original media names.
+
+Run from the current merged main repository and use the real
+maintainer-local evaluation directory under LocalAppData.
+Read-Host accepts the query text locally and no query is
+printed by the evaluation command.
 
 ~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
 git switch main
 git pull --ff-only origin main
 
-# Use the already-configured loopback PostgreSQL environment variable.
-# Example only: replace with the variable name holding your actual
-# maintained local connection string, never the connection string itself.
-$postgresEnv = "PhotoIdentity__Postgres__ConnectionString"
-$database = "photoidentity"
+$ErrorActionPreference = "Stop"
+$run1Job = (Read-Host "Run 1 FrameEvidence job UUID from local SQL").Trim()
+$run2Job = (Read-Host "Run 2 FrameEvidence job UUID from local SQL").Trim()
+[guid]$g1 = [guid]::Empty
+[guid]$g2 = [guid]::Empty
+if (-not [guid]::TryParse($run1Job, [ref]$g1) -or
+    -not [guid]::TryParse($run2Job, [ref]$g2) -or
+    $g1 -eq [guid]::Empty -or $g2 -eq [guid]::Empty -or $g1 -eq $g2) {
+    throw "Select two different valid FrameEvidence job UUIDs from local SQL."
+}
+$privateDir = Join-Path $env:LOCALAPPDATA "PhotoIdentity\PrivateEvaluation"
+New-Item -ItemType Directory -Path $privateDir -Force | Out-Null
+$judgments = Join-Path $privateDir "wi0190-live-retrieval-judgments.json"
 
-$judgments = Join-Path $env:LOCALAPPDATA "PhotoIdentity\PrivateEvaluation\live-judgments.json"
-# Offline hash checks; does not contact Ollama unless -VerifyOllama is set.
-$inference = .\Get-PhotoIdentityApprovedInference.ps1
-$clipModel = $inference.ClipModelPath
-$vocab = $inference.ClipVocabularyPath
-$merges = $inference.ClipMergesPath
+$query1 = Read-Host "Private visible-content search phrase 1"
+$query2 = Read-Host "Different private visible-content search phrase 2"
+if ([string]::IsNullOrWhiteSpace($query1) -or
+    [string]::IsNullOrWhiteSpace($query2) -or
+    $query1.Length -gt 200 -or $query2.Length -gt 200 -or
+    $query1 -ceq $query2) {
+    throw "Enter two different nonempty queries of at most 200 characters."
+}
 
+function Get-RelevantJobs {
+    param([string]$Question)
+    switch ((Read-Host $Question).Trim().ToLowerInvariant()) {
+        "1"    { return $run1Job }
+        "2"    { return $run2Job }
+        "both" { return $run1Job, $run2Job }
+        default { throw "Select 1, 2, or both after viewing BOTH videos." }
+    }
+}
+$relevant1 = @(Get-RelevantJobs "Relevant to query 1: 1 / 2 / both?")
+$relevant2 = @(Get-RelevantJobs "Relevant to query 2: 1 / 2 / both?")
+
+$judgmentData = @{
+    protocol = "wi0190-live-retrieval-judgments-v1"
+    jobIds = @($run1Job, $run2Job)
+    queries = @(
+        @{
+            queryId = [guid]::NewGuid().ToString()
+            text = $query1
+            relevantJobIds = $relevant1
+        },
+        @{
+            queryId = [guid]::NewGuid().ToString()
+            text = $query2
+            relevantJobIds = $relevant2
+        }
+    )
+}
+[IO.File]::WriteAllText(
+    $judgments,
+    ($judgmentData | ConvertTo-Json -Depth 8),
+    [Text.UTF8Encoding]::new($false)
+)
+Write-Host "Private live retrieval manifest created; text not printed."
+~~~
+
+The tool accepts 2–32 different video assets, 1–16 queries
+(maximum 200 characters each), and a local regular manifest
+no larger than 64 KiB. UNC files and reparse/symlink paths
+(including parent directories) are rejected. Do not substitute
+the synthetic illustrative JSON above for real judgments.
+
+### Step 3 — Resolve the real maintained PostgreSQL connection
+
+Your private launcher uses the name
+PHOTOIDENTITY_POSTGRES_CONNECTION_STRING; the actual v38
+database is photoidentity_main. Supply the **environment
+variable name**, never the secret connection string.
+The CLI needs it in its inherited process environment.
+
+~~~powershell
+$launcherPath = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+$launcher = Get-Content -LiteralPath $launcherPath -Raw | ConvertFrom-Json
+$postgresEnv = [string]$launcher.postgresConnectionEnvironmentVariable
+$database = "photoidentity_main"
+
+$conn = [Environment]::GetEnvironmentVariable($postgresEnv, "Process")
+if ([string]::IsNullOrWhiteSpace($conn)) {
+    foreach ($scope in @("User", "Machine")) {
+        $conn = [Environment]::GetEnvironmentVariable($postgresEnv, $scope)
+        if (-not [string]::IsNullOrWhiteSpace($conn)) { break }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($conn)) {
+    throw "Approved local PostgreSQL connection variable is missing."
+}
+[Environment]::SetEnvironmentVariable($postgresEnv, $conn, "Process")
+Remove-Variable conn -ErrorAction SilentlyContinue
+~~~
+
+### Step 4 — Reuse the verified, pinned WI-0126 CLIP package
+
+The local CLIP model, vocabulary and merges must be the
+**same approved installation** used to create the eight
+stored embeddings. The approved ONNX SHA-256 is checked
+against the known WI-0126 digest and the stored v38 model
+provenance; the catalogue does **not** contain the tokenizer
+hashes, so review their installation separately.
+
+~~~powershell
+$clipDir = Join-Path $env:LOCALAPPDATA "PhotoIdentity\Models\WI-0126\clip-vit-base-patch32-b318363"
+$clipModel = Join-Path $clipDir "model.onnx"
+$vocab = Join-Path $clipDir "vocab.json"
+$merges = Join-Path $clipDir "merges.txt"
+foreach ($file in @($clipModel, $vocab, $merges)) {
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        throw "Approved WI-0126 CLIP file is missing."
+    }
+}
+$expectedClipSha = "42b5dac8f0a73e45b1626ae7a69b41a4bc111c6fe1edafcceda8c2a5506dc6db"
+$clipSha = (Get-FileHash -LiteralPath $clipModel -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($clipSha -cne $expectedClipSha) {
+    throw "CLIP model does not match the approved WI-0126 version."
+}
+$vocabSha = (Get-FileHash -LiteralPath $vocab -Algorithm SHA256).Hash.ToLowerInvariant()
+$mergesSha = (Get-FileHash -LiteralPath $merges -Algorithm SHA256).Hash.ToLowerInvariant()
+~~~
+
+When the **optional centralized inference settings have
+already been approved** in launcher.json, prefer
+Get-PhotoIdentityApprovedInference.ps1 to resolve the
+pinned model, vocabulary and merges paths and all three
+digests. Do **not** invent or add unreviewed launcher keys
+merely to run this test. The CLI refuses missing, invalid
+or linked physical model files.
+
+### Step 5 — Execute read-only current-v38 live retrieval
+
+Use frame-top-k=2 and rank-k=2 for the two-video
+baseline. The diagnostic ranking policies still use
+their reviewed definitions; no production search policy
+or automatic media processing is activated.
+
+~~~powershell
 $evaluationArgs = @(
     "run", "--project", "src/PhotoIdentity.Cli", "-c", "Release", "--",
     "video", "frames", "evaluate-live",
@@ -111,32 +306,65 @@ $evaluationArgs = @(
     "--database", $database,
     "--judgments", $judgments,
     "--clip-model", $clipModel,
-    "--clip-model-sha256", $inference.ClipModelSha256,
+    "--clip-model-sha256", $clipSha,
     "--tokenizer-vocab", $vocab,
-    "--tokenizer-vocab-sha256", $inference.ClipVocabularySha256,
+    "--tokenizer-vocab-sha256", $vocabSha,
     "--tokenizer-merges", $merges,
-    "--tokenizer-merges-sha256", $inference.ClipMergesSha256,
-    "--frame-top-k", "2", "--rank-k", "5"
+    "--tokenizer-merges-sha256", $mergesSha,
+    "--frame-top-k", "2",
+    "--rank-k", "2"
 )
-dotnet @evaluationArgs
-"Exit code: $LASTEXITCODE"
+
+$retrievalOutput = dotnet @evaluationArgs
+$retrievalExit = $LASTEXITCODE
+$retrievalOutput
+Write-Host "Exit code: $retrievalExit"
+if ($retrievalExit -ne 0) {
+    throw "Current live retrieval check failed or was refused."
+}
 ~~~
 
-The digest checks detect changes relative to **operator-provided
-hashes**, not independently approve the files. Compare against your
-known-good local digest before choosing them. Use the same CLIP model
-used for the already published video frames; selecting a different
-model, even with a correctly calculated hash, is refused against
-stored provenance. No Azure bridge is needed.
+**Expected gates on success, not yet maintainer-tested:**
+exit 0; protocol wi0190-live-retrieval-evaluation-v1;
+readOnly=true, currentSnapshot=true,
+localTextInference=true, modelDigestMatched=true,
+humanJudgments=true, loopbackPostgresReadPerformed=true,
+externalNetworkRequestsMade=false, originalsOpened=false,
+oneDriveHydrationRequested=false, mediaDecoded=false,
+captionsReturned=false, embeddingsReturned=false,
+rawQueryTextReturned=false, videoJobsEnqueued=false,
+schemaChanged=false. A failed currentness, exclusion,
+provenance, input or vector check should be investigated,
+**not** bypassed by rewriting catalogue state.
 
-The JSON report contains only bounded numeric counts, aggregate
-metrics and timing components `modelPreflightWallMs`,
-`textInferenceWallMs`, `snapshotReadWallMs` and
-`evaluationWallMs`. These are **wall-time diagnostics**, not CPU,
-GPU, energy consumption or Azure billing. The command explicitly
-reports a loopback PostgreSQL read and zero external network requests.
-PostgreSQL stores the frame vectors and the CLI temporarily holds
-them in memory; no vectors or query text are returned by stdout.
+This CLI performs **local CLIP text encoding**, reads only
+stored frame vectors in one repeatable-read **READ ONLY**
+loopback PostgreSQL snapshot, and returns numeric aggregates.
+No FFmpeg, Ollama, Azure bridge, original/proxy decoding,
+OneDrive hydration, frame processing or network AI service
+is needed.
+
+### Step 6 — Interpret metrics without overclaiming
+
+Compare the result's three ranking policies: max-frame cosine,
+top-k frame mean, and deduplicated normalized pooled cosine.
+Record numeric Hit@K, MRR@K, Recall@K, MAP@K and nDCG@K
+against the *human-labeled* relevance sets. These metrics are
+**not caption accuracy**. With only two candidate videos,
+Hit@2 can be trivial: emphasize top-1 ordering and MRR and
+record the queries' discriminatory limitations. The result
+contains aggregate metrics, not per-query private video
+rankings; do not infer an individual query's rank from an
+aggregate-only report.
+
+Record modelPreflightWallMs, textInferenceWallMs,
+snapshotReadWallMs and evaluationWallMs as four different
+*wall times*, not full CPU/GPU resource costs. Report back
+the sanitized numeric JSON and exit code only; retain
+the real query text, relevance judgments, source names,
+and input manifest on the maintainer host. Passing a
+two-clip study is a useful functional demonstration, not
+complete WI-0190 relevance or representative acceptance.
 
 ## Verification and remaining acceptance
 
@@ -147,13 +375,12 @@ duplicate/invalid private labels and strict flag parsing. They do
 **not** require actual ONNX model files or videos. Windows GitHub CI
 is the first integration gate.
 
-An actual relevance study **requires at least two separately published
-current FrameEvidence jobs from different real videos**, with human
-judgments and a compatible local CLIP model. The maintainer's
-accepted checkpoint 8 audit is of **one** job, so it is *insufficient*
-for this study. Do not repeat that successful audit solely for
-PR review. This new command cannot generate additional frame jobs;
-only a separately authorized and approved selected one-shot can.
+Two distinct real-video four-frame FrameEvidence jobs **now pass**
+the independent current-v38 audit and the two-video acceptance report.
+This satisfies the *input-data prerequisite* for live retrieval,
+not the human-judged retrieval evaluation itself. Run the steps
+above and record the result without republishing the same frames.
+The read-only evaluator cannot create additional video jobs.
 
 For a consolidated local study after the development series, record
 a representative set of queries/videos and metrics and the four

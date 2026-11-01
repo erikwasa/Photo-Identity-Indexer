@@ -936,6 +936,81 @@ criteria formally accepted** until the representative media,
 human quality, actual costs and real interruption/recovery
 campaign is finished.
 
+
+## Maintainer verification — two-video four-frame acceptance baseline (2026-11-02)
+
+**Verified on the maintained Windows host, PostgreSQL v38 (photoidentity_main).**
+Two distinct already-published local SDR PlayableProxy video assets were
+selected, each with an independent interval-sampled four-frame FrameEvidence
+job. The operator approved frame disclosure to a controlled loopback
+Ollama/Azure bridge. This is operator-reported local acceptance evidence,
+not synthetic CI coverage; no originals or OneDrive hydration were used.
+
+| Evidence | Run 1 | Run 2 |
+| --- | ---: | ---: |
+| FrameEvidence job UUID | [private Run 1 FrameEvidence UUID] | [private Run 2 FrameEvidence UUID] |
+| PlayableProxy job UUID | [private Run 1 PlayableProxy UUID] | [private Run 2 PlayableProxy UUID] |
+| Read-only frame audit | current-complete, 4/4 | current-complete, 4/4 |
+| CLIP embedding dimensions | 512 | 512 |
+| Measured harness wall time | 168,776 ms | 97,545 ms |
+| Caption + embedding payload | 8,554 bytes | 8,442 bytes |
+| Accurate human-judged captions | 4/4 | 3/4 |
+
+Both dry-run admissions and measurement-harness previews exited 0;
+both executed child commands exited 0 without termination. Independent
+read-only v38 audits exited 0, reported complete current evidence, and
+returned no private caption or embedding data. Both owned frame scratch
+roots contained only their original ownership marker after processing.
+Video control returned to disabled/paused/unselected, with no active,
+queued or failed video jobs; photo work was idle and automatic photo
+captions stayed disabled.
+
+The independent read-only **video frames acceptance-report** exited 0
+and verified **two different video assets** in one current snapshot:
+2 clips, 8 frames, 16,996 payload bytes, 266,321 ms aggregate measured
+wall time, and 1.802 observed frames/minute. Video durations were
+approximately 41.5 and 49.4 seconds. Both were operator-classified
+short/rotated. These payload bytes exclude PostgreSQL disk overhead,
+indexes, WAL and the published MP4 proxies.
+
+For human caption review, the maintainer reconstructed eight private
+JPEG frames locally from SHA-verified published MP4 proxies at the
+persisted timestamps, compared each to the saved caption, and updated
+the acceptance report: 8 captions judged, 7 accurate, **87.5% observed
+accuracy** (4/4 and 3/4). **One incorrect caption** on a dark image
+asserted a person was holding a dark object when only an arm was
+visible. Categorize as **low-visibility visual hallucination:
+nonexistent object / unsupported holding action**. This is not proof
+of a general error rate, nor a verified representative *low-light*
+video category. No private image, prompt, caption, name, source path
+or annotation belongs in repository documentation.
+
+**Resource limitations:** execution wall time is observed; harness
+CLI-only CPU readings (24,125 ms and 29,015 ms) omit FFmpeg and
+local/remote model execution. Peak host working set was unavailable.
+Complete CPU/GPU time and actual Azure billing were **not measured**;
+report zero-valued aggregates have measured-clip counts of zero and
+must not be treated as zero consumption. No real scene boundaries
+were annotated: scene coverage is **unknown**, not zero or complete.
+
+**Next maintainer check: local live CLIP text-to-video retrieval.**
+Use the two audited FrameEvidence job UUIDs, human-select descriptive
+queries and independently judge which of **both** videos are relevant
+to each query, then run the read-only **video frames evaluate-live**
+with approved local CLIP and the same model provenance. See the
+[step-by-step Windows live retrieval runbook](../../operations/video-frame-live-retrieval-evaluation.md).
+No more frame generation, inference bridge or originals are needed.
+Two clips form a narrow functional baseline, not a representative
+quality sample.
+
+**Still open:** live retrieval quality, human-annotated real scene
+coverage where supported footage permits it, complete CPU/GPU/Azure
+resource and cost attribution, and controlled hard interruption /
+delayed scratch recovery using a **disposable isolated database only**.
+Unsupported and unavailable media categories remain *postponed*, not
+accepted. All four full acceptance boxes remain unchecked;
+WI-0190 stays in_progress and fullAcceptanceEstablished=false is correct.
+
 ## Completion notes
 
 - Files changed:

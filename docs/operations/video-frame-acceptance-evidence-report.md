@@ -27,6 +27,49 @@ representative clip. If any selected batch is stale, partial,
 excluded or unsupported, **the entire report fails** and prints
 no per-clip data or partial results.
 
+## Maintained-host baseline — reviewed 2026-11-02
+
+The maintainer evaluated a private two-video manifest against
+the maintained PostgreSQL v38 photoidentity_main catalogue.
+The first current FrameEvidence job
+([private Run 1 FrameEvidence UUID]) contained 4 frames,
+8,554 payload bytes, 168,776 ms measured wall time and
+4/4 correct human-judged captions. The second
+([private Run 2 FrameEvidence UUID]) contained 4 frames,
+8,442 payload bytes, 97,545 ms wall time and 3/4
+correct captions. Both original PlayableProxy receipts were
+already local and valid; no originals were opened.
+
+The read-only **video frames acceptance-report** returned exit 0,
+currentSnapshot=true, clips=2, frames=8,
+evidencePayloadBytes=16996, observedExecutionWallMs=266321,
+observedFramesPerMinute=1.802, captionJudgedClips=2,
+captionsJudged=8, captionsAccurate=7 and
+humanCaptionAccuracyPercent=87.5. The report checked that
+these were **different underlying video assets**, not merely
+different frame jobs.
+
+The inaccurate caption described a person holding a dark object
+where visual review found an arm but no held object. Record this
+as **low-visibility hallucination**, not an independently verified
+low-light *video category*. The two clips were classified short
+and rotated. Missing categories remain multi-scene, long and
+low-light; annotatedClips=0 and weightedSceneCoveragePercent=null.
+Complete CPU/GPU/Azure processing costs were **unmeasured**:
+cpuMeasuredClips=0, gpuMeasuredClips=0,
+azureCostMeasuredClips=0. A zero aggregate for an unmeasured
+resource does *not* mean zero consumption. Report payload bytes
+exclude PostgreSQL indexes/WAL and stored proxy MP4s.
+
+The private operator manifest is stored locally at
+%LOCALAPPDATA%\PhotoIdentity\PrivateEvaluation\wi0190-two-video-acceptance.json.
+Keep human source notes, captions, frame JPEGs, original names,
+and paths out of Git and public logs. The baseline demonstrates
+a two-video functional pipeline and one observed quality error,
+**not representative quality acceptance**; fullAcceptanceEstablished
+is still false. Next independently assess private CLIP retrieval
+relevance using [the two completed FrameEvidence jobs](video-frame-live-retrieval-evaluation.md).
+
 ## Private JSON manifest
 
 Store the manifest under a protected physical directory inside

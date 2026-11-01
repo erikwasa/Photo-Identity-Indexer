@@ -50,6 +50,50 @@ frame content, annotations, captions and paths outside the repository.
 
 See the [workitem's detailed deferral matrix](../delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01).
 
+## Maintained-host verified baseline — 2026-11-02
+
+Two distinct already-published local SDR videos completed four-frame
+interval-sampled FrameEvidence jobs in the maintained v38 catalogue
+(photoidentity_main). Both admissions and measurement-harness previews
+exited 0; both measured child executions exited 0; both independent
+read-only frame audits reported current-complete, 4/4 durable
+512-dimensional vectors. Cleanup left only the approved scratch
+ownership markers, video controls were disabled/paused/unselected
+and no photo/video work remained active.
+
+| Run | FrameEvidence job UUID | Wall time | Numeric caption/vector payload | Human caption correctness |
+| --- | --- | ---: | ---: | ---: |
+| 1 | [private Run 1 FrameEvidence UUID] | 168,776 ms | 8,554 bytes | 4/4 |
+| 2 | [private Run 2 FrameEvidence UUID] | 97,545 ms | 8,442 bytes | 3/4 |
+
+The read-only acceptance report exited 0 and proved 2 **different
+video assets**, 8 frames, 16,996 evidence payload bytes, aggregate
+observed execution wall time 266,321 ms and 1.802 frames/minute.
+The maintainer privately compared the 8 stored captions to matching
+frame JPEGs reconstructed from already-published SHA-verified MP4
+proxies at the saved timestamps: 7/8 correct (87.5%).
+The single error invented a person holding a dark object in a
+dark frame, while an arm but no held object was visible. This is
+**low-visibility hallucination**, not evidence that the entire
+video is a representative low-light sample. No private frame,
+caption or archive source name was committed.
+
+The two video labels are **short** and **rotated**. Neither real
+scene cuts nor multi-scene, long or low-light representative
+coverage has been validated; weighted scene coverage is null.
+Harness CLI process CPU times of 24,125 ms and 29,015 ms are
+*partial*, not full-system CPU. The report shows
+cpuMeasuredClips=0, gpuMeasuredClips=0,
+azureCostMeasuredClips=0; reported zero totals are
+**not** measured zero cost. fullAcceptanceEstablished=false.
+
+**Next:** perform the [private live CLIP retrieval quality test](video-frame-live-retrieval-evaluation.md)
+using these two existing FrameEvidence jobs and independently judged
+text queries. The local retrieval evaluator reads stored vectors
+and encodes text only; it does not call Ollama/Azure, regenerate
+frames or use FFmpeg. The separate hard-interruption test must
+remain restricted to a disposable isolated PostgreSQL database.
+
 ## What is measured
 
 video frames acceptance-harness --mode measure starts ONLY the same
