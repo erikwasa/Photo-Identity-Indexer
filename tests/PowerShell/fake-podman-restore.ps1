@@ -74,7 +74,13 @@ if ($envFlags.ContainsKey('RESTORE_SQL')) {
     }
     if ($sql -like 'SELECT COALESCE(shobj_description*') {
         if ($global:FakeRestore.Exists) {
-            "$($global:FakeRestore.Marker)|8192|$($global:FakeRestore.Sessions)"
+            $sessions = $global:FakeRestore.Sessions
+            if ($global:FakeRestore.Restores -gt 0 -and
+                $global:FakeRestore.TransientSessionsRemaining -gt 0) {
+                $global:FakeRestore.TransientSessionsRemaining--
+                $sessions = 1
+            }
+            "$($global:FakeRestore.Marker)|8192|$sessions"
         }
         return
     }
