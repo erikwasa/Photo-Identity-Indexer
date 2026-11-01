@@ -181,6 +181,78 @@ public sealed class VideoFrameEvidenceWorkerAdapterTests
                     evidence.Provenance.SamplingPolicyVersion);
             }
 
+            // The expanded operator-only four-frame budget must publish an
+            // all-or-nothing annotated scene batch, with four distinct
+            // persisted scene indices and fully regenerable private policy.
+            string fourPolicy = VideoFrameSceneSamplingIdentity.Create(
+                4, [2000L, 4000L, 6000L], 8000);
+            Guid fourJob = await queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    AssetRevisionId.From(revision), VideoDerivativeKind.FrameEvidence,
+                    fourPolicy, VideoFrameExtractionProfile.Version, new string('7', 64)),
+                budget, candidate with { RequestedFrames = 4 });
+            var fourAdapter = new VideoFrameEvidenceWorkerAdapter(database,
+                new SyntheticProducer((lease, _) =>
+                {
+                    Assert.Equal(fourJob, lease.Id);
+                    Assert.Equal(4, lease.RequestedFrames);
+                    VideoFrameSamplingPlan fourPlan =
+                        VideoFrameSceneSamplingIdentity.BuildPlan(
+                            8m, lease.RequestedFrames, lease.PolicyVersion);
+                    Assert.Equal(4, fourPlan.Samples.Count);
+                    Assert.Equal(new int?[] { 0, 1, 2, 3 },
+                        fourPlan.Samples.Select(f => f.SceneIndex).ToArray());
+                    return Task.FromResult(Good(revision, fourPlan));
+                }));
+            VideoWorkerCycleResult fourCycle = await coordinator.RunOneAsync(
+                budget, fourAdapter, selectedJobId: fourJob);
+            Assert.True(fourCycle.Published);
+            VideoFrameEvidenceBatch fourEvidence =
+                Assert.IsType<VideoFrameEvidenceBatch>(
+                    await reader.GetCurrentAsync(fourJob));
+            Assert.Equal(4, fourEvidence.Items.Count);
+            Assert.Equal(fourPolicy,
+                fourEvidence.Provenance.SamplingPolicyVersion);
+            Assert.Equal(new int?[] { 0, 1, 2, 3 },
+                fourEvidence.Items.Select(f => f.SceneIndex).ToArray());
+            // Independent durable SQL count after the adapter commits.
+            await using (NpgsqlConnection countConnection =
+                await database.OpenConnectionAsync())
+            await using (NpgsqlCommand countRows = countConnection.CreateCommand())
+            {
+                countRows.CommandText =
+                    "SELECT COUNT(*) FROM video_frame_evidence_frames WHERE job_id=@job;";
+                countRows.Parameters.AddWithValue("job", fourJob);
+                Assert.Equal(4L, (long)(await countRows.ExecuteScalarAsync())!);
+            }
+
+            // The same four-frame lease must reject three completed frames
+            // atomically. No current partial batch can become searchable.
+            Guid fourPartialJob = await queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    AssetRevisionId.From(revision), VideoDerivativeKind.FrameEvidence,
+                    fourPolicy, VideoFrameExtractionProfile.Version, new string('8', 64)),
+                budget, candidate with { RequestedFrames = 4 });
+            var fourPartialAdapter = new VideoFrameEvidenceWorkerAdapter(database,
+                new SyntheticProducer((lease, _) =>
+                {
+                    VideoFrameSamplingPlan fourPlan =
+                        VideoFrameSceneSamplingIdentity.BuildPlan(
+                            8m, lease.RequestedFrames, lease.PolicyVersion);
+                    VideoFrameEvidenceProduction production = Good(revision, fourPlan);
+                    return Task.FromResult(production with
+                    {
+                        Batch = production.Batch with
+                        {
+                            Items = production.Batch.Items.Take(3).ToArray()
+                        }
+                    });
+                }));
+            VideoWorkerCycleResult partialFour = await coordinator.RunOneAsync(
+                budget, fourPartialAdapter, selectedJobId: fourPartialJob);
+            Assert.False(partialFour.Published);
+            Assert.Null(await reader.GetCurrentAsync(fourPartialJob));
+
             // A partial returned batch must not reach the PG publication path.
             Guid invalidJob = await Enqueue(VideoDerivativeKind.FrameEvidence, 'f');
             var partialAdapter = new VideoFrameEvidenceWorkerAdapter(database,
