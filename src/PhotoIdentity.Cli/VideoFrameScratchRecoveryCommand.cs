@@ -238,9 +238,21 @@ public static class VideoFrameScratchRecoveryCommandRunner
         ArgumentNullException.ThrowIfNull(output);
         if (options.Apply && !options.AcknowledgeDeletion)
             throw new ArgumentException("Private scratch deletion requires explicit acknowledgment.");
-        VideoFrameScratchRecoveryResult report = VideoFrameScratchRecovery
-            .InspectAndRecover(options.ScratchRoot, options.Apply,
+        VideoFrameScratchRecoveryResult report;
+        try
+        {
+            report = VideoFrameScratchRecovery.InspectAndRecover(
+                options.ScratchRoot, options.Apply,
                 DateTimeOffset.UtcNow, options.MinimumAgeHours);
+        }
+        catch (Exception error) when (error is IOException or
+            UnauthorizedAccessException or InvalidOperationException)
+        {
+            // Native filesystem exceptions can include private directory or
+            // scratch-file names; never echo those from a CLI failure.
+            throw new InvalidOperationException(
+                "Owned frame scratch recovery was refused or could not be completed safely.");
+        }
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0190-frame-scratch-recovery-v1",
