@@ -9,7 +9,7 @@ using PhotoIdentity.Persistence.Postgres;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
-/// Explicit operator-only, at-most-two-frame job. The selected identity is
+/// Explicit operator-only, at-most-four-frame job. The selected identity is
 /// an already published local PlayableProxy UUID, not a source path or video
 /// filename. --apply plus BOTH acknowledgements is required to enqueue and
 /// process it; the default dry run has no database writes or media access.
@@ -57,9 +57,9 @@ public sealed record VideoFrameSelectedOneShotOptions(
         if (!Regex.IsMatch(env, @"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant) ||
             !Regex.IsMatch(database, @"^[a-z][a-z0-9_]{0,62}$", RegexOptions.CultureInvariant) ||
             !Guid.TryParse(Required("--proxy-job-id"), out Guid id) || id == Guid.Empty ||
-            !int.TryParse(Required("--max-frames"), out int frames) || frames is < 1 or > 2)
+            !int.TryParse(Required("--max-frames"), out int frames) || frames is < 1 or > VideoFrameSelectedOneShotCommandRunner.MaximumFrames)
             throw new ArgumentException(
-                "Selected frames require a safe local database, proxy UUID and 1-2 frames.");
+                "Selected frames require a safe local database, proxy UUID and 1-4 frames.");
         if (apply != (v38 && disclosure) || (!apply && (v38 || disclosure)))
             throw new ArgumentException(
                 "Execution requires --apply and both v38-rehearsal and frame-disclosure acknowledgements.");
@@ -122,6 +122,7 @@ public sealed record VideoFrameSelectedOneShotOptions(
 /// </summary>
 public static class VideoFrameSelectedOneShotCommandRunner
 {
+    public const int MaximumFrames = VideoFrameSceneSamplingIdentity.MaximumFrames;
     private const long MaxSource = 1024L * 1024 * 1024;
     private const long MaxScratch = 320L * 1024 * 1024;
     private const int MaxSeconds = 13 * 60;
@@ -135,6 +136,9 @@ public static class VideoFrameSelectedOneShotCommandRunner
         if (!OperatingSystem.IsWindows())
             throw new InvalidOperationException(
                 "Selected frame processing requires Windows Job Object containment.");
+        if (options.Frames is < 1 or > MaximumFrames)
+            throw new ArgumentOutOfRangeException(nameof(options),
+                "Selected FrameEvidence must request one to four frames.");
         options.Producer.Validate();
         string root = VideoFrameEvidenceScratchGuard.Validate(options.Producer.ScratchRoot);
 
@@ -283,7 +287,7 @@ public static class VideoFrameSelectedOneShotCommandRunner
         VideoProcessingBudget budget = new(
             Enabled: true, Paused: false, MaximumConcurrentJobs: 1,
             MaximumSourceBytes: MaxSource, MaximumTemporaryBytes: MaxScratch,
-            MaximumExtractedFrames: 2, MaximumJobSeconds: MaxSeconds);
+            MaximumExtractedFrames: MaximumFrames, MaximumJobSeconds: MaxSeconds);
         var candidate = new VideoProcessingCandidate(
             true, false, true, true, originalBytes, MaxScratch, options.Frames);
         var identity = new VideoDerivativeJobIdentity(
@@ -347,7 +351,7 @@ public static class VideoFrameSelectedOneShotCommandRunner
             dryRun, admitted, published, reasonCode,
             samplingMode = sceneAnnotated ? "annotated-scene" : "interval",
             originalsOpened = false, oneDriveHydrationRequested = false,
-            maximumConcurrentJobs = 1, maximumFrames = 2,
+            maximumConcurrentJobs = 1, maximumFrames = MaximumFrames,
             executionWallMs,
             automaticallyEnabled = false, captionsReturned = false
         }));
