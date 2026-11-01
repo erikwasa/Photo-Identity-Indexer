@@ -800,6 +800,75 @@ collected; diverse representative clips, resource/caption/retrieval
 quality and real interruption are pending. WI-0190 remains
 `in_progress`, **0/4 full acceptance criteria**.
 
+## Development checkpoint 16 — measured selected job and controlled interruption tooling (2026-11-01)
+
+After merged PR #695, the selected FrameEvidence CLI supports
+explicit 1–4-frame interval or manual scene policies with distinct
+frame-count provenance, a fenced v38 full-batch publisher, and an
+operator-only marker/lock-based crash scratch recovery tool. Before
+a consolidated local quality/throughput session, the remaining
+tooling gap was **safe repeatable measurement and a controlled
+process-interruption rehearsal**.
+
+This checkpoint adds two new explicitly invoked Windows commands:
+
+- video frames acceptance-harness: accepts only the previously
+  reviewed selected-one-shot arguments and a separate harness
+  --execute acknowledgment. Defaults to a preview that does not
+  launch the child, read the database, run models or disclose
+  pixels. The actual child is the **same PhotoIdentity CLI
+  executable**, with no arbitrary executable/PID input. Its
+  output streams are discarded. It records measured process
+  wallTimeMs, CLI-host-only cumulative CPU milliseconds and peak
+  working set; it explicitly sets full cpuTimeMs, GPU time and
+  Azure billing to **null** (not zero), since these cannot be
+  reliably attributed to FFmpeg/Ollama/remote Azure from the CLI
+  process. An optional interrupt mode requires an additional
+  --acknowledge-owned-child-termination and a 5–600-second
+  countdown, and terminates only the spawned child process tree
+  under Windows.
+- video frames interruption-audit: uses a **read-only repeatable-read
+  PostgreSQL snapshot** and non-deleting owned-scratch inspection
+  to report whether the specifically selected FrameEvidence job
+  has any partial/published rows, active lease/authorization,
+  uncleared operator video control, and remaining marked/unknown
+  scratch. It intentionally returns incomplete while a job is
+  not terminal, the scope is still selected, or the scratch
+  must age before recovery. Nothing is migrated, deleted,
+  enqueued, processed, disarmed or hydrated.
+
+The existing video jobs stop/recover operators can restore a
+**disposable isolated** rehearsal database after bounded
+lease/grant expiry, but these commands affect every queued/
+expired video job in that database and must NOT be used on the
+maintained shared catalogue for this test. Owned crash scratch
+remains subject to the previously implemented **6-hour minimum
+age** and requires a later operator-approved recovery. A
+remotely submitted controlled Azure inference call might
+continue after the local process is killed; this is never
+falsely reported as remote cancellation.
+
+Synthetic subprocess tests verify exact CLI-spawn authorization,
+redacted output, explicit kill gating and OS child-tree
+termination, with pure incomplete/active-lease policy tests.
+Disposable PostgreSQL integration proves read-only current
+control state without mutation. A new
+[consolidated Windows acceptance runbook](../../operations/video-frame-consolidated-acceptance-session.md)
+combines selected-case measurements, private acceptance-report
+and live retrieval evaluation, real interruption and the
+delayed recovery audit. No personal media is used in CI.
+
+**Scope honesty:** process-local CPU and wall measurements are
+useful, but complete CPU/GPU and billed Azure per-clip cost must
+still come from independently instrumented operator-owned
+resources; missing values remain null until measured.
+No local verification is requested to review this PR, and
+the already accepted 12.3-second two-frame audit need not
+be rerun. WI-0190 remains `in_progress` with **0/4 full
+criteria formally accepted** until the representative media,
+human quality, actual costs and real interruption/recovery
+campaign is finished.
+
 ## Completion notes
 
 - Files changed:

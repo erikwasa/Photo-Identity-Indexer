@@ -1,5 +1,25 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 16 (new PR after #695 merged):**
+Adds a default-preview Windows acceptance-harness that can execute
+ONLY its own selected-one-shot child using existing v38 and disclosure
+approvals. It reports process wall, CLI-process-only CPU and peak
+working set, and explicitly leaves full CPU, GPU and Azure billable
+cost null (no unmeasured claims). Controlled interrupt additionally
+requires a specific operator ack, kills only that spawned subprocess
+tree after 5–600s, discards child outputs. Separate READ ONLY
+interruption-audit checks a known FrameEvidence job's terminal state,
+lease/grant/control, zero partial rows and marker-owned scratch.
+Synthetic Windows tests and disposable PG tests added, no personal
+media in CI. Real kill must use disposable isolated DB only;
+normal global stop/recover affects unrelated jobs, crash scratch
+recovery is safely 6h minimum. Complete runbook:
+docs/operations/video-frame-consolidated-acceptance-session.md.
+Already accepted real two-frame v38 audit not to repeat. WI-0190
+still in_progress, 0/4 formally accepted until multi-clip
+caption/retrieval/missed-scene and measured CPU/GPU/Azure cost plus
+real interruption/recovery evidence.
+
 **2026-11-01 WI-0190 checkpoint 15 (PR pending):** PR #694 merged.
 Frame-count-specific interval job IDs now avoid key collision
 with an existing succeeded two-frame interval batch: 1/3/4
