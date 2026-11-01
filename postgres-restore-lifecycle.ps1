@@ -216,9 +216,13 @@ function Invoke-RestoreDrop {
 function Test-RestoreAutovacuumOnly {
     param([Parameter(Mandatory = $true)]$Snapshot)
     $activity = @($Snapshot.activity)
-    return $activity.Count -gt 0 -and
-        @($activity | Where-Object { $_.backendType -cne 'autovacuum worker' }).Count -eq 0 -and
-        @($activity | Where-Object { $_.sessions -le 0 }).Count -eq 0
+    if ($activity.Count -eq 0) { return $false }
+    foreach ($entry in $activity) {
+        if ($entry.backendType -cne 'autovacuum worker' -or $entry.sessions -le 0) {
+            return $false
+        }
+    }
+    return $true
 }
 
 function Remove-OwnedRestoreDatabase {
