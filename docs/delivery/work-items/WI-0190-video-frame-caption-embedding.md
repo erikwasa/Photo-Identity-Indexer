@@ -746,6 +746,50 @@ necessary for formal acceptance. WI-0190 stays `in_progress`,
 representative five-class clips, caption/retrieval relevance and
 CPU/GPU/Azure costs.
 
+## Development checkpoint 15 — four-frame selected real scene coverage (2026-11-01)
+
+After merged PR #694, opt-in frame scratch workspaces have marker
+and OS-held lock recovery for abnormal termination; the remaining
+representative-scene bottleneck was the CLI's **two-frame** limit,
+even though the source-independent scene-policy and transactional
+v38 producer already supported **up to four**.
+
+This checkpoint expands only the explicitly operator-selected
+`video frames selected-one-shot` CLI and its admission budget to
+**1–4 frames**. Interval mode and private human-annotated scene mode
+both reconstruct the exact plan; four requested frames must yield
+four valid distinct timestamps before a dry-run is admitted.
+The runner now independently rejects any manually constructed
+out-of-range frame count before touching its local database or
+approved scratch. The scene-policy identity, tool digest, revision
+and preset remain in the existing deterministic job key; the
+two-frame published jobs are unchanged.
+
+No safety window is expanded: one selected job, 320-MiB scratch,
+13-minute global attempt, 15-minute expiring authorization, 60s
+FFmpeg and 180s model per frame, photo priority, source-revision/
+privacy-exclusion fencing, local pre-published proxy only, no
+OneDrive hydration, automatic workers or third-party black-box
+processing. Four slow sequential frames may exceed the unchanged
+13-minute total and must then **fail without any partial v38
+publication**, rather than extending operator authorization.
+
+The optional capacity is covered by CLI parsing tests (four
+accepted, five refused, two preserved), disposable PostgreSQL
+preflight tests (four distinct annotated scenes admitted without
+writes, impossible short scenes rejected and out-of-range
+programmatic requests refused), and synthetic PostgreSQL worker
+tests (four durable scene-indexed rows with regenerable provenance
+versus three-of-four partial publication refusal). New
+[four-scene runbook](../../operations/video-frame-four-scene-selected-one-shot.md)
+documents a safe read-only Windows preview and the continued
+13/15-minute time-budget trade-off. Existing local two-frame
+success remains accepted; no repeat is necessary to review
+this PR. No real four-scene Azure/FFmpeg evidence has yet been
+collected; diverse representative clips, resource/caption/retrieval
+quality and real interruption are pending. WI-0190 remains
+`in_progress`, **0/4 full acceptance criteria**.
+
 ## Completion notes
 
 - Files changed:
