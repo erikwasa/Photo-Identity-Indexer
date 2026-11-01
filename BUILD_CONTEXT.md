@@ -91,7 +91,7 @@ in_progress, 0/4 formal full criteria. See
 docs/operations/video-frame-live-retrieval-evaluation.md.
 
 
-**2026-10-31 M41 / WI-0208 development:** The restore verifier now records PostgreSQL database-comment ownership, publishes verification evidence before exact-owned automatic cleanup, retains failed/partial/rehearsal copies, and reports cleanup status. Operator inventory/exact-name disposal, synthetic safety and verifier tests, plus the updated operations/rehearsal runbooks are on the WI-0208 PR branch. CI and the maintained Windows/Podman acceptance have NOT yet passed; do not mark WI-0208 completed. Review the work-item and PostgreSQL runbook for the two remaining gates. WI-0209 separately owns backup-file retirement and has not been implemented. Continue WI-0190 separately from M41.
+**2026-11-01 M41 closeout:** WI-0208 and WI-0209 both completed with maintainer evidence; milestone M41 completed. The full-size restore had passing comparison and ordinary automatic cleanup after autovacuum workers finished. The maintainer then ran 49 WI-0209 Windows disposable-file assertions, independently downloaded a restore-verified OneDrive recovery dump, matched SHA-256 and registered it as protected; five historical local dumps remain unclassified and untouched. No extra full-size restore, cloud re-upload or destructive test of the real recovery backup is required. Repository workitems and the PostgreSQL runbooks retain exact evidence. Continue WI-0190 separately from completed M41.
 
 **2026-11-01 WI-0190 checkpoint 11 (PR pending):** PR #689 merged,
 adding manual scene-annotated real two-frame publication with distinct
