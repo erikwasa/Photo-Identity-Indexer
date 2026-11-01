@@ -281,6 +281,16 @@ try {
             $report.cleanupStatus = 'failed'
             $report.cleanupRequired = $true
             $report['cleanupError'] = $cleanupError
+            # Capture only backend types and counts (no PIDs, identities,
+            # queries or SQL payloads) while the retained copy still exists.
+            # Diagnostics are best effort and never override the actual
+            # cleanup failure or authorize a subsequent drop.
+            try {
+                $report['cleanupSessionSummary'] = @(Get-RestoreSessionSummary -Name $VerificationDatabaseName)
+            }
+            catch {
+                $report['cleanupSessionSummaryUnavailable'] = $true
+            }
             try {
                 Write-RestoreVerificationReport -Path $reportPath -Report $report
             }
