@@ -6,6 +6,52 @@ namespace PhotoIdentity.Core.Tests;
 public sealed class VideoFrameSceneSamplingIdentityTests
 {
     [Fact]
+    public void Exact_interval_frame_counts_have_distinct_job_keys_and_regenerate()
+    {
+        string legacyTwo = VideoFrameSceneSamplingIdentity.CreateInterval(2);
+        string one = VideoFrameSceneSamplingIdentity.CreateInterval(1);
+        string three = VideoFrameSceneSamplingIdentity.CreateInterval(3);
+        string four = VideoFrameSceneSamplingIdentity.CreateInterval(4);
+        Assert.Equal(VideoFrameSamplingPlanner.PolicyVersion, legacyTwo);
+        Assert.Equal("video-frame-sampling-interval-v2-n1", one);
+        Assert.Equal("video-frame-sampling-interval-v2-n3", three);
+        Assert.Equal("video-frame-sampling-interval-v2-n4", four);
+        Assert.Equal(4, new HashSet<string> { one, legacyTwo, three, four }.Count);
+        foreach ((string policy, int count) in new[]
+        {
+            (one, 1), (legacyTwo, 2), (three, 3), (four, 4)
+        })
+        {
+            Assert.True(VideoFrameSceneSamplingIdentity.Permits(policy, count));
+            VideoFrameSamplingPlan restored =
+                VideoFrameSceneSamplingIdentity.BuildPlan(12.3m, count, policy);
+            Assert.Equal(policy, restored.PolicyVersion);
+            Assert.Equal(count, restored.Samples.Count);
+            Assert.All(restored.Samples, sample => Assert.Null(sample.SceneIndex));
+        }
+        Assert.False(VideoFrameSceneSamplingIdentity.Permits(four, 2));
+        Assert.False(VideoFrameSceneSamplingIdentity.Permits(three, 4));
+        Assert.False(VideoFrameSceneSamplingIdentity.Permits(
+            "video-frame-sampling-interval-v2-n5", 5));
+        Assert.Throws<ArgumentException>(() =>
+            VideoFrameSceneSamplingIdentity.BuildPlan(12.3m, 2, four));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            VideoFrameSceneSamplingIdentity.CreateInterval(5));
+
+        var revision = PhotoIdentity.Core.Identifiers.AssetRevisionId.From(Guid.NewGuid());
+        string Key(string policy) => new VideoDerivativeJobIdentity(
+            revision, VideoDerivativeKind.FrameEvidence, policy,
+            "wi0190-sdr-frame-jpeg-v1", new string('a', 64)).IdempotencyKey();
+        Assert.NotEqual(Key(legacyTwo), Key(four));
+        Assert.NotEqual(Key(three), Key(four));
+        Assert.NotEqual(Key(one), Key(legacyTwo));
+        // Old publications remain interpretable from the separate persisted
+        // requested_frames count, even when the old policy had no suffix.
+        Assert.Equal(1, VideoFrameSceneSamplingIdentity.BuildPlan(
+            12.3m, 1, legacyTwo).Samples.Count);
+    }
+
+    [Fact]
     public void Annotated_cuts_are_regenerable_and_choose_different_scenes()
     {
         string identity = VideoFrameSceneSamplingIdentity.Create(
