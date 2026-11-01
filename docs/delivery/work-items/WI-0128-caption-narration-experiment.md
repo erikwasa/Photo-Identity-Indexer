@@ -119,3 +119,25 @@ Maintainer verification should:
 - Commands/evidence: repository CI plus private maintainer evaluation using `qwen2.5vl:3b`, full-proxy and 480x320 thumbnail probes.
 - Final maintainer verification on 2026-09-22 accepted WI-0128. A fresh 30-row Swedish `wi-0128-photo-caption-v3` sample contained complete single-sentence captions within the 20-word display bound; the strict SQL validation returned zero displayable violations. Guarded relationship output remained non-displayable. Photo Details persistence across restart, slideshow read-only consumption for present/missing/blocked captions, and stopping new work when enrichment was disabled were also accepted.
 - WI-0128 is complete. Remaining Swedish grammar/style imperfections are model-quality limitations, not failures of the caption lifecycle, normalization or claim-guard contracts.
+
+### Operational follow-up, not workitem reopening (2026-11-02)
+
+The maintainer confirmed a caption generated in the Photo Identity
+application and successfully persisted using the current approved
+Windows `launcher.json`. The deployment uses an operator-controlled
+Azure bridge **listening on loopback port 11434**, rather than a locally
+installed Ollama runtime. Launcher validation passed, the installed CLIP
+ONNX/vocabulary/merges files matched their pinned hashes, and an
+explicit live `Get-PhotoIdentityApprovedInference.ps1 -VerifyOllama`
+returned `OllamaVerified = True` against the approved
+`qwen2.5vl:3b` digest. The previous bridge 403 access failure was
+reported resolved.
+
+This is **maintainer-reported private acceptance evidence**, not a new
+CI result or a reproduction of the separate chat. It confirms the
+current caption-generation/persistence path, but not media-scale
+throughput, caption quality across a new sample, restart recovery or
+the distinct WI-0190 video-frame pipeline. The WI-0128 status remains
+**completed** (original acceptance 2026-09-22). The current
+configuration, model SHA-256 identities and repeatable checks live in
+[approved inference configuration](../../operations/approved-inference-configuration.md#maintained-windows-configuration-observed-acceptance-2026-11-02).
