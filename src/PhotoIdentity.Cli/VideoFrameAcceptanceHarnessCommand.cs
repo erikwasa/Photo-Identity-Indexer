@@ -175,6 +175,26 @@ public static class VideoFrameAcceptanceHarnessCommandRunner
         string assembly = typeof(Program).Assembly.Location;
         ProcessStartInfo info = BuildOwnCliStart(
             processPath, assembly, options.SelectedArgs);
+        return await ObserveStartedChildAsync(info, options.Mode,
+            options.TerminateAfterSeconds, token);
+    }
+
+    /// <summary>
+    /// Test seam: accepts an explicit synthetic process in isolated CI tests.
+    /// The operator CLI never passes anything other than BuildOwnCliStart.
+    /// The only termination target is the Process instance created here.
+    /// </summary>
+    public static async Task<VideoFrameAcceptanceProcessObservation>
+        ObserveStartedChildAsync(ProcessStartInfo info, string mode,
+            int terminateAfterSeconds, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        if (mode is not ("measure" or "interrupt") ||
+            mode == "interrupt" && terminateAfterSeconds is < 5 or > 600 ||
+            info.UseShellExecute || !info.RedirectStandardOutput ||
+            !info.RedirectStandardError)
+            throw new ArgumentException(
+                "A bounded directly launched and redacted child is required.");
         using Process child = new() { StartInfo = info };
         long clock = Stopwatch.GetTimestamp();
         try
@@ -199,8 +219,8 @@ public static class VideoFrameAcceptanceHarnessCommandRunner
         string reason = "child-completed";
         try
         {
-            TimeSpan deadline = options.Mode == "interrupt"
-                ? TimeSpan.FromSeconds(options.TerminateAfterSeconds)
+            TimeSpan deadline = mode == "interrupt"
+                ? TimeSpan.FromSeconds(terminateAfterSeconds)
                 : TimeSpan.FromMinutes(14);
             Task tick = Task.Delay(deadline, token);
             if (await Task.WhenAny(finished, tick) == tick)
@@ -213,13 +233,13 @@ public static class VideoFrameAcceptanceHarnessCommandRunner
                     // matching or operator-supplied arbitrary executable.
                     requested = true;
                     child.Kill(entireProcessTree: true);
-                    reason = options.Mode == "interrupt"
+                    reason = mode == "interrupt"
                         ? "owned-child-terminated" : "harness-safety-timeout";
                 }
             }
             await child.WaitForExitAsync(token);
             await Task.WhenAll(stdout, stderr).WaitAsync(TimeSpan.FromSeconds(10), token);
-            if (options.Mode == "interrupt" && !requested)
+            if (mode == "interrupt" && !requested)
                 reason = "child-exited-before-interruption";
         }
         finally
