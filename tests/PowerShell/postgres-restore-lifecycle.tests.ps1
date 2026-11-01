@@ -154,4 +154,24 @@ try {
 finally {
     Remove-Item -LiteralPath $root -Force -Recurse -ErrorAction SilentlyContinue
 }
+# A cleanup failure can report only fixed backend-type aggregates,
+# never user/application/query identities or unrestricted worker labels.
+$script:sessionRows = @('autovacuum worker|2', 'client backend|1')
+function Invoke-RestoreAdminSql {
+    param([string]$Sql)
+    if ($Sql -notmatch '^SELECT kind \|\| ') {
+        throw 'Unexpected session-summary SQL.'
+    }
+    return $script:sessionRows
+}
+$summary = @(Get-RestoreSessionSummary -Name $script:validName)
+Assert-Condition ($summary.Count -eq 2) 'two aggregate backend types returned'
+Assert-Condition ($summary[0].backendType -eq 'autovacuum worker' -and $summary[0].sessions -eq 2) 'internal worker summary has count only'
+Assert-Condition ($summary[1].backendType -eq 'client backend' -and $summary[1].sessions -eq 1) 'client backend summary has count only'
+Assert-Throws { Get-RestoreSessionSummary -Name 'photoidentity_main' } 'arbitrary database name summary refused'
+$script:sessionRows = @('supersecret-backend|1')
+Assert-Throws { Get-RestoreSessionSummary -Name $script:validName } 'unexpected backend type rejected'
+$script:sessionRows = @('client backend|nope')
+Assert-Throws { Get-RestoreSessionSummary -Name $script:validName } 'malformed count rejected'
+
 Write-Host "WI-0208 synthetic safety/report assertions: $script:checked passed."

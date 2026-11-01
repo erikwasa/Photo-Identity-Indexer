@@ -38,7 +38,13 @@ if ($cmd -like '*pg_restore *') {
 }
 if ($cmd -like '*dropdb *') {
     $global:FakeRestore.DropAttempts++
-    if ($global:FakeRestore.DropFails) { $global:LASTEXITCODE = 1; return }
+    if ($global:FakeRestore.DropFails) {
+        # The final drop can race with a newly opened connection even when
+        # the last ownership/zero-session snapshot was valid.
+        $global:FakeRestore.Sessions = 1
+        $global:LASTEXITCODE = 1
+        return
+    }
     $global:FakeRestore.Exists = $false
     return
 }
@@ -65,6 +71,12 @@ if ($envFlags.ContainsKey('PHOTOIDENTITY_SQL')) {
 }
 if ($envFlags.ContainsKey('RESTORE_SQL')) {
     $sql = $envFlags.RESTORE_SQL
+    if ($sql -match '^SELECT kind \|\| ') {
+        if ($global:FakeRestore.Exists -and $global:FakeRestore.Sessions -gt 0) {
+            "client backend|$($global:FakeRestore.Sessions)"
+        }
+        return
+    }
     if ($sql -like 'COMMENT ON DATABASE *') {
         if (-not $global:FakeRestore.Exists) { $global:LASTEXITCODE = 1; return }
         $match = [regex]::Match($sql, " IS '([^']+)';$")
