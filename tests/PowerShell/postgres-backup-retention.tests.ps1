@@ -62,6 +62,16 @@ try {
     Refuse { & $tool -BackupRoot $root -RegisterPreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha } 'missing change reference'
     Check (-not (Test-Path -LiteralPath (Join-Path $root 'retention-state.json'))) 'failed registration did not publish registry'
 
+    $lockFile = Join-Path $root 'retention-state.lock'
+    $heldLock = [IO.File]::Open($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        Refuse { & $tool -BackupRoot $root -RegisterPreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ChangeReference 'migration-1' } 'concurrent registry lock held'
+        Check (-not (Test-Path -LiteralPath (Join-Path $root 'retention-state.json'))) 'concurrent registration makes no state write'
+    }
+    finally {
+        $heldLock.Dispose()
+    }
+
     & $tool -BackupRoot $root -RegisterPreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ChangeReference 'migration-1'
     $list = @(& $tool -BackupRoot $root)
     Check (@($list | Where-Object { $_.Name -eq 'prechange-a.dump' -and $_.Role -eq 'pre-change' }).Count -eq 1) 'operator registration classified exact pre-change dump'
