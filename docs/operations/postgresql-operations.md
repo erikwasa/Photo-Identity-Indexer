@@ -134,6 +134,8 @@ The verifier:
 
 A passing fresh run normally reports `passed=true`, `cleanupStatus=removed`, and `cleanupRequired=false`. The backup `.dump`, SHA-256 manifest and comparison JSON remain intact. Restore failures, comparison failures, interrupted runs and report-publishing failures retain the isolated database for investigation. Any cleanup failure is reported and causes the verifier to fail even when `passed=true`; do not treat `passed` alone as proof that storage was reclaimed.
 
+**Maintained Windows acceptance (WI-0208, 2026-11-01):** A verified fresh restore of the approximately 17.86 GiB production catalogue passed its comparisons and then automatically removed its exact owned temporary database. PostgreSQL autovacuum workers briefly blocked the normal cleanup window; the verifier's bounded, autovacuum-only extension allowed maintenance to finish before a non-force drop. The final report recorded `passed=true`, `cleanupStatus=removed`, `cleanupRequired=false`, independent inventory showed zero copies and the backup plus manifest remained. Client/mixed/unknown sessions, ownership mismatches and excessive maintenance still fail closed. The unmarked legacy restored database remains protected. See the [WI-0208 acceptance record](postgres-wi0208-verification.md); the final acceptance log did not include paired Podman-volume/VHDX measurements.
+
 For a subsequent migration/schema rehearsal that **needs the actual restored database**, opt in to retention:
 
 ~~~powershell

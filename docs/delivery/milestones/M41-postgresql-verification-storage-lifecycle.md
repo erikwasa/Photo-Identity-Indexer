@@ -22,10 +22,10 @@ A passing representative isolated restore produces a durable, privacy-safe compa
 
 ## Exit criteria
 
-- [ ] Default successful verification no longer accumulates isolated restore databases and accurately reports cleanup.
-- [ ] Failure diagnostics, explicit retention and resume remain safe and auditable.
-- [ ] Tests and maintained-host verification establish that production data and backups are preserved.
-- [ ] Runbook explains safe cleanup and Windows VM-disk reclamation separately.
+- [x] Default successful verification no longer accumulates isolated restore databases and accurately reports cleanup (WI-0208 maintained Windows acceptance, 2026-11-01).
+- [x] Failure diagnostics, explicit retention and resume remain safe and auditable (WI-0208 synthetic and disposable integration verification).
+- [x] Tests and maintained-host verification establish that production data and backups are preserved for the restore-copy lifecycle (WI-0208).
+- [x] Runbook explains safe cleanup and Windows VM-disk reclamation separately.
 - [ ] A single confirmed recovery checkpoint survives independently of the production disk, and accepted pre-change backup files can be retired without age/count rotation.
 
 ## Risks
@@ -34,4 +34,8 @@ A misidentified database can destroy production data; cleanup must use exact gen
 
 ## Evidence
 
-2026-10-31 maintainer diagnostic: four approximately 13 GB isolated restores accumulated; three older copies were manually removed and Windows free storage increased to 128.13 GiB after Podman VHDX compaction. No automated lifecycle fix has yet been implemented or verified.
+2026-10-31 maintainer diagnostic: four approximately 13 GB isolated restores accumulated; three older copies were manually removed and Windows free storage increased to 128.13 GiB after separate, offline Podman VHDX compaction.
+
+2026-11-01 **WI-0208 completed and accepted**: root cause of full-sized cleanup refusal diagnosed as PostgreSQL autovacuum workers; a bounded autovacuum-only grace period now permits ordinary, ownership-checked automatic removal after maintenance ends. The maintainer passed 59 source-free safety assertions, 10 synthetic full-verifier scenarios, and an actual restore of the approximately 17.86 GiB production catalogue. The new restore database `photoidentity_restore_20261101132922_afb037` was removed automatically (`passed=true`, `cleanupStatus=removed`, `cleanupRequired=false`); independent inventory showed zero copies, and backup plus hash manifest survived. Older unmarked legacy restore databases are protected. The acceptance transcript does not provide paired Podman-volume before/after figures; no Windows VHDX compaction benefit is inferred. PRs #688, #693, #696, #698 and #699 delivered the lifecycle and safe diagnostic/cleanup improvements.
+
+**Milestone M41 remains open** because WI-0209 (retiring accepted pre-change backup files while preserving a confirmed independent recovery checkpoint) is not completed. Do not conflate verified restore-copy removal with backup-file retention.

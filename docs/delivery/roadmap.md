@@ -45,7 +45,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M38 | TV-friendly portrait slideshow presentation | ready |
 | M39 | Creative Collection human-review curation and reversible alternatives | in_progress |
 | M40 | Continuous photo quality rating and accepted manual Archive review | ready |
-| M41 | PostgreSQL backup and verification storage lifecycle | in_progress |
+| M41 | PostgreSQL backup and verification storage lifecycle | ready |
 
 Expected evolution:
 
