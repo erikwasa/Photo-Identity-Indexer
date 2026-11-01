@@ -47,7 +47,7 @@ gate is NOT changed.
   free-space headroom. A separate operator-created **empty**
   `photoidentity-frame-evidence-*` scratch root immediately beneath
   OS temp, containing only the exact marker shown below.
-- **Only 1–2 frames** are permitted in this first integration checkpoint.
+- **Checkpoint 15 supports 1–4 frames** per explicitly selected attempt. The original two-frame happy path remains accepted and unchanged. Four frames may time out under the existing 13-minute attempt and 15-minute absolute grant; see [four-scene selected one-shot](video-frame-four-scene-selected-one-shot.md).
   The existing job lease is renewed every 10s, with at most 13 minutes
   per attempt, a 15-minute absolute selected scope, independent 60-second
   FFmpeg budgets and 180 seconds per model inference call.
