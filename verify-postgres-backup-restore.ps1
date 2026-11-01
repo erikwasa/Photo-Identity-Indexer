@@ -269,7 +269,12 @@ try {
 
     if (-not $retained) {
         try {
-            Remove-OwnedRestoreDatabase -Name $VerificationDatabaseName -ExpectedMarker $ownershipMarker -SourceDatabase $sourceDatabase
+            # A full restore can finish while a transient PostgreSQL session
+            # is still visible. Revalidate ownership and idleness for at
+            # most 20 seconds; persistent sessions still fail closed.
+            Remove-OwnedRestoreDatabase -Name $VerificationDatabaseName `
+                -ExpectedMarker $ownershipMarker -SourceDatabase $sourceDatabase `
+                -SessionWaitAttempts 11 -SessionWaitMilliseconds 2000
         }
         catch {
             $cleanupError = $_.Exception.Message

@@ -113,7 +113,9 @@ function Remove-OwnedRestoreDatabase {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$ExpectedMarker,
-        [Parameter(Mandatory = $true)][string]$SourceDatabase
+        [Parameter(Mandatory = $true)][string]$SourceDatabase,
+        [ValidateRange(1, 20)][int]$SessionWaitAttempts = 1,
+        [ValidateRange(0, 5000)][int]$SessionWaitMilliseconds = 0
     )
     if (-not (Test-GeneratedRestoreName $Name) -or
         -not (Test-RestoreOwnershipMarker $ExpectedMarker) -or
@@ -122,19 +124,32 @@ function Remove-OwnedRestoreDatabase {
         throw 'Restore cleanup protection failed (name, marker, or source database).'
     }
 
-    $details = Get-RestoreDatabaseDetails -Name $Name
-    if ($null -eq $details -or -not $details.Owned -or $details.Marker -cne $ExpectedMarker) {
-        throw "Database '$Name' is absent or has missing/mismatched ownership; no drop was attempted."
+    # A finished pg_restore may briefly leave a PostgreSQL connection or
+    # background worker visible. Automatic cleanup can wait for it to exit,
+    # but every observation must recheck exact ownership. Operator cleanup
+    # retains the original immediate refusal (one attempt by default).
+    for ($attempt = 1; $attempt -le $SessionWaitAttempts; $attempt++) {
+        $details = Get-RestoreDatabaseDetails -Name $Name
+        if ($null -eq $details -or -not $details.Owned -or $details.Marker -cne $ExpectedMarker) {
+            throw "Database '$Name' is absent or has missing/mismatched ownership; no drop was attempted."
+        }
+        if ($details.Sessions -eq 0) {
+            # dropdb independently refuses sessions that arrive after this
+            # observation. Never terminate connections or use --force.
+            Invoke-RestoreDrop -Name $Name
+            if ($null -ne (Get-RestoreDatabaseDetails -Name $Name)) {
+                throw "PostgreSQL still reports isolated restore database '$Name' after cleanup."
+            }
+            return
+        }
+        if ($attempt -lt $SessionWaitAttempts) {
+            if ($attempt -eq 1) {
+                Write-Host "Restore cleanup detected active sessions; waiting briefly for them to exit (no connections will be terminated)."
+            }
+            Start-Sleep -Milliseconds $SessionWaitMilliseconds
+        }
     }
-    if ($details.Sessions -ne 0) {
-        throw "Database '$Name' has active sessions; no connections were terminated and no drop was attempted."
-    }
-
-    # dropdb refuses active sessions. Never terminate connections or use --force.
-    Invoke-RestoreDrop -Name $Name
-    if ($null -ne (Get-RestoreDatabaseDetails -Name $Name)) {
-        throw "PostgreSQL still reports isolated restore database '$Name' after cleanup."
-    }
+    throw "Database '$Name' has active sessions after $SessionWaitAttempts checks; no connections were terminated and no drop was attempted."
 }
 
 function Write-RestoreVerificationReport {
