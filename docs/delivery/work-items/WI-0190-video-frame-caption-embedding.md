@@ -31,12 +31,65 @@ Audio transcription, general video action understanding, face recognition (WI-01
 
 - [ ] Supported clips produce timestamped capped captions/embeddings or clear unsupported/failure output.
 - [ ] Every result is regenerable by revision/model/sampling version and partial/stale jobs cannot appear current.
-- [ ] Short, multi-scene, long, rotated and low-light videos demonstrate bounded sampling and documented missed-scene limitations.
+- [ ] On the currently admitted local SDR proxy cohort, demonstrate bounded sampling and missed-scene limitations with available short/rotated clips and any representative multi-scene, low-light, longer or landscape footage that can be identified. Mark unavailable or not-yet-supported representative categories **postponed**, with a reason and revalidation trigger; postponed does not mean passed.
 - [ ] Record throughput, storage/clip, GPU/CPU cost, and caption/retrieval quality on representative private videos.
 
 ## Verification requirements
 
 Sampling, model evidence, failure, privacy and invalidation tests plus local relevance evaluation; no personal media/evidence committed.
+
+## Maintainer decision — postponed representative-video coverage (2026-11-01)
+
+The maintainer has approved **postponing representative-media verification that the
+current admission profile or available local footage cannot support**, rather than
+expanding video formats, byte/duration limits or codecs solely to complete WI-0190.
+This is a scoped acceptance-plan change, **not** a declaration that those cases pass,
+not permission to bypass the proxy safety fences, and not a reason to postpone the
+working SDR FrameEvidence pipeline. Workitem status remains `in_progress`.
+
+Maintained-host, metadata-only observations (no filenames, content or personal paths
+recorded): the inspection cohort contains 31 Rec.709 (`bt709`) video revisions,
+25 HLG (`arib-std-b67`), one unsupported Rec.709 revision and one supported
+revision with unspecified color transfer. There are 24 published PlayableProxy
+receipts across two versions (13 compact 540p and 11 standard 720p), with a longest
+published source of 49.4 seconds. These are job/receipt counts, **not** a verified
+count of distinct source videos across profiles. All listed published sources
+had `-90` display rotation.
+
+Among nine inspected videos lasting at least 60 seconds: three use HLG, five
+Rec.709 videos use `yuvj420p`, and the remaining 172.9-second Rec.709 HEVC
+`yuv420p` source is 164.8 MiB but has **NULL display rotation**. The current
+proxy query requires an explicit rotation in `(0, 90, -90, 180, -180)`, so
+that source is not currently admitted; NULL must not silently be interpreted
+as 0 degrees. A video marked `supported` by metadata inspection is not
+automatically supported by the more restrictive proxy policy.
+
+| Representative case | Decision for this WI-0190 verification pass | Reopen when |
+| --- | --- | --- |
+| Short, already-published local SDR, `-90` rotated phone footage | **Test now**: real frame captions, embeddings, interval/scene coverage as applicable, provenance, retrieval quality and resource use | No deferral |
+| Medium/longer real SDR footage (including 172.9 s with NULL rotation) | **Postponed**: no qualifying published proxy yet; synthetic bounded long-duration sampling still tested | Rotation handling is reviewed and the video has a current approved, published proxy; or another admissible longer clip is found |
+| HLG/HDR (`arib-std-b67`) | **Postponed** for positive inference and quality coverage; continue to verify explicit policy rejection | A reviewed HDR/tone-mapping/color pipeline creates eligible proxies without silently misrepresenting colors |
+| Rec.709 `yuvj420p` | **Postponed** for positive inference and quality coverage; continue to verify explicit policy rejection | Full-range pixel-format admission, levels handling and proxy verification are implemented |
+| Other extensions/containers, codecs, sources over 256 MiB or over 600 seconds | **Postponed where unsupported or absent**, not claimed to be observed in this cohort | The corresponding enumerator, admission policy and guarded processing budget are expanded and locally tested |
+| Genuine landscape, multi-scene and low-light imagery | **Test if a suitable published clip can be identified; otherwise postpone each missing case separately**. Do not infer scene or lighting solely from metadata | Representative supported footage is identified or newly supported input yields a published proxy, with private human labels |
+
+The current bounded FrameEvidence one-shot, rejection, exclusion, cancellation,
+staleness, atomic-publication, privacy and synthetic duration/scene-plan tests
+**remain applicable now**. In particular, postponed positive HDR/format processing
+never excuses accepting an unsupported original into the video worker. Continue
+the existing two-plus-clip private caption/retrieval assessment and measured
+CPU/GPU/storage/cost campaign on available proxies. The real interruption
+campaign remains restricted to a disposable isolated PostgreSQL database.
+
+When video support is deliberately expanded in a later scoped repository workitem
+(for containers/extensions, codec/pixel format/HDR, NULL rotation, source bytes or
+clip duration), revisit these postponed rows against the new explicit policy,
+regenerate a **new** approved proxy where required, and repeat the relevant
+selected-one-shot, read-only frame audit, human coverage, live retrieval and
+cost/quality assessments. The expansion is **not authorized by WI-0190**.
+No OneDrive hydration or original modification is authorized. This decision
+does not retroactively check any of the four full acceptance boxes; accepted
+evidence and postponed exceptions must be reported separately.
 
 ## Development checkpoint 1 — source-free bounded frame sampling (2026-10-31)
 
