@@ -15,6 +15,10 @@ without scheduling a janitor or authorizing processing any new media.
   `.photoidentity-frame-evidence-root` ownership marker. Never point
   at the media archive, original photos, OneDrive folder or private proxy
   cache. Unknown roots cannot be recovered.
+- The FFmpeg process supervisor's own `video-tool-<GUID>` scratch
+  is now **nested inside this producer workspace**, not a sibling of it;
+  after a crash the entire owned extraction tree can be assessed in
+  one lock/marker recovery decision.
 - New producer workspaces carry a private, exact
   `.photoidentity-frame-evidence-workspace` marker and an OS-exclusive
   `.photoidentity-frame-evidence-active.lock` held for the entire job.
