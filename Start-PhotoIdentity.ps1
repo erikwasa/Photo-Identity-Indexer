@@ -37,7 +37,16 @@ $SupportedSettings = @(
     "PhotoIdentity__VideoProcessing__FfprobeSha256",
     "PhotoIdentity__VideoProcessing__CacheRoot",
     "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
-    "PhotoIdentity__VideoProcessing__MaximumProxyMiB"
+    "PhotoIdentity__VideoProcessing__MaximumProxyMiB",
+    "PhotoIdentity__CaptionEnrichment__OllamaBaseUrl",
+    "PhotoIdentity__CaptionEnrichment__Model",
+    "PhotoIdentity__CaptionEnrichment__ApprovedModelSha256",
+    "PhotoIdentity__CaptionEnrichment__ContextTokens",
+    "PhotoIdentity__CaptionEnrichment__TimeoutSeconds",
+    "PhotoIdentity__SemanticSearch__ModelDirectory",
+    "PhotoIdentity__SemanticSearch__ModelSha256",
+    "PhotoIdentity__SemanticSearch__VocabularySha256",
+    "PhotoIdentity__SemanticSearch__MergesSha256"
 )
 
 function Get-LauncherEnvironmentValue {
@@ -64,6 +73,1352 @@ function Assert-LauncherSettingValue {
         [Parameter(Mandatory = $true)]
         [string]$Value
     )
+
+    if ($Name -in @(
+        "PhotoIdentity__CaptionEnrichment__ApprovedModelSha256",
+        "PhotoIdentity__SemanticSearch__ModelSha256",
+        "PhotoIdentity__SemanticSearch__VocabularySha256",
+        "PhotoIdentity__SemanticSearch__MergesSha256"
+    )) {
+        if ($Value -cnotmatch '^[0-9a-f]{64},
+        "PhotoIdentity__VideoProcessing__FfprobeSha256"
+    )) {
+        if ($Value -cnotmatch '^[0-9a-f]{64}$') {
+            throw "$Name must be a lowercase SHA-256 digest (64 hex characters)."
+        }
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__FfmpegPath",
+        "PhotoIdentity__VideoProcessing__FfprobePath",
+        "PhotoIdentity__VideoProcessing__CacheRoot"
+    )) {
+        $isCache = $Name -eq "PhotoIdentity__VideoProcessing__CacheRoot"
+        $kind = if ($isCache) { "Container" } else { "Leaf" }
+        if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+            -not (Test-Path -LiteralPath $Value -PathType $kind) -or
+            (-not $isCache -and [IO.Path]::GetExtension($Value) -ine ".exe")) {
+            throw "$Name must reference an existing local absolute path."
+        }
+        $cursor = [IO.Path]::GetFullPath($Value)
+        while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            if (((Get-Item -LiteralPath $cursor -Force).Attributes -band
+                [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "$Name must not use junctions or symbolic links."
+            }
+            $parent = Split-Path -Parent $cursor
+            if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+            $cursor = $parent
+        }
+        # The application's runtime preflight rechecks executable digests,
+        # cache ownership and separation from catalogue source roots.
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
+        "PhotoIdentity__VideoProcessing__MaximumProxyMiB"
+    )) {
+        [long]$parsed = 0
+        if (-not [long]::TryParse($Value, [ref]$parsed) -or
+            ($Name -eq "PhotoIdentity__VideoProcessing__MaximumCacheMiB" -and
+             ($parsed -lt 64 -or $parsed -gt 16384)) -or
+            ($Name -eq "PhotoIdentity__VideoProcessing__MaximumProxyMiB" -and
+             ($parsed -lt 1 -or $parsed -gt 256))) {
+            throw "$Name is outside its approved integer MiB range."
+        }
+        # The application separately requires BOTH settings and validates
+        # the per-proxy cap against the total cap before enabling the worker.
+        return
+    }
+
+    switch ($Name) {
+        "PhotoIdentity__VideoLibraryEnabled" {
+            [bool]$parsed = $false
+            if (-not [bool]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be true or false."
+            }
+        }
+        "PhotoIdentity__VideoPosterRoot" {
+            # This root is used by the video poster renderer, browser and
+            # privacy purge. Do not silently resolve relative or UNC paths.
+            if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+                -not (Test-Path -LiteralPath $Value -PathType Container)) {
+                throw "$Name must point to an existing absolute local directory."
+            }
+            $fullPath = [IO.Path]::GetFullPath($Value)
+            $cursor = $fullPath
+            while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+                $directory = Get-Item -LiteralPath $cursor -Force
+                if (($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "$Name must not use junctions or symbolic links."
+                }
+                $parent = Split-Path -Parent $cursor
+                if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+                $cursor = $parent
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
+            [bool]$parsed = $false
+            if (-not [bool]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be true or false."
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds" {
+            [int]$parsed = 0
+            if (-not [int]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be an integer millisecond value."
+            }
+            if ($parsed -lt 0 -or $parsed -gt 600000) {
+                throw "$Name must be between 0 and 600000 milliseconds (0 to 10 minutes)."
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds" {
+            [int]$parsed = 0
+            if (-not [int]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be an integer millisecond value."
+            }
+            if ($parsed -lt 1000 -or $parsed -gt 600000) {
+                throw "$Name must be between 1000 and 600000 milliseconds (1 second to 10 minutes)."
+            }
+        }
+    }
+}
+
+function Resolve-LauncherConfigurationPath {
+    if (-not [string]::IsNullOrWhiteSpace($ConfigurationPath)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($ConfigurationPath)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Launcher configuration does not exist: $candidate"
+        }
+
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_LAUNCHER_CONFIG)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($env:PHOTOIDENTITY_LAUNCHER_CONFIG)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "PHOTOIDENTITY_LAUNCHER_CONFIG points to a missing file: $candidate"
+        }
+
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    $adjacent = Join-Path $PSScriptRoot "PhotoIdentity.launcher.json"
+    if (Test-Path -LiteralPath $adjacent -PathType Leaf) {
+        return (Resolve-Path -LiteralPath $adjacent).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $local = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+        if (Test-Path -LiteralPath $local -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $local).Path
+        }
+    }
+
+    return $null
+}
+
+function Resolve-ConfiguredPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value,
+        [string]$BaseDirectory
+    )
+
+    $expanded = [Environment]::ExpandEnvironmentVariables($Value.Trim())
+    if ([string]::IsNullOrWhiteSpace($expanded)) {
+        throw "Configured path may not be empty."
+    }
+
+    if ([IO.Path]::IsPathRooted($expanded)) {
+        return [IO.Path]::GetFullPath($expanded)
+    }
+
+    if ([string]::IsNullOrWhiteSpace($BaseDirectory)) {
+        return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $expanded))
+    }
+
+    return [IO.Path]::GetFullPath((Join-Path $BaseDirectory $expanded))
+}
+
+function Read-MobileAccessConfiguration {
+    param(
+        $ParsedConfiguration,
+        [string]$ConfigurationDirectory
+    )
+
+    $disabled = [pscustomobject]@{
+        Enabled = $false
+        ListenUri = $null
+        PhoneUri = $null
+        CertificatePath = $null
+        CertificatePasswordEnvironmentVariable = $null
+    }
+
+    if ($null -eq $ParsedConfiguration.PSObject.Properties["mobileAccess"] -or
+        $null -eq $ParsedConfiguration.mobileAccess) {
+        return $disabled
+    }
+
+    $mobile = $ParsedConfiguration.mobileAccess
+    [bool]$enabled = $false
+    if ($null -eq $mobile.PSObject.Properties["enabled"] -or
+        -not [bool]::TryParse(([string]$mobile.enabled), [ref]$enabled)) {
+        throw "mobileAccess.enabled must be true or false."
+    }
+
+    if (-not $enabled) {
+        return $disabled
+    }
+
+    if ($null -eq $mobile.PSObject.Properties["listenUrl"] -or
+        [string]::IsNullOrWhiteSpace([string]$mobile.listenUrl)) {
+        throw "mobileAccess.listenUrl is required when mobile access is enabled."
+    }
+
+    $listenUrl = ([string]$mobile.listenUrl).Trim()
+    try {
+        $listenUri = [Uri]$listenUrl
+    }
+    catch {
+        throw "mobileAccess.listenUrl is invalid: $listenUrl"
+    }
+
+    if (-not $listenUri.IsAbsoluteUri -or $listenUri.Scheme -ne "https") {
+        throw "mobileAccess.listenUrl must be an absolute HTTPS URL."
+    }
+    if (-not [string]::IsNullOrEmpty($listenUri.UserInfo) -or
+        -not [string]::IsNullOrEmpty($listenUri.Query) -or
+        -not [string]::IsNullOrEmpty($listenUri.Fragment) -or
+        $listenUri.AbsolutePath -ne "/") {
+        throw "mobileAccess.listenUrl may contain only scheme, host and port."
+    }
+
+    [Net.IPAddress]$listenAddress = $null
+    if (-not [Net.IPAddress]::TryParse($listenUri.Host, [ref]$listenAddress) -or
+        [Net.IPAddress]::IsLoopback($listenAddress) -or
+        $listenAddress.Equals([Net.IPAddress]::Any) -or
+        $listenAddress.Equals([Net.IPAddress]::IPv6Any)) {
+        throw "mobileAccess.listenUrl must use a specific non-loopback IP address assigned for trusted-LAN access. Use mobileAccess.phoneUrl for a DNS hostname."
+    }
+
+    if ($null -eq $mobile.PSObject.Properties["certificatePath"] -or
+        [string]::IsNullOrWhiteSpace([string]$mobile.certificatePath)) {
+        throw "mobileAccess.certificatePath is required when mobile access is enabled."
+    }
+
+    $certificatePath = Resolve-ConfiguredPath -Value ([string]$mobile.certificatePath) -BaseDirectory $ConfigurationDirectory
+    if (-not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
+        throw "mobileAccess.certificatePath does not exist. Provide a PFX certificate file outside the Photo Identity package."
+    }
+
+    $certificatePasswordEnvironmentVariable = $null
+    if ($null -ne $mobile.PSObject.Properties["certificatePasswordEnvironmentVariable"] -and
+        -not [string]::IsNullOrWhiteSpace([string]$mobile.certificatePasswordEnvironmentVariable)) {
+        $certificatePasswordEnvironmentVariable = ([string]$mobile.certificatePasswordEnvironmentVariable).Trim()
+        if ($certificatePasswordEnvironmentVariable -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+            throw "mobileAccess.certificatePasswordEnvironmentVariable must be an environment-variable name."
+        }
+
+        $certificatePassword = Get-LauncherEnvironmentValue -Name $certificatePasswordEnvironmentVariable
+        if ([string]::IsNullOrEmpty($certificatePassword)) {
+            throw "The environment variable '$certificatePasswordEnvironmentVariable' configured for the mobile certificate password is not set."
+        }
+    }
+
+    $phoneUri = $listenUri
+    if ($null -ne $mobile.PSObject.Properties["phoneUrl"] -and
+        -not [string]::IsNullOrWhiteSpace([string]$mobile.phoneUrl)) {
+        $phoneUrl = ([string]$mobile.phoneUrl).Trim()
+        try {
+            $phoneUri = [Uri]$phoneUrl
+        }
+        catch {
+            throw "mobileAccess.phoneUrl is invalid: $phoneUrl"
+        }
+
+        if (-not $phoneUri.IsAbsoluteUri -or $phoneUri.Scheme -ne "https" -or
+            -not [string]::IsNullOrEmpty($phoneUri.UserInfo) -or
+            -not [string]::IsNullOrEmpty($phoneUri.Query) -or
+            -not [string]::IsNullOrEmpty($phoneUri.Fragment) -or
+            $phoneUri.AbsolutePath -ne "/") {
+            throw "mobileAccess.phoneUrl must be an absolute HTTPS origin without a path, query string or fragment."
+        }
+        if ($phoneUri.Port -ne $listenUri.Port) {
+            throw "mobileAccess.phoneUrl must use the same port as mobileAccess.listenUrl."
+        }
+    }
+
+    return [pscustomobject]@{
+        Enabled = $true
+        ListenUri = $listenUri
+        PhoneUri = $phoneUri
+        CertificatePath = $certificatePath
+        CertificatePasswordEnvironmentVariable = $certificatePasswordEnvironmentVariable
+    }
+}
+
+function Read-LauncherConfiguration {
+    $configurationFile = Resolve-LauncherConfigurationPath
+    $localApplicationRoot = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        Join-Path $PSScriptRoot ".photoidentity"
+    }
+    else {
+        Join-Path $env:LOCALAPPDATA "PhotoIdentity"
+    }
+
+    $publishPath = Join-Path $localApplicationRoot "app"
+    $url = "http://127.0.0.1:5080"
+    $settings = @{}
+    $operatorConfiguration = [pscustomobject]@{ AzureOllamaUpstreamUrl = $null }
+    $configurationDirectory = $null
+    $postgresConnectionEnvironmentVariable = $null
+    $mobileAccess = [pscustomobject]@{
+        Enabled = $false
+        ListenUri = $null
+        PhoneUri = $null
+        CertificatePath = $null
+        CertificatePasswordEnvironmentVariable = $null
+    }
+
+    if ($null -ne $configurationFile) {
+        $configurationDirectory = Split-Path -Parent $configurationFile
+        $raw = Get-Content -LiteralPath $configurationFile -Raw
+        try {
+            $parsed = $raw | ConvertFrom-Json
+        }
+        catch {
+            throw "Launcher configuration is not valid JSON: $configurationFile. $($_.Exception.Message)"
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["publishPath"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.publishPath)) {
+            $publishPath = Resolve-ConfiguredPath -Value ([string]$parsed.publishPath) -BaseDirectory $configurationDirectory
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["url"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.url)) {
+            $url = ([string]$parsed.url).Trim()
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["postgresConnectionEnvironmentVariable"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.postgresConnectionEnvironmentVariable)) {
+            $postgresConnectionEnvironmentVariable = ([string]$parsed.postgresConnectionEnvironmentVariable).Trim()
+            if ($postgresConnectionEnvironmentVariable -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+                throw "postgresConnectionEnvironmentVariable must be an environment-variable name."
+            }
+        }
+
+        $mobileAccess = Read-MobileAccessConfiguration -ParsedConfiguration $parsed -ConfigurationDirectory $configurationDirectory
+
+        if ($null -ne $parsed.PSObject.Properties["settings"] -and $null -ne $parsed.settings) {
+            foreach ($property in $parsed.settings.PSObject.Properties) {
+                if ($SupportedSettings -notcontains $property.Name) {
+                    throw "Unsupported launcher setting '$($property.Name)'. Only documented PhotoIdentity settings may be supplied."
+                }
+
+                if ($null -eq $property.Value) {
+                    continue
+                }
+
+                $value = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
+                Assert-LauncherSettingValue -Name $property.Name -Value $value
+                $settings[$property.Name] = $value
+            }
+        }
+        if ($null -ne $parsed.PSObject.Properties["operator"] -and
+            $null -ne $parsed.operator) {
+            $operatorSection = $parsed.operator
+            if ($operatorSection -isnot [pscustomobject]) {
+                throw "operator must be a JSON object."
+            }
+            foreach ($property in $operatorSection.PSObject.Properties) {
+                if ($property.Name -ne "azureOllamaUpstreamUrl") {
+                    throw "Unsupported operator configuration property '$($property.Name)'."
+                }
+                if ($null -eq $property.Value) { continue }
+                $urlValue = ([string]$property.Value).Trim()
+                [uri]$upstream = $null
+                if (-not [uri]::TryCreate($urlValue, [UriKind]::Absolute, [ref]$upstream) -or
+                    $upstream.Scheme -ne "https" -or $upstream.IsLoopback -or
+                    $upstream.UserInfo -or $upstream.Query -or $upstream.Fragment -or
+                    $upstream.AbsolutePath -ne "/") {
+                    throw "operator.azureOllamaUpstreamUrl must be a credential-free remote HTTPS origin."
+                }
+                $operatorConfiguration.AzureOllamaUpstreamUrl = $upstream.AbsoluteUri.TrimEnd('/')
+            }
+        }
+
+        $videoToolKeys = @(
+            "PhotoIdentity__VideoProcessing__FfmpegPath",
+            "PhotoIdentity__VideoProcessing__FfmpegSha256",
+            "PhotoIdentity__VideoProcessing__FfprobePath",
+            "PhotoIdentity__VideoProcessing__FfprobeSha256"
+        )
+        $specifiedVideoToolKeys = @($videoToolKeys | Where-Object { $settings.ContainsKey($_) })
+        if ($specifiedVideoToolKeys.Count -gt 0 -and
+            $specifiedVideoToolKeys.Count -ne $videoToolKeys.Count) {
+            throw "Launcher video processing requires all four FFmpeg/FFprobe path and SHA-256 settings together."
+        }
+
+        if ($settings.ContainsKey("PhotoIdentity__VideoLibraryEnabled") -and
+            $settings["PhotoIdentity__VideoLibraryEnabled"] -eq "true" -and
+            -not $settings.ContainsKey("PhotoIdentity__VideoPosterRoot")) {
+            throw "PhotoIdentity__VideoLibraryEnabled=true requires an explicit PhotoIdentity__VideoPosterRoot for exclusion-safe serving."
+        }
+    }
+    else {
+        $publishPath = [IO.Path]::GetFullPath($publishPath)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PublishPathOverride)) {
+        $publishPath = Resolve-ConfiguredPath -Value $PublishPathOverride -BaseDirectory $PSScriptRoot
+    }
+
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionEnvironmentVariable)) {
+        throw "postgresConnectionEnvironmentVariable is required. PostgreSQL is the only supported runtime catalogue; store only the environment-variable name in launcher.json, never the connection string."
+    }
+
+    $postgresConnectionString = Get-LauncherEnvironmentValue -Name $postgresConnectionEnvironmentVariable
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$postgresConnectionEnvironmentVariable' is empty or missing."
+    }
+
+    try {
+        $baseUri = [Uri]$url
+    }
+    catch {
+        throw "Launcher URL is invalid: $url"
+    }
+
+    if (-not $baseUri.IsAbsoluteUri -or $baseUri.Scheme -ne "http" -or -not $baseUri.IsLoopback) {
+        throw "Launcher URL must be an absolute loopback HTTP URL such as http://127.0.0.1:5080."
+    }
+
+    if (-not [string]::IsNullOrEmpty($baseUri.Query) -or -not [string]::IsNullOrEmpty($baseUri.Fragment)) {
+        throw "Launcher URL may not contain a query string or fragment."
+    }
+
+    return [pscustomobject]@{
+        ConfigurationPath = $configurationFile
+        PublishPath = [IO.Path]::GetFullPath($publishPath)
+        BaseUri = $baseUri
+        Settings = $settings
+        Operator = $operatorConfiguration
+        CatalogueProvider = "postgresql"
+        PostgresConnectionEnvironmentVariable = $postgresConnectionEnvironmentVariable
+        MobileAccess = $mobileAccess
+        LocalApplicationRoot = [IO.Path]::GetFullPath($localApplicationRoot)
+    }
+}
+
+function Get-PhotoIdentityHealth {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    $healthUri = New-Object Uri($BaseUri, "/health")
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUri.AbsoluteUri -TimeoutSec 2
+        if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
+            return $null
+        }
+
+        $payload = $response.Content | ConvertFrom-Json
+        if ($null -eq $payload -or [string]$payload.status -ne "ok") {
+            return $null
+        }
+
+        return $payload
+    }
+    catch {
+        return $null
+    }
+}
+
+function Test-TcpPortOpen {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $task = $client.ConnectAsync($BaseUri.Host, $BaseUri.Port)
+        if (-not $task.Wait(600)) {
+            return $false
+        }
+
+        return $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+function Open-PhotoIdentityBrowser {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    if ($NoBrowser) {
+        return
+    }
+
+    Start-Process $BaseUri.AbsoluteUri | Out-Null
+}
+
+function Start-PhotoIdentityServer {
+    param([Parameter(Mandatory = $true)]$Configuration)
+
+    if (-not (Test-Path -LiteralPath $Configuration.PublishPath -PathType Container)) {
+        throw "Published Photo Identity application was not found at '$($Configuration.PublishPath)'. Publish src\PhotoIdentity.Api\PhotoIdentity.Api.csproj there or create PhotoIdentity.launcher.json from PhotoIdentity.launcher.example.json with the correct publishPath."
+    }
+
+    $executable = Join-Path $Configuration.PublishPath "PhotoIdentity.Api.exe"
+    $assembly = Join-Path $Configuration.PublishPath "PhotoIdentity.Api.dll"
+    $filePath = $null
+    $argumentList = $null
+
+    $serverUrls = @($Configuration.BaseUri.AbsoluteUri)
+    if ($Configuration.MobileAccess.Enabled) {
+        $serverUrls += $Configuration.MobileAccess.ListenUri.AbsoluteUri
+    }
+    $serverUrlArgument = $serverUrls -join ";"
+
+    if (Test-Path -LiteralPath $executable -PathType Leaf) {
+        $filePath = $executable
+        $argumentList = "--urls `"$serverUrlArgument`""
+    }
+    elseif (Test-Path -LiteralPath $assembly -PathType Leaf) {
+        $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($null -eq $dotnet) {
+            throw "PhotoIdentity.Api.dll exists, but the .NET runtime was not found on PATH. Install the required .NET runtime or use the packaged Windows application."
+        }
+
+        $filePath = $dotnet.Source
+        $argumentList = "`"$assembly`" --urls `"$serverUrlArgument`""
+    }
+    else {
+        throw "Publish output '$($Configuration.PublishPath)' does not contain PhotoIdentity.Api.exe or PhotoIdentity.Api.dll. Republish the API project before launching."
+    }
+
+    $logDirectory = Join-Path $Configuration.LocalApplicationRoot "launcher-logs"
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $stdoutLog = Join-Path $logDirectory "api.stdout.log"
+    $stderrLog = Join-Path $logDirectory "api.stderr.log"
+
+    $processEnvironment = @{}
+    foreach ($name in $Configuration.Settings.Keys) {
+        $processEnvironment[$name] = $Configuration.Settings[$name]
+    }
+
+    $postgresConnectionString = Get-LauncherEnvironmentValue -Name $Configuration.PostgresConnectionEnvironmentVariable
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$($Configuration.PostgresConnectionEnvironmentVariable)' became unavailable before process start."
+    }
+    $processEnvironment["PhotoIdentity__Postgres__ConnectionString"] = $postgresConnectionString
+
+    if ($Configuration.MobileAccess.Enabled) {
+        $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Path"] = $Configuration.MobileAccess.CertificatePath
+        $passwordVariable = $Configuration.MobileAccess.CertificatePasswordEnvironmentVariable
+        if ([string]::IsNullOrWhiteSpace($passwordVariable)) {
+            $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] = $null
+        }
+        else {
+            $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] =
+                Get-LauncherEnvironmentValue -Name $passwordVariable
+        }
+    }
+
+    $previousValues = @{}
+    foreach ($name in $processEnvironment.Keys) {
+        $previousValues[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+        [Environment]::SetEnvironmentVariable($name, $processEnvironment[$name], "Process")
+    }
+
+    try {
+        return Start-Process `
+            -FilePath $filePath `
+            -ArgumentList $argumentList `
+            -WorkingDirectory $Configuration.PublishPath `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog `
+            -PassThru
+    }
+    finally {
+        foreach ($name in $processEnvironment.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $previousValues[$name], "Process")
+        }
+    }
+}
+
+try {
+    $configuration = Read-LauncherConfiguration
+
+    if ($ValidateConfigurationOnly) {
+        Write-Host "Photo Identity launcher configuration validation passed."
+        Write-Host "catalogueProvider: $($configuration.CatalogueProvider)"
+        Write-Host "postgresConnectionEnvironmentVariable: $($configuration.PostgresConnectionEnvironmentVariable)"
+        exit 0
+    }
+
+    $existingHealth = Get-PhotoIdentityHealth -BaseUri $configuration.BaseUri
+    if ($null -ne $existingHealth) {
+        $actualProvider = [string]$existingHealth.catalogueProvider
+        if ($actualProvider -ne $configuration.CatalogueProvider) {
+            throw "Photo Identity is already running with catalogueProvider '$actualProvider', but the launcher configuration requests '$($configuration.CatalogueProvider)'. Stop the existing process before switching catalogue authority."
+        }
+
+        Write-Host "Photo Identity is already running at $($configuration.BaseUri.AbsoluteUri)"
+        if ($configuration.MobileAccess.Enabled) {
+            Write-Host "The current launcher configuration requests trusted-LAN mobile access at $($configuration.MobileAccess.PhoneUri.AbsoluteUri). Restart the existing Photo Identity process if mobile settings changed."
+        }
+        Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
+        exit 0
+    }
+
+    if (Test-TcpPortOpen -BaseUri $configuration.BaseUri) {
+        throw "Port $($configuration.BaseUri.Port) is already in use, but Photo Identity did not answer its /health endpoint. Stop the conflicting process or change the loopback URL in the launcher configuration."
+    }
+
+    if ($configuration.MobileAccess.Enabled -and (Test-TcpPortOpen -BaseUri $configuration.MobileAccess.ListenUri)) {
+        throw "The configured mobile HTTPS port $($configuration.MobileAccess.ListenUri.Port) is already in use on the selected trusted-LAN address. Stop the conflicting process or change mobileAccess.listenUrl."
+    }
+
+    Write-Host "Starting Photo Identity from $($configuration.PublishPath)"
+    if ($null -ne $configuration.ConfigurationPath) {
+        Write-Host "Using launcher configuration $($configuration.ConfigurationPath)"
+    }
+    else {
+        Write-Host "No launcher configuration file was found; using local defaults."
+    }
+
+    $process = Start-PhotoIdentityServer -Configuration $configuration
+    $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
+
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if ($process.HasExited) {
+            $logDirectory = Join-Path $configuration.LocalApplicationRoot "launcher-logs"
+            throw "Photo Identity exited during startup with code $($process.ExitCode). Review '$logDirectory\api.stderr.log' for details."
+        }
+
+        $health = Get-PhotoIdentityHealth -BaseUri $configuration.BaseUri
+        if ($null -ne $health) {
+            $actualProvider = [string]$health.catalogueProvider
+            if ($actualProvider -ne $configuration.CatalogueProvider) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                throw "Photo Identity became healthy with catalogueProvider '$actualProvider', but '$($configuration.CatalogueProvider)' was requested. The attempted process was stopped."
+            }
+
+            Write-Host "Photo Identity is ready at $($configuration.BaseUri.AbsoluteUri)"
+            Write-Host "Catalogue provider: $actualProvider"
+            if ($configuration.MobileAccess.Enabled) {
+                Write-Host "Trusted-LAN mobile HTTPS is enabled at $($configuration.MobileAccess.PhoneUri.AbsoluteUri)"
+            }
+            Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
+            exit 0
+        }
+
+        Start-Sleep -Milliseconds 350
+    }
+
+    if (-not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    $logDirectory = Join-Path $configuration.LocalApplicationRoot "launcher-logs"
+    throw "Photo Identity did not become healthy within $StartupTimeoutSeconds seconds. The attempted process was stopped. Review '$logDirectory\api.stderr.log' for details."
+}
+catch {
+    Write-Host "Photo Identity launcher error:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 1
+}
+) {
+            throw "$Name must be a lowercase SHA-256 digest (64 hex characters)."
+        }
+        return
+    }
+
+    if ($Name -eq "PhotoIdentity__CaptionEnrichment__OllamaBaseUrl") {
+        [uri]$uri = $null
+        if (-not [uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$uri) -or
+            -not $uri.IsLoopback -or
+            $uri.Scheme -notin @("http", "https") -or
+            $uri.AbsolutePath -ne "/" -or
+            $uri.UserInfo -or $uri.Query -or $uri.Fragment) {
+            throw "$Name must be a credential-free loopback HTTP(S) origin."
+        }
+        return
+    }
+
+    if ($Name -eq "PhotoIdentity__CaptionEnrichment__Model") {
+        if ($Value.Length -lt 1 -or $Value.Length -gt 100 -or
+            $Value -notmatch '^[A-Za-z0-9][A-Za-z0-9._:/-]*,
+        "PhotoIdentity__VideoProcessing__FfprobeSha256"
+    )) {
+        if ($Value -cnotmatch '^[0-9a-f]{64}$') {
+            throw "$Name must be a lowercase SHA-256 digest (64 hex characters)."
+        }
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__FfmpegPath",
+        "PhotoIdentity__VideoProcessing__FfprobePath",
+        "PhotoIdentity__VideoProcessing__CacheRoot"
+    )) {
+        $isCache = $Name -eq "PhotoIdentity__VideoProcessing__CacheRoot"
+        $kind = if ($isCache) { "Container" } else { "Leaf" }
+        if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+            -not (Test-Path -LiteralPath $Value -PathType $kind) -or
+            (-not $isCache -and [IO.Path]::GetExtension($Value) -ine ".exe")) {
+            throw "$Name must reference an existing local absolute path."
+        }
+        $cursor = [IO.Path]::GetFullPath($Value)
+        while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            if (((Get-Item -LiteralPath $cursor -Force).Attributes -band
+                [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "$Name must not use junctions or symbolic links."
+            }
+            $parent = Split-Path -Parent $cursor
+            if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+            $cursor = $parent
+        }
+        # The application's runtime preflight rechecks executable digests,
+        # cache ownership and separation from catalogue source roots.
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
+        "PhotoIdentity__VideoProcessing__MaximumProxyMiB"
+    )) {
+        [long]$parsed = 0
+        if (-not [long]::TryParse($Value, [ref]$parsed) -or
+            ($Name -eq "PhotoIdentity__VideoProcessing__MaximumCacheMiB" -and
+             ($parsed -lt 64 -or $parsed -gt 16384)) -or
+            ($Name -eq "PhotoIdentity__VideoProcessing__MaximumProxyMiB" -and
+             ($parsed -lt 1 -or $parsed -gt 256))) {
+            throw "$Name is outside its approved integer MiB range."
+        }
+        # The application separately requires BOTH settings and validates
+        # the per-proxy cap against the total cap before enabling the worker.
+        return
+    }
+
+    switch ($Name) {
+        "PhotoIdentity__VideoLibraryEnabled" {
+            [bool]$parsed = $false
+            if (-not [bool]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be true or false."
+            }
+        }
+        "PhotoIdentity__VideoPosterRoot" {
+            # This root is used by the video poster renderer, browser and
+            # privacy purge. Do not silently resolve relative or UNC paths.
+            if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+                -not (Test-Path -LiteralPath $Value -PathType Container)) {
+                throw "$Name must point to an existing absolute local directory."
+            }
+            $fullPath = [IO.Path]::GetFullPath($Value)
+            $cursor = $fullPath
+            while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+                $directory = Get-Item -LiteralPath $cursor -Force
+                if (($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "$Name must not use junctions or symbolic links."
+                }
+                $parent = Split-Path -Parent $cursor
+                if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+                $cursor = $parent
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
+            [bool]$parsed = $false
+            if (-not [bool]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be true or false."
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds" {
+            [int]$parsed = 0
+            if (-not [int]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be an integer millisecond value."
+            }
+            if ($parsed -lt 0 -or $parsed -gt 600000) {
+                throw "$Name must be between 0 and 600000 milliseconds (0 to 10 minutes)."
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds" {
+            [int]$parsed = 0
+            if (-not [int]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be an integer millisecond value."
+            }
+            if ($parsed -lt 1000 -or $parsed -gt 600000) {
+                throw "$Name must be between 1000 and 600000 milliseconds (1 second to 10 minutes)."
+            }
+        }
+    }
+}
+
+function Resolve-LauncherConfigurationPath {
+    if (-not [string]::IsNullOrWhiteSpace($ConfigurationPath)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($ConfigurationPath)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Launcher configuration does not exist: $candidate"
+        }
+
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_LAUNCHER_CONFIG)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($env:PHOTOIDENTITY_LAUNCHER_CONFIG)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "PHOTOIDENTITY_LAUNCHER_CONFIG points to a missing file: $candidate"
+        }
+
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    $adjacent = Join-Path $PSScriptRoot "PhotoIdentity.launcher.json"
+    if (Test-Path -LiteralPath $adjacent -PathType Leaf) {
+        return (Resolve-Path -LiteralPath $adjacent).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $local = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+        if (Test-Path -LiteralPath $local -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $local).Path
+        }
+    }
+
+    return $null
+}
+
+function Resolve-ConfiguredPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value,
+        [string]$BaseDirectory
+    )
+
+    $expanded = [Environment]::ExpandEnvironmentVariables($Value.Trim())
+    if ([string]::IsNullOrWhiteSpace($expanded)) {
+        throw "Configured path may not be empty."
+    }
+
+    if ([IO.Path]::IsPathRooted($expanded)) {
+        return [IO.Path]::GetFullPath($expanded)
+    }
+
+    if ([string]::IsNullOrWhiteSpace($BaseDirectory)) {
+        return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $expanded))
+    }
+
+    return [IO.Path]::GetFullPath((Join-Path $BaseDirectory $expanded))
+}
+
+function Read-MobileAccessConfiguration {
+    param(
+        $ParsedConfiguration,
+        [string]$ConfigurationDirectory
+    )
+
+    $disabled = [pscustomobject]@{
+        Enabled = $false
+        ListenUri = $null
+        PhoneUri = $null
+        CertificatePath = $null
+        CertificatePasswordEnvironmentVariable = $null
+    }
+
+    if ($null -eq $ParsedConfiguration.PSObject.Properties["mobileAccess"] -or
+        $null -eq $ParsedConfiguration.mobileAccess) {
+        return $disabled
+    }
+
+    $mobile = $ParsedConfiguration.mobileAccess
+    [bool]$enabled = $false
+    if ($null -eq $mobile.PSObject.Properties["enabled"] -or
+        -not [bool]::TryParse(([string]$mobile.enabled), [ref]$enabled)) {
+        throw "mobileAccess.enabled must be true or false."
+    }
+
+    if (-not $enabled) {
+        return $disabled
+    }
+
+    if ($null -eq $mobile.PSObject.Properties["listenUrl"] -or
+        [string]::IsNullOrWhiteSpace([string]$mobile.listenUrl)) {
+        throw "mobileAccess.listenUrl is required when mobile access is enabled."
+    }
+
+    $listenUrl = ([string]$mobile.listenUrl).Trim()
+    try {
+        $listenUri = [Uri]$listenUrl
+    }
+    catch {
+        throw "mobileAccess.listenUrl is invalid: $listenUrl"
+    }
+
+    if (-not $listenUri.IsAbsoluteUri -or $listenUri.Scheme -ne "https") {
+        throw "mobileAccess.listenUrl must be an absolute HTTPS URL."
+    }
+    if (-not [string]::IsNullOrEmpty($listenUri.UserInfo) -or
+        -not [string]::IsNullOrEmpty($listenUri.Query) -or
+        -not [string]::IsNullOrEmpty($listenUri.Fragment) -or
+        $listenUri.AbsolutePath -ne "/") {
+        throw "mobileAccess.listenUrl may contain only scheme, host and port."
+    }
+
+    [Net.IPAddress]$listenAddress = $null
+    if (-not [Net.IPAddress]::TryParse($listenUri.Host, [ref]$listenAddress) -or
+        [Net.IPAddress]::IsLoopback($listenAddress) -or
+        $listenAddress.Equals([Net.IPAddress]::Any) -or
+        $listenAddress.Equals([Net.IPAddress]::IPv6Any)) {
+        throw "mobileAccess.listenUrl must use a specific non-loopback IP address assigned for trusted-LAN access. Use mobileAccess.phoneUrl for a DNS hostname."
+    }
+
+    if ($null -eq $mobile.PSObject.Properties["certificatePath"] -or
+        [string]::IsNullOrWhiteSpace([string]$mobile.certificatePath)) {
+        throw "mobileAccess.certificatePath is required when mobile access is enabled."
+    }
+
+    $certificatePath = Resolve-ConfiguredPath -Value ([string]$mobile.certificatePath) -BaseDirectory $ConfigurationDirectory
+    if (-not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
+        throw "mobileAccess.certificatePath does not exist. Provide a PFX certificate file outside the Photo Identity package."
+    }
+
+    $certificatePasswordEnvironmentVariable = $null
+    if ($null -ne $mobile.PSObject.Properties["certificatePasswordEnvironmentVariable"] -and
+        -not [string]::IsNullOrWhiteSpace([string]$mobile.certificatePasswordEnvironmentVariable)) {
+        $certificatePasswordEnvironmentVariable = ([string]$mobile.certificatePasswordEnvironmentVariable).Trim()
+        if ($certificatePasswordEnvironmentVariable -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+            throw "mobileAccess.certificatePasswordEnvironmentVariable must be an environment-variable name."
+        }
+
+        $certificatePassword = Get-LauncherEnvironmentValue -Name $certificatePasswordEnvironmentVariable
+        if ([string]::IsNullOrEmpty($certificatePassword)) {
+            throw "The environment variable '$certificatePasswordEnvironmentVariable' configured for the mobile certificate password is not set."
+        }
+    }
+
+    $phoneUri = $listenUri
+    if ($null -ne $mobile.PSObject.Properties["phoneUrl"] -and
+        -not [string]::IsNullOrWhiteSpace([string]$mobile.phoneUrl)) {
+        $phoneUrl = ([string]$mobile.phoneUrl).Trim()
+        try {
+            $phoneUri = [Uri]$phoneUrl
+        }
+        catch {
+            throw "mobileAccess.phoneUrl is invalid: $phoneUrl"
+        }
+
+        if (-not $phoneUri.IsAbsoluteUri -or $phoneUri.Scheme -ne "https" -or
+            -not [string]::IsNullOrEmpty($phoneUri.UserInfo) -or
+            -not [string]::IsNullOrEmpty($phoneUri.Query) -or
+            -not [string]::IsNullOrEmpty($phoneUri.Fragment) -or
+            $phoneUri.AbsolutePath -ne "/") {
+            throw "mobileAccess.phoneUrl must be an absolute HTTPS origin without a path, query string or fragment."
+        }
+        if ($phoneUri.Port -ne $listenUri.Port) {
+            throw "mobileAccess.phoneUrl must use the same port as mobileAccess.listenUrl."
+        }
+    }
+
+    return [pscustomobject]@{
+        Enabled = $true
+        ListenUri = $listenUri
+        PhoneUri = $phoneUri
+        CertificatePath = $certificatePath
+        CertificatePasswordEnvironmentVariable = $certificatePasswordEnvironmentVariable
+    }
+}
+
+function Read-LauncherConfiguration {
+    $configurationFile = Resolve-LauncherConfigurationPath
+    $localApplicationRoot = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        Join-Path $PSScriptRoot ".photoidentity"
+    }
+    else {
+        Join-Path $env:LOCALAPPDATA "PhotoIdentity"
+    }
+
+    $publishPath = Join-Path $localApplicationRoot "app"
+    $url = "http://127.0.0.1:5080"
+    $settings = @{}
+    $configurationDirectory = $null
+    $postgresConnectionEnvironmentVariable = $null
+    $mobileAccess = [pscustomobject]@{
+        Enabled = $false
+        ListenUri = $null
+        PhoneUri = $null
+        CertificatePath = $null
+        CertificatePasswordEnvironmentVariable = $null
+    }
+
+    if ($null -ne $configurationFile) {
+        $configurationDirectory = Split-Path -Parent $configurationFile
+        $raw = Get-Content -LiteralPath $configurationFile -Raw
+        try {
+            $parsed = $raw | ConvertFrom-Json
+        }
+        catch {
+            throw "Launcher configuration is not valid JSON: $configurationFile. $($_.Exception.Message)"
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["publishPath"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.publishPath)) {
+            $publishPath = Resolve-ConfiguredPath -Value ([string]$parsed.publishPath) -BaseDirectory $configurationDirectory
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["url"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.url)) {
+            $url = ([string]$parsed.url).Trim()
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["postgresConnectionEnvironmentVariable"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.postgresConnectionEnvironmentVariable)) {
+            $postgresConnectionEnvironmentVariable = ([string]$parsed.postgresConnectionEnvironmentVariable).Trim()
+            if ($postgresConnectionEnvironmentVariable -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+                throw "postgresConnectionEnvironmentVariable must be an environment-variable name."
+            }
+        }
+
+        $mobileAccess = Read-MobileAccessConfiguration -ParsedConfiguration $parsed -ConfigurationDirectory $configurationDirectory
+
+        if ($null -ne $parsed.PSObject.Properties["settings"] -and $null -ne $parsed.settings) {
+            foreach ($property in $parsed.settings.PSObject.Properties) {
+                if ($SupportedSettings -notcontains $property.Name) {
+                    throw "Unsupported launcher setting '$($property.Name)'. Only documented PhotoIdentity settings may be supplied."
+                }
+
+                if ($null -eq $property.Value) {
+                    continue
+                }
+
+                $value = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
+                Assert-LauncherSettingValue -Name $property.Name -Value $value
+                $settings[$property.Name] = $value
+            }
+        }
+        $videoToolKeys = @(
+            "PhotoIdentity__VideoProcessing__FfmpegPath",
+            "PhotoIdentity__VideoProcessing__FfmpegSha256",
+            "PhotoIdentity__VideoProcessing__FfprobePath",
+            "PhotoIdentity__VideoProcessing__FfprobeSha256"
+        )
+        $specifiedVideoToolKeys = @($videoToolKeys | Where-Object { $settings.ContainsKey($_) })
+        if ($specifiedVideoToolKeys.Count -gt 0 -and
+            $specifiedVideoToolKeys.Count -ne $videoToolKeys.Count) {
+            throw "Launcher video processing requires all four FFmpeg/FFprobe path and SHA-256 settings together."
+        }
+
+        if ($settings.ContainsKey("PhotoIdentity__VideoLibraryEnabled") -and
+            $settings["PhotoIdentity__VideoLibraryEnabled"] -eq "true" -and
+            -not $settings.ContainsKey("PhotoIdentity__VideoPosterRoot")) {
+            throw "PhotoIdentity__VideoLibraryEnabled=true requires an explicit PhotoIdentity__VideoPosterRoot for exclusion-safe serving."
+        }
+    }
+    else {
+        $publishPath = [IO.Path]::GetFullPath($publishPath)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PublishPathOverride)) {
+        $publishPath = Resolve-ConfiguredPath -Value $PublishPathOverride -BaseDirectory $PSScriptRoot
+    }
+
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionEnvironmentVariable)) {
+        throw "postgresConnectionEnvironmentVariable is required. PostgreSQL is the only supported runtime catalogue; store only the environment-variable name in launcher.json, never the connection string."
+    }
+
+    $postgresConnectionString = Get-LauncherEnvironmentValue -Name $postgresConnectionEnvironmentVariable
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$postgresConnectionEnvironmentVariable' is empty or missing."
+    }
+
+    try {
+        $baseUri = [Uri]$url
+    }
+    catch {
+        throw "Launcher URL is invalid: $url"
+    }
+
+    if (-not $baseUri.IsAbsoluteUri -or $baseUri.Scheme -ne "http" -or -not $baseUri.IsLoopback) {
+        throw "Launcher URL must be an absolute loopback HTTP URL such as http://127.0.0.1:5080."
+    }
+
+    if (-not [string]::IsNullOrEmpty($baseUri.Query) -or -not [string]::IsNullOrEmpty($baseUri.Fragment)) {
+        throw "Launcher URL may not contain a query string or fragment."
+    }
+
+    return [pscustomobject]@{
+        ConfigurationPath = $configurationFile
+        PublishPath = [IO.Path]::GetFullPath($publishPath)
+        BaseUri = $baseUri
+        Settings = $settings
+        CatalogueProvider = "postgresql"
+        PostgresConnectionEnvironmentVariable = $postgresConnectionEnvironmentVariable
+        MobileAccess = $mobileAccess
+        LocalApplicationRoot = [IO.Path]::GetFullPath($localApplicationRoot)
+    }
+}
+
+function Get-PhotoIdentityHealth {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    $healthUri = New-Object Uri($BaseUri, "/health")
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUri.AbsoluteUri -TimeoutSec 2
+        if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
+            return $null
+        }
+
+        $payload = $response.Content | ConvertFrom-Json
+        if ($null -eq $payload -or [string]$payload.status -ne "ok") {
+            return $null
+        }
+
+        return $payload
+    }
+    catch {
+        return $null
+    }
+}
+
+function Test-TcpPortOpen {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $task = $client.ConnectAsync($BaseUri.Host, $BaseUri.Port)
+        if (-not $task.Wait(600)) {
+            return $false
+        }
+
+        return $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+function Open-PhotoIdentityBrowser {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    if ($NoBrowser) {
+        return
+    }
+
+    Start-Process $BaseUri.AbsoluteUri | Out-Null
+}
+
+function Start-PhotoIdentityServer {
+    param([Parameter(Mandatory = $true)]$Configuration)
+
+    if (-not (Test-Path -LiteralPath $Configuration.PublishPath -PathType Container)) {
+        throw "Published Photo Identity application was not found at '$($Configuration.PublishPath)'. Publish src\PhotoIdentity.Api\PhotoIdentity.Api.csproj there or create PhotoIdentity.launcher.json from PhotoIdentity.launcher.example.json with the correct publishPath."
+    }
+
+    $executable = Join-Path $Configuration.PublishPath "PhotoIdentity.Api.exe"
+    $assembly = Join-Path $Configuration.PublishPath "PhotoIdentity.Api.dll"
+    $filePath = $null
+    $argumentList = $null
+
+    $serverUrls = @($Configuration.BaseUri.AbsoluteUri)
+    if ($Configuration.MobileAccess.Enabled) {
+        $serverUrls += $Configuration.MobileAccess.ListenUri.AbsoluteUri
+    }
+    $serverUrlArgument = $serverUrls -join ";"
+
+    if (Test-Path -LiteralPath $executable -PathType Leaf) {
+        $filePath = $executable
+        $argumentList = "--urls `"$serverUrlArgument`""
+    }
+    elseif (Test-Path -LiteralPath $assembly -PathType Leaf) {
+        $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($null -eq $dotnet) {
+            throw "PhotoIdentity.Api.dll exists, but the .NET runtime was not found on PATH. Install the required .NET runtime or use the packaged Windows application."
+        }
+
+        $filePath = $dotnet.Source
+        $argumentList = "`"$assembly`" --urls `"$serverUrlArgument`""
+    }
+    else {
+        throw "Publish output '$($Configuration.PublishPath)' does not contain PhotoIdentity.Api.exe or PhotoIdentity.Api.dll. Republish the API project before launching."
+    }
+
+    $logDirectory = Join-Path $Configuration.LocalApplicationRoot "launcher-logs"
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $stdoutLog = Join-Path $logDirectory "api.stdout.log"
+    $stderrLog = Join-Path $logDirectory "api.stderr.log"
+
+    $processEnvironment = @{}
+    foreach ($name in $Configuration.Settings.Keys) {
+        $processEnvironment[$name] = $Configuration.Settings[$name]
+    }
+
+    $postgresConnectionString = Get-LauncherEnvironmentValue -Name $Configuration.PostgresConnectionEnvironmentVariable
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$($Configuration.PostgresConnectionEnvironmentVariable)' became unavailable before process start."
+    }
+    $processEnvironment["PhotoIdentity__Postgres__ConnectionString"] = $postgresConnectionString
+
+    if ($Configuration.MobileAccess.Enabled) {
+        $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Path"] = $Configuration.MobileAccess.CertificatePath
+        $passwordVariable = $Configuration.MobileAccess.CertificatePasswordEnvironmentVariable
+        if ([string]::IsNullOrWhiteSpace($passwordVariable)) {
+            $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] = $null
+        }
+        else {
+            $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] =
+                Get-LauncherEnvironmentValue -Name $passwordVariable
+        }
+    }
+
+    $previousValues = @{}
+    foreach ($name in $processEnvironment.Keys) {
+        $previousValues[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+        [Environment]::SetEnvironmentVariable($name, $processEnvironment[$name], "Process")
+    }
+
+    try {
+        return Start-Process `
+            -FilePath $filePath `
+            -ArgumentList $argumentList `
+            -WorkingDirectory $Configuration.PublishPath `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog `
+            -PassThru
+    }
+    finally {
+        foreach ($name in $processEnvironment.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $previousValues[$name], "Process")
+        }
+    }
+}
+
+try {
+    $configuration = Read-LauncherConfiguration
+
+    if ($ValidateConfigurationOnly) {
+        Write-Host "Photo Identity launcher configuration validation passed."
+        Write-Host "catalogueProvider: $($configuration.CatalogueProvider)"
+        Write-Host "postgresConnectionEnvironmentVariable: $($configuration.PostgresConnectionEnvironmentVariable)"
+        exit 0
+    }
+
+    $existingHealth = Get-PhotoIdentityHealth -BaseUri $configuration.BaseUri
+    if ($null -ne $existingHealth) {
+        $actualProvider = [string]$existingHealth.catalogueProvider
+        if ($actualProvider -ne $configuration.CatalogueProvider) {
+            throw "Photo Identity is already running with catalogueProvider '$actualProvider', but the launcher configuration requests '$($configuration.CatalogueProvider)'. Stop the existing process before switching catalogue authority."
+        }
+
+        Write-Host "Photo Identity is already running at $($configuration.BaseUri.AbsoluteUri)"
+        if ($configuration.MobileAccess.Enabled) {
+            Write-Host "The current launcher configuration requests trusted-LAN mobile access at $($configuration.MobileAccess.PhoneUri.AbsoluteUri). Restart the existing Photo Identity process if mobile settings changed."
+        }
+        Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
+        exit 0
+    }
+
+    if (Test-TcpPortOpen -BaseUri $configuration.BaseUri) {
+        throw "Port $($configuration.BaseUri.Port) is already in use, but Photo Identity did not answer its /health endpoint. Stop the conflicting process or change the loopback URL in the launcher configuration."
+    }
+
+    if ($configuration.MobileAccess.Enabled -and (Test-TcpPortOpen -BaseUri $configuration.MobileAccess.ListenUri)) {
+        throw "The configured mobile HTTPS port $($configuration.MobileAccess.ListenUri.Port) is already in use on the selected trusted-LAN address. Stop the conflicting process or change mobileAccess.listenUrl."
+    }
+
+    Write-Host "Starting Photo Identity from $($configuration.PublishPath)"
+    if ($null -ne $configuration.ConfigurationPath) {
+        Write-Host "Using launcher configuration $($configuration.ConfigurationPath)"
+    }
+    else {
+        Write-Host "No launcher configuration file was found; using local defaults."
+    }
+
+    $process = Start-PhotoIdentityServer -Configuration $configuration
+    $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
+
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if ($process.HasExited) {
+            $logDirectory = Join-Path $configuration.LocalApplicationRoot "launcher-logs"
+            throw "Photo Identity exited during startup with code $($process.ExitCode). Review '$logDirectory\api.stderr.log' for details."
+        }
+
+        $health = Get-PhotoIdentityHealth -BaseUri $configuration.BaseUri
+        if ($null -ne $health) {
+            $actualProvider = [string]$health.catalogueProvider
+            if ($actualProvider -ne $configuration.CatalogueProvider) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                throw "Photo Identity became healthy with catalogueProvider '$actualProvider', but '$($configuration.CatalogueProvider)' was requested. The attempted process was stopped."
+            }
+
+            Write-Host "Photo Identity is ready at $($configuration.BaseUri.AbsoluteUri)"
+            Write-Host "Catalogue provider: $actualProvider"
+            if ($configuration.MobileAccess.Enabled) {
+                Write-Host "Trusted-LAN mobile HTTPS is enabled at $($configuration.MobileAccess.PhoneUri.AbsoluteUri)"
+            }
+            Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
+            exit 0
+        }
+
+        Start-Sleep -Milliseconds 350
+    }
+
+    if (-not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    $logDirectory = Join-Path $configuration.LocalApplicationRoot "launcher-logs"
+    throw "Photo Identity did not become healthy within $StartupTimeoutSeconds seconds. The attempted process was stopped. Review '$logDirectory\api.stderr.log' for details."
+}
+catch {
+    Write-Host "Photo Identity launcher error:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 1
+}
+) {
+            throw "$Name must be a bounded Ollama model identifier."
+        }
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__CaptionEnrichment__ContextTokens",
+        "PhotoIdentity__CaptionEnrichment__TimeoutSeconds"
+    )) {
+        [int]$parsed = 0
+        if (-not [int]::TryParse($Value, [ref]$parsed) -or
+            ($Name -like '*ContextTokens' -and ($parsed -lt 256 -or $parsed -gt 32768)) -or
+            ($Name -like '*TimeoutSeconds' -and ($parsed -lt 30 -or $parsed -gt 1800))) {
+            throw "$Name is outside its supported integer range."
+        }
+        return
+    }
+
+    if ($Name -eq "PhotoIdentity__SemanticSearch__ModelDirectory") {
+        if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+            -not (Test-Path -LiteralPath $Value -PathType Container)) {
+            throw "$Name must reference an existing local absolute directory."
+        }
+        $cursor = [IO.Path]::GetFullPath($Value)
+        while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            if (((Get-Item -LiteralPath $cursor -Force).Attributes -band
+                [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "$Name must not use junctions or symbolic links."
+            }
+            $parent = Split-Path -Parent $cursor
+            if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+            $cursor = $parent
+        }
+        return
+    }
 
     if ($Name -in @(
         "PhotoIdentity__VideoProcessing__FfmpegSha256",
