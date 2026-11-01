@@ -230,6 +230,15 @@ public sealed class VideoFrameAcceptanceHarnessTests
                         observed_at_utc,media_type,media_kind)
                     VALUES (@revision,@asset,repeat('a',64),4000,now(),
                         'video/mp4','video');
+                    -- Jobs reference inspected video metadata rather than
+                    -- asset_revisions directly. Prove this synthetic video
+                    -- is registered as supported before queueing its job.
+                    INSERT INTO video_revision_metadata(
+                        asset_revision_id,inspection_status,duration_seconds,
+                        color_transfer,inspected_at_utc,tool_sha256,
+                        inspection_profile_id)
+                    VALUES (@revision,'supported',8,'bt709',now(),
+                        repeat('c',64),'interruption-audit-fixture');
                     INSERT INTO video_processing_jobs(id,asset_revision_id,
                         idempotency_key,derivative_kind,policy_version,
                         preset_version,tool_sha256,source_bytes,
