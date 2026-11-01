@@ -50,6 +50,11 @@ try {
     $noReport = Make-Dump 'no-restore.dump' 'delta' $false
     $unknown = Make-Dump 'unknown.dump' 'epsilon'
 
+    $inspection = & $tool -BackupRoot $root -InspectBackup -BackupPath $a.Path
+    Check ($inspection.Role -eq 'unclassified' -and $inspection.ManifestHashAndSizeValid) 'unclassified candidate inspection'
+    Check ($inspection.EligibleForCheckpointPromotion -and -not $inspection.RemoteCopyIndependentlyConfirmed) 'restore-verified local candidate without remote attestation'
+    $missing = & $tool -BackupRoot $root -InspectBackup -BackupPath $noReport.Path
+    Check (-not $missing.EligibleForCheckpointPromotion) 'no restore report means no checkpoint'
     $list = @(& $tool -BackupRoot $root)
     Check ($list.Count -eq 5) 'read-only inventory enumerates existing dumps'
     Check (@($list | Where-Object Role -ne 'unclassified').Count -eq 0) 'legacy/unknown files are not classified implicitly'
