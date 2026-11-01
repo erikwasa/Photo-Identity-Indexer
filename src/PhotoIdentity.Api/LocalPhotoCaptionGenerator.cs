@@ -12,7 +12,8 @@ public sealed record PhotoCaptionGenerationConfiguration(
     Uri OllamaBaseUri,
     string Model,
     int ContextTokens,
-    int TimeoutSeconds)
+    int TimeoutSeconds,
+    string? ApprovedModelSha256 = null)
 {
     public const string GenerationVersion = "wi-0128-photo-caption-v3";
     public const string SentenceAwareGenerationVersion = "wi-0128-photo-caption-v2";
@@ -147,6 +148,7 @@ public sealed class LocalPhotoCaptionGenerator
         }
 
         ArgumentNullException.ThrowIfNull(model);
+        AssertApprovedModel(model);
         HttpClient http = _httpClientFactory.CreateClient(HttpClientName);
 
         object request = new
@@ -236,9 +238,21 @@ public sealed class LocalPhotoCaptionGenerator
                 $"Local Ollama model '{_configuration.Model}' is not installed.");
         }
 
-        return new LocalPhotoCaptionModel(
+        LocalPhotoCaptionModel installed = new(
             model.Name ?? model.Model ?? _configuration.Model,
             NormalizeDigest(model.Digest));
+        AssertApprovedModel(installed);
+        return installed;
+    }
+
+    private void AssertApprovedModel(LocalPhotoCaptionModel model)
+    {
+        if (_configuration.ApprovedModelSha256 is { } expected &&
+            !string.Equals(model.Digest, expected, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The installed Ollama model digest differs from the operator-approved caption model. No caption request was sent.");
+        }
     }
 
     private static string NormalizeDigest(string? digest)
