@@ -147,11 +147,11 @@ function Save-State {
 
 function Get-Role {
     param($State, [string]$Name)
-    if ($null -ne $State.recoveryCheckpoint -and $State.recoveryCheckpoint.name -ceq $Name) {
+    if ($null -ne $State.recoveryCheckpoint -and $State.recoveryCheckpoint.name -eq $Name) {
         return 'recovery-checkpoint'
     }
-    if (@($State.preChanges | Where-Object { $_.name -ceq $Name }).Count -gt 0) { return 'pre-change' }
-    if (@($State.superseded | Where-Object { $_.name -ceq $Name }).Count -gt 0) { return 'superseded-checkpoint' }
+    if (@($State.preChanges | Where-Object { $_.name -eq $Name }).Count -gt 0) { return 'pre-change' }
+    if (@($State.superseded | Where-Object { $_.name -eq $Name }).Count -gt 0) { return 'superseded-checkpoint' }
     return 'unclassified'
 }
 
@@ -242,13 +242,13 @@ if ($SetRecoveryCheckpoint) {
         (Assert-Sha $RemoteSha256) -cne $hash) {
         throw 'Require independent remote availability confirmation and matching remote SHA-256 evidence.'
     }
-    if ($null -ne $state.recoveryCheckpoint -and $state.recoveryCheckpoint.name -cne $backup.Name) {
+    if ($null -ne $state.recoveryCheckpoint -and $state.recoveryCheckpoint.name -ne $backup.Name) {
         if ($state.recoveryCheckpoint.sha256 -ceq $hash) {
             throw 'Replacement checkpoint must have a distinct verified backup fingerprint.'
         }
         $state.superseded = @($state.superseded) + @($state.recoveryCheckpoint)
     }
-    $state.preChanges = @($state.preChanges | Where-Object { $_.name -cne $backup.Name })
+    $state.preChanges = @($state.preChanges | Where-Object { $_.name -ne $backup.Name })
     $state.recoveryCheckpoint = @{
         name = $backup.Name; sha256 = $hash
         remoteConfirmation = $RemoteConfirmation
@@ -266,13 +266,13 @@ if ($RemovePreChange) {
         throw 'Require explicit post-change acceptance and a nonempty local verification reference.'
     }
     Remove-SelectedBackup -Backup $backup -Hash $hash
-    $state.preChanges = @($state.preChanges | Where-Object { $_.name -cne $backup.Name })
+    $state.preChanges = @($state.preChanges | Where-Object { $_.name -ne $backup.Name })
 }
 elseif ($RemoveSuperseded) {
     if ($role -cne 'superseded-checkpoint') {
         throw 'Only explicitly superseded checkpoints may use this removal mode.'
     }
-    if ($null -eq $state.recoveryCheckpoint -or $state.recoveryCheckpoint.name -ceq $backup.Name -or
+    if ($null -eq $state.recoveryCheckpoint -or $state.recoveryCheckpoint.name -eq $backup.Name -or
         [string]::IsNullOrWhiteSpace([string]$state.recoveryCheckpoint.remoteConfirmation)) {
         throw 'A distinct, independently confirmed current recovery checkpoint is required.'
     }
@@ -281,7 +281,7 @@ elseif ($RemoveSuperseded) {
         throw 'Current protected recovery checkpoint cannot be revalidated.'
     }
     Remove-SelectedBackup -Backup $backup -Hash $hash
-    $state.superseded = @($state.superseded | Where-Object { $_.name -cne $backup.Name })
+    $state.superseded = @($state.superseded | Where-Object { $_.name -ne $backup.Name })
 }
 else { throw 'Unknown operation.' }
 Save-State $state
