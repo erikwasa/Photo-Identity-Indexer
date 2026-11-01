@@ -146,7 +146,13 @@ try {
     $r = Check-Report
     Assert-True ($r.passed -and $r.cleanupStatus -eq 'failed' -and $r.cleanupRequired) 'verified restore is distinct from completed cleanup'
     Assert-True ($global:FakeRestore.Exists -and $global:FakeRestore.DropAttempts -eq 1) 'failed cleanup is not silently ignored'
-    Passed-Case 'cleanup failure surfaced'
+    Assert-True (@($r.cleanupSessionSummary).Count -eq 1) 'cleanup failure records bounded backend diagnostics'
+    Assert-True ($r.cleanupSessionSummary[0].backendType -eq 'client backend' -and
+        $r.cleanupSessionSummary[0].sessions -eq 1) 'late client session is reported by type/count only'
+    Assert-True ($r.cleanupSessionSummary[0].PSObject.Properties.Name -notcontains 'pid' -and
+        $r.cleanupSessionSummary[0].PSObject.Properties.Name -notcontains 'query' -and
+        $r.cleanupSessionSummary[0].PSObject.Properties.Name -notcontains 'applicationName') 'no identities or queries in diagnostic report'
+    Passed-Case 'cleanup failure surfaced with sanitized session diagnostics'
 
     Reset-Scenario
     [IO.Directory]::CreateDirectory($reportPath) | Out-Null
