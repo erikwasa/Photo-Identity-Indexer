@@ -34,6 +34,7 @@ function Reset-Scenario {
         Marker = ''
         Sessions = 0
         TransientSessionsRemaining = 0
+        LastObservedSessionCount = 0
         Created = 0
         Copies = 0
         Restores = 0
@@ -91,6 +92,13 @@ try {
     Assert-True ($r.passed -and $r.cleanupStatus -eq 'removed' -and -not $r.cleanupRequired) 'transient session cleanup must be reported as removed'
     Assert-True (-not $global:FakeRestore.Exists -and $global:FakeRestore.DropAttempts -eq 1) 'transient sessions must not strand a successfully verified restore'
     Assert-True ($global:FakeRestore.TransientSessionsRemaining -eq 0) 'transient session scenario was exercised'
+    $samples = @($r.cleanupBusyDiagnostics)
+    Assert-True ($samples.Count -eq 1 -and $samples[0].attempt -eq 1) 'busy session captured in this restore run'
+    Assert-True ($samples[0].sessionsAtOwnershipCheck -eq 1 -and
+        $samples[0].snapshot.activity[0].backendType -eq 'autovacuum worker' -and
+        $samples[0].snapshot.activity[0].clientKind -eq 'internal') 'classified background worker without identity'
+    Assert-True ($samples[0].snapshot.analyzeRunning -eq 1 -and
+        $samples[0].snapshot.vacuumRunning -eq 0) 'maintenance-progress counts captured'
     Passed-Case 'post-restore transient session clears within bounded wait'
 
     Reset-Scenario

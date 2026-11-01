@@ -80,6 +80,83 @@ function Get-RestoreSessionSummary {
     }
 }
 
+# Observe one blocked cleanup attempt without reading queries, names, roles,
+# client addresses or media. SQL collapses client application names into fixed
+# categories and returns only aggregate activity and maintenance counts.
+function Get-RestoreBusyDiagnostic {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    if (-not (Test-GeneratedRestoreName $Name)) {
+        throw 'Only generated restore database names are eligible for diagnostics.'
+    }
+    $sql = @"
+SELECT 'activity|' || backend_kind || '|' || client_kind || '|' || activity_state || '|' || COUNT(*)::text
+FROM (
+    SELECT
+        CASE WHEN backend_type IN ('client backend','autovacuum worker','parallel worker','background worker','logical replication worker')
+            THEN backend_type ELSE 'other' END AS backend_kind,
+        CASE WHEN backend_type <> 'client backend' THEN 'internal'
+            WHEN application_name = 'pg_restore' THEN 'pg_restore'
+            WHEN application_name = 'psql' THEN 'psql'
+            WHEN COALESCE(application_name, '') = '' THEN 'unnamed'
+            ELSE 'other-client' END AS client_kind,
+        CASE WHEN state IN ('active','idle','idle in transaction','idle in transaction (aborted)')
+            THEN state ELSE 'other' END AS activity_state
+    FROM pg_stat_activity
+    WHERE datname = '$Name'
+) classified
+GROUP BY backend_kind, client_kind, activity_state
+UNION ALL
+SELECT 'analyze|progress|internal|active|' || COUNT(*)::text
+FROM pg_stat_progress_analyze WHERE datname = '$Name'
+UNION ALL
+SELECT 'vacuum|progress|internal|active|' || COUNT(*)::text
+FROM pg_stat_progress_vacuum WHERE datname = '$Name';
+"@
+    $rows = @(Invoke-RestoreAdminSql -Sql $sql)
+    $activity = @(
+        foreach ($line in $rows) {
+            $parts = @(([string]$line).Split('|'))
+            $count = [int]0
+            if ($parts.Count -ne 5 -or
+                -not [int]::TryParse($parts[4], [ref]$count) -or $count -lt 0) {
+                throw 'Malformed sanitized PostgreSQL diagnostic row.'
+            }
+            if ($parts[0] -eq 'activity') {
+                if ($parts[1] -cnotin @('client backend','autovacuum worker','parallel worker','background worker','logical replication worker','other') -or
+                    $parts[2] -cnotin @('internal','pg_restore','psql','unnamed','other-client') -or
+                    $parts[3] -cnotin @('active','idle','idle in transaction','idle in transaction (aborted)','other') -or $count -le 0) {
+                    throw 'Unrecognized sanitized PostgreSQL activity category.'
+                }
+                [pscustomobject]@{
+                    backendType = $parts[1]
+                    clientKind = $parts[2]
+                    state = $parts[3]
+                    sessions = $count
+                }
+            }
+            elseif ($parts[0] -eq 'analyze' -or $parts[0] -eq 'vacuum') {
+                if ($parts[1] -cne 'progress' -or $parts[2] -cne 'internal' -or $parts[3] -cne 'active') {
+                    throw 'Unexpected maintenance-progress summary.'
+                }
+            }
+            else {
+                throw 'Unexpected diagnostic row kind.'
+            }
+        }
+    )
+    $analyze = @($rows | Where-Object { $_ -match '^analyze\|' })
+    $vacuum = @($rows | Where-Object { $_ -match '^vacuum\|' })
+    if ($analyze.Count -ne 1 -or $vacuum.Count -ne 1) {
+        throw 'Incomplete maintenance-progress diagnostic summary.'
+    }
+    [pscustomobject]@{
+        capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+        activity = $activity
+        analyzeRunning = [int](@(([string]$analyze[0]).Split('|'))[4])
+        vacuumRunning = [int](@(([string]$vacuum[0]).Split('|'))[4])
+    }
+}
+
 function Set-RestoreDatabaseOwnership {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -139,7 +216,8 @@ function Remove-OwnedRestoreDatabase {
         [Parameter(Mandatory = $true)][string]$ExpectedMarker,
         [Parameter(Mandatory = $true)][string]$SourceDatabase,
         [ValidateRange(1, 20)][int]$SessionWaitAttempts = 1,
-        [ValidateRange(0, 5000)][int]$SessionWaitMilliseconds = 0
+        [ValidateRange(0, 5000)][int]$SessionWaitMilliseconds = 0,
+        [System.Collections.IList]$BusyDiagnostics
     )
     if (-not (Test-GeneratedRestoreName $Name) -or
         -not (Test-RestoreOwnershipMarker $ExpectedMarker) -or
@@ -165,6 +243,25 @@ function Remove-OwnedRestoreDatabase {
                 throw "PostgreSQL still reports isolated restore database '$Name' after cleanup."
             }
             return
+        }
+        # Classify sessions on every busy observation, including the final
+        # one. Diagnostic collection must never override the safety result.
+        if ($null -ne $BusyDiagnostics) {
+            try {
+                $snapshot = Get-RestoreBusyDiagnostic -Name $Name
+                [void]$BusyDiagnostics.Add([pscustomobject]@{
+                    attempt = $attempt
+                    sessionsAtOwnershipCheck = $details.Sessions
+                    snapshot = $snapshot
+                })
+            }
+            catch {
+                [void]$BusyDiagnostics.Add([pscustomobject]@{
+                    attempt = $attempt
+                    sessionsAtOwnershipCheck = $details.Sessions
+                    diagnosticUnavailable = $true
+                })
+            }
         }
         if ($attempt -lt $SessionWaitAttempts) {
             if ($attempt -eq 1) {

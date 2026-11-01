@@ -67,57 +67,50 @@ if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf) -or
 }
 ~~~
 
-The verifier checks for transient sessions on a fully verified restore for up to **20 seconds**, rechecking the exact database ownership marker on every attempt. It never terminates a connection or uses force. If sessions persist, the verified report records `passed=true`, `cleanupStatus=failed`, and `cleanupRequired=true`; the owned database stays available for investigation. After the sessions leave, use the exact-marker inventory/removal procedure in section 3, **not another full restore**. A later manual cleanup does not rewrite the previous failed-cleanup report: retain that report as accurate evidence of the first attempt.
 
-If the automatic cleanup still fails after 20 seconds, **do not start another full restore**. Preserve the retained owned copy, and inspect the PostgreSQL session types from a fresh independent administrator connection. The verifier now also records an optional `cleanupSessionSummary` array containing only aggregate `backendType` and `sessions` on cleanup failure; a diagnostics query failure is explicitly recorded as `cleanupSessionSummaryUnavailable` rather than masking the original error. An earlier report predating this change will not contain these fields.
+The verifier makes 11 bounded checks at two-second intervals. Any failed cleanup leaves its owned verification copy intact, with `passed=true`, `cleanupStatus=failed` and `cleanupRequired=true`. It never terminates connections or uses force. Both earlier full-size runs passed the integrity comparison but had busy sessions through the entire cleanup window; the sessions later disappeared without operator intervention. The backend category during those busy checks was not captured, so **do not infer the cause from their later disappearance**.
+
+### One consolidated diagnosis instead of repeated trial restores
+
+**Only once the follow-up diagnostics PR and CI are accepted**, perform one real restore from a fresh stopped-source backup using the commands in section 2. The verifier now captures an aggregate diagnostic snapshot **for every busy cleanup attempt**, including backend type, recognized client kind (`psql`, `pg_restore`, unnamed or other), activity state, and the number of ongoing `ANALYZE` and `VACUUM` operations. Each sample is recorded in the same durable `*.restore-verification.json`, whether cleanup eventually succeeds or fails. Categories are deliberately limited; no backend PID, user, SQL statement, media, address or original application name is included.
+
+Inspect all samples from **that one run**:
 
 ~~~powershell
 $report = Get-Content -LiteralPath "$backupPath.restore-verification.json" -Raw | ConvertFrom-Json
+$report | Select-Object passed, cleanupStatus, cleanupRequired, verificationDatabase
+
+foreach ($sample in @($report.cleanupBusyDiagnostics)) {
+    if ($sample.diagnosticUnavailable) {
+        [pscustomobject]@{ Attempt = $sample.attempt; ObservedSessions = $sample.sessionsAtOwnershipCheck; Diagnostic = 'unavailable' }
+        continue
+    }
+    [pscustomobject]@{
+        Attempt = $sample.attempt
+        TimestampUtc = $sample.snapshot.capturedAtUtc
+        ObservedSessions = $sample.sessionsAtOwnershipCheck
+        AnalyzeRunning = $sample.snapshot.analyzeRunning
+        VacuumRunning = $sample.snapshot.vacuumRunning
+    }
+    $sample.snapshot.activity | Format-Table backendType, clientKind, state, sessions
+}
+~~~
+
+Classify the result before making any further code changes:
+
+- **Only `autovacuum worker` plus active `ANALYZE` or `VACUUM`**: PostgreSQL maintenance, not an application-client leak, blocked cleanup. Design a bounded maintenance-aware cleanup or scheduling policy; do not terminate maintenance workers.
+- **`client backend` / `psql` or `pg_restore`**: examine verifier connection lifecycle; repeat use of those clients after completion would indicate a process-lifetime problem.
+- **`client backend` / `other-client` or `unnamed`**: investigate another client connecting to the generated database rather than assuming PostgreSQL maintenance.
+- **An internal worker other than autovacuum**: investigate that worker class before deciding whether cleanup should wait.
+- **Differences between `sessionsAtOwnershipCheck` and activity totals**: these are separate read-only snapshots and may differ as connections come/go; inspect the timestamps, not just a single count.
+
+If cleanup failed, **do not create another full restore**. The verifier also writes a last-chance `cleanupSessionSummary` on failure. Recheck live sessions with the read-only query below; after the database becomes idle and its marker is verified, use only the exact-name manual cleanup documented in PostgreSQL operations. Do not rewrite the previous failed report to claim it succeeded.
+
+~~~powershell
 $restoreDb = [string]$report.verificationDatabase
-if ($restoreDb -cnotmatch '^photoidentity_restore_[0-9]{14}_[a-f0-9]{6} The earlier maintained Windows test encountered a temporary session and subsequently confirmed zero sessions, owned provenance, and safe manual removal; the automated wait was added to prevent this from being a routine failure.
-
-Record the after state separately. Windows disk free space may **not** increase when PostgreSQL frees space inside a previously grown WSL/Podman VHDX.
-
-~~~powershell
-$after | Format-Table Name, SizeGiB, Sessions, Ownership
-$windowsFreeAfterGiB = [math]::Round((Get-PSDrive -Name C).Free / 1GB, 2)
-Push-Location .\deploy\postgres
-podman system df
-Pop-Location
-[pscustomobject]@{
-    RestoredDatabaseRemoved = $report.cleanupStatus -eq 'removed'
-    WindowsFreeBeforeGiB = $windowsFreeBeforeGiB
-    WindowsFreeAfterGiB = $windowsFreeAfterGiB
-}
-~~~
-
-## 3. Optional explicit retention / safe removal
-
-This creates **another full restored database**, so run only when capacity permits (or against a small disposable PostgreSQL source fixture). To test the full retain/removal boundary with the same fresh backup:
-
-~~~powershell
-.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
-$report = Get-Content -LiteralPath "$backupPath.restore-verification.json" -Raw | ConvertFrom-Json
-if ($report.cleanupStatus -ne 'retained' -or -not $report.cleanupRequired) {
-    throw 'Explicit retention was not honored.'
-}
-.\manage-postgres-restores.ps1 | Format-Table Name, SizeGiB, Sessions, Ownership
-# Only after confirming this is the disposable retained test copy:
-.\manage-postgres-restores.ps1 -RemoveDatabase $report.verificationDatabase -ExpectedMarker $report.restoreOwnershipMarker -ProductionDatabaseName $productionDb -ConfirmRemoval
-~~~
-
-For simulated restore, comparison, report-write, cleanup failure and read-only resume behavior, rely on the synthetic CI test suite first; use disposable test databases for additional real destructive-path testing, never force deliberate failures against production.
-
-## 4. Acceptance results to report
-
-Record the CI/synthetic test result; real backup/hash/row-comparison success; `passed` and `cleanupStatus`; name absence in inventory; source/restore sizes; Podman disk/volume observations; Windows free space before/after; and whether explicit retention/removal was tested or skipped for capacity. Do **not** share actual dump contents, private catalogue paths, connection strings, usernames, identities or photos.
-
-No VHDX compaction is required to accept automatic restored-database cleanup. Existing unmarked copies are not an excuse for wildcard deletion or termination of running PostgreSQL sessions. WI-0209 separately handles when to retire local backup **files**.
-) {
+if ($restoreDb -cnotmatch '^photoidentity_restore_[0-9]{14}_[a-f0-9]{6}$') {
     throw 'Unexpected restore database name.'
 }
-$report.cleanupSessionSummary | Format-Table backendType, sessions
-
 Push-Location .\deploy\postgres
 try {
     $container = (podman compose ps -q postgres).Trim()
@@ -129,7 +122,8 @@ finally {
 }
 ~~~
 
-This inspection is read-only and deliberately excludes usernames, query text, client addresses and other private data. `autovacuum worker` means PostgreSQL background maintenance is present, while `client backend` indicates a client; the type should be observed rather than assumed. If all sessions later disappear, use the exact ownership-marker manual removal command in section 3. No `--force`, connection termination or production-volume pruning is permitted. The earlier maintained Windows test encountered a temporary session and subsequently confirmed zero sessions, owned provenance, and safe manual removal; the automated wait was added to prevent this from being a routine failure.
+This inspection is read-only. If zero sessions remain, manual removal must still validate the exact generated name, marker, and production exclusion. Legacy unmarked restore copies remain inventory-only. No `--force`, process termination, bulk cleanup or online VHDX compaction is permitted.
+
 
 Record the after state separately. Windows disk free space may **not** increase when PostgreSQL frees space inside a previously grown WSL/Podman VHDX.
 

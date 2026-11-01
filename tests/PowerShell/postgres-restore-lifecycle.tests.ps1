@@ -159,6 +159,9 @@ finally {
 $script:sessionRows = @('autovacuum worker|2', 'client backend|1')
 function Invoke-RestoreAdminSql {
     param([string]$Sql)
+    if ($Sql.StartsWith("SELECT 'activity|'")) {
+        return $script:diagnosticRows
+    }
     if ($Sql -notmatch '^SELECT kind \|\| ') {
         throw 'Unexpected session-summary SQL.'
     }
@@ -173,5 +176,44 @@ $script:sessionRows = @('supersecret-backend|1')
 Assert-Throws { Get-RestoreSessionSummary -Name $script:validName } 'unexpected backend type rejected'
 $script:sessionRows = @('client backend|nope')
 Assert-Throws { Get-RestoreSessionSummary -Name $script:validName } 'malformed count rejected'
+
+# The broader one-shot probe records aggregate backend, client category,
+# and maintenance work at the exact moment an automatic drop is blocked.
+$script:diagnosticRows = @(
+    'activity|autovacuum worker|internal|other|1',
+    'activity|client backend|psql|idle|2',
+    'analyze|progress|internal|active|1',
+    'vacuum|progress|internal|active|0'
+)
+$diagnosis = Get-RestoreBusyDiagnostic -Name $script:validName
+Assert-Condition ($diagnosis.activity.Count -eq 2) 'two categorized activity groups'
+Assert-Condition ($diagnosis.activity[0].backendType -eq 'autovacuum worker' -and
+    $diagnosis.activity[0].sessions -eq 1) 'worker activity is classified'
+Assert-Condition ($diagnosis.activity[1].clientKind -eq 'psql' -and
+    $diagnosis.activity[1].state -eq 'idle') 'client type and state are classified'
+Assert-Condition ($diagnosis.analyzeRunning -eq 1 -and $diagnosis.vacuumRunning -eq 0) 'maintenance progress counts'
+Assert-Throws { Get-RestoreBusyDiagnostic -Name 'photoidentity_main' } 'arbitrary database diagnostic refused'
+
+Reset-Record
+$script:transientBusyChecks = 1
+$diagnosticSamples = [System.Collections.ArrayList]::new()
+Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+    -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 2 -SessionWaitMilliseconds 1 `
+    -BusyDiagnostics $diagnosticSamples
+Assert-Condition ($diagnosticSamples.Count -eq 1 -and
+    $diagnosticSamples[0].attempt -eq 1) 'busy attempt records one snapshot'
+Assert-Condition ($diagnosticSamples[0].snapshot.analyzeRunning -eq 1 -and
+    $script:dropCalls -eq 1) 'snapshot did not prevent later safe cleanup'
+
+$script:diagnosticRows = @(
+    'activity|private_extension_data|internal|other|1',
+    'analyze|progress|internal|active|0',
+    'vacuum|progress|internal|active|0'
+)
+Assert-Throws { Get-RestoreBusyDiagnostic -Name $script:validName } 'unrecognized backend diagnostic rejected'
+$script:diagnosticRows = @(
+    'activity|client backend|other-client|active|1'
+)
+Assert-Throws { Get-RestoreBusyDiagnostic -Name $script:validName } 'missing maintenance diagnostics rejected'
 
 Write-Host "WI-0208 synthetic safety/report assertions: $script:checked passed."
