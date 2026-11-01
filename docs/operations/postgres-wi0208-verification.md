@@ -67,6 +67,8 @@ if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf) -or
 }
 ~~~
 
+The verifier checks for transient sessions on a fully verified restore for up to **20 seconds**, rechecking the exact database ownership marker on every attempt. It never terminates a connection or uses force. If sessions persist, the verified report records `passed=true`, `cleanupStatus=failed`, and `cleanupRequired=true`; the owned database stays available for investigation. After the sessions leave, use the exact-marker inventory/removal procedure in section 3, **not another full restore**. A later manual cleanup does not rewrite the previous failed-cleanup report: retain that report as accurate evidence of the first attempt. The earlier maintained Windows test encountered a temporary session and subsequently confirmed zero sessions, owned provenance, and safe manual removal; the automated wait was added to prevent this from being a routine failure.
+
 Record the after state separately. Windows disk free space may **not** increase when PostgreSQL frees space inside a previously grown WSL/Podman VHDX.
 
 ~~~powershell
