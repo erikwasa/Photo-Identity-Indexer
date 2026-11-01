@@ -116,6 +116,10 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "scratch-recover" =>
+                    VideoFrameScratchRecoveryCommandRunner.Run(
+                        VideoFrameScratchRecoveryOptions.Parse(args.Skip(3).ToArray()),
+                        output),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "acceptance-report" =>
                     await VideoFrameAcceptanceReportCommandRunner.RunAsync(
                         VideoFrameAcceptanceReportOptions.Parse(args.Skip(3).ToArray()),
@@ -339,6 +343,12 @@ public static class Program
                                     (read-only current evidence; human-annotated cuts;
                                      numeric missed-scene audit and counterfactual plans;
                                      no FFmpeg, caption/vector output, or scene detection)
+              video frames scratch-recover --scratch-root ABS_OWNED_OS_TEMP_DIRECTORY
+                                           [--minimum-age-hours 6..720]
+                                           [--apply --acknowledge-private-scratch-deletion]
+                                           (dry-run by default; only stale owned
+                                            orphan workspace children, never originals)
+
               video frames acceptance-report --postgres-connection-env NAME
                                              --database DB --manifest ABS_LOCAL_JSON
                                              (read-only multi-clip currentness,
