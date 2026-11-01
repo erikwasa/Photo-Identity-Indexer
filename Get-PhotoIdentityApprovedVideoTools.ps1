@@ -7,11 +7,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($ConfigurationPath)) {
-    if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        throw "LOCALAPPDATA is missing; supply -ConfigurationPath explicitly."
+    if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_LAUNCHER_CONFIG)) {
+        $ConfigurationPath = $env:PHOTOIDENTITY_LAUNCHER_CONFIG
     }
-    $ConfigurationPath = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+    elseif (Test-Path -LiteralPath (Join-Path $PSScriptRoot "PhotoIdentity.launcher.json")) {
+        $ConfigurationPath = Join-Path $PSScriptRoot "PhotoIdentity.launcher.json"
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $ConfigurationPath = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+    }
+    else {
+        throw "Set -ConfigurationPath or PHOTOIDENTITY_LAUNCHER_CONFIG."
+    }
 }
+$ConfigurationPath = [Environment]::ExpandEnvironmentVariables($ConfigurationPath)
 
 if (-not (Test-Path -LiteralPath $ConfigurationPath -PathType Leaf)) {
     throw "The Photo Identity launcher configuration does not exist."
