@@ -38,7 +38,13 @@ if ($cmd -like '*pg_restore *') {
 }
 if ($cmd -like '*dropdb *') {
     $global:FakeRestore.DropAttempts++
-    if ($global:FakeRestore.DropFails) { $global:LASTEXITCODE = 1; return }
+    if ($global:FakeRestore.DropFails) {
+        # The final drop can race with a newly opened connection even when
+        # the last ownership/zero-session snapshot was valid.
+        $global:FakeRestore.Sessions = 1
+        $global:LASTEXITCODE = 1
+        return
+    }
     $global:FakeRestore.Exists = $false
     return
 }
