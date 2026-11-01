@@ -7,6 +7,49 @@ local SDR playable proxy and independently approved pinned FFmpeg, CLIP
 and Ollama model digests. Azure is an optional operator-controlled
 bridge; unknown third-party endpoints are not accepted.
 
+## Representative media scope and postponed verification (2026-11-01)
+
+The maintainer elected not to widen the current video ingestion/SDR proxy
+admission policy simply to produce an exhaustive representative cohort for
+WI-0190. **Postponed is not passed.** Record the specific absent or
+unsupported case and the policy/fixture change needed to revisit it; do
+not apply proxy generation to originals that are not already eligible.
+This deferral affects positive end-to-end media-quality coverage, not
+synthetic admission/rejection, bounded sampling, privacy, failure,
+revision-staleness, resource-budget or atomic-publication requirements.
+
+Current maintainer observations: 24 successful published proxy receipts
+across 540p and 720p profiles; the longest source duration represented is
+49.4 s and listed published sources all have `-90` display rotation.
+Inspected longer sources include HLG (`arib-std-b67`), Rec.709
+`yuvj420p`, and a 172.9 s Rec.709 HEVC video with NULL rotation.
+None of the longer originals is currently an admissible published
+FrameEvidence input. Inspection `supported` does not override the
+stricter video-proxy profile.
+
+| Case | Verification instruction |
+| --- | --- |
+| Supported local Rec.709/SDR MOV/MP4 proxies, short and rotated | Proceed with opt-in selected one-shot, private human evaluation, audit, retrieval and measured cost/latency |
+| Medium/longer sources, HLG/HDR, `yuvj420p`, NULL/unknown rotation | Postpone positive clip-level tests until the corresponding approved proxy support or a suitable already-admitted clip exists; keep rejection tests |
+| Other formats/codecs, source files over 256 MiB, duration over 600 s | Postpone positive tests until a separately reviewed future workitem expands the relevant limit and bounded safety checks |
+| Genuine landscape, human-labeled multi-scene or low-light content | Find in the supported local proxy cohort where possible; otherwise record each missing sample as postponed without implying quality acceptance |
+
+A long-duration **synthetic planner** test is still required and is
+not equivalent to a long real clip. Real frame motion, sound or exact
+scene boundaries cannot be established from sparse frames, and no
+automatic scene detection is claimed. User-controlled Azure inference
+remains optional; never upload private media to an unvetted third party.
+
+Reopen postponed categories after the video support change has shipped,
+the selected source is verified already-local and included, and a new
+current proxy receipt exists. Re-run the appropriate scene/interval
+selected one-shot, frame audit, coverage, retrieval and independently
+measured cost/quality evidence. The main catalogue must not be used for
+the destructive interrupt/recovery scenario. Keep any private examples,
+frame content, annotations, captions and paths outside the repository.
+
+See the [workitem's detailed deferral matrix](../delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01).
+
 ## What is measured
 
 video frames acceptance-harness --mode measure starts ONLY the same
@@ -200,8 +243,12 @@ read-only audit and active-grant refusal. No tests send media
 to Azure, OneDrive or external AI applications.
 
 For formal WI-0190 closeout the maintainer must still execute
-the representative private video set, judge captions and
-retrieval quality, annotate missed scenes, allocate actual
-system/GPU/Azure cost, and observe the real interruption and
-deferred recovery steps. Successful CI proves the tooling's
+the **currently supported** representative private video set, judge
+captions and retrieval quality, annotate missed scenes where a
+suitable real case exists, allocate actual system/GPU/Azure cost,
+and observe the real interruption and deferred recovery steps.
+Unavailable/unsupported representative cases are separately reported
+as **postponed**, not passed, with the future revalidation trigger
+above; do not expand admission guards or require inaccessible media
+just to check those cases. Successful CI proves the tooling's
 synthetic boundaries, not those real-world measurements.
