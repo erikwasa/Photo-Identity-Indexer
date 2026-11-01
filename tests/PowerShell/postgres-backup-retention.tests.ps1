@@ -130,7 +130,7 @@ try {
     Check (Test-Path -LiteralPath $c.Path) 'new checkpoint remains protected'
 
     if ($IsWindows) {
-        $held = [IO.File]::Open($a.Path, 'Open', 'Read', 'None')
+        $held = [IO.File]::Open($a.Path, 'Open', 'Read', 'Read')
         try {
             Refuse { & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmRemoval -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'passed' } 'locked dump'
             Check ((Test-Path -LiteralPath "$($a.Path).json") -and (Test-Path -LiteralPath "$($a.Path).restore-verification.json")) 'evidence remains after failed locked dump removal'
