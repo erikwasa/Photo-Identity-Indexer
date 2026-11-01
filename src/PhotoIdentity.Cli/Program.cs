@@ -116,6 +116,14 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "acceptance-harness" =>
+                    await VideoFrameAcceptanceHarnessCommandRunner.RunAsync(
+                        VideoFrameAcceptanceHarnessOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "interruption-audit" =>
+                    await VideoFrameInterruptionAuditCommandRunner.RunAsync(
+                        VideoFrameInterruptionAuditOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "scratch-recover" =>
                     VideoFrameScratchRecoveryCommandRunner.Run(
                         VideoFrameScratchRecoveryOptions.Parse(args.Skip(3).ToArray()),
@@ -343,6 +351,19 @@ public static class Program
                                     (read-only current evidence; human-annotated cuts;
                                      numeric missed-scene audit and counterfactual plans;
                                      no FFmpeg, caption/vector output, or scene detection)
+              video frames acceptance-harness
+                  --mode measure|interrupt [--terminate-after-seconds 5..600]
+                  [--execute] [--acknowledge-owned-child-termination]
+                  -- (all approved video frames selected-one-shot options
+                      including --apply and BOTH disclosure acknowledgments)
+                  (defaults to preview; starts ONLY own selected-one-shot
+                   CLI child; CPU = CLI host only, GPU/Azure unmeasured)
+
+              video frames interruption-audit --postgres-connection-env NAME
+                  --database DB --frame-job-id GUID --scratch-root OWNED_OS_TEMP
+                  (read-only grant/lease/partial-publication/scratch status;
+                   does not disarm, delete or recover)
+
               video frames scratch-recover --scratch-root ABS_OWNED_OS_TEMP_DIRECTORY
                                            [--minimum-age-hours 6..720]
                                            [--apply --acknowledge-private-scratch-deletion]
