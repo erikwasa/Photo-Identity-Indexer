@@ -1,5 +1,8 @@
 # Local operator guide
 
+> For new CLIP, Ollama, caption and optional operator-controlled Azure bridge settings, use [approved inference configuration](approved-inference-configuration.md). The operator-only upstream is never injected into the API; `CaptionEnrichment__OllamaBaseUrl` remains loopback-only. Existing PostgreSQL app settings remain their own authority.
+
+
 This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained historical migration/evaluation evidence.
 
 ## Current catalogue authority
