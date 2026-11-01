@@ -33,6 +33,7 @@ function Reset-Scenario {
         Exists = $false
         Marker = ''
         Sessions = 0
+        TransientSessionsRemaining = 0
         Created = 0
         Copies = 0
         Restores = 0
@@ -80,6 +81,17 @@ try {
     Assert-True ((Test-Path $backupPath) -and (Test-Path $backupManifest)) 'backup and hash evidence preserved'
     Assert-True ($global:FakeRestore.TempCleans -eq 1) 'container copy removed after success'
     Passed-Case 'fresh success and cleanup'
+
+    Reset-Scenario
+    # First post-restore details check and first cleanup check see an
+    # ephemeral PostgreSQL session; the subsequent check is idle.
+    $global:FakeRestore.TransientSessionsRemaining = 2
+    & $verifier -BackupPath $backupPath -ApplicationStopped
+    $r = Check-Report
+    Assert-True ($r.passed -and $r.cleanupStatus -eq 'removed' -and -not $r.cleanupRequired) 'transient session cleanup must be reported as removed'
+    Assert-True (-not $global:FakeRestore.Exists -and $global:FakeRestore.DropAttempts -eq 1) 'transient sessions must not strand a successfully verified restore'
+    Assert-True ($global:FakeRestore.TransientSessionsRemaining -eq 0) 'transient session scenario was exercised'
+    Passed-Case 'post-restore transient session clears within bounded wait'
 
     Reset-Scenario
     & $verifier -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
