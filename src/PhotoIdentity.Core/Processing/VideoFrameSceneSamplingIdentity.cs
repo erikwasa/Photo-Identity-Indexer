@@ -11,6 +11,27 @@ namespace PhotoIdentity.Core.Processing;
 public static class VideoFrameSceneSamplingIdentity
 {
     public const string Prefix = "video-frame-sampling-scene-v1-n";
+    // The historic interval policy was independent of requested frame count.
+    // Preserve legacy two-frame identity while assigning new exact identities
+    // to 1/3/4-frame operator-selected jobs. Stored legacy batches remain
+    // readable using their authoritative requested_frames column.
+    public const string IntervalPrefix = "video-frame-sampling-interval-v2-n";
+
+    public static string CreateInterval(int frames)
+    {
+        if (frames is < 1 or > MaximumFrames)
+            throw new ArgumentOutOfRangeException(nameof(frames));
+        return frames == 2
+            ? VideoFrameSamplingPlanner.PolicyVersion
+            : IntervalPrefix + frames.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static bool MatchesInterval(string policyVersion, int frames) =>
+        frames is >= 1 and <= MaximumFrames &&
+        (policyVersion == VideoFrameSamplingPlanner.PolicyVersion ||
+         policyVersion == IntervalPrefix +
+             frames.ToString(CultureInfo.InvariantCulture));
+
     public const int MaximumCuts = 6;
     public const int MaximumFrames = 4;
     public const int MaximumPolicyLength = 80;
@@ -78,17 +99,22 @@ public static class VideoFrameSceneSamplingIdentity
     }
 
     public static bool Permits(string policyVersion, int requestedFrames) =>
-        policyVersion == VideoFrameSamplingPlanner.PolicyVersion ||
+        MatchesInterval(policyVersion, requestedFrames) ||
         (TryParse(policyVersion, out int count, out _) &&
          count == requestedFrames);
 
     public static VideoFrameSamplingPlan BuildPlan(decimal durationSeconds,
         int requestedFrames, string policyVersion)
     {
-        if (policyVersion == VideoFrameSamplingPlanner.PolicyVersion)
-            return VideoFrameSamplingPlanner.Plan(
+        if (MatchesInterval(policyVersion, requestedFrames))
+        {
+            VideoFrameSamplingPlan interval = VideoFrameSamplingPlanner.Plan(
                 new VideoFrameSamplingRequest(durationSeconds,
                     MaximumFrames: requestedFrames));
+            // Persist the exact interval frame-count identity rather than
+            // accidentally reverting to the planner's historic shared name.
+            return interval with { PolicyVersion = policyVersion };
+        }
 
         if (!TryParse(policyVersion, out int frames, out long[] cutsMs) ||
             frames != requestedFrames)
