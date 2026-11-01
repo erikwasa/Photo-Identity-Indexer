@@ -7,6 +7,7 @@ param(
     [switch]$SetRecoveryCheckpoint,
     [switch]$RemovePreChange,
     [switch]$RemoveSuperseded,
+    [switch]$PlanRemoval,
     [string]$ChangeReference,
     [string]$ChangeAcceptanceEvidence,
     [switch]$ConfirmChangeAccepted,
@@ -192,7 +193,7 @@ $state = Read-State
 
 # Exactly one mutating mode is permitted.
 $count = [int]$RegisterPreChange.IsPresent + [int]$SetRecoveryCheckpoint.IsPresent +
-    [int]$RemovePreChange.IsPresent + [int]$RemoveSuperseded.IsPresent
+    [int]$RemovePreChange.IsPresent + [int]$RemoveSuperseded.IsPresent + [int]$PlanRemoval.IsPresent
 if ($count -gt 1) { throw 'Select exactly one backup-management action.' }
 
 if ($count -eq 0) {
@@ -219,6 +220,24 @@ $expected = Assert-Sha $ExpectedSha256
 $role = Get-Role -State $state -Name $backup.Name
 $hash = Get-Evidence -Backup $backup -RequireRestore:$SetRecoveryCheckpoint
 if ($hash -cne $expected) { throw 'Operator-expected backup SHA-256 does not match the file.' }
+
+if ($PlanRemoval) {
+    if ($role -notin @('pre-change', 'superseded-checkpoint')) {
+        throw 'Only explicitly classified, non-current backups can be planned for retirement.'
+    }
+    [pscustomobject]@{
+        Name = $backup.Name
+        Role = $role
+        Sha256 = $hash
+        RemovalRequiresConfirmation = $true
+        Files = @(
+            $backup.Path,
+            "$($backup.Path).json",
+            "$($backup.Path).restore-verification.json"
+        ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    }
+    return
+}
 
 if ($RegisterPreChange) {
     if ($role -cne 'unclassified') { throw 'Classified backups cannot be registered again or change roles implicitly.' }
