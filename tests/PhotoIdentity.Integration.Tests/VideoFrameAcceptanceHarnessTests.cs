@@ -206,7 +206,7 @@ public sealed class VideoFrameAcceptanceHarnessTests
         await administrator.OpenAsync();
         await using (NpgsqlCommand create = administrator.CreateCommand())
         {
-            create.CommandText = $"CREATE DATABASE \\"{dbName}\\";";
+            create.CommandText = $"CREATE DATABASE \"{dbName}\";";
             await create.ExecuteNonQueryAsync();
         }
         try
@@ -251,8 +251,8 @@ public sealed class VideoFrameAcceptanceHarnessTests
             {
                 Assert.Equal(0, await VideoFrameInterruptionAuditCommandRunner
                     .RunAsync(options, output));
-                Assert.Contains("\\"recoveryComplete\\":true", output.ToString());
-                Assert.Contains("\\"noPartialEvidence\\":true", output.ToString());
+                Assert.Contains("\"recoveryComplete\":true", output.ToString());
+                Assert.Contains("\"noPartialEvidence\":true", output.ToString());
                 Assert.DoesNotContain(job.ToString(), output.ToString());
                 Assert.DoesNotContain(scratch, output.ToString());
             }
@@ -276,7 +276,7 @@ public sealed class VideoFrameAcceptanceHarnessTests
             {
                 Assert.Equal(1, await VideoFrameInterruptionAuditCommandRunner
                     .RunAsync(options, output));
-                Assert.Contains("\\"reasonCode\\":\\"grant-still-active\\"",
+                Assert.Contains("\"reasonCode\":\"grant-still-active\"",
                     output.ToString());
             }
             await using (NpgsqlConnection conn = await db.OpenConnectionAsync())
@@ -297,7 +297,7 @@ public sealed class VideoFrameAcceptanceHarnessTests
         {
             Environment.SetEnvironmentVariable(env, previous);
             await using NpgsqlCommand drop = administrator.CreateCommand();
-            drop.CommandText = $"DROP DATABASE IF EXISTS \\"{dbName}\\" WITH (FORCE);";
+            drop.CommandText = $"DROP DATABASE IF EXISTS \"{dbName}\" WITH (FORCE);";
             await drop.ExecuteNonQueryAsync();
             Directory.Delete(scratch, true);
         }
