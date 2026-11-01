@@ -50,6 +50,11 @@ try {
     $noReport = Make-Dump 'no-restore.dump' 'delta' $false
     $unknown = Make-Dump 'unknown.dump' 'epsilon'
 
+    $inspection = & $tool -BackupRoot $root -InspectBackup -BackupPath $a.Path
+    Check ($inspection.Role -eq 'unclassified' -and $inspection.ManifestHashAndSizeValid) 'unclassified candidate inspection'
+    Check ($inspection.EligibleForCheckpointPromotion -and -not $inspection.RemoteConfirmationRecorded) 'restore-verified local candidate without remote attestation'
+    $missing = & $tool -BackupRoot $root -InspectBackup -BackupPath $noReport.Path
+    Check (-not $missing.EligibleForCheckpointPromotion) 'no restore report means no checkpoint'
     $list = @(& $tool -BackupRoot $root)
     Check ($list.Count -eq 5) 'read-only inventory enumerates existing dumps'
     Check (@($list | Where-Object Role -ne 'unclassified').Count -eq 0) 'legacy/unknown files are not classified implicitly'
@@ -124,6 +129,14 @@ try {
     Check (-not (Test-Path -LiteralPath "$($b.Path).restore-verification.json")) 'superseded restore report deleted'
     Check (Test-Path -LiteralPath $c.Path) 'new checkpoint remains protected'
 
+    if ($IsWindows) {
+        $held = [IO.File]::Open($a.Path, 'Open', 'Read', 'Read')
+        try {
+            Refuse { & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmRemoval -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'passed' } 'locked dump'
+            Check ((Test-Path -LiteralPath "$($a.Path).json") -and (Test-Path -LiteralPath "$($a.Path).restore-verification.json")) 'evidence remains after failed locked dump removal'
+        }
+        finally { $held.Dispose() }
+    }
     & $tool -BackupRoot $root -RemovePreChange -BackupPath $a.Path -ExpectedSha256 $a.Sha -ConfirmRemoval -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'migration-1 post-change application and schema verification passed'
     Check (-not (Test-Path -LiteralPath $a.Path)) 'accepted pre-change dump explicitly retired'
     Check (-not (Test-Path -LiteralPath "$($a.Path).json")) 'accepted pre-change manifest explicitly retired'
