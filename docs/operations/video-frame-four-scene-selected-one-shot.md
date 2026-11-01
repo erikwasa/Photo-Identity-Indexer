@@ -7,6 +7,17 @@ sampling planner and scene-policy identity already supported four.
 This checkpoint makes **1–4 frames** available per *explicitly
 operator-selected* job, for interval or manual scene sampling.
 
+**Interval provenance:** the historical two-frame interval identity
+remains video-frame-sampling-v1, preserving already-published jobs.
+Previously the legacy interval key did not encode the selected
+frame count. This checkpoint makes new **1-, 3- and 4-frame**
+interval attempts use video-frame-sampling-interval-v2-n1/n3/n4,
+so requesting four on a previously published two-frame clip cannot
+reuse a succeeded two-frame job by accident. The historical policy
+remains readable with its persisted requested_frames value.
+Annotated-scene identities already encode the count and private
+scene cuts. No migration or retroactive relabeling is done.
+
 It does not activate automatic processing. Selecting four is a fresh
 authorization decision: up to four sampled private JPEG frames may be
 sent to the configured vetted loopback caption service, which may in
@@ -88,7 +99,7 @@ multi-clip acceptance and CPU/GPU/cost procedures as needed.
 
 ## Automated verification and remaining acceptance
 
-The CLI tests verify four is explicitly accepted, five is refused,
+The CLI tests verify four is explicitly accepted, five is refused,\nnew exact-count interval keys are deterministic and distinct,
 four-scene preflight is read-only and impossible cuts are rejected
 without any jobs. Synthetic PostgreSQL worker integration tests
 prove a complete four-scene published batch with four durable
