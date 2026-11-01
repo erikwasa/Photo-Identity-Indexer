@@ -1,5 +1,21 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 12:** PR #690 merged with
+WI-0190 checkpoint 11 offline CLIP relevance metrics (CI passed).
+Current branch agent/WI-0190-live-local-retrieval-benchmark adds
+private read-only local PostgreSQL v38 batch evaluation with local
+SHA-256-pinned CLIP text encoding. It reuses the audit currentness
+gate in one snapshot and reports only aggregate ranking quality
+plus wall-time components; no vector exports, external inference,
+schema writes, job enqueue or production search. CI pending.
+Maintained host has only one accepted real two-frame FrameEvidence
+job, so multi-video human relevance, diverse scene coverage, CPU/
+GPU/Azure costs and real Windows interruption gates remain **local**
+acceptance. Do not repeat the prior successful audit. WI-0190
+in_progress, 0/4 formal full criteria. See
+docs/operations/video-frame-live-retrieval-evaluation.md.
+
+
 **2026-10-31 M41 / WI-0208 development:** The restore verifier now records PostgreSQL database-comment ownership, publishes verification evidence before exact-owned automatic cleanup, retains failed/partial/rehearsal copies, and reports cleanup status. Operator inventory/exact-name disposal, synthetic safety and verifier tests, plus the updated operations/rehearsal runbooks are on the WI-0208 PR branch. CI and the maintained Windows/Podman acceptance have NOT yet passed; do not mark WI-0208 completed. Review the work-item and PostgreSQL runbook for the two remaining gates. WI-0209 separately owns backup-file retirement and has not been implemented. Continue WI-0190 separately from M41.
 
 **2026-11-01 WI-0190 checkpoint 11 (PR pending):** PR #689 merged,
