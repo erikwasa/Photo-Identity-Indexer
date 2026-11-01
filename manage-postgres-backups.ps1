@@ -280,9 +280,6 @@ if ($SetRecoveryCheckpoint) {
         throw 'Require independent remote availability confirmation and matching remote SHA-256 evidence.'
     }
     if ($null -ne $state.recoveryCheckpoint -and $state.recoveryCheckpoint.name -ne $backup.Name) {
-        if ($state.recoveryCheckpoint.sha256 -ceq $hash) {
-            throw 'Replacement checkpoint must have a distinct verified backup fingerprint.'
-        }
         $state.superseded = @($state.superseded) + @($state.recoveryCheckpoint)
     }
     $state.preChanges = @($state.preChanges | Where-Object { $_.name -ne $backup.Name })
