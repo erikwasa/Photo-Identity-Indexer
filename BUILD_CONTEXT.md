@@ -1,5 +1,21 @@
 # Build context
 
+**2026-11-01 WI-0190 checkpoint 13 (PR pending):** PR #691 merged,
+bringing private current-v38 multi-video CLIP retrieval quality.
+Current work adds a bounded read-only **representative acceptance
+report** spanning multiple distinct current frame-evidence assets,
+human scene annotations, caption+embedding payload, class coverage,
+optional manually verified CPU/GPU/Azure cost, timed throughput
+and caption accuracy. Uses one repeatable-read read-only
+PostgreSQL snapshot and returns only aggregate numerical evidence,
+explicit nulls for unknowns and no automatic acceptance decision.
+Synthetic pure and PG tests added. The maintained-host one-job
+two-frame audit is accepted, **do not repeat**. Outstanding:
+human-labeled diverse real clips, GPU/CPU and billed Azure cost,
+caption + cross-video CLIP relevance, Windows interruption and
+cleanup. WI-0190 in_progress, 0/4 full formal criteria.
+Runbook docs/operations/video-frame-acceptance-evidence-report.md.
+
 **2026-11-01 WI-0190 checkpoint 12:** PR #690 merged with
 WI-0190 checkpoint 11 offline CLIP relevance metrics (CI passed).
 Current branch agent/WI-0190-live-local-retrieval-benchmark adds
