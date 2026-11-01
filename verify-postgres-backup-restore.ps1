@@ -268,15 +268,22 @@ try {
     Write-RestoreVerificationReport -Path $reportPath -Report $report
 
     if (-not $retained) {
+        # Capture every busy-check classification in this same restore run.
+        # All values are aggregate categories; no SQL, PIDs or identities.
+        $cleanupBusyDiagnostics = [System.Collections.ArrayList]::new()
         try {
             # A full restore can finish while a transient PostgreSQL session
             # is still visible. Revalidate ownership and idleness for at
             # most 20 seconds; persistent sessions still fail closed.
             Remove-OwnedRestoreDatabase -Name $VerificationDatabaseName `
                 -ExpectedMarker $ownershipMarker -SourceDatabase $sourceDatabase `
-                -SessionWaitAttempts 11 -SessionWaitMilliseconds 2000
+                -SessionWaitAttempts 11 -SessionWaitMilliseconds 2000 `
+                -BusyDiagnostics $cleanupBusyDiagnostics
         }
         catch {
+            if ($cleanupBusyDiagnostics.Count -gt 0) {
+                $report['cleanupBusyDiagnostics'] = @($cleanupBusyDiagnostics.ToArray())
+            }
             $cleanupError = $_.Exception.Message
             $report.cleanupStatus = 'failed'
             $report.cleanupRequired = $true
@@ -298,6 +305,9 @@ try {
                 Write-Warning 'Cleanup failed and the failure report could not be saved; inspect the database manually.'
             }
             throw "Verification passed but cleanup failed for '$VerificationDatabaseName': $cleanupError"
+        }
+        if ($cleanupBusyDiagnostics.Count -gt 0) {
+            $report['cleanupBusyDiagnostics'] = @($cleanupBusyDiagnostics.ToArray())
         }
         $report.cleanupStatus = 'removed'
         $report.cleanupRequired = $false
