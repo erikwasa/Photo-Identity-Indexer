@@ -66,6 +66,23 @@ public static class VideoFrameEvidenceScratchGuard
              scratchRoot.StartsWith(@"\\", StringComparison.Ordinal)))
             throw new InvalidOperationException("An owned local frame scratch is required.");
 
+        string root = ValidateOwnedRoot(scratchRoot);
+        string marker = Path.Combine(root, MarkerName);
+        if (Directory.EnumerateFileSystemEntries(root).Any(path => path != marker))
+            throw new InvalidOperationException(
+                "Frame scratch ownership or empty-workspace invariant failed.");
+        return root;
+    }
+
+    public static string ValidateOwnedRoot(string scratchRoot)
+    {
+        if (string.IsNullOrWhiteSpace(scratchRoot) ||
+            !Path.IsPathFullyQualified(scratchRoot) ||
+            !Directory.Exists(scratchRoot) ||
+            (OperatingSystem.IsWindows() &&
+             scratchRoot.StartsWith(@"\\", StringComparison.Ordinal)))
+            throw new InvalidOperationException("An owned local frame scratch is required.");
+
         string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(scratchRoot));
         string temp = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
         string relative = Path.GetRelativePath(temp, root);
@@ -82,8 +99,7 @@ public static class VideoFrameEvidenceScratchGuard
         if (!File.Exists(marker) ||
             (File.GetAttributes(marker) & FileAttributes.ReparsePoint) != 0 ||
             new FileInfo(marker).Length != MarkerContents.Length ||
-            File.ReadAllText(marker) != MarkerContents ||
-            Directory.EnumerateFileSystemEntries(root).Any(path => path != marker))
+            File.ReadAllText(marker) != MarkerContents)
             throw new InvalidOperationException(
                 "Frame scratch ownership or empty-workspace invariant failed.");
         return root;
@@ -144,8 +160,10 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
         string workspace = Path.Combine(root,
             "wi0190-evidence-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
+        FileStream? workspaceLock = null;
         try
         {
+            workspaceLock = VideoFrameScratchRecovery.CreateActiveWorkspace(workspace);
             var safety = new PostgresVideoLeaseSafetyProbe(database);
             async Task RequirePermit(CancellationToken ct)
             {
@@ -222,7 +240,7 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
                 ImageFrame? image = null;
                 byte[]? jpeg = null;
                 VideoToolExecutionResult decoded = await supervisor.RunAsync(
-                    options.FfmpegPath, options.FfmpegSha256, root,
+                    options.FfmpegPath, options.FfmpegSha256, workspace,
                     ffWorkspace => VideoFrameExtractionProfile.BuildArguments(
                         staged, ffWorkspace, frame, plan.DurationMilliseconds),
                     FrameBudget, token,
@@ -280,8 +298,11 @@ public sealed class VideoRegisteredProxyFrameEvidenceProducer(
         }
         finally
         {
+            // Release the exclusive workspace lease before normal cleanup.
+            // An abnormal process termination releases the OS handle, while
+            // leaving the ownership marker for an explicit age-gated recovery.
+            workspaceLock?.Dispose();
             // Only this freshly created, random-named child may be removed.
-            // A future abnormal-exit janitor is a separate work item.
             if (Directory.Exists(workspace))
             {
                 VideoDerivativeCacheGuard.AssertNoLinks(workspace);
