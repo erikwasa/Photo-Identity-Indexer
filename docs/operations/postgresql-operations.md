@@ -105,7 +105,11 @@ By default backups are written beneath `%LOCALAPPDATA%\PhotoIdentity\backups\pos
 
 A normal logical `pg_dump` is transactionally consistent and may be taken while the application is running. For the WI-0106 restore acceptance below, stop the application first and take a fresh backup so exact row counts can be compared deterministically with the restored copy.
 
-## Isolated restore verification
+## Operator-managed backup-file retention (WI-0209)
+
+The normal backup tool continues to produce a dump and SHA-256 manifest without automatic retention or removal. A separate, explicitly invoked [WI-0209 Windows backup-retention runbook](postgres-wi0209-backup-retention.md) and backup-management script support read-only inventory, registration of short-lived pre-change precautions, acceptance-controlled exact-file cleanup, and a protected restore-verified recovery checkpoint with manually confirmed independent off-disk availability. **Do not infer remote OneDrive durability from local sync status.** This new workflow never deletes unclassified backups, the protected checkpoint, remote objects or any PostgreSQL database.
+
+
 
 For acceptance, stop Photo Identity first. Then create a fresh backup while the catalogue is quiescent:
 
