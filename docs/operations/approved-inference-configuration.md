@@ -12,6 +12,57 @@ Do not copy hashes from an example blindly: **approve the specific files
 and Ollama installation first**. No personal media or secrets belong in
 the configuration file or a GitHub PR.
 
+## Maintained Windows configuration: observed acceptance (2026-11-02)
+
+The maintainer reports that the **current private** `launcher.json` is configured
+for a **separately started, operator-controlled Azure Ollama bridge listening
+on `http://127.0.0.1:11434/`**. Port 11434 is the *bridge*, **not a local
+Ollama model installation**; the bridge forwards to the operator-selected
+`operator.azureOllamaUpstreamUrl`. The prior Azure 403/RBAC problem was
+resolved by the operator. The upstream address, bridge authorization and
+service lifecycle remain operator responsibilities; the launcher does not
+start or scale Azure.
+
+| Check | Maintainer observation | Evidence scope |
+| --- | --- | --- |
+| `Start-PhotoIdentity.ps1 -ConfigurationPath $launcherPath -ValidateConfigurationOnly` | **Passed**, `catalogueProvider: postgresql` | Configuration parsing/validation; does not start the app |
+| `Get-PhotoIdentityApprovedInference.ps1 -ConfigurationPath $launcherPath` | **Completed without error** | Actual on-disk CLIP model, vocabulary and merges matched launcher SHA-256 pins |
+| `GET http://127.0.0.1:11434/api/version` and `/api/tags` | **Responded**; model `qwen2.5vl:3b`, digest matched approval | The operator identified the port's listener as the Azure bridge, not locally installed Ollama |
+| `Get-PhotoIdentityApprovedInference.ps1 -ConfigurationPath $launcherPath -VerifyOllama` | **`OllamaVerified = True`** | Live loopback model inventory and approved digest check; not itself an inference request |
+| Photo Identity caption generation and persistence | **Passed, maintainer-reported in a separate chat** | One end-to-end photo-caption write with the same launcher settings; no private photo, SQL row or transcript is checked into Git |
+
+Approved identities observed for this deployment:
+
+- CLIP ONNX SHA-256: `42b5dac8f0a73e45b1626ae7a69b41a4bc111c6fe1edafcceda8c2a5506dc6db`
+- CLIP vocabulary SHA-256: `5047b556ce86ccaf6aa22b3ffccfc52d391ea4accdab9c2f2407da5b742d4363`
+- CLIP merges SHA-256: `9fd691f7c8039210e0fced15865466c65820d09b63988b0174bfe25de299051a`
+- Ollama `qwen2.5vl:3b` SHA-256: `fb90415cde1ef08aa669ae74b082d49b158729b6db1ab183c941417d507e71a1`; context `1024`, timeout `600` seconds.
+
+**Result:** Configuration preflight, live approved-model identity and a
+production caption-persistence smoke test are accepted on the maintained
+Windows host. No further configuration change is needed while this bridge
+continues to listen on port 11434 and the approved model remains unchanged.
+This is operator-reported deployment evidence, **not** a claim of CI
+execution, ongoing Azure availability, full backlog quality coverage,
+restart/recovery acceptance or any WI-0190 video-frame acceptance.
+Automatic caption enablement/language remains governed by PostgreSQL
+application settings.
+
+For a repeat check from the repository root:
+
+```powershell
+$launcherPath = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+.\Start-PhotoIdentity.ps1 -ConfigurationPath $launcherPath -ValidateConfigurationOnly
+$verified = .\Get-PhotoIdentityApprovedInference.ps1 -ConfigurationPath $launcherPath -VerifyOllama
+$verified.OllamaVerified   # Expected: True while the approved bridge is running
+```
+
+The configured loopback origin proves only the API-to-bridge hop; the
+bridge forwards caption thumbnails to the operator-controlled Azure
+infrastructure. **Do not interpret a loopback URL as local-only processing.**
+Do not copy the maintainer's remote URL, private paths or personal media
+into repository examples.
+
 ## Feasibility review
 
 | Candidate | Decision | Consumer and boundary |
@@ -62,7 +113,8 @@ The JSON above is **illustrative only**. Angle-bracket placeholders fail
 digest/URL validation until replaced. Keep the rest of your existing
 launcher keys, especially the PostgreSQL reference, video tool pins and
 archive settings. To route captions through an authorized bridge, use
-its actual loopback listening origin (for example port 11435) in
+its actual loopback listening origin (the maintained host currently uses
+port **11434**; the historical October bridge procedure used **11435**) in
 `CaptionEnrichment__OllamaBaseUrl`; **never** put an Azure hostname there.
 
 ## PowerShell and CLI usage
