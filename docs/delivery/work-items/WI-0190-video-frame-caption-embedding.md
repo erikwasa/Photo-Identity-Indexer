@@ -698,6 +698,54 @@ required. Formal WI-0190 stays `in_progress`, **0/4 full criteria
 accepted**, and **no new local video work is needed merely to review
 this PR**.
 
+## Development checkpoint 14 — crash-safe owned temporary workspace recovery (2026-11-01)
+
+After PR #692 merged, the read-only representative acceptance report
+combines actual current v38 frame evidence with optional operator
+scene/caption/relevance/resource measurements; it does not close real
+Windows interruption acceptance. The registered-proxy frame producer
+already normally removes its random private work folder in a
+`finally` block, but an abnormal process exit/power loss does
+not run `finally`, leaving a nonempty scratch root that correctly
+prevents a new selected one-shot.
+
+This checkpoint adds **explicit opt-in, local-only crash scratch
+recovery**. Newly created frame workspaces now have an exact child
+ownership marker plus a live **OS-exclusive file lock** for their
+entire processing attempt. A new `video frames scratch-recover`
+command validates the same previously approved OS-temp-only root
+and its root marker, discovers only exact GUID-named, marker-owned
+child workspaces, checks a hard age threshold (6–720 hours, 24h
+default), verifies every file recursively against reparse links,
+a 256-entry cap and 320-MiB byte cap, and refuses a still-live
+workspace lock. It performs a **dry-run by default** and does
+not delete even a valid orphan unless the operator supplies
+`--apply --acknowledge-private-scratch-deletion`. Unknown/unmarked
+siblings block all deletion. Numeric output never reveals private
+names, source paths or model inputs. The production workspace
+remains exclusively local; no database, Azure, FFmpeg, media, model,
+hydration or job work occurs during recovery.
+
+Normal success/cancel still closes the lock then cleans its child
+workspace. A hard crash leaves an aged, unlocked, owned orphan that
+can be safely reclaimed **manually** without authorizing a new
+video run. Synthetic filesystem tests cover active-lock refusal,
+premature age, unknown/unmarked entry blocking, symlink descendant
+refusal, explicit apply, post-cleanup ownership and numeric redaction.
+See the [checkpoint 14 recovery runbook](../../operations/video-frame-scratch-crash-recovery.md).
+
+**Limitations:** legacy scratch folders from a build without the
+child marker are *not* automatically deleted; recovery does not
+purge the DB job, replace v38 lease-expiry fencing or validate an
+actual FFmpeg/Ollama process kill. The prior maintained-host
+two-frame success remains accepted and need not be repeated to
+review this PR. A **separate real Windows interruption and
+cleanup test on approved disposable private media** is still
+necessary for formal acceptance. WI-0190 stays `in_progress`,
+**0/4 complete formal criteria**; other open gates include
+representative five-class clips, caption/retrieval relevance and
+CPU/GPU/Azure costs.
+
 ## Completion notes
 
 - Files changed:
