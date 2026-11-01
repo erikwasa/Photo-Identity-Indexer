@@ -37,6 +37,35 @@ proposed. **M30 is not complete**. See
 [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) and the
 [frame-sampling runbook](../../operations/video-frame-evidence-sampling.md).
 
+## WI-0190 maintained-host video-coverage deferral (2026-11-01)
+
+The maintainer confirmed the legacy 720p queued jobs were runnable with
+the approved matching FFmpeg digest and preset: the video queue cleared
+without failures, and the user-visible completed count increased to 23.
+A subsequent read-only PostgreSQL query found 24 published proxy receipts
+across the 540p/720p profiles (different query scopes/snapshots; do not
+assume these counts are identical). Longest published source: 49.4 seconds.
+Metadata inspection includes 25 HLG videos and several longer Rec.709
+sources rejected by the current proxy pixel-format/rotation policy.
+
+For WI-0190, **do not increase video input support merely to satisfy the
+full representative-clip list**. The supported short/rotated SDR proxy
+cohort remains available for current frame-caption/embedding, scene,
+retrieval, throughput and cost testing. Positive evaluation on HLG,
+`yuvj420p`, NULL-rotation, longer/larger or other unsupported inputs
+is **postponed, not accepted** until the respective admission/format
+capabilities expand and are verified. Missing genuine landscape, low-light
+or multi-scene footage is similarly postponed individually if no usable
+supported clip is found. Synthetic long/scene sampling, explicit
+unsupported-input rejection and all privacy/atomic-publication/worker
+guards remain mandatory.
+
+[WI-0190's maintained-host coverage matrix](../work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01)
+records the reopen triggers. WI-0190 and M30 remain **in progress**;
+postponed checks are not automatically passed. Any broader proxy/
+video-input work must be separately scoped in a repository workitem,
+not activated as an implicit change to WI-0190.
+
 ## WI-0190 registered-proxy model pilot (2026-10-31)
 
 A third checkpoint offers an **explicit opt-in, read-only** evaluation
