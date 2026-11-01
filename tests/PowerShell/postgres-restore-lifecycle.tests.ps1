@@ -159,7 +159,7 @@ finally {
 $script:sessionRows = @('autovacuum worker|2', 'client backend|1')
 function Invoke-RestoreAdminSql {
     param([string]$Sql)
-    if ($Sql -notlike 'SELECT CASE WHEN backend_type IN (*') {
+    if ($Sql -notlike 'SELECT kind || '*') {
         throw 'Unexpected session-summary SQL.'
     }
     return $script:sessionRows
