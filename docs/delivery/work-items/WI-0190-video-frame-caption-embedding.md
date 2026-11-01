@@ -761,7 +761,17 @@ both reconstruct the exact plan; four requested frames must yield
 four valid distinct timestamps before a dry-run is admitted.
 The runner now independently rejects any manually constructed
 out-of-range frame count before touching its local database or
-approved scratch. The scene-policy identity, tool digest, revision
+approved scratch. The historic interval identity did not encode requested frame count,
+which could collide with a previous succeeded two-frame job for the
+same source/tool. The new interval policy explicitly encodes **1, 3
+or 4 frames** (video-frame-sampling-interval-v2-n1/n3/n4),
+while retaining the previous exact two-frame identity and allowing
+prior v38 rows to regenerate using their stored requested_frames.
+The existing manual scene policy already includes frame count
+and cuts. Pure tests compare deterministic job keys and restore
+the exact new interval policy without migrating old evidence.
+
+The scene-policy identity, tool digest, revision
 and preset remain in the existing deterministic job key; the
 two-frame published jobs are unchanged.
 
