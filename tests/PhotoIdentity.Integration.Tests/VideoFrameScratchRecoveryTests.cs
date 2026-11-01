@@ -1,4 +1,5 @@
 using PhotoIdentity.Cli;
+using PhotoIdentity.Core.Processing;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -98,6 +99,12 @@ public sealed class VideoFrameScratchRecoveryTests
         {
             var (orphan, lease) = CreateWorkspace(root);
             File.WriteAllText(Path.Combine(orphan, "private-transient-frame.jpg"), "synthetic");
+            // The real FFmpeg supervisor creates its own marked temporary
+            // child. This MUST now be nested below the producer lock so
+            // hard-exit recovery can reclaim both the proxy and tool scratch.
+            string ffmpegChild = VideoScratchOwnership.Create(orphan, "video-tool");
+            File.WriteAllText(Path.Combine(ffmpegChild, "frame-output.jpg"),
+                "synthetic-ffmpeg-output");
             Age(orphan);
 
             var active = VideoFrameScratchRecovery.InspectAndRecover(
@@ -121,6 +128,7 @@ public sealed class VideoFrameScratchRecoveryTests
             Assert.Equal(1, clean.RemovedWorkspaces);
             Assert.False(clean.Blocked);
             Assert.False(Directory.Exists(orphan));
+            Assert.False(Directory.Exists(ffmpegChild));
             Assert.True(File.Exists(Path.Combine(root,
                 VideoFrameEvidenceScratchGuard.MarkerName)));
             Assert.Equal(root, VideoFrameEvidenceScratchGuard.Validate(root));
