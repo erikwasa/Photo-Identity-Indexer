@@ -52,7 +52,7 @@ try {
 
     $inspection = & $tool -BackupRoot $root -InspectBackup -BackupPath $a.Path
     Check ($inspection.Role -eq 'unclassified' -and $inspection.ManifestHashAndSizeValid) 'unclassified candidate inspection'
-    Check ($inspection.EligibleForCheckpointPromotion -and -not $inspection.RemoteCopyIndependentlyConfirmed) 'restore-verified local candidate without remote attestation'
+    Check ($inspection.EligibleForCheckpointPromotion -and -not $inspection.RemoteConfirmationRecorded) 'restore-verified local candidate without remote attestation'
     $missing = & $tool -BackupRoot $root -InspectBackup -BackupPath $noReport.Path
     Check (-not $missing.EligibleForCheckpointPromotion) 'no restore report means no checkpoint'
     $list = @(& $tool -BackupRoot $root)
