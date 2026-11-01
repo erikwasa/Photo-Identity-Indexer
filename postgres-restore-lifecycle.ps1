@@ -144,8 +144,8 @@ FROM pg_stat_progress_vacuum WHERE datname = '$Name';
             }
         }
     )
-    $analyze = @($rows | Where-Object { $_ -match '^analyze\\|' })
-    $vacuum = @($rows | Where-Object { $_ -match '^vacuum\\|' })
+    $analyze = @($rows | Where-Object { $_ -match '^analyze\|' })
+    $vacuum = @($rows | Where-Object { $_ -match '^vacuum\|' })
     if ($analyze.Count -ne 1 -or $vacuum.Count -ne 1) {
         throw 'Incomplete maintenance-progress diagnostic summary.'
     }
