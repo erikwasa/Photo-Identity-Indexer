@@ -65,6 +65,10 @@ try {
         $approved.OllamaBaseUrl -ne "http://127.0.0.1:11435") {
         throw "Inference reader did not return the approved configuration."
     }
+    $azureOnly = & $reader -ConfigurationPath $configPath -AzureUpstreamOnly
+    if ($azureOnly.AzureOllamaUpstreamUrl -ne "https://approved.example.test") {
+        throw "Azure-only configuration could not be resolved."
+    }
     # A valid hex pin must still match the actual bytes.
     $settings.PhotoIdentity__SemanticSearch__ModelSha256 = ("b" * 64)
     Write-Fixture -Settings $settings
