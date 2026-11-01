@@ -66,7 +66,7 @@ function Get-RestoreSessionSummary {
     }
     # Categories are fixed on the server before any diagnostic values are
     # returned. Unrecognized extension worker labels collapse to 'other'.
-    $sql = "SELECT CASE WHEN backend_type IN ('client backend','autovacuum worker','parallel worker','background worker','logical replication worker') THEN backend_type ELSE 'other' END || '|' || COUNT(*)::text FROM pg_stat_activity WHERE datname = '$Name' GROUP BY 1 ORDER BY 1;"
+    $sql = "SELECT kind || '|' || COUNT(*)::text FROM (SELECT CASE WHEN backend_type IN ('client backend','autovacuum worker','parallel worker','background worker','logical replication worker') THEN backend_type ELSE 'other' END AS kind FROM pg_stat_activity WHERE datname = '$Name') scoped GROUP BY kind ORDER BY kind;"
     $rows = @(Invoke-RestoreAdminSql -Sql $sql)
     foreach ($line in $rows) {
         $parts = @(([string]$line).Split('|'))
