@@ -12,3 +12,9 @@ blocker_notes: []
 evidence:
 - type: documentation
   value: docs/operations/postgres-wi0209-backup-retention.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/701
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/702
+- type: maintainer_verification
+  value: '2026-11-01: 49 disposable PowerShell safety assertions passed. The previously full-size restore-verified wi0208-acceptance-20261101-142600.dump (2,398,115,284 bytes) was uploaded to OneDrive, then independently downloaded to a separate local directory; both local and retrieved SHA-256 matched 5d743b0821b6bdcbc72ee5c6e2d749ffb592ef5f01331ab2566efb83a163f759. Exact protected checkpoint registration succeeded; subsequent inspection confirmed recovery-checkpoint role and remote attestation recorded. No other real backups deleted or classified. Remaining acceptance: practical disposable-root operator retirement/replacement rehearsal.'
