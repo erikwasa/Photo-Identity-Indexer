@@ -214,7 +214,7 @@ public static class VideoFrameSelectedOneShotCommandRunner
         try
         {
             samplingPolicy = options.SceneCutsMs is null
-                ? VideoFrameSamplingPlanner.PolicyVersion
+                ? VideoFrameSceneSamplingIdentity.CreateInterval(options.Frames)
                 : VideoFrameSceneSamplingIdentity.Create(
                     options.Frames, options.SceneCutsMs,
                     (long)decimal.Round(duration * 1000m, 0,
