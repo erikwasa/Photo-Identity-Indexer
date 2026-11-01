@@ -116,6 +116,10 @@ public static class Program
                     await VideoSyntheticFramePilotCommandRunner.RunAsync(
                         VideoSyntheticFramePilotOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "frames" && args[2] == "acceptance-report" =>
+                    await VideoFrameAcceptanceReportCommandRunner.RunAsync(
+                        VideoFrameAcceptanceReportOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "evaluate-live" =>
                     await VideoFrameLiveRetrievalCommandRunner.RunAsync(
                         VideoFrameLiveRetrievalOptions.Parse(args.Skip(3).ToArray()),
@@ -335,6 +339,12 @@ public static class Program
                                     (read-only current evidence; human-annotated cuts;
                                      numeric missed-scene audit and counterfactual plans;
                                      no FFmpeg, caption/vector output, or scene detection)
+              video frames acceptance-report --postgres-connection-env NAME
+                                             --database DB --manifest ABS_LOCAL_JSON
+                                             (read-only multi-clip currentness,
+                                              scene coverage, storage, human-reported costs;
+                                              numeric aggregate only, never auto-accept)
+
               video frames evaluate-live --postgres-connection-env NAME --database DB
                                          --judgments ABS_LOCAL_JSON
                                          --clip-model ABS_LOCAL_ONNX --clip-model-sha256 HEX
