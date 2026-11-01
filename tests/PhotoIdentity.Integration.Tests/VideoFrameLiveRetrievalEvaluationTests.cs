@@ -101,7 +101,7 @@ public sealed class VideoFrameLiveRetrievalEvaluationTests
                     await using NpgsqlCommand insert = conn.CreateCommand();
                     insert.CommandText = """
                         INSERT INTO sources(id,kind,root_locator,created_at_utc)
-                        VALUES (@source,'local-folder','live-retrieval-test',now());
+                        VALUES (@source,'local-folder',@root_locator,now());
                         INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
                         VALUES (@asset,@source,'private-video.mp4',now(),'video');
                         INSERT INTO asset_revisions(id,asset_id,content_sha256,
@@ -137,6 +137,10 @@ public sealed class VideoFrameLiveRetrievalEvaluationTests
                             decode('0000803f00000000','hex'));
                         """;
                     insert.Parameters.AddWithValue("source", sources[i]);
+                    // sources(kind, root_locator) is unique even when
+                    // each test video has a different source UUID.
+                    insert.Parameters.AddWithValue("root_locator",
+                        "live-retrieval-test-" + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
                     insert.Parameters.AddWithValue("asset", assets[i]);
                     insert.Parameters.AddWithValue("revision", revisions[i]);
                     insert.Parameters.AddWithValue("job", jobs[i]);
