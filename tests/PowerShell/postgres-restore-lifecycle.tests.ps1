@@ -10,6 +10,9 @@ $script:throwDrop = $false
 $script:record = $null
 $script:postDropMissing = $true
 $script:checked = 0
+$script:detailChecks = 0
+$script:transientBusyChecks = 0
+$script:markerFlipAfterChecks = 0
 
 function Assert-Condition {
     param([bool]$Condition, [string]$Message)
@@ -27,7 +30,23 @@ function Assert-Throws {
 # Override only the Podman/SQL boundary, not the ownership gate under test.
 function Get-RestoreDatabaseDetails {
     param([string]$Name)
+    $script:detailChecks++
     if ($script:dropCalls -gt 0 -and $script:postDropMissing) { return $null }
+    if ($null -eq $script:record) { return $null }
+    if ($script:markerFlipAfterChecks -gt 0 -and
+        $script:detailChecks -gt $script:markerFlipAfterChecks) {
+        $script:record.Marker = 'photoidentity-restore:v1:' + ('c' * 32) + ':' + ('b' * 64)
+    }
+    if ($script:transientBusyChecks -gt 0) {
+        $script:transientBusyChecks--
+        return [pscustomobject]@{
+            Name = $script:record.Name
+            Marker = $script:record.Marker
+            Owned = $script:record.Owned
+            Bytes = $script:record.Bytes
+            Sessions = 1
+        }
+    }
     return $script:record
 }
 function Invoke-RestoreDrop {
@@ -37,6 +56,9 @@ function Invoke-RestoreDrop {
 }
 function Reset-Record {
     $script:dropCalls = 0
+    $script:detailChecks = 0
+    $script:transientBusyChecks = 0
+    $script:markerFlipAfterChecks = 0
     $script:throwDrop = $false
     $script:postDropMissing = $true
     $script:record = [pscustomobject]@{
@@ -77,6 +99,33 @@ Reset-Record
 $script:record.Sessions = 1
 Assert-Throws { Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker -SourceDatabase 'photoidentity_main' } 'live session'
 Assert-Condition ($script:dropCalls -eq 0) 'active connection never terminated'
+
+# Automatic cleanup tolerates short-lived sessions, with strict bounds and
+# revalidated marker on EVERY attempt. Manual cleanup above remains immediate.
+Reset-Record
+$script:transientBusyChecks = 2
+Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+    -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 3 -SessionWaitMilliseconds 1
+Assert-Condition ($script:dropCalls -eq 1) 'transient sessions allow one safe drop after becoming idle'
+Assert-Condition ($script:detailChecks -eq 4) 'two busy probes, idle probe, and post-drop check'
+
+Reset-Record
+$script:record.Sessions = 1
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 3 -SessionWaitMilliseconds 1
+} 'persistent sessions still prevent automatic cleanup'
+Assert-Condition ($script:detailChecks -eq 3 -and $script:dropCalls -eq 0) 'bounded busy probes never drop'
+
+Reset-Record
+$script:transientBusyChecks = 1
+$script:markerFlipAfterChecks = 1
+Assert-Throws {
+    Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker `
+        -SourceDatabase 'photoidentity_main' -SessionWaitAttempts 3 -SessionWaitMilliseconds 1
+} 'changed ownership during retry fails closed'
+Assert-Condition ($script:dropCalls -eq 0 -and $script:detailChecks -eq 2) 'ownership rechecked before drop'
+
 Reset-Record
 $script:record = $null
 Assert-Throws { Remove-OwnedRestoreDatabase -Name $script:validName -ExpectedMarker $script:validMarker -SourceDatabase 'photoidentity_main' } 'missing target'
