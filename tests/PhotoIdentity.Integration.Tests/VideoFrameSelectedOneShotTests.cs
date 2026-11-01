@@ -54,6 +54,10 @@ public sealed class VideoFrameSelectedOneShotTests
             options.Producer.SelectedProxyJobId);
         Assert.Equal(new string('b', 64), options.Producer.ExpectedClipSha256);
         Assert.Equal(new string('c', 64), options.Producer.ExpectedOllamaSha256);
+        var bridged = VideoFrameSelectedOneShotOptions.Parse(
+            [.. Valid(root), "--ollama-base-url", "http://127.0.0.1:11435/"]);
+        Assert.Equal("http://127.0.0.1:11435/",
+            bridged.Producer.OllamaBaseUri!.AbsoluteUri);
         Assert.True(VideoFrameSelectedOneShotOptions.Parse(
             [.. Valid(root), "--apply",
             "--acknowledge-isolated-v38-rehearsal",
@@ -68,6 +72,8 @@ public sealed class VideoFrameSelectedOneShotTests
             new[] { "--source", @"C:\private\family.mov" },
             new[] { "--original-path", @"C:\private\family.mov" },
             new[] { "--online-only", "yes" },
+            new[] { "--ollama-base-url", "https://unknown-remote.example/" },
+            new[] { "--ollama-base-url", "http://127.0.0.1:11435/?token=secret" },
             new[] { "--max-frames", "5" },
             new[] { "--max-frames", "3" },
             new[] { "--scene-boundaries-ms", "none" },

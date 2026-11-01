@@ -20,7 +20,8 @@ public sealed record VideoRegisteredFramePilotOptions(
     string ConnectionEnv, string Database, Guid JobId, string CacheRoot,
     string ScratchRoot, string Ffmpeg, string FfmpegSha256,
     string ClipModel, string ClipVocabulary, string ClipMerges,
-    string OllamaModel, int MaximumFrames, string? Query, bool Apply)
+    string OllamaModel, int MaximumFrames, string? Query, bool Apply,
+    Uri? OllamaBaseUri = null)
 {
     public static VideoRegisteredFramePilotOptions Parse(string[] args)
     {
@@ -36,7 +37,7 @@ public sealed record VideoRegisteredFramePilotOptions(
             if (args[i] is not ("--postgres-connection-env" or "--database" or
                 "--job-id" or "--cache-root" or "--scratch-root" or "--ffmpeg" or
                 "--ffmpeg-sha256" or "--clip-model" or "--clip-vocab" or
-                "--clip-merges" or "--ollama-model" or "--max-frames" or "--query") ||
+                "--clip-merges" or "--ollama-model" or "--ollama-base-url" or "--max-frames" or "--query") ||
                 i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(args[i], args[++i]))
                 throw new ArgumentException("Invalid or repeated registered-frame pilot option.");
@@ -73,9 +74,17 @@ public sealed record VideoRegisteredFramePilotOptions(
         if (query is not null && (query.Length is < 1 or > 200 ||
                                   query.Any(char.IsControl)))
             throw new ArgumentException("CLIP comparison query must be 1..200 plain-text characters.");
+        Uri? baseUri = null;
+        if (values.TryGetValue("--ollama-base-url", out string? baseText) &&
+            (!Uri.TryCreate(baseText, UriKind.Absolute, out baseUri) ||
+             !baseUri.IsLoopback || baseUri.Scheme is not ("http" or "https") ||
+             baseUri.AbsolutePath != "/" || baseUri.UserInfo.Length > 0 ||
+             baseUri.Query.Length > 0 || baseUri.Fragment.Length > 0))
+            throw new ArgumentException("Pilot Ollama URL must be a credential-free loopback HTTP(S) origin.");
         return new(env, db, jobId, Absolute("--cache-root"), Absolute("--scratch-root"),
             Absolute("--ffmpeg"), digest, Absolute("--clip-model"),
-            Absolute("--clip-vocab"), Absolute("--clip-merges"), ollama, frames, query, apply);
+            Absolute("--clip-vocab"), Absolute("--clip-merges"), ollama, frames, query, apply,
+            baseUri);
     }
 }
 
@@ -166,7 +175,8 @@ public static class VideoRegisteredFramePilotCommandRunner
                 Timeout = TimeSpan.FromSeconds(200)
             };
             var captionClient = new OllamaVisionCaptionClient(
-                http, OllamaVisionCaptionClient.DefaultBaseUri, options.OllamaModel);
+                http, options.OllamaBaseUri ?? OllamaVisionCaptionClient.DefaultBaseUri,
+                options.OllamaModel);
             LocalVisionModelDescriptor captionModel =
                 await captionClient.GetInstalledModelAsync(deadline.Token);
 

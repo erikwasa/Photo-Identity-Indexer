@@ -98,9 +98,11 @@ $postgresEnv = "PhotoIdentity__Postgres__ConnectionString"
 $database = "photoidentity"
 
 $judgments = Join-Path $env:LOCALAPPDATA "PhotoIdentity\PrivateEvaluation\live-judgments.json"
-$clipModel = "C:\ApprovedPrivateModels\clip-dual-encoder.onnx"
-$vocab = "C:\ApprovedPrivateModels\vocab.json"
-$merges = "C:\ApprovedPrivateModels\merges.txt"
+# Offline hash checks; does not contact Ollama unless -VerifyOllama is set.
+$inference = .\Get-PhotoIdentityApprovedInference.ps1
+$clipModel = $inference.ClipModelPath
+$vocab = $inference.ClipVocabularyPath
+$merges = $inference.ClipMergesPath
 
 $evaluationArgs = @(
     "run", "--project", "src/PhotoIdentity.Cli", "-c", "Release", "--",
@@ -109,11 +111,11 @@ $evaluationArgs = @(
     "--database", $database,
     "--judgments", $judgments,
     "--clip-model", $clipModel,
-    "--clip-model-sha256", (Get-FileHash -LiteralPath $clipModel -Algorithm SHA256).Hash.ToLowerInvariant(),
+    "--clip-model-sha256", $inference.ClipModelSha256,
     "--tokenizer-vocab", $vocab,
-    "--tokenizer-vocab-sha256", (Get-FileHash -LiteralPath $vocab -Algorithm SHA256).Hash.ToLowerInvariant(),
+    "--tokenizer-vocab-sha256", $inference.ClipVocabularySha256,
     "--tokenizer-merges", $merges,
-    "--tokenizer-merges-sha256", (Get-FileHash -LiteralPath $merges -Algorithm SHA256).Hash.ToLowerInvariant(),
+    "--tokenizer-merges-sha256", $inference.ClipMergesSha256,
     "--frame-top-k", "2", "--rank-k", "5"
 )
 dotnet @evaluationArgs

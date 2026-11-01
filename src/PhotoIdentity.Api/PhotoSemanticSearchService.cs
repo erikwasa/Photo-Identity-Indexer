@@ -9,7 +9,11 @@ using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
-public sealed record PhotoSemanticSearchConfiguration(string ModelDirectory)
+public sealed record PhotoSemanticSearchConfiguration(
+    string ModelDirectory,
+    string? ExpectedModelSha256 = null,
+    string? ExpectedVocabularySha256 = null,
+    string? ExpectedMergesSha256 = null)
 {
     public const string DefaultModelFolderName = "clip-vit-base-patch32-b318363";
 
@@ -68,14 +72,28 @@ public sealed class PhotoSemanticSearchModel : IDisposable
                 return _descriptor;
             }
 
-            _initializationAttempted = true;
             if (!_configuration.AssetsExist)
             {
+                _initializationAttempted = true;
                 return null;
             }
 
             string modelSha256 = await ComputeSha256Async(
                 _configuration.ModelPath,
+                cancellationToken);
+            if (_configuration.ExpectedModelSha256 is { } expectedModel &&
+                modelSha256 != expectedModel)
+            {
+                throw new InvalidDataException(
+                    "CLIP model digest differs from operator approval.");
+            }
+            await AssertApprovedDigestAsync(
+                _configuration.TokenizerVocabularyPath,
+                _configuration.ExpectedVocabularySha256,
+                cancellationToken);
+            await AssertApprovedDigestAsync(
+                _configuration.TokenizerMergesPath,
+                _configuration.ExpectedMergesSha256,
                 cancellationToken);
             _encoder = new ClipEmbeddingEncoder(
                 _configuration.ModelPath,
@@ -86,6 +104,7 @@ public sealed class PhotoSemanticSearchModel : IDisposable
                 modelSha256,
                 ClipZeroShotTagger.ImagePreprocessingVersion,
                 PhotoEmbeddingEvidence.Float32L2NormalizedEncoding);
+            _initializationAttempted = true;
             return _descriptor;
         }
         finally
@@ -144,6 +163,21 @@ public sealed class PhotoSemanticSearchModel : IDisposable
         finally
         {
             _inferenceGate.Release();
+        }
+    }
+
+    private static async Task AssertApprovedDigestAsync(
+        string path, string? expected, CancellationToken cancellationToken)
+    {
+        if (expected is null)
+        {
+            return;
+        }
+        string actual = await ComputeSha256Async(path, cancellationToken);
+        if (actual != expected)
+        {
+            throw new InvalidDataException(
+                "CLIP tokenizer asset digest differs from operator approval.");
         }
     }
 

@@ -39,6 +39,28 @@ public sealed class PhotoCaptionEnrichmentContractTests
     }
 
     [Fact]
+    public async Task Approved_clip_digest_rejects_unreviewed_assets_before_onnx_initialization()
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "photoidentity-clip-pin-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "model.onnx"), "synthetic-mismatch");
+            File.WriteAllText(Path.Combine(root, "vocab.json"), "synthetic-vocab");
+            File.WriteAllText(Path.Combine(root, "merges.txt"), "synthetic-merges");
+            using PhotoSemanticSearchModel model = new(
+                new PhotoSemanticSearchConfiguration(root, new string('a', 64)));
+            await Assert.ThrowsAsync<InvalidDataException>(
+                () => model.GetDescriptorAsync());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Production_defaults_reuse_the_successful_bounded_probe()
     {
         Assert.Equal("qwen2.5vl:3b", PhotoCaptionGenerationConfiguration.DefaultModel);

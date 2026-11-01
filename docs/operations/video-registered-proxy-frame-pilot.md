@@ -74,9 +74,12 @@ On Windows PowerShell, from the repository root:
 ```powershell
 $jobId = "<selected-existing-successful-playable-proxy-job-id>"
 $cacheRoot = "<existing-WI0189-private-video-cache-root>"
-$clipModel = "<path-to-existing-CLIP-ONNX-model>"
-$clipVocab = "<path-to-existing-CLIP-vocabulary-json>"
-$clipMerges = "<path-to-existing-CLIP-merges-txt>"
+# Read-only local file/hash preflight; optionally add -VerifyOllama when
+# the intended local runtime or authorized localhost bridge is running.
+$inference = .\Get-PhotoIdentityApprovedInference.ps1 -VerifyOllama
+$clipModel = $inference.ClipModelPath
+$clipVocab = $inference.ClipVocabularyPath
+$clipMerges = $inference.ClipMergesPath
 $approved = .\Get-PhotoIdentityApprovedVideoTools.ps1
 $ffmpeg = $approved.FfmpegPath
 $ffmpegSha = $approved.FfmpegSha256
@@ -93,7 +96,10 @@ $baseArgs = @(
   "--scratch-root", $root, "--ffmpeg", $ffmpeg,
   "--ffmpeg-sha256", $ffmpegSha,
   "--clip-model", $clipModel, "--clip-vocab", $clipVocab,
-  "--clip-merges", $clipMerges, "--max-frames", "2"
+  "--clip-merges", $clipMerges,
+  "--ollama-model", $inference.OllamaModel,
+  "--ollama-base-url", $inference.OllamaBaseUrl,
+  "--max-frames", "2"
 )
 # The preview DOES NOT open PostgreSQL/media/models.
 dotnet @baseArgs
@@ -108,10 +114,10 @@ Get-ChildItem -LiteralPath $root -Force
 
 Verify that the environment variable named above is set; adjust the
 environment-variable name and database if your maintained configuration
-differs. The installed local Ollama model defaults to `qwen2.5vl:3b`;
-optional `--ollama-model` selects another installed model. Model weights
-must be locally available (nothing is downloaded automatically). The
-Ollama endpoint is fixed to loopback.
+differs. The pinned Ollama identity and selected loopback origin now come from the
+launcher resolver. Model weights must already be available (nothing is
+downloaded automatically); a separately authorized bridge may be selected.
+The pilot does not have an automatic Azure fallback.
 
 **Operator evidence to share:** `status`, `frames`, `jpegBytes`,
 `decodingMs`, `modelMs`, optional `retrievalScores`, final temp

@@ -89,7 +89,9 @@ public partial class Program
                 ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
                 ?? PhotoCaptionGenerationConfiguration.DefaultModel,
             captionContextTokens,
-            captionTimeoutSeconds);
+            captionTimeoutSeconds,
+            ParseOptionalSha256(builder.Configuration,
+                "PhotoIdentity:CaptionEnrichment:ApprovedModelSha256"));
 
         int? automaticGeoNamesMinimumRequestInterval = ParseOptionalInt(
             builder.Configuration,
@@ -133,7 +135,13 @@ public partial class Program
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyJpegQuality")));
         builder.Services.AddSingleton(captionConfiguration);
         builder.Services.AddSingleton(new PhotoSemanticSearchConfiguration(
-            Path.GetFullPath(semanticSearchModelDirectory)));
+            Path.GetFullPath(semanticSearchModelDirectory),
+            ParseOptionalSha256(builder.Configuration,
+                "PhotoIdentity:SemanticSearch:ModelSha256"),
+            ParseOptionalSha256(builder.Configuration,
+                "PhotoIdentity:SemanticSearch:VocabularySha256"),
+            ParseOptionalSha256(builder.Configuration,
+                "PhotoIdentity:SemanticSearch:MergesSha256")));
         builder.Services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes"),
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes"),
@@ -327,6 +335,23 @@ public partial class Program
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
+    }
+
+    private static string? ParseOptionalSha256(IConfiguration configuration, string key)
+    {
+        string? value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+        if (value.Length != 64 ||
+            value.Any(character => !((character is >= '0' and <= '9') ||
+                                     (character is >= 'a' and <= 'f'))))
+        {
+            throw new InvalidOperationException(
+                $"Configuration '{key}' must be a lowercase SHA-256 digest.");
+        }
+        return value;
     }
 
     private static long? ParseOptionalLong(IConfiguration configuration, string key)

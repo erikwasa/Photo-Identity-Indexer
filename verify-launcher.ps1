@@ -401,6 +401,14 @@ try {
         throw "Port-specific Photo Identity process already exists before launcher verification: $($preexisting.ProcessId -join ', ')."
     }
 
+    # Enforce the new inference/bridge allowlist and approved-model resolver
+    # with synthetic data before starting the real test host.
+    $inferenceVerification = Join-Path $repositoryRoot "tests\PowerShell\inference-launcher.tests.ps1"
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $inferenceVerification
+    if ($LASTEXITCODE -ne 0) {
+        throw "Synthetic inference launcher verification failed."
+    }
+
     Assert-RejectsInvalidGeoNamesTiming
     Assert-RejectsUnsafeMobileAccess
     Assert-PostgresLauncherConfiguration

@@ -10,6 +10,20 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 # WI-0190: Extract timestamped video-frame captions and visual embeddings
 
+## Configuration checkpoint — centralized approved inference (2026-11-01)
+
+A cross-cutting configuration review confirmed that the existing launcher
+blocked caption and semantic model inputs already consumed by the API.
+The proposed reviewed change adds a fail-closed optional caption digest pin,
+CLIP model/vocabulary/merges pins, a read-only PowerShell resolver, an
+explicit loopback Ollama origin for operator-only video CLI commands, and a
+separate non-exported Azure upstream URL. This is **configuration plumbing**,
+not permission for remote inference, a new video worker, or proof of the
+remaining private-video acceptance criteria. The previously verified
+one-shot evidence remains the accepted checkpoint, subject to the
+[approved inference configuration](../../operations/approved-inference-configuration.md)
+Windows validation procedure before activating newly pinned settings.
+
 ## Objective
 
 Analyze selected clips through bounded frames/scenes and store versioned visual descriptions and embeddings suitable for later video search.

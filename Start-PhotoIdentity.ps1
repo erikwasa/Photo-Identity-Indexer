@@ -37,7 +37,16 @@ $SupportedSettings = @(
     "PhotoIdentity__VideoProcessing__FfprobeSha256",
     "PhotoIdentity__VideoProcessing__CacheRoot",
     "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
-    "PhotoIdentity__VideoProcessing__MaximumProxyMiB"
+    "PhotoIdentity__VideoProcessing__MaximumProxyMiB",
+    "PhotoIdentity__CaptionEnrichment__OllamaBaseUrl",
+    "PhotoIdentity__CaptionEnrichment__Model",
+    "PhotoIdentity__CaptionEnrichment__ApprovedModelSha256",
+    "PhotoIdentity__CaptionEnrichment__ContextTokens",
+    "PhotoIdentity__CaptionEnrichment__TimeoutSeconds",
+    "PhotoIdentity__SemanticSearch__ModelDirectory",
+    "PhotoIdentity__SemanticSearch__ModelSha256",
+    "PhotoIdentity__SemanticSearch__VocabularySha256",
+    "PhotoIdentity__SemanticSearch__MergesSha256"
 )
 
 function Get-LauncherEnvironmentValue {
@@ -64,6 +73,69 @@ function Assert-LauncherSettingValue {
         [Parameter(Mandatory = $true)]
         [string]$Value
     )
+
+    if ($Name -in @(
+        "PhotoIdentity__CaptionEnrichment__ApprovedModelSha256",
+        "PhotoIdentity__SemanticSearch__ModelSha256",
+        "PhotoIdentity__SemanticSearch__VocabularySha256",
+        "PhotoIdentity__SemanticSearch__MergesSha256"
+    )) {
+        if ($Value -cnotmatch '^[0-9a-f]{64}$') {
+            throw "$Name must be a lowercase SHA-256 digest (64 hex characters)."
+        }
+        return
+    }
+
+    if ($Name -eq "PhotoIdentity__CaptionEnrichment__OllamaBaseUrl") {
+        [uri]$uri = $null
+        if (-not [uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$uri) -or
+            -not $uri.IsLoopback -or
+            $uri.Scheme -notin @("http", "https") -or
+            $uri.AbsolutePath -ne "/" -or
+            $uri.UserInfo -or $uri.Query -or $uri.Fragment) {
+            throw "$Name must be a credential-free loopback HTTP(S) origin."
+        }
+        return
+    }
+
+    if ($Name -eq "PhotoIdentity__CaptionEnrichment__Model") {
+        if ($Value.Length -lt 1 -or $Value.Length -gt 100 -or
+            $Value -notmatch '^[A-Za-z0-9][A-Za-z0-9._:/-]*$') {
+            throw "$Name must be a bounded Ollama model identifier."
+        }
+        return
+    }
+
+    if ($Name -in @(
+        "PhotoIdentity__CaptionEnrichment__ContextTokens",
+        "PhotoIdentity__CaptionEnrichment__TimeoutSeconds"
+    )) {
+        [int]$parsed = 0
+        if (-not [int]::TryParse($Value, [ref]$parsed) -or
+            ($Name -like '*ContextTokens' -and ($parsed -lt 256 -or $parsed -gt 32768)) -or
+            ($Name -like '*TimeoutSeconds' -and ($parsed -lt 30 -or $parsed -gt 1800))) {
+            throw "$Name is outside its supported integer range."
+        }
+        return
+    }
+
+    if ($Name -eq "PhotoIdentity__SemanticSearch__ModelDirectory") {
+        if ($Value -notmatch '^[A-Za-z]:[\\/]' -or
+            -not (Test-Path -LiteralPath $Value -PathType Container)) {
+            throw "$Name must reference an existing local absolute directory."
+        }
+        $cursor = [IO.Path]::GetFullPath($Value)
+        while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            if (((Get-Item -LiteralPath $cursor -Force).Attributes -band
+                [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "$Name must not use junctions or symbolic links."
+            }
+            $parent = Split-Path -Parent $cursor
+            if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) { break }
+            $cursor = $parent
+        }
+        return
+    }
 
     if ($Name -in @(
         "PhotoIdentity__VideoProcessing__FfmpegSha256",
@@ -358,6 +430,7 @@ function Read-LauncherConfiguration {
     $publishPath = Join-Path $localApplicationRoot "app"
     $url = "http://127.0.0.1:5080"
     $settings = @{}
+    $operatorConfiguration = [pscustomobject]@{ AzureOllamaUpstreamUrl = $null }
     $configurationDirectory = $null
     $postgresConnectionEnvironmentVariable = $null
     $mobileAccess = [pscustomobject]@{
@@ -413,6 +486,29 @@ function Read-LauncherConfiguration {
                 $settings[$property.Name] = $value
             }
         }
+        if ($null -ne $parsed.PSObject.Properties["operator"] -and
+            $null -ne $parsed.operator) {
+            $operatorSection = $parsed.operator
+            if ($operatorSection -isnot [pscustomobject]) {
+                throw "operator must be a JSON object."
+            }
+            foreach ($property in $operatorSection.PSObject.Properties) {
+                if ($property.Name -ne "azureOllamaUpstreamUrl") {
+                    throw "Unsupported operator configuration property '$($property.Name)'."
+                }
+                if ($null -eq $property.Value) { continue }
+                $urlValue = ([string]$property.Value).Trim()
+                [uri]$upstream = $null
+                if (-not [uri]::TryCreate($urlValue, [UriKind]::Absolute, [ref]$upstream) -or
+                    $upstream.Scheme -ne "https" -or $upstream.IsLoopback -or
+                    $upstream.UserInfo -or $upstream.Query -or $upstream.Fragment -or
+                    $upstream.AbsolutePath -ne "/") {
+                    throw "operator.azureOllamaUpstreamUrl must be a credential-free remote HTTPS origin."
+                }
+                $operatorConfiguration.AzureOllamaUpstreamUrl = $upstream.AbsoluteUri.TrimEnd('/')
+            }
+        }
+
         $videoToolKeys = @(
             "PhotoIdentity__VideoProcessing__FfmpegPath",
             "PhotoIdentity__VideoProcessing__FfmpegSha256",
@@ -468,6 +564,7 @@ function Read-LauncherConfiguration {
         PublishPath = [IO.Path]::GetFullPath($publishPath)
         BaseUri = $baseUri
         Settings = $settings
+        Operator = $operatorConfiguration
         CatalogueProvider = "postgresql"
         PostgresConnectionEnvironmentVariable = $postgresConnectionEnvironmentVariable
         MobileAccess = $mobileAccess
