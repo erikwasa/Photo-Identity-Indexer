@@ -93,12 +93,15 @@ $inference |
 # These do not add --apply or disclosure acknowledgements.
 ```
 
+The `-AzureUpstreamOnly` mode validates just the Azure origin and can be
+used from a management shell without installed CLIP/Ollama models.
 The helper **does not** set any environment variables, start Ollama,
 hydrate online-only media, download model files, or contact Azure. Its
 `AzureOllamaUpstreamUrl` is for the operator's separate bridge command:
 
 ```powershell
-$inference = .\Get-PhotoIdentityApprovedInference.ps1
+# Upstream address retrieval does not require installed CLIP or Ollama.
+$inference = .\Get-PhotoIdentityApprovedInference.ps1 -AzureUpstreamOnly
 if (-not $inference.AzureOllamaUpstreamUrl) {
     throw "No operator-authorized Azure upstream was configured."
 }
