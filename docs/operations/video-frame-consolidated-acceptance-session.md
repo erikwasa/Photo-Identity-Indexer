@@ -87,12 +87,31 @@ cpuMeasuredClips=0, gpuMeasuredClips=0,
 azureCostMeasuredClips=0; reported zero totals are
 **not** measured zero cost. fullAcceptanceEstablished=false.
 
-**Next:** perform the [private live CLIP retrieval quality test](video-frame-live-retrieval-evaluation.md)
-using these two existing FrameEvidence jobs and independently judged
-text queries. The local retrieval evaluator reads stored vectors
-and encodes text only; it does not call Ollama/Azure, regenerate
-frames or use FFmpeg. The separate hard-interruption test must
-remain restricted to a disposable isolated PostgreSQL database.
+**Completed local CLIP retrieval (2026-11-02):**
+The maintainer privately judged two distinct text queries (one relevant
+video per query) against these two previously audited FrameEvidence
+batches. Read-only **video frames evaluate-live** exited 0 using
+the original approved WI-0126 model, 8 persisted 512-dimensional
+vectors, and loopback PostgreSQL. **All three** candidate policies
+(maximum frame, top-2 mean, deduplicated pooled) achieved
+Hit@2=1.00, MRR@2=1.00, Recall@2=1.00,
+MAP@2=1.00 and nDCG@2=1.00. With one relevant clip per
+query, MRR=1.00 establishes both were first-ranked; a
+two-video corpus does not establish representative ranking
+quality. Phase wall times: 608 ms model preflight, 17,320 ms
+local text encoding, 276 ms database snapshot, 27 ms scoring.
+No originals, OneDrive hydration, model network endpoint,
+FFmpeg, new video job or schema mutation was used.
+See the [verified live retrieval report and Windows procedure](video-frame-live-retrieval-evaluation.md).
+
+**Remaining:** genuine operator-annotated scene coverage on eligible
+media (or a case-specific documented postponement), explicit
+negative/revision/exclusion/cancellation gates with non-skipped
+disposable PostgreSQL tests, attributable full-system CPU/GPU/
+Azure cost and proxy/database storage accounting, and the
+**real owned-process interruption plus delayed scratch recovery**
+in a *disposable* database only. The independent two-video
+caption and retrieval success should not be rerun by default.
 
 ## What is measured
 
