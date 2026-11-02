@@ -44,7 +44,8 @@ public static class VideoLibraryEndpoints
             page.Items.Select(item => new VideoLibraryItemResponse(
                 item.RevisionId.ToString(), item.InspectionStatus,
                 item.DurationSeconds, item.Width, item.Height,
-                item.RotationDegrees, item.CaptureAtUtc, item.HasPoster)).ToArray(),
+                item.RotationDegrees, item.CaptureAtUtc, item.HasPoster,
+                item.HasPlayableProxy)).ToArray(),
             page.Offset, page.Limit, page.HasMore));
     }
 
