@@ -316,7 +316,7 @@ public sealed class PostgresPhotoSearchRepositoryTests
             INSERT INTO asset_revisions (id, asset_id, content_sha256,
                 size_bytes, observed_at_utc, media_type, width, height, media_kind)
             VALUES (@video_revision, @video_asset, repeat('f',64),
-                123, @now, 'video/quicktime', 1000, 700, 'video');
+                4000, @now, 'video/quicktime', 1000, 700, 'video');
 
             INSERT INTO archive_review_proxy_profiles (
                 profile_id,
