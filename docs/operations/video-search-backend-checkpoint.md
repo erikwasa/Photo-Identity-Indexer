@@ -194,8 +194,8 @@ new Azure processing solely because a poster is absent.
   at read-snapshot time. This initial API does not confirm on-disk poster
   or playable-proxy presence for each result; poster bytes remain guarded
   separately by the existing video endpoint.
-- A separate Video Search browser page is now in checkpoint-2 development,
-  pending build and manual UI acceptance. There is still no video collection
-  integration or unattended processing. Poster availability, maintained
-  browser verification, larger-set relevance and negative-case integration
-  tests remain pending.
+- The separate Video Search browser page was accepted for basic use on the
+  maintained host; two newer search results lack durable still posters.
+  Poster diagnosis, larger-set relevance, negative-case eligibility and
+  photo-ranking/performance comparisons remain outstanding. No video
+  collection integration or unattended processing is introduced.
