@@ -111,6 +111,12 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/711
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/712
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/713
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/714
 - id: WI-0196
   title: Define TV portrait-viewing benchmark and safe-framing rules
   milestone: M38
