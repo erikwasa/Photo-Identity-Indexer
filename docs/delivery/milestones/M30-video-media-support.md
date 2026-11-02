@@ -10,9 +10,10 @@ depends_on: [M19, M22, M24, M27]
 ## Scheduling status
 
 **M30 is in_progress, not completed.** WI-0190 is completed;
-WI-0191 has now started with an isolated, opt-in read-only Video Search
-backend (checkpoint 1). The separate browser view and maintained-library
-verification are not delivered yet. The other video items remain proposed.
+WI-0191 has delivered an opt-in read-only Video Search API,
+with a successful three-video maintainer pilot and a new dedicated
+browser page implemented on the current WI-0191 branch (checkpoint 2,
+pending UI review). The other video items remain proposed.
 This does not reactivate WI-0190's deferred acceptance work. WI-0150 architecture,
 WI-0151 video metadata/posters, WI-0188 isolated local video
 processing and WI-0189 versioned playable proxies were previously
