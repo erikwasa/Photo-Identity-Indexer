@@ -10,7 +10,5 @@ blockers:
 - WI-0144
 blocker_notes: []
 evidence:
-- type: scope_decision
-  value: '2026-11-02: maintainer deferred collections, limited desired video metadata to capture date/time, GPS/optional altitude, make/model, duration, resolution and FPS; video-enabled Smart Collection filters postponed to separate decision.'
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
