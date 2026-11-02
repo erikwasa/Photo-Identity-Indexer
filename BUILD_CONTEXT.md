@@ -12,8 +12,8 @@ photo search and saved-collection fixture, then asserts unchanged
 photo membership/order/score/counts and saved selections, with
 video still discoverable only from separate Video Search. A
 read-only Photo/Video/Photo maintainer smoke script compares the
-same behavior without exposing private media IDs or captions. CI is
-pending; no claim of historical photo latency equivalence or
+same behavior without exposing private media IDs or captions. The workflow classifier was extended narrowly to run the disposable
+PostgreSQL CI lane for this test-only change. CI is pending; no claim of historical photo latency equivalence or
 larger-video-corpus relevance. Next: review CI, optional one-time
 operator smoke, then scoped WI-0191 acceptance without new poster,
 Azure, OneDrive or performance engineering. See
