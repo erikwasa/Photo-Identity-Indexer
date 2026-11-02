@@ -33,7 +33,7 @@ public sealed class VideoSearchRankerTests
         Assert.Equal(1000L, found[0].TimestampMilliseconds);
         Assert.Equal("interval-v2-n2", found[0].SamplingPolicyVersion);
         Assert.Equal("caption-model", found[0].CaptionModelId);
-        Assert.Equal(First, Assert.Single(found.Where(x => x.RevisionId == First)).RevisionId);
+        Assert.Equal(First, Assert.Single(found, x => x.RevisionId == First).RevisionId);
     }
 
     [Fact]
