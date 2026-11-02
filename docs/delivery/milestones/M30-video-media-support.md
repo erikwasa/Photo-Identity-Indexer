@@ -36,6 +36,20 @@ authorized by a search request. See
 [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) and
 [operator verification](../../operations/video-search-backend-checkpoint.md).
 
+## WI-0191 dedicated video-search browser checkpoint (2026-11-02)
+
+A separate `/video-search` page is implemented for already published
+FrameEvidence with Visual/Caption/Combined modes, matching frame
+timestamp, caption and evidence provenance, and validated existing
+poster routes with a missing-poster fallback. The Video Library opt-in
+gates the controls and the backend still requires that flag. Navigation
+is separate from photo Search, which retains its existing contracts,
+scope and saved selection workflows. This is a browser-development
+checkpoint **pending Windows CI and human UI review**, not WI-0191
+completion; no video playback/Smart Collections, source hydration or
+automatic search-time processing is introduced. See
+[WI-0191](../work-items/WI-0191-video-semantic-caption-search.md).
+
 **WI-0190 current maintainer verification (2026-11-02):**
 Two different supported short/rotated published SDR proxies have
 each produced **four durable timestamped frame captions and
