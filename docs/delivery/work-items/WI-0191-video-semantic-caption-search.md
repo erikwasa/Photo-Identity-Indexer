@@ -248,7 +248,9 @@ measurements from both builds.
 This is a real cross-media persistence/ranking/collection regression,
 not an extra indexing system. No schema or production search changes,
 new poster generation, original-video access, OneDrive hydration,
-Azure inference or live catalogue writes are made. Windows CI and
+Azure inference or live catalogue writes are made. The PR classifier explicitly activates the disposable PostgreSQL
+package-verification lane when this mixed-photo/video test file changes,
+including test-only PRs. Windows CI and
 optional maintainer smoke are pending; the existing **2/5** accepted
 criteria remain unchanged until evidence is reviewed.
 
