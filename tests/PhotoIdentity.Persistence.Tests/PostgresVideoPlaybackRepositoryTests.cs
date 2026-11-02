@@ -148,6 +148,27 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                     DateTimeOffset.UtcNow);
             Assert.Null(await playback.OpenCurrentAsync(
                 AssetRevisionId.From(revision), cache));
+
+            // Remove only this disposable test exclusion, then advance the
+            // catalogue's current revision. The old proxy must stay hidden.
+            await using (NpgsqlConnection db = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand advance = db.CreateCommand())
+            {
+                advance.CommandText = """
+                    DELETE FROM source_copy_exclusions
+                    WHERE source_id=@source AND source_key='offline/clip.mov';
+                    INSERT INTO asset_revisions(id,asset_id,content_sha256,
+                        size_bytes,observed_at_utc,media_type,media_kind)
+                    VALUES (@newrevision,@asset,repeat('d',64),5001,
+                        now()+interval '1 minute','video/quicktime','video');
+                    """;
+                advance.Parameters.AddWithValue("source", source);
+                advance.Parameters.AddWithValue("asset", asset);
+                advance.Parameters.AddWithValue("newrevision", Guid.NewGuid());
+                await advance.ExecuteNonQueryAsync();
+            }
+            Assert.Null(await playback.OpenCurrentAsync(
+                AssetRevisionId.From(revision), cache));
         }
         finally
         {
