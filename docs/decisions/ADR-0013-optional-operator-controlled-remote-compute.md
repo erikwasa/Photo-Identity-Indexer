@@ -54,6 +54,38 @@ Bind output to the immutable source revision and behavior-affecting model, promp
 
 The pre-existing ADR-0011 temporary photo-caption bridge remains permitted with its manual activation, exact model digest, HTTPS, guard and shutdown procedures. For **new** offloaded tasks (including video-frame captions/embeddings), first document the approved payload contract, endpoint/runtime supply chain, authentication, exclusion/revision/hydration fences, local validation, retention/purge, concurrency/cost limits, failure/retry behavior, versioned model and input profiles, quality/performance parity evidence and ON/OFF runbook. Track the implementation and evidence in repository-native work items. No remote video-frame worker, full-original transfer, remote transcoding or cloud access to the catalogue is approved merely by this ADR.
 
+## Practical interpretation for M30 (maintainer, 2026-11-02)
+
+The rule is **vetted, operator-controlled processing**, not a
+categorical prohibition on private data leaving the PC and not a
+mandate for new Azure infrastructure every time the existing
+approved bridge is useful.
+
+- Reuse the existing approved and configured application/model
+  bridge when the new task fits its established authentication,
+  transport, purpose, inputs and retention contract. A materially
+  different new service, model supply chain, type of data transfer
+  or remote worker still needs focused review and a scoped
+  implementation decision.
+- Review *real* operational risks: no secrets/OneDrive access or
+  catalogue writer in Azure; authenticated encrypted transport;
+  private temporary media and bounded jobs; exclusion and current
+  revision checks around disclosure/publication; operator ability
+  to disable access and delete managed scratch.
+- Choose sensible quotas/timeouts and retention for the task.
+  **Do not require exhaustive new performance, cloud-accounting,
+  model-parity, third-party-legal or destructive failure studies**
+  before reusing an already accepted path. Investigate materially
+  changed quality, unexpected exposure, unaffordable usage or
+  operational slowness when those arise.
+- The optional cloud executor remains an infrastructure tool,
+  not a separate archive or canonical authority. Opaque, unvetted
+  provider-hosted AI application processing is not authorized.
+
+This section clarifies how to apply the existing safeguards
+proportionately; it does not approve an unimplemented video-frame
+Azure executor or remove task-specific data disclosure consent.
+
 ## Consequences
 
 - Azure is a **permitted optional accelerator**, not the standard workflow or a forbidden processing location.
