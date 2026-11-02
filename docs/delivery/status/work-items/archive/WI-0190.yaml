@@ -1,12 +1,15 @@
 id: WI-0190
 title: Extract timestamped video-frame captions and visual embeddings
 milestone: M30
-status: in_progress
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0190-video-frame-caption-embedding.md
 started_at: 2026-10-31
+completed_at: 2026-11-02
+verified_at: 2026-11-02
+verified_by: maintainer
 last_updated_at: 2026-11-02
-branch: agent/WI-0190-live-retrieval-accepted-closeout-gates-20261102
+branch: docs/WI-0190-pragmatic-maintainer-closeout-20261102
 blockers:
 - WI-0151
 - WI-0188
@@ -43,3 +46,13 @@ evidence:
   value: docs/operations/video-frame-four-scene-selected-one-shot.md
 - type: documentation
   value: docs/operations/video-frame-consolidated-acceptance-session.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/707
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/709
+- type: maintainer_verification
+  value: '2026-11-02: maintainer reported two current four-frame batch audits, 7/8 human caption correctness and successful two-query CLIP retrieval; docs validate and generate --check passed. PR #709 Windows build, fast tests and integration shards passed.'
+- type: scope_decision
+  value: '2026-11-02: maintainer accepted pragmatic WI-0190 scope on already-local selected SDR proxies; broader scenes postponed until video types expand, full Azure cost accounting reconsidered if monthly credit insufficient, performance measured when slow; no destructive interruption rehearsal demanded. Existing safety guards and PostgreSQL backup/restore remain in place; deferrals are not claimed as tested.'
+- type: maintainer-acceptance
+  value: '2026-11-02: maintainer accepted bounded real-video frame caption/embedding publication and small-corpus CLIP retrieval as WI-0190 scope; broader media/cost/performance/crash-stress investigations explicitly deferred, not passed.'

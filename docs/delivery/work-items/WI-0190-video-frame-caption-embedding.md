@@ -41,25 +41,44 @@ Analyze selected clips through bounded frames/scenes and store versioned visual 
 
 Audio transcription, general video action understanding, face recognition (WI-0155), automatic canonical tagging and search UI (WI-0191).
 
-## Acceptance criteria
+## Acceptance criteria — maintainer-scoped acceptance (2026-11-02)
 
-- [ ] Supported clips produce timestamped capped captions/embeddings or clear unsupported/failure output.
-- [ ] Every result is regenerable by revision/model/sampling version and partial/stale jobs cannot appear current.
-- [ ] On the currently admitted local SDR proxy cohort, demonstrate bounded sampling and missed-scene limitations with available short/rotated clips and any representative multi-scene, low-light, longer or landscape footage that can be identified. Mark unavailable or not-yet-supported representative categories **postponed**, with a reason and revalidation trigger; postponed does not mean passed.
-- [ ] Record throughput, storage/clip, GPU/CPU cost, and caption/retrieval quality on representative private videos.
+- [x] **Supported current local SDR proxy clips** produce bounded timestamped captions and CLIP embeddings, or are refused safely by the existing admission guards. Two different real videos completed four frames each; negative input/cleanup guards remain in the automated test suite.
+- [x] Persisted evidence is **revision/model/sampling-version scoped**, complete and subject to latest-revision, privacy-exclusion, cancellation and atomic-publication gates. The independent v38 audit returned current-complete on both full batches; automated negative-path tests remain mandatory for future code changes, not a reason to run a destructive real-data drill now.
+- [x] The **currently supported two-video SDR cohort** demonstrates bounded four-frame interval sampling, including rotated footage. Scene-diversity and missed-scene quality are **explicitly deferred** until broader admissible video types provide useful examples. No claim of representative multi-scene or scene-recall quality is made.
+- [x] Record a **practical initial quality and cost baseline**: 266,321 ms measured execution wall time, 1.802 frames/minute, 16,996 bytes of caption/vector payload, 7/8 human-judged captions correct, and successful 2-query live CLIP retrieval. Comprehensive CPU/GPU/proxy/database cost allocation and Azure charges are not required at this stage; reassess **Azure spend if monthly credit becomes insufficient** and **processing performance when it becomes noticeably slow**.
+
+**Acceptance scope:** These four checkboxes reflect the maintainer's explicit
+2026-11-02 pragmatic scope reduction and the previously verified positive
+runs, not a claim that postponed research or destructive tests took place.
+The feature remains selected/opt-in and retains every existing safety check.
+The 2026-10-31 and 2026-11-01 checkpoint narratives below are historical
+records of earlier development plans; their older statements that all four
+criteria were open or that detailed costs/real interruption were required
+are superseded by this maintainer scope decision.
 
 ## Verification requirements
 
-Sampling, model evidence, failure, privacy and invalidation tests plus local relevance evaluation; no personal media/evidence committed.
+Sampling, model evidence, failure, privacy and invalidation guards remain
+required in the implementation and automated CI. Existing focused synthetic
+and disposable-PostgreSQL tests exercise these behaviors. No destructive
+real Windows-process termination, full-system accounting or additional
+private-video run is required solely for scoped acceptance. Do not commit
+personal media, private query text, captions or evidence identifiers.
 
 ## Maintainer decision — postponed representative-video coverage (2026-11-01)
 
-The maintainer has approved **postponing representative-media verification that the
-current admission profile or available local footage cannot support**, rather than
-expanding video formats, byte/duration limits or codecs solely to complete WI-0190.
-This is a scoped acceptance-plan change, **not** a declaration that those cases pass,
-not permission to bypass the proxy safety fences, and not a reason to postpone the
-working SDR FrameEvidence pipeline. Workitem status remains `in_progress`.
+The maintainer approved **postponing representative-media verification
+that the current admission profile or available local footage cannot
+support**, instead of expanding video formats, byte/duration limits or
+codecs solely to complete WI-0190. On **2026-11-02**, the maintainer
+also deferred scene-coverage analysis until the supported video variety
+increases, even for the limited present corpus.
+This is a scoped acceptance-plan change, **not** a declaration
+that those cases passed or permission to bypass the proxy safety fences.
+The working SDR FrameEvidence pipeline and its previously collected
+acceptance results are accepted; postponed categories may be revisited
+as a separate scoped work item when the video admissibility expands.
 
 Maintained-host, metadata-only observations (no filenames, content or personal paths
 recorded): the inspection cohort contains 31 Rec.709 (`bt709`) video revisions,
@@ -87,13 +106,16 @@ automatically supported by the more restrictive proxy policy.
 | Other extensions/containers, codecs, sources over 256 MiB or over 600 seconds | **Postponed where unsupported or absent**, not claimed to be observed in this cohort | The corresponding enumerator, admission policy and guarded processing budget are expanded and locally tested |
 | Genuine landscape, multi-scene and low-light imagery | **Test if a suitable published clip can be identified; otherwise postpone each missing case separately**. Do not infer scene or lighting solely from metadata | Representative supported footage is identified or newly supported input yields a published proxy, with private human labels |
 
-The current bounded FrameEvidence one-shot, rejection, exclusion, cancellation,
-staleness, atomic-publication, privacy and synthetic duration/scene-plan tests
-**remain applicable now**. In particular, postponed positive HDR/format processing
-never excuses accepting an unsupported original into the video worker. Continue
-the existing two-plus-clip private caption/retrieval assessment and measured
-CPU/GPU/storage/cost campaign on available proxies. The real interruption
-campaign remains restricted to a disposable isolated PostgreSQL database.
+The existing bounded FrameEvidence one-shot, rejection, exclusion,
+cancellation, staleness, atomic-publication, privacy and synthetic
+duration/scene-plan guards **remain in effect**. Postponed positive
+HDR/format processing never excuses accepting an unsupported
+original into the video worker. The two-plus-clip private
+caption/retrieval assessment is **completed**. Additional scene/cost
+campaigns and destructive interruption rehearsals are **not
+WI-0190 completion prerequisites**. If a future interruption
+study is voluntarily performed, use a disposable isolated
+PostgreSQL database, never the maintained catalogue.
 
 When video support is deliberately expanded in a later scoped repository workitem
 (for containers/extensions, codec/pixel format/HDR, NULL rotation, source bytes or
@@ -101,9 +123,10 @@ clip duration), revisit these postponed rows against the new explicit policy,
 regenerate a **new** approved proxy where required, and repeat the relevant
 selected-one-shot, read-only frame audit, human coverage, live retrieval and
 cost/quality assessments. The expansion is **not authorized by WI-0190**.
-No OneDrive hydration or original modification is authorized. This decision
-does not retroactively check any of the four full acceptance boxes; accepted
-evidence and postponed exceptions must be reported separately.
+No OneDrive hydration or original modification is authorized.
+The 2026-11-02 maintainer scope decision explicitly accepts the
+narrow, working SDR implementation while preserving postponed-media
+exceptions as **not tested**, not as successful positive results.
 
 ## Development checkpoint 1 — source-free bounded frame sampling (2026-10-31)
 
@@ -1030,58 +1053,61 @@ baseline is accepted; do not repeat it simply to close the item.**
 The [live retrieval runbook](../../operations/video-frame-live-retrieval-evaluation.md)
 records the verified aggregate result and the local procedure.
 
-## Precise remaining WI-0190 completion gates (2026-11-02)
+## Maintainer closeout decision — pragmatic scope (2026-11-02)
 
-The four formal acceptance checkboxes above **remain unchecked**
-until the combined evidence below is reviewed, rather than marking
-each checked merely because some constituent positive tests passed.
+**Decision:** The feature is considered sufficiently functional for
+its **current selected, already-local SDR proxy cohort**. Do not
+extend the work item into a broader scene-analysis, cloud-accounting,
+performance-tuning or destructive-recovery project just to achieve
+theoretical completeness.
 
-| Criterion | Evidence already accepted | Outstanding for formal closeout |
+| Area | Maintainer decision | Evidence / explicit limitation |
 | --- | --- | --- |
-| 1. Supported media succeeds or safely fails | Two distinct current SDR proxies, four frames each, 512-dimensional CLIP, captions, audit, no originals/hydration, normal scratch cleanup | Verify and record **FrameEvidence-specific** unsupported/oversized/excluded/revised input refusal and no orphan scratch or new partial/current evidence. Existing isolated synthetic tests may support these negative cases; confirm they **actually ran** with a disposable PostgreSQL test-admin database, not skipped. Add a targeted local preflight only if a specific real-host safety boundary remains untested. |
-| 2. Revision/model/policy regeneration and stale/partial isolation | Versioned provenance, deterministic frame-count policies, v38 atomic 4/4 publication, current read-only audits, CI integration tests | Verify the **negative** integrity path on a disposable database: stale newer revision, source exclusion, incomplete/cancelled publication and scoped authorization revocation do not appear as current. Complete the real owned-process interruption / after-expiry recovery study below; verify marker-only normal cleanup and conservative crash cleanup without touching the maintained catalogue. |
-| 3. Bounded sampling / scene omission on admitted footage | Real four-frame interval jobs on two different short, rotated supported SDR videos; synthetic bounded planner and scene-identity tests | Inspect each available eligible clip **privately** for meaningful scene boundaries and execute read-only `video frames coverage` with actual cuts (`none` only if the operator genuinely judges a single scene). Record actual covered/missed counts and compare interval with hypothetical scene-balanced plan. If **no multi-scene/low-light/landscape/long** qualified published proxy exists, record that specific category as **postponed, not passed** under the 2026-11-01 approved deferral; keep synthetic long-duration and scene-limit/rejection tests. An actual scene-balanced `--apply` run is needed only when evaluating the real annotated-scene publication contract on suitable eligible media, with separate disclosure consent, not solely to repeat interval success. |
-| 4. Throughput, storage, CPU/GPU/Azure cost, caption and retrieval quality | 266,321 ms two-video observed wall time, 1.802 frames/minute, 16,996 caption/vector payload bytes (not physical database size), 7/8 captions accurate with dark-frame object hallucination, 2-query top-1 retrieval for all three policies | **Measure** attributable full-system CPU (including FFmpeg), GPU processing on the inference host where available, and actual operator-controlled Azure billable cost for an explicitly selected fresh, distinct job; log physical proxy/database overhead where the criterion requires storage/clip rather than payload alone. Do not substitute CLI-only CPU time, GPU utilization %, advertised Azure list price or zero values for unmeasured totals. If a cost cannot be attributed, record it `null` and seek explicit maintainer scope decision rather than silently claiming criterion 4 complete. Expand quality evaluation on other **currently admissible** distinct videos/queries as needed to support a defensible representative assessment; do not fabricate a statistical threshold from two queries. |
+| **Working feature and safety** | **Accepted.** Keep existing admission, exclusion, revision fencing, atomic-publish, cancellation and scratch safeguards; rely on existing focused CI/disposable-PostgreSQL tests rather than new destructive manual tests. | Two successful real four-frame publications, independent complete-current audits, normal scratch cleanup and disabled controls. Merged PR #709 passed its Windows build, fast tests, integration shards and documentation checks. This is not proof of an actual user-triggered hard-process kill. |
+| **Broader scenes / media** | **Postponed**, not a blocker for this scoped WI. | Current published proxies are predominantly short rotated SDR footage and lack useful diversity; the frame sample may miss events between timestamps. Reopen when admitted video types broaden or an actual coverage problem affects users. HLG/HDR, full-range/NULL-rotation, long, genuine multi-scene and low-light positive-inference cases are **not claimed tested**. |
+| **Resource and storage accounting** | **Not required for current acceptance.** Keep already measured wall time and evidence payload; no new GPU/CPU instrumentation, physical database/proxy byte attribution or extra inference run just to measure. | Existing 266,321 ms wall-time total, 1.802 frames/minute, 16,996 caption/vector bytes. CPU/GPU/Azure cost metrics remain **unmeasured** (not zero). Revisit cost only if monthly Azure credit is insufficient and performance if processing becomes slow. |
+| **Real crash-interruption and recovery** | **No destructive real-process rehearsal required for this WI.** | Normal cleanup, transaction/lease safety, automated interruption/cancellation tests and the established PostgreSQL backup/restore process form the current operational risk posture. A backup is a *recovery fallback*, **not** evidence that lease cancellation or partial-publication fencing passed a real hard-kill test. Existing defensive logic remains unchanged. An actual incident can trigger a targeted fix. |
+| **Human quality and retrieval** | **Accepted as a limited functional baseline**, not statistical model validation. | 7/8 captions accurate (one low-visibility invented held object); local CLIP retrieval ranked the relevant video first on both privately labeled queries for all three policies (MRR@2=1.00). |
 
-**Mandatory real interruption/recovery gate (criteria 1–2):**
-Use the [consolidated acceptance session](../../operations/video-frame-consolidated-acceptance-session.md)
-in a **new disposable, already-rehearsed PostgreSQL database**,
-with a disposable eligible proxy, fresh exclusive scratch root and
-both existing explicit disclosure acknowledgments. Preview the
-`acceptance-harness --mode interrupt` first, then independently
-authorize its `--execute --acknowledge-owned-child-termination`
-path. Require an actual `owned-child-terminated` result, not a
-`child-exited-before-interruption`. Query the read-only
-`video frames interruption-audit` after the operation, confirm
-no published/partial FrameEvidence, no unexpected original/source
-effects and no active grant/lease after normal fence expiry and
-deliberate scoped recovery. Do **not** run global `video jobs
-stop/recover --apply` on `photoidentity_main`; these can affect
-other jobs. Recover only marker/lock-validated owned scratch
-after the **six-hour hard minimum age** (default 24h) and repeat
-the independent audit to exit 0, with no unrecognized workspace
-children. Never fake the age or directly delete unknown files.
+**Maintenance triggers (not open WI-0190 tasks):**
+Reassess supported scene diversity when new video formats/proxies are
+admitted or misses become user-visible; revisit optional Azure
+processing costs only when the monthly credit is insufficient; profile
+CPU/GPU/latency only when processing becomes operationally slow;
+investigate interruption and recovery only if observed reliability
+or backup-restore evidence warrants it. Any meaningful expansion
+must have its own repository work item/acceptance scope and must not
+silently enable automatic processing, OneDrive-only hydration,
+unvetted external AI, or weaken any existing guards.
 
-**Closeout mechanics and scope:** Keep all private queries, media,
-captions, vectors, path names, PostgreSQL secrets, scene cuts and
-frame JPEGs off GitHub. Record only sanitized metrics, test exits,
-case categories, actual measurement coverage, failure reasons
-and deferred-media revalidation triggers in this repository.
-Run the targeted unit/integration tests with their disposable
-PostgreSQL dependency **present**; require Windows CI and
-`PhotoIdentity.Docs validate` plus `generate --check` to pass.
-Request maintainer review that the remaining mandatory gates
-were observed and the approved media deferrals are explicitly
-accepted. Only **then** check the applicable four criteria,
-move WI-0190 to `completed` through repository-native lifecycle
-tools, archive its canonical status shard, and regenerate status
-and roadmap views. WI-0191 production video search UI, WI-0207
-OneDrive-only hydration and optional automatic remote dispatch
-are separate work items and **not** WI-0190 closure blockers.
+**Completion evidence and governance:** The maintainer reported
+successful local `PhotoIdentity.Docs validate` and
+`generate --check` after merged PR #709. That PR's GitHub
+Actions Windows build and test shards completed successfully.
+This pragmatic revision is the maintainer's explicit acceptance of
+the **revised** four criteria above, not an assertion that the
+earlier aspirational criteria were fully tested. WI-0190 may be
+completed and archived under the repository-native lifecycle
+rules; M30 remains `in_progress` because other video work items
+remain. WI-0191 video-search product UI, WI-0207 online-only
+OneDrive hydration and future video-format expansion are outside
+WI-0190.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- **Status:** Scoped acceptance and closeout approved 2026-11-02;
+  selected opt-in FrameEvidence implementation completed for
+  the currently admitted local SDR proxy cohort.
+- **Verification:** Two different verified four-frame batches,
+  v38 current-complete audits, normal scratch cleanup, caption
+  judgments (7/8), two-video live CLIP query ranking (all
+  strategies MRR@2=1.00), measured wall time and payload,
+  successful merged PR #709 Windows CI, maintainer-reported
+  documentation validation and generated-view check.
+- **Deferred by explicit maintainer decision:** broader scene
+  coverage, full performance/resource/cost accounting until
+  monthly credit or throughput warrants review, and destructive
+  real-interruption drills. Preserve existing safety guards.
+- **Privacy:** no personal media, private labels or model data
+  committed to Git. This item's closure does not complete M30.
+

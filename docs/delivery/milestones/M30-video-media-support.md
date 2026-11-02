@@ -37,17 +37,32 @@ MAP@2 and nDCG@2 of 1.00, with exit 0 and no external
 AI service requests. This establishes a **limited two-video
 functional retrieval baseline**, not general search quality.
 
-**WI-0190 remains in_progress:** complete-system CPU/GPU and
-actual Azure costs, physical proxy/database storage, real
-scene omission annotations, documented positive-media
-deferrals, FrameEvidence-specific negative safety evidence
-and real process interruption/delayed recovery in a separate
-disposable database still require closeout evidence. The
-maintainer-approved HLG/HDR, long/NULL-rotation, full-range
-pixel-format and other unsupported positive-media cases
-remain **postponed, not passed**. See the
-[WI-0190 exact closeout gates](../work-items/WI-0190-video-frame-caption-embedding.md#precise-remaining-wi-0190-completion-gates-2026-11-02).
-**M30 cannot be closed by completing WI-0190 alone.**
+**WI-0190 scoped maintainer acceptance (2026-11-02):**
+The maintainer accepted the **currently functional local SDR
+FrameEvidence slice** and explicitly rejected extra acceptance
+work that would make completion disproportionate: full scene-diversity
+verification until wider video formats are admitted, detailed
+CPU/GPU/Azure cost accounting while monthly credit remains sufficient,
+performance investigation while the workflow is acceptably fast,
+and a destructive hard-interruption rehearsal. These are not
+claims that the postponed cases passed. Existing admission, privacy,
+atomicity, cancellation and temporary-file safeguards stay intact;
+the existing PostgreSQL backup/restore system remains a recovery
+fallback, not proof of an actual forced-kill scenario.
+
+The current evidence supports completion of **WI-0190's revised,
+maintainer-approved scope**: durable 4/4 frame evidence on two
+distinct current proxies, independent v38 audits, 7/8 human
+caption judgments, 2-query/2-video CLIP first-rank relevance,
+normal cleanup, previously passing Windows tests and
+documentation validation. Revisit costs if the monthly Azure
+credit is insufficient, performance if it becomes slow, and
+scene quality when new supported video types/real user reports
+warrant further work. Broader positive HDR/long/full-range/
+multi-scene/low-light coverage remains deferred, not approved.
+See [WI-0190 maintainer-scoped closeout](../work-items/WI-0190-video-frame-caption-embedding.md#maintainer-closeout-decision--pragmatic-scope-2026-11-02).
+**M30 remains in progress** because its other independent
+video work items are not complete.
 
 ## WI-0190 maintained-host video-coverage deferral (2026-11-01)
 
@@ -73,8 +88,9 @@ unsupported-input rejection and all privacy/atomic-publication/worker
 guards remain mandatory.
 
 [WI-0190's maintained-host coverage matrix](../work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01)
-records the reopen triggers. WI-0190 and M30 remain **in progress**;
-postponed checks are not automatically passed. Any broader proxy/
+records the reopen triggers. WI-0190 is accepted for the **narrow current SDR scope**;
+M30 remains **in progress** and postponed checks are not
+claimed to have passed. Any broader proxy/
 video-input work must be separately scoped in a repository workitem,
 not activated as an implicit change to WI-0190.
 
