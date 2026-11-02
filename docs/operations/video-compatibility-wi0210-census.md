@@ -10,6 +10,20 @@ Output contains only aggregated counts: source kind, last-recorded availability,
 
 The worker comparison uses the existing Rec.709 H.264/HEVC, selected audio/pixel formats, known rotations, coded dimensions 16–4096, duration 0.2–600 seconds and 256 MiB source cap. The **overlappingCandidateGaps** are deliberately nonexclusive: a large HLG video counts as both large and non-bt709. The **workerPrimaryGates** name the first failure per item; neither ranking establishes an independently unlockable number or implementation effort.
 
+**Coverage limitation:** This census counts only video assets already registered in
+Photo Identity's PostgreSQL catalogue. It does **not** enumerate the broader
+OneDrive/archive tree, nor can it infer codecs for files never inspected.
+The 2026-10-14 inventory saw 1,309 MOV/MP4 entries but probed only 18
+already-local samples. Do not treat a small catalogue count as the whole
+archive or rank universal codec coverage from it. For a wider **separate**
+read-only source-side count, the existing
+[WI-0150 archive survey](video-codec-survey.md) can enumerate filesystem
+attributes and safely skip online-only placeholders; its optional bounded
+FFprobe sampling opens *only* approved locally available files, so review
+its parameters separately before running. Compare source-side metadata
+totals with the catalogue before selecting an expansion. Both are partial
+signals, not full-archive codec knowledge.
+
 **Limitations:** The catalogue's availability is last-observed, not a fresh filesystem check. A registered proxy/poster/frame receipt does not prove the cached bytes are present, authentic or playable. No original bytes are read, no FFprobe or local-file traversal is performed, and there is no OneDrive recall, job enqueue, derivative write, search or migration. The SQL does not select identifiers, paths, filenames, capture dates, camera labels, coordinates, captions, embeddings or identities.
 
 ## Windows verification before merge
@@ -44,7 +58,9 @@ Keep the report in the local diagnostics folder, outside the repo. Aggregates ma
 
 ## Checkpoint 2 decision gate
 
-1. Review actual current counts, unknown metadata and cached availability separately. The 2026-10-14 18-file sample is **not** representative of the full archive.
+1. Review **both** actual current catalogue counts and the independent
+   archive's filesystem-only availability/extension counts; note unknown
+   metadata, missing registrations and cached availability separately. The 2026-10-14 18-file sample is **not** representative of the full archive.
 2. Compare two or three candidate gaps for real-user usefulness, overlapping limitations, effort and approved already-local test media. Gap counts are upper bounds, not a promise of unlocks.
 3. Maintainer explicitly approves **one** selected input class and target stages (poster, retained playable proxy, and/or timestamped frame evidence).
 4. Then change only the necessary policy/profile, using a few approved real local originals and focused revision/exclusion/scratch/colour and photo regressions. Leave unsupported/HDR formats explicit and do not invoke WI-0207 hydration.
