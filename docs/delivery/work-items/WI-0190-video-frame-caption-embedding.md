@@ -1088,8 +1088,8 @@ This pragmatic revision is the maintainer's explicit acceptance of
 the **revised** four criteria above, not an assertion that the
 earlier aspirational criteria were fully tested. WI-0190 may be
 completed and archived under the repository-native lifecycle
-rules; M30 remains `in_progress` because other video work items
-remain. WI-0191 video-search product UI, WI-0207 online-only
+rules; M30 recalculates to `ready`, **not completed**, because
+further video work items remain proposed or ready. WI-0191 video-search product UI, WI-0207 online-only
 OneDrive hydration and future video-format expansion are outside
 WI-0190.
 
