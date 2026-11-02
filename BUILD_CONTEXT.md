@@ -16,8 +16,9 @@ atomic-publish/cancellation tests and current PostgreSQL
 backup/restore safeguards remain in place; a backup is not
 proof of hard-kill lease recovery. New risks should trigger
 targeted follow-up work items, not reopening WI-0190 by default.
-**WI-0190 is scoped completed and archived**, M30 stays
-in_progress for its other video work items. All more ambitious
+**WI-0190 is scoped completed and archived**. M30 recalculates
+to `ready` (not completed) after WI-0190 leaves active work;
+remaining video work items are proposed or ready. All more ambitious
 2026-11-01 checkpoint plans below are historical.
 See docs/delivery/work-items/WI-0190-video-frame-caption-embedding.md
 and its archival status shard for current scope and evidence.
