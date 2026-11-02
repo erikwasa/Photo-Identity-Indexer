@@ -55,6 +55,18 @@ completion; no video playback/Smart Collections, source hydration or
 automatic search-time processing is introduced. See
 [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md).
 
+## WI-0191 search eligibility checkpoint (2026-11-02)
+
+A disposable PostgreSQL regression matrix is being added to the
+existing frame-publication test: current supported FrameEvidence remains
+searchable; unsupported/HDR, soft-deleted, superseded, non-local-source
+and inconsistent frame-count evidence is suppressed, with the existing
+source-exclusion purge test retained. No maintained database, live video
+source or poster workflow is touched. The maintainer has deferred
+creation of two missing posters. This is an automated safety check
+pending Windows CI, **not** proof of actual source-file availability
+or the remaining photo-ranking/large-library criteria.
+
 **WI-0190 current maintainer verification (2026-11-02):**
 Two different supported short/rotated published SDR proxies have
 each produced **four durable timestamped frame captions and
