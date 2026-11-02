@@ -29,6 +29,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/720
   - type: documentation
     value: docs/operations/video-playback-wi0152.md
+  - type: maintainer-verification
+    value: '2026-11-03: maintainer reported PASS for PostgreSQL/HTTP range tests, docs validate/generate, desktop and phone playback/seek, HTTP 206/416/404, OneDrive online-only unchanged, no processing, and photo viewer/search regression; desktop and phone both clipped lower native video controls. CSS fix in PR #720 pending desktop/phone visual retest; work item remains in_progress.'
 - id: WI-0153
   title: Integrate video with manual metadata and collection queries
   milestone: M30
