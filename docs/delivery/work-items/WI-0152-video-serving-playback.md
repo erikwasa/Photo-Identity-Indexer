@@ -5,7 +5,7 @@ milestone: M30
 status_source: ../status/work-items.yaml
 depends_on: [WI-0151, WI-0189]
 related_adrs: [ADR-0012]
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Integration.Tests, docs]
+affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Tests, PhotoIdentity.Integration.Tests, docs]
 ---
 
 # WI-0152: Add safe browser video serving and viewer playback
@@ -71,5 +71,24 @@ No private video content is committed.
 
 ## Completion notes
 
-- Status: ready for implementation, after the M30 roadmap review.
+- Status: implementation in progress; this first branch is not yet locally
+  accepted. PR #719 merged the scope decision, not playback behavior.
+- Checkpoint 1 (2026-11-02) adds a separate GET/HEAD
+  `/api/videos/{revisionId}/play` endpoint, SHA/byte-length verified
+  bounded MP4 streams, ASP.NET byte-range 206/416 semantics, source-row
+  locks held through the HTTP response, refreshed revision/exclusion gates,
+  canonical app-owned cache enforcement, and the opt-in Videos page's
+  embedded browser controls and missing-proxy indication.
+- Playback only reads registered succeeded PlayableProxy outputs using
+  the approved standard-720p and compact-540p versions. It never touches
+  an original file, sends cache paths, hydrates OneDrive, or enqueues jobs.
+- Synthetic and optional disposable PostgreSQL tests were authored for
+  path/size/SHA/exclusion/missing-file behavior, plus pure HTTP file-range
+  tests. Execution remains **pending** in GitHub CI and on the maintained
+  Windows host; no local test results or phone evidence are claimed here.
+- Follow the
+  [WI-0152 playback acceptance runbook](../../operations/video-playback-wi0152.md).
+  Desktop/phone playback, real online-only original behavior, photograph
+  viewer regression and 404/206/416 response codes all remain to be
+  verified. Keep the five acceptance checkboxes open until accepted.
 - Keep acceptance bounded to locally retained playable proxies.
