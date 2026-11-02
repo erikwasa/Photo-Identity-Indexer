@@ -1,26 +1,25 @@
 # Build context
 
-**Current handoff — 2026-11-02 WI-0191 photo isolation accepted:**
-PRs #711–#716 merged; PR #716 full Windows CI run 41510054848
-passed. The maintainer's read-only Photo/Video/Photo smoke on the
-existing application returned 10/10 photo Caption hits before and
-after a Combined video query, with exactly unchanged photo ranking,
-scores and indexed/captioned totals, no saved-collection membership
-change (one checked), three unique video hits and disjoint photo/video
-result IDs. Photo query elapsed values were 451.9 and 410.6 ms,
-video 158.5 ms; these are observations, not historical benchmarks.
-Disposable PostgreSQL tests also verify mixed-media coexistence,
-photo collection isolation, stale/unsupported/deleted/excluded video
-evidence suppression and exclusion-purge behavior.
+**Current handoff — 2026-11-02 WI-0191 scoped closure:** The
+maintainer explicitly selected acceptance option B: complete the
+opt-in video-only Visual/Caption/Combined search on the current
+three-video supported local SDR cohort. Descriptions and matching
+timestamps were judged useful. A read-only unmatched Caption query
+reported no unrelated matches, unchanged queued/running/succeeded/
+failed/cancelled/expired-lease counts, 3 candidate videos and no
+candidate truncation. The prior Photo/Video/Photo regression and
+disposable PostgreSQL eligibility/exclusion suites passed.
 
-WI-0191 remains in_progress, **3/5 criteria accepted**: video-only
-three-mode search, evidence/timestamps, and pragmatic photo-only
-preservation. Physical source availability cannot be inferred from
-stored frame evidence and larger video-set relevance is not yet
-verified. The maintainer postponed missing-poster generation; do not
-reopen it or invent large-corpus benchmarks to finish this item.
-Next: scope the remaining two checks pragmatically when relevant.
-See `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
+WI-0191 is **completed under revised scoped criteria**; do not
+represent physical original-file availability at search time or
+large/varied-corpus relevance as verified. Trigger targeted follow-ups
+only if stale media becomes user-visible, additional formats yield a
+representative set, or query performance becomes problematic. The
+maintainer deferred two missing posters; no generation or hydration
+is authorized. M30 becomes **ready**, not completed, because other
+video capabilities remain proposed. See
+`docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`
+and `docs/operations/video-search-backend-checkpoint.md`.
 
 **2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
 The maintainer accepted the bounded already-local selected SDR

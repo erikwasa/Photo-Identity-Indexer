@@ -1,0 +1,40 @@
+id: WI-0191
+title: Offer opt-in semantic and caption search over indexed videos
+milestone: M30
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0191-video-semantic-caption-search.md
+started_at: 2026-11-02
+completed_at: 2026-11-02
+verified_at: 2026-11-02
+verified_by: maintainer
+last_updated_at: 2026-11-02
+branch: docs/WI-0191-scoped-acceptance-closeout-20261102
+blockers:
+- WI-0190
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/711
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/712
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/713
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/714
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/715
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/716
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/717
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/718
+- type: documentation
+  value: docs/operations/video-search-backend-checkpoint.md
+- type: maintainer_verification
+  value: '2026-11-02: read-only unmatched Caption query showed no unrelated matches, unchanged processing state counters, 3 candidate videos and no candidate truncation; maintainer judged generated frame descriptions/timestamps useful. Earlier all three video modes and photo/video isolation passed on maintained app.'
+- type: scope_decision
+  value: '2026-11-02: maintainer explicitly selected option B for scoped WI-0191 acceptance: current 3-video supported SDR visual/caption/combined search, catalogue-based eligibility and read-only behavior. Physical original-file availability at search time and large-diverse-corpus relevance benchmarking were deferred, not tested or passed. Search may not hydrate or auto-process media.'
+- type: maintainer-acceptance
+  value: '2026-11-02: accepted complete WI-0191 on revised bounded criteria; two missing durable posters remain a separate deferred operator task, not a search blocker.'
