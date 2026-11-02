@@ -3,6 +3,7 @@ using NpgsqlTypes;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
@@ -56,7 +57,7 @@ public sealed class PostgresPhotoSearchRepositoryTests
             AssetRevisionId first = AssetRevisionId.New();
             AssetRevisionId second = AssetRevisionId.New();
             DateTimeOffset now = new(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
-            await SeedAsync(database, first, second, now);
+            AssetRevisionId videoRevision = await SeedAsync(database, first, second, now);
 
             PostgresPhotoCaptionRepository captions = new(database);
             await captions.SaveAsync(Caption(
@@ -156,6 +157,101 @@ public sealed class PostgresPhotoSearchRepositoryTests
             Assert.Equal(2, statistics.EmbeddingDimensions);
             Assert.Equal(8, statistics.RawEmbeddingBytes);
             Assert.Equal(12.5, statistics.AverageEmbeddingGenerationMilliseconds);
+
+            // WI-0191: coexistence regression. Snapshot real photo search
+            // ranks, counts and saved photo collection ordering, publish
+            // independent video FrameEvidence, and compare exactly again.
+            var photoCollections = new PostgresPhotoListCollectionRepository(
+                database, TimeProvider.System);
+            PhotoListCollectionDefinition photoCollection =
+                await photoCollections.CreateAsync(
+                    "Stable photo selection", [second, first]);
+            PhotoListCollectionSlideshowSnapshot photoSnapshotBefore =
+                Assert.IsType<PhotoListCollectionSlideshowSnapshot>(
+                    await photoCollections.CreateSlideshowSnapshotAsync(photoCollection.Id));
+
+            async Task<PhotoSearchRankedHit[]> PhotoResultsAsync()
+            {
+                IReadOnlyList<PhotoSearchEmbeddingRecord> records =
+                    await search.GetCurrentEmbeddingsAsync(
+                        ModelId, ModelSha, PreprocessingVersion, Encoding);
+                IReadOnlyList<PhotoSearchSemanticHit> semantic = PhotoSearchSemanticRanker.Find(
+                    records.ToDictionary(item => item.Evidence.RevisionId,
+                        item => item.Evidence),
+                    [1f, 0f], 10);
+                IReadOnlyList<PhotoSearchCaptionHit> caption =
+                    await search.SearchCaptionsAsync("bil", 10);
+                return PhotoSearchRanker.Fuse(semantic, caption, "combined", 10).ToArray();
+            }
+
+            PhotoSearchRankedHit[] before = await PhotoResultsAsync();
+            PhotoSearchCatalogueStatistics photoCountsBefore =
+                await search.GetCatalogueStatisticsAsync();
+            PhotoSearchStorageStatistics photoStatsBefore =
+                await search.GetStatisticsAsync(
+                    ModelId, ModelSha, PreprocessingVersion, Encoding);
+
+            VideoFrameSamplingPlan videoPlan = VideoFrameSamplingPlanner.Plan(
+                new VideoFrameSamplingRequest(8m, MaximumFrames: 2));
+            var videoBudget = new VideoProcessingBudget(
+                Enabled: true, Paused: false, MaximumConcurrentJobs: 1,
+                MaximumSourceBytes: 5000, MaximumTemporaryBytes: 30000,
+                MaximumExtractedFrames: 4);
+            var videoCandidate = new VideoProcessingCandidate(
+                true, false, true, true, 4000, 16000, 2);
+            var jobs = new PostgresVideoProcessingJobRepository(database);
+            Guid job = await jobs.EnqueueAsync(
+                new VideoDerivativeJobIdentity(
+                    videoRevision, VideoDerivativeKind.FrameEvidence,
+                    videoPlan.PolicyVersion, "wi0190-sdr-frame-jpeg-v1",
+                    new string('c', 64)),
+                videoBudget, videoCandidate);
+            VideoProcessingJobLease lease = Assert.IsType<VideoProcessingJobLease>(
+                await jobs.TryClaimNextAsync(videoBudget));
+            var provenance = new VideoFrameEvidenceProvenance(
+                videoRevision, videoPlan.PolicyVersion, "wi0190-sdr-frame-jpeg-v1",
+                ModelId, ModelSha, PreprocessingVersion)
+            {
+                CaptionModelId = "synthetic-caption-model",
+                CaptionModelSha256 = new string('d', 64),
+                CaptionPromptVersion = "synthetic-caption-prompt-v1"
+            };
+            var videoEvidence = new VideoFrameEvidenceBatch(
+                provenance,
+                videoPlan.Samples.Select((frame, index) => new VideoFrameEvidenceItem(
+                    frame.TimestampMilliseconds, frame.SceneIndex,
+                    index == 0 ? "A car parked in the street." : "Children playing near a car.",
+                    [0.2f, 0.8f])).ToArray());
+            Assert.True(await new PostgresVideoFrameEvidenceRepository(database)
+                .TryPublishAsync(lease, videoPlan, videoEvidence));
+            Assert.Equal("succeeded", (await jobs.GetAsync(job))?.Status);
+            Assert.Equal(videoRevision.Value,
+                Assert.Single(await new PostgresVideoSearchRepository(database)
+                    .ReadCurrentAsync()).RevisionId);
+
+            PhotoSearchRankedHit[] after = await PhotoResultsAsync();
+            Assert.Equal(
+                before.Select(item => (item.RevisionId, item.CombinedScore,
+                    item.SemanticScore, item.CaptionScore, item.CaptionLanguage,
+                    item.Caption)).ToArray(),
+                after.Select(item => (item.RevisionId, item.CombinedScore,
+                    item.SemanticScore, item.CaptionScore, item.CaptionLanguage,
+                    item.Caption)).ToArray());
+            Assert.DoesNotContain(after, item => item.RevisionId == videoRevision);
+            Assert.Equal(photoCountsBefore, await search.GetCatalogueStatisticsAsync());
+            Assert.Equal(photoStatsBefore, await search.GetStatisticsAsync(
+                ModelId, ModelSha, PreprocessingVersion, Encoding));
+            PhotoListCollectionSlideshowSnapshot photoSnapshotAfter =
+                Assert.IsType<PhotoListCollectionSlideshowSnapshot>(
+                    await photoCollections.CreateSlideshowSnapshotAsync(photoCollection.Id));
+            Assert.Equal(photoSnapshotBefore.RevisionIds, photoSnapshotAfter.RevisionIds);
+            await Assert.ThrowsAsync<PhotoListCollectionRevisionUnavailableException>(() =>
+                photoCollections.UpdateAsync(
+                    photoCollection.Id, photoCollection.Name, [first, videoRevision]));
+            Assert.Equal([second, first],
+                (await photoCollections.CreateSlideshowSnapshotAsync(photoCollection.Id))!
+                    .RevisionIds);
+
         }
         finally
         {
@@ -187,7 +283,7 @@ public sealed class PostgresPhotoSearchRepositoryTests
             100,
             generatedAtUtc);
 
-    private static async Task SeedAsync(
+    private static async Task<AssetRevisionId> SeedAsync(
         PostgresCatalogueDatabase database,
         AssetRevisionId first,
         AssetRevisionId second,
@@ -203,7 +299,7 @@ public sealed class PostgresPhotoSearchRepositoryTests
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
-            VALUES (@source, 'test', @root, @now);
+            VALUES (@source, 'local-folder', @root, @now);
 
             INSERT INTO assets (id, source_id, source_key, created_at_utc)
             VALUES
@@ -256,6 +352,13 @@ public sealed class PostgresPhotoSearchRepositoryTests
                 (@first_revision, @profile_id, 42, @proxy_hash_1, 100, 80, @now, 'review-proxies/first.jpg'),
                 (@second_revision, @profile_id, 42, @proxy_hash_2, 100, 80, @now, 'review-proxies/second.jpg'),
                 (@video_revision, @profile_id, 42, @proxy_hash_3, 100, 80, @now, 'review-proxies/legacy-video.jpg');
+
+            INSERT INTO video_revision_metadata (
+                asset_revision_id, inspection_status, duration_seconds,
+                color_transfer, inspected_at_utc, tool_sha256, inspection_profile_id)
+            VALUES (@video_revision, 'supported', 8, 'bt709', @now, repeat('c', 64), 'synthetic');
+
+            UPDATE video_processing_control SET enabled=true, paused=false WHERE singleton_id=1;
             """;
         command.Parameters.AddWithValue("source", NpgsqlDbType.Uuid, source);
         command.Parameters.AddWithValue("root", NpgsqlDbType.Text, $"search-{source:N}");
@@ -273,6 +376,7 @@ public sealed class PostgresPhotoSearchRepositoryTests
         command.Parameters.AddWithValue("proxy_hash_2", NpgsqlDbType.Text, new string('4', 64));
         command.Parameters.AddWithValue("proxy_hash_3", NpgsqlDbType.Text, new string('5', 64));
         await command.ExecuteNonQueryAsync();
+        return AssetRevisionId.From(videoRevision);
     }
 
     private static string QuoteIdentifier(string identifier) =>
