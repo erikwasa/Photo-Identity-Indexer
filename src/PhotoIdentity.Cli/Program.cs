@@ -295,6 +295,10 @@ public static class Program
                                         (read-only Windows cache/tool/resource preflight;
                                          no job creation or real-media access;
                                          no hard disk/IO/network isolation claim)
+              video compatibility survey --postgres-connection-env NAME --database DB
+                                       (read-only aggregate current-video inventory;
+                                        no media opens, OneDrive hydration or jobs;
+                                        cached availability is NOT a live file probe)
               video one-shot candidates --postgres-connection-env NAME --database DB
                                        [--limit COUNT (1..20)]
                                        (read-only, UUID-only metadata shortlist;
