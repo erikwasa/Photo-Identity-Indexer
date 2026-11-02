@@ -244,8 +244,10 @@ A successful pair of queries does not prove the photo baseline latency
 of an earlier installed version; inspect timings only if a slowdown
 is actually observed.
 
-The corresponding automated test is already included in the existing
-Windows PostgreSQL CI package-verification lane; optional local
+The corresponding automated test is included in the existing
+Windows PostgreSQL CI package-verification lane. The PR classifier
+explicitly enables that lane when this exact test file changes;
+optional local
 disposable-db execution is:
 
 ```powershell
