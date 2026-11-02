@@ -181,6 +181,31 @@ not include the two search results. Require a reviewed preview and
 normal backup/authorization before any separately deliberate `--apply`.
 Do not re-run FrameEvidence, hydrate OneDrive placeholders or initiate
 new Azure processing solely because a poster is absent.
+## Checkpoint 3 — eligibility regression without local media
+
+After the next PR's Windows CI, the repository-level
+`VideoFrameEvidencePublicationTests` verifies that Search suppresses
+unsupported/HDR, deleted, superseded, non-local and incomplete synthetic
+FrameEvidence, in addition to its existing exclusion/purge test. This
+uses a **disposable** test PostgreSQL database only.
+
+```powershell
+dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj -c Release --filter "FullyQualifiedName~VideoFrameEvidencePublicationTests"
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+This local test runs the database-backed case only if
+`PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` is explicitly
+configured for a **disposable admin connection**; otherwise that test
+returns early. Do not point an admin test connection at the maintained
+production catalogue, and do not create new credentials just for this
+workitem when the CI disposable database test passes.
+
+The maintainer is deferring the two missing posters. No poster dry run,
+`--apply`, database backup, original-video scan, or rerun of frame
+inference is required for WI-0191 checkpoint 3.
+
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible
