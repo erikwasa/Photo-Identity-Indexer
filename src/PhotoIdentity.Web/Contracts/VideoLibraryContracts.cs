@@ -9,7 +9,8 @@ public sealed record VideoLibraryItemResponse(
     int? Height,
     int? RotationDegrees,
     DateTimeOffset? CaptureAtUtc,
-    bool HasPoster);
+    bool HasPoster,
+    bool HasPlayableProxy);
 
 public sealed record VideoLibraryResponse(
     IReadOnlyList<VideoLibraryItemResponse> Items,
