@@ -5,6 +5,72 @@ does not authorize bulk video processing, hydrating originals or exposing the
 cache to a public network. It uses the existing opt-in video library and
 operator-configured trusted-LAN HTTPS mode.
 
+## Maintained host results and targeted clipping fix — 2026-11-03
+
+The maintainer reported **PASS** for disposable PostgreSQL playback tests,
+HTTP range tests, docs validate/generate, desktop functional play/pause/seek,
+206/416/404, zero new video processing, OneDrive online-only retention,
+phone trusted-LAN HTTPS playback and photo viewer/search regression. However,
+**both desktop and phone clipped the lower part of the native video player**:
+the frame and bottom play/pause controls were partly invisible. This is a
+**WI-0152 acceptance blocker**, not a pass simply because seeking works.
+
+PR #720's follow-up CSS/markup correction gives the active player its own
+expanded card, removes the fixed 16:10 poster constraint during playback,
+allows natural video-element height, and caps very tall portrait players
+to 75% of the viewport without cropping (`object-fit: contain`).
+The CSS layout contract test does not substitute for actual phone/desktop
+visual review.
+
+### Focused retest after PR #720 follow-up
+
+Update the existing WI-0152 checkout and execute:
+
+```powershell
+cd "C:\\Kod\\codex\\Photo Identity Indexer"
+git fetch origin
+git switch wi0152-retained-proxy-playback-v1
+git pull --ff-only origin wi0152-retained-proxy-playback-v1
+
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
+    --filter "FullyQualifiedName~VideoPlaybackLayoutContractTests" `
+    -p:WasmEnableWebcil=false
+if ($LASTEXITCODE -ne 0) { throw "Video player layout contract failed." }
+
+dotnet publish src/PhotoIdentity.Api/PhotoIdentity.Api.csproj `
+    --configuration Release `
+    --output ".artifacts/wi0152-test-app"
+if ($LASTEXITCODE -ne 0) { throw "WI-0152 republish failed." }
+```
+
+Stop the currently running Photo Identity server normally. Restart
+`Start-PhotoIdentity.ps1` using the **same previously validated private
+launcher.json** and `-PublishPathOverride` pointing at
+`$PWD\.artifacts\wi0152-test-app` (the exact startup commands are in
+the existing verification procedure). Do not start a second server on
+the same port, and do not change the stored PostgreSQL or video settings.
+
+Hard-reload `/videos` on the Windows browser and HTTPS phone, open a
+retained proxy (ideally both landscape and portrait if available), and
+check **all of these**:
+
+- The entire image, including its bottom edge, is visible—no poster
+  cropping, forced 16:10 player height or half-frame cutoff.
+- The native control bar and play/pause button are visible/reachable
+  on desktop and phone without opening browser developer tools.
+- Playback, pause, seeking and closing the player still work;
+  controls remain visible after phone orientation change if supported.
+- Closing restores the normal fixed-size poster tile. Opening a second
+  card does not leave the previous player running or damage gallery layout.
+- No changed original state or new video job is observed. The already
+  accepted 206/416/404 and privacy tests do not need to be repeated
+  solely for this CSS change unless something else regresses.
+
+Report **desktop and phone visual PASS/FAIL separately**, with device
+orientation and any still-hidden controls. Do not share personal video,
+private media URLs, OneDrive paths or screenshots of identifying footage.
+WI-0152 remains `in_progress` until this is visually accepted.
+
 ## Configuration
 
 1. Update to the WI-0152 branch/package on the maintained Windows host, using
