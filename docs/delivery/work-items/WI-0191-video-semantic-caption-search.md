@@ -32,8 +32,8 @@ Audio/subtitle search, mixed-media Creative Collection recipes, live semantic Sm
 - [x] Visual, Caption and Combined modes return videos only when video mode is selected, with one result per source revision.
 - [x] Results retain the grounded matching frame timestamp/description and explicit generated-evidence provenance.
 - [x] Existing photo-only search eligibility, ranking, saving and baseline latency are preserved.
-- [ ] Missing/stale/excluded videos never leak; requests are read-only with respect to video processing.
-- [ ] Maintainer verifies representative queries with small and large video sets.
+- [x] Search excludes deleted, superseded, source-excluded, unsupported and incomplete *catalogue* evidence; each query is read-only with respect to video processing. Physical original-file existence is not checked at search time (scoped limitation).
+- [x] Maintainer verifies relevant Visual, Caption and Combined queries against the currently available three-video supported SDR cohort, including matching descriptions/timestamps. Larger-set relevance/latency evaluation is deferred until a representative corpus exists (scoped limitation).
 
 ## Verification requirements
 
@@ -303,9 +303,58 @@ larger/varied indexed video corpus is not available yet. Do not
 generate posters, hydrate remote media, or fabricate large-scene
 coverage to close those gaps.
 
+## Maintainer final scoped acceptance and read-only safety check — 2026-11-02
+
+**Decision: scoped acceptance B, approved by the maintainer.**
+The five criteria above are **closed under their explicitly revised,
+bounded scope**. This does **not** assert the original broader physical-
+file-availability or large-video-corpus requirements were verified.
+
+Following PR #717's merge, the maintainer completed the final
+maintained-host read-only safety check: an intentionally unmatched
+Caption query produced **no unrelated matches**, while video
+processing state counters (queued, running, succeeded, failed,
+cancelled and expired leases) were unchanged across the search.
+The endpoint reported **3 candidate videos** and
+`candidateLimitReached=false`. This reinforces the prior automated
+PostgreSQL transaction read-only guard and exclusion/stale revision
+tests, without reconfiguring processing or touching source files.
+
+The maintainer also confirmed that **descriptions and frame
+timestamps are useful**. Earlier Video Search browser verification
+found the Caption, Visual and Combined modes usable; each returned
+three unique video results for the three-video pilot, with a grounded
+frame time and model/sampling provenance. The maintained photo
+regression passed (10 Caption hits before and after a video search,
+same rank and scores, same indexed/caption totals, unchanged one saved
+photo collection, disjoint photo/video results). PR #716 Windows CI
+[passed](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/41510054848),
+including disposable PostgreSQL eligibility and mixed-media tests.
+Observed photo search times of 451.9 and 410.6 ms were a same-session
+comparison, **not** a cross-version performance benchmark.
+
+### Explicit boundaries and future triggers
+
+| Area | Closing decision and limits |
+| --- | --- |
+| **Current evidence safety** | Accept catalogue-based current revision, local-folder authority, deletion, exclusion, supported SDR and published FrameEvidence checks, plus the read-only search contract. Search deliberately does **not** open original/proxy/poster bytes to check physical availability. Catalogue authority is not proof that a file still exists on disk. |
+| **Physical media availability** | Defer search-time physical source checks, hydration and post-eviction original/proxy verification. Reassess if stale media appears in results despite current catalogue records or a user-visible access/security problem emerges; create a focused follow-up rather than expanding this completed item. |
+| **Scale and relevance** | Accept human review of the existing three supported local SDR videos as the functional baseline. No substantial larger or varied indexed cohort currently exists. Reassess relevance, the 256-candidate cap and performance when the supported video library becomes representative or measurable slowdowns/misses occur. No invented benchmark. |
+| **Posters** | Two newer results show “Poster unavailable”. Maintainer explicitly deferred their independent still-poster materialization. This does not block searching their stored frames. No automatic posters, scans or regeneration are authorized by closure. |
+| **Photo safety** | Accept existing scoped photo search, saved-collection and duplicate-media isolation checks. Historical pre-change photo latency was not directly measured; profile only if degradation is observed. |
+
+**Closeout:** WI-0191 is **completed by explicit maintainer scoped
+acceptance** on 2026-11-02. No local mutation, extra caption inference,
+OneDrive hydration, manual source exclusion changes, forced larger-set
+creation or destructive testing was required. The deferred areas are
+**not passed tests**, and WI-0191's closure does not complete milestone
+M30 or any separate planned video capability.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- **Status:** Completed by maintainer-approved scoped acceptance B on 2026-11-02.
+- **Delivered:** Opt-in video-only Visual/Caption/Combined browser and API, one hit per video revision, matching-frame timestamps, captions, provenance and explicit candidate cap; no search-time processing.
+- **Verification:** Three-video maintainer pilot and human-usefulness judgment; read-only unmatched Caption search with no unrelated matches, all processing counters unchanged and candidateLimitReached=false; photo/video isolation smoke; disposable PostgreSQL exclusion/currentness and photo regression tests; merged PRs #711–#717 and passing PR #716 Windows CI.
+- **Trade-offs:** Catalogue-authorized FrameEvidence retrieval does not verify original bytes on disk. The sample is three supported SDR videos only and the 256-candidate ceiling is explicit.
+- **Deferred / triggers:** Physical source availability/hydration safety if actual false positives occur; larger-corpus ranking and capacity evaluation when new video types provide representative samples; separate still-poster generation at the maintainer's discretion. No historical cross-version latency claims.
+- **Commands actually reported by maintainer:** `Test-PhotoIdentityVideoSearchIsolation.ps1` (all comparison checks passed) and a read-only `POST /api/video-search/query` Caption query bracketed by `GET /api/video-processing/settings` (no matches and unchanged counters). The documentation-only closeout still requires PR CI checks.
