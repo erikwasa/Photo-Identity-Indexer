@@ -1,17 +1,19 @@
 # Build context
 
-**Current handoff — 2026-11-02 WI-0191 checkpoint 1:** PR #711 merged
-with passing Windows CI. Maintainer confirmed separate Caption, Semantic
-and Combined read-only Video Search against three current indexed videos;
-one result per revision, model/provenance fields and approved local CLIP
-were observed. A second, known-positive photo Caption query returned
-10/10 results (26,904 indexed photos; 24,770 displayable captions).
-This confirms basic existing photo Caption retrieval, not unchanged
-ranking, saved workflows or performance. No browser Video Search UI exists.
-WI-0191 remains in_progress, 0/5 criteria accepted.
-Next: add separate opt-in video browser search; verify local poster
-availability, eligibility, other photo modes and relevance when useful.
-See `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
+**Current handoff — 2026-11-02 WI-0191 checkpoint 2:** PRs #711 and
+#712 merged. The opt-in read-only Video Search API passed Windows CI and
+maintained-host three-video Caption/Visual/Combined smoke (one result
+per revision; model/provenance confirmed). Known-positive photo Caption
+still returned 10/10 after the change (26,904 indexed; 24,770 captions).
+A separate Blazor `/video-search` browser with mode selector, validated
+poster routes, frame descriptions/timestamps, evidence detail and
+disabled/truncation/empty states is now on the current branch.
+**Windows CI and maintained-host browser acceptance are still pending.**
+WI-0191 remains in_progress; the five workitem acceptance boxes remain
+unchecked. Next: review CI, run manual UI smoke, and decide whether
+additional currentness/large-library checks are justified. See
+`docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`
+and `docs/operations/video-search-backend-checkpoint.md`.
 
 
 **2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
