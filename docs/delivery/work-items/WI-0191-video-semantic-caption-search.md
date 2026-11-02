@@ -106,6 +106,39 @@ exclusion negative cases, large-corpus results, and video relevance
 judgments were not reported by this pilot. The browser Video Search
 page remains unimplemented; the five work-item acceptance boxes remain open.
 
+## Implementation checkpoint 2 — separate Video Search browser (2026-11-02)
+
+A dedicated Blazor WebAssembly route `/video-search` now uses the
+checkpoint-1 video-only query API. It has explicit Visual, Caption and
+Combined modes; bounded result limits; a natural-language query field;
+one card per returned video revision with stored frame timestamp,
+generated description, source badges, and expandable model, sampling and
+prompt provenance. Poster requests use only the revision-bound local
+`/api/videos/{revision}/poster` path; invalid paths are never rendered,
+and missing poster bytes display an honest placeholder rather than
+triggering source hydration or thumbnail generation. A visible notice
+explains 256-candidate truncation, and Visual-unavailable mode is
+explained to the user instead of presenting empty results as conclusive.
+All returned caption text is HTML-encoded by Blazor and is not included
+in browser URL parameters.
+
+The browser checks the existing opt-in video-library endpoint before
+showing search controls, and handles a 404 if the operator disables the
+library while the page is open. The existing photo `/search` experience,
+photo selection state, slideshow collection actions and their endpoint
+contracts remain untouched. Navigation is under Advanced > Video
+search and on the existing Videos page. There is **no** video playback,
+Smart Collection integration, original-source access, background
+processing or OneDrive hydration.
+
+New pure presentation tests cover timestamp formatting and refusing
+poster URLs that do not match their revision. Full client compilation,
+CI, manual layout and actual poster availability are unverified until
+this PR is validated. The maintained-host query evidence currently
+covers three eligible video revisions only, so the complete workitem
+still needs relevant larger-set and exclusion/eligibility verification.
+**Do not mark all five acceptance criteria complete at this checkpoint.**
+
 ## Completion notes
 
 - Files changed:
