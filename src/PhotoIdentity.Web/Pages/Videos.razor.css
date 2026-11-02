@@ -50,3 +50,19 @@
 }
 .video-library-card-body span { opacity: .78; }
 .video-library-more { margin-top: 1.5rem; display: flex; justify-content: center; }
+
+.video-library-player {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #08090c;
+}
+.video-library-play-button {
+    align-self: flex-start;
+    margin-top: .35rem;
+}
+.video-library-card-body p[role="status"] {
+    margin: .25rem 0 0;
+    overflow-wrap: anywhere;
+}
