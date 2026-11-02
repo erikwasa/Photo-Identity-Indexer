@@ -59,6 +59,33 @@ $result.Items | Select-Object TimestampMilliseconds, Sources, EvidenceKind
 Keep actual captions, source identifiers and media content local. Do not
 paste personal search results into public CI logs or issue comments.
 
+## Observed Windows maintainer smoke (2026-11-02)
+
+PR #711 merged; its final Windows build/integration/package run
+[#3398](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/41426752736)
+passed. Against the maintained local catalogue, the maintainer reported:
+
+| Query mode | Candidate videos | Returned videos | Unique revisions | Model available | Elapsed |
+| --- | ---: | ---: | --- | --- | ---: |
+| Caption | 3 | 3 | yes | false (expected) | 32.3 ms |
+| Semantic | 3 | 3 | yes | true | 77.2 ms |
+| Combined | 3 | 3 | yes | true | 59.9 ms |
+
+No mode reached the 256-candidate bound. The standalone CLIP approval
+script confirmed local model-file availability; the Combined response
+included timestamped, model-labeled, source-labeled generated frame
+evidence and revision-bound poster paths. This **does not establish
+caption correctness, large-set relevance, poster bytes on disk, or
+absence of stale/excluded results across untested cases**.
+
+One photo Caption API request returned successfully with zero items.
+That is an unmatched query rather than proof of photo-search regression
+or preservation; repeat with a privately known-positive photo query
+before treating that part of acceptance as verified. The maintainer
+has not yet reported focused local tests or documentation validation
+for this checkpoint. No private queries or media identifiers are stored
+in this record.
+
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible
