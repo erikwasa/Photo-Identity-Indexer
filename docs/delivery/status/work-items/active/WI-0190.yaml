@@ -5,8 +5,8 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0190-video-frame-caption-embedding.md
 started_at: 2026-10-31
-last_updated_at: 2026-11-01
-branch: agent/WI-0190-acceptance-measure-interrupt
+last_updated_at: 2026-11-02
+branch: agent/WI-0190-live-retrieval-accepted-closeout-gates-20261102
 blockers:
 - WI-0151
 - WI-0188
