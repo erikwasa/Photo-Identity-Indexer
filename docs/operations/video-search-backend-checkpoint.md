@@ -290,6 +290,36 @@ generation. The remaining WI-0191 questions concern the distinction
 between catalogue authorization and physical original availability,
 plus future larger-set relevance when suitable indexed videos exist.
 
+## Final scoped WI-0191 acceptance — 2026-11-02
+
+The maintainer accepted **option B** after testing the already
+deployed Video Search UI and three supported local SDR video results.
+Descriptions and matching frame timestamps were judged useful.
+The existing read-only Photo/Video/Photo smoke showed identical
+photo ranking, scores, counts and one saved photo collection and
+no photo/video overlap; the CI disposable PostgreSQL tests passed.
+
+The final harmless unmatched Caption query returned
+`NoUnrelatedCaptionMatches=True` and
+`ProcessingCountsUnchanged=True`; the request observed
+`CandidateVideos=3` and `CandidateLimitReached=False`.
+These are snapshot observations; they do not show that arbitrary
+future background work could never change processing counts.
+The video search reader independently runs a PostgreSQL
+repeatable-read, read-only transaction and filters current
+authorized published FrameEvidence.
+
+**WI-0191 is closed on revised scoped criteria, not on an
+unperformed physical-file or large-corpus test.** Search does not
+verify that original/proxy/poster bytes exist at query time.
+If a user-visible stale source problem occurs, investigate it
+through a separate follow-up rather than implicitly adding
+source-file reads or OneDrive hydration to search. Larger video
+relevance and 256-candidate-cap evaluation await a representative
+supported video library, and still posters remain deferred. No
+additional local acceptance runs or video processing are required
+for this scoped workitem.
+
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible
