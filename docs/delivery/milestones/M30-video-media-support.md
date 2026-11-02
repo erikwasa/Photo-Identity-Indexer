@@ -10,9 +10,10 @@ depends_on: [M19, M22, M24, M27]
 ## Scheduling status
 
 **M30 is in_progress, not completed.** WI-0190 is completed;
-WI-0191 has now started with an isolated, opt-in read-only Video Search
-backend (checkpoint 1). The separate browser view and maintained-library
-verification are not delivered yet. The other video items remain proposed.
+WI-0191 has delivered an opt-in read-only Video Search API,
+with a successful three-video maintainer pilot and a new dedicated
+browser page implemented on the current WI-0191 branch (checkpoint 2,
+pending UI review). The other video items remain proposed.
 This does not reactivate WI-0190's deferred acceptance work. WI-0150 architecture,
 WI-0151 video metadata/posters, WI-0188 isolated local video
 processing and WI-0189 versioned playable proxies were previously
@@ -35,6 +36,20 @@ acceptance remain. No source decoding, hydration or background work is
 authorized by a search request. See
 [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) and
 [operator verification](../../operations/video-search-backend-checkpoint.md).
+
+## WI-0191 dedicated video-search browser checkpoint (2026-11-02)
+
+A separate `/video-search` page is implemented for already published
+FrameEvidence with Visual/Caption/Combined modes, matching frame
+timestamp, caption and evidence provenance, and validated existing
+poster routes with a missing-poster fallback. The Video Library opt-in
+gates the controls and the backend still requires that flag. Navigation
+is separate from photo Search, which retains its existing contracts,
+scope and saved selection workflows. This is a browser-development
+checkpoint **pending Windows CI and human UI review**, not WI-0191
+completion; no video playback/Smart Collections, source hydration or
+automatic search-time processing is introduced. See
+[WI-0191](../work-items/WI-0191-video-semantic-caption-search.md).
 
 **WI-0190 current maintainer verification (2026-11-02):**
 Two different supported short/rotated published SDR proxies have
