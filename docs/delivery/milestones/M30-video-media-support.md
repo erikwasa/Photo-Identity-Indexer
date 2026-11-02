@@ -30,6 +30,62 @@ were explicitly **excluded from the accepted scope**, not passed.
 Poster generation for two missing stills remains deferred. Photo-first,
 local-first, media privacy and exclusion rules stay in force.
 
+## Current product priorities and scope review — 2026-11-02
+
+**Next work:** WI-0152 basic browser playback of current retained
+proxies, using existing API guards and opt-in trusted-LAN HTTPS.
+A retained proxy is usable **even if the original is OneDrive
+online-only**, without rehydrating it. A missing proxy shows a
+useful unavailable state; play/seek/search do not start processing.
+
+**Then:** WI-0210 first archive-value-driven compatibility expansion,
+selecting one supported input class from a read-only catalogue survey;
+follow with WI-0207 real-OneDrive opt-in hydration/reuse/release
+acceptance. A processing download remains local while approved
+pending/active video work still needs it and may be released under
+the existing app-owned cache policy after the last use; originally
+local or user-pinned content remains local. The existing video path
+already has opt-in staging, but cross-job retention must be checked,
+not assumed complete.
+
+**Later / conditional:** WI-0153 simple metadata and explicit
+mixed-media collections (both deferred for now; video-enabled Smart
+Collection filters require a separate future workitem); WI-0154
+mixed slideshows after playback **and** a collection-selection
+contract; WI-0155 initially bounded video-face recognition prototype
+(possibly separate experimental repo, no canonical DB writes), with
+full tracking/review production work scoped only after the prototype.
+Video face recognition is a desired product capability, but not a
+prerequisite for basic playback. WI-0156 Live Photo pairing is
+**retired without implementation** because it is not wanted now.
+
+**Do not silently revive rabbit holes:** automatic Azure video
+offload, mandatory AppContainer/kernel isolation, extensive mixed
+load or cost benchmarks, compulsory full-archive hydration,
+destructive recovery experiments, universal formats, or unrequested
+Smart Collection redesign. Keep the important protections for
+immutable originals, exclusion/purge, private derivative access,
+managed hydration ownership, source/revision fencing, limited
+resources and vetted operator-controlled Azure inference.
+[ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md)
+and [ADR-0013](../../decisions/ADR-0013-optional-operator-controlled-remote-compute.md)
+reflect this proportionate interpretation.
+
+**Video compatibility is staged**, not a single global support bit.
+See [the supported-by-stage matrix](../../operations/video-compatibility-matrix.md):
+catalogued → poster → locally playable proxy → searchable frame
+evidence → optional video face evidence. The present normal shared
+video worker accepts a narrower Rec.709 SDR subset (including a
+256 MiB source cap) than metadata inspection. WI-0210 will pick the
+next expansion from actual archive counts, rather than guessing
+formats or assuming all 1,291 historically online-only samples
+need processing.
+
+This section supersedes *scheduling and remaining-requirement*
+statements in the chronological checkpoints below. Historical
+“pending” wording records the state of the earlier PR, not current
+completion status.
+
 ## WI-0191 scoped maintainer closeout (2026-11-02)
 
 WI-0191 is **completed by explicitly revised acceptance B**, with
@@ -445,47 +501,78 @@ opaque video revision UUID. It does not open or enqueue media; the
 existing exact-revision `video one-shot enqueue` dry run must still
 prove local availability before further trial decisions.
 
-## Goal and rollout
+## Goal and rollout (updated)
 
-Support private family videos on local hardware without modifying originals, expanding online-only hydration unexpectedly, or changing normal photo ingestion, recognition, search, collections and slideshows. The **initial slice is a separate, opt-in video lane**; ordinary photo results remain photo-only.
+Build useful private family video playback and search without changing
+originals or the existing photo experience. The basic video catalogue,
+SDR still posters, isolated local processing, 720p/540p playable proxy
+generation, timestamped frame captions/embeddings and opt-in
+Caption/Visual/Combined Video Search are **already delivered**
+(WI-0150/0151/0188/0189/0190/0191). WI-0202's historical photo-query
+performance regression was also resolved. No additional foundational
+processing system is required to restart the video roadmap.
 
-1. **Architecture gate — WI-0150:** inspect actual MOV/MP4 codecs and metadata; agree supported subset, FFprobe/FFmpeg packaging/security/license decision, media contracts, video toggle, processing budget, locally retained proxy policy, frame sampling, privacy and ADR.
-2. **Metadata/poster — WI-0151:** opt-in discovery; video kind, duration, dimensions/rotation, streams/camera/GPS/time where present; bounded still poster. No mass automatic model processing.
-3. **Isolated local video processing — WI-0188 (completed):** default-off, one-at-a-time, photo-first queue for already-local media, with guarded FFmpeg execution, durable derivative publication, cancellation, recovery and observability.
-4. **Online-only OneDrive video — WI-0207 (proposed):** explicitly opted-in bounded hydration and safe return-to-online-only, to be verified independently without modifying pre-existing local originals.
-5. **Local low-res video copy — WI-0189 (completed):** maintainer-accepted revision/preset-versioned local playable proxies, unchanged originals, bounded **registered-byte** publication quota, explicitly confirmed operator cleanup, and selectable Standard 720p / Compact 540p. No unattended eviction or hard filesystem cap is claimed.
-6. **Video visual evidence — WI-0190:** bounded timestamped frame sampling, caption generation and versioned CLIP-compatible embeddings when model suitability is confirmed; per-video/scene aggregation and uncertainty.
-7. **Video retrieval — WI-0191:** explicit Videos/Photos search scope, Visual/Caption/Combined ranking at video level, with meaningful matched timestamps and no changed photo-search defaults.
-8. **Face feasibility — WI-0155:** separately evaluate sampled face detection, temporal track deduplication and suggestions against *existing confirmed* identities; review burden, precision and compute/storage decide adopt/defer/no-go.
+Remaining sequenced plan:
 
-**Later optional integrations:** WI-0152 viewer/range playback, WI-0153 manual metadata and mixed-media collections, WI-0154 slideshow playback and WI-0156 Live Photo pairing. They are not prerequisites for the standalone catalogue/analyze/search path.
+1. **WI-0152 — next / ready:** guarded HTTP range playback of existing
+   local proxies on desktop and existing trusted-LAN HTTPS phone path.
+2. **WI-0210 — proposed:** inventory real archive compatibility gaps;
+   select and implement **one** highest-value bounded file/codec/
+   duration/size/colour/rotation expansion; defer any further batches
+   to later independently justified workitems.
+3. **WI-0207 — proposed:** reuse photo-style app-owned OneDrive managed
+   hydration, keep newly fetched videos locally while needed for
+   processing, safely release only eligible app-hydrated files afterward.
+   One real authorized example, core safety and targeted exception tests.
+4. **WI-0153 / WI-0154 — deferred:** basic display metadata (date/time,
+   GPS/optional altitude, make/model, duration, resolution/FPS) and
+   collections/slideshow integration later. Video-enabled Smart
+   Collections are **not in this scope** and must not change saved
+   photo-only filters.
+5. **WI-0155 — proposed later:** a bounded, possibly isolated prototype
+   to decide what face recognition in videos should do. Feature wanted;
+   full tracking and canonical integration are **future choices**.
+6. **WI-0156 — administratively retired:** Live Photo pairing is not
+   needed or implemented; no research gate remains.
 
-## Architectural constraints
+## Preserved safeguards and pragmatic acceptance
 
-- Originals remain read-only; stable asset/revision identity, privacy/exclusions, local-first catalogue and bounded OneDrive materialization remain authoritative.
-- Videos and photo workers/queries remain separate by default. No heavy video work or mass transcoding occurs from ordinary photo operations.
-- Distinguish still posters, smaller *playable video proxies*, frame-derived captions, visual embeddings and face evidence. All derivatives are revision/preset/model/policy-versioned, disposable and invalidated on changes or exclusion.
-- Application-owned local cache, never an original or OneDrive sync directory. Limit total quota, per-file bytes, duration/frames, CPU/GPU/IO and parallelism.
-- A visual embedding of sampled frames is **not** a full video understanding: motion between frames, speech and sound are out of scope until separately evaluated.
-- Video face detection, intra-video tracks and known-person identity matches are different stages; preserve governed assignment policy and never flood photo review with repeat frames.
-- Unsupported codecs/containers and online-only sources must produce explicit diagnostic outcomes, not uncontrolled retries or silent skips.
-- Test default-off photo compatibility and throughput with competing video work before opt-in promotion.
+- Keep immutable originals, current revision/exclusion checks,
+  app-owned derivative integrity and photo-only default behavior.
+- The browser may serve a current authorized *retained* proxy even
+  while its source original is online-only. Do not hydrate originals
+  just for browsing/search/playback. Future deliberate preparation
+  uses the existing managed processing lane.
+- User-pinned and previously local OneDrive originals are never
+  automatically released. An app-hydrated original can stay local
+  for active and already-planned processing and then be released
+  safely by managed-cache policy when no longer needed.
+- Use existing FFmpeg resource bounds, local control, status/retry,
+  backup and disposable tests. Do not add mandatory AppContainer,
+  cloud outage rehearsals or detailed GPU/cost/performance studies
+  without a real operational trigger.
+- Operator-controlled Azure applications remain permitted for
+  explicit, vetted inference, not automatic unknown third-party AI
+  services or cloud catalogue access.
+- Missing/unsupported media must produce honest states; a catalogued
+  video does not automatically promise poster/proxy/search readiness.
 
 ## Work items
 
-- [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) — design and explicit activation.
-- [WI-0151](../work-items/WI-0151-video-ingestion-metadata-posters.md) — metadata and still posters.
-- [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed photo-only PostgreSQL query regression recovery (formerly blocked WI-0151); [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md).
-- [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed, maintainer-accepted local-video processing, scheduling/limits and safety.
-- [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed independently opted-in OneDrive-only video hydration and safe release verification.
-- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — **completed** local playable proxy publishing and manual retention, all four scoped acceptance criteria accepted 2026-10-30 (PRs #665–#671 merged).
-- [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — captions and visual embeddings.
-- [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — video retrieval.
-- [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — face feasibility.
-- [WI-0152](../work-items/WI-0152-video-serving-playback.md) — video viewer.
-- [WI-0153](../work-items/WI-0153-video-metadata-collections.md) — optional mixed collections.
-- [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) — optional mixed playback.
-- [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) — Live Photo evaluation.
+- [WI-0150](../work-items/WI-0150-video-architecture-activation-gate.md) — completed architecture activation.
+- [WI-0151](../work-items/WI-0151-video-ingestion-metadata-posters.md) — completed scoped metadata and SDR posters.
+- [WI-0188](../work-items/WI-0188-video-isolated-processing-lane.md) — completed opt-in local-video worker.
+- [WI-0189](../work-items/WI-0189-video-local-low-resolution-proxies.md) — completed local playable proxies and controlled retention.
+- [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — completed scoped frame descriptions/embeddings.
+- [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — completed scoped video search.
+- [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed independent photo-query regression recovery.
+- [WI-0152](../work-items/WI-0152-video-serving-playback.md) — **next priority / ready**.
+- [WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md) — proposed first archive-driven format/size/duration expansion.
+- [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed bounded real-OneDrive verification and managed reuse.
+- [WI-0153](../work-items/WI-0153-video-metadata-collections.md) — deferred basic metadata/manual collections, no video Smart queries yet.
+- [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) — deferred mixed-media slideshows, depends on WI-0152 and WI-0153.
+- [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — later bounded face prototype; full feature scope not yet chosen.
+- [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) — retired without implementation.
 
 ## Completed first video slice — WI-0151 local acceptance (2026-10-19)
 
@@ -493,12 +580,47 @@ The maintainer completed all **11/11** consolidated PostgreSQL/schema, opt-in in
 
 **Scope boundary:** WI-0151 establishes durable, revision-bound, exclusion-aware **Rec.709 SDR still posters and read-only metadata browsing** only. No playable proxy, new video analysis worker, mixed slideshow, manual video annotation, caption/frame embeddings, video search or HDR production posters are approved by this result. The rest of M30's milestone exit criteria remain unchecked until their own work items are implemented and verified.
 
-## Exit criteria
+## Exit criteria — current staged acceptance
 
-- [x] WI-0150 architecture complete: ADR-0012 accepted, codec/build/hash evidence recorded, and PR #523 merged.
-- [x] WI-0151 initial video kind/metadata, revision-bound durable Rec.709 SDR still posters and read-only opt-in Videos library: consolidated maintainer real-file acceptance on 2026-10-19.
-- [ ] Metadata/poster, bounded local playback proxy, timestamped captions and embeddings work for a documented codec subset and do not mutate originals.
-- [x] Initial locally available video processing is opt-in, photo-first, one-at-a-time, resource-limited, recoverable and accepted without photo functionality regressions under the maintainer-revised WI-0188 scope. Remote OneDrive-only hydration/release is separately pending as WI-0207; concurrent performance benchmarking was explicitly removed.
-- [ ] Video retrieval is useful and has explicit photo-only compatibility defaults.
-- [ ] Face processing gets an evidence-based adopt/defer/no-go and follows existing identity governance.
-- [ ] Optional viewer, collections, slideshows and Live Photo integrations are independently verified before introduction.
+Completed foundations:
+
+- [x] Explicit architecture activation, existing video discovery,
+  metadata and current Rec.709 SDR poster policy (WI-0150/0151).
+- [x] Bounded locally available opt-in processing, immutable originals,
+  approved photo safety, app-owned local playable proxies and manual
+  retention controls (WI-0188/0189).
+- [x] Timestamped frame captions/embeddings and useful opt-in Video
+  Search with unchanged photo defaults, under the maintainer's
+  documented small-SDR-cohort scoped acceptance (WI-0190/0191).
+- [x] The historical photo Archive/Smart Collection performance
+  regression is resolved under WI-0202's accepted scope.
+
+Remaining initial M30 user-value outcomes:
+
+- [ ] **WI-0152:** current locally retained proxies play and seek
+  in the existing browser/phone experience, without original recall.
+- [ ] **WI-0210:** select and verify one archive-evidence-driven
+  compatibility expansion, not every possible media format.
+- [ ] **WI-0207:** demonstrate bounded online-only video hydration
+  and app-owned local reuse/release with one real authorized example
+  and focused safety tests.
+- [ ] **WI-0155:** after higher-priority media work, record a bounded
+  feasibility prototype and a small next-production-slice decision
+  for desired video face recognition. Full tracking/recognition
+  production delivery is not a hidden gate here.
+
+Explicitly **not required for the above initial outcomes**:
+WI-0153 video collection integration, WI-0154 video slideshow
+integration, video-enabled Smart Collection filters, Live Photo
+pairing (WI-0156 retired), universal HDR/codec support, exhaustive
+scene benchmarking, automatic cloud fallback or new security
+infrastructure.
+
+**Registry caveat:** WI-0153 and WI-0154 remain proposed M30
+members because their future value is retained. The milestone
+status generator requires all member workitems to be terminal
+before marking the milestone completed. At the future M30 closeout,
+either deliberately activate them or move their deferred scope
+to an appropriate later milestone with a reviewed status change.
+Do not pretend they were implemented or silently administratively
+complete merely to satisfy milestone arithmetic.
