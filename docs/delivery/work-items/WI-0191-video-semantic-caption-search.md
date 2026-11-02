@@ -31,7 +31,7 @@ Audio/subtitle search, mixed-media Creative Collection recipes, live semantic Sm
 
 - [x] Visual, Caption and Combined modes return videos only when video mode is selected, with one result per source revision.
 - [x] Results retain the grounded matching frame timestamp/description and explicit generated-evidence provenance.
-- [x] Existing photo-only search eligibility, ranking, saving and baseline latency are preserved.
+- [x] Existing photo-only search eligibility, ranking and saved-photo membership remain unchanged; same-session photo request times show no regression signal, without claiming a historical cross-version latency benchmark (scoped limit).
 - [x] Search excludes deleted, superseded, source-excluded, unsupported and incomplete *catalogue* evidence; each query is read-only with respect to video processing. Physical original-file existence is not checked at search time (scoped limitation).
 - [x] Maintainer verifies relevant Visual, Caption and Combined queries against the currently available three-video supported SDR cohort, including matching descriptions/timestamps. Larger-set relevance/latency evaluation is deferred until a representative corpus exists (scoped limitation).
 
