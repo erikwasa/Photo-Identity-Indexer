@@ -67,6 +67,18 @@ creation of two missing posters. This is an automated safety check
 pending Windows CI, **not** proof of actual source-file availability
 or the remaining photo-ranking/large-library criteria.
 
+## WI-0191 photo/video coexistence checkpoint (2026-11-02)
+
+Extend an existing disposable PostgreSQL photo search fixture with
+published synthetic video FrameEvidence, then assert photo result
+membership, rank/component scores, photo catalogue counts and saved
+photo-list collection order are unchanged while the video remains
+searchable only through the opt-in Video Search boundary. A
+read-only maintained-host Photo / Video / Photo query check is also
+available. This is a bounded photo-preservation regression awaiting CI
+and optional human smoke, not proof of pre-upgrade latency equality.
+Poster generation remains explicitly deferred.
+
 **WI-0190 current maintainer verification (2026-11-02):**
 Two different supported short/rotated published SDR proxies have
 each produced **four durable timestamped frame captions and
