@@ -1,36 +1,26 @@
 # Build context
 
-**2026-11-02 WI-0190 maintained-host local acceptance (PR for documentation):**
-Two distinct already-published SDR videos produced four current,
-durable 512-dimension frame evidence rows each, verified by
-independent v38 read-only audits and an aggregated acceptance
-report. Total: 8 frames, 16,996 caption/vector bytes, 266,321 ms
-execution wall, 1.802 frames/min. Human caption review: 7/8
-accurate; a dark-frame caption hallucinated a held object.
-Separately, the local CLIP evaluate-live test exited 0 with two
-privately judged queries (one different relevant video per
-query): all three policies scored MRR@2=1.00, and Hit@2/
-Recall@2/MAP@2/nDCG@2=1.00. Model/DB/safety gates passed
-with no Azure or original-video access during retrieval.
-**This is a verified two-video baseline, not full acceptance.**
-
-WI-0190 remains in_progress, with four formal criteria
-unchecked. Remaining: real annotated scene coverage where
-eligible clips exist (unavailable formats/categories explicitly
-postponed); FrameEvidence negative-safety/invalidation regression
-evidence from an actually exercised disposable PG database;
-attributable local FFmpeg+host CPU, inference-host GPU and
-Azure billed cost plus physical storage/clip; and actual
-Windows owned-child interruption followed by fenced lease
-and age-gated scratch recovery in a **disposable isolated
-PostgreSQL database**. Do not repeat accepted four-frame,
-caption or retrieval runs solely to refresh evidence.
-Authoritative closeout matrix:
-docs/delivery/work-items/WI-0190-video-frame-caption-embedding.md.
-Operator steps:
-docs/operations/video-frame-consolidated-acceptance-session.md.
-No original modification, OneDrive hydration or unattended
-video work is authorized.
+**2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
+The maintainer accepted the bounded already-local selected SDR
+FrameEvidence slice after two independent four-frame published
+batches, normal cleanup, 7/8 manually correct frame captions,
+successful two-query/two-video local CLIP retrieval (all policies
+MRR@2=1.00), and passing PR #709 Windows CI and documentation
+validation. Work-item acceptance was **explicitly narrowed**:
+broader scene coverage awaits additional video formats and
+meaningful cases; Azure billing work is only useful if monthly
+credit is insufficient; performance tuning is triggered by
+observable slowness. No destructive real-process interruption
+rehearsal is required. Existing admission, exclusion,
+atomic-publish/cancellation tests and current PostgreSQL
+backup/restore safeguards remain in place; a backup is not
+proof of hard-kill lease recovery. New risks should trigger
+targeted follow-up work items, not reopening WI-0190 by default.
+**WI-0190 is scoped completed and archived**, M30 stays
+in_progress for its other video work items. All more ambitious
+2026-11-01 checkpoint plans below are historical.
+See docs/delivery/work-items/WI-0190-video-frame-caption-embedding.md
+and its archival status shard for current scope and evidence.
 
 **2026-11-01 WI-0190 checkpoint 15 (PR pending):** PR #694 merged.
 Frame-count-specific interval job IDs now avoid key collision
