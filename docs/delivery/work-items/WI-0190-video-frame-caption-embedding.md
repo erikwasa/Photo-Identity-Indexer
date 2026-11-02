@@ -993,23 +993,91 @@ report zero-valued aggregates have measured-clip counts of zero and
 must not be treated as zero consumption. No real scene boundaries
 were annotated: scene coverage is **unknown**, not zero or complete.
 
-**Next maintainer check: local live CLIP text-to-video retrieval.**
-Use the two audited FrameEvidence job UUIDs, human-select descriptive
-queries and independently judge which of **both** videos are relevant
-to each query, then run the read-only **video frames evaluate-live**
-with approved local CLIP and the same model provenance. See the
-[step-by-step Windows live retrieval runbook](../../operations/video-frame-live-retrieval-evaluation.md).
-No more frame generation, inference bridge or originals are needed.
-Two clips form a narrow functional baseline, not a representative
-quality sample.
+**Completed maintainer check — local live CLIP text-to-video retrieval
+(2026-11-02).** After human inspection of the already-published proxies,
+the operator authored **two distinct private text queries** with one
+independently relevant video per query (one for each of the two current,
+different source video assets). The manifest stayed under protected
+LocalAppData, never in Git. The read-only
+`video frames evaluate-live` completed with **exit 0** against
+`photoidentity_main` and the approved WI-0126 CLIP model/tokenizer.
+The report verified `clips=2`, `queries=2`, `relevantJudgments=2`,
+`frameVectors=8`, `embeddingDimensions=512`,
+`frameTopK=2`, `rankingK=2` and `modelDigestMatched=true`.
 
-**Still open:** live retrieval quality, human-annotated real scene
-coverage where supported footage permits it, complete CPU/GPU/Azure
-resource and cost attribution, and controlled hard interruption /
-delayed scratch recovery using a **disposable isolated database only**.
-Unsupported and unavailable media categories remain *postponed*, not
-accepted. All four full acceptance boxes remain unchecked;
-WI-0190 stays in_progress and fullAcceptanceEstablished=false is correct.
+| Retrieval ranking policy | Hit@2 | MRR@2 | Recall@2 | MAP@2 | nDCG@2 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Maximum frame cosine | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Top-2 frame mean | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Deduplicated normalized pooled cosine | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+
+Because each query had exactly one judged relevant video, the
+MRR@2 of 1.00 establishes first-ranked relevant results for both
+queries under all three strategies. Hit@2/Recall@2 alone would be
+nearly trivial in a two-video corpus. The study does **not** rank
+the three strategies against each other, measure generalization to
+large collections, or expose per-query private rankings.
+Model preflight wall time: 608 ms; local CLIP text encoding:
+17,320 ms; PostgreSQL read snapshot: 276 ms; scoring: 27 ms.
+The four measured phase times sum to 18,231 ms, not system CPU
+or GPU time. The run reported `readOnly=true`,
+`currentSnapshot=true`, `localTextInference=true`,
+`loopbackPostgresReadPerformed=true`,
+`externalNetworkRequestsMade=false`, no originals opened, no
+OneDrive hydration or media decoding, no caption/vector/query
+text returned and no job or schema mutation. **This retrieval
+baseline is accepted; do not repeat it simply to close the item.**
+The [live retrieval runbook](../../operations/video-frame-live-retrieval-evaluation.md)
+records the verified aggregate result and the local procedure.
+
+## Precise remaining WI-0190 completion gates (2026-11-02)
+
+The four formal acceptance checkboxes above **remain unchecked**
+until the combined evidence below is reviewed, rather than marking
+each checked merely because some constituent positive tests passed.
+
+| Criterion | Evidence already accepted | Outstanding for formal closeout |
+| --- | --- | --- |
+| 1. Supported media succeeds or safely fails | Two distinct current SDR proxies, four frames each, 512-dimensional CLIP, captions, audit, no originals/hydration, normal scratch cleanup | Verify and record **FrameEvidence-specific** unsupported/oversized/excluded/revised input refusal and no orphan scratch or new partial/current evidence. Existing isolated synthetic tests may support these negative cases; confirm they **actually ran** with a disposable PostgreSQL test-admin database, not skipped. Add a targeted local preflight only if a specific real-host safety boundary remains untested. |
+| 2. Revision/model/policy regeneration and stale/partial isolation | Versioned provenance, deterministic frame-count policies, v38 atomic 4/4 publication, current read-only audits, CI integration tests | Verify the **negative** integrity path on a disposable database: stale newer revision, source exclusion, incomplete/cancelled publication and scoped authorization revocation do not appear as current. Complete the real owned-process interruption / after-expiry recovery study below; verify marker-only normal cleanup and conservative crash cleanup without touching the maintained catalogue. |
+| 3. Bounded sampling / scene omission on admitted footage | Real four-frame interval jobs on two different short, rotated supported SDR videos; synthetic bounded planner and scene-identity tests | Inspect each available eligible clip **privately** for meaningful scene boundaries and execute read-only `video frames coverage` with actual cuts (`none` only if the operator genuinely judges a single scene). Record actual covered/missed counts and compare interval with hypothetical scene-balanced plan. If **no multi-scene/low-light/landscape/long** qualified published proxy exists, record that specific category as **postponed, not passed** under the 2026-11-01 approved deferral; keep synthetic long-duration and scene-limit/rejection tests. An actual scene-balanced `--apply` run is needed only when evaluating the real annotated-scene publication contract on suitable eligible media, with separate disclosure consent, not solely to repeat interval success. |
+| 4. Throughput, storage, CPU/GPU/Azure cost, caption and retrieval quality | 266,321 ms two-video observed wall time, 1.802 frames/minute, 16,996 caption/vector payload bytes (not physical database size), 7/8 captions accurate with dark-frame object hallucination, 2-query top-1 retrieval for all three policies | **Measure** attributable full-system CPU (including FFmpeg), GPU processing on the inference host where available, and actual operator-controlled Azure billable cost for an explicitly selected fresh, distinct job; log physical proxy/database overhead where the criterion requires storage/clip rather than payload alone. Do not substitute CLI-only CPU time, GPU utilization %, advertised Azure list price or zero values for unmeasured totals. If a cost cannot be attributed, record it `null` and seek explicit maintainer scope decision rather than silently claiming criterion 4 complete. Expand quality evaluation on other **currently admissible** distinct videos/queries as needed to support a defensible representative assessment; do not fabricate a statistical threshold from two queries. |
+
+**Mandatory real interruption/recovery gate (criteria 1–2):**
+Use the [consolidated acceptance session](../../operations/video-frame-consolidated-acceptance-session.md)
+in a **new disposable, already-rehearsed PostgreSQL database**,
+with a disposable eligible proxy, fresh exclusive scratch root and
+both existing explicit disclosure acknowledgments. Preview the
+`acceptance-harness --mode interrupt` first, then independently
+authorize its `--execute --acknowledge-owned-child-termination`
+path. Require an actual `owned-child-terminated` result, not a
+`child-exited-before-interruption`. Query the read-only
+`video frames interruption-audit` after the operation, confirm
+no published/partial FrameEvidence, no unexpected original/source
+effects and no active grant/lease after normal fence expiry and
+deliberate scoped recovery. Do **not** run global `video jobs
+stop/recover --apply` on `photoidentity_main`; these can affect
+other jobs. Recover only marker/lock-validated owned scratch
+after the **six-hour hard minimum age** (default 24h) and repeat
+the independent audit to exit 0, with no unrecognized workspace
+children. Never fake the age or directly delete unknown files.
+
+**Closeout mechanics and scope:** Keep all private queries, media,
+captions, vectors, path names, PostgreSQL secrets, scene cuts and
+frame JPEGs off GitHub. Record only sanitized metrics, test exits,
+case categories, actual measurement coverage, failure reasons
+and deferred-media revalidation triggers in this repository.
+Run the targeted unit/integration tests with their disposable
+PostgreSQL dependency **present**; require Windows CI and
+`PhotoIdentity.Docs validate` plus `generate --check` to pass.
+Request maintainer review that the remaining mandatory gates
+were observed and the approved media deferrals are explicitly
+accepted. Only **then** check the applicable four criteria,
+move WI-0190 to `completed` through repository-native lifecycle
+tools, archive its canonical status shard, and regenerate status
+and roadmap views. WI-0191 production video search UI, WI-0207
+OneDrive-only hydration and optional automatic remote dispatch
+are separate work items and **not** WI-0190 closure blockers.
 
 ## Completion notes
 

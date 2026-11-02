@@ -67,8 +67,31 @@ Keep human source notes, captions, frame JPEGs, original names,
 and paths out of Git and public logs. The baseline demonstrates
 a two-video functional pipeline and one observed quality error,
 **not representative quality acceptance**; fullAcceptanceEstablished
-is still false. Next independently assess private CLIP retrieval
-relevance using [the two completed FrameEvidence jobs](video-frame-live-retrieval-evaluation.md).
+is still false. **Live CLIP retrieval is now independently verified:** the maintained
+host executed the read-only **video frames evaluate-live** command
+with two privately judged queries (one relevant video per query)
+and 8 persisted 512-dimensional frame vectors. Exit code was 0,
+with Hit@2, MRR@2, Recall@2, MAP@2 and nDCG@2 all 1.00
+under maximum-frame, top-2 mean and deduplicated pooled
+ranking. The relevant video ranked first for each of the two
+queries under every policy; this is a narrow two-video baseline,
+not general retrieval-quality acceptance. The benchmark did not
+use FFmpeg, Ollama or Azure, mutate records, or disclose inputs.
+Measured local retrieval wall-time phases were 608 ms model
+preflight, 17,320 ms text inference, 276 ms PostgreSQL snapshot
+and 27 ms ranking. The
+[verification procedure and observed results](video-frame-live-retrieval-evaluation.md)
+retain query text, media identifiers and judgment manifests
+outside the repository.
+
+**Outstanding:** operator-annotated scene omissions where
+a current eligible multi-scene proxy exists (otherwise record
+specific postponed category), non-skipped negative safety tests
+and actual interruption/recovery in an isolated disposable
+database, and attributable system CPU/GPU/Azure cost plus
+physical proxy/database footprint beyond the 16,996-byte
+payload baseline. The current report does not and cannot
+claim formal full acceptance.
 
 ## Private JSON manifest
 

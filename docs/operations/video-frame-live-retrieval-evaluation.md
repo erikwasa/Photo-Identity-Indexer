@@ -86,8 +86,10 @@ audits and the two-video acceptance report exited 0; the latter
 verified eight frames, 16,996 caption/vector payload bytes,
 and 266,321 ms observed execution wall time. Human frame-by-frame
 caption review judged 7/8 accurate, with one low-visibility
-invented held-object claim. **Those checks do not establish
-live text-to-video retrieval quality.**
+invented held-object claim. **The separate local retrieval benchmark
+has now also passed on this exact small two-video corpus**; see
+the observed numeric results below. These tests do not establish
+representative retrieval quality across a larger library.
 
 | Private video label | Current FrameEvidence job UUID | Frames |
 | --- | --- | ---: |
@@ -97,6 +99,44 @@ live text-to-video retrieval quality.**
 Use the FrameEvidence UUIDs above, **not the PlayableProxy IDs**.
 This two-video cohort is a limited first retrieval baseline,
 not representative quality acceptance.
+
+## Maintainer-verified live retrieval evidence (2026-11-02)
+
+The operator independently inspected both already-published local
+videos, wrote two **private distinct** visual-content query phrases,
+and designated one different relevant video for each query.
+The approved WI-0126 local CLIP package and current
+photoidentity_main PostgreSQL v38 evidence were used.
+**video frames evaluate-live exited 0** and returned:
+clips=2, queries=2, relevantJudgments=2, frameVectors=8,
+embeddingDimensions=512, frameTopK=2, rankingK=2,
+modelDigestMatched=true, readOnly=true, currentSnapshot=true,
+localTextInference=true, humanJudgments=true,
+loopbackPostgresReadPerformed=true and
+externalNetworkRequestsMade=false. No original, OneDrive
+hydration, media decode, Azure/Ollama request, job enqueue,
+schema change or caption/vector/query disclosure occurred.
+
+| Retrieval policy | Hit@2 | MRR@2 | Recall@2 | MAP@2 | nDCG@2 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Maximum frame cosine | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Top-2 frame mean | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Deduplicated normalized pooled cosine | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+
+With one independently relevant video per query,
+MRR@2=1.00 means both relevant videos ranked first under
+all three policies. At two candidates Hit@2 and Recall@2
+are not discriminating. The test does not establish which
+strategy is preferable or support broad quality claims.
+
+Phase measurements: model preflight 608 ms, local text
+inference 17,320 ms, repeatable-read PostgreSQL snapshot
+276 ms and scoring 27 ms. Total of measured phases:
+18,231 ms. These are wall times, **not** CPU/GPU time or
+Azure cost. Private queries, exact job IDs, original source
+paths and judgment manifests remain local-only. The success
+is now accepted as the **small-corpus live retrieval baseline**;
+do not repeat it solely for this work-item checkpoint.
 
 ## Windows maintained-host live retrieval — exact steps
 
@@ -375,12 +415,15 @@ duplicate/invalid private labels and strict flag parsing. They do
 **not** require actual ONNX model files or videos. Windows GitHub CI
 is the first integration gate.
 
-Two distinct real-video four-frame FrameEvidence jobs **now pass**
-the independent current-v38 audit and the two-video acceptance report.
-This satisfies the *input-data prerequisite* for live retrieval,
-not the human-judged retrieval evaluation itself. Run the steps
-above and record the result without republishing the same frames.
-The read-only evaluator cannot create additional video jobs.
+Two distinct real-video four-frame FrameEvidence jobs **passed**
+the independent current-v38 audit and the two-video acceptance
+report; the maintainer has **also completed** a separate real
+local CLIP retrieval benchmark with two independent human
+queries and first-ranked relevant results under all three
+policies. Keep this as a functional, two-video baseline,
+not general representative-quality evidence. The guide
+above remains reproducible for additional future clips and
+judgments without republishing already-current frames.
 
 For a consolidated local study after the development series, record
 a representative set of queries/videos and metrics and the four
