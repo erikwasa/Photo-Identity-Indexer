@@ -71,6 +71,41 @@ presented as full-library coverage. Existing acceptance boxes remain
 **0/5 pending** until the full end-to-end workitem is verified.
 See [backend pilot procedure](../../operations/video-search-backend-checkpoint.md).
 
+## Maintained-host backend smoke — 2026-11-02
+
+After PR #711 merged and its final Windows CI run
+[passed](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/41426752736),
+the maintainer exercised the opt-in endpoint against the existing local
+PostgreSQL catalogue and approved CLIP installation. Caption, Semantic
+and Combined each returned **3 video revisions from 3 candidates**;
+all modes reported one result per revision and no candidate-limit
+truncation. Model availability was intentionally false for Caption
+(which does not initialize CLIP), and true for Semantic and Combined;
+the separately approved local CLIP file check returned true.
+The observed elapsed values were **32.3, 77.2 and 59.9 ms** respectively.
+These are small-pilot observations, not a benchmark.
+
+The Combined response carried frame-relative timestamps, generated
+FrameEvidence provenance, caption and semantic source flags, sampling
+policy versions, CLIP/caption model identities, and revision-bound
+poster routes. The maintainer supplied no personally identifying media
+details for repository documentation.
+
+Photo-search regression smoke: the initial photo Caption query returned
+HTTP success with zero matches, followed by a separate **known-positive
+Caption query** returning **10 photo results (limit 10)**. The response
+reported **26,904 indexed photos** and **24,770 displayable captions**.
+This establishes that the existing photo Caption API can return results
+against the maintained catalogue after the video-search change. It does
+**not** verify unchanged relevance/ranking, other photo search modes,
+saved-photo workflows or baseline latency without a before/after
+comparison. The query text and photo identifiers are deliberately omitted.
+
+Local focused test and docs-command outputs, poster byte availability,
+exclusion negative cases, large-corpus results, and video relevance
+judgments were not reported by this pilot. The browser Video Search
+page remains unimplemented; the five work-item acceptance boxes remain open.
+
 ## Completion notes
 
 - Files changed:
