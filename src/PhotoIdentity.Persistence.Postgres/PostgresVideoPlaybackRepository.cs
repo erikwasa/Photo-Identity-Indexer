@@ -46,6 +46,28 @@ public sealed class PostgresVideoPlaybackRepository(PostgresCatalogueDatabase da
         try
         {
             transaction = await connection.BeginTransactionAsync(token);
+            // Lock BEFORE the eligibility query. A lock waited on during a
+            // single SELECT could otherwise use a snapshot taken before an
+            // exclusion committed. The next statement gets a fresh snapshot.
+            await using (NpgsqlCommand sourceLock = connection.CreateCommand())
+            {
+                sourceLock.Transaction = transaction;
+                sourceLock.CommandText = """
+                    SELECT source.id
+                    FROM asset_revisions revision
+                    JOIN assets asset ON asset.id = revision.asset_id
+                    JOIN sources source ON source.id = asset.source_id
+                    WHERE revision.id = @revision AND source.kind = 'local-folder'
+                    FOR UPDATE OF source;
+                    """;
+                sourceLock.Parameters.AddWithValue("revision", revisionId.Value);
+                if (await sourceLock.ExecuteScalarAsync(token) is not Guid)
+                {
+                    await transaction.DisposeAsync();
+                    await connection.DisposeAsync();
+                    return null;
+                }
+            }
             await using NpgsqlCommand query = connection.CreateCommand();
             query.Transaction = transaction;
             query.CommandText = """
@@ -81,8 +103,7 @@ public sealed class PostgresVideoPlaybackRepository(PostgresCatalogueDatabase da
                     WHERE excluded.source_id = asset.source_id
                       AND excluded.source_key = asset.source_key)
                 ORDER BY receipt.created_at_utc DESC, receipt.job_id DESC
-                LIMIT 1
-                FOR UPDATE OF source;
+                LIMIT 1;
                 """;
             query.Parameters.AddWithValue("revision", revisionId.Value);
             Guid jobId = Guid.Empty;
