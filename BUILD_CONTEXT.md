@@ -1,5 +1,43 @@
 # Build context
 
+**Current handoff — M30 planning decisions (2026-11-02, PR #719):**
+Maintainer requested pragmatic video roadmap clarification before a new
+implementation workitem. **WI-0152 basic video playback is now next /
+ready**: serve already retained, revision-verified playable proxies
+with range/seek in the existing viewer and opt-in trusted-LAN HTTPS
+phone mode. A current proxy must play without hydrating its
+OneDrive-online-only original; no browser-triggered transcode/recall.
+
+**WI-0210** is a new *proposed*, archive-driven compatibility expansion:
+inventory existing records without unnecessary hydration, choose a
+single highest-value file/codec/duration/size/colour/rotation expansion
+and close that one tranche; later coverage needs a new workitem.
+See `docs/operations/video-compatibility-matrix.md`.
+**WI-0207** is proposed photo-style managed video hydration: keep
+app-initiated downloaded originals local while pending/active
+processing requires them, then release only app-owned eligible bytes;
+one real approved online-only video, key safety and focused failure
+tests, no destructive fault-injection marathon.
+
+**WI-0153 / WI-0154** video metadata/mixed collections and slideshow
+remain deferred (simple date/time, GPS/optional altitude, make/model,
+resolution, FPS; no video-enabled Smart Collection expansion).
+**WI-0155** video face recognition is definitely wanted, beginning
+with a bounded prototype potentially in a separate experimental repo;
+full tracking/production identity writes are not initial gates.
+**WI-0156** Live Photo pairing is administratively retired, explicitly
+**not implemented**, per maintainer decision. No mandatory new
+cloud infrastructure, universal formats, exhaustive benchmarks,
+AppContainer certification or destructive OneDrive failure drills.
+Preserve immutable originals, source-copy exclusions, version
+fencing, app-owned retention and vetted optional controlled Azure
+compute under ADR-0013. M30 remains **ready**, not completed.
+
+This PR updates delivery workitems, canonical/generated statuses,
+product scope/non-goals, security/privacy, ADR-0012/0013 and M30
+exit criteria. Historical WI-0190/0191 scoped verification remains
+accepted; do not reopen it without a concrete trigger.
+
 **Current handoff — 2026-11-02 WI-0191 scoped closure:** The
 maintainer explicitly selected acceptance option B: complete the
 opt-in video-only Visual/Caption/Combined search on the current
