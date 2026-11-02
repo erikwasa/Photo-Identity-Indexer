@@ -12,7 +12,10 @@ The current product direction deliberately does not aim to:
 - Require the full logical OneDrive archive to remain hydrated on local disk.
 - Support several simultaneous independent writers to the canonical catalogue.
 - Guarantee universal decoding of every proprietary camera RAW format ever produced; version 1 targets HEIC/HEIF and the RAW variants actually present in the maintained archive and reports unsupported variants explicitly.
-- Process video in the current implementation. [M30](../delivery/milestones/M30-video-media-support.md) architecture review is now active under WI-0150, but video runtime processing remains out of scope until its proposal and real-archive evidence are accepted.
+- Guarantee every video container, codec, colour transfer, input size or duration without archive-based prioritization. The [M30](../delivery/milestones/M30-video-media-support.md) basic video catalogue/proxy/frame-search slices are implemented; [WI-0210](../delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md) targets one useful coverage expansion at a time.
+- Automatically recall online-only OneDrive videos for browsing or search; on-demand processing hydration requires an independently enabled controlled workflow.
+- Require Live Photo pairing or video-enabled Smart Collection filters for basic video support; both are outside the currently approved slice.
+- Make full temporal face-tracking/automatic person assignments prerequisites to video playback. Video face recognition is desired, but its first scope is a bounded prototype.
 - Build a public cloud photo gallery or public sharing service.
 - Treat model-generated visible-content tags as authoritative human facts without provenance.
 
