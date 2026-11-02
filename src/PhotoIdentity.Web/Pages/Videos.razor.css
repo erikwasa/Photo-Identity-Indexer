@@ -11,6 +11,11 @@
     border-radius: 12px;
     background: var(--surface, #fff);
 }
+/* The player needs room for its native controls, not a thumbnail-sized card. */
+.video-library-card--playing {
+    grid-column: 1 / -1;
+    width: min(100%, 840px);
+}
 .video-library-poster {
     position: relative;
     width: 100%;
@@ -20,6 +25,13 @@
     overflow: hidden;
     display: grid;
     place-items: center;
+}
+/* Poster tiles keep the fixed crop-free preview shape; an open video must
+   grow with its own intrinsic aspect ratio rather than being clipped to 16:10. */
+.video-library-poster--playing {
+    aspect-ratio: auto;
+    overflow: visible;
+    display: block;
 }
 .video-library-poster img {
     width: 100%;
@@ -54,7 +66,11 @@
 .video-library-player {
     display: block;
     width: 100%;
-    height: 100%;
+    height: auto;
+    /* Bound tall portrait clips to the viewport while keeping the entire
+       frame and native control bar visible (no object-fit cropping). */
+    max-height: 75vh;
+    max-height: 75dvh;
     object-fit: contain;
     background: #08090c;
 }
