@@ -91,6 +91,50 @@ The maintainer has not yet reported focused local tests or documentation
 validation for this checkpoint. No private queries or media identifiers
 are stored in this record.
 
+## Dedicated browser checkpoint — manual UI verification
+
+With the new WI-0191 browser PR installed from current `main` after
+merge (the existing published app/package must also be refreshed):
+
+1. Keep the same approved launcher, local PostgreSQL database, and
+   `PhotoIdentity__VideoLibraryEnabled=true`; restart the installed
+   app after deploying new code. There is no need to run processing,
+   hydrate originals, use the Azure bridge or republish frame evidence.
+2. Open `http://127.0.0.1:5080/video-search` (also linked under
+   **Advanced → Video search** and from **Videos**).
+3. Enter a private scene phrase known to match an indexed video.
+   Check **Captions only**, **Visual only** and **Visual + captions**.
+   Confirm matching captions, one result per video, frame timestamp,
+   evidence badges, and expandable generated-evidence policy/model
+   provenance. Check loading and zero-result states with a mismatching
+   harmless query; keep private captions off screenshots/reports.
+4. Check poster images. A missing/evicted poster should show
+   **Poster unavailable** rather than launching processing. Clicking
+   **Browse video library** returns to existing video cards.
+5. If the launcher is already configured with Video Library off, the
+   page should show a disabled message and no input controls. Do **not**
+   switch off the real maintained installation just to run this case.
+   The backend continues to enforce its own disabled 404 gate.
+6. On a narrow desktop/mobile-width browser, verify that the form and
+   result cards remain readable and keyboard Enter performs a query.
+7. Run one known-positive `/search` photo Caption query (previously
+   observed 10/10 on the maintained catalogue). Photo-only selection
+   and saved photo slideshow collections remain unchanged; do not
+   create a new saved collection solely for this smoke.
+
+From the repository root, source checks for this checkpoint are:
+
+```powershell
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter "FullyQualifiedName~VideoSearchPresentationTests"
+dotnet build PhotoIdentity.slnx -c Release
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+These commands are not a substitute for checking the built app after
+deployment. The previously observed three-video query timings cannot
+establish relevance or large-library performance.
+
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible
