@@ -10,4 +10,6 @@ branch: agent/WI-0191-video-search-backend-20261102
 blockers:
 - WI-0190
 blocker_notes: []
-evidence: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/711
