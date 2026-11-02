@@ -12,8 +12,12 @@ depends_on: [M19, M22, M24, M27]
 **M30 is in_progress, not completed.** WI-0190 is completed;
 WI-0191 has delivered an opt-in read-only Video Search API,
 with a successful three-video maintainer pilot and a new dedicated
-browser page implemented on the current WI-0191 branch (checkpoint 2,
-pending UI review). The other video items remain proposed.
+browser page accepted for basic use after PR #713 merged. One result
+showed a poster, while two newer video search results had no available
+poster; separate WI-0151 poster materialization is not automatic.
+WI-0191 remains in progress with the first two acceptance criteria
+verified, and search eligibility/photo regression and broader relevance
+still open. The other video items remain proposed.
 This does not reactivate WI-0190's deferred acceptance work. WI-0150 architecture,
 WI-0151 video metadata/posters, WI-0188 isolated local video
 processing and WI-0189 versioned playable proxies were previously

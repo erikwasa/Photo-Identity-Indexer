@@ -135,6 +135,52 @@ These commands are not a substitute for checking the built app after
 deployment. The previously observed three-video query timings cannot
 establish relevance or large-library performance.
 
+## Maintained-host browser and poster follow-up (2026-11-02)
+
+After PR #713 merged with passing Windows CI, the maintainer confirmed
+the Video Search page works with stored captions, matching-frame time
+and generated-evidence labels. One result showed a poster and two
+newer results displayed **Poster unavailable**. The user suggested
+they may have been imported from another folder; this is a hypothesis,
+not a confirmed fault.
+
+The read-only video-search API uses durable FrameEvidence, not still
+poster metadata. Still posters are generated only by the separate
+opt-in `video posters` CLI and require an existing registered source
+root, a supported `bt709` revision, already-local original bytes
+and a verified independent derivative root. The command traverses
+nested folders under the selected source root, but does not process
+another registered root automatically. Search does not attempt
+poster generation or source hydration.
+
+**Diagnose before generating:** Query `/api/videos?offset=0&limit=60`
+(page while `hasMore=true`) and compare the missing search revisions
+with the library's `hasPoster` flag. Separately GET the existing
+`/api/videos/{revisionId}/poster` route. Keep private IDs off PR logs.
+
+- `hasPoster=false` and poster 404: no current poster evidence row;
+  frame evidence and search are independent and can still be correct.
+- `hasPoster=true` and poster 404: a row exists but the approved poster
+  file/root, checksum, access or current-revision check failed. Check
+  the existing approved `PhotoIdentity__VideoPosterRoot`; do not
+  change it, overwrite rows or regenerate blindly.
+- `hasPoster=true` and poster 200: the server can deliver a JPEG;
+  inspect the browser request and UI before touching files.
+- Search revision absent from the video library: investigate an
+  eligibility inconsistency rather than running poster materialization.
+
+If no poster record is present, choose the **verified registered**
+source root containing those already-local videos, not an arbitrary
+subfolder. Read and use the dry-run-only `video posters --enable-video`
+command in [WI-0151 durable poster instructions](video-durable-posters.md).
+Use the approved FFmpeg path from `Get-PhotoIdentityApprovedVideoTools.ps1`
+and the exact existing launcher poster root and confirmed database.
+`--max-videos` counts the first eligible candidates in traversal
+order, **not selected revision IDs**; an arbitrary bounded run may
+not include the two search results. Require a reviewed preview and
+normal backup/authorization before any separately deliberate `--apply`.
+Do not re-run FrameEvidence, hydrate OneDrive placeholders or initiate
+new Azure processing solely because a poster is absent.
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible
@@ -148,8 +194,8 @@ establish relevance or large-library performance.
   at read-snapshot time. This initial API does not confirm on-disk poster
   or playable-proxy presence for each result; poster bytes remain guarded
   separately by the existing video endpoint.
-- A separate Video Search browser page is now in checkpoint-2 development,
-  pending build and manual UI acceptance. There is still no video collection
-  integration or unattended processing. Poster availability, maintained
-  browser verification, larger-set relevance and negative-case integration
-  tests remain pending.
+- The separate Video Search browser page was accepted for basic use on the
+  maintained host; two newer search results lack durable still posters.
+  Poster diagnosis, larger-set relevance, negative-case eligibility and
+  photo-ranking/performance comparisons remain outstanding. No video
+  collection integration or unattended processing is introduced.

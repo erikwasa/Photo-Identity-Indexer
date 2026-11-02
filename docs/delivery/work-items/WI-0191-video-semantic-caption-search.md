@@ -29,8 +29,8 @@ Audio/subtitle search, mixed-media Creative Collection recipes, live semantic Sm
 
 ## Acceptance criteria
 
-- [ ] Visual, Caption and Combined modes return videos only when video mode is selected, with one result per source revision.
-- [ ] Results retain the grounded matching frame timestamp/description and explicit generated-evidence provenance.
+- [x] Visual, Caption and Combined modes return videos only when video mode is selected, with one result per source revision.
+- [x] Results retain the grounded matching frame timestamp/description and explicit generated-evidence provenance.
 - [ ] Existing photo-only search eligibility, ranking, saving and baseline latency are preserved.
 - [ ] Missing/stale/excluded videos never leak; requests are read-only with respect to video processing.
 - [ ] Maintainer verifies representative queries with small and large video sets.
@@ -138,6 +138,49 @@ this PR is validated. The maintained-host query evidence currently
 covers three eligible video revisions only, so the complete workitem
 still needs relevant larger-set and exclusion/eligibility verification.
 **Do not mark all five acceptance criteria complete at this checkpoint.**
+
+## Maintained-host browser smoke and independent poster follow-up — 2026-11-02
+
+After PR #713 merged and its Windows CI run passed, the maintainer
+confirmed that the dedicated Video Search browser works and displays
+evidence badges, stored frame descriptions, timestamps, sampling/model
+details and generated-evidence provenance. The prior live API pilot
+independently exercised all three modes against three current videos,
+one result per revision. Together these observations support the
+**first two of five acceptance criteria**; they do not establish
+untested larger-library, photo-score or source-availability guarantees.
+
+One search result displayed a still poster. **Two newer video search
+results displayed “Poster unavailable”**, despite returning valid frame
+evidence. The user suggested that the newer videos came from a
+different folder; this is **unverified**. The implementation explains
+why this can occur: FrameEvidence publication does not generate
+`video_still_posters` rows. Posters are produced separately by the
+explicit opt-in `video posters` CLI for one registered source root,
+and served from the approved derivative root. A nested folder under
+that root is scanned recursively; a distinct registered source root
+requires its own deliberate materialization run. A missing registered
+poster, or a registered poster with unavailable/mismatched on-disk
+bytes, should not be conflated with failure to search the video.
+
+The existing UI handles missing posters safely without opening video
+originals. **No poster generation, source hydration, deletions or
+new PostgreSQL writes have been authorized or performed.** First
+compare the video-library `hasPoster` catalogue flag with its
+revision-bound GET status using the read-only triage in the
+[operator runbook](../../operations/video-search-backend-checkpoint.md).
+If the poster record is absent, preview a bounded poster pass for the
+verified registered source root; do not run `--apply` against a guessed
+source/database or assume `--max-videos` targets selected revisions.
+If a row exists but GET fails, inspect the registered derivative root
+and integrity rather than rerendering blindly.
+
+Remaining requirements: fuller photo-only regression (ranking,
+saving, relative latency), source-inaccessible/stale/excluded
+negative eligibility, and relevance/scale acceptance when a larger
+representative current video set is actually available. No need
+to build an automatic thumbnail worker or unblock deferred video
+formats solely for the two missing posters.
 
 ## Completion notes
 

@@ -1,18 +1,19 @@
 # Build context
 
-**Current handoff — 2026-11-02 WI-0191 checkpoint 2:** PRs #711 and
-#712 merged. The opt-in read-only Video Search API passed Windows CI and
-maintained-host three-video Caption/Visual/Combined smoke (one result
-per revision; model/provenance confirmed). Known-positive photo Caption
-still returned 10/10 after the change (26,904 indexed; 24,770 captions).
-A separate Blazor `/video-search` browser with mode selector, validated
-poster routes, frame descriptions/timestamps, evidence detail and
-disabled/truncation/empty states is now on the current branch.
-**Windows CI and maintained-host browser acceptance are still pending.**
-WI-0191 remains in_progress; the five workitem acceptance boxes remain
-unchecked. Next: review CI, run manual UI smoke, and decide whether
-additional currentness/large-library checks are justified. See
-`docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`
+**Current handoff — 2026-11-02 WI-0191 browser acceptance:** PRs
+#711–#713 merged and Windows CI passed. Maintainer confirmed the opt-in
+separate Video Search browser works; prior three-video Caption/Visual/
+Combined queries returned one video each with stored frame time and
+model/provenance labels. A known-positive photo Caption query returned
+10/10 (26,904 indexed; 24,770 displayable captions). WI-0191 has
+**2/5 verified criteria** and remains in_progress.
+One result displayed a poster, two newer videos did not. Search evidence
+and WI-0151 durable still posters have separate creation flows; a
+different registered source folder is a hypothesis. Next: diagnose
+`hasPoster` vs revision-bound poster GET before running any explicit
+poster materialization. Remaining requirements concern eligibility and
+broader photo/relevance validation, not an automatic poster worker.
+See `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`
 and `docs/operations/video-search-backend-checkpoint.md`.
 
 
