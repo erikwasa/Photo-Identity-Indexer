@@ -100,6 +100,8 @@ $countsSame = (
 $collectionsSame = (Get-SavedCollectionSignature $collectionsBefore) -ceq (Get-SavedCollectionSignature $collectionsAfter)
 $videoIds = @($video.items | ForEach-Object { [string]$_.revisionId })
 $videoUnique = @($videoIds | Sort-Object -Unique).Count -eq $videoIds.Count
+$photoIds = @($photoAfter.items | ForEach-Object { [string]$_.revisionId })
+$resultsDisjoint = @($photoIds | Where-Object { $videoIds -contains $_ }).Count -eq 0
 
 [pscustomobject]@{
     PhotoMode = $photoBefore.mode
@@ -112,12 +114,13 @@ $videoUnique = @($videoIds | Sort-Object -Unique).Count -eq $videoIds.Count
     VideoMode = $video.mode
     VideoResults = $videoIds.Count
     OneResultPerVideoRevision = $videoUnique
+    PhotoVideoResultsDisjoint = $resultsDisjoint
     PhotoMillisecondsBefore = [math]::Round([double]$photoBefore.searchMilliseconds, 1)
     PhotoMillisecondsAfter = [math]::Round([double]$photoAfter.searchMilliseconds, 1)
     VideoMilliseconds = [math]::Round([double]$video.searchMilliseconds, 1)
 }
 
-if (!$rankSame -or !$countsSame -or !$collectionsSame -or !$videoUnique) {
+if (!$rankSame -or !$countsSame -or !$collectionsSame -or !$videoUnique -or !$resultsDisjoint) {
     throw "Search isolation regression detected; investigate locally without publishing captions or IDs."
 }
 # Timings are observations, not proof of unchanged pre-upgrade baseline.
