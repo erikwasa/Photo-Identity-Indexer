@@ -93,6 +93,22 @@ physical proxy/database footprint beyond the 16,996-byte
 payload baseline. The current report does not and cannot
 claim formal full acceptance.
 
+## Maintainer-scoped completion note (2026-11-02)
+
+WI-0190's revised acceptance scope is complete for its current
+opt-in, already-local SDR proxy cohort. The prior report's
+`fullAcceptanceEstablished=false` is **a hard-coded statement
+about full representative sampling/cost evidence**, not a
+work-item lifecycle verdict. The report must continue to
+say false for these two clips: scene coverage is unknown,
+CPU/GPU/Azure totals were not measured, and 7/8 caption
+accuracy is a small sample. The maintainer explicitly
+postponed broader scenes until additional supported video
+formats are available, cloud cost accounting until monthly
+credit is insufficient, and performance profiling until
+processing becomes slow. No extra original or Azure inference
+run is needed for administrative work-item closure.
+
 ## Private JSON manifest
 
 Store the manifest under a protected physical directory inside

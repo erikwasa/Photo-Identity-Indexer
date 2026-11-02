@@ -196,6 +196,21 @@ identity is not a fresh inference run: select distinct policy/job
 identities and approved clips as needed. Do not repeat the already
 accepted two-frame 12.3-second audit simply for this checkpoint.
 
+## Optional hard-interruption study — disposable isolated PostgreSQL only
+
+**WI-0190 scope decision, 2026-11-02:** This is a diagnostic procedure
+only, **not a prerequisite for closing WI-0190**. The maintainer
+accepted the working bounded selected-frame feature based on
+real two-video publication, normal scratch cleanup, live retrieval,
+the existing cancellation/atomic-publication tests and the current
+PostgreSQL backup/restore capability. Backups are a recovery fallback;
+they are **not** proof that a forced process kill safely disarms leases
+or removes partial work. Preserve existing defensive code and do not
+run a destructive rehearsal without a specific incident or new
+risk requiring it. If this optional procedure is ever invoked,
+its isolation, authorization, cooldown and ownership rules below
+are unchanged.
+
 ## Hard-interruption study — disposable isolated PostgreSQL only
 
 This is intentionally destructive to ONE newly spawned private
@@ -305,13 +320,14 @@ reasons. A disposable PostgreSQL integration test verifies the
 read-only audit and active-grant refusal. No tests send media
 to Azure, OneDrive or external AI applications.
 
-For formal WI-0190 closeout the maintainer must still execute
-the **currently supported** representative private video set, judge
-captions and retrieval quality, annotate missed scenes where a
-suitable real case exists, allocate actual system/GPU/Azure cost,
-and observe the real interruption and deferred recovery steps.
-Unavailable/unsupported representative cases are separately reported
-as **postponed**, not passed, with the future revalidation trigger
-above; do not expand admission guards or require inaccessible media
-just to check those cases. Successful CI proves the tooling's
-synthetic boundaries, not those real-world measurements.
+For WI-0190's **maintainer-approved narrower acceptance**, the
+already completed two-video frame/caption/retrieval baseline and
+existing automated safety tests are sufficient; no actual kill,
+full CPU/GPU/Azure accounting, new scene sample or extra real-video
+generation is required for this work item. Those remain
+**optional diagnostics**, with explicit triggers in the
+[work item](../delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-closeout-decision--pragmatic-scope-2026-11-02).
+If future failures or newly admitted formats warrant a deeper
+study, preserve all the existing disposable-database, private
+scratch and no-original-access gates. An unavailable or unsupported
+representative case is postponed, **not** proven passed.

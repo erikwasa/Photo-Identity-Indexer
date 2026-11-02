@@ -138,6 +138,20 @@ paths and judgment manifests remain local-only. The success
 is now accepted as the **small-corpus live retrieval baseline**;
 do not repeat it solely for this work-item checkpoint.
 
+## Scope and closure note (2026-11-02)
+
+The maintainer accepted this independently verified
+two-video/two-query retrieval test as sufficient for
+**WI-0190's narrow initial local SDR scope**. The
+MRR@2=1.00 across all three policies does not establish
+large-corpus retrieval quality or a preferred production
+ranking policy. Expanding the benchmark, testing more
+scene types and tuning performance are **not mandatory
+WI-0190 closeout work**. Revisit only as the admitted
+video collection expands or actual search/performance
+problems emerge. WI-0191 retains responsibility for
+the video-search product UI.
+
 ## Windows maintained-host live retrieval — exact steps
 
 ### Step 1 — Independently choose queries and relevance labels
