@@ -320,7 +320,7 @@ supported video library, and still posters remain deferred. No
 additional local acceptance runs or video processing are required
 for this scoped workitem.
 
-## Limits intentionally retained for the next checkpoint
+## Limits retained after scoped closure
 
 - Current reader scans a maximum of **256** most-recent, current eligible
   video revisions (not an exhaustive whole-library index). A
@@ -335,6 +335,8 @@ for this scoped workitem.
   separately by the existing video endpoint.
 - The separate Video Search browser page was accepted for basic use on the
   maintained host; two newer search results lack durable still posters.
-  Poster diagnosis, larger-set relevance, negative-case eligibility and
-  photo-ranking/performance comparisons remain outstanding. No video
-  collection integration or unattended processing is introduced.
+  Disposable PostgreSQL negative-case eligibility and the maintainer's
+  photo-search isolation check **passed**. Physical original availability
+  and larger, more varied video relevance have **not** been exercised;
+  investigate if a real need arises. No video collection integration
+  or unattended processing is introduced.
