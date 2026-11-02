@@ -5,6 +5,19 @@
 
 This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained historical migration/evaluation evidence.
 
+**Maintained-host inference checkpoint (2026-11-02):** The operator's
+`launcher.json` uses `http://127.0.0.1:11434/` for caption enrichment,
+where an **operator-controlled bridge**, not local Ollama, forwards to Azure.
+Launcher validation and on-disk CLIP SHA-256 verification passed, and the
+live `Get-PhotoIdentityApprovedInference.ps1 -VerifyOllama` check returned
+`OllamaVerified = True` for `qwen2.5vl:3b` with the approved model
+digest. The maintainer also confirmed a real Photo Identity caption was
+generated and durably persisted with these same settings in a separate
+chat. See the [full checkpoint and repeatable verification commands](approved-inference-configuration.md#maintained-windows-configuration-observed-acceptance-2026-11-02).
+This is an observed deployment check, not independent automated evidence.
+Caption enablement and language remain in the application settings; the
+Azure bridge and remote compute are activated separately.
+
 ## Current catalogue authority
 
 PostgreSQL is the single supported and authoritative catalogue. WI-0102 completed the maintainer production migration/cutover and rollback acceptance, WI-0147 made PostgreSQL unconditional at runtime, and WI-0149 removed the former SQLite implementation and executable compatibility paths. `/health` must report `catalogueProvider: postgresql`.

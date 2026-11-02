@@ -4,6 +4,21 @@ This runbook documents the operator procedure proven on the maintained Windows c
 
 **Current operator configuration:** Use [approved inference configuration](approved-inference-configuration.md) for the active launcher model name/hash, caption loopback origin and operator-only Azure upstream URL. The values in this historical accepted-burst record are evidence, not a replacement for current approval. Configuring the upstream URL alone never starts the bridge or allows inference. The Azure resource state file remains separately useful on the Azure management PC.
 
+**Maintained-host update (2026-11-02):** The current approved
+`launcher.json` routes `CaptionEnrichment__OllamaBaseUrl` to the
+operator's **Azure-forwarding bridge at `http://127.0.0.1:11434/`**;
+there is no locally installed Ollama serving this port. The bridge's
+previous 403/RBAC access failure was fixed, the live `/api/tags`
+approved-model digest check passed (`OllamaVerified = True`), and the
+maintainer independently reports successful Photo Identity caption
+generation and persistence under these settings. This update supersedes
+the historical **11435** port **for the current installation only**; the
+11435 commands, measurements and diagrams below document the
+2026-10-01 experiment and must not be treated as current launcher values.
+See [the maintained configuration acceptance record](approved-inference-configuration.md#maintained-windows-configuration-observed-acceptance-2026-11-02).
+A localhost URL does **not** mean inference stays on the host: the bridge
+sends authorized thumbnail content to the operator-controlled Azure app.
+
 The architecture exception is defined by [ADR-0011](../decisions/ADR-0011-operator-authorized-caption-burst-bridge.md). Normal day-to-day operation remains the local path in [Local operator guide](local-operator-guide.md) and [Local caption and narration evaluation](local-caption-narration-evaluation.md).
 
 ## Proven result
