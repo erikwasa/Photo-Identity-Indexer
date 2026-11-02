@@ -67,6 +67,19 @@ creation of two missing posters. This is an automated safety check
 pending Windows CI, **not** proof of actual source-file availability
 or the remaining photo-ranking/large-library criteria.
 
+## WI-0191 photo-search preservation accepted (2026-11-02)
+
+PR #716 merged after full Windows CI passed, including disposable
+PostgreSQL mixed-media search and saved-photo-collection isolation.
+The maintained-host read-only Photo/Video/Photo smoke independently
+returned 10/10 photo hits, 3 distinct video hits, identical photo
+ordering/scores and counts, unchanged membership of one saved photo
+collection and disjoint photo/video revisions. Photo elapsed values
+were 451.9 and 410.6 ms; these are not historical latency baselines.
+WI-0191 is now **3/5 scoped criteria verified** and remains
+in_progress. Physical original availability and broad realistic
+video-set relevance are not demonstrated; poster creation is deferred.
+
 ## WI-0191 photo/video coexistence checkpoint (2026-11-02)
 
 Extend an existing disposable PostgreSQL photo search fixture with

@@ -264,6 +264,32 @@ database-backed test returns early. **Never point this admin test
 variable at the maintained catalogue.** No local DB rerun is required
 if the full CI disposable test passes. Missing posters remain deferred.
 
+## Completed maintained-host photo/video regression — 2026-11-02
+
+The maintainer ran `Test-PhotoIdentityVideoSearchIsolation.ps1` after
+PR #716 was merged, using private known-positive photo and video
+phrases. The resulting checks all returned `True`:
+`PhotoRanksAndScoresUnchanged`,
+`PhotoCountsUnchanged`, `PhotoCollectionsUnchanged`,
+`OneResultPerVideoRevision`, and `PhotoVideoResultsDisjoint`.
+Photo Caption yielded 10 hits before and 10 after the intervening
+Combined video query; video search yielded 3 distinct results.
+One saved photo collection was checked without writing to it.
+
+Observed search times were **451.9 ms** for the first photo request,
+**410.6 ms** for the second and **158.5 ms** for the video request.
+These do not establish cross-version performance equivalence. The
+CI run
+[41510054848](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/41510054848)
+passed the complete Windows pipeline, including disposable PostgreSQL
+mixed-media and source-eligibility tests.
+
+No further local photo/video isolation verification is necessary for
+this checkpoint. The maintainer has explicitly postponed still-poster
+generation. The remaining WI-0191 questions concern the distinction
+between catalogue authorization and physical original availability,
+plus future larger-set relevance when suitable indexed videos exist.
+
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible

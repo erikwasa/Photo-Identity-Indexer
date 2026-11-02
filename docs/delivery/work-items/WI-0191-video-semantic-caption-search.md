@@ -31,7 +31,7 @@ Audio/subtitle search, mixed-media Creative Collection recipes, live semantic Sm
 
 - [x] Visual, Caption and Combined modes return videos only when video mode is selected, with one result per source revision.
 - [x] Results retain the grounded matching frame timestamp/description and explicit generated-evidence provenance.
-- [ ] Existing photo-only search eligibility, ranking, saving and baseline latency are preserved.
+- [x] Existing photo-only search eligibility, ranking, saving and baseline latency are preserved.
 - [ ] Missing/stale/excluded videos never leak; requests are read-only with respect to video processing.
 - [ ] Maintainer verifies representative queries with small and large video sets.
 
@@ -254,6 +254,54 @@ package-verification lane when this mixed-photo/video test file changes,
 including test-only PRs. Windows CI and
 optional maintainer smoke are pending; the existing **2/5** accepted
 criteria remain unchanged until evidence is reviewed.
+
+## Maintained-host photo/video isolation acceptance — 2026-11-02
+
+After merging PR #716, the maintainer ran the optional read-only
+`Test-PhotoIdentityVideoSearchIsolation.ps1` against the existing
+local app and catalogue with privately entered known-positive photo
+and video queries. The observed results were:
+
+| Observation | Maintained-host result |
+| --- | --- |
+| Photo query mode | Caption |
+| Photo hits before and after video query | 10 and 10 |
+| Photo ordered revisions, component scores and ranking | Exactly unchanged |
+| Photo indexed and displayable-caption totals | Exactly unchanged |
+| Existing saved photo collections | 1 checked; membership unchanged |
+| Video query mode and results | Combined; 3 videos |
+| Duplicate video revisions | None |
+| Photo/video result-set intersection | Empty |
+| Photo elapsed, first and second request | 451.9 ms and 410.6 ms |
+| Video elapsed | 158.5 ms |
+
+The final Windows CI run for PR #716
+([run 41510054848](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/41510054848))
+also **passed**, including the disposable PostgreSQL photo/video
+coexistence test and package verification. That fixture additionally
+checks that publishing synthetic video FrameEvidence leaves existing
+photo search ranking, statistics and photo collection order unchanged,
+and video revisions cannot be added to photo-only collections.
+
+Under the **pragmatic scoped acceptance** of the existing search
+isolation requirement, the third acceptance box is now verified.
+There is no photo search implementation or saved-collection contract
+change in WI-0191, and neither CI nor the maintained-host check
+indicates a regression. The photo elapsed observations are comparable
+within a single run but **are not** a rigorous historical before/after
+latency measurement. Revisit performance only if a meaningful
+slowdown appears. No actual photo collection was created or modified
+during the read-only maintained-host check. No private query text,
+revision IDs or caption content are retained in this documentation.
+
+WI-0191 remains **in_progress, 3/5 accepted**.
+The fourth criterion has automated catalogue eligibility/exclusion
+and read-only query coverage, but the evidence-only route cannot prove
+that an original video or poster is still available on disk. The
+fifth criterion has the successful three-video pilot; a meaningful
+larger/varied indexed video corpus is not available yet. Do not
+generate posters, hydrate remote media, or fabricate large-scene
+coverage to close those gaps.
 
 ## Completion notes
 
