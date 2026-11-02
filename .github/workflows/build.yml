@@ -57,6 +57,9 @@ jobs:
             const package = sharedPublishSurface || launcher ||
               paths.some(path => path.startsWith('packaging/windows/')) ||
               paths.some(path => path.startsWith('models/')) ||
+              // FrameEvidence search/privacy checks need the disposable PostgreSQL
+              // lane even when only their persistence test file changes.
+              exact.has('tests/PhotoIdentity.Persistence.Tests/VideoFrameEvidencePublicationTests.cs') ||
               exact.has('Package-PhotoIdentity.ps1') ||
               exact.has('verify-package.ps1');
 
