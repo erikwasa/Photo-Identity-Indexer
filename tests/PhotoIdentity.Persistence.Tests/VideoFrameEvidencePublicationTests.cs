@@ -10,7 +10,7 @@ namespace PhotoIdentity.Persistence.Tests;
 /// No personal files or remote models. CI creates and drops an isolated
 /// PostgreSQL catalogue when the test-admin connection is supplied.
 /// </summary>
-public sealed class VideoFrameEvidencePublicationTests
+public sealed class PostgresVideoFrameEvidencePublicationTests
 {
     private static readonly VideoFrameSamplingPlan Plan = VideoFrameSamplingPlanner.Plan(
         new VideoFrameSamplingRequest(8m, MaximumFrames: 2));
