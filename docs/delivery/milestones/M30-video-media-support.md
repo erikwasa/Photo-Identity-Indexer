@@ -9,14 +9,15 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 returns to ready, not completed, after the scoped closure of
-WI-0191 on 2026-11-02.** The previously active video search workitem
-is completed and archived, along with WI-0190 and the existing
+**M30 is in progress as WI-0152 begins implementation on
+2026-11-02 (draft PR #720), but remains far from completed.**
+After WI-0191 closed, M30 temporarily returned to ready; PR #719 then
+approved starting bounded browser playback. WI-0190/0191 and the existing
 architecture/metadata/processing/proxy foundations (WI-0150, WI-0151,
-WI-0188 and WI-0189). The milestone still contains independently
-proposed future video work, including playback, metadata/collections,
-video-face evaluation and online-only OneDrive hydration (WI-0207).
-Do not mistake WI-0191 closure for permission to start those items.
+WI-0188 and WI-0189) are accepted. WI-0152's desktop, phone, range,
+and online-only acceptance remain unverified, and independently proposed
+metadata/collections, video-face evaluation, codec expansion and
+OneDrive hydration (WI-0207) remain separate.
 
 The dedicated opt-in Video Search view and API are accepted for the
 existing three current, already-local supported SDR videos. The
