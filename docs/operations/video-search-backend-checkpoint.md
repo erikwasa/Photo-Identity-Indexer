@@ -237,7 +237,8 @@ runs Photo / Video / Photo queries and two read-only saved-collection
 GET requests, and prints **only** result counts, equality flags and
 individual elapsed milliseconds. Pass means photo membership/order,
 component scores, photo index totals and saved photo collection
-membership were unchanged **across the intervening video search
+membership were unchanged, with no sampled video result appearing
+in the photo results **across the intervening video search
 request**. It does not write photos or collections, access video
 originals, trigger processing or output source identifiers.
 A successful pair of queries does not prove the photo baseline latency
