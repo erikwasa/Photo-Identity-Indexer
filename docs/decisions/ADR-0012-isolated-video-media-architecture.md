@@ -34,7 +34,7 @@ This ADR complements [ADR-0007](ADR-0007-permanent-archive-bounded-storage.md) (
 
 The first deliverable after this gate is **WI-0151: opt-in catalogue metadata and a still poster for supported local MOV/MP4 files**. No face matching, full transcode or slideshow work is required to make a video indexable. WI-0188 then adds a dedicated video queue used by expensive derivatives; implement lightweight ingestion without launching bulk jobs on ordinary photo scans.
 
-The isolated video lane is an application-owned, local worker within the existing modular monolith, not a cloud service or second database. Jobs are explicitly enabled and selected, capped and cancelable. Photo processing/search/slideshow work has priority; video CPU/GPU/IO/hydration and disk use must be separately measurable and pausable. Defaults: no background video work; at most one heavy video job when deliberately enabled until a mixed-load benchmark establishes safe budgets. Persist revision/model/policy job status and support restart, idempotency, cancellation and failed-attempt cleanup.
+The isolated video lane is an application-owned, local worker within the existing modular monolith, not a second catalogue or mandatory cloud service. Jobs are explicitly enabled and selected, capped and cancelable. Photo processing/search/slideshow work retains priority; video CPU/IO/hydration and disk use have practical bounded controls and can be paused. Defaults: no background video work, one heavy video job at a time. Reassess capacity and richer performance instrumentation only when actual use warrants it; a comprehensive mixed-load benchmark is **not** a release prerequisite. Persist revision/model/policy job status and support safe restart, cancellation and failed-attempt cleanup.
 
 ### 3. Codec and metadata policy
 
@@ -69,6 +69,53 @@ References: https://ffmpeg.org/legal.html ; https://www.gyan.dev/ffmpeg/builds/ 
 A future WI-0152 viewer serves authorized playable proxies through guarded HTTP endpoints supporting range requests (206/416), cancellation and bounded seek/read; do not expose local cache paths or allow arbitrary file serving. Applying exclusion gates before serving, hydration or model retrieval is mandatory. A missing proxy does not automatically hydrate an online-only original.
 
 No personal frame images, identifying tags, embeddings, filenames, source paths or codec-survey raw output are committed. Video processing stays local by default. ADR-0013 subsequently authorizes optional, purpose-scoped operator-controlled Azure **inference**, but no off-host video-frame worker, full-video upload or remote catalogue is enabled by this ADR alone.
+
+## Maintainer scope clarification — 2026-11-02
+
+This ADR remains the accepted protection for original bytes,
+catalogue authority, source-copy exclusions, revision fencing and
+app-owned derived data. Its 2026-10-14 activation/format
+requirements were **initial scope**, not permanent restrictions
+on which reasonable source files Photo Identity may support.
+
+- **Stage video compatibility** as catalogued metadata → still
+  poster → locally retained playable proxy → frame-search evidence
+  → optional face evidence. Each step has distinct eligibility
+  and caps. [WI-0210](../delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md)
+  owns one archive-prioritized initial widening, not universal codecs.
+- **Playback before broader expansion:** WI-0152 serves a current
+  approved local proxy via guarded byte-range endpoints and the
+  existing trusted-LAN HTTPS path. It may play while the source
+  original is online-only. Viewer requests must not silently
+  hydrate, re-encode or fall back to streaming originals.
+- **Managed hydration:** when WI-0207 is explicitly enabled, use
+  the same ownership-based OneDrive materialization lifecycle
+  already applied to photos. A newly app-hydrated original
+  remains local while authorized dependent processing requires
+  it; only after that processing and its leases end may the
+  managed-cache policy release it. Never unpin originally local
+  or user-pinned files.
+- **Reasonable safety, not maximal isolation:** preserve
+  bounded trusted FFmpeg invocation, photo priority, revision/
+  exclusion checks, atomic output and cleanup. The previously
+  revised WI-0188 scope removed mandatory AppContainer,
+  comprehensive GPU/kernel isolation, concurrent photo/video
+  throughput benchmarking and destructive interruption drills.
+  Do not silently restore those as gates for future video slices.
+- **Privacy/Azure:** [ADR-0013](ADR-0013-optional-operator-controlled-remote-compute.md)
+  permits opt-in inference on a maintainer-controlled vetted
+  Azure application. It does not authorize unvetted third-party
+  opaque processing, automatic full-video uploads or remote
+  catalogue authority.
+- **Feature sequencing:** simple human-readable capture time,
+  GPS/location, make/model, resolution and FPS are enough for
+  basic metadata. Collections and Smart Collection integration
+  are postponed. Video face recognition is a desired feature,
+  starting with a non-production prototype rather than mandatory
+  temporal tracking. Live Photo pairing is retired from M30.
+
+See [video compatibility stages](../operations/video-compatibility-matrix.md)
+and the [current milestone scope](../delivery/milestones/M30-video-media-support.md).
 
 ## Alternatives considered
 
