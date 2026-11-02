@@ -1,0 +1,31 @@
+id: WI-0152
+title: Add safe browser video serving and viewer playback
+milestone: M30
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0152-video-serving-playback.md
+started_at: 2026-11-02
+completed_at: 2026-11-03
+verified_at: 2026-11-03
+verified_by: maintainer
+last_updated_at: 2026-11-03
+branch: wi0152-retained-proxy-playback-v1
+blockers:
+- WI-0151
+- WI-0189
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/720
+- type: documentation
+  value: docs/operations/video-playback-wi0152.md
+- type: maintainer-verification
+  value: '2026-11-03: initial maintainer PASS for PostgreSQL/HTTP range tests, docs validate/generate, desktop and phone functional playback/seek, HTTP 206/416/404, OneDrive online-only unchanged, no processing, and photo viewer/search regression. Lower native video controls were initially clipped on both devices; corrected in PR #720.'
+- type: maintainer-verification
+  value: '2026-11-03: after the PR #720 layout fix, maintainer confirmed the entire native video player is visible on both desktop PC and phone; previous bottom-clipping blocker resolved. All five scoped WI-0152 acceptance criteria verified; merge completed; archival recorded.'
+- type: ci-verification
+  value: '2026-11-03: GitHub Actions build run 41543246154 on commit fe24b58 passed six jobs including build/test, both integration shards, launcher and package. PR #720 subsequently merged after delivery review.'
+- type: maintainer-acceptance
+  value: '2026-11-03: PR #720 merged after desktop and phone native-player full-visibility correction. Maintainer previously reported PASS for all scoped playback, range, PostgreSQL, online-only original retention, no-job, HTTPS phone and photo-regression requirements. WI-0152 accepted and archived; no new real-media test required.'
