@@ -10,8 +10,9 @@ generation; no poster work is authorized.
 Current branch extends existing disposable PostgreSQL search-regression
 coverage: unsupported/HDR, soft deletion, supersession, non-local
 source and incomplete evidence fail closed, complementing exclusion
-purge tests. The formerly unselected publication test now matches the CI `Postgres`
-filter; Windows CI is pending. No private video files, live
+purge tests. The existing publication test now matches the CI `Postgres` filter;
+test-only changes to it also activate the disposable PostgreSQL
+verification lane. Windows CI is pending. No private video files, live
 catalogue writes or inference are involved. Next: review CI; check
 remaining photo ranking/saving/latency and practical larger-library
 relevance without forced format expansion or overengineering. See
