@@ -33,6 +33,24 @@ public sealed class VideoPlaybackRangeResultTests
     }
 
     [Fact]
+    public async Task Head_returns_metadata_without_a_video_body()
+    {
+        using ServiceProvider services = new ServiceCollection()
+            .AddLogging().BuildServiceProvider();
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Method = "HEAD";
+        using var response = new MemoryStream();
+        context.Response.Body = response;
+
+        await Results.File(new MemoryStream(new byte[128]), "video/mp4",
+            enableRangeProcessing: true).ExecuteAsync(context);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Equal(128, context.Response.ContentLength);
+        Assert.Empty(response.ToArray());
+    }
+
+    [Fact]
     public async Task Unsatisfiable_range_returns_416_without_media_bytes()
     {
         byte[] mp4 = new byte[128];
