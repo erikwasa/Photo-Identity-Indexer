@@ -52,11 +52,11 @@ proxy and trusted-LAN infrastructure instead of a new streaming stack.
 - [ ] On the maintained local host, an already-retained supported proxy
   plays, pauses and seeks correctly in the browser with no original
   hydration or new video processing job.
-- [ ] Current revision, exclusion, file integrity and safe-range guards
+- [x] Current revision, exclusion, file integrity and safe-range guards
   prevent serving unauthorized, stale or malformed proxy bytes.
-- [ ] An online-only original with a retained proxy is play-capable
+- [x] An online-only original with a retained proxy is play-capable
   without hydration; an unavailable proxy fails clearly and safely.
-- [ ] Existing image viewer remains unchanged.
+- [x] Existing image viewer remains unchanged.
 - [ ] A real phone can play/seek using existing opt-in trusted-LAN
   HTTPS if that established mobile path is configured and available;
   no new LAN security or identity system is required.
@@ -82,13 +82,34 @@ No private video content is committed.
 - Playback only reads registered succeeded PlayableProxy outputs using
   the approved standard-720p and compact-540p versions. It never touches
   an original file, sends cache paths, hydrates OneDrive, or enqueues jobs.
-- Synthetic and optional disposable PostgreSQL tests were authored for
-  path/size/SHA/exclusion/missing-file behavior, plus pure HTTP file-range
-  tests. Execution remains **pending** in GitHub CI and on the maintained
-  Windows host; no local test results or phone evidence are claimed here.
+- **Maintainer-reported Windows acceptance, 2026-11-03:** focused
+  PostgreSQL and HTTP range tests PASS; docs validate and generate PASS;
+  desktop play/pause/seek, HTTP 206/416/404, no new processing, retained
+  proxy with OneDrive-online-only original remaining online-only, existing
+  HTTPS phone playback, and photo viewer/search regression all PASS at
+  the functional level. These are operator-observed results, not an
+  independent automated device lab, and contain no private media evidence.
+- **Open visual regression:** both desktop and phone rendered only the
+  top part of the native video player; the bottom control bar was
+  sometimes clipped. Functional seeking worked but the video viewer
+  is not visually acceptable. **Do not close WI-0152 or treat the
+  initial desktop/phone criterion as complete.**
+- **Checkpoint 2:** PR #720 additionally changes the active card to
+  use a full-width row, releases the fixed 16:10 poster-frame clip
+  while playing, uses natural video element height with a 75dvh cap,
+  and retains `object-fit: contain`. Adds the
+  `VideoPlaybackLayoutContractTests` style contract to prevent
+  reintroducing the CSS clipping. This fixes the identified styling
+  cause in code, but actual desktop and phone visual confirmation is
+  **pending** and is not claimed as passed.
 - Follow the
-  [WI-0152 playback acceptance runbook](../../operations/video-playback-wi0152.md).
-  Desktop/phone playback, real online-only original behavior, photograph
-  viewer regression and 404/206/416 response codes all remain to be
-  verified. Keep the five acceptance checkboxes open until accepted.
+  [WI-0152 playback acceptance runbook](../../operations/video-playback-wi0152.md)
+  for a focused republish + desktop/phone clipping and native-controls
+  retest, plus the new layout contract test. No new original-hydration,
+  database or real video-processing verification is required merely
+  for this CSS correction.
+- Remaining acceptance: visually complete un-cropped frames and fully
+  accessible native play/pause/seek controls on both desktop and phone.
+  Preserve the already-passed API/integrity/privacy/photo evidence;
+  keep WI-0152 in progress until this regression is resolved.
 - Keep acceptance bounded to locally retained playable proxies.
