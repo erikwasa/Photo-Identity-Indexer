@@ -9,22 +9,27 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 remains in progress while WI-0152's accepted browser playback
-is awaiting PR #720 review/merge (2026-11-03).** PR #719 approved
-the bounded playback scope; the maintained Windows host has now passed
-PostgreSQL and range checks, desktop and phone play/pause/seek, HTTP
-206/416/404, OneDrive online-only nonhydration, unchanged processing,
-and photo regression. The native player initially clipped lower
-controls on both devices; after the corrective UI commit the maintainer
-confirmed that the entire player is visible on PC and phone. All
-five scoped WI-0152 criteria are accepted; its lifecycle is `in_review`
-until the PR merges, not yet archived.
+**Current handoff, 2026-11-03:** PR #720 merged; WI-0152's
+maintainer-accepted desktop/phone playback has been completed and archived.
+All five scoped criteria passed on the maintained Windows host; the
+native-player clipping regression was fixed and separately verified.
+No repeat playback or online-only original hydration check is requested
+merely to close that item.
 
-WI-0190/0191 and the existing architecture/metadata/processing/proxy
-foundations (WI-0150/0151/0188/0189) remain accepted. Independently
-proposed metadata/collections, video-face evaluation, codec expansion
-and OneDrive hydration (WI-0207) remain separate. This individual
-work-item acceptance does **not** complete M30.
+**WI-0210 is now in progress:** checkpoint 1 adds a privacy-safe,
+read-only current-video PostgreSQL census of inspection and technical
+metadata, last-observed availability, stage receipts, and overlapping
+worker-admission gaps. It does **not** open originals or expand supported
+formats. Windows CI and an actual maintained-host inventory are pending.
+The maintainer will use the counts to choose ONE bounded format/size/
+duration/colour expansion and target stages before processing real media.
+See [the census runbook](../../operations/video-compatibility-wi0210-census.md).
+
+M30 remains in progress. WI-0207 opt-in OneDrive hydration/release is
+separate and later. WI-0153/0154 metadata/mixed collections/slideshow
+work is deferred. WI-0155 face feasibility remains an experimental
+prototype; WI-0156 Live Photo pairing is retired. Earlier WI-0150/0151,
+WI-0188/0189, WI-0190/0191 acceptance remains valid.
 
 The dedicated opt-in Video Search view and API are accepted for the
 existing three current, already-local supported SDR videos. The
