@@ -89,13 +89,22 @@ The Combined response carried frame-relative timestamps, generated
 FrameEvidence provenance, caption and semantic source flags, sampling
 policy versions, CLIP/caption model identities, and revision-bound
 poster routes. The maintainer supplied no personally identifying media
-details for repository documentation. A photo Caption query returned
-HTTP success with **zero matching photos**; this is not a regression
-signal without a known-positive photo query/baseline. Local focused
-test and docs-command outputs, poster byte availability, exclusion
-negative cases, large-corpus results, and relevance judgments were
-not reported by this pilot. The browser Video Search page remains
-unimplemented; the five work-item acceptance boxes remain open.
+details for repository documentation.
+
+Photo-search regression smoke: the initial photo Caption query returned
+HTTP success with zero matches, followed by a separate **known-positive
+Caption query** returning **10 photo results (limit 10)**. The response
+reported **26,904 indexed photos** and **24,770 displayable captions**.
+This establishes that the existing photo Caption API can return results
+against the maintained catalogue after the video-search change. It does
+**not** verify unchanged relevance/ranking, other photo search modes,
+saved-photo workflows or baseline latency without a before/after
+comparison. The query text and photo identifiers are deliberately omitted.
+
+Local focused test and docs-command outputs, poster byte availability,
+exclusion negative cases, large-corpus results, and video relevance
+judgments were not reported by this pilot. The browser Video Search
+page remains unimplemented; the five work-item acceptance boxes remain open.
 
 ## Completion notes
 
