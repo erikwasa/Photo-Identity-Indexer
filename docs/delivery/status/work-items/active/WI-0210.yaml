@@ -9,7 +9,5 @@ blockers:
 - WI-0188
 blocker_notes: []
 evidence:
-- type: scope_decision
-  value: '2026-11-02: maintainer asked for one archive-driven compatibility workitem to choose highest-value real video format/size/duration gaps, then create another item only if later expansion is warranted.'
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
