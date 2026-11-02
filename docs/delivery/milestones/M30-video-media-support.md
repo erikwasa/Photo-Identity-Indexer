@@ -9,19 +9,32 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 is ready, not completed.** WI-0190 was the last in-progress
-M30 item; its scoped completion leaves proposed or ready video work,
-so the canonical lifecycle recalculates the milestone to `ready`.
-This means further work is available, not that the milestone has
-been completed. WI-0150 architecture,
+**M30 is in_progress, not completed.** WI-0190 is completed;
+WI-0191 has now started with an isolated, opt-in read-only Video Search
+backend (checkpoint 1). The separate browser view and maintained-library
+verification are not delivered yet. The other video items remain proposed.
+This does not reactivate WI-0190's deferred acceptance work. WI-0150 architecture,
 WI-0151 video metadata/posters, WI-0188 isolated local video
 processing and WI-0189 versioned playable proxies were previously
 completed with their scoped maintainer acceptance. Photo-first,
 local-first and original-media safety remain authoritative.
 **Online-only OneDrive video hydration/release is separately proposed
 under WI-0207**; it has not been authorized or exercised by WI-0190.
-Other video search (WI-0191), optional playback and face evaluation
-are separate M30 work items.
+Video search (WI-0191), optional playback and face evaluation
+remain separate M30 work items.
+
+## WI-0191 video-search backend checkpoint (2026-11-02)
+
+A separate `POST /api/video-search/query` opt-in endpoint now has a
+bounded read-only current-frame-evidence PostgreSQL reader, local CLIP
+text matching when model provenance is compatible, simple caption matching
+and per-revision reciprocal-rank fusion. Existing photo search and saved
+photo workflows are unchanged. This is an initial backend checkpoint,
+**not** completed video search: browser UI, larger corpus and maintained-host
+acceptance remain. No source decoding, hydration or background work is
+authorized by a search request. See
+[WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) and
+[operator verification](../../operations/video-search-backend-checkpoint.md).
 
 **WI-0190 current maintainer verification (2026-11-02):**
 Two different supported short/rotated published SDR proxies have

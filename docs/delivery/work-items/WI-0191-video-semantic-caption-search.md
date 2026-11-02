@@ -39,6 +39,38 @@ Audio/subtitle search, mixed-media Creative Collection recipes, live semantic Sm
 
 Query/ranking/access tests and maintained-archive comparison of video search relevance and photo-search regression.
 
+## Implementation checkpoint 1 — isolated read-only search backend (2026-11-02)
+
+The first WI-0191 branch implements a separate `POST /api/video-search/query`
+route, enabled only when the existing explicit video-library configuration
+`PhotoIdentity:VideoLibraryEnabled=true` is active. It does not change
+`/api/photo-search/query`, the photo page, Smart Collection eligibility,
+photo result selections or saved photo collections. The endpoint returns
+only indexed videos and generated captions with a grounded frame timestamp,
+evidence policy/model labels and the existing revision-bound poster URL.
+It neither decodes media nor schedules video processing/hydration.
+
+An isolated PostgreSQL repeatable-read, read-only snapshot selects at most
+256 current, supported SDR video revisions with published successful
+FrameEvidence batches, local-folder source authority, no deletion and no
+source-copy exclusion. It verifies frame count, ordinals, timestamp order,
+vector dimensions and finite values before exposing candidates to ranking.
+The pure core ranker reduces each video to its best Visual and Caption
+frame separately, performs reciprocal-rank fusion **once per video**, and
+uses the already-approved local CLIP text encoder for Visual matching only
+when evidence model hash/preprocessing match. Caption-only matching works
+without the model; no remote or third-party inference is added.
+
+**Not delivered by this checkpoint:** the dedicated browser Video Search
+view, accessible poster/playback navigation, production-quality caption
+full-text ranking, proof of local availability after a proxy eviction,
+large-corpus scaling/relevance comparison and maintainer verification.
+The initial caption ranker is intentionally simple token overlap/phrase
+matching, and the 256-video ceiling is explicit rather than silently
+presented as full-library coverage. Existing acceptance boxes remain
+**0/5 pending** until the full end-to-end workitem is verified.
+See [backend pilot procedure](../../operations/video-search-backend-checkpoint.md).
+
 ## Completion notes
 
 - Files changed:

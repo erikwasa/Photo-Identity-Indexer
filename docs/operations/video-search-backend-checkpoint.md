@@ -1,0 +1,77 @@
+# WI-0191 checkpoint 1 — video-search backend verification
+
+This is a deliberately bounded first checkpoint, not full WI-0191 acceptance.
+It adds the separately selected **video-only** POST endpoint
+`/api/video-search/query` and leaves `/api/photo-search/query` unchanged.
+The new route is unavailable (404) unless
+`PhotoIdentity:VideoLibraryEnabled=true` is already explicitly configured.
+Do not enable processing, source hydration or Azure inference to test search.
+
+## Automated tests and documentation
+
+From a current main-derived checkout on Windows:
+
+```powershell
+dotnet test tests/PhotoIdentity.Core.Tests/PhotoIdentity.Core.Tests.csproj -c Release --filter "FullyQualifiedName~VideoSearchRankerTests"
+dotnet build PhotoIdentity.slnx -c Release
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+A failing build or generator check is a blocker, not evidence of acceptance.
+No local Windows command has been claimed to run through the GitHub connector.
+
+## Bounded maintained-host pilot
+
+Only after the PR has passed CI, launch using the existing approved local
+PostgreSQL catalogue, installed pinned CLIP model and current personal
+video-library configuration. Do not edit credentials or switch to a
+disposable database casually. The route is explicitly video-only.
+
+1. With Video Library disabled, confirm the endpoint responds with 404.
+   No current photo-search behavior should change.
+2. With Video Library explicitly enabled, run **Caption** mode on a harmless
+   text query that corresponds to an already published frame. This does not
+   need a loaded CLIP model. Inspect the result **privately**; captions are
+   personal data and should not be copied into PR comments.
+3. Run **Semantic** and **Combined** with an approved local CLIP model.
+   The server authenticates the model through the same existing configuration
+   as photo search and ignores vectors with differing digest/preprocessing.
+   An unavailable model produces no Visual matches; Combined can still use
+   matching captions.
+4. Compare returned revision IDs to the existing privately audited current
+   FrameEvidence jobs. Observe one result per revision, a real frame
+   timestamp, generated-evidence provenance and no unsupported/excluded or
+   superseded revision. Do not change real source exclusions merely to test
+   the negative case; use disposable PostgreSQL fixtures later.
+5. Compare one unchanged photo search query before and after the change.
+   Do not infer performance equivalence from a single query.
+
+Example call, run only on the existing local app port:
+
+```powershell
+$body = @{ query = "a harmless scene description"; mode = "caption"; limit = 10 } | ConvertTo-Json
+$result = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5080/api/video-search/query" -ContentType "application/json" -Body $body
+$result | Select-Object Mode, SemanticModelAvailable, CandidateVideos, CandidateLimitReached
+$result.Items | Select-Object TimestampMilliseconds, Sources, EvidenceKind
+```
+
+Keep actual captions, source identifiers and media content local. Do not
+paste personal search results into public CI logs or issue comments.
+
+## Limits intentionally retained for the next checkpoint
+
+- Current reader scans a maximum of **256** most-recent, current eligible
+  video revisions (not an exhaustive whole-library index). A
+  `candidateLimitReached` response flag reports possible truncation.
+- Simple case-insensitive token/phrase caption ranking is a baseline, not
+  PostgreSQL full-text ranking. Combined mode fuses per-video ranked lists,
+  not raw photo/video scores. The displayed timestamp is always from the
+  selected stored frame.
+- Access is verified from catalogue status and current revision/exclusion
+  at read-snapshot time. This initial API does not confirm on-disk poster
+  or playable-proxy presence for each result; poster bytes remain guarded
+  separately by the existing video endpoint.
+- There is no Video Search browser page, collection integration, or
+  unattended processing. The maintenance verification, large-set latency,
+  negative-case integration tests and full acceptance remain pending.

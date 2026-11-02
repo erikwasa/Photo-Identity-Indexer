@@ -142,6 +142,16 @@ public sealed class VideoFrameEvidencePublicationTests
             Assert.Equal(batch.Items[0].Caption, stored.Items[0].Caption);
             Assert.Equal(batch.Items[0].Embedding, stored.Items[0].Embedding);
 
+            // WI-0191: the separate read-only video-search snapshot sees only
+            // complete current published evidence, without a second producer.
+            var videoSearch = new PostgresVideoSearchRepository(database);
+            var searchable = Assert.Single(await videoSearch.ReadCurrentAsync());
+            Assert.Equal(revision, searchable.RevisionId);
+            Assert.Equal(batch.Items.Count, searchable.Frames.Count);
+            Assert.Equal(batch.Items[0].TimestampMilliseconds,
+                searchable.Frames[0].TimestampMilliseconds);
+            Assert.Equal(batch.Items[0].Caption, searchable.Frames[0].Caption);
+
             // No second commit may reuse an acknowledged, consumed lease.
             Assert.False(await repository.TryPublishAsync(lease, Plan, batch));
 
@@ -167,6 +177,7 @@ public sealed class VideoFrameEvidencePublicationTests
                 await exclude.ExecuteNonQueryAsync();
             }
             Assert.Null(await repository.GetCurrentAsync(jobId));
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
             // Source-copy exclusion must physically purge private captions
             // and embeddings through v38 FK cascade, not only hide them.
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())

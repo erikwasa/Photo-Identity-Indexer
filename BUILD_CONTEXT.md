@@ -1,5 +1,21 @@
 # Build context
 
+**Current handoff — 2026-11-02 WI-0191 checkpoint 1:** PR #710 merged,
+WI-0190 is scoped completed and archived. WI-0191 (M30) is now
+in_progress on `agent/WI-0191-video-search-backend-20261102`.
+The separate video-search backend reads only current authorized
+FrameEvidence from a bounded read-only PostgreSQL snapshot, ranks
+one result per video (Visual, Caption or Combined), and uses the
+existing local CLIP encoder when provenance matches. The video-library
+opt-in configuration gates the new API. No photo search changes,
+video hydration, processing or browser UI. The first checkpoint needs
+Windows CI and local API/DB verification; WI-0191 remains 0/5 accepted.
+Next: review CI, add video-only browser UI and maintained-host evaluation
+without broadening the video processing policy. See
+`docs/delivery/work-items/WI-0191-video-semantic-caption-search.md` and
+`docs/operations/video-search-backend-checkpoint.md`.
+
+
 **2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
 The maintainer accepted the bounded already-local selected SDR
 FrameEvidence slice after two independent four-frame published
