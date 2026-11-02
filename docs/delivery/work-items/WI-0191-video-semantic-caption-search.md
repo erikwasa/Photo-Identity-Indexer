@@ -204,6 +204,10 @@ These cases require **no real photos/videos, filesystem modifications,
 Azure processing, OneDrive access or writes to the maintained catalogue**.
 The test uses the pre-existing disposable test database and only adds
 low-level assertions, not another integration host or search index.
+Its test class is now named `PostgresVideoFrameEvidencePublicationTests`
+so the maintained `FullyQualifiedName~Postgres` CI filter actually runs
+this already-existing publication/regression test (previously the
+non-Postgres class name could bypass that specific live-DB lane).
 Passing Windows CI is still required; none of these new assertions is
 claimed as a test result until CI completes.
 
