@@ -9,24 +9,47 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 is in_progress, not completed.** WI-0190 is completed;
-WI-0191 has delivered an opt-in read-only Video Search API,
-with a successful three-video maintainer pilot and a new dedicated
-browser page accepted for basic use after PR #713 merged. One result
-showed a poster, while two newer video search results had no available
-poster; separate WI-0151 poster materialization is not automatic.
-WI-0191 remains in progress with the first two acceptance criteria
-verified, and search eligibility/photo regression and broader relevance
-still open. The other video items remain proposed.
-This does not reactivate WI-0190's deferred acceptance work. WI-0150 architecture,
-WI-0151 video metadata/posters, WI-0188 isolated local video
-processing and WI-0189 versioned playable proxies were previously
-completed with their scoped maintainer acceptance. Photo-first,
-local-first and original-media safety remain authoritative.
-**Online-only OneDrive video hydration/release is separately proposed
-under WI-0207**; it has not been authorized or exercised by WI-0190.
-Video search (WI-0191), optional playback and face evaluation
-remain separate M30 work items.
+**M30 returns to ready, not completed, after the scoped closure of
+WI-0191 on 2026-11-02.** The previously active video search workitem
+is completed and archived, along with WI-0190 and the existing
+architecture/metadata/processing/proxy foundations (WI-0150, WI-0151,
+WI-0188 and WI-0189). The milestone still contains independently
+proposed future video work, including playback, metadata/collections,
+video-face evaluation and online-only OneDrive hydration (WI-0207).
+Do not mistake WI-0191 closure for permission to start those items.
+
+The dedicated opt-in Video Search view and API are accepted for the
+existing three current, already-local supported SDR videos. The
+maintainer verified useful frame descriptions and timestamps, all
+three retrieval modes, photo-search isolation, and an unmatched
+read-only Caption search with no processing counter changes.
+Catalogue eligibility and exclusion controls were also tested in
+disposable PostgreSQL. A physical original-file existence check on
+each search and representative larger-video relevance benchmarking
+were explicitly **excluded from the accepted scope**, not passed.
+Poster generation for two missing stills remains deferred. Photo-first,
+local-first, media privacy and exclusion rules stay in force.
+
+## WI-0191 scoped maintainer closeout (2026-11-02)
+
+WI-0191 is **completed by explicitly revised acceptance B**, with
+five **scoped** criteria accounted for, not five original aspirational
+criteria universally tested. The maintainer's final harmless unmatched
+Caption search returned no unrelated matches, unchanged video job
+counters (queued, running, succeeded, failed, cancelled and expired
+leases), 3 candidate videos and no candidate truncation. The maintainer
+judged current descriptions/timestamps useful. Prior local
+photo/video isolation and disposable PostgreSQL eligibility tests
+passed. No source files were read, restored or hydrated by this
+closeout verification.
+
+**Deferred triggers:** Reassess physical media availability if a
+stale catalogue entry or user-visible access issue occurs, and revisit
+rank relevance and the 256-candidate limit when a useful larger,
+more varied supported video cohort exists. The absent posters are
+not part of search acceptance. M30 is **ready** for separate future
+video work, not finished. See
+[WI-0191](../work-items/WI-0191-video-semantic-caption-search.md).
 
 ## WI-0191 video-search backend checkpoint (2026-11-02)
 
