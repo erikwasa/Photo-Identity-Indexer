@@ -4,11 +4,13 @@
 with passing Windows CI. Maintainer confirmed separate Caption, Semantic
 and Combined read-only Video Search against three current indexed videos;
 one result per revision, model/provenance fields and approved local CLIP
-were observed. Photo Caption API returned zero matches for an unmatched
-query, so known-positive photo regression remains unverified. No browser
-Video Search UI exists. WI-0191 remains in_progress, 0/5 criteria accepted.
-Next: add separate opt-in video browser search; verify positive photo
-search, local poster availability, eligibility and relevance when useful.
+were observed. A second, known-positive photo Caption query returned
+10/10 results (26,904 indexed photos; 24,770 displayable captions).
+This confirms basic existing photo Caption retrieval, not unchanged
+ranking, saved workflows or performance. No browser Video Search UI exists.
+WI-0191 remains in_progress, 0/5 criteria accepted.
+Next: add separate opt-in video browser search; verify local poster
+availability, eligibility, other photo modes and relevance when useful.
 See `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
 
 
