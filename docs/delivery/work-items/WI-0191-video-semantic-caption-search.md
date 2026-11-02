@@ -239,7 +239,8 @@ A new optional read-only Windows operator script,
 `Test-PhotoIdentityVideoSearchIsolation.ps1`, interleaves a
 known-positive photo query, an existing indexed video query and the
 same photo query, and compares ordered photo hit IDs/scores, index
-counts and saved photo-list collection membership without saving
+counts, photo/video result disjointness and saved photo-list
+collection membership without saving
 collections or printing private captions/identifiers. It reports
 observed search timings but **does not** claim historical pre-upgrade
 latency equivalence, which would require comparable before/after
