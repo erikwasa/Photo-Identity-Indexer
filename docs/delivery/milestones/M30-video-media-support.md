@@ -9,14 +9,22 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 returns to ready, not completed, after the scoped closure of
-WI-0191 on 2026-11-02.** The previously active video search workitem
-is completed and archived, along with WI-0190 and the existing
-architecture/metadata/processing/proxy foundations (WI-0150, WI-0151,
-WI-0188 and WI-0189). The milestone still contains independently
-proposed future video work, including playback, metadata/collections,
-video-face evaluation and online-only OneDrive hydration (WI-0207).
-Do not mistake WI-0191 closure for permission to start those items.
+**M30 remains in progress while WI-0152's accepted browser playback
+is awaiting PR #720 review/merge (2026-11-03).** PR #719 approved
+the bounded playback scope; the maintained Windows host has now passed
+PostgreSQL and range checks, desktop and phone play/pause/seek, HTTP
+206/416/404, OneDrive online-only nonhydration, unchanged processing,
+and photo regression. The native player initially clipped lower
+controls on both devices; after the corrective UI commit the maintainer
+confirmed that the entire player is visible on PC and phone. All
+five scoped WI-0152 criteria are accepted; its lifecycle is `in_review`
+until the PR merges, not yet archived.
+
+WI-0190/0191 and the existing architecture/metadata/processing/proxy
+foundations (WI-0150/0151/0188/0189) remain accepted. Independently
+proposed metadata/collections, video-face evaluation, codec expansion
+and OneDrive hydration (WI-0207) remain separate. This individual
+work-item acceptance does **not** complete M30.
 
 The dedicated opt-in Video Search view and API are accepted for the
 existing three current, already-local supported SDR videos. The
@@ -32,11 +40,11 @@ local-first, media privacy and exclusion rules stay in force.
 
 ## Current product priorities and scope review — 2026-11-02
 
-**Next work:** WI-0152 basic browser playback of current retained
-proxies, using existing API guards and opt-in trusted-LAN HTTPS.
-A retained proxy is usable **even if the original is OneDrive
-online-only**, without rehydrating it. A missing proxy shows a
-useful unavailable state; play/seek/search do not start processing.
+**Current delivery gate:** locally accepted WI-0152 basic browser
+playback of already retained H.264/AAC proxies needs PR #720 merge
+and work-item archival. It reuses guarded APIs and trusted-LAN
+HTTPS: an online-only original stays online-only, missing proxies
+are unavailable, and playback/seek does not enqueue processing.
 
 **Then:** WI-0210 first archive-value-driven compatibility expansion,
 selecting one supported input class from a read-only catalogue survey;

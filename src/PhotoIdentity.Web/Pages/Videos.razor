@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Opt-in catalogue</p>
         <h1>Videos</h1>
-        <p>Still posters and technical details for indexed videos. Playback, photo search and slideshow inclusion are not enabled here.</p>
+        <p>Indexed video posters and playback of already-retained local proxies. Playing or seeking never downloads an online-only original or starts processing.</p>
     </div>
     <div class="video-library-actions">
         <a class="button secondary" href="/video-search">Search indexed videos</a>
@@ -38,9 +38,20 @@ else
     <section class="video-library-grid" aria-label="Indexed videos">
         @foreach (VideoLibraryItemResponse video in Items)
         {
-            <article class="video-library-card" @key="video.RevisionId">
-                <div class="video-library-poster">
-                    @if (video.HasPoster)
+            bool playing = ActivePlaybackRevisionId == video.RevisionId;
+            <article class="@(playing ? "video-library-card video-library-card--playing" : "video-library-card")" @key="video.RevisionId">
+                <div class="@(playing ? "video-library-poster video-library-poster--playing" : "video-library-poster")">
+                    @if (ActivePlaybackRevisionId == video.RevisionId)
+                    {
+                        <video class="video-library-player" controls playsinline preload="metadata"
+                               aria-label="Video playback"
+                               poster="@(video.HasPoster ? $"/api/videos/{video.RevisionId}/poster" : null)"
+                               src="@($"/api/videos/{video.RevisionId}/play")"
+                               @onerror="() => PlaybackFailed(video.RevisionId)">
+                            Your browser cannot play this video.
+                        </video>
+                    }
+                    else if (video.HasPoster)
                     {
                         <img loading="lazy" alt="Video still poster" src="@($"/api/videos/{video.RevisionId}/poster")" />
                     }
@@ -48,12 +59,30 @@ else
                     {
                         <span class="video-library-placeholder" aria-label="No verified still poster">Video</span>
                     }
-                    <span class="video-library-duration">@FormatDuration(video.DurationSeconds)</span>
+                    @if (ActivePlaybackRevisionId != video.RevisionId)
+                    {
+                        <span class="video-library-duration">@FormatDuration(video.DurationSeconds)</span>
+                    }
                 </div>
                 <div class="video-library-card-body">
                     <strong>@(video.CaptureAtUtc is DateTimeOffset date ? date.ToString("yyyy-MM-dd") : "Date unknown")</strong>
                     <span>@FormatResolution(video.Width, video.Height, video.RotationDegrees)</span>
                     <span>@(video.InspectionStatus ?? "Not inspected")</span>
+                    @if (video.HasPlayableProxy)
+                    {
+                        <button class="button secondary video-library-play-button"
+                                @onclick="() => TogglePlayback(video.RevisionId)">
+                            @(ActivePlaybackRevisionId == video.RevisionId ? "Close player" : "Open player")
+                        </button>
+                    }
+                    else
+                    {
+                        <span>Playable proxy unavailable · prepare later in Video processing</span>
+                    }
+                    @if (PlaybackErrorRevisionId == video.RevisionId)
+                    {
+                        <p role="status">This proxy could not be played. It may have been removed or changed. No original was opened.</p>
+                    }
                 </div>
             </article>
         }
@@ -68,6 +97,8 @@ else
 
 @code {
     private readonly List<VideoLibraryItemResponse> Items = [];
+    private string? ActivePlaybackRevisionId;
+    private string? PlaybackErrorRevisionId;
     private bool Loading;
     private bool HasMore;
     private string? Error;
@@ -77,6 +108,8 @@ else
 
     private async Task RefreshAsync()
     {
+        ActivePlaybackRevisionId = null;
+        PlaybackErrorRevisionId = null;
         Items.Clear();
         HasMore = false;
         Error = null;
@@ -111,6 +144,18 @@ else
             Error = "The video catalogue could not be loaded. No originals or photo data were changed.";
         }
         finally { Loading = false; }
+    }
+
+    private void TogglePlayback(string revisionId)
+    {
+        ActivePlaybackRevisionId = ActivePlaybackRevisionId == revisionId ? null : revisionId;
+        PlaybackErrorRevisionId = null;
+    }
+
+    private void PlaybackFailed(string revisionId)
+    {
+        ActivePlaybackRevisionId = null;
+        PlaybackErrorRevisionId = revisionId;
     }
 
     private static string FormatDuration(decimal? seconds)

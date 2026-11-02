@@ -1,9 +1,23 @@
 # Build context
 
-**Current handoff — M30 planning decisions (2026-11-02, PR #719):**
+**Current handoff — WI-0152 accepted on Windows (2026-11-03, PR #720):**
+Maintainer-confirmed all nine original checks PASS: PostgreSQL playback,
+HTTP 206/416/404, docs validate/generate, desktop and trusted-LAN HTTPS
+phone playback, unchanged processing, OneDrive-online-only original
+remaining online-only, and normal photo viewer/search. The first desktop
+and phone test exposed clipping of the lower native player; the
+corrective full-height/card layout was committed and the maintainer
+confirmed the **entire player is now visible on both devices**.
+All five scoped WI-0152 criteria are accepted; CI run 41543246154
+passed six Windows jobs before the final documentation updates.
+The canonical work item is `in_review` pending PR #720 merge.
+After merge, complete/archive WI-0152 and regenerate the repository
+status views; M30 remains open for separate proposed work.
+Do not repeat already accepted original/hydration processing checks.
+
+**Historical handoff — M30 planning decisions (2026-11-02, PR #719):**
 Maintainer requested pragmatic video roadmap clarification before a new
-implementation workitem. **WI-0152 basic video playback is now next /
-ready**: serve already retained, revision-verified playable proxies
+implementation workitem. **WI-0152 was selected next (now implemented and locally accepted)**: serve already retained, revision-verified playable proxies
 with range/seek in the existing viewer and opt-in trusted-LAN HTTPS
 phone mode. A current proxy must play without hydrating its
 OneDrive-online-only original; no browser-triggered transcode/recall.

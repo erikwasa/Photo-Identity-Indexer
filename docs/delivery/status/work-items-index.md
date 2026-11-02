@@ -6,7 +6,7 @@ Current work items: **17**. Archived terminal items: **191**.
 
 | Work item | Milestone | Status | Owner | Canonical status |
 |---|---|---|---|---|
-| [WI-0152](../work-items/WI-0152-video-serving-playback.md) Add safe browser video serving and viewer playback | M30 | ready | unassigned | [YAML](work-items/active/WI-0152.yaml) |
+| [WI-0152](../work-items/WI-0152-video-serving-playback.md) Add safe browser video serving and viewer playback | M30 | in_review | ai-agent | [YAML](work-items/active/WI-0152.yaml) |
 | [WI-0153](../work-items/WI-0153-video-metadata-collections.md) Integrate video with manual metadata and collection queries | M30 | proposed | unassigned | [YAML](work-items/active/WI-0153.yaml) |
 | [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) Integrate video clips into slideshow playback | M30 | proposed | unassigned | [YAML](work-items/active/WI-0154.yaml) |
 | [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | proposed | unassigned | [YAML](work-items/active/WI-0155.yaml) |

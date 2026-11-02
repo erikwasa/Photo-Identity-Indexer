@@ -115,6 +115,7 @@ public partial class Program
             Path.Combine(defaultApplicationRoot, "quality-suggestions")));
         builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
         builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
+        builder.Services.AddSingleton<PostgresVideoPlaybackRepository>();
         builder.Services.AddSingleton<PostgresVideoSearchRepository>();
         builder.Services.AddSingleton<VideoProcessingPreferencesStore>();
         builder.Services.AddSingleton<VideoArchiveProcessingService>();

@@ -13,7 +13,8 @@ public sealed record VideoLibraryEntry(
     int? Height,
     int? RotationDegrees,
     DateTimeOffset? CaptureAtUtc,
-    bool HasPoster);
+    bool HasPoster,
+    bool HasPlayableProxy);
 
 public sealed record VideoLibraryPage(
     IReadOnlyList<VideoLibraryEntry> Items, int Offset, int Limit, bool HasMore);
@@ -42,7 +43,22 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                    metadata.duration_seconds, metadata.coded_width,
                    metadata.coded_height, metadata.display_rotation_degrees,
                    metadata.capture_at_utc,
-                   (poster.asset_revision_id IS NOT NULL) AS has_poster
+                   (poster.asset_revision_id IS NOT NULL) AS has_poster,
+                   EXISTS (
+                       SELECT 1
+                       FROM video_published_derivatives proxy
+                       JOIN video_processing_jobs job ON job.id = proxy.job_id
+                       WHERE proxy.asset_revision_id = latest.id
+                         AND job.asset_revision_id = latest.id
+                         AND job.status = 'succeeded'
+                         AND job.derivative_kind = 'PlayableProxy'
+                         AND job.policy_version = 'wi0188-v1'
+                         AND job.preset_version IN (
+                           'wi0188-sdr-h264-aac-720p-pilot-v1',
+                           'wi0189-sdr-h264-aac-540p-compact-v1')
+                         AND metadata.inspection_status = 'supported'
+                         AND metadata.color_transfer = 'bt709'
+                   ) AS has_playable_proxy
             FROM assets asset
             JOIN LATERAL (
                 SELECT revision.id, revision.observed_at_utc
@@ -86,7 +102,7 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                 reader.IsDBNull(4) ? null : reader.GetInt32(4),
                 reader.IsDBNull(5) ? null : reader.GetInt32(5),
                 reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6),
-                reader.GetBoolean(7)));
+                reader.GetBoolean(7), reader.GetBoolean(8)));
         }
         return new VideoLibraryPage(rows.Take(limit).ToArray(), offset, limit,
             rows.Count > limit);
