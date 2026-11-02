@@ -49,7 +49,7 @@ proxy and trusted-LAN infrastructure instead of a new streaming stack.
 
 ## Acceptance criteria
 
-- [ ] On the maintained local host, an already-retained supported proxy
+- [x] On the maintained local host, an already-retained supported proxy
   plays, pauses and seeks correctly in the browser with no original
   hydration or new video processing job.
 - [x] Current revision, exclusion, file integrity and safe-range guards
@@ -57,7 +57,7 @@ proxy and trusted-LAN infrastructure instead of a new streaming stack.
 - [x] An online-only original with a retained proxy is play-capable
   without hydration; an unavailable proxy fails clearly and safely.
 - [x] Existing image viewer remains unchanged.
-- [ ] A real phone can play/seek using existing opt-in trusted-LAN
+- [x] A real phone can play/seek using existing opt-in trusted-LAN
   HTTPS if that established mobile path is configured and available;
   no new LAN security or identity system is required.
 
@@ -71,8 +71,10 @@ No private video content is committed.
 
 ## Completion notes
 
-- Status: implementation in progress; this first branch is not yet locally
-  accepted. PR #719 merged the scope decision, not playback behavior.
+- **Status: all five scoped acceptance criteria verified on the
+  maintained host on 2026-11-03.** PR #719 merged the scope decision;
+  PR #720 implements the feature and is awaiting review/merge. The
+  repository lifecycle remains `in_review` until delivery is merged.
 - Checkpoint 1 (2026-11-02) adds a separate GET/HEAD
   `/api/videos/{revisionId}/play` endpoint, SHA/byte-length verified
   bounded MP4 streams, ASP.NET byte-range 206/416 semantics, source-row
@@ -89,27 +91,31 @@ No private video content is committed.
   HTTPS phone playback, and photo viewer/search regression all PASS at
   the functional level. These are operator-observed results, not an
   independent automated device lab, and contain no private media evidence.
-- **Open visual regression:** both desktop and phone rendered only the
-  top part of the native video player; the bottom control bar was
-  sometimes clipped. Functional seeking worked but the video viewer
-  is not visually acceptable. **Do not close WI-0152 or treat the
-  initial desktop/phone criterion as complete.**
+- **Visual regression found and resolved:** the initial host run
+  exposed clipping of the lower video/player controls on both PC and phone.
+  The follow-up CSS/markup correction in PR #720 eliminated the fixed
+  poster-frame constraint. **The maintainer confirmed on 2026-11-03
+  that the player is fully visible on both devices** after the fix.
+  The earlier functional PASS results remain valid; this second
+  report closes the outstanding visual acceptance blocker.
 - **Checkpoint 2:** PR #720 additionally changes the active card to
   use a full-width row, releases the fixed 16:10 poster-frame clip
   while playing, uses natural video element height with a 75dvh cap,
-  and retains `object-fit: contain`. Adds the
-  `VideoPlaybackLayoutContractTests` style contract to prevent
-  reintroducing the CSS clipping. This fixes the identified styling
-  cause in code, but actual desktop and phone visual confirmation is
-  **pending** and is not claimed as passed.
+  and retains `object-fit: contain`. The added
+  `VideoPlaybackLayoutContractTests` style contract guards the
+  CSS clipping. The maintainer's post-fix real PC and phone visual
+  acceptance is **PASS**, independent of the static style contract.
 - Follow the
   [WI-0152 playback acceptance runbook](../../operations/video-playback-wi0152.md)
-  for a focused republish + desktop/phone clipping and native-controls
-  retest, plus the new layout contract test. No new original-hydration,
-  database or real video-processing verification is required merely
-  for this CSS correction.
-- Remaining acceptance: visually complete un-cropped frames and fully
-  accessible native play/pause/seek controls on both desktop and phone.
-  Preserve the already-passed API/integrity/privacy/photo evidence;
-  keep WI-0152 in progress until this regression is resolved.
+  for repeatable local verification. Maintainer-reported functional
+  playback, original hydration safeguards, photo regression and the
+  post-fix desktop/phone full-frame view all PASS. The Windows GitHub
+  Actions build for follow-up commit `fe24b58` passed six jobs:
+  build/tests, two integration shards, launcher, package and
+  PR classification. The new documentation/status commits still
+  require their own CI completion prior to merge.
+- **No outstanding scope acceptance blockers.** Delivery is awaiting
+  PR #720 review and merge; WI-0152 should be marked `completed`
+  and archived in the repository lifecycle after merge, without
+  re-running already accepted real-media tests.
 - Keep acceptance bounded to locally retained playable proxies.
