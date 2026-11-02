@@ -4,104 +4,135 @@ title: Verify opt-in OneDrive-only video hydration and safe online-only release
 milestone: M30
 status_source: PhotoIdentity.Docs
 depends_on: [WI-0188]
-related_adrs: [ADR-0012]
+related_adrs: [ADR-0012, ADR-0007]
 affected_modules: [PhotoIdentity.Api, PhotoIdentity.Source.OneDriveSync, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Integration.Tests, docs]
 ---
 
 # WI-0207: Verify opt-in OneDrive-only video hydration and safe online-only release
 
-## Objective
+## Objective and revised scope — maintainer 2026-11-02
 
-Independently verify and, only if evidence identifies gaps, harden the
-**already opt-in** online-only video materialization and release behavior
-that was intentionally **not exercised** during WI-0188 local-file
-acceptance. This is a separate M30 workitem; it is not part of the
-completed WI-0188 local-first processing acceptance.
+Reuse the **existing photo-style managed OneDrive hydration strategy**
+for opt-in video processing. Videos that were online-only may be
+materialized when a specific authorized processing job needs them,
+and **kept locally for as long as the application's pending and
+active processing requires them**, across applicable dependent
+derivatives or safe retries. Once no processing lease or planned
+near-term job needs the bytes, the normal bounded managed-cache
+policy may release eligible app-hydrated files back to OneDrive
+online-only. No automatic recall for mere browsing or search.
 
-## Origin and boundary
+This replaces a needlessly strict expectation that every video must
+be released immediately following one isolated processing step.
+The existing implementation already has default-off online-only
+controls and guarded staging; this workitem **first verifies and
+reuses** them, and changes code only for observed gaps.
 
-**Maintainer scope decision (2026-10-30):** WI-0188 successfully
-processed locally available media and passed its persistence, integrity,
-photo-regression, controls/recovery, exclusion and 17 isolated rejection/
-scratch-cleanup tests. No online-only video was hydrated or released
-during that verification. The unverified cloud-only behavior is moved
-here rather than being represented as passed in WI-0188.
+## Background
 
-The WI-0188 implementation already contains default-off controls and
-a guarded OneDrive-local staging path. This workitem first verifies
-the implemented semantics rather than assuming new code is necessary.
+WI-0188 was completed for already-local video processing on
+2026-10-30. Its real media test did not hydrate an online-only
+OneDrive file or verify managed release. Those behaviors remain
+unverified, not failed. WI-0207 is independent of accepted
+local-file processing and does not reopen previous test gates.
 
-## In scope
+## Essential contract
 
-- Verify **Include online-only videos** is independently opt-in and
-  disabled by default; with it off, online-only placeholders remain
-  unhydrated and do not block eligible already-local video candidates.
-- With explicit maintainer authorization and an already-catalogued
-  eligible online-only test video, observe **one** bounded,
-  source-controlled OneDrive hydration, with capacity/source/revision/
-  exclusion checks before and after materialization; no mass recall.
-- Verify the worker stages only the authorized local revision, enforces
-  the same bounded FFprobe/FFmpeg, photo-priority, pause/cancellation
-  and publication fences as for local inputs, and never writes originals.
-- Verify that **only application-initiated** hydration may request
-  return to online-only after use. Originally local media must remain
-  local. A failed release leaves local bytes in place and reports the
-  reason safely; no normal filesystem deletion of a cloud original.
-- Test restart, cancellation and cloud/API failure cases without
-  leaking paths or credentials, losing verified copies, or silently
-  retrying unlimited transfers. Preserve exclusion and latest-revision
-  fencing across attempted hydration.
-- Document a reproducible operator verification procedure with
-  explicit before/after local/online-only availability, job and source
-  integrity evidence; add focused automated regression coverage where
-  a demonstrated gap warrants changes.
+- Keep **Include online-only videos** independently optional and
+  off by default. Turning on general video processing must not
+  silently grant online-only hydration.
+- Hydrate **one authorized current revision on demand**, with
+  existing source/exclusion, capacity and availability checks.
+  Reuse the OneDrive sync client and existing managed hydration
+  ownership tracking; no new downloader, cloud API or second cache.
+- **Keep an application-hydrated original local while processing
+  still requires it**, including active stages and already-planned
+  adjacent jobs or bounded retries. Do not release a file merely
+  because a proxy was published while another eligible approved
+  derivative still needs the input. Do not retain it forever when
+  processing has concluded and it is managed-cache-eligible.
+- Only original files **hydrated by Photo Identity** may be
+  automatically released. Pre-existing local files or user-pinned
+  files remain local. Failed release must leave bytes intact and
+  be visible; do not attempt ordinary filesystem deletion of an
+  authoritative OneDrive original.
+- Respect current revision, source-copy exclusion and job
+  cancellation/lease guards before using bytes or publishing a
+  derivative. Do not allow infinite automatic transfer retries.
+- **Playback and browsing**: an already-retained, current,
+  authorized playable proxy can be served by WI-0152 even while
+  the original is online-only. Play/seek/search never causes
+  hydration. If the proxy is unavailable, the viewer shows a
+  clear state; a future explicit preparation action can reuse
+  this existing controlled hydration/processing pathway.
+
+## Three levels of acceptance
+
+1. **One real OneDrive example (mandatory):** With maintainer
+   approval, exercise one known online-only catalogue video using
+   the explicit setting. Verify it hydrates, is processed safely,
+   remains local while needed, and follows the existing owned-cache
+   release policy only after work is finished. Report private
+   before/after availability and basic results without filenames.
+2. **Core safety (mandatory):** Default-off does not hydrate;
+   an already-local or user-pinned original is never released by
+   the app; exclusions/current revision and unchanged originals
+   hold; failed release preserves the local file.
+3. **Exceptional failures (targeted simulation):** Use existing
+   tests and add only focused checks for any uncovered cancellation,
+   restart, stale-revision or cloud-error guard. A battery of real
+   destructive disconnects or cloud outages is **not required**
+   without a demonstrated problem.
+
+## Acceptance criteria (revised)
+
+- [ ] Default-off online-only opt-in remains independent of the
+  normal video switch; local-video processing still works.
+- [ ] One specifically authorized online-only video demonstrates
+  bounded hydration, safe processing and local reuse while needed;
+  its original remains unchanged.
+- [ ] The release policy recognizes app-owned hydration, active/
+  pending use and user/pre-existing pinning; release happens only
+  when eligible and preserves bytes on failure.
+- [ ] Focused existing/disposable tests cover essential
+  exclusion/revision/cancel/retry safety; no mandatory large failure
+  simulation campaign.
+- [ ] Maintainer confirms the real example and its bounded
+  privacy/storage behavior; record any missing capability as a
+  specifically scoped fix, not a general overhaul.
 
 ## Out of scope
 
-- Automatically hydrating online-only video, enabling this setting
-  by default or changing WI-0188's locally available processing path.
-- Processing arbitrary Internet URLs or using non-OneDrive cloud sources.
-- Deleting source files, changing existing source-pinning preferences,
-  mass downloading or migrating originals to Azure.
-- Video playback, caption/embedding search and enhanced proxy profiles
-  (separate M30 workitems).
-- Re-running WI-0188's previously accepted 17 isolated safety tests or
-  resetting its historical terminal failed jobs as a prerequisite.
-
-## Acceptance criteria
-
-- [ ] Default-off and independent online-only opt-in confirmed through
-  settings persistence and safe handling when permission/tools are absent.
-- [ ] With opt-in off, no cloud-only source is hydrated and local videos
-  still make progress; excluded/out-of-coverage sources remain ineligible.
-- [ ] One specifically authorized online-only video passes bounded
-  hydration, revision/hash/local-availability checks and guarded processing
-  without changes to originals or photo functionality.
-- [ ] Return-to-online-only is attempted **only for an app-initiated
-  download**; a pre-existing local file is never unpinned or deleted.
-  Release failure or cancellation preserves bytes and is observable.
-- [ ] Repeated runs, restart, cancellation and stale revision/exclusion
-  cases fail closed with bounded retries, temporary cleanup and no
-  incorrectly published result.
-- [ ] Maintainer reports final real-OneDrive local acceptance, including
-  before/after availability and privacy safety, and keeps this feature
-  separate from local-video WI-0188 completion.
+- Auto-hydrating placeholders by browsing, search or opening a proxy.
+- Bulk hydration, a second OneDrive connector, arbitrary cloud URLs,
+  whole-archive staging, forced local-file deletion or changes to
+  user pinning preferences.
+- Video format expansion (WI-0210), browser playback (WI-0152),
+  face recognition, broad performance/transfer-cost benchmarking.
+- Re-running WI-0188's already accepted test campaign.
 
 ## Verification and safety
 
-Start with read-only inspection of current controls and available test
-media. Do not activate online-only hydration merely by creating this
-workitem. A dedicated future verification run must explicitly record
-the maintainer's approval of one non-sensitive, already-catalogued test
-video and an authoritative backup where database changes are needed.
-Never run bulk retries, force-download placeholders, delete originals,
-or use a whole-archive test to compensate for an unavailable fixture.
+Start with inspection of current local settings and managed-hydration
+behaviour. The maintained-host test uses a single explicitly approved,
+already-catalogued online-only video, with an authoritative database
+backup when the acceptance operation writes to the catalogue. Do not
+download unrelated placeholders or alter original source bytes.
+A file that remains local after an attempted OneDrive release is
+**not** proof of failed processing; record release success/failure
+separately from durable derivative publication.
 
-Reference: [WI-0188 local-file acceptance](WI-0188-video-isolated-processing-lane.md),
-[shared archive video runbook](../../operations/video-processing-shared-archive-verification.md),
-and [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md).
+The **reuse-until-no-longer-needed** policy is a desired scope/contract
+for WI-0207; documentation does not assert that the current worker
+already implements every cross-job reuse case. Confirm the current
+implementation before adding coordination.
+
+References: [ADR-0007](../../decisions/ADR-0007-permanent-archive-bounded-storage.md),
+[WI-0188](WI-0188-video-isolated-processing-lane.md),
+[WI-0152](WI-0152-video-serving-playback.md) and
+[shared video runbook](../../operations/video-processing-shared-archive-verification.md).
 
 ## Current status
 
-**Proposed / not exercised (2026-10-30).** No real online-only
-hydration, release or maintained-host cloud-only PASS has been claimed.
+**Proposed.** No real online-only video hydration/release or
+cross-stage reuse has yet been verified on the maintained system.
