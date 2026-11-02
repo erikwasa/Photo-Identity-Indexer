@@ -38,8 +38,9 @@ else
     <section class="video-library-grid" aria-label="Indexed videos">
         @foreach (VideoLibraryItemResponse video in Items)
         {
-            <article class="video-library-card" @key="video.RevisionId">
-                <div class="video-library-poster">
+            bool playing = ActivePlaybackRevisionId == video.RevisionId;
+            <article class="@(playing ? "video-library-card video-library-card--playing" : "video-library-card")" @key="video.RevisionId">
+                <div class="@(playing ? "video-library-poster video-library-poster--playing" : "video-library-poster")">
                     @if (ActivePlaybackRevisionId == video.RevisionId)
                     {
                         <video class="video-library-player" controls playsinline preload="metadata"
