@@ -9,7 +9,11 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 is in progress, not completed.** WI-0150 architecture,
+**M30 is ready, not completed.** WI-0190 was the last in-progress
+M30 item; its scoped completion leaves proposed or ready video work,
+so the canonical lifecycle recalculates the milestone to `ready`.
+This means further work is available, not that the milestone has
+been completed. WI-0150 architecture,
 WI-0151 video metadata/posters, WI-0188 isolated local video
 processing and WI-0189 versioned playable proxies were previously
 completed with their scoped maintainer acceptance. Photo-first,
@@ -61,8 +65,8 @@ scene quality when new supported video types/real user reports
 warrant further work. Broader positive HDR/long/full-range/
 multi-scene/low-light coverage remains deferred, not approved.
 See [WI-0190 maintainer-scoped closeout](../work-items/WI-0190-video-frame-caption-embedding.md#maintainer-closeout-decision--pragmatic-scope-2026-11-02).
-**M30 remains in progress** because its other independent
-video work items are not complete.
+**M30 remains open with lifecycle status `ready`** because
+other independent video work items remain proposed or ready.
 
 ## WI-0190 maintained-host video-coverage deferral (2026-11-01)
 
@@ -89,7 +93,7 @@ guards remain mandatory.
 
 [WI-0190's maintained-host coverage matrix](../work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01)
 records the reopen triggers. WI-0190 is accepted for the **narrow current SDR scope**;
-M30 remains **in progress** and postponed checks are not
+M30 remains **open (`ready`)**, and postponed checks are not
 claimed to have passed. Any broader proxy/
 video-input work must be separately scoped in a repository workitem,
 not activated as an implicit change to WI-0190.
