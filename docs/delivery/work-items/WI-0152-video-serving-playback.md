@@ -12,7 +12,7 @@ affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persisten
 
 ## Priority and objective
 
-**Next M30 development priority (maintainer scope decision, 2026-11-02).**
+**Completed and maintainer-accepted (2026-11-03; merged PR #720).**
 Play an already-produced, current locally retained WI-0189 proxy in the
 existing browser viewer on Windows and phone, with play/pause/seek and
 a useful missing-proxy state. Build on the already completed poster,
@@ -73,8 +73,8 @@ No private video content is committed.
 
 - **Status: all five scoped acceptance criteria verified on the
   maintained host on 2026-11-03.** PR #719 merged the scope decision;
-  PR #720 implements the feature and is awaiting review/merge. The
-  repository lifecycle remains `in_review` until delivery is merged.
+  PR #720 implemented and merged the feature. The repository lifecycle
+  is `completed` and archived.
 - Checkpoint 1 (2026-11-02) adds a separate GET/HEAD
   `/api/videos/{revisionId}/play` endpoint, SHA/byte-length verified
   bounded MP4 streams, ASP.NET byte-range 206/416 semantics, source-row
@@ -113,9 +113,8 @@ No private video content is committed.
   Actions build for follow-up commit `fe24b58` passed six jobs:
   build/tests, two integration shards, launcher, package and
   PR classification. The new documentation/status commits still
-  require their own CI completion prior to merge.
-- **No outstanding scope acceptance blockers.** Delivery is awaiting
-  PR #720 review and merge; WI-0152 should be marked `completed`
-  and archived in the repository lifecycle after merge, without
-  re-running already accepted real-media tests.
+  were merged with PR #720 after review.
+- **No outstanding scope acceptance blockers.** PR #720 merged on
+  2026-11-03; WI-0152 is completed and archived after maintainer
+  acceptance, without re-running the already accepted real-media tests.
 - Keep acceptance bounded to locally retained playable proxies.
