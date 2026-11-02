@@ -72,6 +72,11 @@ public static class Program
                         VideoOneShotEnvironmentOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "compatibility" && args[2] == "survey" =>
+                    await VideoCompatibilitySurveyCommandRunner.RunAsync(
+                        VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "candidates" =>
                     await VideoOneShotCandidatesCommandRunner.RunAsync(
                         VideoOneShotCandidatesOptions.Parse(args.Skip(3).ToArray()),
