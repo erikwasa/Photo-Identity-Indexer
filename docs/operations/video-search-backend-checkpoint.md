@@ -148,6 +148,8 @@ establish relevance or large-library performance.
   at read-snapshot time. This initial API does not confirm on-disk poster
   or playable-proxy presence for each result; poster bytes remain guarded
   separately by the existing video endpoint.
-- There is no Video Search browser page, collection integration, or
-  unattended processing. The maintenance verification, large-set latency,
-  negative-case integration tests and full acceptance remain pending.
+- A separate Video Search browser page is now in checkpoint-2 development,
+  pending build and manual UI acceptance. There is still no video collection
+  integration or unattended processing. Poster availability, maintained
+  browser verification, larger-set relevance and negative-case integration
+  tests remain pending.
