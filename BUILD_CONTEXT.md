@@ -1,21 +1,22 @@
 # Build context
 
-**Current handoff — 2026-11-02 WI-0191 checkpoint 3:** PRs #711–#714
-merged. Maintainer accepted video search browser and three-video
-Caption/Visual/Combined pilot; 2/5 criteria verified. A photo Caption
-positive control returned 10/10 (26,904 indexed / 24,770 captions).
-Two newer results have no poster, and maintainer defers poster
-generation; no poster work is authorized.
+**Current handoff — 2026-11-02 WI-0191 checkpoint 4:** PRs #711–#715
+merged. Video search browser plus maintained three-video
+Caption/Visual/Combined pilot accepted, 2/5 WI criteria verified.
+Known-positive photo Caption returned 10/10 among 26,904 indexed
+and 24,770 captioned photos. Two video posters are missing;
+maintainer explicitly deferred generation.
 
-Current branch extends existing disposable PostgreSQL search-regression
-coverage: unsupported/HDR, soft deletion, supersession, non-local
-source and incomplete evidence fail closed, complementing exclusion
-purge tests. The existing publication test now matches the CI `Postgres` filter;
-test-only changes to it also activate the disposable PostgreSQL
-verification lane. Windows CI is pending. No private video files, live
-catalogue writes or inference are involved. Next: review CI; check
-remaining photo ranking/saving/latency and practical larger-library
-relevance without forced format expansion or overengineering. See
+Current PR #716 publishes synthetic FrameEvidence alongside existing
+photo search and saved-collection fixture, then asserts unchanged
+photo membership/order/score/counts and saved selections, with
+video still discoverable only from separate Video Search. A
+read-only Photo/Video/Photo maintainer smoke script compares the
+same behavior without exposing private media IDs or captions. CI is
+pending; no claim of historical photo latency equivalence or
+larger-video-corpus relevance. Next: review CI, optional one-time
+operator smoke, then scoped WI-0191 acceptance without new poster,
+Azure, OneDrive or performance engineering. See
 `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
 
 **2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
