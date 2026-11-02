@@ -8,4 +8,8 @@ blockers:
 - WI-0151
 - WI-0188
 blocker_notes: []
-evidence: []
+evidence:
+- type: scope_decision
+  value: '2026-11-02: video face recognition remains desired; first phase is a small isolated prototype with no canonical catalogue updates, with full tracking and production integration only after explicit follow-up.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
