@@ -9,7 +9,7 @@ not imply that the file is absent, excluded or unreadable.
 | --- | --- | --- | --- |
 | **1. Discovered/catalogued** | Opt-in enumeration of MOV/MP4 videos, source/revision identity, known technical metadata and explicit unsupported/unknown inspection results | File attributes/OneDrive placeholders can be inventoried without opening bytes; actual FFprobe inspection requires already-local bytes or a separately approved managed hydration. The explicit ingest operation has a 1 GiB source ceiling; its supported codec inspection limits include H.264 Main/High, HEVC Main/Main 10 and up to 600 seconds. This is not a promise of derivative support. | WI-0210 for new compatibility classes; WI-0207 for online-only availability |
 | **2. Still poster available** | Versioned durable JPEGs for explicitly admitted Rec.709 SDR videos, checked by revision, exclusions, integrity and derivative root | HLG/PQ, missing colour information and several unapproved formats are recorded without silently producing misleading SDR output. A private HLG preview exists but is **not** a production poster profile. Some indexed videos have no poster. | WI-0210 if the archive inventory selects this gap; two existing missing posters remain a separate deferred operator choice |
-| **3. Playable local proxy available** | WI-0189 publishes seekable bounded H.264/AAC MP4 under an app-owned local cache (720p default, 540p optional) for admitted local videos | Shared worker currently selects supported Rec.709 SDR H.264/HEVC inputs, known rotations, selected pixel/audio formats, coded dimensions 16–4096, duration 0.2–600 s and at most **256 MiB source bytes**; retention and per-proxy caps are separate. A cached proxy may exist while the original is online-only. | WI-0210 for widened inputs; WI-0207 for managed hydration, WI-0152 for actual browser playback |
+| **3. Playable local proxy available** | WI-0189 publishes seekable bounded H.264/AAC MP4 under an app-owned local cache (720p default, 540p optional) for admitted local videos | Shared worker currently selects supported Rec.709 SDR H.264/HEVC inputs, known rotations, selected pixel/audio formats, coded dimensions 16–4096, duration 0.2–600 s and at most **256 MiB source bytes**; retention and per-proxy caps are separate. A cached proxy may exist while the original is online-only. | WI-0210 for widened inputs; WI-0207 for managed hydration, WI-0152 completed for actual browser playback |
 | **4. Searchable frame evidence** | WI-0190 stores timestamped caption/embedding samples for selected current eligible local proxies; WI-0191 reads them via opt-in Caption/Visual/Combined Video Search | Evidence is a separate deliberate processing step, not produced by cataloguing or playback. Search reads at most 256 eligible candidate revisions and does not check original/proxy bytes at query time. Frame samples do not establish full motion, sound or unsampled scenes. | WI-0210 if new examples warrant sampling evaluation; further ranking/scale follow-up only after meaningful growth |
 | **5. Face evidence (future)** | Not delivered; photo identities are never inferred from video merely because frames have captions | Bounded prototype and human reviewed identity-governance decision come first; full temporal tracking and production integration require a later approved scope | WI-0155, staged experiment |
 
@@ -17,7 +17,7 @@ not imply that the file is absent, excluded or unreadable.
 
 - **Source presence:** known local vs OneDrive-online-only is independent
   from codec. A retained, current app-owned playable proxy can be
-  played without hydrating an online-only original once WI-0152 adds
+  played without hydrating an online-only original because WI-0152 supplies
   the authorized browser player. A missing/stale proxy must not silently
   trigger hydration from a browser request.
 - **Container and codec:** MOV/MP4 H.264/HEVC represent the initial
@@ -31,7 +31,7 @@ not imply that the file is absent, excluded or unreadable.
   256 MiB source ceiling, while explicit video ingest permits up to
   1 GiB. Do not raise one cap and assume the others follow.
 - **Playability:** a generated proxy is not the same as browser
-  playback; WI-0152 owns controlled local/phone serving and seeking.
+  playback; WI-0152's controlled local/phone serving and seeking are delivered.
 - **Search relevance:** a video remains visible in the Videos library
   even when not among search-eligible FrameEvidence revisions.
 
@@ -51,3 +51,13 @@ other variants are deferred candidates—not automatic acceptance gates.
 See [WI-0210](../delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md),
 [WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 [ADR-0012](../decisions/ADR-0012-isolated-video-media-architecture.md).
+
+## WI-0210 read-only census checkpoint (2026-11-03)
+
+The new metadata-only CLI census reports current, nonexcluded video
+counts by stage receipt and format/size/duration gates, including
+overlapping blockers and **last-observed** availability (not actual
+OneDrive hydration state). No compatibility policy is widened by the
+survey. Maintained-host counts and the first selected tranche are still
+pending; do not claim a new format is supported. See the
+[WI-0210 census runbook](video-compatibility-wi0210-census.md).
