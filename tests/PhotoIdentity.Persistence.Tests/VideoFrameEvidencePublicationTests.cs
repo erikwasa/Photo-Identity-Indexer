@@ -195,6 +195,34 @@ public sealed class VideoFrameEvidencePublicationTests
             Assert.Equal(revision,
                 Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
 
+            // Search refuses evidence under non-local source authority
+            // even when the persisted batch remains valid.
+            await UpdateFixtureAsync("""
+                UPDATE sources SET kind = 'remote-collection' WHERE id = (
+                    SELECT source_id FROM assets WHERE id = @asset);
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE sources SET kind = 'local-folder' WHERE id = (
+                    SELECT source_id FROM assets WHERE id = @asset);
+                """);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
+
+            // Even if a later catalogue bug produces an internally
+            // inconsistent published batch, read-only search fails closed.
+            await UpdateFixtureAsync("""
+                UPDATE video_frame_evidence_batches SET frame_count = 3
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE video_frame_evidence_batches SET frame_count = 2
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
+
             // The prior succeeded FrameEvidence batch must not be returned
             // after a later video revision exists with no published evidence.
             Guid next = Guid.NewGuid();
