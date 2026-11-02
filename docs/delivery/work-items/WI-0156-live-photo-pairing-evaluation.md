@@ -10,40 +10,34 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, doc
 
 # WI-0156: Evaluate iPhone Live Photo pairing as one logical media experience
 
-## Objective
+## Administrative retirement — 2026-11-02
 
-Determine whether paired still + MOV Live Photo assets should remain independent or be presented as one logical media item.
+The maintainer explicitly decided **Live Photo pairing is not
+needed** for the current product and M30 milestone. This workitem is
+**retired without implementation**, not a failed evaluation and not
+a claim that the application has reliable Live Photo pairing.
 
-## Why
+No further pairing inventory, metadata matching, UI, review,
+slideshow or source-migration work is requested. Existing still
+photos and short MOV videos remain independently catalogued under
+their ordinary supported-media rules. Physical source assets must
+never be deleted or merged to emulate a pairing relationship.
 
-Naively treating both companions as unrelated can duplicate library/slideshow results, while premature pairing can damage source identity semantics.
+The repository's milestone lifecycle currently represents
+administrative retirement with terminal `completed` status (as
+used for retired Azure workitems WI-0020 and WI-0021). The evidence
+and this document explicitly distinguish that lifecycle state from
+delivery of a Live Photo feature.
 
-## In scope
+## Objective (retired)
 
-- Identify reliable pairing metadata in the maintained archive.
-- Preserve both immutable source/revision identities.
-- Evaluate browsing, Smart Collection and slideshow implications.
-- Define fallback when one companion is missing/unsupported.
-
-## Out of scope
-
-- Deleting/merging physical source assets.
-- Filename-only pairing assumptions.
-- Blocking ordinary video support on pairing.
-
-## Acceptance criteria
-
-- [ ] Representative evidence establishes pairing reliability.
-- [ ] Any logical grouping preserves both revisions/provenance.
-- [ ] An adopt/defer/no-go decision is documented independently of basic video support.
-
-## Verification requirements
-
-Representative private archive inspection and documented decision.
+Determine whether paired still + MOV Live Photo assets should be
+presented as one logical media item. **No longer an M30 goal.**
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- **Disposition:** administrative closeout only, no implementation.
+- **Decision:** maintainer removed Live Photo pairing from planned
+  video support on 2026-11-02.
+- **Future:** if pairing becomes useful, create a new separately
+  scoped workitem rather than reopening this retired feature.

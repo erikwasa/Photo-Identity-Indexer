@@ -20,7 +20,7 @@
 - Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
-- M30's architecture gate WI-0150 was completed with maintainer acceptance of ADR-0012 on 2026-10-14. Begin WI-0151 only after WI-0150's PR #523 is merged, using the accepted external FFmpeg boundary. Keep stable source/revision and existing photo pipeline contracts unless the approved work item requires a change.
+- M30's opt-in video ingestion, local processing, playable proxies, selected frame evidence and Video Search have been completed under documented bounded scopes (WI-0150/0151/0188/0189/0190/0191). **WI-0152 browser playback is the next ready user-facing item**; WI-0210 owns one archive-prioritized compatibility expansion, and WI-0207 independently verifies photo-style managed online-only video hydration. Keep source/revision, original-file and existing photo contracts. Video face recognition is desired but starts with a bounded experimental WI-0155 prototype; mixed collections/slideshows are postponed and Live Photo pairing administratively retired. Consult M30's current section, not historical activation instructions.
 
 ## Scope discipline
 

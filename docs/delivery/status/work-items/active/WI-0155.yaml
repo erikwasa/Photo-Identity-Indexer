@@ -8,4 +8,6 @@ blockers:
 - WI-0151
 - WI-0188
 blocker_notes: []
-evidence: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719

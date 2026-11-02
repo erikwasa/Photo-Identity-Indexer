@@ -12,14 +12,16 @@ work_items:
 - id: WI-0152
   title: Add safe browser video serving and viewer playback
   milestone: M30
-  status: proposed
+  status: ready
   owner: unassigned
   document: ../work-items/WI-0152-video-serving-playback.md
   blockers:
   - WI-0151
   - WI-0189
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
 - id: WI-0153
   title: Integrate video with manual metadata and collection queries
   milestone: M30
@@ -31,7 +33,9 @@ work_items:
   - WI-0141
   - WI-0144
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
 - id: WI-0154
   title: Integrate video clips into slideshow playback
   milestone: M30
@@ -40,9 +44,12 @@ work_items:
   document: ../work-items/WI-0154-video-slideshow-playback.md
   blockers:
   - WI-0152
+  - WI-0153
   - WI-0139
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
 - id: WI-0155
   title: Evaluate face discovery and identity processing inside video
   milestone: M30
@@ -53,17 +60,9 @@ work_items:
   - WI-0151
   - WI-0188
   blocker_notes: []
-  evidence: []
-- id: WI-0156
-  title: Evaluate iPhone Live Photo pairing as one logical media experience
-  milestone: M30
-  status: proposed
-  owner: unassigned
-  document: ../work-items/WI-0156-live-photo-pairing-evaluation.md
-  blockers:
-  - WI-0151
-  blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
@@ -213,4 +212,19 @@ work_items:
   blockers:
   - WI-0188
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+- id: WI-0210
+  title: Expand video compatibility for the highest-value archive cases
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
+  blockers:
+  - WI-0151
+  - WI-0188
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719

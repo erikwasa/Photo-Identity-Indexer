@@ -1,11 +1,13 @@
 id: WI-0152
 title: Add safe browser video serving and viewer playback
 milestone: M30
-status: proposed
+status: ready
 owner: unassigned
 document: ../work-items/WI-0152-video-serving-playback.md
 blockers:
 - WI-0151
 - WI-0189
 blocker_notes: []
-evidence: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719

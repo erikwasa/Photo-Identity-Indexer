@@ -6,6 +6,9 @@ owner: unassigned
 document: ../work-items/WI-0154-video-slideshow-playback.md
 blockers:
 - WI-0152
+- WI-0153
 - WI-0139
 blocker_notes: []
-evidence: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719

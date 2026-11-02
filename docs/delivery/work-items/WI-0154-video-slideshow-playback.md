@@ -3,50 +3,54 @@ id: WI-0154
 title: Integrate video clips into slideshow playback
 milestone: M30
 status_source: ../status/work-items.yaml
-depends_on: [WI-0152, WI-0139]
+depends_on: [WI-0152, WI-0153, WI-0139]
 related_adrs: []
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, docs]
 ---
 
 # WI-0154: Integrate video clips into slideshow playback
 
+## Scheduling decision — 2026-11-02
+
+**Proposed / deferred.** Browser playback (WI-0152) is the next
+priority. Mixed-media collection inputs are deferred under WI-0153,
+so this workitem now explicitly depends on that collection boundary.
+Do not start mixed slideshow work before a supported mixed-media
+selection source has been accepted.
+
 ## Objective
 
-Allow mixed photo/video collections to play through the slideshow experience with predictable timing and controls.
+Allow a user-selected mixture of photos and available playable video
+proxies in a slideshow with predictable timing and basic controls.
 
-## Why
+## In scope when activated
 
-Family slideshows are the main consumption path where catalogued videos would otherwise remain conspicuously excluded.
-
-## In scope
-
-- Enable video playback only for explicitly mixed-media selections, leaving image-only slideshow defaults unchanged.
-- Define clip duration/bounded playback policy and advancement.
-- Reuse fullscreen/no-fullscreen, protected controls and wake behavior.
-- Stage poster/video readiness without charging unrelated photo timing.
-- Handle muted/autoplay restrictions explicitly.
-- Keep resource use bounded in long mixed loops.
+- Explicitly selected mixed photo/video sessions only; leave
+  photo-only slideshow defaults and saved photo collections unchanged.
+- Reuse existing approved video proxy serving and protected fullscreen,
+  wake, navigation and phone/HTTPS paths.
+- Use a simple, bounded clip duration/advance rule and a visible
+  fallback when a proxy is missing or browser autoplay is blocked.
+- No autoplay workaround, automatic hydration, batch transcode or
+  mandatory large-load benchmarking.
 
 ## Out of scope
 
-- Automatic highlight extraction.
-- Complex trimming/editing.
-- Forcing autoplay against browser policy.
+Automatic highlights, complex trimming, video recognition, audio
+transcription and new media-collection query infrastructure.
 
 ## Acceptance criteria
 
-- [ ] Mixed collection advances photo -> video -> photo safely.
-- [ ] Long-clip policy is deterministic/documented.
-- [ ] Autoplay/fullscreen restrictions degrade actionably rather than deadlock.
-- [ ] Image-only slideshow behavior remains unchanged.
+- [ ] An explicitly mixed selection advances photo → video → photo.
+- [ ] Clip duration/advance and blocked-autoplay fallbacks are clear.
+- [ ] Missing proxy does not hydrate the source or stall the session.
+- [ ] Existing photo-only slideshow behavior remains unchanged.
 
 ## Verification requirements
 
-Automated mixed-media playback tests plus phone/desktop acceptance.
+Focused transition tests plus a small real-device slideshow check
+after WI-0152 and the chosen mixed-media collection contract exist.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Status: proposed/deferred; not the immediate next workitem.
