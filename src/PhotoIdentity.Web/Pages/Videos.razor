@@ -9,7 +9,10 @@
         <h1>Videos</h1>
         <p>Still posters and technical details for indexed videos. Playback, photo search and slideshow inclusion are not enabled here.</p>
     </div>
-    <button class="button secondary" @onclick="RefreshAsync" disabled="@Loading">Refresh</button>
+    <div class="video-library-actions">
+        <a class="button secondary" href="/video-search">Search indexed videos</a>
+        <button class="button secondary" @onclick="RefreshAsync" disabled="@Loading">Refresh</button>
+    </div>
 </section>
 
 @if (Loading && Items.Count == 0)
