@@ -37,15 +37,17 @@ dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Test
     -p:WasmEnableWebcil=false
 if ($LASTEXITCODE -ne 0) { throw "Video player layout contract failed." }
 
+# IMPORTANT: first stop the running Photo Identity instance normally.
+# Publishing over files of a running Windows app can fail due to file locks.
+# Run the publish command below only after its port is free.
 dotnet publish src/PhotoIdentity.Api/PhotoIdentity.Api.csproj `
     --configuration Release `
     --output ".artifacts/wi0152-test-app"
 if ($LASTEXITCODE -ne 0) { throw "WI-0152 republish failed." }
 ```
 
-Stop the currently running Photo Identity server normally. Restart
-`Start-PhotoIdentity.ps1` using the **same previously validated private
-launcher.json** and `-PublishPathOverride` pointing at
+After publishing, restart `Start-PhotoIdentity.ps1` using the
+**same previously validated private launcher.json** and `-PublishPathOverride` pointing at
 `$PWD\.artifacts\wi0152-test-app` (the exact startup commands are in
 the existing verification procedure). Do not start a second server on
 the same port, and do not change the stored PostgreSQL or video settings.
