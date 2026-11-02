@@ -115,6 +115,7 @@ public partial class Program
             Path.Combine(defaultApplicationRoot, "quality-suggestions")));
         builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
         builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
+        builder.Services.AddSingleton<PostgresVideoSearchRepository>();
         builder.Services.AddSingleton<VideoProcessingPreferencesStore>();
         builder.Services.AddSingleton<VideoArchiveProcessingService>();
         builder.Services.AddSingleton<IPhotoSearchRepository>(
@@ -314,6 +315,7 @@ public partial class Program
         app.MapSmartCollectionEndpoints();
         app.MapPhotoListCollectionEndpoints();
         app.MapPhotoSearchEndpoints();
+        app.MapVideoSearchEndpoints();
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
         app.MapSlideshowExposureEndpoints();
