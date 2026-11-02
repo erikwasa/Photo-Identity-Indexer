@@ -10,7 +10,7 @@ namespace PhotoIdentity.Persistence.Tests;
 /// No personal files or remote models. CI creates and drops an isolated
 /// PostgreSQL catalogue when the test-admin connection is supplied.
 /// </summary>
-public sealed class VideoFrameEvidencePublicationTests
+public sealed class PostgresVideoFrameEvidencePublicationTests
 {
     private static readonly VideoFrameSamplingPlan Plan = VideoFrameSamplingPlanner.Plan(
         new VideoFrameSamplingRequest(8m, MaximumFrames: 2));
@@ -151,6 +151,100 @@ public sealed class VideoFrameEvidencePublicationTests
             Assert.Equal(batch.Items[0].TimestampMilliseconds,
                 searchable.Frames[0].TimestampMilliseconds);
             Assert.Equal(batch.Items[0].Caption, searchable.Frames[0].Caption);
+
+            // WI-0191: on each new read snapshot, stale/unsupported/hidden
+            // videos must disappear even though published frame evidence
+            // remains durable. All mutations occur in this disposable DB.
+            async Task UpdateFixtureAsync(string sql, Guid? additionalId = null)
+            {
+                await using NpgsqlConnection db = await database.OpenConnectionAsync();
+                await using NpgsqlCommand update = db.CreateCommand();
+                update.CommandText = sql;
+                update.Parameters.AddWithValue("asset", asset);
+                update.Parameters.AddWithValue("revision", revision);
+                if (additionalId.HasValue)
+                    update.Parameters.AddWithValue("next", additionalId.Value);
+                await update.ExecuteNonQueryAsync();
+            }
+
+            await UpdateFixtureAsync("""
+                UPDATE video_revision_metadata SET inspection_status = 'unsupported'
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE video_revision_metadata SET inspection_status = 'supported',
+                    color_transfer = 'arib-std-b67'
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE video_revision_metadata SET color_transfer = 'bt709'
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
+
+            await UpdateFixtureAsync("""
+                UPDATE assets SET deleted_at_utc = now() WHERE id = @asset;
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE assets SET deleted_at_utc = NULL WHERE id = @asset;
+                """);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
+
+            // Search refuses evidence under non-local source authority
+            // even when the persisted batch remains valid.
+            await UpdateFixtureAsync("""
+                UPDATE sources SET kind = 'remote-collection' WHERE id = (
+                    SELECT source_id FROM assets WHERE id = @asset);
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE sources SET kind = 'local-folder' WHERE id = (
+                    SELECT source_id FROM assets WHERE id = @asset);
+                """);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
+
+            // Even if a later catalogue bug produces an internally
+            // inconsistent published batch, read-only search fails closed.
+            await UpdateFixtureAsync("""
+                UPDATE video_frame_evidence_batches SET frame_count = 3
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE video_frame_evidence_batches SET frame_count = 2
+                WHERE asset_revision_id = @revision;
+                """);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
+
+            // The prior succeeded FrameEvidence batch must not be returned
+            // after a later video revision exists with no published evidence.
+            Guid next = Guid.NewGuid();
+            await UpdateFixtureAsync("""
+                INSERT INTO asset_revisions(
+                    id,asset_id,content_sha256,size_bytes,observed_at_utc,
+                    media_type,media_kind)
+                VALUES (@next,@asset,repeat('f',64),4000,
+                    now() + interval '1 day','video/mp4','video');
+                INSERT INTO video_revision_metadata(
+                    asset_revision_id,inspection_status,duration_seconds,
+                    color_transfer,inspected_at_utc,tool_sha256,
+                    inspection_profile_id)
+                VALUES (@next,'supported',8,'bt709',now(),repeat('d',64),'synthetic');
+                """, next);
+            Assert.Empty(await videoSearch.ReadCurrentAsync());
+            await UpdateFixtureAsync("""
+                UPDATE asset_revisions SET observed_at_utc = now() - interval '1 day'
+                WHERE id = @next;
+                """, next);
+            Assert.Equal(revision,
+                Assert.Single(await videoSearch.ReadCurrentAsync()).RevisionId);
 
             // No second commit may reuse an acknowledged, consumed lease.
             Assert.False(await repository.TryPublishAsync(lease, Plan, batch));
