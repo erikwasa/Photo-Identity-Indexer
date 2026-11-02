@@ -222,6 +222,39 @@ Physical availability of the original video is not tested by an
 evidence-only query, which deliberately does not access local source
 bytes; catalogue currentness and authorization are tested instead.
 
+## Implementation checkpoint 4 — photo/video coexistence regression (2026-11-02)
+
+The existing disposable PostgreSQL photo-search regression now publishes
+a complete synthetic video FrameEvidence batch through the same
+video-job claim and publication adapters used by the app, next to
+existing indexed/captioned photos. It measures photo retrieval **before
+and after** that publication and asserts unchanged ordered photo search
+hits, fused/component scores, photo index/caption statistics and saved
+photo slideshow collection membership/order. Video Search must still
+retrieve the new video, and the photo collection adapter must refuse to
+add its revision. The video fixture deliberately includes a legacy
+photo review-proxy row to catch accidental photo-source crossover.
+
+A new optional read-only Windows operator script,
+`Test-PhotoIdentityVideoSearchIsolation.ps1`, interleaves a
+known-positive photo query, an existing indexed video query and the
+same photo query, and compares ordered photo hit IDs/scores, index
+counts, photo/video result disjointness and saved photo-list
+collection membership without saving
+collections or printing private captions/identifiers. It reports
+observed search timings but **does not** claim historical pre-upgrade
+latency equivalence, which would require comparable before/after
+measurements from both builds.
+
+This is a real cross-media persistence/ranking/collection regression,
+not an extra indexing system. No schema or production search changes,
+new poster generation, original-video access, OneDrive hydration,
+Azure inference or live catalogue writes are made. The PR classifier explicitly activates the disposable PostgreSQL
+package-verification lane when this mixed-photo/video test file changes,
+including test-only PRs. Windows CI and
+optional maintainer smoke are pending; the existing **2/5** accepted
+criteria remain unchanged until evidence is reviewed.
+
 ## Completion notes
 
 - Files changed:

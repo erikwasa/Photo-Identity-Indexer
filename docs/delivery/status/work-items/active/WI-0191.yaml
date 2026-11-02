@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0191-video-semantic-caption-search.md
 started_at: 2026-11-02
 last_updated_at: 2026-11-02
-branch: agent/WI-0191-search-eligibility-hardening-20261102
+branch: agent/WI-0191-photo-video-coexistence-regression-20261102
 blockers:
 - WI-0190
 blocker_notes: []
@@ -21,3 +21,5 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/714
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/715
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/716

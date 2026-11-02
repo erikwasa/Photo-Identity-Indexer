@@ -210,6 +210,60 @@ The maintainer is deferring the two missing posters. No poster dry run,
 `--apply`, database backup, original-video scan, or rerun of frame
 inference is required for WI-0191 checkpoint 3.
 
+## Checkpoint 4 — photo-only preservation after video evidence publication
+
+The `PostgresPhotoSearchRepositoryTests` disposable database fixture
+now publishes valid synthetic video frame captions/embeddings using
+the video job/publisher path. Photo search query order, ranked/component
+scores, indexed/caption totals and an existing saved photo-list
+collection must remain exactly the same. The video stays searchable
+through the separate Video Search repository and cannot be saved
+through the photo collection adapter. CI exercises this fixture
+without any private user media.
+
+After this PR merges, optionally check the maintained running app with
+a private photo query known to match a caption and a video query known
+to match existing frames:
+
+```powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch main
+git pull --ff-only origin main
+.\Test-PhotoIdentityVideoSearchIsolation.ps1
+```
+
+The script prompts privately for one photo and one video phrase,
+runs Photo / Video / Photo queries and two read-only saved-collection
+GET requests, and prints **only** result counts, equality flags and
+individual elapsed milliseconds. Pass means photo membership/order,
+component scores, photo index totals and saved photo collection
+membership were unchanged, with no sampled video result appearing
+in the photo results **across the intervening video search
+request**. It does not write photos or collections, access video
+originals, trigger processing or output source identifiers.
+A successful pair of queries does not prove the photo baseline latency
+of an earlier installed version; inspect timings only if a slowdown
+is actually observed.
+
+The corresponding automated test is included in the existing
+Windows PostgreSQL CI package-verification lane. The PR classifier
+explicitly enables that lane when this exact test file changes;
+optional local
+disposable-db execution is:
+
+```powershell
+dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj -c Release --filter "FullyQualifiedName~PostgresPhotoSearchRepositoryTests"
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
+
+The database test requires the existing
+`PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` configured
+for a disposable PostgreSQL test environment; without it, the
+database-backed test returns early. **Never point this admin test
+variable at the maintained catalogue.** No local DB rerun is required
+if the full CI disposable test passes. Missing posters remain deferred.
+
 ## Limits intentionally retained for the next checkpoint
 
 - Current reader scans a maximum of **256** most-recent, current eligible
