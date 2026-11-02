@@ -78,13 +78,18 @@ evidence and revision-bound poster paths. This **does not establish
 caption correctness, large-set relevance, poster bytes on disk, or
 absence of stale/excluded results across untested cases**.
 
-One photo Caption API request returned successfully with zero items.
-That is an unmatched query rather than proof of photo-search regression
-or preservation; repeat with a privately known-positive photo query
-before treating that part of acceptance as verified. The maintainer
-has not yet reported focused local tests or documentation validation
-for this checkpoint. No private queries or media identifiers are stored
-in this record.
+The initial photo Caption API request returned zero results. A
+subsequent privately known-positive Caption query returned **10 of 10
+requested photos**, with **26,904 indexed photos** and **24,770
+displayable captions** reported by the API. Photo Caption retrieval
+therefore functions on the maintained host after the new backend was
+merged. This is a focused positive smoke, **not proof** that photo
+ranking, eligibility, saved results or baseline latency are unchanged;
+there is no before/after comparison or other-mode control here.
+
+The maintainer has not yet reported focused local tests or documentation
+validation for this checkpoint. No private queries or media identifiers
+are stored in this record.
 
 ## Limits intentionally retained for the next checkpoint
 
