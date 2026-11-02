@@ -1,0 +1,247 @@
+@page "/video-search"
+@using System.Net
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Video search · Photo Identity</PageTitle>
+
+<section class="video-search-heading">
+    <div>
+        <p class="eyebrow">Opt-in · indexed videos only</p>
+        <h1>Search videos</h1>
+        <p>
+            Find previously indexed video frames using visual similarity, generated captions, or both.
+            Search reads existing evidence only; it does not process, download or upload videos.
+        </p>
+    </div>
+    <a class="button secondary" href="/videos">Browse video library</a>
+</section>
+
+@if (CheckingAvailability)
+{
+    <section class="empty-state compact" role="status"><p>Checking video library availability…</p></section>
+}
+else if (LibraryEnabled == false)
+{
+    <section class="empty-state compact" role="status">
+        <h2>Video search is disabled</h2>
+        <p>Enable the existing Video Library setting in the approved local launcher configuration, then restart the application. Photo search remains available.</p>
+        <a href="/search">Search photos instead</a>
+    </section>
+}
+else if (LibraryEnabled == true)
+{
+    <section class="video-search-controls" aria-label="Video search controls">
+        <label class="video-search-query">
+            <span>Describe a video scene</span>
+            <input @bind="Query" @bind:event="oninput"
+                   @onkeydown="HandleQueryKeyDown"
+                   maxlength="300"
+                   placeholder="a dog running on a beach"
+                   disabled="@Busy" />
+            <small>Visual matching uses English text; captions match their stored language.</small>
+        </label>
+        <label>
+            <span>Evidence</span>
+            <select @bind="Mode" disabled="@Busy">
+                <option value="combined">Visual + captions</option>
+                <option value="semantic">Visual only</option>
+                <option value="caption">Captions only</option>
+            </select>
+        </label>
+        <label>
+            <span>Results</span>
+            <select @bind="Limit" disabled="@Busy">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="40">40</option>
+                <option value="80">80</option>
+                <option value="200">200</option>
+            </select>
+        </label>
+        <button class="button primary" type="button"
+                disabled="@(Busy || string.IsNullOrWhiteSpace(Query))"
+                @onclick="SearchAsync">
+            @(Busy ? "Searching…" : "Search videos")
+        </button>
+    </section>
+
+    @if (Busy)
+    {
+        <p role="status" aria-live="polite">Searching indexed video evidence…</p>
+    }
+    @if (Results is not null)
+    {
+        <section class="video-search-summary" role="status" aria-live="polite">
+            <strong>@Results.Items.Length video results</strong>
+            <span>from @Results.CandidateVideos indexed candidates</span>
+            <span>· @Results.SearchMilliseconds.ToString("0") ms</span>
+        </section>
+
+        @if (Results.CandidateLimitReached)
+        {
+            <p class="video-search-notice" role="status">
+                The backend checked only its most recent 256 eligible video revisions. These results may not cover the whole library.
+            </p>
+        }
+        @if (Results.Mode != "caption" && !Results.SemanticModelAvailable)
+        {
+            <p class="video-search-notice" role="status">
+                The approved local visual-search model is unavailable. Visual-only searches cannot match; Combined searches can still use captions.
+            </p>
+        }
+        @if (Results.Items.Length == 0)
+        {
+            <section class="empty-state compact">
+                <p>No indexed videos matched this query. Try a different phrase or evidence mode. Videos without published frame evidence are not searchable.</p>
+            </section>
+        }
+        else
+        {
+            <section class="video-search-grid" aria-label="Video search results">
+                @foreach (VideoSearchResultResponse result in Results.Items)
+                {
+                    string? poster = VideoSearchPresentation.PosterPath(result);
+                    <article class="video-search-card" @key="result.RevisionId">
+                        <div class="video-search-poster">
+                            @if (poster is not null && !MissingPosters.Contains(result.RevisionId))
+                            {
+                                <img src="@poster"
+                                     alt="Indexed video still"
+                                     loading="lazy"
+                                     decoding="async"
+                                     @onerror="() => MarkPosterMissing(result.RevisionId)" />
+                            }
+                            else
+                            {
+                                <span class="video-search-placeholder">Poster unavailable</span>
+                            }
+                            <span class="video-search-frame-time">Matching frame @VideoSearchPresentation.FrameTime(result.TimestampMilliseconds)</span>
+                        </div>
+                        <div class="video-search-card-body">
+                            <div class="video-search-badges" aria-label="Matching evidence">
+                                @if (result.Sources.Contains("semantic", StringComparer.Ordinal))
+                                {
+                                    <span class="video-search-badge">Visual</span>
+                                }
+                                @if (result.Sources.Contains("caption", StringComparer.Ordinal))
+                                {
+                                    <span class="video-search-badge">Caption</span>
+                                }
+                            </div>
+                            <p>@result.Caption</p>
+                            <details class="video-search-evidence">
+                                <summary>Frame evidence</summary>
+                                <dl>
+                                    <dt>Source</dt><dd>@result.EvidenceKind</dd>
+                                    <dt>Sampling</dt><dd>@result.SamplingPolicyVersion</dd>
+                                    <dt>Visual model</dt><dd>@result.ClipModelId</dd>
+                                    <dt>Caption model</dt><dd>@result.CaptionModelId</dd>
+                                    <dt>Caption prompt</dt><dd>@result.CaptionPromptVersion</dd>
+                                </dl>
+                            </details>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+    }
+}
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <p class="video-search-error" role="alert">@Error</p>
+}
+
+<p class="video-search-footer-note">
+    Video results are separate from photo Search and cannot be added to photo slideshow collections here.
+    Matching timestamps refer to sampled frames, not a verified playable video position.
+    <a href="/search">Return to photo search</a>.
+</p>
+
+@code {
+    private string Query { get; set; } = string.Empty;
+    private string Mode { get; set; } = "combined";
+    private int Limit { get; set; } = 40;
+    private bool Busy { get; set; }
+    private bool CheckingAvailability { get; set; } = true;
+    private bool? LibraryEnabled { get; set; }
+    private string? Error { get; set; }
+    private VideoSearchResponse? Results { get; set; }
+    private HashSet<string> MissingPosters { get; } = new(StringComparer.Ordinal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using HttpResponseMessage response = await Http.GetAsync("/api/videos?offset=0&limit=1");
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                LibraryEnabled = false;
+            }
+            else if (response.IsSuccessStatusCode)
+            {
+                LibraryEnabled = true;
+            }
+            else
+            {
+                Error = "Video library availability could not be checked.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            Error = "The local video library is unavailable.";
+        }
+        finally
+        {
+            CheckingAvailability = false;
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (Busy || LibraryEnabled != true || string.IsNullOrWhiteSpace(Query))
+            return;
+
+        Busy = true;
+        Error = null;
+        Results = null;
+        MissingPosters.Clear();
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/video-search/query",
+                new VideoSearchRequest(Query.Trim(), Mode, Limit));
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                LibraryEnabled = false;
+                return;
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "Video search could not be completed. Please retry with a shorter query.";
+                return;
+            }
+            Results = await response.Content.ReadFromJsonAsync<VideoSearchResponse>();
+            if (Results is null)
+                Error = "The video search response was empty.";
+        }
+        catch (Exception exception) when (exception is HttpRequestException or
+                                          System.Text.Json.JsonException or
+                                          InvalidOperationException)
+        {
+            Error = "The local video search request failed. No video processing was started.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task HandleQueryKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            await SearchAsync();
+    }
+
+    private void MarkPosterMissing(string revisionId) => MissingPosters.Add(revisionId);
+}
