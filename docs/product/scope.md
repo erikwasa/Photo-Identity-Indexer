@@ -35,20 +35,62 @@ The accepted roadmap then improves the permanent catalogue rather than replacing
 - add protected fullscreen slideshows from saved Smart Collections, including toddler-resistant phone playback and optional bounded original preparation; and
 - experiment with local visible-content tagging before selecting a production semantic-tagging approach.
 
+## Video support after version 1 (M30, active development)
+
+The [M30 video milestone](../delivery/milestones/M30-video-media-support.md)
+has already delivered the opt-in video catalogue and technical metadata,
+durable Rec.709 still posters, bounded local playable proxies, selected
+timestamped frame caption/embedding evidence and separate Video Search.
+The existing photo catalogue, photo search, collections and slideshow
+behavior are preserved by default. Those completed capabilities apply
+to an explicitly bounded initial MOV/MP4 subset, not arbitrary video
+formats or whole-archive online-only hydration.
+
+**Next user-facing feature:** play a current retained local proxy in
+the browser using the existing trusted-LAN HTTPS phone access where
+configured (WI-0152). A playable proxy can be served even when its
+original is online-only; playback never silently recalls the original.
+
+**Next coverage phases:** one archive-evidence-selected compatibility
+expansion (WI-0210), then explicitly opted-in photo-style managed
+OneDrive video hydration/reuse/release (WI-0207). Basic metadata of
+interest includes trustworthy capture date/time, GPS/Place and optional
+altitude, camera make/model, duration, resolution and FPS. Mixed
+collections are wanted later but deferred; video-enabled Smart
+Collection predicates require a distinct future decision.
+
+**Video face recognition is a desired future feature**, initially
+explored in a bounded prototype (WI-0155) without modifying the
+canonical production catalogue. A complex tracker/review system
+is not promised before that experiment. Live Photo pairing is
+not a current product goal (WI-0156 retired).
+
+See [video compatibility by stage](../operations/video-compatibility-matrix.md).
+
 ## Optional or deferred
 
-These are not required for the local product or for version 1:
+These are not prerequisites to ordinary photo or basic video
+operation:
 
-- Azure execution and checkpointing;
-- Microsoft Graph access to Personal OneDrive;
-- Azure application identities or managed identities;
-- public hosting or a cloud database;
-- GPU requirements;
-- neural-network fine-tuning; and
-- video processing in the current implementation. The [M30](../delivery/milestones/M30-video-media-support.md) **architecture phase** started on 2026-10-14, while actual runtime support remains gated on WI-0150 design acceptance and private archive codec evidence.
+- Azure VM/checkpoint orchestration, public cloud hosting or a cloud
+  copy of the canonical database.
+- Microsoft Graph or Personal OneDrive application credentials.
+- Required GPU hardware or neural-model fine-tuning.
+- Universal proprietary video decoding, HDR support without
+  reviewed tone mapping, automatic mass transcoding or compulsory
+  entire-video downloads for browsing.
+- Advanced video Smart Collection filtering, video slideshows,
+  Live Photo pairing and complete face-tracking machinery.
+- Performance, storage and cost benchmarking beyond evidence needed
+  for a real observed problem or a deliberately expanded workflow.
 
-Production model execution remains on maintainer-controlled local hardware. Any future remote-compute path requires a new accepted architecture decision and separately scoped work; the canonical catalogue, review workflow and source-of-truth decisions remain local.
+## Local-first and optional Azure inference
 
-## Future media direction
-
-Video support is planned rather than rejected. WI-0150/M30 architecture planning is active, but actual video runtime work remains deferred until proposed ADR-0012 and private archive codec evidence are accepted. Prefer media-neutral source/asset/revision semantics where natural; preserve image-specific processing boundaries until the approved video slice is implemented.
+Windows remains the canonical control plane for PostgreSQL, OneDrive
+hydration, person identity governance, exclusions and publication.
+The accepted [ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md)
+permits explicitly selected private photo/video-frame inference on
+a vetted **maintainer-controlled Azure application and model** as an
+optional accelerator. Local processing remains the default; neither
+mandatory cloud infrastructure nor unvetted black-box third-party
+AI services are part of the product.
