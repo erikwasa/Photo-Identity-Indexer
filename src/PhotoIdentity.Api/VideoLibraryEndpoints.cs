@@ -12,6 +12,8 @@ public static class VideoLibraryEndpoints
     {
         endpoints.MapGet("/api/videos", ListAsync);
         endpoints.MapGet("/api/videos/{revisionId}/poster", GetPosterAsync);
+        endpoints.MapMethods("/api/videos/{revisionId}/play",
+            ["GET", "HEAD"], GetPlaybackAsync);
         return endpoints;
     }
 
@@ -46,6 +48,12 @@ public static class VideoLibraryEndpoints
             page.Offset, page.Limit, page.HasMore));
     }
 
+    private static string ProxyRoot(IConfiguration settings) =>
+        settings["PhotoIdentity:VideoProcessing:CacheRoot"] ??
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PhotoIdentity", "video-worker-cache");
+
     private static void DisableCaching(HttpContext context)
     {
         // Video metadata and private revision-bound posters must not persist in
@@ -53,6 +61,48 @@ public static class VideoLibraryEndpoints
         context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
         context.Response.Headers["Pragma"] = "no-cache";
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+
+
+    private static async Task<IResult> GetPlaybackAsync(
+        string revisionId,
+        PostgresVideoPlaybackRepository proxies, IConfiguration settings,
+        HttpContext context, CancellationToken token)
+    {
+        DisableCaching(context);
+        if (!Enabled(settings) ||
+            !Guid.TryParseExact(revisionId, "D", out Guid guid))
+            return Results.NotFound();
+        try
+        {
+            VideoPlaybackLease? lease = await proxies.OpenCurrentAsync(
+                AssetRevisionId.From(guid), ProxyRoot(settings), token);
+            return lease is null ? Results.NotFound() : new PlaybackResult(lease);
+        }
+        catch (Exception error) when (
+            error is IOException or InvalidDataException or
+                UnauthorizedAccessException or InvalidOperationException or
+                ArgumentException)
+        {
+            // Missing/evicted/corrupt/linked cache entries are never served or
+            // resolved through originals. Return no private path diagnostics.
+            return Results.NotFound();
+        }
+    }
+
+    private sealed class PlaybackResult(VideoPlaybackLease lease) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext context)
+        {
+            // Results.File implements standard GET/HEAD + single-byte-range
+            // 206/416 semantics on a seekable stream. Hold the source-row
+            // lock until ASP.NET has finished streaming or aborted.
+            await using (lease)
+            {
+                await Results.File(lease.Stream, "video/mp4",
+                    enableRangeProcessing: true).ExecuteAsync(context);
+            }
+        }
     }
 
     private static async Task<IResult> GetPosterAsync(
