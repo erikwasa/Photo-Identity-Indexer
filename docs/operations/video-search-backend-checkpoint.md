@@ -184,7 +184,7 @@ new Azure processing solely because a poster is absent.
 ## Checkpoint 3 — eligibility regression without local media
 
 After the next PR's Windows CI, the repository-level
-`VideoFrameEvidencePublicationTests` verifies that Search suppresses
+`PostgresVideoFrameEvidencePublicationTests` verifies that Search suppresses
 unsupported/HDR, deleted, superseded, non-local and incomplete synthetic
 FrameEvidence, in addition to its existing exclusion/purge test. This
 uses a **disposable** test PostgreSQL database only.
@@ -195,7 +195,9 @@ dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
-This local test runs the database-backed case only if
+The test class now matches the maintained `Postgres` CI filter and
+therefore runs automatically in the disposable Windows PostgreSQL lane.
+A local run executes the database-backed case only if
 `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` is explicitly
 configured for a **disposable admin connection**; otherwise that test
 returns early. Do not point an admin test connection at the maintained
