@@ -196,7 +196,9 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
 The test class now matches the maintained `Postgres` CI filter and
-therefore runs automatically in the disposable Windows PostgreSQL lane.
+the PR classifier explicitly activates the disposable Windows PostgreSQL
+lane when this test-only file changes. The CI runner provides an isolated
+test-admin connection; no production catalogue is used.
 A local run executes the database-backed case only if
 `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` is explicitly
 configured for a **disposable admin connection**; otherwise that test
