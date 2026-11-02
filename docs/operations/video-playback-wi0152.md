@@ -1,9 +1,10 @@
 # WI-0152 — retained video proxy playback acceptance
 
-**State: implementation checkpoint pending Windows/phone acceptance.** This
-does not authorize bulk video processing, hydrating originals or exposing the
-cache to a public network. It uses the existing opt-in video library and
-operator-configured trusted-LAN HTTPS mode.
+**State: scoped maintained-Windows acceptance complete on 2026-11-03;
+PR #720 awaiting merge.** This does not authorize bulk video processing,
+hydrating originals or exposing the cache to a public network. It uses
+the existing opt-in video library and operator-configured trusted-LAN
+HTTPS mode.
 
 ## Maintained host results and targeted clipping fix — 2026-11-03
 
@@ -21,6 +22,19 @@ allows natural video-element height, and caps very tall portrait players
 to 75% of the viewport without cropping (`object-fit: contain`).
 The CSS layout contract test does not substitute for actual phone/desktop
 visual review.
+
+**Final maintainer visual retest PASS (2026-11-03):** after republishing
+the corrected player, the maintainer confirmed the native player is
+fully visible on **both the desktop PC and phone**. This closes the
+previously documented clipping/accessibility blocker, in addition to
+the nine functional PASS checks above. No new original hydration or
+processing was needed. Device model/orientation details were not
+supplied and are not claimed as independently tested.
+
+The new static `VideoPlaybackLayoutContractTests` and all required
+Windows CI jobs passed on the prior CI-validated branch commit
+`fe24b58`. Documentation/status-only commits should complete their
+own CI checks before PR #720 is merged.
 
 ### Focused retest after PR #720 follow-up
 
@@ -71,7 +85,9 @@ check **all of these**:
 Report **desktop and phone visual PASS/FAIL separately**, with device
 orientation and any still-hidden controls. Do not share personal video,
 private media URLs, OneDrive paths or screenshots of identifying footage.
-WI-0152 remains `in_progress` until this is visually accepted.
+WI-0152's visual acceptance has now been confirmed; the item is
+`in_review` pending PR #720 merge, after which it can be archived
+as `completed`.
 
 ## Configuration
 
@@ -179,5 +195,7 @@ slideshow remain unchanged. Share aggregate pass/fail, response codes and
 device type only—no video URLs with private IDs, screenshots of private
 content, source paths, tokens or footage.
 
-WI-0152 acceptance and status closure require maintainer evidence from
-these checks; merged code alone is not acceptance.
+WI-0152's maintained-host acceptance evidence was supplied on 2026-11-03:
+all nine initial checks and the corrective desktop/phone visual retest PASS.
+Completion/archive is pending PR #720 merge; merged code alone would not
+have substituted for the recorded device verification.
