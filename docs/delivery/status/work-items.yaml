@@ -12,11 +12,11 @@ work_items:
 - id: WI-0152
   title: Add safe browser video serving and viewer playback
   milestone: M30
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0152-video-serving-playback.md
   started_at: 2026-11-02
-  last_updated_at: 2026-11-02
+  last_updated_at: 2026-11-03
   branch: wi0152-retained-proxy-playback-v1
   blockers:
   - WI-0151
@@ -30,7 +30,11 @@ work_items:
   - type: documentation
     value: docs/operations/video-playback-wi0152.md
   - type: maintainer-verification
-    value: '2026-11-03: maintainer reported PASS for PostgreSQL/HTTP range tests, docs validate/generate, desktop and phone playback/seek, HTTP 206/416/404, OneDrive online-only unchanged, no processing, and photo viewer/search regression; desktop and phone both clipped lower native video controls. CSS fix in PR #720 pending desktop/phone visual retest; work item remains in_progress.'
+    value: '2026-11-03: initial maintainer PASS for PostgreSQL/HTTP range tests, docs validate/generate, desktop and phone functional playback/seek, HTTP 206/416/404, OneDrive online-only unchanged, no processing, and photo viewer/search regression. Lower native video controls were initially clipped on both devices; corrected in PR #720.'
+  - type: maintainer-verification
+    value: '2026-11-03: after the PR #720 layout fix, maintainer confirmed the entire native video player is visible on both desktop PC and phone; previous bottom-clipping blocker resolved. All five scoped WI-0152 acceptance criteria verified; merge/repository archival pending.'
+  - type: ci-verification
+    value: '2026-11-03: GitHub Actions build run 41543246154 on commit fe24b58 passed six jobs including build/test, both integration shards, launcher and package. Documentation/status follow-up commits await their own gate.'
 - id: WI-0153
   title: Integrate video with manual metadata and collection queries
   milestone: M30
