@@ -9,33 +9,45 @@ depends_on: [M19, M22, M24, M27]
 
 ## Scheduling status
 
-**M30 is in progress, not completed.** WI-0190 has started a source-free
-frame-sampling foundation (2026-10-31); the lifecycle recalculates to
-`in_progress`. WI-0150 architecture and WI-0151
-video metadata/SDR posters are completed. **WI-0188 completed
-following maintainer acceptance on 2026-10-30** for already-local,
-default-off, photo-first, bounded video processing and durable
-proxy publication. The operator confirmed first real-video success,
-restart persistence, original/derivative integrity, Settings and
-Pause/recovery, local-first/exclusions, existing photo regressions,
-and **17/17 isolated Windows safety tests** for unsupported/oversized
-input guards and temporary-file cleanup.
+**M30 is in progress, not completed.** WI-0150 architecture,
+WI-0151 video metadata/posters, WI-0188 isolated local video
+processing and WI-0189 versioned playable proxies were previously
+completed with their scoped maintainer acceptance. Photo-first,
+local-first and original-media safety remain authoritative.
+**Online-only OneDrive video hydration/release is separately proposed
+under WI-0207**; it has not been authorized or exercised by WI-0190.
+Other video search (WI-0191), optional playback and face evaluation
+are separate M30 work items.
 
-**Online-only video hydration/release has not been exercised.**
-The maintainer explicitly moved that separate opted-in OneDrive
-verification to [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
-a new proposed M30 workitem dependent on WI-0188. This does not
-permit automatic hydration or alter locally available video behavior.
-**WI-0189 is completed and maintainer-accepted as of 2026-10-30**:
-PRs #665–#671 merged; Windows CI and the reported locally run synthetic
-and already-local MOV/MP4 checks passed for the agreed registered-byte
-quota and manually confirmed retention scope.
-WI-0190 frame evidence is now **in progress** at a pure sampling planner
-checkpoint, with no video decoding, caption/embedding output or active job
-trigger. Other M30 playback, video search and collection integrations remain
-proposed. **M30 is not complete**. See
-[WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) and the
-[frame-sampling runbook](../../operations/video-frame-evidence-sampling.md).
+**WI-0190 current maintainer verification (2026-11-02):**
+Two different supported short/rotated published SDR proxies have
+each produced **four durable timestamped frame captions and
+512-dimensional CLIP embeddings**, with successful read-only
+current-v38 audits, normal bounded scratch cleanup and disabled
+video controls after execution. The combined acceptance report
+found 8 frames, 16,996 caption/vector payload bytes,
+266,321 ms total measured execution wall time
+(1.802 observed frames/minute). Human review judged 7 of 8
+captions accurate (87.5%); one dark frame caption invented
+a held object. The operator then ran local current-v38
+**video frames evaluate-live** with two manually judged
+queries, one different relevant video per query. All three
+CLIP ranking policies returned Hit@2, MRR@2, Recall@2,
+MAP@2 and nDCG@2 of 1.00, with exit 0 and no external
+AI service requests. This establishes a **limited two-video
+functional retrieval baseline**, not general search quality.
+
+**WI-0190 remains in_progress:** complete-system CPU/GPU and
+actual Azure costs, physical proxy/database storage, real
+scene omission annotations, documented positive-media
+deferrals, FrameEvidence-specific negative safety evidence
+and real process interruption/delayed recovery in a separate
+disposable database still require closeout evidence. The
+maintainer-approved HLG/HDR, long/NULL-rotation, full-range
+pixel-format and other unsupported positive-media cases
+remain **postponed, not passed**. See the
+[WI-0190 exact closeout gates](../work-items/WI-0190-video-frame-caption-embedding.md#precise-remaining-wi-0190-completion-gates-2026-11-02).
+**M30 cannot be closed by completing WI-0190 alone.**
 
 ## WI-0190 maintained-host video-coverage deferral (2026-11-01)
 
