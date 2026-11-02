@@ -1,21 +1,20 @@
 # Build context
 
-**Current handoff — 2026-11-02 WI-0191 browser acceptance:** PRs
-#711–#713 merged and Windows CI passed. Maintainer confirmed the opt-in
-separate Video Search browser works; prior three-video Caption/Visual/
-Combined queries returned one video each with stored frame time and
-model/provenance labels. A known-positive photo Caption query returned
-10/10 (26,904 indexed; 24,770 displayable captions). WI-0191 has
-**2/5 verified criteria** and remains in_progress.
-One result displayed a poster, two newer videos did not. Search evidence
-and WI-0151 durable still posters have separate creation flows; a
-different registered source folder is a hypothesis. Next: diagnose
-`hasPoster` vs revision-bound poster GET before running any explicit
-poster materialization. Remaining requirements concern eligibility and
-broader photo/relevance validation, not an automatic poster worker.
-See `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`
-and `docs/operations/video-search-backend-checkpoint.md`.
+**Current handoff — 2026-11-02 WI-0191 checkpoint 3:** PRs #711–#714
+merged. Maintainer accepted video search browser and three-video
+Caption/Visual/Combined pilot; 2/5 criteria verified. A photo Caption
+positive control returned 10/10 (26,904 indexed / 24,770 captions).
+Two newer results have no poster, and maintainer defers poster
+generation; no poster work is authorized.
 
+Current branch extends existing disposable PostgreSQL search-regression
+coverage: unsupported/HDR, soft deletion, supersession, non-local
+source and incomplete evidence fail closed, complementing exclusion
+purge tests. Windows CI is pending. No private video files, live
+catalogue writes or inference are involved. Next: review CI; check
+remaining photo ranking/saving/latency and practical larger-library
+relevance without forced format expansion or overengineering. See
+`docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
 
 **2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
 The maintainer accepted the bounded already-local selected SDR
