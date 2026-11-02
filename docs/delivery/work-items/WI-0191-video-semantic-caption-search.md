@@ -205,9 +205,11 @@ Azure processing, OneDrive access or writes to the maintained catalogue**.
 The test uses the pre-existing disposable test database and only adds
 low-level assertions, not another integration host or search index.
 Its test class is now named `PostgresVideoFrameEvidencePublicationTests`
-so the maintained `FullyQualifiedName~Postgres` CI filter actually runs
-this already-existing publication/regression test (previously the
-non-Postgres class name could bypass that specific live-DB lane).
+so the maintained `FullyQualifiedName~Postgres` CI filter selects it.
+The narrowly scoped `build.yml` PR classifier now also runs the
+package/PostgreSQL lane for changes to this exact test file, instead of
+skipping database execution on test-only pull requests. The existing
+CI package job supplies a disposable PostgreSQL admin connection.
 Passing Windows CI is still required; none of these new assertions is
 claimed as a test result until CI completes.
 
