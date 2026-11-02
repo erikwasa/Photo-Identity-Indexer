@@ -182,6 +182,40 @@ representative current video set is actually available. No need
 to build an automatic thumbnail worker or unblock deferred video
 formats solely for the two missing posters.
 
+## Implementation checkpoint 3 — disposable PostgreSQL eligibility regression (2026-11-02)
+
+Extend the existing isolated PostgreSQL FrameEvidence publication test
+to exercise the actual `PostgresVideoSearchRepository.ReadCurrentAsync`
+read-only search boundary. After publishing two valid synthetic frames,
+repeat the search under successive changed catalogue conditions:
+
+- A now-unsupported inspection or HDR (`arib-std-b67`) transfer is hidden,
+  then becomes searchable again when the synthetic fixture is restored.
+- A soft-deleted video asset is hidden and restored when undeleted.
+- A newer revision with no FrameEvidence suppresses the old revision's
+  still-persisted successful batch; reverting currentness restores it.
+- A non-local source kind hides published evidence.
+- An inconsistent published batch frame count is rejected wholesale.
+- The existing source-copy exclusion regression continues to prove both
+  immediate invisibility and physical frame evidence purge via the
+  PostgreSQL exclusion trigger.
+
+These cases require **no real photos/videos, filesystem modifications,
+Azure processing, OneDrive access or writes to the maintained catalogue**.
+The test uses the pre-existing disposable test database and only adds
+low-level assertions, not another integration host or search index.
+Passing Windows CI is still required; none of these new assertions is
+claimed as a test result until CI completes.
+
+The maintainer has explicitly deferred generation of two missing video
+posters. This is independent of published search evidence and does not
+block the current search workitem. WI-0191 remains **2/5** criteria
+accepted; unchanged photo ranking/saving/latency and representative
+larger-library relevance are not proved by these database tests.
+Physical availability of the original video is not tested by an
+evidence-only query, which deliberately does not access local source
+bytes; catalogue currentness and authorization are tested instead.
+
 ## Completion notes
 
 - Files changed:
