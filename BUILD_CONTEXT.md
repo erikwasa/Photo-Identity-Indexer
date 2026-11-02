@@ -1,24 +1,26 @@
 # Build context
 
-**Current handoff — 2026-11-02 WI-0191 checkpoint 4:** PRs #711–#715
-merged. Video search browser plus maintained three-video
-Caption/Visual/Combined pilot accepted, 2/5 WI criteria verified.
-Known-positive photo Caption returned 10/10 among 26,904 indexed
-and 24,770 captioned photos. Two video posters are missing;
-maintainer explicitly deferred generation.
+**Current handoff — 2026-11-02 WI-0191 photo isolation accepted:**
+PRs #711–#716 merged; PR #716 full Windows CI run 41510054848
+passed. The maintainer's read-only Photo/Video/Photo smoke on the
+existing application returned 10/10 photo Caption hits before and
+after a Combined video query, with exactly unchanged photo ranking,
+scores and indexed/captioned totals, no saved-collection membership
+change (one checked), three unique video hits and disjoint photo/video
+result IDs. Photo query elapsed values were 451.9 and 410.6 ms,
+video 158.5 ms; these are observations, not historical benchmarks.
+Disposable PostgreSQL tests also verify mixed-media coexistence,
+photo collection isolation, stale/unsupported/deleted/excluded video
+evidence suppression and exclusion-purge behavior.
 
-Current PR #716 publishes synthetic FrameEvidence alongside existing
-photo search and saved-collection fixture, then asserts unchanged
-photo membership/order/score/counts and saved selections, with
-video still discoverable only from separate Video Search. A
-read-only Photo/Video/Photo maintainer smoke script compares the
-same behavior without exposing private media IDs or captions; it also checks
-photo and video result IDs do not overlap. The workflow classifier was extended narrowly to run the disposable
-PostgreSQL CI lane for this test-only change. CI is pending; no claim of historical photo latency equivalence or
-larger-video-corpus relevance. Next: review CI, optional one-time
-operator smoke, then scoped WI-0191 acceptance without new poster,
-Azure, OneDrive or performance engineering. See
-`docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
+WI-0191 remains in_progress, **3/5 criteria accepted**: video-only
+three-mode search, evidence/timestamps, and pragmatic photo-only
+preservation. Physical source availability cannot be inferred from
+stored frame evidence and larger video-set relevance is not yet
+verified. The maintainer postponed missing-poster generation; do not
+reopen it or invent large-corpus benchmarks to finish this item.
+Next: scope the remaining two checks pragmatically when relevant.
+See `docs/delivery/work-items/WI-0191-video-semantic-caption-search.md`.
 
 **2026-11-02 WI-0190 pragmatic maintainer acceptance / closure:**
 The maintainer accepted the bounded already-local selected SDR
