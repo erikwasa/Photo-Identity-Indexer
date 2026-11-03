@@ -41,11 +41,19 @@ PR #723's isolated format-contract work is merged. The next
 bounded development checkpoint is a real FFmpeg/FFprobe roundtrip on
 two **generated** full-range synthetic clips under existing Windows
 tool containment, without database or original-media access.
-Operator verification is only requested **after the PR merges into
-main**; CI handles documentation validation and generation.
-Even a successful synthetic trial will not establish real source
-availability or camera colour quality. Full-range production admission
-still requires the already-local real clip acceptance.
+PR #724 merged and the maintained-host synthetic verification
+**PASSED**: the Windows pinned-tool trial produced 720×406 H.264/AAC
+landscape with audio and 406×720 portrait without audio, both
+3 seconds, and removed the entire marked scratch after reporting
+no original, database or derivative access. CI owns documentation
+validation; local review starts **after PR merge on main**.
+This establishes synthetic format safety, not real camera colour
+quality or local availability. The next checkpoint performs a
+bounded, **attribute-only** availability classification on the 12
+catalogue candidates (see
+[the live check runbook](../../operations/video-compatibility-wi0210-local-check.md)).
+Full-range production admission still requires approved already-local
+real source integrity, visual conversion and playback checks.
 See [the synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md).
 
 See [the census runbook](../../operations/video-compatibility-wi0210-census.md).
