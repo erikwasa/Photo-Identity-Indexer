@@ -64,6 +64,17 @@ to an existing no-recall source-integrity command. A real original
 read still requires separate operator authorization; no FFprobe,
 transcoding, proxy publication or worker gate changes are approved.
 See [the guarded one-revision proof](../../operations/video-fullrange-wi0210-source-proof.md).
+**Checkpoint 7 accepted (2026-11-04):** The maintainer
+separately authorized and verified a no-recall SHA-256 read
+of **one** exact-class real original; it matched its
+registered revision, stayed metadata-stable and requested no
+hydration or processing. The next implementation is a **single
+guarded real-video evaluation vertical slice**, with independent
+input/output probes, bounded conversion, original recheck and
+one post-merge visual acceptance; then production integration
+only upon approval. This follows the
+[agent vertical-slice guide](../../operations/agent-vertical-slice-delivery.md)
+and [single real-video acceptance runbook](../../operations/video-fullrange-wi0210-real-evaluation.md).
 Full-range production admission still requires approved already-local
 real source integrity, visual conversion and playback checks.
 See [the synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md).
