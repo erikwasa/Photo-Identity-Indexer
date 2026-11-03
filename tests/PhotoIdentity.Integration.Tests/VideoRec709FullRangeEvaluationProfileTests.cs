@@ -143,6 +143,71 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
         }
     }
 
+    [Fact]
+    public void Synthetic_source_probe_requires_actual_full_range_and_known_test_geometry()
+    {
+        const long bytes = 4096;
+        string valid = SyntheticInputProbe();
+        VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+            Encoding.UTF8.GetBytes(valid), 1280, 720, audio: true, bytes);
+
+        foreach (string corrupted in new[]
+        {
+            valid.Replace("\"color_range\":\"pc\"", "\"color_range\":\"tv\""),
+            valid.Replace("\"color_range\":\"pc\",", ""),
+            valid.Replace("\"color_transfer\":\"bt709\"", "\"color_transfer\":\"arib-std-b67\""),
+            valid.Replace("\"color_primaries\":\"bt709\"", "\"color_primaries\":\"bt2020\""),
+            valid.Replace("\"color_space\":\"bt709\"", "\"color_space\":\"bt2020nc\""),
+            valid.Replace("\"pix_fmt\":\"yuvj420p\"", "\"pix_fmt\":\"yuv420p\""),
+            valid.Replace("\"codec_name\":\"h264\"", "\"codec_name\":\"vp9\""),
+            valid.Replace("\"width\":1280", "\"width\":1920"),
+            valid.Replace("\"height\":720", "\"height\":1080"),
+            valid.Replace("\"size\":\"4096\"", "\"size\":\"4097\""),
+            valid.Replace("\"duration\":\"3.0\"", "\"duration\":\"900\""),
+            valid.Replace("\"format_name\":\"mov,mp4,m4a,3gp,3g2,mj2\"",
+                "\"format_name\":\"matroska,webm\""),
+            valid.Replace("\"codec_name\":\"aac\"", "\"codec_name\":\"opus\""),
+            valid.Replace("\"channels\":1", "\"channels\":6")
+        })
+        {
+            Assert.NotEqual(valid, corrupted);
+            Assert.ThrowsAny<Exception>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+                    Encoding.UTF8.GetBytes(corrupted), 1280, 720, true, bytes));
+        }
+
+        Assert.Throws<InvalidDataException>(() =>
+            VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+                Encoding.UTF8.GetBytes(valid), 720, 1280, true, bytes));
+        Assert.Throws<InvalidDataException>(() =>
+            VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+                Encoding.UTF8.GetBytes(valid), 1280, 720, false, bytes));
+        Assert.Throws<InvalidDataException>(() =>
+            VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+                Encoding.UTF8.GetBytes(valid), 1280, 720, true, bytes + 1));
+
+        string silent = valid.Replace(
+            ",\"codec_type\":\"audio\"", ",\"codec_type\":\"audio\"");
+        // A supported silent case is validated separately using an exact
+        // single-stream fixture, not by ignoring an unexpected audio track.
+        string silentProbe = valid.Replace(
+            "},\n   {\"codec_type\":\"audio\",\"codec_name\":\"aac\",\"channels\":1}",
+            "}");
+        // Verify a genuine test fixture change before deciding its outcome.
+        if (silentProbe != valid)
+            VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+                Encoding.UTF8.GetBytes(silentProbe), 1280, 720, false, bytes);
+    }
+
+    private static string SyntheticInputProbe() => """
+        {"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3.0","size":"4096"},
+         "streams":[
+           {"codec_type":"video","codec_name":"h264","pix_fmt":"yuvj420p",
+            "color_range":"pc","color_transfer":"bt709","color_primaries":"bt709",
+            "color_space":"bt709","width":1280,"height":720},
+           {"codec_type":"audio","codec_name":"aac","channels":1}]}
+        """;
+
     private static VideoRevisionInspection Current() => new(
         AssetRevisionId.From(Guid.NewGuid()),
         "supported", null, "mov,mp4", "h264", "High", "aac",
