@@ -121,9 +121,11 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
 
             Guid source = Guid.NewGuid();
             Guid full = Guid.NewGuid(), hdr = Guid.NewGuid(),
-                excluded = Guid.NewGuid(), unavailable = Guid.NewGuid();
+                excluded = Guid.NewGuid(), unavailable = Guid.NewGuid(),
+                standard = Guid.NewGuid();
             Guid revision = Guid.NewGuid(), hdrRevision = Guid.NewGuid(),
-                excludedRevision = Guid.NewGuid(), unavailableRevision = Guid.NewGuid();
+                excludedRevision = Guid.NewGuid(), unavailableRevision = Guid.NewGuid(),
+                standardRevision = Guid.NewGuid();
             await using (NpgsqlConnection conn = await database.OpenConnectionAsync())
             await using (NpgsqlCommand cmd = conn.CreateCommand())
             {
@@ -134,13 +136,15 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                     VALUES (@full,@source,'fullrange.mov',now(),'video'),
                            (@hdr,@source,'hdr.mov',now(),'video'),
                            (@excluded,@source,'excluded.mov',now(),'video'),
-                           (@unavailable,@source,'unavailable.mov',now(),'video');
+                           (@unavailable,@source,'unavailable.mov',now(),'video'),
+                           (@standard,@source,'standard.mov',now(),'video');
                     INSERT INTO asset_revisions(id,asset_id,content_sha256,size_bytes,
                         observed_at_utc,media_type,media_kind)
                     VALUES (@revision,@full,repeat('a',64),4096,now(),'video/quicktime','video'),
                            (@hdrRevision,@hdr,repeat('b',64),4096,now(),'video/quicktime','video'),
                            (@excludedRevision,@excluded,repeat('c',64),4096,now(),'video/quicktime','video'),
-                           (@unavailableRevision,@unavailable,repeat('e',64),4096,now(),'video/quicktime','video');
+                           (@unavailableRevision,@unavailable,repeat('e',64),4096,now(),'video/quicktime','video'),
+                           (@standardRevision,@standard,repeat('f',64),4096,now(),'video/quicktime','video');
                     INSERT INTO video_revision_metadata(asset_revision_id,inspection_status,
                         video_codec,pixel_format,color_transfer,audio_codec,coded_width,
                         coded_height,display_rotation_degrees,duration_seconds,inspected_at_utc,
@@ -152,6 +156,8 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                            (@excludedRevision,'supported','h264','yuvj420p','bt709','aac',
                             1920,1080,90,3,now(),repeat('d',64),'fixture'),
                            (@unavailableRevision,'supported','h264','yuvj420p','bt709','aac',
+                            1920,1080,90,3,now(),repeat('d',64),'fixture'),
+                           (@standardRevision,'supported','h264','yuv420p','bt709','aac',
                             1920,1080,90,3,now(),repeat('d',64),'fixture');
                     INSERT INTO source_copy_exclusions(source_id,source_key,excluded_at_utc,
                         purge_state,purge_updated_at_utc)
@@ -163,10 +169,12 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 cmd.Parameters.AddWithValue("hdr", hdr);
                 cmd.Parameters.AddWithValue("excluded", excluded);
                 cmd.Parameters.AddWithValue("unavailable", unavailable);
+                cmd.Parameters.AddWithValue("standard", standard);
                 cmd.Parameters.AddWithValue("revision", revision);
                 cmd.Parameters.AddWithValue("hdrRevision", hdrRevision);
                 cmd.Parameters.AddWithValue("excludedRevision", excludedRevision);
                 cmd.Parameters.AddWithValue("unavailableRevision", unavailableRevision);
+                cmd.Parameters.AddWithValue("standardRevision", standardRevision);
                 await cmd.ExecuteNonQueryAsync();
             }
             string envName = "PHOTOIDENTITY_WI0210_LOCAL_" +
@@ -253,6 +261,33 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 Assert.Equal("coded-landscape", localCandidates[0]
                     .GetProperty("codedOrientation").GetString());
                 Assert.True(localCandidates[0].GetProperty("hasAudio").GetBoolean());
+                // The generic source-proof remains available for older
+                // workflows, but WI-0210 explicitly requires the exact
+                // full-range pixel-only class. A normal yuv420p revision
+                // must fail BEFORE any byte read or availability check.
+                using StringWriter denied = new();
+                VideoOneShotSourceProofOptions proofOptions =
+                    VideoOneShotSourceProofOptions.Parse(
+                    [
+                        "--postgres-connection-env", envName,
+                        "--database", lease.DatabaseName,
+                        "--revision-id", standardRevision.ToString(),
+                        "--require-rec709-fullrange-pixel-only",
+                        "--read-local-bytes"
+                    ]);
+                Assert.Equal(1,
+                    await VideoOneShotSourceProofCommandRunner.RunAsync(
+                        proofOptions, denied));
+                using JsonDocument deniedReport = JsonDocument.Parse(denied.ToString());
+                JsonElement deniedRoot = deniedReport.RootElement;
+                Assert.Equal("revision-not-eligible",
+                    deniedRoot.GetProperty("status").GetString());
+                Assert.True(deniedRoot.GetProperty(
+                    "requireRec709FullRangePixelOnly").GetBoolean());
+                Assert.False(deniedRoot.GetProperty("originalBytesOpened").GetBoolean());
+                Assert.False(deniedRoot.GetProperty(
+                    "oneDriveHydrationRequested").GetBoolean());
+                Assert.False(deniedRoot.GetProperty("jobsEnqueued").GetBoolean());
             }
             finally { Environment.SetEnvironmentVariable(envName, null); }
 
@@ -267,7 +302,7 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 """;
             await using NpgsqlDataReader result = await counts.ExecuteReaderAsync();
             Assert.True(await result.ReadAsync());
-            Assert.Equal(4L, result.GetInt64(0));
+            Assert.Equal(5L, result.GetInt64(0));
             Assert.Equal(0L, result.GetInt64(1));
             Assert.Equal(0L, result.GetInt64(2));
         }
