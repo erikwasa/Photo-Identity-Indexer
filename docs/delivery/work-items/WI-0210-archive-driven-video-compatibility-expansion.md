@@ -133,13 +133,6 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   `color_range` is not presently recorded in catalogue inspection.
   Keep existing HDR/poster/frame policies unchanged.
 
-- **2026-11-03 checkpoint 1 — implementation in progress:** Added a read-only,
-  privacy-safe current-video catalogue census command: aggregate inspection,
-  technical format, last-recorded availability, source size and stage receipt
-  counts with current worker/poster metadata gates and overlapping blockers.
-  The command cannot start a job, touch originals, probe OneDrive or migrate
-  PostgreSQL. Focused parsing/privacy/classification tests were added.
-  See [WI-0210 census runbook](../../operations/video-compatibility-wi0210-census.md).
 - **Pending:** CI for the next checkpoint, exact pixel-format and
   counterfactual eligibility distribution, a bounded approved local
   real-video conversion test and final production-profile authorization.
