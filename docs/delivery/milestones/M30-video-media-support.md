@@ -37,6 +37,17 @@ Maintain the existing Rec.709 SDR production proxy gate until a
 representative already-local original demonstrates correct colour
 conversion and the maintainer explicitly approves that class/stage.
 HLG, unspecified transfer and missing rotation are not silently admitted.
+PR #723's isolated format-contract work is merged. The next
+bounded development checkpoint is a real FFmpeg/FFprobe roundtrip on
+two **generated** full-range synthetic clips under existing Windows
+tool containment, without database or original-media access.
+Operator verification is only requested **after the PR merges into
+main**; CI handles documentation validation and generation.
+Even a successful synthetic trial will not establish real source
+availability or camera colour quality. Full-range production admission
+still requires the already-local real clip acceptance.
+See [the synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md).
+
 See [the census runbook](../../operations/video-compatibility-wi0210-census.md).
 
 M30 remains in progress. WI-0207 opt-in OneDrive hydration/release is
