@@ -71,6 +71,74 @@ public sealed class VideoSyntheticProxyPilotTests
     }
 
     [Fact]
+    public async Task Full_range_synthetic_evaluation_is_explicit_dry_run_default_and_never_registered()
+    {
+        string root = NewScratch();
+        try
+        {
+            var options = VideoSyntheticProxyPilotOptions.Parse(
+                [.. Arguments(root), "--full-range-evaluation"]);
+            Assert.True(options.FullRangeEvaluation);
+            Assert.False(options.Apply);
+            Assert.Equal(VideoRec709FullRangeEvaluationProfile.Version,
+                options.EncodingProfile);
+            Assert.Throws<ArgumentException>(() =>
+                VideoProxyEncodingProfiles.Resolve(options.EncodingProfile));
+
+            using StringWriter output = new();
+            Assert.Equal(0, await VideoSyntheticProxyPilotCommandRunner.RunAsync(
+                options, output));
+            using JsonDocument doc = JsonDocument.Parse(output.ToString());
+            JsonElement report = doc.RootElement;
+            Assert.Equal("not-run", report.GetProperty("status").GetString());
+            Assert.True(report.GetProperty("dryRun").GetBoolean());
+            Assert.Equal(VideoRec709FullRangeEvaluationProfile.Version,
+                report.GetProperty("profile").GetString());
+            Assert.False(report.GetProperty("schemaUsed").GetBoolean());
+            Assert.False(report.GetProperty("originalsOpened").GetBoolean());
+            Assert.False(report.GetProperty("videoWorkersActivated").GetBoolean());
+            Assert.False(report.GetProperty("derivativesRetained").GetBoolean());
+            Assert.Single(Directory.EnumerateFileSystemEntries(root));
+
+            foreach (string[] rejected in new[]
+            {
+                new[] { "--full-range-evaluation", "--full-range-evaluation" },
+                new[] { "--full-range-evaluation", "--profile", "standard-720p" },
+                new[] { "--full-range-evaluation", "--profile", "compact-540p" }
+            })
+                Assert.Throws<ArgumentException>(() =>
+                    VideoSyntheticProxyPilotOptions.Parse(
+                        [.. Arguments(root), .. rejected]));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public void Full_range_synthetic_generator_is_fixed_source_free_and_explicitly_signaled()
+    {
+        string workspace = Path.GetFullPath("synthetic-working");
+        foreach ((int width, int height, bool audio) in new[]
+                 { (1280, 720, true), (720, 1280, false) })
+        {
+            string[] baseline = [.. VideoSyntheticProxyPilotCommandRunner
+                .GenerateArguments(workspace, width, height, audio)];
+            string[] trial = [.. VideoSyntheticProxyPilotCommandRunner
+                .GenerateArguments(workspace, width, height, audio,
+                    fullRangeEvaluation: true)];
+            Assert.Equal(baseline.Length + 4, trial.Length);
+            Assert.Equal("pc", trial[Array.IndexOf(trial, "-color_range") + 1]);
+            Assert.Equal("range=pc:colorprim=bt709:transfer=bt709:colormatrix=bt709",
+                trial[Array.IndexOf(trial, "-x264-params") + 1]);
+            Assert.Equal(Path.Combine(workspace, "output.mp4"), trial[^1]);
+
+            List<string> stripped = [.. trial];
+            stripped.RemoveRange(stripped.IndexOf("-x264-params"), 2);
+            stripped.RemoveRange(stripped.IndexOf("-color_range"), 2);
+            Assert.Equal(baseline, stripped);
+        }
+    }
+
+    [Fact]
     public async Task Compact_profile_dry_run_has_no_media_side_effects()
     {
         string root = NewScratch();
@@ -208,7 +276,8 @@ public sealed class VideoSyntheticProxyPilotTests
             // presets and verifies that the scratch root is clean after each.
             foreach (string profile in new[]
                      { VideoProxyEncodingProfiles.StandardKey,
-                       VideoProxyEncodingProfiles.CompactKey })
+                       VideoProxyEncodingProfiles.CompactKey,
+                       VideoRec709FullRangeEvaluationProfile.Version })
             {
                 VideoSyntheticProxyPilotOptions options =
                     VideoSyntheticProxyPilotOptions.Parse(
@@ -218,7 +287,10 @@ public sealed class VideoSyntheticProxyPilotTests
                         "--ffmpeg-sha256", ffmpegHash!,
                         "--ffprobe", ffprobe!,
                         "--ffprobe-sha256", ffprobeHash!,
-                        "--profile", profile, "--apply"
+                        .. (profile == VideoRec709FullRangeEvaluationProfile.Version
+                            ? new[] { "--full-range-evaluation" }
+                            : new[] { "--profile", profile }),
+                        "--apply"
                     ]);
                 using StringWriter output = new();
                 Assert.Equal(0, await VideoSyntheticProxyPilotCommandRunner
