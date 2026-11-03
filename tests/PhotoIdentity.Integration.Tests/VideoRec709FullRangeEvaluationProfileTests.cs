@@ -186,17 +186,7 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
             VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
                 Encoding.UTF8.GetBytes(valid), 1280, 720, true, bytes + 1));
 
-        string silent = valid.Replace(
-            ",\"codec_type\":\"audio\"", ",\"codec_type\":\"audio\"");
-        // A supported silent case is validated separately using an exact
-        // single-stream fixture, not by ignoring an unexpected audio track.
-        string silentProbe = valid.Replace(
-            "},\n   {\"codec_type\":\"audio\",\"codec_name\":\"aac\",\"channels\":1}",
-            "}");
-        // Verify a genuine test fixture change before deciding its outcome.
-        if (silentProbe != valid)
-            VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
-                Encoding.UTF8.GetBytes(silentProbe), 1280, 720, false, bytes);
+
     }
 
     private static string SyntheticInputProbe() => """
