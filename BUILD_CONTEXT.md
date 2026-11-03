@@ -7,12 +7,16 @@ Do not repeat those tests solely for WI-0210.
 
 Next selected scope is **WI-0210**: PR #721's read-only video
 compatibility census passed all seven maintainer-host checks including
-disposable PostgreSQL. In the registered 58 current video catalogue
-entries, 26 fail transfer first, 13 pixel format, 5 rotation,
-1 inspection; 13 pass all metadata gates. The next engineering
-target is Rec.709 `yuvj420p` full-range input for a validated
-playable-proxy-only expansion. First quantify isolated pixel-gate
-candidates by last-recorded availability without reading media.
+disposable PostgreSQL. In the production database `photoidentity_main` with 58
+current videos, 26 fail transfer first, 13 pixel, 5 rotation,
+1 inspection; 13 pass metadata gates. Merged PR #722 confirms
+**12** Rec.709 `yuvj420p` pixel-only, **22** HLG transfer-only
+and **5** missing-rotation-only metadata candidates. All 58
+last-recorded source availabilities are **unknown**. Next engineering
+target is an **unregistered**, fail-closed Rec.709 full-range
+720p H.264/AAC evaluation contract, NOT worker admission.
+Real local-source proof, `color_range`, and colour-quality
+verification are required before any production policy expansion.
 Do not authorize production processing until representative local
 FFprobe colour-range and real proxy colour verification passes.
 See docs/operations/video-compatibility-wi0210-census.md. WI-0207 managed hydration follows separately.
