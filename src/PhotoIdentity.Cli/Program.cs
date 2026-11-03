@@ -82,6 +82,11 @@ public static class Program
                         VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "compatibility" && args[2] == "local-candidates" =>
+                    await VideoCompatibilityLocalCheckCommandRunner.RunCandidatesAsync(
+                        VideoCompatibilityLocalSelectionOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "candidates" =>
                     await VideoOneShotCandidatesCommandRunner.RunAsync(
                         VideoOneShotCandidatesOptions.Parse(args.Skip(3).ToArray()),
@@ -309,6 +314,12 @@ public static class Program
                                         for exact Rec.709 yuvj420p metadata candidates;
                                         no source content reads, hydration or jobs;
                                         private paths/IDs are never output)
+              video compatibility local-candidates --postgres-connection-env NAME --database DB
+                                       --show-revision-ids
+                                       (explicit, local-only UUID shortlist of
+                                        exact Rec.709 yuvj420p pixel candidates;
+                                        no private paths or media content opened;
+                                        selecting an ID does NOT authorize reads)
               video one-shot candidates --postgres-connection-env NAME --database DB
                                        [--limit COUNT (1..20)]
                                        (read-only, UUID-only metadata shortlist;
