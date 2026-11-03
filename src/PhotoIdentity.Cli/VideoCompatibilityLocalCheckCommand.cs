@@ -14,6 +14,32 @@ namespace PhotoIdentity.Cli;
 /// DB source locators stay inside the process. No source stream, probe,
 /// SHA-256, OneDrive pin, hydrate, job or output file is ever opened/created.
 /// </summary>
+
+public sealed record VideoCompatibilityLocalSelectionOptions(
+    VideoCompatibilitySurveyOptions Survey)
+{
+    public static VideoCompatibilityLocalSelectionOptions Parse(string[] args)
+    {
+        // Deliberate disclosure boundary: the normal local-check remains
+        // aggregate-only, and this separate command requires an explicit
+        // switch before printing local revision UUIDs to the operator.
+        if (args.Count(x => x == "--show-revision-ids") != 1)
+            throw new ArgumentException(
+                "Local revision selection requires one --show-revision-ids flag.");
+        return new(VideoCompatibilitySurveyOptions.Parse(
+            args.Where(x => x != "--show-revision-ids").ToArray()));
+    }
+}
+
+/// <summary>
+/// Local-only UUIDs and bounded numeric stream metadata. Never sources,
+/// filenames, paths, checksums, tags, capture times or private content.
+/// Coded orientation is NOT the displayed rotation-adjusted orientation.
+/// </summary>
+public sealed record VideoCompatibilityLocalCandidate(
+    Guid RevisionId, long SourceBytes, decimal DurationSeconds,
+    string CodedOrientation, bool HasAudio);
+
 public static class VideoCompatibilityLocalCheckCommandRunner
 {
     private const int MaximumCandidateChecks = 64;
@@ -25,9 +51,22 @@ public static class VideoCompatibilityLocalCheckCommandRunner
         VideoCompatibilitySurvey.WorkerGate(row with { Pixel = "yuv420p" }) ==
             "metadata-eligible";
 
-    public static async Task<int> RunAsync(
+    public static Task<int> RunAsync(
         VideoCompatibilitySurveyOptions options, TextWriter output,
+        CancellationToken token = default) =>
+        RunInternalAsync(options, output, showRevisionIds: false, token);
+
+    public static Task<int> RunCandidatesAsync(
+        VideoCompatibilityLocalSelectionOptions options, TextWriter output,
         CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return RunInternalAsync(options.Survey, output, showRevisionIds: true, token);
+    }
+
+    private static async Task<int> RunInternalAsync(
+        VideoCompatibilitySurveyOptions options, TextWriter output,
+        bool showRevisionIds, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
@@ -47,7 +86,8 @@ public static class VideoCompatibilityLocalCheckCommandRunner
         // Select private locators ONLY for this local, bounded attribute check.
         // Unlike the general compatibility census these keys must be in process
         // memory, but never escape into the JSON or an exception message.
-        List<(Guid Source, string Root, string Key, long Bytes)> candidates = [];
+        List<(Guid Revision, Guid Source, string Root, string Key,
+            long Bytes, decimal Duration, int Width, int Height, bool Audio)> candidates = [];
         await using (NpgsqlConnection connection = await db.OpenConnectionAsync(token))
         await using (NpgsqlTransaction transaction = await connection.BeginTransactionAsync(
             IsolationLevel.RepeatableRead, token))
@@ -77,7 +117,7 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                            m.inspection_status, m.video_codec, m.pixel_format,
                            m.color_transfer, m.audio_codec, m.coded_width,
                            m.coded_height, m.display_rotation_degrees,
-                           m.duration_seconds, r.size_bytes
+                           m.duration_seconds, r.size_bytes, r.id
                     FROM assets a
                     JOIN sources s ON s.id=a.source_id
                     JOIN LATERAL (
@@ -120,6 +160,7 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                     decimal? duration = reader.IsDBNull(11)
                         ? null : reader.GetDecimal(11);
                     long bytes = reader.GetInt64(12);
+                    Guid revisionId = reader.GetGuid(13);
                     VideoCompatibilityObservation row = new(
                         false, "local-folder", null, inspection, null, codec,
                         pixel, transfer, audio, width, height, rotation,
@@ -128,13 +169,16 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                     if (candidates.Count >= MaximumCandidateChecks)
                         throw new InvalidOperationException(
                             "More than 64 candidates; audit refuses a partial result.");
-                    candidates.Add((sourceId, sourceRoot, sourceKey, bytes));
+                    candidates.Add((revisionId, sourceId, sourceRoot, sourceKey,
+                        bytes, duration!.Value, width!.Value, height!.Value,
+                        audio is not null));
                 }
             }
             await transaction.CommitAsync(token);
         }
 
         Dictionary<string, int> counts = new(StringComparer.Ordinal);
+        List<VideoCompatibilityLocalCandidate> matched = [];
         foreach (var candidate in candidates)
         {
             token.ThrowIfCancellationRequested();
@@ -142,6 +186,38 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                 candidate.Key, candidate.Bytes, token);
             counts[status] = counts.TryGetValue(status, out int prior)
                 ? checked(prior + 1) : 1;
+            if (showRevisionIds && status == "local-metadata-match")
+                matched.Add(new(candidate.Revision, candidate.Bytes,
+                    candidate.Duration,
+                    candidate.Width > candidate.Height ? "coded-landscape" :
+                    candidate.Height > candidate.Width ? "coded-portrait" :
+                    "coded-square", candidate.Audio));
+        }
+
+        if (showRevisionIds)
+        {
+            // These UUIDs are shown ONLY through the separate explicit
+            // selection command. No automatic pick, no local media read.
+            // A proof of unchanged original bytes requires a later
+            // independently authorized --read-local-bytes operation.
+            output.WriteLine(JsonSerializer.Serialize(new
+            {
+                protocol = "wi0210-explicit-local-revision-selection-v1",
+                readOnly = true, candidateClass = "rec709-yuvj420p-pixel-only",
+                revisionIdsShown = true, operatorSelectionRequired = true,
+                candidateCount = candidates.Count,
+                locallyMatchedCount = matched.Count,
+                sourceContentOpened = false, oneDriveHydrationRequested = false,
+                videosDecoded = false, jobsEnqueued = false,
+                derivativesPublished = false, localIsNotIntegrityProven = true,
+                candidates = matched.OrderBy(x => x.DurationSeconds)
+                    .ThenBy(x => x.SourceBytes)
+                    .ThenBy(x => x.RevisionId).ToArray()
+            }, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }));
+            return 0;
         }
 
         var results = counts.OrderBy(x => x.Key, StringComparer.Ordinal)

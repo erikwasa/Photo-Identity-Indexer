@@ -48,10 +48,14 @@ landscape with audio and 406×720 portrait without audio, both
 no original, database or derivative access. CI owns documentation
 validation; local review starts **after PR merge on main**.
 This establishes synthetic format safety, not real camera colour
-quality or local availability. The next checkpoint performs a
-bounded, **attribute-only** availability classification on the 12
-catalogue candidates (see
-[the live check runbook](../../operations/video-compatibility-wi0210-local-check.md)).
+quality or local availability. The maintainer's actual live **attribute-only** availability
+check on production `photoidentity_main` now shows
+**12 of 12** isolated Rec.709 `yuvj420p` pixel-only candidates
+`local-metadata-match`, with no original content access or hydration.
+A new explicitly opted-in private UUID-only selection command
+is the next bounded step; SHA-256 proof and real-camera colour
+conversion still require separate operator authorization.
+See [the post-merge selection runbook](../../operations/video-compatibility-wi0210-local-check.md).
 Full-range production admission still requires approved already-local
 real source integrity, visual conversion and playback checks.
 See [the synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md).

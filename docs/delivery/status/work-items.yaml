@@ -210,7 +210,7 @@ work_items:
   document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
   started_at: 2026-11-03
   last_updated_at: 2026-11-03
-  branch: wi0210-fix-local-availability-reader-order
+  branch: wi0210-explicit-local-revision-selection
   blockers:
   - WI-0151
   - WI-0188
@@ -230,6 +230,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/725
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/726
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/727
   - type: documentation
     value: docs/operations/video-compatibility-wi0210-census.md
   - type: implementation
@@ -244,3 +246,5 @@ work_items:
     value: '2026-11-03 checkpoint 4 PR #724 merged and maintained-host synthetic full-range conversion accepted: 720x406 landscape AAC, 406x720 portrait silent, both 3s; no originals/DB/workers/retained derivatives, scratch removed. Checkpoint 5 proposes attribute-only, no-hydration live availability aggregate of 12 exact Rec.709 yuvj420p metadata candidates; production worker remains unchanged.'
   - type: implementation
     value: '2026-11-03 PR #725 local audit failed on production due to Npgsql SequentialAccess reading ordinal 12 before 3-11. PR #726 fixes forward-only reader ordering; CI disposable PostgreSQL regression existing. No original content read, no hydration; candidate availability remains unverified until after merged main rerun.'
+  - type: implementation
+    value: '2026-11-03 checkpoint 5 accepted: production photoidentity_main live attribute-only survey returned 12/12 rec709 yuvj420p pixel-only candidates local-metadata-match, readOnly=true, sourceContentOpened=false, oneDriveHydrationRequested=false. Checkpoint 6 proposes deliberately opted-in local-only UUID shortlist of those candidates without source content access; individual original proof remains separately authorized.'
