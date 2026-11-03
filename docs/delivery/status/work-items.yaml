@@ -224,6 +224,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/722
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/723
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/724
   - type: documentation
     value: docs/operations/video-compatibility-wi0210-census.md
   - type: implementation
