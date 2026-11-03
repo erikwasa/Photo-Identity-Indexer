@@ -109,6 +109,30 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
 
 ## Development checkpoints
 
+- **2026-11-03 checkpoint 1 — maintainer accepted:** PR #721 merged.
+  Maintainer reported all seven local checks PASS, including the isolated
+  PostgreSQL integration test. The sanitized catalogue census contains
+  58 current nonexcluded videos (0 excluded): first worker gates are
+  26 transfer, 13 pixel-format, 5 rotation, 1 unsupported inspection,
+  and 13 metadata-eligible. Current registered receipts are 13 proxies,
+  3 frame batches and 1 still poster. The gate partition sums to 58;
+  stage receipt counts are **not** guaranteed to refer to the same videos.
+  Historical 1,309 archive files are not all represented by the
+  current PostgreSQL catalogue.
+- **Next development slice — read-only single-gate candidate projections:**
+  Quantify exactly how many Rec.709 `yuvj420p` revisions fail only
+  the pixel gate, separately by last-recorded local/online-only state.
+  Also show HLG-transfer-only, missing-transfer-only and
+  missing-rotation-only upper bounds without relaxing any admission.
+  **Proposed first expansion:** a separately validated full-range
+  Rec.709 `yuvj420p` input to the **playable proxy stage only**.
+  This is an engineering target, **not yet maintainer approval of a
+  production processing profile**. A known-local source must prove
+  correct full-to-limited YUV range conversion and Rec.709 signaling,
+  orientation, preserved original bytes, and no unexpected hydration;
+  `color_range` is not presently recorded in catalogue inspection.
+  Keep existing HDR/poster/frame policies unchanged.
+
 - **2026-11-03 checkpoint 1 — implementation in progress:** Added a read-only,
   privacy-safe current-video catalogue census command: aggregate inspection,
   technical format, last-recorded availability, source size and stage receipt
@@ -116,15 +140,19 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   The command cannot start a job, touch originals, probe OneDrive or migrate
   PostgreSQL. Focused parsing/privacy/classification tests were added.
   See [WI-0210 census runbook](../../operations/video-compatibility-wi0210-census.md).
-- **Pending:** Windows CI, maintainer's actual catalogue counts and a
-  two/three-candidate shortlist. No format, budget, encoding, poster or frame
-  policy has been widened; acceptance checkboxes remain open.
+- **Pending:** CI for the next checkpoint, exact pixel-format and
+  counterfactual eligibility distribution, a bounded approved local
+  real-video conversion test and final production-profile authorization.
+  No format, budget, encoding, poster or frame policy has been widened;
+  acceptance checkboxes remain open.
 - **Approval gate:** select one bounded supported input class and promised
   stage(s) from actual archive findings *before* modifying compatibility.
 
 ## Completion notes
 
-- Status: in_progress; archive census instrument proposed in PR, real inventory,
-  selection, implementation and acceptance still pending.
+- Status: in_progress; read-only archive census is locally accepted.
+  A narrow full-range Rec.709 proxy engineering target is identified;
+  exact candidate eligibility and visual conversion evidence remain
+  pending before production admission.
 - Scope: one evidence-selected archive compatibility slice, with new
   workitems only for later independently justified expansions.
