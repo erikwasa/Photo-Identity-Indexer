@@ -15,6 +15,11 @@ and **5** missing-rotation-only metadata candidates. All 58
 last-recorded source availabilities are **unknown**. Next engineering
 target is an **unregistered**, fail-closed Rec.709 full-range
 720p H.264/AAC evaluation contract, NOT worker admission.
+PR #723 merged; the next change extends the existing Windows
+synthetic proxy pilot with explicit full-range input and output
+FFprobe range proof under fixed tool budgets. CI owns docs checks.
+Local verification starts **after merge from main**, not on a PR
+branch. No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.
 Do not authorize production processing until representative local
