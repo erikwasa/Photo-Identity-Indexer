@@ -77,6 +77,11 @@ public static class Program
                         VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "compatibility" && args[2] == "local-check" =>
+                    await VideoCompatibilityLocalCheckCommandRunner.RunAsync(
+                        VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "candidates" =>
                     await VideoOneShotCandidatesCommandRunner.RunAsync(
                         VideoOneShotCandidatesOptions.Parse(args.Skip(3).ToArray()),
@@ -299,6 +304,11 @@ public static class Program
                                        (read-only aggregate current-video inventory;
                                         no media opens, OneDrive hydration or jobs;
                                         cached availability is NOT a live file probe)
+              video compatibility local-check --postgres-connection-env NAME --database DB
+                                       (read-only Windows file-attribute availability
+                                        for exact Rec.709 yuvj420p metadata candidates;
+                                        no source content reads, hydration or jobs;
+                                        private paths/IDs are never output)
               video one-shot candidates --postgres-connection-env NAME --database DB
                                        [--limit COUNT (1..20)]
                                        (read-only, UUID-only metadata shortlist;
