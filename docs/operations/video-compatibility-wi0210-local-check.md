@@ -94,13 +94,88 @@ if ((($report.availability | Measure-Object -Property count -Sum).Sum) -ne
 `oneDriveHydrationRequested = False`, `videosDecoded = False`,
 `videoJobsEnqueued = False`, `derivativesPublished = False`.
 If the catalogue is unchanged, expect `candidateCount = 12`.
-The grouped availability counts are **unknown until the maintainer
-runs this checkpoint**, and must not be invented.
+**Maintainer acceptance, 2026-11-03:** after PR #726 merged, the
+read-only production audit returned `candidateCount=12` and exactly
+`local-metadata-match=12`; `readOnly=true`,
+`sourceContentOpened=false`, `oneDriveHydrationRequested=false`.
+All 12 currently appear local with matching sizes, but SHA, full-range
+signalling and visual colour remain unverified.
 
 A fresh database inventory is not needed solely to rerun the
 previous 58-video census. Share the aggregate `candidateCount`
 and `availability` counts, not source filenames or DB credentials.
 The local state should be unchanged after the command.
+
+## Checkpoint 6 — explicit private UUID shortlist, AFTER PR merge
+
+The normal `video compatibility local-check` command remains
+**aggregate-only**. This separate `local-candidates` command needs
+a deliberate, once-only `--show-revision-ids` flag. Only
+current, nonexcluded Rec.709 `yuvj420p` pixel-only revisions with
+**matching local file attributes and size** appear in the
+private local results; no filename, path, SHA or user media is exposed.
+Neither this command nor displaying a UUID authorizes an original
+read, decode, transcode, hydration or processing job.
+
+Start **only after the PR is merged**, on local `main`.
+CI owns documentation validation; do not run docs checks locally.
+
+```powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch main
+git pull --ff-only origin main
+
+$db = "photoidentity_main"
+$envName = "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING"
+
+# Explicitly permit UUID display ONLY in this private terminal.
+$lines = & dotnet run --project src/PhotoIdentity.Cli --configuration Release -- video compatibility local-candidates --postgres-connection-env $envName --database $db --show-revision-ids
+if ($LASTEXITCODE -ne 0) {
+    throw "WI-0210 local revision selection failed."
+}
+$selection = ($lines -join "`n") | ConvertFrom-Json -ErrorAction Stop
+
+if (-not $selection.readOnly -or
+    -not $selection.revisionIdsShown -or
+    -not $selection.operatorSelectionRequired -or
+    -not $selection.localIsNotIntegrityProven -or
+    $selection.sourceContentOpened -or
+    $selection.oneDriveHydrationRequested -or
+    $selection.videosDecoded -or
+    $selection.jobsEnqueued -or
+    $selection.derivativesPublished -or
+    $selection.locallyMatchedCount -ne @($selection.candidates).Count) {
+    throw "WI-0210 local revision selection safety check failed."
+}
+
+$selection | Select-Object candidateCount, locallyMatchedCount, readOnly,
+    sourceContentOpened, oneDriveHydrationRequested
+
+# PRIVATE TERMINAL ONLY: do not paste revision UUIDs or paths into
+# shared chat, PRs, tickets, logs or documentation.
+$selection.candidates | Format-Table revisionId, sourceBytes,
+    durationSeconds, codedOrientation, hasAudio -AutoSize
+```
+
+Expected if unchanged: `candidateCount=12`,
+`locallyMatchedCount=12`, 12 private UUIDs, all safety flags
+`False`. The shortlist is ordered by shorter duration, then
+source bytes, then UUID, but **does not automatically select**
+a file. Its orientation is **coded**, not the
+rotation-adjusted display orientation. The local classification
+may change between calls.
+
+**Stop after viewing the shortlist.** Do not run
+`--read-local-bytes` or FFprobe automatically. A separate,
+deliberately authorized exact-revision integrity stage must
+recheck exclusions, revision currentness, availability,
+no-recall source SHA and process controls before any
+original-media use. The already implemented
+`video one-shot source-proof` uses explicit
+`--read-local-bytes`; it is **not invoked here**.
+
+Share only `candidateCount`, `locallyMatchedCount`,
+and whether the safety checks passed, not the actual UUIDs.
 
 ## What follows
 
