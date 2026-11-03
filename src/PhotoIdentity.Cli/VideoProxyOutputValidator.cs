@@ -29,7 +29,7 @@ public sealed class VideoProxyValidationException : Exception
 /// </summary>
 public sealed class VideoProxyOutputValidator(
     string ffprobePath, string ffprobeSha256, string scratchRoot,
-    int maximumDimension = 720)
+    int maximumDimension = 720, bool requireLimitedRange = false)
 {
     private static VideoToolExecutionBudget ProbeBudget => new(
         MaximumWallTime: TimeSpan.FromSeconds(15),
@@ -50,7 +50,8 @@ public sealed class VideoProxyOutputValidator(
         CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(inspect);
-        if (maximumDimension is not (540 or 720))
+        if (maximumDimension is not (540 or 720) ||
+            (requireLimitedRange && maximumDimension != 720))
             throw new ArgumentOutOfRangeException(nameof(maximumDimension));
         if (!OperatingSystem.IsWindows() ||
             !Path.IsPathFullyQualified(candidateFile) ||
@@ -73,7 +74,7 @@ public sealed class VideoProxyOutputValidator(
                 "-probesize", "2097152", "-analyzeduration", "2000000",
                 "-show_streams", "-show_format",
                 "-show_entries",
-                "format=format_name,duration,size:stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,color_transfer,color_primaries,color_space,channels:stream_tags=rotate:stream_side_data=rotation",
+                "format=format_name,duration,size:stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,color_transfer,color_primaries,color_space,color_range,channels:stream_tags=rotate:stream_side_data=rotation",
                 "-of", "json",
                 "-o", Path.Combine(workspace, "probe.json"),
                 "-i", candidateFile
@@ -89,8 +90,9 @@ public sealed class VideoProxyOutputValidator(
                     new FileInfo(json).Length is < 20 or > 65536)
                     throw new InvalidDataException("Video probe output is absent or unbounded.");
                 byte[] data = await File.ReadAllBytesAsync(json, checkToken);
-                inspection = VideoProxyCandidateProfile.ValidateOutputJson(
-                    data, length, maximumDimension);
+                inspection = requireLimitedRange
+                    ? VideoRec709FullRangeEvaluationProfile.ValidateOutputProbeJson(data, length)
+                    : VideoProxyCandidateProfile.ValidateOutputJson(data, length, maximumDimension);
             });
         if (!result.Started)
             throw new VideoProxyValidationException("probe-not-started");
