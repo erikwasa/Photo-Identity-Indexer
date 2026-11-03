@@ -82,11 +82,14 @@ on **main after merge**, with no duplicate local documentation checks.
 The maintained-host synthetic trial **passed** on 2026-11-03:
 720×406 with audio and 406×720 without, both 3-second encoded
 H.264/AAC/Rec.709 outputs with no original access, no database and
-no retained scratch. A new **attribute-only** live availability
-audit is proposed to partition the 12 exact Rec.709 `yuvj420p`
-metadata candidates by current Files On-Demand state, with no
-source content reads or hydration. Even a `local-metadata-match`
-result does **not** prove byte-level revision integrity or colour.
+no retained scratch. A live attribute-only availability check now found **12 of 12**
+Rec.709 `yuvj420p` pixel-only candidates `local-metadata-match`
+on maintained-host `photoidentity_main`, with no content opened
+or OneDrive hydration. The earlier 58-video `unknown` values
+were **last-recorded database observations**, not the current
+file-attribute check. The next explicitly selected private UUID
+shortlist still performs no media reading. This does **not**
+prove source SHA, explicit full-range signalling or real colour.
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
