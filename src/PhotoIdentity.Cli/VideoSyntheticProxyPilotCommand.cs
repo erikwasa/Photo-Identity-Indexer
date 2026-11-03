@@ -343,6 +343,10 @@ public static class VideoSyntheticProxyPilotCommandRunner
         ]);
         if (fullRangeEvaluation)
             args.AddRange([
+                // Produce actual full-range synthetic luma/chroma values,
+                // not only full-range metadata on limited-range testsrc2.
+                "-vf", "scale=in_range=limited:out_range=full:" +
+                       "in_color_matrix=bt709:out_color_matrix=bt709,format=yuv420p",
                 "-color_range", "pc",
                 "-x264-params", "range=pc:colorprim=bt709:transfer=bt709:colormatrix=bt709"
             ]);
