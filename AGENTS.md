@@ -23,6 +23,19 @@
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
 - M30's opt-in video ingestion, local processing, playable proxies, selected frame evidence and Video Search have been completed under documented bounded scopes (WI-0150/0151/0188/0189/0190/0191). **WI-0152 browser playback is merged, maintainer-accepted and archived (PR #720)**; WI-0210's merged PR #722 reports 58 current `photoidentity_main` videos with 12 isolated Rec.709 yuvj420p proxy metadata candidates, but ALL 58 source availabilities unknown; PR #724 merged and the guarded synthetic full-range proxy roundtrip PASSED on the maintainer's Windows FFmpeg; checkpoint 5 live availability verified 12/12 Rec.709 yuvj420p pixel-only candidates as local size matches (not SHA or colour proof). Checkpoint 6 merged PR #727 operator shortlist is accepted (12/12, readOnly, no source bytes opened or hydration); next add an optional exact Rec.709 yuvj420p pixel-only metadata guard to the existing explicit no-recall SHA source-proof command, preserving separate --read-local-bytes authorization and production isolation.Next develop explicit opt-in private UUID-only candidate selection without content opens, hydration or job writes. Production gate/HDR remain unchanged until approved real-source checks; local review starts on merged main and CI owns docs validation; WI-0207 independently owns online-only video hydration/release. Keep source/revision, original-file and existing photo contracts. Video face recognition is desired but starts with a bounded experimental WI-0155 prototype; mixed collections/slideshows are postponed and Live Photo pairing administratively retired. Consult M30's current section, not historical activation instructions.
 
+**WI-0210 delivery handoff (2026-11-04):** PR #728's
+exact-revision local original SHA passed on the maintained
+Windows host with no hydration or worker side effects.
+Under the [agent vertical-slice guide](docs/operations/agent-vertical-slice-delivery.md),
+implement the **whole guarded real-source conversion evaluation
+in one PR** (input probe + bounded full→limited conversion +
+output validation + post-trial SHA + private review), then
+only after real visual acceptance implement one cohesive
+production playable-proxy integration. No new small
+prep-only PRs, production admission or unapproved original
+read. CI owns docs checks and local verification starts
+after merge on `main`.
+
 ## Scope discipline
 
 - Follow [the agent vertical-slice delivery guide](docs/operations/agent-vertical-slice-delivery.md): aim for a coherent user-visible outcome (often one or two reviewable PRs), put reproducible proof in CI, and prioritize archive changes by additional *usable* assets at an explicitly named stage. Record justified exceptions rather than multiplying preparatory PRs or local acceptance sessions.
