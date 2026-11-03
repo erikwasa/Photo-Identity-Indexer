@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
 started_at: 2026-11-03
 last_updated_at: 2026-11-03
-branch: wi0210-readonly-archive-compatibility-survey
+branch: wi0210-pixel-range-candidate-evidence
 blockers:
 - WI-0151
 - WI-0188
@@ -14,7 +14,13 @@ blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/721
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/722
 - type: documentation
   value: docs/operations/video-compatibility-wi0210-census.md
 - type: implementation
-  value: '2026-11-03 checkpoint 1: aggregate repeatable-read, metadata-only local PostgreSQL video compatibility inventory CLI and focused policy/privacy tests. Pending Windows CI and maintained-host census. No policy widening, media processing or OneDrive hydration.'
+  value: '2026-11-03 checkpoint 1: aggregate repeatable-read, metadata-only local PostgreSQL video compatibility inventory CLI and focused policy/privacy tests. All seven maintained-host verification checks PASS, including disposable PostgreSQL; 58 current nonexcluded video rows, 45 worker gate blocked. No policy widening, media processing or OneDrive hydration.'
+- type: implementation
+  value: '2026-11-03 checkpoint 2 PR #722: read-only single-gate Rec.709 yuvj420p / HLG / missing-transfer / missing-rotation candidate projections by last-recorded availability, with overlapping-gate tests. Proposed proxy-only first expansion requires explicit approval and real local range-conversion proof.'
