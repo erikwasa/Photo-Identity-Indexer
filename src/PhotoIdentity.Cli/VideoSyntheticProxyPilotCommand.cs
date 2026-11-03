@@ -14,17 +14,23 @@ namespace PhotoIdentity.Cli;
 public sealed record VideoSyntheticProxyPilotOptions(
     string ScratchRoot, string Ffmpeg, string FfmpegSha256,
     string Ffprobe, string FfprobeSha256, bool Apply,
-    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey)
+    string EncodingProfile = VideoProxyEncodingProfiles.StandardKey,
+    bool FullRangeEvaluation = false)
 {
     public static VideoSyntheticProxyPilotOptions Parse(string[] args)
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
-        bool apply = false;
+        bool apply = false, fullRangeEvaluation = false;
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--apply" && !apply)
             {
                 apply = true;
+                continue;
+            }
+            if (args[i] == "--full-range-evaluation" && !fullRangeEvaluation)
+            {
+                fullRangeEvaluation = true;
                 continue;
             }
             if (args[i] is not ("--scratch-root" or "--ffmpeg" or "--ffmpeg-sha256" or
@@ -50,11 +56,17 @@ public sealed record VideoSyntheticProxyPilotOptions(
             !IsHash(encodeHash) || !IsHash(probeHash))
             throw new ArgumentException(
                 "Video pilot needs absolute tool/scratch paths and lowercase approved SHA-256 values.");
-        string profile = values.TryGetValue("--profile", out string? requested)
-            ? requested : VideoProxyEncodingProfiles.StandardKey;
-        _ = VideoProxyEncodingProfiles.Resolve(profile);
+        if (fullRangeEvaluation && values.ContainsKey("--profile"))
+            throw new ArgumentException(
+                "Full-range synthetic evaluation cannot select a production preset.");
+        string profile = fullRangeEvaluation
+            ? VideoRec709FullRangeEvaluationProfile.Version
+            : values.TryGetValue("--profile", out string? requested)
+                ? requested : VideoProxyEncodingProfiles.StandardKey;
+        if (!fullRangeEvaluation)
+            _ = VideoProxyEncodingProfiles.Resolve(profile);
         return new(Path.GetFullPath(root), Path.GetFullPath(ffmpeg), encodeHash,
-            Path.GetFullPath(ffprobe), probeHash, apply, profile);
+            Path.GetFullPath(ffprobe), probeHash, apply, profile, fullRangeEvaluation);
     }
 
     private static bool IsHash(string value) =>
@@ -79,6 +91,17 @@ public static class VideoSyntheticProxyPilotCommandRunner
     public const string RootMarker = ".photoidentity-synthetic-video-lab";
     public const string MarkerText = "wi0188-synthetic-video-lab-v1";
 
+    private static VideoToolExecutionBudget SyntheticSourceProbeBudget => new(
+        MaximumWallTime: TimeSpan.FromSeconds(15),
+        MaximumTemporaryBytes: 128 * 1024,
+        MaximumTemporaryEntries: 8,
+        InspectionInterval: TimeSpan.FromMilliseconds(100),
+        WindowsJobLimits: new WindowsVideoJobLimits(
+            MaximumJobMemoryMiB: 512, MaximumProcesses: 1,
+            MaximumCpuPercent: 25,
+            MaximumObservedReadBytes: 128L * 1024 * 1024,
+            MaximumObservedWriteBytes: 32L * 1024 * 1024));
+
     private static VideoToolExecutionBudget EncodeBudget => new(
         MaximumWallTime: TimeSpan.FromSeconds(120),
         MaximumTemporaryBytes: 32L * 1024 * 1024,
@@ -99,11 +122,17 @@ public static class VideoSyntheticProxyPilotCommandRunner
         // beneath the OS temp directory, never a source archive, OneDrive
         // collection, conventional derivatives folder or network share.
         string root = ValidateRoot(options.ScratchRoot);
-        VideoProxyEncodingProfile profile = VideoProxyEncodingProfiles.Resolve(
-            options.EncodingProfile);
+        bool fullRangeEvaluation = options.FullRangeEvaluation;
+        VideoProxyEncodingProfile? profile = fullRangeEvaluation
+            ? null : VideoProxyEncodingProfiles.Resolve(options.EncodingProfile);
+        if (fullRangeEvaluation &&
+            options.EncodingProfile != VideoRec709FullRangeEvaluationProfile.Version)
+            throw new ArgumentException("Full-range evaluation requires its exact fixed profile.");
+        string profileLabel = fullRangeEvaluation
+            ? VideoRec709FullRangeEvaluationProfile.Version : profile!.Key;
         if (!options.Apply)
         {
-            Write(output, true, "not-run", [], profile: profile.Key);
+            Write(output, true, "not-run", [], profile: profileLabel);
             return 0;
         }
         if (!OperatingSystem.IsWindows())
@@ -113,7 +142,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
         var encoder = new VideoToolProcessSupervisor();
         var validator = new VideoProxyOutputValidator(
             options.Ffprobe, options.FfprobeSha256, root,
-            profile.MaximumDimension);
+            fullRangeEvaluation ? 720 : profile!.MaximumDimension,
+            requireLimitedRange: fullRangeEvaluation);
         List<VideoSyntheticProxyPilotCase> observations = [];
         // Only predetermined, public phase identifiers are reported. Tool
         // stderr, executable locations and private workspace names are never
@@ -135,7 +165,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
                 VideoSyntheticProxyPilotCase? observed = null;
                 VideoToolExecutionResult generator = await encoder.RunAsync(
                     options.Ffmpeg, options.FfmpegSha256, root,
-                    workspace => GenerateArguments(workspace, width, height, audio),
+                    workspace => GenerateArguments(workspace, width, height, audio,
+                        fullRangeEvaluation),
                     EncodeBudget, token,
                     afterSuccessfulExit: async (generatorWorkspace, generatedToken) =>
                     {
@@ -146,12 +177,21 @@ public static class VideoSyntheticProxyPilotCommandRunner
                         if (!File.Exists(input))
                             throw new InvalidDataException(
                                 "Synthetic fixture generator did not produce an input.");
+                        if (fullRangeEvaluation)
+                        {
+                            stage = "synthetic-source-range-probe";
+                            await VerifySyntheticFullRangeSourceAsync(
+                                options.Ffprobe, options.FfprobeSha256,
+                                root, input, width, height, audio, generatedToken);
+                        }
                         stage = "proxy-encode";
                         Stopwatch clock = Stopwatch.StartNew();
                         VideoToolExecutionResult transcode = await encoder.RunAsync(
                             options.Ffmpeg, options.FfmpegSha256, root,
-                            encodeWorkspace =>
-                                profile.BuildArguments(input, encodeWorkspace),
+                            encodeWorkspace => fullRangeEvaluation
+                                ? VideoRec709FullRangeEvaluationProfile.BuildArguments(
+                                    input, encodeWorkspace)
+                                : profile!.BuildArguments(input, encodeWorkspace),
                             EncodeBudget, generatedToken,
                             afterSuccessfulExit: async (encodeWorkspace, encodeToken) =>
                             {
@@ -175,7 +215,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
                                 observed = new(orientation, valid.Width, valid.Height,
                                     valid.HasAudio, valid.DurationSeconds, bytes,
                                     (long)clock.Elapsed.TotalMilliseconds,
-                                    profile.Key);
+                                    profileLabel);
                             });
                         if (transcode.ExitCode != 0)
                         {
@@ -200,7 +240,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
                 observations.Add(observed);
             }
 
-            Write(output, false, "validated", observations, profile: profile.Key);
+            Write(output, false, "validated", observations, profile: profileLabel);
             return 0;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -219,7 +259,7 @@ public static class VideoSyntheticProxyPilotCommandRunner
                         ? probe.ToolExitCode : null),
                 error is Win32Exception native ? native.NativeErrorCode : null,
                 VideoToolFailureEvidence.Read(error),
-                profile: profile.Key);
+                profile: profileLabel);
             return 1;
         }
     }
@@ -267,7 +307,8 @@ public static class VideoSyntheticProxyPilotCommandRunner
     }
 
     public static IReadOnlyList<string> GenerateArguments(
-        string workspace, int width, int height, bool audio)
+        string workspace, int width, int height, bool audio,
+        bool fullRangeEvaluation = false)
     {
         bool approvedFixture =
             (width == 1280 && height == 720 && audio) ||
@@ -300,6 +341,11 @@ public static class VideoSyntheticProxyPilotCommandRunner
             "-color_primaries", "bt709", "-color_trc", "bt709",
             "-colorspace", "bt709"
         ]);
+        if (fullRangeEvaluation)
+            args.AddRange([
+                "-color_range", "pc",
+                "-x264-params", "range=pc:colorprim=bt709:transfer=bt709:colormatrix=bt709"
+            ]);
         if (audio)
             args.AddRange(["-c:a", "aac", "-b:a", "96k"]);
         args.AddRange([
@@ -307,6 +353,46 @@ public static class VideoSyntheticProxyPilotCommandRunner
             Path.Combine(workspace, "output.mp4")
         ]);
         return args;
+    }
+
+    /// <summary>
+    /// Independently check the FFmpeg-created input really is full-range.
+    /// Only the fixed scratch-owned synthetic fixture can reach this probe.
+    /// The standard synthetic pilot remains byte-for-byte unchanged.
+    /// </summary>
+    private static async Task VerifySyntheticFullRangeSourceAsync(
+        string ffprobe, string ffprobeHash, string scratchRoot, string input,
+        int width, int height, bool audio, CancellationToken token)
+    {
+        bool verified = false;
+        VideoToolExecutionResult probe = await new VideoToolProcessSupervisor()
+            .RunAsync(ffprobe, ffprobeHash, scratchRoot,
+                workspace =>
+                [
+                    "-v", "error", "-hide_banner",
+                    "-protocol_whitelist", "file",
+                    "-probesize", "2097152", "-analyzeduration", "2000000",
+                    "-show_streams", "-show_format",
+                    "-show_entries",
+                    "format=format_name,duration,size:stream=codec_type,codec_name,pix_fmt,width,height,color_range,color_transfer,color_primaries,color_space,channels:stream_tags=rotate:stream_side_data=rotation",
+                    "-of", "json", "-o", Path.Combine(workspace, "probe.json"),
+                    "-i", input
+                ],
+                SyntheticSourceProbeBudget, token,
+                afterSuccessfulExit: async (workspace, checkToken) =>
+                {
+                    string path = Path.Combine(workspace, "probe.json");
+                    if (!File.Exists(path) ||
+                        (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0 ||
+                        new FileInfo(path).Length is < 20 or > 65536)
+                        throw new InvalidDataException("Synthetic source probe evidence missing.");
+                    byte[] evidence = await File.ReadAllBytesAsync(path, checkToken);
+                    VideoRec709FullRangeEvaluationProfile.ValidateSyntheticInputProbeJson(
+                        evidence, width, height, audio, new FileInfo(input).Length);
+                    verified = true;
+                });
+        if (probe.ExitCode != 0 || !verified)
+            throw new InvalidDataException("Generated source range was not independently proven.");
     }
 
     public static string ClassifyFailure(Exception error) => error switch
