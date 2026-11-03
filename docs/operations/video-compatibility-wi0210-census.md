@@ -63,15 +63,26 @@ git pull --ff-only origin main
 dotnet test tests/PhotoIdentity.Integration.Tests --filter "FullyQualifiedName~VideoCompatibilitySurveyCommandTests"
 
 $envName = "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING"
-$db = "photoidentity_catalogue"  # Verify this matches your active launcher catalogue.
-if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($envName))) {
+$raw = [Environment]::GetEnvironmentVariable($envName)
+if ([string]::IsNullOrWhiteSpace($raw)) {
     throw "Approved local PostgreSQL environment variable is not set."
 }
+# Derive the REAL catalogue name; do not use the sample database name.
+$parsed = [System.Data.Common.DbConnectionStringBuilder]::new()
+$parsed.ConnectionString = $raw
+if (-not $parsed.ContainsKey("Database")) {
+    throw "The connection string does not specify a database."
+}
+$db = [string]$parsed["Database"]
+
+$output = & dotnet run --project src/PhotoIdentity.Cli --configuration Release -- video compatibility survey --postgres-connection-env $envName --database $db
+if ($LASTEXITCODE -ne 0) { throw "WI-0210 survey failed; do not save incomplete output." }
+$json = $output -join "`n"
+$report = $json | ConvertFrom-Json -ErrorAction Stop
 $outDir = Join-Path $env:LOCALAPPDATA "PhotoIdentity\diagnostics"
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 $outFile = Join-Path $outDir "wi0210-compatibility-inventory.json"
-dotnet run --project src/PhotoIdentity.Cli -- video compatibility survey --postgres-connection-env $envName --database $db | Set-Content -LiteralPath $outFile -Encoding utf8
-$report = Get-Content -LiteralPath $outFile -Raw | ConvertFrom-Json
+$json | Set-Content -LiteralPath $outFile -Encoding utf8
 $report | Select-Object protocol, readOnly, currentNonExcludedVideoCount, excludedCurrentVideoCount, originalBytesOpened, filesystemAvailabilityChecked, oneDriveHydrationRequested, jobsEnqueued
 $report.overlappingCandidateGaps | Select-Object -First 10 | Format-Table reason, affected
 $report.workerPrimaryGates | Format-Table reason, count
