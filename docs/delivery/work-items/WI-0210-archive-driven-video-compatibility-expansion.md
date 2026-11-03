@@ -242,13 +242,38 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   See [post-merge selection](../../operations/video-compatibility-wi0210-local-check.md).
   Local review begins on merged `main` and CI validates docs.
 
+- **2026-11-03 checkpoint 6 — PR #727 merged, maintainer accepted:**
+  In `photoidentity_main`, the private operator shortlist reported
+  `candidateCount=12`, `locallyMatchedCount=12`,
+  `readOnly=true`, `sourceContentOpened=false` and
+  `oneDriveHydrationRequested=false`. This proves the
+  deliberate disclosure boundary and all 12 local metadata/size
+  matches, **not** a SHA or original colour/range check.
+  The maintainer did not share or authorize a particular UUID.
+- **Checkpoint 7 — explicitly guarded one-revision SHA proof (proposed):**
+  Extend existing `video one-shot source-proof` with
+  `--require-rec709-fullrange-pixel-only`. When combined with
+  separately authorized `--read-local-bytes`, require the
+  current, nonexcluded, exactly one-pixel-gate WI-0210
+  `yuvj420p` metadata class before any source bytes open;
+  reuse existing stopped-worker/photo-idle, no-recall bounded
+  SHA-256 and unchanged-source checks. Generic source-proof
+  behavior is unchanged without the new flag. Default dry-run
+  must not even access PostgreSQL. Verify negative class denial
+  against disposable PostgreSQL and test all parser opt-ins.
+  See [post-merge guarded source-proof runbook](../../operations/video-fullrange-wi0210-source-proof.md).
+  A real original read is **NOT** authorized merely because
+  the candidate list passed. CI owns docs checks; review begins
+  on merged `main`.
 ## Completion notes
 
-- Status: in_progress. The earlier 58-video `unknown` availability
-  values were **last-recorded catalogue observations**. On 2026-11-03
-  a live attribute-and-size check verified all 12 exact candidates
-  are currently `local-metadata-match`, with no original content
-  opened. Byte-level integrity, actual colour signalling, real
-  colour conversion, production admission and playback remain pending.
+- Status: in_progress. Previous 58-video `unknown` availabilities
+  were **last-recorded catalogue observations**. Current
+  attribute-only and private shortlist verification both found
+  **12 of 12** isolated Rec.709 `yuvj420p` candidates locally
+  present with matching sizes and no original content opened.
+  Neither operator selection of one private UUID nor a byte-level
+  source proof has been accepted. Actual full-range colour metadata,
+  real conversion, production admission and playback remain pending.
 - Scope: one evidence-selected archive compatibility slice, with new
   workitems only for later independently justified expansions.
