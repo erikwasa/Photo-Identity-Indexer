@@ -54,10 +54,16 @@ See [WI-0210](../delivery/work-items/WI-0210-archive-driven-video-compatibility-
 
 ## WI-0210 read-only census checkpoint (2026-11-03)
 
-The new metadata-only CLI census reports current, nonexcluded video
-counts by stage receipt and format/size/duration gates, including
-overlapping blockers and **last-observed** availability (not actual
-OneDrive hydration state). No compatibility policy is widened by the
-survey. Maintained-host counts and the first selected tranche are still
-pending; do not claim a new format is supported. See the
-[WI-0210 census runbook](video-compatibility-wi0210-census.md).
+PR #721's metadata-only census passed all seven maintainer checks on
+2026-11-03: 58 live registered videos, of which 26 fail transfer first,
+13 pixel format first, 5 rotation first, 1 inspection first and 13
+are metadata-eligible. Current registered receipts: 13 playable proxies,
+3 frame batches and 1 still poster. The survey measures
+**last-observed** availability, not live OneDrive hydration state.
+The first proposed engineering class is specifically Rec.709
+`yuvj420p` full-range input for playable-proxy output, pending
+independently reviewed range conversion, subtype counts, an approved
+local video and explicit production-profile approval. Read-only
+single-gate projections will bound that opportunity without opening
+source bytes or widening support. HLG transfer remains deferred.
+See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
