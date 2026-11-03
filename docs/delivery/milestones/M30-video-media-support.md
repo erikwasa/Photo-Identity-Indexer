@@ -27,10 +27,16 @@ of the historical 1,309 source-enumerated archive files.
 **Selected next engineering target, not yet authorized production
 admission:** Rec.709 full-range `yuvj420p` input for a playable-proxy
 profile, bounded by read-only isolated-gate and availability projections.
-Maintain the existing Rec.709 SDR proxy gate until a representative
-already-local original demonstrates colour-range conversion and the
-maintainer explicitly approves that class/stage. HLG, unspecified
-transfer and missing rotation are not silently admitted.
+PR #722's production-catalogue survey now confirms **12** isolated
+Rec.709 full-range pixel-only candidates, **22** HLG-transfer-only
+and **5** missing-rotation-only. All **58** have unknown
+last-recorded source availability. The candidate comparison selects
+the small Rec.709 full-range playable-proxy **evaluation** first;
+the next checkpoint adds a versioned unregistered encoding contract.
+Maintain the existing Rec.709 SDR production proxy gate until a
+representative already-local original demonstrates correct colour
+conversion and the maintainer explicitly approves that class/stage.
+HLG, unspecified transfer and missing rotation are not silently admitted.
 See [the census runbook](../../operations/video-compatibility-wi0210-census.md).
 
 M30 remains in progress. WI-0207 opt-in OneDrive hydration/release is

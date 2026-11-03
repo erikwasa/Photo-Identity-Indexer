@@ -141,11 +141,31 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
 - **Approval gate:** select one bounded supported input class and promised
   stage(s) from actual archive findings *before* modifying compatibility.
 
+- **2026-11-03 checkpoint 2 — merged PR #722, maintainer census:**
+  Real production database `photoidentity_main` contains 58 current
+  nonexcluded videos. Single-gate projections: **12** Rec.709
+  `yuvj420p` pixel-only, **22** HLG transfer-only and **5**
+  missing-rotation-only candidates. All 58 have **unknown**
+  last-recorded source availability. The format breakdown is
+  20 `yuv420p`, 25 `yuv420p10le`, 13 `yuvj420p`;
+  transfer is 32 `bt709`, 25 `arib-std-b67`, 1 unknown.
+  Select Rec.709 full-range **playable-proxy only** for further
+  engineering, conditional on real local-source and colour validation.
+- **Checkpoint 3 — isolated Rec.709 full-range evaluation contract,
+  proposed:** add a fail-closed independent FFprobe input contract,
+  versioned full-to-limited Rec.709 720p conversion recipe and
+  stricter limited-range output validation with deterministic
+  tests. The profile is **not registered** with production workers,
+  encoding preferences, enqueuers or durable receipts. This does
+  not authorize OneDrive hydration, processing or release.
+  A real already-local clip, proven `color_range=pc` and visual
+  conversion quality are required before production admission.
+
 ## Completion notes
 
-- Status: in_progress; read-only archive census is locally accepted.
-  A narrow full-range Rec.709 proxy engineering target is identified;
-  exact candidate eligibility and visual conversion evidence remain
-  pending before production admission.
+- Status: in_progress; checkpoint 1 and the merged PR #722 survey
+  identify 12 isolated Rec.709 pixel candidates. All 58 source
+  availabilities remain unknown; production admission and real-video
+  conversion evidence are pending.
 - Scope: one evidence-selected archive compatibility slice, with new
   workitems only for later independently justified expansions.

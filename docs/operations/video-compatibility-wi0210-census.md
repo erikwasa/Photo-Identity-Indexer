@@ -1,4 +1,4 @@
-# WI-0210 — read-only video compatibility census (checkpoint 1)
+# WI-0210 — archive census and Rec.709 full-range evaluation
 
 **State:** PR #721 merged; maintainer accepted all seven local checkpoint-1 checks on 2026-11-03, including disposable PostgreSQL. The operator's current catalogue has 58 nonexcluded current videos, with 45 worker metadata-blocked. This checkpoint still admits no additional media class. WI-0207 separately owns OneDrive hydration.
 
@@ -67,13 +67,12 @@ $raw = [Environment]::GetEnvironmentVariable($envName)
 if ([string]::IsNullOrWhiteSpace($raw)) {
     throw "Approved local PostgreSQL environment variable is not set."
 }
-# Derive the REAL catalogue name; do not use the sample database name.
-$parsed = [System.Data.Common.DbConnectionStringBuilder]::new()
-$parsed.ConnectionString = $raw
-if (-not $parsed.ContainsKey("Database")) {
-    throw "The connection string does not specify a database."
-}
-$db = [string]$parsed["Database"]
+# The maintainer confirmed that the real production catalogue is
+# photoidentity_main. The deploy/postgres/.env value "photoidentity" is
+# only the container's initial database, NOT this catalogue.
+# Do not infer the production database name from the connection string:
+# in this maintained installation it does not specify that key.
+$db = "photoidentity_main"
 
 $output = & dotnet run --project src/PhotoIdentity.Cli --configuration Release -- video compatibility survey --postgres-connection-env $envName --database $db
 if ($LASTEXITCODE -ne 0) { throw "WI-0210 survey failed; do not save incomplete output." }
@@ -119,6 +118,84 @@ Do not broaden `bt709` transfer admission, interpret missing rotation
 as zero, or auto-generate poster/frame evidence. HLG requires a separately
 reviewed tone mapping policy. Existing Rec.709 poster eligibility is a
 distinct gate and remains unchanged.
+
+## Checkpoint 2 — confirmed catalogue, selected input class (2026-11-03)
+
+PR #722 merged and the maintainer successfully ran the read-only survey
+against the **actual production database `photoidentity_main`**. Do not
+mistake the container's initial `photoidentity` database or a historical
+`photoidentity_catalogue` example for that database. The survey never
+migrates a database with the wrong schema.
+
+Actual current counts: **58** active video revisions, **0** excluded;
+**32** Rec.709 transfer, **25** HLG, **1** unknown transfer;
+**20** `yuv420p`, **25** `yuv420p10le`, **13** `yuvj420p`;
+**47** rotations in the 90-degree bucket, **1** in the 180-degree
+bucket and **10** unknown.
+
+The **mutually exclusive**, *single-gate* projection results are:
+
+| Metadata-only change | Candidate count | Last-recorded availability |
+| --- | ---: | --- |
+| Rec.709 `yuvj420p` pixel gate only | **12** | unknown |
+| HLG transfer gate only | 22 | unknown |
+| Missing rotation gate only | 5 | unknown |
+
+All **58** current video rows report `last-recorded-availability:
+unknown`. No actual local existence, OneDrive Files On-Demand state,
+source range or achievable new proxy count is demonstrated by this
+survey. The initial **12/58 (~20.7%)** upper bound selects only the
+Rec.709 full-range candidate class for the first playable-proxy
+evaluation. Do not infer the format's `color_range` from its pixel
+format alone.
+
+### Checkpoint 3 — isolated evaluation contract (not production admission)
+
+`VideoRec709FullRangeEvaluationProfile` is an unregistered code
+contract, never exposed by the app's profile selector or enqueue SQL:
+
+- Strict independent FFprobe **input** checks require one approved
+  video stream, at most one approved audio stream, explicit
+  `yuvj420p`, `color_range=pc`, Rec.709 primaries/transfer/matrix,
+  known matching rotation, current inspection metadata, duration,
+  dimensions and source-byte ceiling. Unknown or contradictory tags
+  fail closed; the reader does not open originals.
+- Its separate fixed version
+  `wi0210-rec709-fullrange-720p-evaluation-v1` derives software-only
+  H.264/AAC 720p args from the unchanged baseline, but forces
+  `scale=in_range=full:out_range=limited` with BT.709 in/out
+  matrices and `-color_range tv`. It remains unregistered and cannot
+  enqueue jobs.
+- **Output** contract adds an independent
+  `color_range=tv` requirement to the existing H.264/AAC,
+  tagged-Rec.709, bounded MP4 validator contract.
+- Unit tests cover valid/invalid metadata and FFprobe JSON,
+  range-signalling, orientation, no accidental input stream admission,
+  unchanged normal baseline and the unregistered profile.
+- This does **not** yet prove how real source colours appear, that
+  FFmpeg produces a compliant output on the operator's installed
+  build, or that any of the 12 current originals are locally available.
+
+To verify the contract on Windows without media or PostgreSQL:
+
+~~~powershell
+cd "C:\Kod\codex\Photo Identity Indexer"
+dotnet test tests/PhotoIdentity.Integration.Tests --configuration Release --filter "FullyQualifiedName~VideoRec709FullRangeEvaluationProfileTests|FullyQualifiedName~VideoProxyEncodingProfilesTests|FullyQualifiedName~VideoProxyCandidateProfileTests"
+if ($LASTEXITCODE -ne 0) { throw "Full-range evaluation contract tests failed." }
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+~~~
+
+**Do not** widen worker SQL/preset selection or alter persisted video
+jobs based on this test alone. Next: identify **one operator-approved,
+already-local** Rec.709 full-range example (do not hydrate anything);
+use hash-approved FFprobe on that source to confirm all four colour
+tags and known orientation; test the fixed conversion in owned private
+scratch under the existing Windows media-tool budgets; inspect output
+`color_range=tv`, true colour/contrast, rotation, bounded playback
+and zero source mutation. Once these pass and the maintainer explicitly
+approves this stage/class, register a **new** policy/version, preserving
+existing SDR/HDR/unknown input policy and exclusion controls.
 
 ## Checkpoint 2 decision gate
 
