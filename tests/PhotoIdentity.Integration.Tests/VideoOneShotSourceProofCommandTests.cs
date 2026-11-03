@@ -36,6 +36,50 @@ public sealed class VideoOneShotSourceProofCommandTests
     }
 
     [Fact]
+    public void WI0210_exact_pixel_class_requires_single_explicit_opt_in()
+    {
+        VideoOneShotSourceProofOptions guarded =
+            VideoOneShotSourceProofOptions.Parse(
+                [.. Arguments(), "--require-rec709-fullrange-pixel-only"]);
+        Assert.True(guarded.RequireRec709FullRangePixelOnly);
+        Assert.False(guarded.ReadLocalBytes);
+        Assert.False(VideoOneShotSourceProofOptions.Parse(Arguments())
+            .RequireRec709FullRangePixelOnly);
+        Assert.True(VideoOneShotSourceProofOptions.Parse(
+            [.. Arguments(), "--read-local-bytes",
+             "--require-rec709-fullrange-pixel-only"]).ReadLocalBytes);
+
+        Assert.Throws<ArgumentException>(() =>
+            VideoOneShotSourceProofOptions.Parse(
+                [.. Arguments(), "--require-rec709-fullrange-pixel-only",
+                 "--require-rec709-fullrange-pixel-only"]));
+        Assert.Throws<ArgumentException>(() =>
+            VideoOneShotSourceProofOptions.Parse(
+                [.. Arguments(), "--require-rec709-fullrange-pixel-only",
+                 "--source-path", "private.mov"]));
+    }
+
+    [Fact]
+    public async Task WI0210_guard_dry_run_never_connects_or_reads_bytes()
+    {
+        VideoOneShotSourceProofOptions options =
+            VideoOneShotSourceProofOptions.Parse(
+                [.. Arguments(), "--require-rec709-fullrange-pixel-only"]);
+        using StringWriter output = new();
+        Assert.Equal(0,
+            await VideoOneShotSourceProofCommandRunner.RunAsync(options, output));
+        using JsonDocument json = JsonDocument.Parse(output.ToString());
+        JsonElement result = json.RootElement;
+        Assert.Equal("not-run", result.GetProperty("status").GetString());
+        Assert.True(result.GetProperty("dryRun").GetBoolean());
+        Assert.True(result.GetProperty("requireRec709FullRangePixelOnly").GetBoolean());
+        Assert.False(result.GetProperty("originalBytesOpened").GetBoolean());
+        Assert.False(result.GetProperty("oneDriveHydrationRequested").GetBoolean());
+        Assert.False(result.GetProperty("jobsEnqueued").GetBoolean());
+        Assert.False(result.GetProperty("realVideoExecutionAuthorized").GetBoolean());
+    }
+
+    [Fact]
     public async Task Default_preview_does_not_even_connect_to_PostgreSQL()
     {
         var options = VideoOneShotSourceProofOptions.Parse(Arguments());
