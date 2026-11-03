@@ -230,19 +230,19 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 Assert.DoesNotContain(unavailableRevision.ToString(), privateOutput,
                     StringComparison.OrdinalIgnoreCase);
                 using JsonDocument selectedDoc = JsonDocument.Parse(privateOutput);
-                JsonElement result = selectedDoc.RootElement;
+                JsonElement selectionReport = selectedDoc.RootElement;
                 Assert.Equal("wi0210-explicit-local-revision-selection-v1",
-                    result.GetProperty("protocol").GetString());
-                Assert.True(result.GetProperty("revisionIdsShown").GetBoolean());
-                Assert.True(result.GetProperty("operatorSelectionRequired").GetBoolean());
-                Assert.True(result.GetProperty("readOnly").GetBoolean());
-                Assert.True(result.GetProperty("localIsNotIntegrityProven").GetBoolean());
-                Assert.False(result.GetProperty("sourceContentOpened").GetBoolean());
-                Assert.False(result.GetProperty("oneDriveHydrationRequested").GetBoolean());
-                Assert.False(result.GetProperty("jobsEnqueued").GetBoolean());
-                Assert.Equal(2, result.GetProperty("candidateCount").GetInt32());
-                Assert.Equal(1, result.GetProperty("locallyMatchedCount").GetInt32());
-                JsonElement localCandidates = result.GetProperty("candidates");
+                    selectionReport.GetProperty("protocol").GetString());
+                Assert.True(selectionReport.GetProperty("revisionIdsShown").GetBoolean());
+                Assert.True(selectionReport.GetProperty("operatorSelectionRequired").GetBoolean());
+                Assert.True(selectionReport.GetProperty("readOnly").GetBoolean());
+                Assert.True(selectionReport.GetProperty("localIsNotIntegrityProven").GetBoolean());
+                Assert.False(selectionReport.GetProperty("sourceContentOpened").GetBoolean());
+                Assert.False(selectionReport.GetProperty("oneDriveHydrationRequested").GetBoolean());
+                Assert.False(selectionReport.GetProperty("jobsEnqueued").GetBoolean());
+                Assert.Equal(2, selectionReport.GetProperty("candidateCount").GetInt32());
+                Assert.Equal(1, selectionReport.GetProperty("locallyMatchedCount").GetInt32());
+                JsonElement localCandidates = selectionReport.GetProperty("candidates");
                 Assert.Single(localCandidates.EnumerateArray());
                 Assert.Equal(revision, localCandidates[0]
                     .GetProperty("revisionId").GetGuid());
