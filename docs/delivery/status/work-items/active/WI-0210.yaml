@@ -30,6 +30,8 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/727
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/728
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/730
 - type: documentation
   value: docs/operations/video-compatibility-wi0210-census.md
 - type: implementation
