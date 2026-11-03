@@ -64,6 +64,13 @@ The first proposed engineering class is specifically Rec.709
 `yuvj420p` full-range input for playable-proxy output, pending
 independently reviewed range conversion, subtype counts, an approved
 local video and explicit production-profile approval. Read-only
-single-gate projections will bound that opportunity without opening
-source bytes or widening support. HLG transfer remains deferred.
+single-gate projections isolated **12** Rec.709 `yuvj420p`
+metadata candidates from the maintainer's production catalogue,
+versus **22** HLG-transfer-only and **5** missing-rotation-only.
+All 58 registered videos have **unknown** last-recorded source
+availability, so no new locally playable clip count is known.
+Checkpoint 3 adds only an **unregistered** Rec.709 full-to-limited
+encoding evaluation contract with strict input/output colour checks.
+It does not widen normal worker eligibility or create derivatives.
+HLG transfer remains deferred.
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
