@@ -47,7 +47,8 @@ public static class VideoRec709FullRangeEvaluationProfile
             new JsonDocumentOptions { MaxDepth = 12 });
         JsonElement root = doc.RootElement;
         if (!root.TryGetProperty("format", out JsonElement format) ||
-            !Text(format, "format_name")?.Split(',').Any(x => x is "mov" or "mp4") == true)
+            Text(format, "format_name") is not string container ||
+            !container.Split(',').Any(x => x is "mov" or "mp4"))
             throw new InvalidDataException("Input container was not approved.");
         if (!TryLong(format, "size", out long bytes) ||
             bytes != registeredSourceBytes ||
