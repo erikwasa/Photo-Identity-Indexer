@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
 started_at: 2026-11-03
 last_updated_at: 2026-11-03
-branch: wi0210-explicit-local-revision-selection
+branch: wi0210-exact-class-source-proof-gate
 blockers:
 - WI-0151
 - WI-0188
@@ -28,6 +28,8 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/726
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/727
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/728
 - type: documentation
   value: docs/operations/video-compatibility-wi0210-census.md
 - type: implementation
@@ -44,3 +46,5 @@ evidence:
   value: '2026-11-03 PR #725 local audit failed on production due to Npgsql SequentialAccess reading ordinal 12 before 3-11. PR #726 fixes forward-only reader ordering; CI disposable PostgreSQL regression existing. No original content read, no hydration; candidate availability remains unverified until after merged main rerun.'
 - type: implementation
   value: '2026-11-03 checkpoint 5 accepted: production photoidentity_main live attribute-only survey returned 12/12 rec709 yuvj420p pixel-only candidates local-metadata-match, readOnly=true, sourceContentOpened=false, oneDriveHydrationRequested=false. Checkpoint 6 proposes deliberately opted-in local-only UUID shortlist of those candidates without source content access; individual original proof remains separately authorized.'
+- type: implementation
+  value: '2026-11-03 checkpoint 6 accepted on production photoidentity_main: 12 locally matched of 12 candidates, readOnly=true, sourceContentOpened=false, oneDriveHydrationRequested=false. Next exact-class opt-in source-proof guard requires fullrange yuvj420p worker pixel-only conditions before separately authorized no-recall local original SHA. No original read or FFprobe/video processing authorized by shortlist.'

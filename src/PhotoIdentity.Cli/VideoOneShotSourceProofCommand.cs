@@ -17,17 +17,23 @@ namespace PhotoIdentity.Cli;
 /// </summary>
 public sealed record VideoOneShotSourceProofOptions(
     string ConnectionEnv, string DatabaseName, Guid RevisionId,
-    bool ReadLocalBytes)
+    bool ReadLocalBytes, bool RequireRec709FullRangePixelOnly = false)
 {
     public static VideoOneShotSourceProofOptions Parse(string[] args)
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
         bool read = false;
+        bool requireClass = false;
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--read-local-bytes" && !read)
             {
                 read = true;
+                continue;
+            }
+            if (args[i] == "--require-rec709-fullrange-pixel-only" && !requireClass)
+            {
+                requireClass = true;
                 continue;
             }
             if (args[i] is not ("--postgres-connection-env" or "--database" or
@@ -50,7 +56,7 @@ public sealed record VideoOneShotSourceProofOptions(
             !Guid.TryParse(Required("--revision-id"), out Guid revision) ||
             revision == Guid.Empty)
             throw new ArgumentException("Invalid exact revision or local PostgreSQL reference.");
-        return new(env, db, revision, read);
+        return new(env, db, revision, read, requireClass);
     }
 }
 
@@ -78,7 +84,8 @@ public static class VideoOneShotSourceProofCommandRunner
 
         if (!options.ReadLocalBytes)
         {
-            Write(output, options.ReadLocalBytes, null);
+            Write(output, options.ReadLocalBytes, null,
+                options.RequireRec709FullRangePixelOnly);
             return 0;
         }
         if (!OperatingSystem.IsWindows())
@@ -96,6 +103,7 @@ public static class VideoOneShotSourceProofCommandRunner
         Guid sourceId = Guid.Empty;
         string? sourceRoot = null, sourceKey = null, expectedSha = null;
         long expectedBytes = 0;
+        bool exactPixelCandidate = false;
 
         // This explicit proof never calls schema initialization, and uses
         // a PostgreSQL read-only transaction for metadata authority.
@@ -125,7 +133,12 @@ public static class VideoOneShotSourceProofCommandRunner
                 query.Transaction = transaction;
                 query.CommandText = """
                     SELECT source.id, source.root_locator, asset.source_key,
-                           revision.content_sha256, revision.size_bytes
+                           revision.content_sha256, revision.size_bytes,
+                           metadata.video_codec, metadata.pixel_format,
+                           metadata.color_transfer, metadata.audio_codec,
+                           metadata.coded_width, metadata.coded_height,
+                           metadata.display_rotation_degrees,
+                           metadata.duration_seconds
                     FROM asset_revisions revision
                     JOIN assets asset ON asset.id=revision.asset_id
                     JOIN sources source ON source.id=asset.source_id
@@ -157,15 +170,42 @@ public static class VideoOneShotSourceProofCommandRunner
                     sourceKey = reader.GetString(2);
                     expectedSha = reader.GetString(3);
                     expectedBytes = reader.GetInt64(4);
+                    if (options.RequireRec709FullRangePixelOnly)
+                    {
+                        string? T(int i) => reader.IsDBNull(i)
+                            ? null : reader.GetString(i);
+                        int? I(int i) => reader.IsDBNull(i)
+                            ? null : reader.GetInt32(i);
+                        VideoCompatibilityObservation observation = new(
+                            Excluded: false, SourceKind: "local-folder",
+                            CachedAvailability: null, Inspection: "supported",
+                            Container: null, Codec: T(5), Pixel: T(6),
+                            Transfer: T(7), Audio: T(8), Width: I(9),
+                            Height: I(10), Rotation: I(11),
+                            DurationSeconds: reader.IsDBNull(12)
+                                ? null : reader.GetDecimal(12),
+                            SourceBytes: expectedBytes,
+                            PosterReceipt: false, ProxyReceipt: false,
+                            FrameReceipt: false);
+                        // Fail closed before any availability test, source read
+                        // or hash; uses precisely the WI-0210 worker-gate
+                        // counterfactual implemented for the 12 candidates.
+                        exactPixelCandidate =
+                            VideoCompatibilityLocalCheckCommandRunner
+                                .IsPixelOnlyCandidate(observation);
+                    }
                 }
             }
             await transaction.CommitAsync(token);
         }
 
         if (sourceId == Guid.Empty || sourceRoot is null || sourceKey is null ||
-            expectedSha is null || !IsApprovedDigest(expectedSha))
+            expectedSha is null || !IsApprovedDigest(expectedSha) ||
+            (options.RequireRec709FullRangePixelOnly && !exactPixelCandidate))
         {
-            Write(output, true, VideoOneShotSourceProofResult.Fail(false, "revision-not-eligible"));
+            Write(output, true, VideoOneShotSourceProofResult.Fail(
+                false, "revision-not-eligible"),
+                options.RequireRec709FullRangePixelOnly);
             return 1;
         }
 
@@ -192,7 +232,8 @@ public static class VideoOneShotSourceProofCommandRunner
             control, photo.PhotoWorkActive, runningVideo);
         if (gate is not null)
         {
-            Write(output, true, VideoOneShotSourceProofResult.Fail(false, gate));
+            Write(output, true, VideoOneShotSourceProofResult.Fail(false, gate),
+                options.RequireRec709FullRangePixelOnly);
             return 1;
         }
 
@@ -217,7 +258,7 @@ public static class VideoOneShotSourceProofCommandRunner
             // Never expose untrusted .Message/paths or Windows exceptions.
             result = VideoOneShotSourceProofResult.Fail(null, "source-unavailable");
         }
-        Write(output, true, result);
+        Write(output, true, result, options.RequireRec709FullRangePixelOnly);
         return result.Verified ? 0 : 1;
     }
 
@@ -289,7 +330,8 @@ public static class VideoOneShotSourceProofCommandRunner
     }
 
     public static void Write(
-        TextWriter output, bool requested, VideoOneShotSourceProofResult? result)
+        TextWriter output, bool requested, VideoOneShotSourceProofResult? result,
+        bool requireRec709FullRangePixelOnly = false)
     {
         ArgumentNullException.ThrowIfNull(output);
         string reason = result?.ReasonCode ?? "not-run";
@@ -305,6 +347,7 @@ public static class VideoOneShotSourceProofCommandRunner
             protocol = "wi0188-one-shot-source-proof-v1",
             dryRun = !requested,
             explicitLocalReadRequested = requested,
+            requireRec709FullRangePixelOnly,
             status = reason,
             revisionDigestMatched = result?.Verified,
             originalBytesOpened = requested ? result?.OriginalOpened : false,

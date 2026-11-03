@@ -90,6 +90,17 @@ were **last-recorded database observations**, not the current
 file-attribute check. The next explicitly selected private UUID
 shortlist still performs no media reading. This does **not**
 prove source SHA, explicit full-range signalling or real colour.
+The maintainer's checkpoint-6 private UUID shortlist also
+passed with **12 candidates, 12 local matches**, no original
+bytes opened and no OneDrive hydration. The next scoped proof
+adds an **optional** exact `yuvj420p` pixel-only class
+guard to the already established Windows no-recall SHA
+source-proof command. Neither this metadata gate nor its
+dry-run authorizes reading an original; the read requires
+explicit separate `--read-local-bytes` approval. Even a
+successful SHA-256 proof will not establish independent
+actual `color_range=pc` or camera colour quality.
+See [the one-revision source-proof runbook](video-fullrange-wi0210-source-proof.md).
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
