@@ -220,11 +220,35 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   nonempty-row path. Re-run the audit **only after the fix merges
   into main**; CI handles documentation checks.
 
+- **2026-11-03 checkpoint 5 — PR #726 merged, maintainer accepted:**
+  Read-only production `photoidentity_main` availability check returned
+  `candidateCount=12`, `readOnly=true`,
+  `sourceContentOpened=false`,
+  `oneDriveHydrationRequested=false`, and
+  `local-metadata-match=12`. All 12 exact Rec.709 `yuvj420p`
+  pixel-only candidates appear locally present with matching
+  sizes. This does **not** prove original SHA identity,
+  `color_range=pc` or real visual fidelity.
+- **Checkpoint 6 — private local revision selection (proposed):**
+  Explicit `video compatibility local-candidates --show-revision-ids`
+  reuses the checked candidate and Windows path/availability
+  boundary and reports **only** the locally matched UUIDs and
+  coarse duration/size/coded-orientation metadata. The existing
+  `local-check` command remains aggregate-only.
+  No original content, FFprobe, FFmpeg, hydration or worker
+  is touched; the operator selects one exact revision later.
+  A future `video one-shot source-proof --read-local-bytes`
+  is a **separate explicitly authorized** operation.
+  See [post-merge selection](../../operations/video-compatibility-wi0210-local-check.md).
+  Local review begins on merged `main` and CI validates docs.
+
 ## Completion notes
 
-- Status: in_progress; checkpoint 1 and the merged PR #722 survey
-  identify 12 isolated Rec.709 pixel candidates. All 58 source
-  availabilities remain unknown; production admission and real-video
-  conversion evidence are pending.
+- Status: in_progress. The earlier 58-video `unknown` availability
+  values were **last-recorded catalogue observations**. On 2026-11-03
+  a live attribute-and-size check verified all 12 exact candidates
+  are currently `local-metadata-match`, with no original content
+  opened. Byte-level integrity, actual colour signalling, real
+  colour conversion, production admission and playback remain pending.
 - Scope: one evidence-selected archive compatibility slice, with new
   workitems only for later independently justified expansions.
