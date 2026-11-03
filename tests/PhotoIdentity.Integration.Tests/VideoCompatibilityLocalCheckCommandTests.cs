@@ -2,6 +2,7 @@ using System.Text.Json;
 using Npgsql;
 using PhotoIdentity.Cli;
 using PhotoIdentity.Persistence.Postgres;
+using PhotoIdentity.Testing.Postgres;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
