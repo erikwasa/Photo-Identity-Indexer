@@ -149,7 +149,7 @@ Rec.709 full-range candidate class for the first playable-proxy
 evaluation. Do not infer the format's `color_range` from its pixel
 format alone.
 
-### Checkpoint 3 — isolated evaluation contract (not production admission)
+### Checkpoint 3 — PR #723 merged: isolated evaluation contract (not production admission)
 
 `VideoRec709FullRangeEvaluationProfile` is an unregistered code
 contract, never exposed by the app's profile selector or enqueue SQL:
@@ -187,7 +187,10 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ~~~
 
 **Do not** widen worker SQL/preset selection or alter persisted video
-jobs based on this test alone. Next: identify **one operator-approved,
+jobs based on this test alone. Checkpoint 4 (proposed) first adds a
+[fully synthetic, guarded FFmpeg/FFprobe roundtrip](video-fullrange-wi0210-synthetic-acceptance.md),
+verified **after merge on main**. It does not require local documentation
+validation; CI owns that. Afterward: identify **one operator-approved,
 already-local** Rec.709 full-range example (do not hydrate anything);
 use hash-approved FFprobe on that source to confirm all four colour
 tags and known orientation; test the fixed conversion in owned private
