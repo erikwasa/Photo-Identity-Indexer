@@ -99,6 +99,11 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                     CommandBehavior.SequentialAccess, token);
                 while (await reader.ReadAsync(token))
                 {
+                    // SequentialAccess requires monotonic column reads;
+                    // keep private locators in memory, never the report.
+                    Guid sourceId = reader.GetGuid(0);
+                    string sourceRoot = reader.GetString(1);
+                    string sourceKey = reader.GetString(2);
                     string? T(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
                     int? I(int i) => reader.IsDBNull(i) ? null : reader.GetInt32(i);
                     long bytes = reader.GetInt64(12);
@@ -111,8 +116,7 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                     if (candidates.Count >= MaximumCandidateChecks)
                         throw new InvalidOperationException(
                             "More than 64 candidates; audit refuses a partial result.");
-                    candidates.Add((reader.GetGuid(0), reader.GetString(1),
-                        reader.GetString(2), bytes));
+                    candidates.Add((sourceId, sourceRoot, sourceKey, bytes));
                 }
             }
             await transaction.CommitAsync(token);
