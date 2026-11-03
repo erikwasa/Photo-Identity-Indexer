@@ -3,9 +3,10 @@
 ## Read before changing the repository
 
 1. Read `BUILD_CONTEXT.md` for the current handoff only.
-2. Use `PhotoIdentity.Docs show WI-XXXX` to locate the item's canonical status shard, then read that shard and the linked work-item document.
-3. Read only the linked ADRs and module documents needed for that item.
-4. Use `PhotoIdentity.Docs` for dependency and formal lifecycle status. Do not load archived work-item shards routinely.
+2. Read [the agent vertical-slice delivery approach](docs/operations/agent-vertical-slice-delivery.md) before planning feature work: prefer complete outcomes, CI-first checks and archive-value prioritization while preserving every safety gate.
+3. Use `PhotoIdentity.Docs show WI-XXXX` to locate the item's canonical status shard, then read that shard and the linked work-item document.
+4. Read only the linked ADRs and module documents needed for that item.
+5. Use `PhotoIdentity.Docs` for dependency and formal lifecycle status. Do not load archived work-item shards routinely.
 
 `BUILD_CONTEXT.md` should stay short and current. Do not turn it into a project history or repeat completion details that already live in work-item documents, ADRs, milestone documents or canonical status shards.
 
@@ -24,6 +25,8 @@
 
 ## Scope discipline
 
+- Follow [the agent vertical-slice delivery guide](docs/operations/agent-vertical-slice-delivery.md): aim for a coherent user-visible outcome (often one or two reviewable PRs), put reproducible proof in CI, and prioritize archive changes by additional *usable* assets at an explicitly named stage. Record justified exceptions rather than multiplying preparatory PRs or local acceptance sessions.
+- Local operator acceptance begins only after merge into `main`; CI owns documentation validation/generation. Any original read, OneDrive hydration or production worker admission still requires its established explicit authorization and guards.
 - Work on one work item at a time.
 - Do not broaden a work item silently. Create a follow-up item for unrelated work.
 - A contract change must be explicit and documented.
