@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
 started_at: 2026-11-03
 last_updated_at: 2026-11-03
-branch: wi0210-pixel-range-candidate-evidence
+branch: wi0210-rec709-fullrange-evaluation-contract
 blockers:
 - WI-0151
 - WI-0188
@@ -24,3 +24,5 @@ evidence:
   value: '2026-11-03 checkpoint 1: aggregate repeatable-read, metadata-only local PostgreSQL video compatibility inventory CLI and focused policy/privacy tests. All seven maintained-host verification checks PASS, including disposable PostgreSQL; 58 current nonexcluded video rows, 45 worker gate blocked. No policy widening, media processing or OneDrive hydration.'
 - type: implementation
   value: '2026-11-03 checkpoint 2 PR #722: read-only single-gate Rec.709 yuvj420p / HLG / missing-transfer / missing-rotation candidate projections by last-recorded availability, with overlapping-gate tests. Proposed proxy-only first expansion requires explicit approval and real local range-conversion proof.'
+- type: implementation
+  value: '2026-11-03 checkpoint 2 accepted input evidence: production photoidentity_main contains 58 active videos, 12 isolated Rec.709 yuvj420p pixel-only candidates, 22 HLG transfer-only, 5 missing-rotation-only; all 58 last-recorded availabilities unknown. Next PR adds UNREGISTERED fail-closed full-range evaluation profile and focused contract tests; no production profile, worker gate, OneDrive hydration or media processing changed.'
