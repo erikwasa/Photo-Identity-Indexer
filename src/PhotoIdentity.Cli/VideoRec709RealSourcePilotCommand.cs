@@ -330,7 +330,7 @@ public static class VideoRec709RealSourcePilotCommandRunner
             Math.Abs(output.DurationSeconds - (double)input.DurationSeconds.Value) <= 1;
     }
 
-    private static async Task<VideoRec709SelectedSource?> ReadSelectedAsync(
+    internal static async Task<VideoRec709SelectedSource?> ReadSelectedAsync(
         PostgresCatalogueDatabase database, Guid revision, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
