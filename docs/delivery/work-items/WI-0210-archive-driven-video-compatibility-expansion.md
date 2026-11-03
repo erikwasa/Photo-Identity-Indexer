@@ -184,6 +184,24 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   **Run only after PR merge on local main**, using the new
   [synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md);
   no separate local docs validation is requested.
+- **2026-11-03 checkpoint 4 — PR #724 merged; maintainer accepted:**
+  The actual maintained Windows FFmpeg/FFprobe roundtrip reported
+  `status=validated` for both **720×406 landscape with audio** and
+  **406×720 portrait without audio**, 3 seconds each; recorded
+  compressed sizes 183,352/149,221 bytes and 630/832 ms encode times.
+  `originalsOpened=false`, `schemaUsed=false`,
+  `videoWorkersActivated=false`, `derivativesRetained=false`;
+  scratch contained only the ownership marker and was removed by
+  the maintainer. This is accepted synthetic colour-*signalling*
+  evidence, not approved real-source colour/contrast.
+- **Checkpoint 5 — bounded, metadata-only live availability audit
+  proposed:** Inspect only the 12 Rec.709 `yuvj420p` pixel-only
+  current, nonexcluded catalogue candidates for current Windows
+  Files On-Demand **attributes and length**; no source content is
+  opened, no hashing, FFprobe, staging, hydration or jobs. Emit only
+  aggregate results without source names or IDs. Use
+  [the post-merge local-check runbook](../../operations/video-compatibility-wi0210-local-check.md)
+  **after the PR merges into main**. CI owns all docs checks.
 - **Still pending:** a selected, already-local *real* `yuvj420p`
   video, live OneDrive availability without hydration, revision/SHA
   checks, real colour/contrast/rotation approval, a separately
