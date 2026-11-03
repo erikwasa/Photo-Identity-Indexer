@@ -295,8 +295,10 @@ public static class Program
                                                 never authorizes production)
               video one-shot source-proof --postgres-connection-env NAME --database DB
                                           --revision-id UUID [--read-local-bytes]
+                                          [--require-rec709-fullrange-pixel-only]
                                           (default no media read; explicit bounded
                                            no-recall SHA-256 source integrity check;
+                                           optional WI-0210 exact-class guard;
                                            no queue/write/FFmpeg/hydration request)
               video one-shot environment --postgres-connection-env NAME --database DB
                                         --cache-root MARKED_PRIVATE_ROOT
