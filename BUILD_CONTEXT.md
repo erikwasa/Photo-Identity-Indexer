@@ -19,10 +19,15 @@ PR #723 merged; PR #724 merged and the maintainer's Windows
 full-range synthetic proxy roundtrip **PASSED** with 720×406
 landscape + audio, 406×720 portrait without audio, both 3s.
 Cleanup and no-original/no-DB/no-worker/no-derivative flags PASS.
-Next development is a **read-only live file-attribute check**
-on the 12 `yuvj420p` pixel-only candidates to determine local
-availability without opening or recalling originals. CI owns
-docs checks and local verification starts after merge from main.
+Checkpoint 5 local attribute-only check **PASSED**:
+all 12 of 12 Rec.709 `yuvj420p` pixel-only candidates
+were `local-metadata-match` on production `photoidentity_main`,
+with no original content opened or hydration. This is NOT SHA-256,
+colour-range or quality proof. Next work is a deliberately
+opted-in private UUID-only shortlist to let the maintainer
+choose one exact real sample before a separately authorized
+no-recall source proof. CI owns docs checks; review starts
+only on merged `main`.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.
