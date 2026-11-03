@@ -101,6 +101,16 @@ explicit separate `--read-local-bytes` approval. Even a
 successful SHA-256 proof will not establish independent
 actual `color_range=pc` or camera colour quality.
 See [the one-revision source-proof runbook](video-fullrange-wi0210-source-proof.md).
+**Checkpoint 7 real-original SHA passed** on one deliberately
+selected, already-local exact Rec.709 `yuvj420p` candidate,
+without hydration, jobs, worker changes or derivatives.
+The current next step is a **single complete guarded real-media
+evaluation**, including actual independent input range/colour
+FFprobe, unregistered bounded conversion, limited-range
+output validation, post-trial original SHA and operator visual
+review; not further isolated preparatory commands.
+See [the real-video evaluation runbook](video-fullrange-wi0210-real-evaluation.md).
+Production still does not admit this pixel class.
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
