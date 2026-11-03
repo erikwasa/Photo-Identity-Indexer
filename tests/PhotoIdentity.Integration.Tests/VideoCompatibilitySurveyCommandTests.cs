@@ -19,9 +19,10 @@ public sealed class VideoCompatibilitySurveyCommandTests
         bool excluded = false, string? transfer = "bt709",
         long bytes = 10 * 1024 * 1024, decimal? duration = 12,
         string? availability = "local", bool poster = false,
-        bool proxy = false, bool frame = false) =>
+        bool proxy = false, bool frame = false,
+        string? pixel = "yuv420p", int? rotation = 0) =>
         new(excluded, "local-folder", availability, "supported", "mov,mp4,m4a,3gp,3g2,mj2",
-            "h264", "yuv420p", transfer, "aac", 1920, 1080, 0,
+            "h264", pixel, transfer, "aac", 1920, 1080, rotation,
             duration, bytes, poster, proxy, frame);
 
     [Fact]
@@ -106,6 +107,40 @@ public sealed class VideoCompatibilitySurveyCommandTests
     }
 
     [Fact]
+    public void Single_gate_projections_require_all_other_gates_and_show_recorded_availability()
+    {
+        VideoCompatibilitySurvey survey = new();
+        survey.Add(Row(pixel: "yuvj420p", availability: "online-only"));
+        survey.Add(Row(pixel: "yuvj420p", duration: 601));
+        survey.Add(Row(pixel: "yuvj420p", transfer: "arib-std-b67"));
+        survey.Add(Row(transfer: "arib-std-b67", availability: "local"));
+        survey.Add(Row(transfer: null, availability: "local"));
+        survey.Add(Row(rotation: null, availability: "local"));
+        survey.Add(Row(excluded: true, pixel: "yuvj420p"));
+
+        using StringWriter output = new();
+        survey.Write(output);
+        using JsonDocument parsed = JsonDocument.Parse(output.ToString());
+        JsonElement projections = parsed.RootElement.GetProperty("singleGateProjections");
+
+        Assert.Contains(projections.EnumerateArray(), item =>
+            item.GetProperty("candidate").GetString() == "rec709-yuvj420p-pixel-only" &&
+            item.GetProperty("recordedAvailability").GetString() == "online-only" &&
+            item.GetProperty("count").GetInt64() == 1);
+        Assert.Contains(projections.EnumerateArray(), item =>
+            item.GetProperty("candidate").GetString() == "hlg-transfer-only" &&
+            item.GetProperty("count").GetInt64() == 1);
+        Assert.Contains(projections.EnumerateArray(), item =>
+            item.GetProperty("candidate").GetString() == "unknown-transfer-only" &&
+            item.GetProperty("count").GetInt64() == 1);
+        Assert.Contains(projections.EnumerateArray(), item =>
+            item.GetProperty("candidate").GetString() == "missing-rotation-only" &&
+            item.GetProperty("count").GetInt64() == 1);
+        Assert.Equal(4, projections.GetArrayLength());
+        Assert.Equal(6, parsed.RootElement.GetProperty("currentNonExcludedVideoCount").GetInt64());
+    }
+
+    [Fact]
     public void Empty_archive_produces_zero_counts_without_division_or_probe()
     {
         using StringWriter output = new();
@@ -113,6 +148,7 @@ public sealed class VideoCompatibilitySurveyCommandTests
         using JsonDocument parsed = JsonDocument.Parse(output.ToString());
         Assert.Equal(0, parsed.RootElement.GetProperty("currentNonExcludedVideoCount").GetInt64());
         Assert.Empty(parsed.RootElement.GetProperty("overlappingCandidateGaps").EnumerateArray());
+        Assert.Empty(parsed.RootElement.GetProperty("singleGateProjections").EnumerateArray());
     }
 
     [Fact]
