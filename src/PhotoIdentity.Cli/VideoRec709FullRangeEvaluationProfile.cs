@@ -139,6 +139,78 @@ public static class VideoRec709FullRangeEvaluationProfile
         return result;
     }
 
+    /// <summary>
+    /// Prove that the synthetic pilot actually generated a full-range test
+    /// source BEFORE conversion. This never authorizes a real archive source:
+    /// actual source admission still requires the persisted-revision contract
+    /// and independent availability/exclusion/identity checks.
+    /// </summary>
+    public static void ValidateSyntheticInputProbeJson(
+        ReadOnlySpan<byte> utf8, int width, int height, bool audio, long bytes)
+    {
+        if (width is not (720 or 1280) || height is not (720 or 1280) ||
+            width == height || bytes is < 128 or > 32L * 1024 * 1024 ||
+            utf8.Length is < 20 or > 65536)
+            throw new InvalidDataException("Synthetic full-range source envelope rejected.");
+
+        using JsonDocument document = JsonDocument.Parse(utf8.ToArray(),
+            new JsonDocumentOptions { MaxDepth = 12 });
+        JsonElement root = document.RootElement;
+        if (!root.TryGetProperty("format", out JsonElement format) ||
+            Text(format, "format_name") is not string container ||
+            !container.Split(',').Contains("mp4", StringComparer.Ordinal) ||
+            !TryLong(format, "size", out long statedBytes) ||
+            statedBytes != bytes ||
+            !TryDecimal(format, "duration", out decimal duration) ||
+            duration is < 2.5m or > 3.5m ||
+            !root.TryGetProperty("streams", out JsonElement streams) ||
+            streams.ValueKind != JsonValueKind.Array ||
+            streams.GetArrayLength() != (audio ? 2 : 1))
+            throw new InvalidDataException("Synthetic source structure differs from its fixed recipe.");
+
+        int videoCount = 0, audioCount = 0;
+        foreach (JsonElement stream in streams.EnumerateArray())
+        {
+            switch (Text(stream, "codec_type"))
+            {
+                case "video":
+                    if (++videoCount != 1 ||
+                        Text(stream, "codec_name") != "h264" ||
+                        Text(stream, "pix_fmt") != "yuvj420p" ||
+                        Text(stream, "color_range") != "pc" ||
+                        Text(stream, "color_transfer") != "bt709" ||
+                        Text(stream, "color_primaries") != "bt709" ||
+                        Text(stream, "color_space") != "bt709" ||
+                        !TryInt(stream, "width", out int actualWidth) ||
+                        actualWidth != width ||
+                        !TryInt(stream, "height", out int actualHeight) ||
+                        actualHeight != height ||
+                        (stream.TryGetProperty("tags", out JsonElement tags) &&
+                         Text(tags, "rotate") is not (null or "0")))
+                        throw new InvalidDataException("Synthetic source lacks explicit full-range BT.709.");
+                    if (stream.TryGetProperty("side_data_list", out JsonElement side) &&
+                        side.ValueKind == JsonValueKind.Array &&
+                        side.EnumerateArray().Any(item =>
+                            item.TryGetProperty("rotation", out JsonElement rotation) &&
+                            (rotation.ValueKind != JsonValueKind.Number ||
+                             !rotation.TryGetInt32(out int n) || n != 0)))
+                        throw new InvalidDataException("Synthetic source contains unexpected rotation.");
+                    break;
+                case "audio":
+                    if (++audioCount != 1 || !audio ||
+                        Text(stream, "codec_name") != "aac" ||
+                        !TryInt(stream, "channels", out int channels) ||
+                        channels is < 1 or > 2)
+                        throw new InvalidDataException("Synthetic audio differs from the fixed source.");
+                    break;
+                default:
+                    throw new InvalidDataException("Synthetic source has an unapproved stream.");
+            }
+        }
+        if (videoCount != 1 || (audioCount == 1) != audio)
+            throw new InvalidDataException("Synthetic source streams are incomplete.");
+    }
+
     private static string? Text(JsonElement element, string key) =>
         element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(key, out JsonElement value) &&

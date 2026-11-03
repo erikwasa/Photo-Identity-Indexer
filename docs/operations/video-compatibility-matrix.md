@@ -72,5 +72,12 @@ availability, so no new locally playable clip count is known.
 Checkpoint 3 adds only an **unregistered** Rec.709 full-to-limited
 encoding evaluation contract with strict input/output colour checks.
 It does not widen normal worker eligibility or create derivatives.
-HLG transfer remains deferred.
+The next synthetic-only checkpoint adds `--full-range-evaluation` to
+the pre-existing bounded, Windows Job Object-controlled synthetic pilot:
+fixed full-range BT.709 test fixtures, independent source and output
+FFprobe checks and scratch cleanup. This is **not** production video
+admission and cannot establish real archive colour quality or local
+availability. HLG transfer remains deferred. The procedure starts
+on **main after merge**, with no duplicate local documentation checks.
+See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md).
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).

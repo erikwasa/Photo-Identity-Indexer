@@ -210,7 +210,7 @@ work_items:
   document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
   started_at: 2026-11-03
   last_updated_at: 2026-11-03
-  branch: wi0210-rec709-fullrange-evaluation-contract
+  branch: wi0210-fullrange-synthetic-roundtrip
   blockers:
   - WI-0151
   - WI-0188
@@ -224,6 +224,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/722
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/723
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/724
   - type: documentation
     value: docs/operations/video-compatibility-wi0210-census.md
   - type: implementation
@@ -232,3 +234,5 @@ work_items:
     value: '2026-11-03 checkpoint 2 PR #722: read-only single-gate Rec.709 yuvj420p / HLG / missing-transfer / missing-rotation candidate projections by last-recorded availability, with overlapping-gate tests. Proposed proxy-only first expansion requires explicit approval and real local range-conversion proof.'
   - type: implementation
     value: '2026-11-03 checkpoint 2 accepted input evidence: production photoidentity_main contains 58 active videos, 12 isolated Rec.709 yuvj420p pixel-only candidates, 22 HLG transfer-only, 5 missing-rotation-only; all 58 last-recorded availabilities unknown. Next PR adds UNREGISTERED fail-closed full-range evaluation profile and focused contract tests; no production profile, worker gate, OneDrive hydration or media processing changed.'
+  - type: implementation
+    value: '2026-11-03 checkpoint 3: PR #723 merged. Checkpoint 4 PR pending: opt-in synthetic-only guarded full-range Rec.709 source probe and limited-range 720p proxy output roundtrip, inherited Windows tool budgets, no registered worker profile or original media. Local review begins after merge on main; CI owns documentation checks.'

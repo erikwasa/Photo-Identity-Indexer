@@ -447,10 +447,12 @@ public static class Program
                                           --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 HASH
                                           --ffprobe ABSOLUTE_EXE --ffprobe-sha256 HASH
                                           [--profile standard-720p|compact-540p]
-                                          [--apply]
+                                          [--full-range-evaluation] [--apply]
                                           (synthetic-only, database-free, dry-run
                                            default; makes two transient test clips,
                                            validates MP4 and deletes outputs;
+                                           full-range evaluation is separate
+                                           from registered production presets;
                                            requires an empty marked temp child)
 
               video scratch-cleanup --scratch-root DIR

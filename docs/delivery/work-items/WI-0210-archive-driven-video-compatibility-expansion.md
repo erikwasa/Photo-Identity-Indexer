@@ -78,9 +78,12 @@ OneDrive hydration; do not conflate it with codec/processing eligibility.
 
 ## Acceptance criteria
 
-- [ ] A sanitized inventory and **stage-specific** exclusion summary
+- [x] A sanitized inventory and **stage-specific** exclusion summary
   identify the highest-value compatibility gap and limitations of
-  locally available samples.
+  locally available samples. **Satisfied by merged PRs #721–722**
+  and maintainer-reported 58-video inventory. All source
+  availability remains last-recorded **unknown**; this is only
+  an archive-registered inventory, not a file availability test.
 - [ ] Maintainer selects one bounded compatibility expansion and
   explicitly approves its supported input class and target stages.
 - [ ] Selected real locally available video(s) succeed at the
@@ -160,6 +163,32 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   not authorize OneDrive hydration, processing or release.
   A real already-local clip, proven `color_range=pc` and visual
   conversion quality are required before production admission.
+
+- **2026-11-03 checkpoint 3 — PR #723 merged:** the maintainer
+  merged the unregistered fail-closed Rec.709 `yuvj420p` input/output
+  contract after fixing its initial no-op JSON fixture tests.
+  No production worker, source, OneDrive or codec-policy expansion.
+- **Checkpoint 4 — guarded synthetic actual-tool roundtrip (proposed):**
+  Extend only the existing `video synthetic-proxy-pilot` with explicit
+  `--full-range-evaluation`, keeping default dry-run and current
+  standard/compact profiles unchanged. Generate two fixed synthetic
+  videos with actual full-range pixels and explicit Rec.709 signalling;
+  independently prove `yuvj420p` + `pc` on the generated source,
+  transcode using the unregistered versioned BT.709 full→limited
+  720p recipe, and independently prove H.264/AAC output
+  `color_range=tv` with correct orientation/audio. Continue using
+  approved FFmpeg/FFprobe digests, Windows Job Object budgets and
+  marked disposable scratch. CI tests must cover safe opt-in,
+  independent range evidence, existing profile isolation,
+  failure cleanup and regression.
+  **Run only after PR merge on local main**, using the new
+  [synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md);
+  no separate local docs validation is requested.
+- **Still pending:** a selected, already-local *real* `yuvj420p`
+  video, live OneDrive availability without hydration, revision/SHA
+  checks, real colour/contrast/rotation approval, a separately
+  versioned opt-in production profile and worker, publisher and
+  UI/playback acceptance. WI-0210 stays in_progress.
 
 ## Completion notes
 
