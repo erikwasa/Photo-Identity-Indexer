@@ -28,6 +28,16 @@ opted-in private UUID-only shortlist to let the maintainer
 choose one exact real sample before a separately authorized
 no-recall source proof. CI owns docs checks; review starts
 only on merged `main`.
+Checkpoint 6 private local shortlist from merged PR #727
+**PASSED** on `photoidentity_main`: 12 candidates, 12 matched,
+read-only, no original content opened or hydration; no specific
+UUID has been shared or authorized. Next is a minimal opt-in
+exact-class guard for the existing Windows one-shot source-proof:
+`--require-rec709-fullrange-pixel-only` must be present to
+tie a subsequent **separately approved** `--read-local-bytes`
+SHA to this work item's 12-pixel-only class. CI handles docs,
+operator verification on merged main only. No FFprobe, real
+media conversion or production admission yet.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.
