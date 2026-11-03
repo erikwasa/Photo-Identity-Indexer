@@ -210,7 +210,7 @@ work_items:
   document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
   started_at: 2026-11-03
   last_updated_at: 2026-11-03
-  branch: wi0210-local-candidate-availability-audit
+  branch: wi0210-fix-local-availability-reader-order
   blockers:
   - WI-0151
   - WI-0188
@@ -228,6 +228,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/724
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/725
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/726
   - type: documentation
     value: docs/operations/video-compatibility-wi0210-census.md
   - type: implementation
@@ -240,3 +242,5 @@ work_items:
     value: '2026-11-03 checkpoint 3: PR #723 merged. Checkpoint 4 PR pending: opt-in synthetic-only guarded full-range Rec.709 source probe and limited-range 720p proxy output roundtrip, inherited Windows tool budgets, no registered worker profile or original media. Local review begins after merge on main; CI owns documentation checks.'
   - type: implementation
     value: '2026-11-03 checkpoint 4 PR #724 merged and maintained-host synthetic full-range conversion accepted: 720x406 landscape AAC, 406x720 portrait silent, both 3s; no originals/DB/workers/retained derivatives, scratch removed. Checkpoint 5 proposes attribute-only, no-hydration live availability aggregate of 12 exact Rec.709 yuvj420p metadata candidates; production worker remains unchanged.'
+  - type: implementation
+    value: '2026-11-03 PR #725 local audit failed on production due to Npgsql SequentialAccess reading ordinal 12 before 3-11. PR #726 fixes forward-only reader ordering; CI disposable PostgreSQL regression existing. No original content read, no hydration; candidate availability remains unverified until after merged main rerun.'
