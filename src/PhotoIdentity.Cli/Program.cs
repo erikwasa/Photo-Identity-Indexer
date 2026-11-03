@@ -72,6 +72,11 @@ public static class Program
                         VideoOneShotEnvironmentOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "compatibility" && args[2] == "survey" =>
+                    await VideoCompatibilitySurveyCommandRunner.RunAsync(
+                        VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "candidates" =>
                     await VideoOneShotCandidatesCommandRunner.RunAsync(
                         VideoOneShotCandidatesOptions.Parse(args.Skip(3).ToArray()),
@@ -290,6 +295,10 @@ public static class Program
                                         (read-only Windows cache/tool/resource preflight;
                                          no job creation or real-media access;
                                          no hard disk/IO/network isolation claim)
+              video compatibility survey --postgres-connection-env NAME --database DB
+                                       (read-only aggregate current-video inventory;
+                                        no media opens, OneDrive hydration or jobs;
+                                        cached availability is NOT a live file probe)
               video one-shot candidates --postgres-connection-env NAME --database DB
                                        [--limit COUNT (1..20)]
                                        (read-only, UUID-only metadata shortlist;

@@ -107,8 +107,24 @@ See [the staged compatibility matrix](../../operations/video-compatibility-matri
 [ADR-0012](../../decisions/ADR-0012-isolated-video-media-architecture.md)
 and the [M30 milestone](../milestones/M30-video-media-support.md).
 
+## Development checkpoints
+
+- **2026-11-03 checkpoint 1 — implementation in progress:** Added a read-only,
+  privacy-safe current-video catalogue census command: aggregate inspection,
+  technical format, last-recorded availability, source size and stage receipt
+  counts with current worker/poster metadata gates and overlapping blockers.
+  The command cannot start a job, touch originals, probe OneDrive or migrate
+  PostgreSQL. Focused parsing/privacy/classification tests were added.
+  See [WI-0210 census runbook](../../operations/video-compatibility-wi0210-census.md).
+- **Pending:** Windows CI, maintainer's actual catalogue counts and a
+  two/three-candidate shortlist. No format, budget, encoding, poster or frame
+  policy has been widened; acceptance checkboxes remain open.
+- **Approval gate:** select one bounded supported input class and promised
+  stage(s) from actual archive findings *before* modifying compatibility.
+
 ## Completion notes
 
-- Status: proposed; inventory, prioritization and actual expansion pending.
+- Status: in_progress; archive census instrument proposed in PR, real inventory,
+  selection, implementation and acceptance still pending.
 - Scope: one evidence-selected archive compatibility slice, with new
   workitems only for later independently justified expansions.

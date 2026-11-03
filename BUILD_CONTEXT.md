@@ -1,5 +1,22 @@
 # Build context
 
+**Current handoff — M30 WI-0210 archive census (2026-11-03):**
+PR #720 has merged. WI-0152 is maintainer-accepted, completed and
+archived with desktop/phone full-height native playback verified.
+Do not repeat those tests solely for WI-0210.
+
+Next selected scope is **WI-0210**: the new read-only video
+compatibility census command reads current PostgreSQL metadata and
+aggregate stage receipts but never opens originals, hydrates OneDrive,
+enqueues jobs, or enables codecs. Its Windows CI and maintained-host
+counts are still pending. See
+docs/operations/video-compatibility-wi0210-census.md.
+Review overlapping gap counts and select ONE approved archive-relevant
+input class and target stages before broadening any worker, poster,
+proxy or frame policies. WI-0207 managed hydration follows separately.
+WI-0153/0154 remain postponed, and WI-0155 remains experimental.
+M30 is in_progress, not completed.
+
 **Current handoff — WI-0152 accepted on Windows (2026-11-03, PR #720):**
 Maintainer-confirmed all nine original checks PASS: PostgreSQL playback,
 HTTP 206/416/404, docs validate/generate, desktop and trusted-LAN HTTPS

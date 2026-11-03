@@ -9,32 +9,6 @@ allowed_statuses:
 - completed
 - cancelled
 work_items:
-- id: WI-0152
-  title: Add safe browser video serving and viewer playback
-  milestone: M30
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0152-video-serving-playback.md
-  started_at: 2026-11-02
-  last_updated_at: 2026-11-03
-  branch: wi0152-retained-proxy-playback-v1
-  blockers:
-  - WI-0151
-  - WI-0189
-  blocker_notes: []
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/720
-  - type: documentation
-    value: docs/operations/video-playback-wi0152.md
-  - type: maintainer-verification
-    value: '2026-11-03: initial maintainer PASS for PostgreSQL/HTTP range tests, docs validate/generate, desktop and phone functional playback/seek, HTTP 206/416/404, OneDrive online-only unchanged, no processing, and photo viewer/search regression. Lower native video controls were initially clipped on both devices; corrected in PR #720.'
-  - type: maintainer-verification
-    value: '2026-11-03: after the PR #720 layout fix, maintainer confirmed the entire native video player is visible on both desktop PC and phone; previous bottom-clipping blocker resolved. All five scoped WI-0152 acceptance criteria verified; merge/repository archival pending.'
-  - type: ci-verification
-    value: '2026-11-03: GitHub Actions build run 41543246154 on commit fe24b58 passed six jobs including build/test, both integration shards, launcher and package. Documentation/status follow-up commits await their own gate.'
 - id: WI-0153
   title: Integrate video with manual metadata and collection queries
   milestone: M30
@@ -231,9 +205,12 @@ work_items:
 - id: WI-0210
   title: Expand video compatibility for the highest-value archive cases
   milestone: M30
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
+  started_at: 2026-11-03
+  last_updated_at: 2026-11-03
+  branch: wi0210-readonly-archive-compatibility-survey
   blockers:
   - WI-0151
   - WI-0188
@@ -241,3 +218,7 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+  - type: documentation
+    value: docs/operations/video-compatibility-wi0210-census.md
+  - type: implementation
+    value: '2026-11-03 checkpoint 1: aggregate repeatable-read, metadata-only local PostgreSQL video compatibility inventory CLI and focused policy/privacy tests. Pending Windows CI and maintained-host census. No policy widening, media processing or OneDrive hydration.'
