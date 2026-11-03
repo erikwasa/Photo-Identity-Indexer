@@ -125,13 +125,16 @@ public sealed class VideoSyntheticProxyPilotTests
             string[] trial = [.. VideoSyntheticProxyPilotCommandRunner
                 .GenerateArguments(workspace, width, height, audio,
                     fullRangeEvaluation: true)];
-            Assert.Equal(baseline.Length + 4, trial.Length);
+            Assert.Equal(baseline.Length + 6, trial.Length);
+            Assert.Contains("scale=in_range=limited:out_range=full",
+                trial[Array.IndexOf(trial, "-vf") + 1]);
             Assert.Equal("pc", trial[Array.IndexOf(trial, "-color_range") + 1]);
             Assert.Equal("range=pc:colorprim=bt709:transfer=bt709:colormatrix=bt709",
                 trial[Array.IndexOf(trial, "-x264-params") + 1]);
             Assert.Equal(Path.Combine(workspace, "output.mp4"), trial[^1]);
 
             List<string> stripped = [.. trial];
+            stripped.RemoveRange(stripped.IndexOf("-vf"), 2);
             stripped.RemoveRange(stripped.IndexOf("-x264-params"), 2);
             stripped.RemoveRange(stripped.IndexOf("-color_range"), 2);
             Assert.Equal(baseline, stripped);
