@@ -137,6 +137,10 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
             {
                 Environment.SetEnvironmentVariable(envName, lease.ConnectionString);
                 using StringWriter output = new();
+                // This executes the actual Npgsql CommandBehavior.SequentialAccess
+                // reader over a nonempty metadata row (ordinals 0..12).
+                // Reading the final size (12) before the metadata (3..11)
+                // previously broke the maintained-host production audit.
                 Assert.Equal(0, await VideoCompatibilityLocalCheckCommandRunner.RunAsync(
                     new VideoCompatibilitySurveyOptions(envName, lease.DatabaseName), output));
                 Assert.DoesNotContain(root, output.ToString(), StringComparison.OrdinalIgnoreCase);
