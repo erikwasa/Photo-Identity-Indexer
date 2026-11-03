@@ -16,13 +16,21 @@ native-player clipping regression was fixed and separately verified.
 No repeat playback or online-only original hydration check is requested
 merely to close that item.
 
-**WI-0210 is now in progress:** checkpoint 1 adds a privacy-safe,
-read-only current-video PostgreSQL census of inspection and technical
-metadata, last-observed availability, stage receipts, and overlapping
-worker-admission gaps. It does **not** open originals or expand supported
-formats. Windows CI and an actual maintained-host inventory are pending.
-The maintainer will use the counts to choose ONE bounded format/size/
-duration/colour expansion and target stages before processing real media.
+**WI-0210 in progress:** PR #721's read-only PostgreSQL census has
+merged and all seven maintainer-host checkpoint-1 checks passed, including
+disposable PostgreSQL. The actual catalogue has 58 nonexcluded current
+videos; 26 fail the transfer gate first, 13 pixel format, 5 rotation,
+1 inspection, and 13 are metadata-eligible. Receipts: 13 retained
+proxies, 3 frame batches, 1 still poster. These are not a census
+of the historical 1,309 source-enumerated archive files.
+
+**Selected next engineering target, not yet authorized production
+admission:** Rec.709 full-range `yuvj420p` input for a playable-proxy
+profile, bounded by read-only isolated-gate and availability projections.
+Maintain the existing Rec.709 SDR proxy gate until a representative
+already-local original demonstrates colour-range conversion and the
+maintainer explicitly approves that class/stage. HLG, unspecified
+transfer and missing rotation are not silently admitted.
 See [the census runbook](../../operations/video-compatibility-wi0210-census.md).
 
 M30 remains in progress. WI-0207 opt-in OneDrive hydration/release is
