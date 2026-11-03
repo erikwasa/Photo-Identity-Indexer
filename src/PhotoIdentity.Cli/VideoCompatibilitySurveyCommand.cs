@@ -46,6 +46,8 @@ public sealed class VideoCompatibilitySurvey
     private readonly Dictionary<(string Stage, string State), long> _stages = new();
     private readonly Dictionary<string, long> _workerGates = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _overlappingGaps = new(StringComparer.Ordinal);
+    // One metadata gate hypothetically changed; NOT permission to decode or publish.
+    private readonly Dictionary<(string Candidate, string Availability), long> _singleGateProjections = new();
     public long ActiveVideoCount { get; private set; }
     public long ExcludedCurrentCount { get; private set; }
 
@@ -120,6 +122,26 @@ public sealed class VideoCompatibilitySurvey
 
         string gate = WorkerGate(row);
         Increment(_workerGates, gate);
+
+        // Counterfactual single-gate checks keep ALL other worker rules
+        // unchanged. In particular they do not certify source availability,
+        // safe colour conversion, correct orientation or decodability.
+        void Project(string candidate) => Increment(_singleGateProjections,
+            (candidate, Known(row.CachedAvailability,
+                "local", "online-only", "downloading", "unavailable", "error")));
+        if (row.Pixel == "yuvj420p" &&
+            WorkerGate(row with { Pixel = "yuv420p" }) == "metadata-eligible")
+            Project("rec709-yuvj420p-pixel-only");
+        if (row.Transfer == "arib-std-b67" &&
+            WorkerGate(row with { Transfer = "bt709" }) == "metadata-eligible")
+            Project("hlg-transfer-only");
+        if (row.Transfer is null &&
+            WorkerGate(row with { Transfer = "bt709" }) == "metadata-eligible")
+            Project("unknown-transfer-only");
+        if (row.Rotation is null &&
+            WorkerGate(row with { Rotation = 0 }) == "metadata-eligible")
+            Project("missing-rotation-only");
+
         Stage("worker-metadata-admission", gate == "metadata-eligible"
             ? "candidate-only" : "blocked");
 
@@ -157,6 +179,15 @@ public sealed class VideoCompatibilitySurvey
         var gaps = _overlappingGaps.OrderByDescending(x => x.Value)
             .ThenBy(x => x.Key, StringComparer.Ordinal)
             .Select(x => new { reason = x.Key, affected = x.Value });
+        var singleGateProjections = _singleGateProjections
+            .OrderBy(x => x.Key.Candidate, StringComparer.Ordinal)
+            .ThenBy(x => x.Key.Availability, StringComparer.Ordinal)
+            .Select(x => new
+            {
+                candidate = x.Key.Candidate,
+                recordedAvailability = x.Key.Availability,
+                count = x.Value
+            });
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = "wi0210-compatibility-inventory-v1",
@@ -167,6 +198,7 @@ public sealed class VideoCompatibilitySurvey
             currentNonExcludedVideoCount = ActiveVideoCount,
             excludedCurrentVideoCount = ExcludedCurrentCount,
             dimensions, stages, workerPrimaryGates = gates, overlappingCandidateGaps = gaps,
+            singleGateProjections,
             // This report does not choose an expansion or validate a derivative.
             selectionApproved = false, mediaDecodingPerformed = false
         }));
