@@ -155,6 +155,7 @@ public static class VideoRec709RealSourcePilotCommandRunner
             afterIntegrity = false, retained = false;
         VideoProxyInspection? playable = null;
         string reviewFile = Path.Combine(root, ReviewFileName);
+        string partialReview = Path.Combine(root, "review-proxy.partial");
         using CancellationTokenSource deadline =
             CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromMinutes(12));
@@ -260,7 +261,11 @@ public static class VideoRec709RealSourcePilotCommandRunner
                     stage = "retain-private-review";
                     if (!await Allowed(ct))
                         throw new InvalidOperationException("Source authorization was revoked.");
-                    File.Copy(candidate, reviewFile, overwrite: false);
+                    File.Copy(candidate, partialReview, overwrite: false);
+                    // Review is only exposed as a playable filename after
+                    // a complete, validated copy; never expose half-written
+                    // private output from an interrupted tool callback.
+                    File.Move(partialReview, reviewFile);
                     retained = true;
                 });
             if (!encode.Completed || encode.ExitCode != 0 || !outputValidated)
@@ -296,6 +301,7 @@ public static class VideoRec709RealSourcePilotCommandRunner
             bool cleanupFailed = false;
             try
             {
+                if (File.Exists(partialReview)) File.Delete(partialReview);
                 if (File.Exists(reviewFile)) File.Delete(reviewFile);
             }
             catch (Exception deleteError) when (deleteError is IOException or
