@@ -23,10 +23,6 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/721
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/722
 - id: WI-0154
   title: Integrate video clips into slideshow playback
   milestone: M30
@@ -222,6 +218,10 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/721
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/722
   - type: documentation
     value: docs/operations/video-compatibility-wi0210-census.md
   - type: implementation
