@@ -290,11 +290,28 @@ public static class VideoRec709RealSourcePilotCommandRunner
         catch (Exception error)
         {
             // Never print exception messages, private paths, tokens,
-            // hashes, raw probe JSON or tool stdout/stderr.
-            if (File.Exists(reviewFile)) File.Delete(reviewFile);
+            // hashes, raw probe JSON or tool stdout/stderr. If private
+            // review-file cleanup fails, report that failure explicitly,
+            // rather than pretending the evaluation left no media behind.
+            bool cleanupFailed = false;
+            try
+            {
+                if (File.Exists(reviewFile)) File.Delete(reviewFile);
+            }
+            catch (Exception deleteError) when (deleteError is IOException or
+                UnauthorizedAccessException)
+            {
+                cleanupFailed = true;
+            }
             Write(output, "trial-failed", false, opened, inputProven,
-                outputValidated, afterIntegrity, false, null,
-                new { stage, reason = VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(error) });
+                outputValidated, afterIntegrity, cleanupFailed, null,
+                new
+                {
+                    stage = cleanupFailed ? "review-cleanup" : stage,
+                    reason = cleanupFailed
+                        ? "private-review-cleanup-refused"
+                        : VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(error)
+                });
             return 1;
         }
     }
