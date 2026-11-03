@@ -208,6 +208,18 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   versioned opt-in production profile and worker, publisher and
   UI/playback acceptance. WI-0210 stays in_progress.
 
+- **2026-11-03 checkpoint 5 — maintainer run encountered an audit
+  reader bug after PR #725 merged:** on production
+  `photoidentity_main`, the read-only command failed while reading
+  a sequential Npgsql row because it accessed source size (ordinal 12)
+  before remaining metadata (ordinals 3–11). This failure occurred
+  before any live availability classification or media content access;
+  **candidate availability is still unknown**. The correction reads
+  all columns in monotonically increasing ordinal order. The existing
+  disposable PostgreSQL integration test exercises this exact
+  nonempty-row path. Re-run the audit **only after the fix merges
+  into main**; CI handles documentation checks.
+
 ## Completion notes
 
 - Status: in_progress; checkpoint 1 and the merged PR #722 survey

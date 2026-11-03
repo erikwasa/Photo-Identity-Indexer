@@ -106,12 +106,24 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                     string sourceKey = reader.GetString(2);
                     string? T(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
                     int? I(int i) => reader.IsDBNull(i) ? null : reader.GetInt32(i);
+                    // Npgsql SequentialAccess may ONLY move forward. Materialize
+                    // every field in SELECT ordinal order before building the row;
+                    // reading bytes (12) before metadata (3..11) is invalid.
+                    string? inspection = T(3);
+                    string? codec = T(4);
+                    string? pixel = T(5);
+                    string? transfer = T(6);
+                    string? audio = T(7);
+                    int? width = I(8);
+                    int? height = I(9);
+                    int? rotation = I(10);
+                    decimal? duration = reader.IsDBNull(11)
+                        ? null : reader.GetDecimal(11);
                     long bytes = reader.GetInt64(12);
                     VideoCompatibilityObservation row = new(
-                        false, "local-folder", null, T(3), null, T(4), T(5),
-                        T(6), T(7), I(8), I(9), I(10),
-                        reader.IsDBNull(11) ? null : reader.GetDecimal(11),
-                        bytes, false, false, false);
+                        false, "local-folder", null, inspection, null, codec,
+                        pixel, transfer, audio, width, height, rotation,
+                        duration, bytes, false, false, false);
                     if (!IsPixelOnlyCandidate(row)) continue;
                     if (candidates.Count >= MaximumCandidateChecks)
                         throw new InvalidOperationException(
