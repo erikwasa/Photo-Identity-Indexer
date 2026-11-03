@@ -31,7 +31,7 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
         foreach (string changed in new[]
         {
             valid.Replace("\"color_range\":\"pc\"", "\"color_range\":\"tv\""),
-            valid.Replace(",\"color_range\":\"pc\"", ""),
+            valid.Replace("\"color_range\":\"pc\",", ""),
             valid.Replace("\"color_transfer\":\"bt709\"", "\"color_transfer\":\"arib-std-b67\""),
             valid.Replace("\"color_primaries\":\"bt709\"", "\"color_primaries\":\"bt2020\""),
             valid.Replace("\"color_space\":\"bt709\"", "\"color_space\":\"bt2020nc\""),
@@ -39,7 +39,7 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
             valid.Replace("\"codec_name\":\"h264\"", "\"codec_name\":\"vp9\""),
             valid.Replace("\"width\":1920", "\"width\":1280"),
             valid.Replace("\"rotation\":-90", "\"rotation\":90"),
-            valid.Replace(",\"side_data_list\":[{\"rotation\":-90}]", ""),
+            valid.Replace("\"rotation\":-90", "\"not_rotation\":-90"),
             valid.Replace("\"duration\":\"10.5\"", "\"duration\":\"900\""),
             valid.Replace("\"size\":\"4096\"", "\"size\":\"4097\""),
             valid.Replace("\"format_name\":\"mov,mp4,m4a,3gp,3g2,mj2\"",
@@ -49,6 +49,10 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
             valid.Replace("\"streams\":[", "\"streams\":[] , \"unused\":["),
         })
         {
+            // Reject ineffective fixture mutations before testing the policy.
+            // Otherwise a no-op Replace can make a valid fixture look like
+            // an incorrect admission decision.
+            Assert.NotEqual(valid, changed);
             Assert.ThrowsAny<Exception>(() =>
                 VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                     Encoding.UTF8.GetBytes(changed), Current(), SourceSize));
@@ -127,13 +131,16 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
         foreach (string corrupted in new[]
         {
             json.Replace("\"color_range\":\"tv\"", "\"color_range\":\"pc\""),
-            json.Replace(",\"color_range\":\"tv\"", ""),
+            json.Replace("\"color_range\":\"tv\",", ""),
             json.Replace("\"color_transfer\":\"bt709\"", "\"color_transfer\":\"arib-std-b67\""),
             json.Replace("\"pix_fmt\":\"yuv420p\"", "\"pix_fmt\":\"yuvj420p\"")
         })
+        {
+            Assert.NotEqual(json, corrupted);
             Assert.ThrowsAny<Exception>(() =>
                 VideoRec709FullRangeEvaluationProfile.ValidateOutputProbeJson(
                     Encoding.UTF8.GetBytes(corrupted), SourceSize));
+        }
     }
 
     private static VideoRevisionInspection Current() => new(
