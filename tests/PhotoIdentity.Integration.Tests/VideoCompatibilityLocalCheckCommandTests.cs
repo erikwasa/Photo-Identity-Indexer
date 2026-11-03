@@ -34,6 +34,37 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
     }
 
     [Fact]
+    public void Revision_id_disclosure_requires_explicit_unrepeated_opt_in()
+    {
+        string[] args =
+        [
+            "--postgres-connection-env", "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
+            "--database", "photoidentity_main"
+        ];
+        foreach (string[] unsafeArgs in new[]
+        {
+            args,
+            [.. args, "--show-revision-ids", "--show-revision-ids"],
+            [.. args, "--apply", "--show-revision-ids"],
+            [.. args, "--source", "secret.mov", "--show-revision-ids"],
+            [.. args, "--read-local-bytes", "--show-revision-ids"]
+        })
+            Assert.Throws<ArgumentException>(() =>
+                VideoCompatibilityLocalSelectionOptions.Parse(unsafeArgs));
+
+        VideoCompatibilityLocalSelectionOptions selected =
+            VideoCompatibilityLocalSelectionOptions.Parse(
+                [.. args, "--show-revision-ids"]);
+        Assert.Equal("photoidentity_main", selected.Survey.Database);
+        Assert.Equal("PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
+            selected.Survey.ConnectionEnv);
+
+        // The existing aggregate command intentionally rejects the UUID flag.
+        Assert.Throws<ArgumentException>(() =>
+            VideoCompatibilitySurveyOptions.Parse([.. args, "--show-revision-ids"]));
+    }
+
+    [Fact]
     public async Task Metadata_only_local_status_never_opens_media_or_recalls_missing_files()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -161,6 +192,55 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                     .GetProperty("status").GetString());
                 Assert.Equal(1, json.GetProperty("availability")[0]
                     .GetProperty("count").GetInt32());
+
+                // Separate explicit local UUID disclosure still uses the
+                // same strictly forward-only DB reader and attribute check.
+                using StringWriter selected = new();
+                var selection = VideoCompatibilityLocalSelectionOptions.Parse(
+                [
+                    "--postgres-connection-env", envName,
+                    "--database", lease.DatabaseName,
+                    "--show-revision-ids"
+                ]);
+                Assert.Equal(0, await VideoCompatibilityLocalCheckCommandRunner
+                    .RunCandidatesAsync(selection, selected));
+                string privateOutput = selected.ToString();
+                Assert.DoesNotContain(root, privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("fullrange.mov", privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("hdr.mov", privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("excluded.mov", privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(hdrRevision.ToString(), privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(excludedRevision.ToString(), privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
+                using JsonDocument selectedDoc = JsonDocument.Parse(privateOutput);
+                JsonElement result = selectedDoc.RootElement;
+                Assert.Equal("wi0210-explicit-local-revision-selection-v1",
+                    result.GetProperty("protocol").GetString());
+                Assert.True(result.GetProperty("revisionIdsShown").GetBoolean());
+                Assert.True(result.GetProperty("operatorSelectionRequired").GetBoolean());
+                Assert.True(result.GetProperty("readOnly").GetBoolean());
+                Assert.True(result.GetProperty("localIsNotIntegrityProven").GetBoolean());
+                Assert.False(result.GetProperty("sourceContentOpened").GetBoolean());
+                Assert.False(result.GetProperty("oneDriveHydrationRequested").GetBoolean());
+                Assert.False(result.GetProperty("jobsEnqueued").GetBoolean());
+                Assert.Equal(1, result.GetProperty("candidateCount").GetInt32());
+                Assert.Equal(1, result.GetProperty("locallyMatchedCount").GetInt32());
+                JsonElement localCandidates = result.GetProperty("candidates");
+                Assert.Single(localCandidates.EnumerateArray());
+                Assert.Equal(revision, localCandidates[0]
+                    .GetProperty("revisionId").GetGuid());
+                Assert.Equal(4096L, localCandidates[0]
+                    .GetProperty("sourceBytes").GetInt64());
+                Assert.Equal(3m, localCandidates[0]
+                    .GetProperty("durationSeconds").GetDecimal());
+                Assert.Equal("coded-landscape", localCandidates[0]
+                    .GetProperty("codedOrientation").GetString());
+                Assert.True(localCandidates[0].GetProperty("hasAudio").GetBoolean());
             }
             finally { Environment.SetEnvironmentVariable(envName, null); }
 
