@@ -56,6 +56,14 @@ A new explicitly opted-in private UUID-only selection command
 is the next bounded step; SHA-256 proof and real-camera colour
 conversion still require separate operator authorization.
 See [the post-merge selection runbook](../../operations/video-compatibility-wi0210-local-check.md).
+**Checkpoint 6 accepted (2026-11-03):** After PR #727 merged,
+the private read-only candidate shortlist returned 12 candidates
+and 12 locally matched, with no source content opened or hydration.
+The new checkpoint adds only an optional exact-class precondition
+to an existing no-recall source-integrity command. A real original
+read still requires separate operator authorization; no FFprobe,
+transcoding, proxy publication or worker gate changes are approved.
+See [the guarded one-revision proof](../../operations/video-fullrange-wi0210-source-proof.md).
 Full-range production admission still requires approved already-local
 real source integrity, visual conversion and playback checks.
 See [the synthetic acceptance runbook](../../operations/video-fullrange-wi0210-synthetic-acceptance.md).
