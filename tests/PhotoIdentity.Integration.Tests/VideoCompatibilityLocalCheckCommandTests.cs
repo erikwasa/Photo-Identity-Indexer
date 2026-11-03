@@ -120,9 +120,10 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
             await database.InitializeAsync();
 
             Guid source = Guid.NewGuid();
-            Guid full = Guid.NewGuid(), hdr = Guid.NewGuid(), excluded = Guid.NewGuid();
+            Guid full = Guid.NewGuid(), hdr = Guid.NewGuid(),
+                excluded = Guid.NewGuid(), unavailable = Guid.NewGuid();
             Guid revision = Guid.NewGuid(), hdrRevision = Guid.NewGuid(),
-                excludedRevision = Guid.NewGuid();
+                excludedRevision = Guid.NewGuid(), unavailableRevision = Guid.NewGuid();
             await using (NpgsqlConnection conn = await database.OpenConnectionAsync())
             await using (NpgsqlCommand cmd = conn.CreateCommand())
             {
@@ -132,12 +133,14 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                     INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
                     VALUES (@full,@source,'fullrange.mov',now(),'video'),
                            (@hdr,@source,'hdr.mov',now(),'video'),
-                           (@excluded,@source,'excluded.mov',now(),'video');
+                           (@excluded,@source,'excluded.mov',now(),'video'),
+                           (@unavailable,@source,'unavailable.mov',now(),'video');
                     INSERT INTO asset_revisions(id,asset_id,content_sha256,size_bytes,
                         observed_at_utc,media_type,media_kind)
                     VALUES (@revision,@full,repeat('a',64),4096,now(),'video/quicktime','video'),
                            (@hdrRevision,@hdr,repeat('b',64),4096,now(),'video/quicktime','video'),
-                           (@excludedRevision,@excluded,repeat('c',64),4096,now(),'video/quicktime','video');
+                           (@excludedRevision,@excluded,repeat('c',64),4096,now(),'video/quicktime','video'),
+                           (@unavailableRevision,@unavailable,repeat('e',64),4096,now(),'video/quicktime','video');
                     INSERT INTO video_revision_metadata(asset_revision_id,inspection_status,
                         video_codec,pixel_format,color_transfer,audio_codec,coded_width,
                         coded_height,display_rotation_degrees,duration_seconds,inspected_at_utc,
@@ -147,6 +150,8 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                            (@hdrRevision,'supported','h264','yuvj420p','arib-std-b67','aac',
                             1920,1080,90,3,now(),repeat('d',64),'fixture'),
                            (@excludedRevision,'supported','h264','yuvj420p','bt709','aac',
+                            1920,1080,90,3,now(),repeat('d',64),'fixture'),
+                           (@unavailableRevision,'supported','h264','yuvj420p','bt709','aac',
                             1920,1080,90,3,now(),repeat('d',64),'fixture');
                     INSERT INTO source_copy_exclusions(source_id,source_key,excluded_at_utc,
                         purge_state,purge_updated_at_utc)
@@ -157,9 +162,11 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 cmd.Parameters.AddWithValue("full", full);
                 cmd.Parameters.AddWithValue("hdr", hdr);
                 cmd.Parameters.AddWithValue("excluded", excluded);
+                cmd.Parameters.AddWithValue("unavailable", unavailable);
                 cmd.Parameters.AddWithValue("revision", revision);
                 cmd.Parameters.AddWithValue("hdrRevision", hdrRevision);
                 cmd.Parameters.AddWithValue("excludedRevision", excludedRevision);
+                cmd.Parameters.AddWithValue("unavailableRevision", unavailableRevision);
                 await cmd.ExecuteNonQueryAsync();
             }
             string envName = "PHOTOIDENTITY_WI0210_LOCAL_" +
@@ -186,12 +193,15 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 Assert.False(json.GetProperty("sourceContentOpened").GetBoolean());
                 Assert.False(json.GetProperty("oneDriveHydrationRequested").GetBoolean());
                 Assert.False(json.GetProperty("videoJobsEnqueued").GetBoolean());
-                Assert.Equal(1, json.GetProperty("candidateCount").GetInt32());
-                Assert.Single(json.GetProperty("availability").EnumerateArray());
-                Assert.Equal("local-metadata-match", json.GetProperty("availability")[0]
-                    .GetProperty("status").GetString());
-                Assert.Equal(1, json.GetProperty("availability")[0]
-                    .GetProperty("count").GetInt32());
+                Assert.Equal(2, json.GetProperty("candidateCount").GetInt32());
+                JsonElement availability = json.GetProperty("availability");
+                Assert.Equal(2, availability.GetArrayLength());
+                Assert.Contains(availability.EnumerateArray(), item =>
+                    item.GetProperty("status").GetString() == "local-metadata-match" &&
+                    item.GetProperty("count").GetInt32() == 1);
+                Assert.Contains(availability.EnumerateArray(), item =>
+                    item.GetProperty("status").GetString() == "unavailable" &&
+                    item.GetProperty("count").GetInt32() == 1);
 
                 // Separate explicit local UUID disclosure still uses the
                 // same strictly forward-only DB reader and attribute check.
@@ -217,6 +227,8 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                     StringComparison.OrdinalIgnoreCase);
                 Assert.DoesNotContain(excludedRevision.ToString(), privateOutput,
                     StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(unavailableRevision.ToString(), privateOutput,
+                    StringComparison.OrdinalIgnoreCase);
                 using JsonDocument selectedDoc = JsonDocument.Parse(privateOutput);
                 JsonElement result = selectedDoc.RootElement;
                 Assert.Equal("wi0210-explicit-local-revision-selection-v1",
@@ -228,7 +240,7 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 Assert.False(result.GetProperty("sourceContentOpened").GetBoolean());
                 Assert.False(result.GetProperty("oneDriveHydrationRequested").GetBoolean());
                 Assert.False(result.GetProperty("jobsEnqueued").GetBoolean());
-                Assert.Equal(1, result.GetProperty("candidateCount").GetInt32());
+                Assert.Equal(2, result.GetProperty("candidateCount").GetInt32());
                 Assert.Equal(1, result.GetProperty("locallyMatchedCount").GetInt32());
                 JsonElement localCandidates = result.GetProperty("candidates");
                 Assert.Single(localCandidates.EnumerateArray());
@@ -255,7 +267,7 @@ public sealed class VideoCompatibilityLocalCheckCommandTests
                 """;
             await using NpgsqlDataReader result = await counts.ExecuteReaderAsync();
             Assert.True(await result.ReadAsync());
-            Assert.Equal(3L, result.GetInt64(0));
+            Assert.Equal(4L, result.GetInt64(0));
             Assert.Equal(0L, result.GetInt64(1));
             Assert.Equal(0L, result.GetInt64(2));
         }
