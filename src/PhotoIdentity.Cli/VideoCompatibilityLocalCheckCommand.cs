@@ -213,6 +213,9 @@ public static class VideoCompatibilityLocalCheckCommandRunner
                 candidates = matched.OrderBy(x => x.DurationSeconds)
                     .ThenBy(x => x.SourceBytes)
                     .ThenBy(x => x.RevisionId).ToArray()
+            }, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             }));
             return 0;
         }
