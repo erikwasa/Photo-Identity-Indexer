@@ -65,6 +65,20 @@ relax format gates or choose additional media blindly**.
 After merge, a *separately authorized* single real-source
 re-evaluation may distinguish metadata mismatch from
 an unproven source; maintain production gate.
+2026-11-04 accepted operator retry after PR #731:
+the exact current real local source again failed safely at
+`input-probe`, now `source-stream-layout-unsupported`.
+No original metadata/probe JSON may be disclosed. The
+experimental decoder was refusing all MOV/MP4 sources with
+>2 streams, a known pattern for camera timecode
+`tmcd` and telemetry `gpmd`. The next change narrowly
+accepts those **identified auxiliary data tracks only**
+(at most one each, max 4 total streams), strips all data
+and source metadata from the output, and keeps exact
+Rec.709/full-range and privacy/worker gates. Actual original
+stream types remain unproven; a single new opt-in
+post-merge local trial may validate. Avoid additional small
+check-only PRs or broad compatibility guesses.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.
