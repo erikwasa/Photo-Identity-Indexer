@@ -76,25 +76,45 @@ OneDrive hydration; do not conflate it with codec/processing eligibility.
   (separate workitems).
 - End-to-end OneDrive-only materialization/release (WI-0207).
 
-## Acceptance criteria
+## Acceptance criteria — completed 2026-11-04
 
 - [x] A sanitized inventory and **stage-specific** exclusion summary
-  identify the highest-value compatibility gap and limitations of
-  locally available samples. **Satisfied by merged PRs #721–722**
-  and maintainer-reported 58-video inventory. All source
-  availability remains last-recorded **unknown**; this is only
-  an archive-registered inventory, not a file availability test.
-- [ ] Maintainer selects one bounded compatibility expansion and
-  explicitly approves its supported input class and target stages.
-- [ ] Selected real locally available video(s) succeed at the
-  promised stage(s); unsupported cases remain diagnosable, originals
-  unchanged, and existing photo/video exclusion guards intact.
-- [ ] Focused automated safety/behaviour tests and maintained-host
-  verification pass; update stage matrix with admitted limits and
-  known remaining gaps.
-- [ ] Further possible formats and deferred coverage are noted
-  **without** preventing completion or automatically opening more
-  compatibility work.
+  identified the high-value gap. The maintained PostgreSQL survey
+  found 58 current video revisions, with **12** Rec.709 `yuvj420p`
+  pixel-gate-only metadata candidates; the later no-content local
+  shortlist found **12/12 locally matched**. These counts are
+  potential coverage, not successful production conversions.
+- [x] The maintainer approved the **narrow Rec.709 full-range
+  `yuvj420p` input → limited-range 720p H.264/AAC playable-proxy**
+  expansion only. The new `rec709-fullrange-720p` profile is
+  explicitly selected, local-only and one-video-step-per-advance;
+  normal SDR presets are unchanged.
+- [x] One already-local original passed registered SHA integrity,
+  independent actual full-range/BT.709 FFprobe, bounded conversion,
+  independent limited-range output validation, post-conversion source
+  integrity, audio/orientation/seek and maintainer visual colour
+  review. **Production acceptance then passed** on the merged
+  PR #734: one new registered and visually playable proxy,
+  Succeeded **27→28 (+1)**, Queued **0→0**, Failed **0→0**,
+  LastResult `published`, and no unexpected OneDrive hydration.
+- [x] Focused safety/behaviour tests and actual maintained-host
+  verification passed. PR #734's required CI run #41911935992
+  passed all six checks, including both integration shards,
+  launcher/package checks and tests. Existing revision/exclusion,
+  photo-priority, no-recall staging, metadata-stripping, guarded
+  source/output proofs and browser-playback restrictions remain
+  enforced. The stage compatibility matrix is updated.
+- [x] Further candidate formats and deferred coverage are recorded
+  separately. **Do not** infer that all 12 candidates are playable,
+  or silently admit HLG/PQ, missing rotation, online-only originals,
+  still posters or searchable frames through this profile. WI-0207
+  remains the separate owner of managed online-only hydration/release.
+
+**Closure:** WI-0210 is **completed**. Its accepted user-visible
+outcome is one previously blocked full-range Rec.709 video now
+published and played as a production proxy. The cohort-wide
+success rate and any other format/stage remain unverified and are
+not completion prerequisites.
 
 ## Verification and risk boundaries
 
@@ -427,6 +447,20 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   **Do not claim any additional playable production videos
   until this acceptance has succeeded.**
 ## Completion notes
+
+**Final maintained-host production acceptance — 2026-11-04:**
+After PR #734 merged and CI succeeded, the maintainer selected the
+new Rec.709 full-range 720p profile with local-only, single-step
+processing and advanced exactly one video step. A new published
+playable proxy was observed and its visual playback passed.
+Sanitized counters: Succeeded 27→28 (+1), Queued 0→0, Failed 0→0,
+LastResult `published`; no unexpected OneDrive hydration.
+No private media, source paths, revision IDs or digests were
+submitted. This completes WI-0210 without extending eligibility
+to the remaining 11 untested candidates, HDR or searchable frames.
+See [the accepted production runbook](../../operations/video-fullrange-wi0210-production-acceptance.md).
+
+
 
 - Status: in_progress. The previous 58-video `unknown` figures
   are stale recorded availability. Live metadata checks found
