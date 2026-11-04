@@ -9,7 +9,7 @@ namespace PhotoIdentity.Cli;
 /// source's independent FFprobe. Never contains private stream values,
 /// original paths, revision IDs, full FFprobe output or exception text.
 /// </summary>
-public sealed class VideoFullRangeInputRejectionException : InvalidDataException
+public sealed class VideoFullRangeInputRejectionException : Exception
 {
     public string ReasonCode { get; }
 
