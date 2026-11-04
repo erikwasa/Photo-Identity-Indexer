@@ -265,7 +265,8 @@ public static class VideoCompatibilitySurveyCommandRunner
                       AND j.policy_version='wi0188-v1'
                       AND j.preset_version IN (
                           'wi0188-sdr-h264-aac-720p-pilot-v1',
-                          'wi0189-sdr-h264-aac-540p-compact-v1')),
+                          'wi0189-sdr-h264-aac-540p-compact-v1',
+                           'wi0210-rec709-fullrange-720p-production-v1')),
                 EXISTS(SELECT 1 FROM video_frame_evidence_batches b
                     JOIN video_processing_jobs j ON j.id=b.job_id
                     WHERE b.asset_revision_id=r.id
