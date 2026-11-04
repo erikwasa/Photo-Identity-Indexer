@@ -108,61 +108,6 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
             ORDER BY sort_at DESC, id DESC
             LIMIT @take OFFSET @skip;
             """;
-ArgumentOutOfRangeException(nameof(limit), "Video library page must be bounded.");
-        await _exclusions.EnsureReadyAsync(token);
-        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
-        await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT latest.id, metadata.inspection_status,
-                   metadata.duration_seconds, metadata.coded_width,
-                   metadata.coded_height, metadata.display_rotation_degrees,
-                   metadata.capture_at_utc,
-                   (poster.asset_revision_id IS NOT NULL) AS has_poster,
-                   EXISTS (
-                       SELECT 1
-                       FROM video_published_derivatives proxy
-                       JOIN video_processing_jobs job ON job.id = proxy.job_id
-                       WHERE proxy.asset_revision_id = latest.id
-                         AND job.asset_revision_id = latest.id
-                         AND job.status = 'succeeded'
-                         AND job.derivative_kind = 'PlayableProxy'
-                         AND job.policy_version = 'wi0188-v1'
-                         AND job.preset_version IN (
-                           'wi0188-sdr-h264-aac-720p-pilot-v1',
-                           'wi0189-sdr-h264-aac-540p-compact-v1',
-                            'wi0210-rec709-fullrange-720p-production-v1')
-                         AND metadata.inspection_status = 'supported'
-                         AND metadata.color_transfer = 'bt709'
-                   ) AS has_playable_proxy
-            FROM assets asset
-            JOIN LATERAL (
-                SELECT revision.id, revision.observed_at_utc
-                FROM asset_revisions revision
-                WHERE revision.asset_id = asset.id AND revision.media_kind = 'video'
-                ORDER BY revision.observed_at_utc DESC, revision.id DESC
-                LIMIT 1
-            ) latest ON TRUE
-            LEFT JOIN video_revision_metadata metadata
-                ON metadata.asset_revision_id = latest.id
-            LEFT JOIN LATERAL (
-                SELECT poster.asset_revision_id
-                FROM video_still_posters poster
-                WHERE poster.asset_revision_id = latest.id
-                  AND poster.poster_profile_id = 'wi0151-sdr-still-v1'
-                  AND metadata.inspection_status = 'supported'
-                  AND metadata.color_transfer = 'bt709'
-                ORDER BY poster.generated_at_utc DESC, poster.tool_sha256
-                LIMIT 1
-            ) poster ON TRUE
-            WHERE asset.media_kind = 'video' AND asset.deleted_at_utc IS NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM source_copy_exclusions exclusion
-                  WHERE exclusion.source_id = asset.source_id
-                    AND exclusion.source_key = asset.source_key)
-            ORDER BY COALESCE(metadata.capture_at_utc, latest.observed_at_utc) DESC,
-                     latest.id DESC
-            LIMIT @take OFFSET @skip;
-            """;
         command.Parameters.AddWithValue("take", limit + 1);
         command.Parameters.AddWithValue("skip", offset);
         command.Parameters.AddWithValue("playable_only", playableOnly);
