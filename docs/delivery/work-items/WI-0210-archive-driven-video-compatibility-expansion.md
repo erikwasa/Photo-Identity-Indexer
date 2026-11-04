@@ -348,6 +348,41 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   proceeds to colour/proxy validation. If it does, proceed
   directly to production-integrated playable proxies rather
   than another preparatory checkpoint.
+- **2026-11-04 exact real-file ancillary-track gate result:**
+  After PR #732 merged, a fresh privately authorized evaluation
+  of the **same** current locally present original again failed
+  safely at `input-probe` with
+  `source-ancillary-stream-unapproved`. This establishes the
+  presence of at least one declared `data` stream that failed
+  the strict `tmcd` / `gpmd` code/codec/quantity allowlist.
+  It does **not** identify its private codec, tag, provenance
+  or payload. The result had `inputFullRangeProven=false`,
+  `outputLimitedRangeValidated=false`,
+  `sourceIntegrityRechecked=false`, no private proxy,
+  no OneDrive hydration, database writes, jobs,
+  published derivatives or production policy changes.
+- **Next cohesive guard correction — bounded unmapped `data`:**
+  Avoid repeatedly guessing camera-specific data codec tags.
+  Admit at most **two `codec_type=data` input tracks** with
+  at most four total streams, while retaining the existing
+  one exact registered video / optional one audio contract,
+  strict colour and geometry/rotation proof and rejection of
+  unknown/subtitle/attachment/extra media streams. Do not
+  select, decode, copy or persist input data tracks: the
+  fixed recipe uses only `-map 0:v:0` and optional
+  `-map 0:a:0?`, `-dn`, `-sn`,
+  `-map_metadata -1`, `-map_chapters -1` and a
+  **new** `-map_metadata:s -1` for selected stream tags.
+  Independently reject extra output streams; stop requesting
+  auxiliary input four-character tags. Add positive/negative
+  CI tests for two data tracks, absent/proprietary names,
+  extra A/V/subtitle/attachment, 3+ data, full-range
+  mismatch and privacy/output mapping.
+  One post-merge operator-only real and visual
+  trial is still needed to establish actual playable
+  progress before production admission. This correction
+  remains in WI-0210; candidate count is still **12
+  possible, zero newly playable accepted**.
 ## Completion notes
 
 - Status: in_progress. The previous 58-video `unknown` figures
