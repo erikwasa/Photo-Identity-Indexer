@@ -331,7 +331,7 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   contract rejects even common MOV/MP4 cameras with separate
   timecode and telemetry streams; those are a **hypothesis**
   about this sample, not independently observed contents.
-- **Guarded ancillary-stream correction, same evaluation slice:**
+- **Guarded ancillary-stream correction (PR #732), same evaluation slice:**
   Permit only **one each** of explicitly tagged MOV `tmcd`
   timecode and `gpmd` telemetry data alongside exactly one
   expected video and at most one matching audio, with a four-stream
