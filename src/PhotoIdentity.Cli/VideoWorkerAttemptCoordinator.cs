@@ -244,14 +244,14 @@ public static class VideoAttemptFailureDiagnostics
     private const string StageKey = "PhotoIdentity.VideoAttempt.SanitizedStage";
     private static readonly HashSet<string> AllowedStages =
     [
-        "source-staging", "tool-execution", "output-validation",
-        "publication", "lease-safety"
+        "source-staging", "source-validation", "tool-execution",
+        "output-validation", "publication", "lease-safety"
     ];
 
     private static readonly HashSet<string> ReportStages =
     [
-        "source-staging", "tool-execution", "output-validation",
-        "publication", "lease-safety", "adapter-report",
+        "source-staging", "source-validation", "tool-execution",
+        "output-validation", "publication", "lease-safety", "adapter-report",
         "acknowledgement", "unclassified"
     ];
 
@@ -270,6 +270,13 @@ public static class VideoAttemptFailureDiagnostics
         "native-process-setup", "timeout", "filesystem-access-denied",
         "required-file-missing", "required-directory-missing",
         "filesystem-io", "invalid-media-evidence", "configuration-rejected",
+        "source-registered-class-ineligible", "source-probe-data-invalid",
+        "source-container-unapproved", "source-size-or-duration-mismatch",
+        "source-stream-layout-unsupported", "source-ancillary-stream-unapproved",
+        "source-video-codec-mismatch", "source-pixel-format-unproven",
+        "source-full-range-unproven", "source-bt709-signalling-unproven",
+        "source-geometry-mismatch", "source-rotation-unproven",
+        "source-audio-layout-mismatch", "source-probe-execution-incomplete",
         "execution-safety-rejected", "cancelled", "unexpected-failure"
     ];
 
@@ -316,6 +323,7 @@ public static class VideoAttemptFailureDiagnostics
         {
             VideoProxyPublicationQuotaExceededException => "proxy-quota-exceeded",
             VideoProxyValidationException validation => validation.ReasonCode,
+            VideoFullRangeInputRejectionException input => input.ReasonCode,
             System.ComponentModel.Win32Exception => "native-process-setup",
             TimeoutException => "timeout",
             UnauthorizedAccessException => "filesystem-access-denied",
