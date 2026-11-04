@@ -110,6 +110,19 @@ FFprobe, unregistered bounded conversion, limited-range
 output validation, post-trial original SHA and operator visual
 review; not further isolated preparatory commands.
 See [the real-video evaluation runbook](video-fullrange-wi0210-real-evaluation.md).
+**Real-camera source-probe update (2026-11-04):**
+a maintained-host trial returned the precise code
+`source-stream-layout-unsupported`, with no conversion or
+published derivative. The experimental evaluation is being
+narrowly revised to recognize only tagged `tmcd` timecode
+and `gpmd` telemetry *auxiliary data* tracks, at most
+one each and four total streams, while the existing fixed
+FFmpeg map excludes all such data from output. This is
+a hypothesis about the selected source, not a verified
+stream inventory or a claim of working full-range colour;
+real input colour/geometry, conversion and visual acceptance
+are still pending. See
+[the real-video evaluation runbook](video-fullrange-wi0210-real-evaluation.md).
 Production still does not admit this pixel class.
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).

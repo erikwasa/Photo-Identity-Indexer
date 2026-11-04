@@ -148,6 +148,8 @@ public sealed class VideoRec709RealSourcePilotTests
         Assert.Contains("-protocol_whitelist", args);
         Assert.Contains("file", args);
         Assert.Contains("-show_entries", args);
+        Assert.Contains(args, item => item.Contains(
+            "codec_tag_string", StringComparison.Ordinal));
         Assert.Contains("-o", args);
         Assert.Contains(Path.Combine(scratch, "probe.json"), args);
         Assert.Equal(input, args.Last());

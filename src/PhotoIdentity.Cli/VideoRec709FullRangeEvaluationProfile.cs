@@ -19,7 +19,8 @@ public sealed class VideoFullRangeInputRejectionException : Exception
         if (reasonCode is not (
             "source-registered-class-ineligible" or "source-probe-data-invalid" or
             "source-container-unapproved" or "source-size-or-duration-mismatch" or
-            "source-stream-layout-unsupported" or "source-video-codec-mismatch" or
+            "source-stream-layout-unsupported" or "source-ancillary-stream-unapproved" or
+            "source-video-codec-mismatch" or
             "source-pixel-format-unproven" or "source-full-range-unproven" or
             "source-bt709-signalling-unproven" or "source-geometry-mismatch" or
             "source-rotation-unproven" or "source-audio-layout-mismatch" or
@@ -98,10 +99,17 @@ public static class VideoRec709FullRangeEvaluationProfile
 
             if (!root.TryGetProperty("streams", out JsonElement streams) ||
                 streams.ValueKind != JsonValueKind.Array ||
-                streams.GetArrayLength() is < 1 or > 2)
+                streams.GetArrayLength() is < 1 or > 4)
                 throw Reject("source-stream-layout-unsupported");
 
-            int videos = 0, audios = 0;
+            // A MOV/MP4 camera source may also carry separate timecode and
+            // telemetry tracks. These do not authorize any broader video,
+            // audio or metadata handling: the encoding profile maps only
+            // the first video and optional first audio; -dn and
+            // -map_metadata -1 forbid ancillary-track publication.
+            // Accept only exact MOV four-character codes, never arbitrary
+            // data streams or user-specified stream maps.
+            int videos = 0, audios = 0, timecodes = 0, telemetry = 0;
             foreach (JsonElement stream in streams.EnumerateArray())
             {
                 switch (Text(stream, "codec_type"))
@@ -133,6 +141,18 @@ public static class VideoRec709FullRangeEvaluationProfile
                             Text(stream, "codec_name") != current.AudioCodec)
                             throw Reject("source-audio-layout-mismatch");
                         break;
+                    case "data":
+                        string? code = Text(stream, "codec_tag_string");
+                        string? dataCodec = Text(stream, "codec_name");
+                        if (code == "tmcd" &&
+                            dataCodec is (null or "none" or "bin_data") &&
+                            ++timecodes == 1)
+                            break;
+                        if (code == "gpmd" &&
+                            dataCodec is (null or "none" or "bin_data") &&
+                            ++telemetry == 1)
+                            break;
+                        throw Reject("source-ancillary-stream-unapproved");
                     default:
                         throw Reject("source-stream-layout-unsupported");
                 }

@@ -320,6 +320,34 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   A single optional post-merge real-media re-evaluation may
   establish the underlying rejection reason; no further
   preparatory work items or blind retries.
+- **2026-11-04 maintained-host input-probe diagnosis:**
+  After merging the sanitized diagnostic change (PR #731),
+  an explicitly authorized second real-original evaluation
+  returned `source-stream-layout-unsupported` at `input-probe`.
+  The dry-run and approved tools passed; no full-range colour proof,
+  conversion, review proxy, post-trial original SHA, hydration,
+  database write, worker activation or derivative publication was
+  reported. The accepted `1 video + optional audio` input
+  contract rejects even common MOV/MP4 cameras with separate
+  timecode and telemetry streams; those are a **hypothesis**
+  about this sample, not independently observed contents.
+- **Guarded ancillary-stream correction (PR #732), same evaluation slice:**
+  Permit only **one each** of explicitly tagged MOV `tmcd`
+  timecode and `gpmd` telemetry data alongside exactly one
+  expected video and at most one matching audio, with a four-stream
+  bound. Reject unrecognized data, subtitles, duplicate tags,
+  extra video/audio or missing type proof. Preserve the fixed
+  `-map 0:v:0 -map 0:a:0? -dn -sn -map_metadata -1`
+  output policy so no sensitive auxiliary payload is included
+  in a proxy. Extend FFprobe stream-tag evidence and synthetic
+  positive/negative CI tests **in the same PR**. Keep the
+  full-range Rec.709 signal contract, explicit local read,
+  source SHA and OneDrive safeguards, no production gate
+  broadening. A single **separately authorized**, post-merge
+  real-video evaluation will determine whether the format
+  proceeds to colour/proxy validation. If it does, proceed
+  directly to production-integrated playable proxies rather
+  than another preparatory checkpoint.
 ## Completion notes
 
 - Status: in_progress. The previous 58-video `unknown` figures
