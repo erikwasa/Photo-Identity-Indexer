@@ -25,6 +25,8 @@ public sealed class VideoLibraryBrowsingLayoutContractTests
         Assert.Contains("playableOnly={PlayableOnly.ToString().ToLowerInvariant()}", page);
         Assert.Contains("No playable video proxies", page);
         Assert.Contains("No verified poster", page);
+        Assert.Contains("PosterFailed(video.RevisionId)", page);
+        Assert.Contains("FailedPosters.Clear()", page);
         Assert.Contains("video-library-player\" controls playsinline preload=\"metadata\"", page);
         Assert.Contains("/api/videos/coverage", page);
         Assert.Contains("GetCoverageAsync", api);
