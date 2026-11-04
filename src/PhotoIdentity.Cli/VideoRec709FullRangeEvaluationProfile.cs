@@ -5,6 +5,31 @@ using PhotoIdentity.Core.Catalogue;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
+/// Sanitized, operator-visible outcome for an explicitly authorized real
+/// source's independent FFprobe. Never contains private stream values,
+/// original paths, revision IDs, full FFprobe output or exception text.
+/// </summary>
+public sealed class VideoFullRangeInputRejectionException : InvalidDataException
+{
+    public string ReasonCode { get; }
+
+    public VideoFullRangeInputRejectionException(string reasonCode)
+        : base("Real full-range input evidence did not meet the approved contract.")
+    {
+        if (reasonCode is not (
+            "source-registered-class-ineligible" or "source-probe-data-invalid" or
+            "source-container-unapproved" or "source-size-or-duration-mismatch" or
+            "source-stream-layout-unsupported" or "source-video-codec-mismatch" or
+            "source-pixel-format-unproven" or "source-full-range-unproven" or
+            "source-bt709-signalling-unproven" or "source-geometry-mismatch" or
+            "source-rotation-unproven" or "source-audio-layout-mismatch" or
+            "source-probe-execution-incomplete"))
+            throw new ArgumentException("Unrecognized sanitized input rejection code.");
+        ReasonCode = reasonCode;
+    }
+}
+
+/// <summary>
 /// WI-0210 isolated evaluation contract, NOT a registered worker profile or
 /// operator command. Only a separately approved, locally staged original
 /// and a bounded independent FFprobe result may enter a future trial.
@@ -26,8 +51,10 @@ public static class VideoRec709FullRangeEvaluationProfile
         ReadOnlySpan<byte> utf8, VideoRevisionInspection? current,
         long registeredSourceBytes)
     {
+        static VideoFullRangeInputRejectionException Reject(string reason) => new(reason);
+
         if (utf8.Length is < 20 or > 65536)
-            throw new InvalidDataException("Bounded full-range input probe required.");
+            throw Reject("source-probe-data-invalid");
         if (current is not
             {
                 InspectionStatus: "supported",
@@ -41,60 +68,81 @@ public static class VideoRec709FullRangeEvaluationProfile
             } ||
             current.AudioCodec is not (null or "aac" or "pcm_s16le" or "pcm_s24le") ||
             registeredSourceBytes is < 1 or > MaximumSourceBytes)
-            throw new InvalidDataException("Input is outside the exact full-range metadata trial.");
+            throw Reject("source-registered-class-ineligible");
 
-        using JsonDocument doc = JsonDocument.Parse(utf8.ToArray(),
-            new JsonDocumentOptions { MaxDepth = 12 });
-        JsonElement root = doc.RootElement;
-        if (!root.TryGetProperty("format", out JsonElement format) ||
-            Text(format, "format_name") is not string container ||
-            !container.Split(',').Any(x => x is "mov" or "mp4"))
-            throw new InvalidDataException("Input container was not approved.");
-        if (!TryLong(format, "size", out long bytes) ||
-            bytes != registeredSourceBytes ||
-            !TryDecimal(format, "duration", out decimal duration) ||
-            duration is < 0.2m or > 600m ||
-            Math.Abs(duration - current.DurationSeconds!.Value) > 0.5m)
-            throw new InvalidDataException("Input size or duration does not match revision evidence.");
-
-        if (!root.TryGetProperty("streams", out JsonElement streams) ||
-            streams.ValueKind != JsonValueKind.Array ||
-            streams.GetArrayLength() is < 1 or > 2)
-            throw new InvalidDataException("Unapproved input stream layout.");
-
-        int videos = 0, audios = 0;
-        foreach (JsonElement stream in streams.EnumerateArray())
+        // Only bounded, allowlisted field *categories* leave this
+        // validator. Actual JSON and all media values stay private.
+        JsonDocument document;
+        try
         {
-            switch (Text(stream, "codec_type"))
-            {
-                case "video":
-                    if (++videos != 1 ||
-                        Text(stream, "codec_name") != current.VideoCodec ||
-                        Text(stream, "pix_fmt") != "yuvj420p" ||
-                        Text(stream, "color_range") != "pc" ||
-                        Text(stream, "color_transfer") != "bt709" ||
-                        Text(stream, "color_primaries") != "bt709" ||
-                        Text(stream, "color_space") != "bt709" ||
-                        !TryInt(stream, "width", out int width) ||
-                        !TryInt(stream, "height", out int height) ||
-                        width != current.CodedWidth || height != current.CodedHeight ||
-                        !TryExplicitRotation(stream, out int rotation,
-                            allowAbsentAsZero: current.DisplayRotationDegrees == 0) ||
-                        rotation != current.DisplayRotationDegrees)
-                        throw new InvalidDataException("Input colour, geometry or rotation is not proven.");
-                    break;
-                case "audio":
-                    if (++audios > 1 ||
-                        Text(stream, "codec_name") != current.AudioCodec)
-                        throw new InvalidDataException("Audio stream differs from revision evidence.");
-                    break;
-                default:
-                    throw new InvalidDataException("Unsupported input stream type.");
-            }
+            document = JsonDocument.Parse(utf8.ToArray(),
+                new JsonDocumentOptions { MaxDepth = 12 });
         }
-        if (videos != 1 || (audios == 0 && current.AudioCodec is not null) ||
-            (audios == 1 && current.AudioCodec is null))
-            throw new InvalidDataException("Input stream set differs from revision evidence.");
+        catch (JsonException)
+        {
+            throw Reject("source-probe-data-invalid");
+        }
+        using (document)
+        {
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("format", out JsonElement format) ||
+                Text(format, "format_name") is not string container ||
+                !container.Split(',').Any(x => x is "mov" or "mp4"))
+                throw Reject("source-container-unapproved");
+            if (!TryLong(format, "size", out long bytes) ||
+                bytes != registeredSourceBytes ||
+                !TryDecimal(format, "duration", out decimal duration) ||
+                duration is < 0.2m or > 600m ||
+                Math.Abs(duration - current.DurationSeconds!.Value) > 0.5m)
+                throw Reject("source-size-or-duration-mismatch");
+
+            if (!root.TryGetProperty("streams", out JsonElement streams) ||
+                streams.ValueKind != JsonValueKind.Array ||
+                streams.GetArrayLength() is < 1 or > 2)
+                throw Reject("source-stream-layout-unsupported");
+
+            int videos = 0, audios = 0;
+            foreach (JsonElement stream in streams.EnumerateArray())
+            {
+                switch (Text(stream, "codec_type"))
+                {
+                    case "video":
+                        if (++videos != 1)
+                            throw Reject("source-stream-layout-unsupported");
+                        if (Text(stream, "codec_name") != current.VideoCodec)
+                            throw Reject("source-video-codec-mismatch");
+                        if (Text(stream, "pix_fmt") != "yuvj420p")
+                            throw Reject("source-pixel-format-unproven");
+                        if (Text(stream, "color_range") != "pc")
+                            throw Reject("source-full-range-unproven");
+                        if (Text(stream, "color_transfer") != "bt709" ||
+                            Text(stream, "color_primaries") != "bt709" ||
+                            Text(stream, "color_space") != "bt709")
+                            throw Reject("source-bt709-signalling-unproven");
+                        if (!TryInt(stream, "width", out int width) ||
+                            !TryInt(stream, "height", out int height) ||
+                            width != current.CodedWidth || height != current.CodedHeight)
+                            throw Reject("source-geometry-mismatch");
+                        if (!TryExplicitRotation(stream, out int rotation,
+                                allowAbsentAsZero: current.DisplayRotationDegrees == 0) ||
+                            rotation != current.DisplayRotationDegrees)
+                            throw Reject("source-rotation-unproven");
+                        break;
+                    case "audio":
+                        if (++audios > 1 ||
+                            Text(stream, "codec_name") != current.AudioCodec)
+                            throw Reject("source-audio-layout-mismatch");
+                        break;
+                    default:
+                        throw Reject("source-stream-layout-unsupported");
+                }
+            }
+            if (videos != 1)
+                throw Reject("source-stream-layout-unsupported");
+            if ((audios == 0 && current.AudioCodec is not null) ||
+                (audios == 1 && current.AudioCodec is null))
+                throw Reject("source-audio-layout-mismatch");
+        }
     }
 
     /// <summary>
