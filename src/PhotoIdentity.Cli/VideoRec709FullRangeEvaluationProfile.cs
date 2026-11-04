@@ -42,6 +42,26 @@ public static class VideoRec709FullRangeEvaluationProfile
     private const long MaximumSourceBytes = 256L * 1024 * 1024;
 
     /// <summary>
+    /// Only the exact persisted SDR pixel class previously accepted under
+    /// one privately authorized real-video evaluation can be selected.
+    /// This is a metadata preflight, NOT permission to encode: the worker
+    /// must independently FFprobe the staged, SHA-verified original.
+    /// </summary>
+    public static bool Eligible(VideoRevisionInspection? input) =>
+        input is
+        {
+            InspectionStatus: "supported",
+            ColorTransfer: "bt709",
+            PixelFormat: "yuvj420p",
+            VideoCodec: "h264" or "hevc",
+            CodedWidth: >= 16 and <= 4096,
+            CodedHeight: >= 16 and <= 4096,
+            DurationSeconds: >= 0.2m and <= 600m,
+            DisplayRotationDegrees: 0 or 90 or -90 or 180 or -180
+        } && input.AudioCodec is null or "aac" or "pcm_s16le" or "pcm_s24le";
+
+
+    /// <summary>
     /// Confirm an explicitly full-range, correctly signalled Rec.709 stream
     /// against the CURRENT persisted revision. Pixel format alone does NOT
     /// establish full range, matrix, primaries, rotation or local availability.
