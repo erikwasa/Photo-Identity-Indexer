@@ -627,7 +627,9 @@ public sealed class VideoArchiveProcessingService(
               AND metadata.inspection_status='supported'
               AND metadata.color_transfer='bt709'
               AND metadata.video_codec IN ('h264','hevc')
-              AND metadata.pixel_format IN ('yuv420p','yuv420p10le')
+              AND ((@fullrange AND metadata.pixel_format='yuvj420p')
+                   OR (NOT @fullrange AND
+                       metadata.pixel_format IN ('yuv420p','yuv420p10le')))
               AND (metadata.audio_codec IS NULL OR
                    metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
               AND metadata.coded_width BETWEEN 16 AND 4096
@@ -654,6 +656,8 @@ public sealed class VideoArchiveProcessingService(
         query.Parameters.AddWithValue("max", MaxSourceBytes);
         query.Parameters.AddWithValue("preset", presetVersion);
         query.Parameters.AddWithValue("tool", toolSha256);
+        query.Parameters.AddWithValue("fullrange",
+            presetVersion == VideoProxyEncodingProfiles.Rec709FullRange.Version);
         List<VideoArchiveCandidate> candidates = [];
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
         {
