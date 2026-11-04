@@ -7,23 +7,28 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
-**2026-11-04 WI-0210 real-media acceptance:** One
-explicitly authorized already-local full-range Rec.709
-`yuvj420p` camera source passed independent input FFprobe,
-full-to-limited 720p output, post-trial SHA/source integrity
-and human visual playback/colour/orientation/audio review.
-It produced only a temporary private proxy; **zero newly
-published production videos** are confirmed. The next
-product integration keeps the current SDR default and
-compact profiles untouched while adding a separately
-versioned local-only, operator-selected one-step
-Rec.709 full-range playable-proxy path through the
-existing photo-first queue, guarded staged input,
-independent output validator, publication receipt and
-browser playback. Never infer acceptance for all 12
-metadata candidates, HDR, or online-only sources. See
-[WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md)
-and [single production acceptance runbook](../../operations/video-fullrange-wi0210-production-acceptance.md).
+**2026-11-04 WI-0210 production expansion — maintainer ACCEPTED and completed:**
+PR #734 merged after six passing CI jobs. One deliberately
+selected locally available Rec.709 full-range `yuvj420p`
+video was converted, registered and actually played through
+Photo Identity using the explicit local-only, one-video-step
+720p profile. The maintainer confirmed visual playback PASS
+and no unexpected hydration; sanitized job results:
+Succeeded **27→28 (+1)**, Queued **0→0**, Failed **0→0**,
+LastResult `published`. The earlier independent full-range
+BT.709 source probe, limited-range output, integrity and
+colour/orientation/audio review also passed. This
+**completes WI-0210**, not all of milestone M30.
+
+The archive survey identified **12** pixel-only metadata
+candidates locally matched; only **one additional production
+playable proxy is now verified**. The other 11 are potential,
+not production success claims. Standard SDR/compact encoding,
+HDR/HLG, posters, searchable frames, absent rotation and
+online-only release/hydration remain separate boundaries.
+M30 retains other proposed work, including WI-0207. See the
+[final acceptance](../../operations/video-fullrange-wi0210-production-acceptance.md)
+and [completed WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md).
 
 ## Scheduling status
 
