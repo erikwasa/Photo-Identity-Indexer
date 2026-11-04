@@ -17,6 +17,18 @@ before the maintainer can approve the separate production integration.
   registered SHA-256 **verified**; stable source metadata,
   no OneDrive hydration, jobs or derivatives.
 - Synthetic actual-tool full→limited Rec.709 roundtrip: passed.
+- **2026-11-04 maintainer acceptance:** after the bounded data-stream
+  correction in merged PR #733, the same explicitly authorized real
+  local original returned `status=validated`: full-range Rec.709
+  input proven, independent limited-range H.264/AAC output proven,
+  post-encode original integrity rechecked, private review proxy
+  retained, and **human visual colour, orientation, audio, playback
+  and seek review PASS**. No hydration, database writes, jobs or
+  published derivatives. The isolated real-video evaluation is
+  **accepted for one real original**; this does **not** certify
+  12 production proxies or browser delivery. Its follow-on product
+  scope is the [explicitly selected, local-only, single-step
+  production playback acceptance](video-fullrange-wi0210-production-acceptance.md).
 
 The new workflow removes the need to rerun separate local
 source-proof, FFprobe and synthetic commands. Instead it rechecks
