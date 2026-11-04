@@ -82,6 +82,47 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
     }
 
     [Fact]
+    public void Absent_rotation_defaults_to_zero_only_for_recorded_zero()
+    {
+        string rotated = InputProbe();
+        using System.Text.Json.JsonDocument document =
+            System.Text.Json.JsonDocument.Parse(rotated);
+        using MemoryStream buffer = new();
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("format");
+            document.RootElement.GetProperty("format").WriteTo(writer);
+            writer.WritePropertyName("streams");
+            writer.WriteStartArray();
+            foreach (System.Text.Json.JsonElement stream in
+                document.RootElement.GetProperty("streams").EnumerateArray())
+            {
+                writer.WriteStartObject();
+                foreach (System.Text.Json.JsonProperty field in stream.EnumerateObject())
+                {
+                    if (field.Name == "side_data_list") continue;
+                    field.WriteTo(writer);
+                }
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+        byte[] noRotation = buffer.ToArray();
+        VideoRevisionInspection zero =
+            Current() with { DisplayRotationDegrees = 0 };
+        VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+            noRotation, zero, SourceSize);
+        Assert.Throws<InvalidDataException>(() =>
+            VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                noRotation, Current(), SourceSize));
+        Assert.Throws<InvalidDataException>(() =>
+            VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                Encoding.UTF8.GetBytes(rotated), zero, SourceSize));
+    }
+
+    [Fact]
     public void Fixed_evaluation_recipe_converts_full_to_limited_and_retains_baseline_guardrails()
     {
         string source = Path.GetFullPath("approved-local-staged.mov");

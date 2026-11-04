@@ -78,7 +78,8 @@ public static class VideoRec709FullRangeEvaluationProfile
                         !TryInt(stream, "width", out int width) ||
                         !TryInt(stream, "height", out int height) ||
                         width != current.CodedWidth || height != current.CodedHeight ||
-                        !TryExplicitRotation(stream, out int rotation) ||
+                        !TryExplicitRotation(stream, out int rotation,
+                            allowAbsentAsZero: current.DisplayRotationDegrees == 0) ||
                         rotation != current.DisplayRotationDegrees)
                         throw new InvalidDataException("Input colour, geometry or rotation is not proven.");
                     break;
@@ -238,7 +239,8 @@ public static class VideoRec709FullRangeEvaluationProfile
             CultureInfo.InvariantCulture, out number);
     }
 
-    private static bool TryExplicitRotation(JsonElement stream, out int rotation)
+    private static bool TryExplicitRotation(JsonElement stream, out int rotation,
+        bool allowAbsentAsZero = false)
     {
         rotation = default;
         int? value = null;
@@ -266,6 +268,11 @@ public static class VideoRec709FullRangeEvaluationProfile
             }
         }
 
+        // Absent QuickTime rotation signalling means a default zero
+        // display transform ONLY when the registered revision also says 0.
+        // Never silently infer a nonzero rotation or overlook conflicts.
+        if (value is null && allowAbsentAsZero)
+            return true;
         if (value is not (0 or 90 or -90 or 180 or -180))
             return false;
         rotation = value.Value;

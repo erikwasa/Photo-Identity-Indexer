@@ -265,15 +265,46 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   A real original read is **NOT** authorized merely because
   the candidate list passed. CI owns docs checks; review begins
   on merged `main`.
+- **2026-11-04 checkpoint 7 — PR #728 merged; maintainer accepted real SHA:**
+  The default exact-class source-proof dry-run passed with
+  `status=not-run`, no original read/hydration/job and
+  `requireRec709FullRangePixelOnly=true`. The maintainer then
+  **explicitly authorized reading one already-local original** and
+  obtained `status=verified`, `revisionDigestMatched=true`,
+  `sourceMetadataStable=true`, `originalBytesOpened=true`,
+  with `oneDriveHydrationRequested=false`, no jobs,
+  worker activation, derivatives or production authorization.
+  One chosen real revision has verified SHA, not all 12.
+- **Next vertical slice — guarded real-video conversion (proposed):**
+  Following [the standing agent delivery guide](../../operations/agent-vertical-slice-delivery.md),
+  combine previously separate proposed FFprobe, transform, output
+  probe, post-source integrity and private visual review steps into
+  one explicitly opted-in `video compatibility real-evaluate`
+  command and **one** post-merge local acceptance session.
+  Reject unapproved/changed/excluded/online-only sources; use
+  no-recall SHA-verified private staging and pinned FFprobe/FFmpeg
+  in Windows Job Objects under existing bounds. Require real
+  source `color_range=pc`, BT.709 and rotation evidence, use the
+  unregistered full-to-limited 720p profile, independently
+  verify limited-range H.264/AAC output and original SHA after
+  the tool run, and retain **only a private, manually cleaned
+  review proxy** upon explicit authorization.
+  No PostgreSQL writes, derivative publication, worker eligibility,
+  HDR/poster/frame policy or production change. See the
+  [single post-merge acceptance runbook](../../operations/video-fullrange-wi0210-real-evaluation.md).
+  CI owns all reproducible tests. After the operator accepts real
+  colour/orientation/playback, one substantial production-integration
+  PR should implement the exact playable-proxy stage and measure
+  actual newly playable videos; no more preparatory CLI checkpoints.
 ## Completion notes
 
-- Status: in_progress. Previous 58-video `unknown` availabilities
-  were **last-recorded catalogue observations**. Current
-  attribute-only and private shortlist verification both found
-  **12 of 12** isolated Rec.709 `yuvj420p` candidates locally
-  present with matching sizes and no original content opened.
-  Neither operator selection of one private UUID nor a byte-level
-  source proof has been accepted. Actual full-range colour metadata,
-  real conversion, production admission and playback remain pending.
+- Status: in_progress. The previous 58-video `unknown` figures
+  are stale recorded availability. Live metadata checks found
+  **12/12** isolated Rec.709 `yuvj420p` candidates locally
+  present with matching size; a selected real original has
+  **passed exact-revision SHA** under explicit no-recall
+  authorization. The real-colour conversion/visual result,
+  production proxy eligibility and browser playback still
+  require acceptance. No production format gate is widened.
 - Scope: one evidence-selected archive compatibility slice, with new
   workitems only for later independently justified expansions.

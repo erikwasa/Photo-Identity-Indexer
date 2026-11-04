@@ -87,6 +87,11 @@ public static class Program
                         VideoCompatibilityLocalSelectionOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "compatibility" && args[2] == "real-evaluate" =>
+                    await VideoRec709RealSourcePilotCommandRunner.RunAsync(
+                        VideoRec709RealSourcePilotOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "candidates" =>
                     await VideoOneShotCandidatesCommandRunner.RunAsync(
                         VideoOneShotCandidatesOptions.Parse(args.Skip(3).ToArray()),
@@ -322,6 +327,16 @@ public static class Program
                                         exact Rec.709 yuvj420p pixel candidates;
                                         no private paths or media content opened;
                                         selecting an ID does NOT authorize reads)
+              video compatibility real-evaluate --postgres-connection-env NAME --database DB
+                                       --revision-id UUID --scratch-root TEMP_CHILD_ROOT
+                                       --ffmpeg ABS_EXE --ffmpeg-sha256 HASH
+                                       --ffprobe ABS_EXE --ffprobe-sha256 HASH
+                                       [--apply --read-local-bytes --retain-review-proxy]
+                                       (default dry-run, no DB or original reads;
+                                        explicit exact-revision no-recall staging,
+                                        bounded full-range input and output probes,
+                                        private unregistered review-proxy.mp4;
+                                        never publishes or enqueues video jobs)
               video one-shot candidates --postgres-connection-env NAME --database DB
                                        [--limit COUNT (1..20)]
                                        (read-only, UUID-only metadata shortlist;

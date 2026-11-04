@@ -38,6 +38,19 @@ tie a subsequent **separately approved** `--read-local-bytes`
 SHA to this work item's 12-pixel-only class. CI handles docs,
 operator verification on merged main only. No FFprobe, real
 media conversion or production admission yet.
+PR #728 merged, and checkpoint 7 maintained-host **PASSED**:
+one private current Rec.709 `yuvj420p` original was
+explicitly authorized for no-recall SHA, matching the
+registered digest with stable metadata and no hydration,
+jobs, publication or production permission. The next
+**substantial vertical slice** is one guarded real-source
+FFprobe + conversion + validated private review proxy +
+post-trial SHA workflow. After one merged-main visual
+acceptance, the next PR should integrate the exact
+playable-proxy worker/profile end-to-end; do not
+create separate preparatory PRs for each guard.
+See docs/operations/agent-vertical-slice-delivery.md
+and docs/operations/video-fullrange-wi0210-real-evaluation.md.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.

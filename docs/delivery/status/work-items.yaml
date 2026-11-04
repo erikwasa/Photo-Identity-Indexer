@@ -210,7 +210,7 @@ work_items:
   document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
   started_at: 2026-11-03
   last_updated_at: 2026-11-03
-  branch: wi0210-exact-class-source-proof-gate
+  branch: wi0210-guarded-real-source-proxy-evaluation
   blockers:
   - WI-0151
   - WI-0188
@@ -234,6 +234,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/727
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/728
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/730
   - type: documentation
     value: docs/operations/video-compatibility-wi0210-census.md
   - type: implementation
@@ -252,3 +254,5 @@ work_items:
     value: '2026-11-03 checkpoint 5 accepted: production photoidentity_main live attribute-only survey returned 12/12 rec709 yuvj420p pixel-only candidates local-metadata-match, readOnly=true, sourceContentOpened=false, oneDriveHydrationRequested=false. Checkpoint 6 proposes deliberately opted-in local-only UUID shortlist of those candidates without source content access; individual original proof remains separately authorized.'
   - type: implementation
     value: '2026-11-03 checkpoint 6 accepted on production photoidentity_main: 12 locally matched of 12 candidates, readOnly=true, sourceContentOpened=false, oneDriveHydrationRequested=false. Next exact-class opt-in source-proof guard requires fullrange yuvj420p worker pixel-only conditions before separately authorized no-recall local original SHA. No original read or FFprobe/video processing authorized by shortlist.'
+  - type: implementation
+    value: '2026-11-04 checkpoint 7 accepted: merged PR #728 exact-class SHA proof on one user-authorized local original returned verified, revisionDigestMatched=true, sourceMetadataStable=true, no hydration/jobs/derivatives. Next substantial vertical slice combines guarded real source FFprobe fullrange Rec709 validation, 720p full-to-limited encode, output probe, original SHA recheck and private human visual review; no production pixel gate change, CI owns reproducible checks.'

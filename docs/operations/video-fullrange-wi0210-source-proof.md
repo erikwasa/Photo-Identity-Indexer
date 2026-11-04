@@ -53,7 +53,7 @@ $selection.candidates | Format-Table revisionId, sourceBytes, durationSeconds, c
 UUIDs, paths, camera metadata or credentials in GitHub or chat.
 
 ~~~powershell
-$revision = [Guid](Read-Host "Select one exact local candidate UUID")
+$revision = [Guid]::Parse((Read-Host "Select one exact local candidate UUID"))
 if (@($selection.candidates | Where-Object {
     [Guid]$_.revisionId -eq $revision
 }).Count -ne 1) {
