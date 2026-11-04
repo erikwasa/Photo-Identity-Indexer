@@ -54,8 +54,8 @@ public sealed class VideoProxyPosterCommandTests
     {
         IReadOnlyList<string> args = VideoProxyPosterCommandRunner.BuildRenderArguments(
             "C:\\derived\\verified.mp4", "C:\\derived\\poster.jpg", 20m);
-        Assert.Equal("4.000", args[args.IndexOf("-ss") + 1]);
-        Assert.Equal("C:\\derived\\verified.mp4", args[args.IndexOf("-i") + 1]);
+        Assert.Equal("4.000", args[args.ToList().IndexOf("-ss") + 1]);
+        Assert.Equal("C:\\derived\\verified.mp4", args[args.ToList().IndexOf("-i") + 1]);
         Assert.Equal("C:\\derived\\poster.jpg", args[^1]);
         Assert.Contains("file", args);
         Assert.Contains("-map_metadata", args);
