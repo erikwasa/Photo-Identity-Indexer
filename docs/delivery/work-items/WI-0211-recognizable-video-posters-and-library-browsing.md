@@ -154,3 +154,28 @@ may ship alongside this work-item **proposal**
 because it does not process or modify video media.
 Its implementation should not be mistaken for
 poster functionality.
+
+## Implementation checkpoint 1 — read-only coverage and usable filtering (2026-11-05)
+
+The first scoped change adds **read-only**, current-revision source/exclusion-
+filtered aggregate poster/proxy counts and a real server-side paginated
+`Playable videos only` control on `/videos`. It retains the existing
+native player and revision-bound poster service and improves the missing-
+poster label. Counts report *registered evidence*, not successful media
+file validation; the playback and poster endpoints still perform their
+own guarded byte verification. All new functionality is metadata-only
+and does not request original bytes, OneDrive hydration, transcoding,
+FFmpeg, publishing or background processing.
+
+Disposable PostgreSQL regression fixtures cover current, excluded and
+superseded revisions and real registered proxy receipts. A separate source
+contract protects the browse filter, native controls and read-only route.
+After merge, the optional maintained-browser and sanitized aggregate
+verification is documented in
+[`video-poster-coverage-wi0211.md`](../../operations/video-poster-coverage-wi0211.md).
+
+**Not completed:** the new versioned, opt-in proxy-to-poster producer,
+retained-cache validation and safe JPEG publication/serving, recognizability
+and color/rotation acceptance, and real before/after poster population.
+Do not mark any whole-work-item acceptance criteria complete or close
+WI-0211 based only on this checkpoint.

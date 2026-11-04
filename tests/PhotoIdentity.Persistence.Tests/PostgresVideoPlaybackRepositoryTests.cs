@@ -68,7 +68,8 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                 connectionString.ConnectionString);
             await database.InitializeAsync();
             Guid source = Guid.NewGuid(), asset = Guid.NewGuid(),
-                revision = Guid.NewGuid();
+                revision = Guid.NewGuid(), otherAsset = Guid.NewGuid(),
+                otherRevision = Guid.NewGuid();
             await using (NpgsqlConnection db = await database.OpenConnectionAsync())
             await using (NpgsqlCommand seed = db.CreateCommand())
             {
@@ -76,11 +77,14 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                     INSERT INTO sources(id,kind,root_locator,created_at_utc)
                     VALUES (@source,'local-folder',@root,now());
                     INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
-                    VALUES (@asset,@source,'offline/clip.mov',now(),'video');
+                    VALUES (@asset,@source,'offline/clip.mov',now(),'video'),
+                           (@other_asset,@source,'offline/uninspected.mov',now(),'video');
                     INSERT INTO asset_revisions(id,asset_id,content_sha256,
                         size_bytes,observed_at_utc,media_type,media_kind)
                     VALUES (@revision,@asset,repeat('a',64),5000,now(),
-                        'video/quicktime','video');
+                        'video/quicktime','video'),
+                           (@other_revision,@other_asset,repeat('e',64),4000,
+                            now(),'video/quicktime','video');
                     INSERT INTO video_revision_metadata(asset_revision_id,
                         inspection_status,color_transfer,duration_seconds,
                         inspected_at_utc,tool_sha256,inspection_profile_id)
@@ -93,6 +97,8 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                 seed.Parameters.AddWithValue("root", originals);
                 seed.Parameters.AddWithValue("asset", asset);
                 seed.Parameters.AddWithValue("revision", revision);
+                seed.Parameters.AddWithValue("other_asset", otherAsset);
+                seed.Parameters.AddWithValue("other_revision", otherRevision);
                 await seed.ExecuteNonQueryAsync();
             }
 
@@ -120,9 +126,20 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                 .PublishAsync(lease, cache, output));
             VideoLibraryPage visible = await new PostgresVideoLibraryRepository(database)
                 .ListAsync(0, 24);
+            Assert.Equal(2, visible.Items.Count);
             Assert.Contains(visible.Items, x =>
                 x.RevisionId == AssetRevisionId.From(revision) &&
                 x.HasPlayableProxy);
+            var browse = new PostgresVideoLibraryRepository(database);
+            VideoLibraryPage playable = await browse.ListAsync(0, 24, playableOnly: true);
+            Assert.Equal(AssetRevisionId.From(revision), Assert.Single(playable.Items).RevisionId);
+            VideoLibraryCoverage coverage = await browse.GetCoverageAsync();
+            Assert.Equal(2, coverage.TotalVideos);
+            Assert.Equal(1, coverage.PlayableVideos);
+            Assert.Equal(0, coverage.VideosWithPosters);
+            Assert.Equal(0, coverage.PlayableWithPosters);
+            Assert.Equal(1, coverage.PlayableMissingPosters);
+            Assert.Equal(1, coverage.UninspectedOrUnsupported);
             string file = Path.Combine(cache, VideoDerivativeArtifactPath.ForLease(lease)
                 .Replace('/', Path.DirectorySeparatorChar));
             var playback = new PostgresVideoPlaybackRepository(database);
@@ -156,6 +173,8 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                     DateTimeOffset.UtcNow);
             Assert.Null(await playback.OpenCurrentAsync(
                 AssetRevisionId.From(revision), cache));
+            Assert.Equal(1, (await browse.GetCoverageAsync()).TotalVideos);
+            Assert.Empty((await browse.ListAsync(0, 24, playableOnly: true)).Items);
 
             // Remove only this disposable test exclusion, then advance the
             // catalogue's current revision. The old proxy must stay hidden.
@@ -177,6 +196,9 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             }
             Assert.Null(await playback.OpenCurrentAsync(
                 AssetRevisionId.From(revision), cache));
+            Assert.Equal(2, (await browse.GetCoverageAsync()).TotalVideos);
+            Assert.Equal(0, (await browse.GetCoverageAsync()).PlayableVideos);
+            Assert.Empty((await browse.ListAsync(0, 24, playableOnly: true)).Items);
         }
         finally
         {

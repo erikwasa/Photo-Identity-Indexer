@@ -19,6 +19,11 @@ public sealed record VideoLibraryEntry(
 public sealed record VideoLibraryPage(
     IReadOnlyList<VideoLibraryEntry> Items, int Offset, int Limit, bool HasMore);
 
+public sealed record VideoLibraryCoverage(
+    long TotalVideos, long PlayableVideos, long VideosWithPosters,
+    long PlayableWithPosters, long PlayableMissingPosters,
+    long UninspectedOrUnsupported);
+
 /// <summary>
 /// Explicit video-only read boundary. No photo, search, collection or slideshow
 /// query uses it. Poster payloads are checked under the same source-row lock
@@ -30,15 +35,9 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
     private const string PosterProfile = "wi0151-sdr-still-v1";
     private const long MaxPosterBytes = 8L * 1024 * 1024;
 
-    public async Task<VideoLibraryPage> ListAsync(
-        int offset, int limit, CancellationToken token = default)
-    {
-        if (offset < 0 || limit is < 1 or > 60)
-            throw new ArgumentOutOfRangeException(nameof(limit), "Video library page must be bounded.");
-        await _exclusions.EnsureReadyAsync(token);
-        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
-        await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = """
+    // A single read-only visibility predicate drives both the browse page and
+    // aggregate counts. Never enumerate originals or expose source keys in an API.
+    private const string CurrentVideoSql = """
             SELECT latest.id, metadata.inspection_status,
                    metadata.duration_seconds, metadata.coded_width,
                    metadata.coded_height, metadata.display_rotation_degrees,
@@ -59,7 +58,8 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                             'wi0210-rec709-fullrange-720p-production-v1')
                          AND metadata.inspection_status = 'supported'
                          AND metadata.color_transfer = 'bt709'
-                   ) AS has_playable_proxy
+                   ) AS has_playable_proxy,
+                   COALESCE(metadata.capture_at_utc, latest.observed_at_utc) AS sort_at
             FROM assets asset
             JOIN LATERAL (
                 SELECT revision.id, revision.observed_at_utc
@@ -85,12 +85,32 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                   SELECT 1 FROM source_copy_exclusions exclusion
                   WHERE exclusion.source_id = asset.source_id
                     AND exclusion.source_key = asset.source_key)
-            ORDER BY COALESCE(metadata.capture_at_utc, latest.observed_at_utc) DESC,
-                     latest.id DESC
+        """;
+
+    public Task<VideoLibraryPage> ListAsync(
+        int offset, int limit, CancellationToken token = default) =>
+        ListAsync(offset, limit, playableOnly: false, token);
+
+    public async Task<VideoLibraryPage> ListAsync(
+        int offset, int limit, bool playableOnly, CancellationToken token = default)
+    {
+        if (offset < 0 || limit is < 1 or > 60)
+            throw new ArgumentOutOfRangeException(nameof(limit), "Video library page must be bounded.");
+        await _exclusions.EnsureReadyAsync(token);
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT id, inspection_status, duration_seconds, coded_width,
+                   coded_height, display_rotation_degrees, capture_at_utc,
+                   has_poster, has_playable_proxy
+            FROM ({CurrentVideoSql}) AS catalogue
+            WHERE NOT @playable_only OR has_playable_proxy
+            ORDER BY sort_at DESC, id DESC
             LIMIT @take OFFSET @skip;
             """;
         command.Parameters.AddWithValue("take", limit + 1);
         command.Parameters.AddWithValue("skip", offset);
+        command.Parameters.AddWithValue("playable_only", playableOnly);
         List<VideoLibraryEntry> rows = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
@@ -107,6 +127,34 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
         }
         return new VideoLibraryPage(rows.Take(limit).ToArray(), offset, limit,
             rows.Count > limit);
+    }
+
+    /// <summary>
+    /// Aggregate visibility across the full catalogue, not only the current page.
+    /// Reads metadata/receipts only; never accesses media files or original paths.
+    /// "Has poster" means registered evidence, not a new filesystem read.
+    /// </summary>
+    public async Task<VideoLibraryCoverage> GetCoverageAsync(
+        CancellationToken token = default)
+    {
+        await _exclusions.EnsureReadyAsync(token);
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT COUNT(*),
+                   COUNT(*) FILTER (WHERE has_playable_proxy),
+                   COUNT(*) FILTER (WHERE has_poster),
+                   COUNT(*) FILTER (WHERE has_playable_proxy AND has_poster),
+                   COUNT(*) FILTER (WHERE has_playable_proxy AND NOT has_poster),
+                   COUNT(*) FILTER (WHERE inspection_status IS DISTINCT FROM 'supported')
+            FROM ({CurrentVideoSql}) AS catalogue;
+            """;
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token))
+            throw new InvalidDataException("Video coverage query returned no aggregate.");
+        return new VideoLibraryCoverage(
+            reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2),
+            reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5));
     }
 
     /// <summary>
