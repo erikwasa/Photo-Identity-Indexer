@@ -383,6 +383,49 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   progress before production admission. This correction
   remains in WI-0210; candidate count is still **12
   possible, zero newly playable accepted**.
+- **2026-11-04 real-source evaluation accepted (merged PR #733):**
+  The maintainer separately authorized evaluation of one current,
+  already-local Rec.709 full-range `yuvj420p` source. The complete
+  private one-video evaluation returned `status=validated`,
+  `inputFullRangeProven=true`, `outputLimitedRangeValidated=true`,
+  `sourceIntegrityRechecked=true`, `reviewProxyRetained=true`,
+  with AAC audio, correct portrait geometry and
+  **human visual inspection PASS** (colour, orientation,
+  playback/seek and audio). No OneDrive hydration, database writes,
+  jobs, production profile changes or derivative publication
+  occurred during that experiment. Accepted evidence applies
+  to ONE real original, not all 12 metadata candidates.
+- **Next product vertical slice — opt-in production playable proxy:**
+  Reuse the accepted experimental transform as a distinct durable
+  `rec709-fullrange-720p` job preset. The selected profile alone
+  must never enqueue or process videos; require explicit
+  operator-enabled one-step, local-only archive advancement.
+  Keep standard 720p / compact 540p unchanged and never
+  silently include the new pixel format in their gates.
+  Archive pending selection must match the exact format.
+  The existing worker must stage an original with no-recall SHA
+  and lease/photo-priority protection, independently FFprobe
+  the staged source with **the same complete full-range Rec.709
+  input contract** before FFmpeg, and independently verify
+  H.264/AAC limited-range output before reusing the existing
+  lease-fenced publisher, receipt, and HTTP/browser playback.
+  Do not map data streams or preserve source metadata. Keep
+  HLG/HDR, unknown colour/rotation, online-only originals and
+  poster/frame pipelines unchanged.
+  CI owns positive/negative source and output contracts,
+  strict profile/version selection, disabled settings,
+  limited permissions and no-extra-stream mapping.
+  Operator's single post-merge acceptance: record baseline
+  video proxy count; explicitly opt into local-only one-step
+  profile; advance exactly one video processing step after
+  photos drain; prove one new correctly playable receipt
+  on desktop/phone as applicable; pause/disable processing
+  and report sanitized before/after counts. The
+  previously accepted experimental proxy must NOT be
+  counted as a published production asset.
+  See [the production one-step acceptance](../../operations/video-fullrange-wi0210-production-acceptance.md).
+  **Do not claim any additional playable production videos
+  until this acceptance has succeeded.**
 ## Completion notes
 
 - Status: in_progress. The previous 58-video `unknown` figures
