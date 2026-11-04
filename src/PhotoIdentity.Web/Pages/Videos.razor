@@ -65,9 +65,11 @@ else
                             Your browser cannot play this video.
                         </video>
                     }
-                    else if (video.HasPoster)
+                    else if (video.HasPoster && !FailedPosters.Contains(video.RevisionId))
                     {
-                        <img loading="lazy" alt="Video still poster" src="@($"/api/videos/{video.RevisionId}/poster")" />
+                        <img loading="lazy" alt="Video still poster"
+                             src="@($"/api/videos/{video.RevisionId}/poster")"
+                             @onerror="() => PosterFailed(video.RevisionId)" />
                     }
                     else
                     {
@@ -111,6 +113,7 @@ else
 
 @code {
     private readonly List<VideoLibraryItemResponse> Items = [];
+    private readonly HashSet<string> FailedPosters = [];
     private string? ActivePlaybackRevisionId;
     private string? PlaybackErrorRevisionId;
     private bool Loading;
@@ -127,6 +130,7 @@ else
         ActivePlaybackRevisionId = null;
         PlaybackErrorRevisionId = null;
         Items.Clear();
+        FailedPosters.Clear();
         HasMore = false;
         Error = null;
         await LoadMoreAsync();
@@ -177,6 +181,13 @@ else
             Error = "The video catalogue could not be loaded. No originals or photo data were changed.";
         }
         finally { Loading = false; }
+    }
+
+    private void PosterFailed(string revisionId)
+    {
+        // A registered receipt can still reference a missing/tampered JPEG.
+        // Keep playback available and show an honest, local-only fallback.
+        FailedPosters.Add(revisionId);
     }
 
     private void TogglePlayback(string revisionId)
