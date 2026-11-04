@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Nodes;
 using PhotoIdentity.Cli;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
@@ -181,6 +182,107 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
 
         Assert.Throws<ArgumentException>(() =>
             new VideoFullRangeInputRejectionException("private/source/path.mov"));
+    }
+
+    [Fact]
+    public void Known_camera_timecode_and_telemetry_sidecars_are_not_media_streams()
+    {
+        // Exact known MOV four-character codes, not a blanket allowance for
+        // data/attachments/subtitles or additional audio/video streams.
+        string valid = InputProbe();
+        VideoRevisionInspection revision = Current();
+        foreach (string trial in new[]
+        {
+            WithAncillaryStreams(valid, ("tmcd", "none")),
+            WithAncillaryStreams(valid, ("tmcd", "bin_data")),
+            WithAncillaryStreams(valid, ("gpmd", "bin_data")),
+            WithAncillaryStreams(valid, ("gpmd", "none")),
+            WithAncillaryStreams(valid, ("tmcd", "none"), ("gpmd", "bin_data"))
+        })
+            VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                Encoding.UTF8.GetBytes(trial), revision, SourceSize);
+
+        // Fixed map arguments and no-data/no-metadata policy are what make
+        // the accepted sidecars irrelevant to the resulting review proxy.
+        IReadOnlyList<string> encoded = VideoRec709FullRangeEvaluationProfile
+            .BuildArguments(Path.GetFullPath("approved-staged.mp4"),
+                Path.GetFullPath("private-workspace"));
+        Assert.Equal(2, encoded.Count(x => x == "-map"));
+        Assert.Contains("0:v:0", encoded);
+        Assert.Contains("0:a:0?", encoded);
+        Assert.Contains("-dn", encoded);
+        Assert.Contains("-sn", encoded);
+        int metadata = encoded.ToList().IndexOf("-map_metadata");
+        Assert.True(metadata >= 0);
+        Assert.Equal("-1", encoded[metadata + 1]);
+    }
+
+    [Theory]
+    [InlineData("gpmd", "arbitrary")]
+    [InlineData("tmcd", "arbitrary")]
+    [InlineData("evil", "bin_data")]
+    [InlineData("", "bin_data")]
+    public void Unrecognized_or_weakly_identified_camera_data_is_not_authorized(
+        string tag, string codec)
+    {
+        string evidence = WithAncillaryStreams(InputProbe(), (tag, codec));
+        VideoFullRangeInputRejectionException fail =
+            Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                    Encoding.UTF8.GetBytes(evidence), Current(), SourceSize));
+        Assert.Equal("source-ancillary-stream-unapproved", fail.ReasonCode);
+    }
+
+    [Fact]
+    public void Duplicate_or_unbounded_or_untagged_camera_sidecars_fail_closed()
+    {
+        foreach (string invalid in new[]
+        {
+            WithAncillaryStreams(InputProbe(), ("tmcd", "none"), ("tmcd", "none")),
+            WithAncillaryStreams(InputProbe(), ("gpmd", "bin_data"), ("gpmd", "bin_data")),
+            WithAncillaryStreams(InputProbe(), ("tmcd", "none"),
+                ("gpmd", "bin_data"), ("gpmd", "bin_data")),
+        })
+        {
+            VideoFullRangeInputRejectionException fail =
+                Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                    VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                        Encoding.UTF8.GetBytes(invalid), Current(), SourceSize));
+            Assert.Contains(fail.ReasonCode,
+                new[] { "source-ancillary-stream-unapproved",
+                    "source-stream-layout-unsupported" });
+        }
+
+        // No codec_tag_string is NOT evidence for an allowlisted track.
+        JsonObject json = JsonNode.Parse(InputProbe())!.AsObject();
+        JsonArray streams = json["streams"]!.AsArray();
+        streams.Add(new JsonObject
+        {
+            ["codec_type"] = "data",
+            ["codec_name"] = "bin_data"
+        });
+        VideoFullRangeInputRejectionException missingTag =
+            Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                    Encoding.UTF8.GetBytes(json.ToJsonString()), Current(), SourceSize));
+        Assert.Equal("source-ancillary-stream-unapproved", missingTag.ReasonCode);
+    }
+
+    private static string WithAncillaryStreams(
+        string baseline, params (string Tag, string Codec)[] sidecars)
+    {
+        JsonObject result = JsonNode.Parse(baseline)!.AsObject();
+        JsonArray streams = result["streams"]!.AsArray();
+        foreach ((string tag, string codec) in sidecars)
+        {
+            streams.Add(new JsonObject
+            {
+                ["codec_type"] = "data",
+                ["codec_name"] = codec,
+                ["codec_tag_string"] = tag
+            });
+        }
+        return result.ToJsonString();
     }
 
     [Fact]
