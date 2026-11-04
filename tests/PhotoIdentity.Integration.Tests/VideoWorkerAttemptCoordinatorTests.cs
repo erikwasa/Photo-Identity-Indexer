@@ -27,6 +27,18 @@ public sealed class VideoWorkerAttemptCoordinatorTests
         Assert.Throws<ArgumentException>(() =>
             VideoAttemptFailureDiagnostics.Mark(source, @"C:\sensitive.mov"));
 
+        var fullRangeRejection = new VideoFullRangeInputRejectionException(
+            "source-full-range-unproven");
+        VideoAttemptFailureDiagnostics.Mark(fullRangeRejection,
+            "source-validation");
+        VideoAttemptFailureDiagnostic privateProbe =
+            VideoAttemptFailureDiagnostics.Sanitize(
+                VideoAttemptFailureDiagnostics.FromException(fullRangeRejection));
+        Assert.Equal("source-validation", privateProbe.Stage);
+        Assert.Equal("source-full-range-unproven", privateProbe.FailureClass);
+        Assert.DoesNotContain("private", JsonSerializer.Serialize(privateProbe));
+        Assert.DoesNotContain("path", JsonSerializer.Serialize(privateProbe));
+
         var tool = new InvalidOperationException("path-and-arguments-private");
         VideoToolFailureEvidence.Mark(tool, "io-accounting-unavailable");
         VideoAttemptFailureDiagnostics.Mark(tool, "tool-execution");
