@@ -159,9 +159,10 @@ public static class VideoRec709FullRangeEvaluationProfile
     }
 
     /// <summary>
-    /// The standard 720p software recipe is inherited; ONLY the fixed,
-    /// full-to-limited BT.709 range conversion and explicit limited range
-    /// signaling differ. No caller-provided filters, shell or protocols.
+    /// The standard 720p software recipe is inherited; the fixed,
+    /// full-to-limited BT.709 range conversion and explicit limited-range
+    /// signaling plus stream-metadata stripping are added. No caller-provided
+    /// filters, shell, streams or protocols.
     /// This is not a registered production preset/version.
     /// </summary>
     public static IReadOnlyList<string> BuildArguments(string stagedFile, string workspace)
