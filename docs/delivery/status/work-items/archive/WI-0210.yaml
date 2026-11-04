@@ -1,11 +1,14 @@
 id: WI-0210
 title: Expand video compatibility for the highest-value archive cases
 milestone: M30
-status: in_progress
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0210-archive-driven-video-compatibility-expansion.md
 started_at: 2026-11-03
-last_updated_at: 2026-11-03
+completed_at: 2026-11-04
+verified_at: 2026-11-04
+verified_by: maintainer
+last_updated_at: 2026-11-04
 branch: wi0210-guarded-real-source-proxy-evaluation
 blockers:
 - WI-0151
@@ -52,3 +55,17 @@ evidence:
   value: '2026-11-03 checkpoint 6 accepted on production photoidentity_main: 12 locally matched of 12 candidates, readOnly=true, sourceContentOpened=false, oneDriveHydrationRequested=false. Next exact-class opt-in source-proof guard requires fullrange yuvj420p worker pixel-only conditions before separately authorized no-recall local original SHA. No original read or FFprobe/video processing authorized by shortlist.'
 - type: implementation
   value: '2026-11-04 checkpoint 7 accepted: merged PR #728 exact-class SHA proof on one user-authorized local original returned verified, revisionDigestMatched=true, sourceMetadataStable=true, no hydration/jobs/derivatives. Next substantial vertical slice combines guarded real source FFprobe fullrange Rec709 validation, 720p full-to-limited encode, output probe, original SHA recheck and private human visual review; no production pixel gate change, CI owns reproducible checks.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/731
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/732
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/733
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/734
+- type: ci-verification
+  value: '2026-11-04: PR #734 merge commit 5c1af89d56efb076f48429a16732d789b1feb730, required CI run 41911935992 passed six jobs: build and tests, both integration shards, launcher, package, change classification.'
+- type: maintainer-acceptance
+  value: '2026-11-04: Local-only, one-step Rec.709 full-range 720p production profile selected. One new registered proxy published and visually played successfully in Photo Identity. Succeeded jobs 27 to 28 (+1), queued 0 to 0, failed 0 to 0, last processing result published. No unexpected OneDrive hydration. Earlier one real original independently validated full-range BT.709 input, limited-range H.264/AAC output, source SHA recheck, colour, orientation, audio and playback. Scope is ONE published playable production example from 12 locally matched metadata candidates, not blanket compatibility. WI-0210 accepted; M30 remains open with generated status ready because other work items are proposed.'
+- type: documentation
+  value: docs/operations/video-fullrange-wi0210-production-acceptance.md
