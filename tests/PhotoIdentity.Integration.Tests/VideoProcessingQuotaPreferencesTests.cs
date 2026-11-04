@@ -165,6 +165,60 @@ public sealed class VideoProcessingQuotaPreferencesTests
     }
 
     [Fact]
+    public async Task Fullrange_profile_requires_explicit_local_only_one_step_operator_selection()
+    {
+        string profile = PhotoIdentity.Cli.VideoProxyEncodingProfiles.Rec709FullRangeKey;
+        var inactive = new VideoProcessingPreferences(false, false,
+            EncodingProfile: profile);
+        inactive.Validate();
+        Assert.False(inactive.Enabled);
+
+        var approved = inactive with
+        {
+            Enabled = true, StopAfterOneVideoStepPerAdvance = true
+        };
+        approved.Validate();
+        Assert.False(approved.IncludeOnlineOnly);
+        Assert.Throws<ArgumentException>(() =>
+            (approved with { IncludeOnlineOnly = true }).Validate());
+        Assert.Throws<ArgumentException>(() =>
+            (approved with { StopAfterOneVideoStepPerAdvance = false }).Validate());
+        Assert.Throws<ArgumentException>(() =>
+            (inactive with { IncludeOnlineOnly = true }).Validate());
+
+        // Existing default / compact profiles retain their current settings.
+        new VideoProcessingPreferences(true, true).Validate();
+        new VideoProcessingPreferences(true, true,
+            EncodingProfile: PhotoIdentity.Cli.VideoProxyEncodingProfiles.CompactKey)
+            .Validate();
+
+        string path = Path.Combine(Path.GetTempPath(),
+            "wi0210-operator-prefs-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var store = new VideoProcessingPreferencesStore(path,
+                new(false, false));
+            await store.SaveAsync(inactive);
+            Assert.Equal(profile,
+                new VideoProcessingPreferencesStore(path, new(false, false))
+                    .Current.EncodingProfile);
+            await store.SaveAsync(approved);
+            Assert.True(new VideoProcessingPreferencesStore(path, new(false, false))
+                .Current.StopAfterOneVideoStepPerAdvance);
+            Assert.True(new VideoProcessingPreferencesStore(path, new(false, false))
+                .Current.Enabled);
+            string saved = File.ReadAllText(path);
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                store.SaveAsync(approved with { IncludeOnlineOnly = true }));
+            Assert.Equal(saved, File.ReadAllText(path));
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task Selected_video_profile_persists_across_restart_and_legacy_JSON_defaults_to_720p()
     {
         string root = Path.Combine(Path.GetTempPath(),
