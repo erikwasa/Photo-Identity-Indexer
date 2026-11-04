@@ -7,6 +7,30 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**2026-11-04 new scoped follow-up — WI-0211 proposed:** The
+maintainer's Videos screenshot shows widespread indistinguishable
+dark `Video` placeholders despite a successful new
+production playable proxy under completed WI-0210.
+WI-0151's completed manual, durable, original-backed
+poster path does not automatically provide adequate
+poster coverage for newly registered playable proxies.
+[WI-0211](../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md)
+will deliver a separately authorized, bounded and
+versioned still-poster path preferably from **already
+verified local playable proxies**, together with useful
+Videos browse controls and clear fallbacks. Opening the
+Videos page must never itself process, hydrate or
+download an original. The work item is proposed, not
+permission for bulk media reads.
+
+A separate targeted Settings UI correction addresses
+oversized/misaligned checkboxes, preserves the status
+panel during refresh to avoid scroll jumps, keeps Save
+and its feedback in view, and collapses the advanced
+manual proxy-retention action. It does not change
+processing permissions, original access or cache
+deletion semantics.
+
 **2026-11-04 WI-0210 production expansion — maintainer ACCEPTED and completed:**
 PR #734 merged after six passing CI jobs. One deliberately
 selected locally available Rec.709 full-range `yuvj420p`
