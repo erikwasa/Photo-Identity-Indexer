@@ -10,10 +10,24 @@
         <p>Indexed video posters and playback of already-retained local proxies. Playing or seeking never downloads an online-only original or starts processing.</p>
     </div>
     <div class="video-library-actions">
+        <label class="video-library-filter">
+            <input type="checkbox" @bind="PlayableOnly" @bind:after="RefreshAsync" disabled="@Loading" />
+            Playable videos only
+        </label>
         <a class="button secondary" href="/video-search">Search indexed videos</a>
         <button class="button secondary" @onclick="RefreshAsync" disabled="@Loading">Refresh</button>
     </div>
 </section>
+
+@if (Coverage is not null)
+{
+    <section class="video-library-coverage" aria-label="Current video coverage">
+        <strong>@Coverage.TotalVideos</strong> catalogued ·
+        <strong>@Coverage.PlayableVideos</strong> playable ·
+        <strong>@Coverage.VideosWithPosters</strong> with registered posters ·
+        <strong>@Coverage.PlayableMissingPosters</strong> playable without posters
+    </section>
+}
 
 @if (Loading && Items.Count == 0)
 {
@@ -29,8 +43,8 @@ else if (Error is not null)
 else if (Items.Count == 0)
 {
     <section class="empty-state" role="status">
-        <h2>No videos indexed yet</h2>
-        <p>This library only displays videos registered through the opt-in local video workflow.</p>
+        <h2>@(PlayableOnly ? "No playable video proxies" : "No videos indexed yet")</h2>
+        <p>@(PlayableOnly ? "Switch off the playable-only filter to see the full catalogue. Browsing does not start video processing." : "This library only displays videos registered through the opt-in local video workflow.")</p>
     </section>
 }
 else
@@ -57,7 +71,7 @@ else
                     }
                     else
                     {
-                        <span class="video-library-placeholder" aria-label="No verified still poster">Video</span>
+                        <span class="video-library-placeholder" aria-label="No verified still poster">No verified poster</span>
                     }
                     @if (ActivePlaybackRevisionId != video.RevisionId)
                     {
@@ -101,6 +115,8 @@ else
     private string? PlaybackErrorRevisionId;
     private bool Loading;
     private bool HasMore;
+    private bool PlayableOnly;
+    private VideoLibraryCoverageResponse? Coverage;
     private string? Error;
     private const int PageSize = 24;
 
@@ -114,6 +130,23 @@ else
         HasMore = false;
         Error = null;
         await LoadMoreAsync();
+        if (Error is null) await LoadCoverageAsync();
+    }
+
+    private async Task LoadCoverageAsync()
+    {
+        try
+        {
+            Coverage = await Http.GetFromJsonAsync<VideoLibraryCoverageResponse>(
+                "/api/videos/coverage");
+        }
+        catch (Exception error) when (error is HttpRequestException or
+                                     System.Text.Json.JsonException or
+                                     InvalidDataException)
+        {
+            // A failed aggregate must not hide an otherwise usable library.
+            Coverage = null;
+        }
     }
 
     private async Task LoadMoreAsync()
@@ -123,7 +156,7 @@ else
         try
         {
             using HttpResponseMessage response = await Http.GetAsync(
-                $"/api/videos?offset={Items.Count}&limit={PageSize}");
+                $"/api/videos?offset={Items.Count}&limit={PageSize}&playableOnly={PlayableOnly.ToString().ToLowerInvariant()}");
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 Error = "Enable PhotoIdentity:VideoLibraryEnabled on the local server after completing video ingestion and poster verification.";
