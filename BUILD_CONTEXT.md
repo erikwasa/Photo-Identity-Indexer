@@ -51,6 +51,20 @@ playable-proxy worker/profile end-to-end; do not
 create separate preparatory PRs for each guard.
 See docs/operations/agent-vertical-slice-delivery.md
 and docs/operations/video-fullrange-wi0210-real-evaluation.md.
+PR #730 merged and maintained-host real-source evaluation
+**stopped safely at input-probe**: pinned tool and 12/12
+local selection plus no-read dry-run passed, but the one
+operator-authorized original trial produced
+`trial-failed` / `invalid-media-evidence` before encoding;
+the actual missing FFprobe guarantee is not yet known.
+No hydration, catalogue writes, jobs or derivatives.
+Current correction within the same full evaluation slice:
+make independent input colour/range/rotation/stream
+rejection reasons sanitized and test them in CI; **do not
+relax format gates or choose additional media blindly**.
+After merge, a *separately authorized* single real-source
+re-evaluation may distinguish metadata mismatch from
+an unproven source; maintain production gate.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.

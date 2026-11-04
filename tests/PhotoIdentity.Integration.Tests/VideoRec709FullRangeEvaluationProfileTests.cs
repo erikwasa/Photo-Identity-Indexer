@@ -73,10 +73,10 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
                 VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                     Encoding.UTF8.GetBytes(valid), mismatch, SourceSize));
 
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 Encoding.UTF8.GetBytes(valid), Current(), 256L * 1024 * 1024 + 1));
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 Encoding.UTF8.GetBytes(valid), Current(), SourceSize + 1));
     }
@@ -114,12 +114,73 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
             Current() with { DisplayRotationDegrees = 0 };
         VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
             noRotation, zero, SourceSize);
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 noRotation, Current(), SourceSize));
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 Encoding.UTF8.GetBytes(rotated), zero, SourceSize));
+    }
+
+    [Theory]
+    [InlineData("\"color_range\":\"pc\"", "\"color_range\":\"tv\"",
+        "source-full-range-unproven")]
+    [InlineData("\"color_transfer\":\"bt709\"", "\"color_transfer\":\"arib-std-b67\"",
+        "source-bt709-signalling-unproven")]
+    [InlineData("\"color_primaries\":\"bt709\"", "\"color_primaries\":\"bt2020\"",
+        "source-bt709-signalling-unproven")]
+    [InlineData("\"color_space\":\"bt709\"", "\"color_space\":\"bt2020nc\"",
+        "source-bt709-signalling-unproven")]
+    [InlineData("\"pix_fmt\":\"yuvj420p\"", "\"pix_fmt\":\"yuv420p\"",
+        "source-pixel-format-unproven")]
+    [InlineData("\"codec_name\":\"h264\"", "\"codec_name\":\"vp9\"",
+        "source-video-codec-mismatch")]
+    [InlineData("\"width\":1920", "\"width\":1280",
+        "source-geometry-mismatch")]
+    [InlineData("\"rotation\":-90", "\"rotation\":90",
+        "source-rotation-unproven")]
+    [InlineData("\"codec_name\":\"aac\"", "\"codec_name\":\"opus\"",
+        "source-audio-layout-mismatch")]
+    [InlineData("\"codec_type\":\"audio\"", "\"codec_type\":\"subtitle\"",
+        "source-stream-layout-unsupported")]
+    [InlineData("\"size\":\"4096\"", "\"size\":\"4097\"",
+        "source-size-or-duration-mismatch")]
+    [InlineData("\"format_name\":\"mov,mp4,m4a,3gp,3g2,mj2\"",
+        "\"format_name\":\"matroska,webm\"", "source-container-unapproved")]
+    public void Independent_input_probe_rejections_have_specific_safe_reason_codes(
+        string original, string changed, string expectedReason)
+    {
+        string valid = InputProbe();
+        string rejected = valid.Replace(original, changed);
+        Assert.NotEqual(valid, rejected);
+        VideoFullRangeInputRejectionException failure =
+            Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                    Encoding.UTF8.GetBytes(rejected), Current(), SourceSize));
+        Assert.Equal(expectedReason, failure.ReasonCode);
+        Assert.DoesNotContain("mov", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("1920", failure.Message);
+    }
+
+    [Fact]
+    public void Malformed_or_changed_registered_input_does_not_leak_probe_evidence()
+    {
+        VideoFullRangeInputRejectionException malformed =
+            Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                    Encoding.UTF8.GetBytes("{not valid video metadata}"),
+                    Current(), SourceSize));
+        Assert.Equal("source-probe-data-invalid", malformed.ReasonCode);
+
+        VideoFullRangeInputRejectionException ineligible =
+            Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                    Encoding.UTF8.GetBytes(InputProbe()),
+                    Current() with { PixelFormat = "yuv420p" }, SourceSize));
+        Assert.Equal("source-registered-class-ineligible", ineligible.ReasonCode);
+
+        Assert.Throws<ArgumentException>(() =>
+            new VideoFullRangeInputRejectionException("private/source/path.mov"));
     }
 
     [Fact]
