@@ -192,7 +192,7 @@ public static class VideoProxyPosterCommandRunner
 
         string temporaryProxy = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp.mp4");
         string temporaryPoster = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp.jpg");
-        bool published = false, moved = false;
+        bool published = false, moved = false, publicationAttempted = false;
         try
         {
             // This is the verified, revision-bound MP4 HANDLE from the playback
@@ -250,16 +250,22 @@ public static class VideoProxyPosterCommandRunner
             File.Move(temporaryPoster, target, overwrite: false);
             moved = true;
 
+            publicationAttempted = true;
             published = await lease.PublishProxyPosterAsync(new VideoStillPoster(
                 revision, Profile, ffmpegHash, posterHash, relative,
                 length, width, height, DateTimeOffset.UtcNow), token);
+            if (!published && File.Exists(target)) File.Delete(target);
             return published;
         }
         finally
         {
             if (File.Exists(temporaryProxy)) File.Delete(temporaryProxy);
             if (File.Exists(temporaryPoster)) File.Delete(temporaryPoster);
-            if (moved && !published && File.Exists(target)) File.Delete(target);
+            // An uncertain SQL commit (e.g. a lost connection after COMMIT)
+            // must not erase a JPEG which might already have a durable row.
+            // A confirmed no-op is cleaned above, while the source lock is held.
+            if (moved && !published && !publicationAttempted && File.Exists(target))
+                File.Delete(target);
         }
     }
 
