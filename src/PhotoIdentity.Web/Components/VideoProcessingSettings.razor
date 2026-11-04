@@ -10,7 +10,7 @@
         </div>
     </div>
 
-    @if (Loading)
+    @if (Loading && Status is null)
     {
         <div class="empty-state compact">Loading video settings…</div>
     }
@@ -20,19 +20,23 @@
     }
     else
     {
-        @if (!string.IsNullOrWhiteSpace(Error))
-        {
-            <div class="notice error" role="alert">@Error</div>
-        }
-        @if (!string.IsNullOrWhiteSpace(Message))
-        {
-            <div class="notice success" role="status">@Message</div>
-        }
-
-        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <form class="video-settings-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="video-settings-action-strip">
+                <button class="button primary" type="submit" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save video settings")
+                </button>
+                @if (!string.IsNullOrWhiteSpace(Error))
+                {
+                    <span class="video-settings-feedback video-settings-feedback--error" role="alert">@Error</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(Message))
+                {
+                    <span class="video-settings-feedback video-settings-feedback--success" role="status">@Message</span>
+                }
+            </div>
             <div class="review-filter-grid">
                 <div>
-                    <label class="field-label" for="video-processing-enabled">
+                    <label class="field-label video-settings-check-row" for="video-processing-enabled">
                         <input id="video-processing-enabled" type="checkbox"
                                @bind="Enabled" disabled="@Saving" />
                         Process videos
@@ -41,7 +45,7 @@
                        after photo processing. No parallel video jobs.</p>
                 </div>
                 <div>
-                    <label class="field-label" for="video-processing-online">
+                    <label class="field-label video-settings-check-row" for="video-processing-online">
                         <input id="video-processing-online" type="checkbox"
                                @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled || EncodingProfile == "rec709-fullrange-720p")" />
                         Include online-only videos
@@ -53,7 +57,7 @@
             </div>
             <fieldset class="review-filter-panel">
                 <legend class="field-label">Bounded video verification</legend>
-                <label class="field-label" for="video-processing-one-step">
+                <label class="field-label video-settings-check-row" for="video-processing-one-step">
                     <input id="video-processing-one-step" type="checkbox"
                            @bind="StopAfterOneVideoStepPerAdvance"
                            disabled="@Saving" />
@@ -78,24 +82,19 @@
                         @bind="EncodingProfile" disabled="@Saving">
                     <option value="standard-720p">Standard 720p — current default</option>
                     <option value="compact-540p">Compact 540p — smaller picture / lower bitrate</option>
-                    <option value="rec709-fullrange-720p">Rec.709 full-range 720p — evaluated camera-video compatibility (local only)</option>
+                    <option value="rec709-fullrange-720p">Rec.709 full-range 720p — validated local compatibility</option>
                 </select>
                 <p class="field-help">
-                    The standard and compact presets retain their existing SDR
-                    H.264/AAC behavior. Rec.709 full-range is a separate,
-                    explicitly selected 720p profile for locally available
-                    yuvj420p camera videos. Its independent input probe must
-                    establish full-range BT.709 before encoding. It refuses
-                    online-only processing and requires "Stop each Archive
-                    advance after one video step" when enabled; uncheck
-                    "Include online-only videos" before selecting it. No
-                    files are read or processed merely by choosing a profile.
-                    The compact preset may reduce file size and detail; actual
-                    quality and encoding time are measured on local videos. Selecting a different
-                    preset creates a distinct durable job for that source
-                    revision; it never rewrites existing proxies or starts
-                    processing on its own. Pause active video processing
-                    before changing profiles.
+                    Standard 720p and Compact 540p remain the existing SDR
+                    presets. Rec.709 full-range is a separately validated,
+                    opt-in 720p profile for locally available yuvj420p videos.
+                    Each selected original must still independently prove full-range
+                    BT.709; this does not approve all videos. It requires
+                    online-only processing off and one-video-step mode on.
+                    Choosing a preset does not read videos, start jobs or
+                    replace existing proxies; a future Archive advance may
+                    create a distinct durable job. Pause the Archive before
+                    changing an active processing profile.
                 </p>
             </fieldset>
             <fieldset class="review-filter-panel">
@@ -118,7 +117,7 @@
             </fieldset>
             <fieldset class="review-filter-panel">
                 <legend class="field-label">Local video proxy storage</legend>
-                <label class="field-label" for="video-processing-quota-override">
+                <label class="field-label video-settings-check-row" for="video-processing-quota-override">
                     <input id="video-processing-quota-override" type="checkbox"
                            @bind="OverrideProxyLimits" disabled="@Saving" />
                     Override launcher proxy limits
@@ -158,11 +157,7 @@
                     Archive run before changing the limits.
                 </p>
             </fieldset>
-            <div class="card-actions">
-                <button class="button primary" type="submit" disabled="@Saving">
-                    @(Saving ? "Saving…" : "Save video settings")
-                </button>
-            </div>
+            <p class="field-help video-settings-save-hint">Use the Save button above to apply your changes.</p>
             <p class="field-help">
                 These preferences are saved immediately. Use Advance archive
                 to start processing; use Pause archive to interrupt it.
@@ -206,7 +201,7 @@
                 </div>
                 @if (plan.Planned > 0 && plan.PlanFingerprint is not null)
                 {
-                    <label class="field-label" for="video-retention-confirm">
+                    <label class="field-label video-settings-check-row" for="video-retention-confirm">
                         <input id="video-retention-confirm" type="checkbox"
                                @bind="ConfirmRetention" disabled="@Saving" />
                         I understand that these generated proxy copies will be
