@@ -9,7 +9,7 @@ not imply that the file is absent, excluded or unreadable.
 | --- | --- | --- | --- |
 | **1. Discovered/catalogued** | Opt-in enumeration of MOV/MP4 videos, source/revision identity, known technical metadata and explicit unsupported/unknown inspection results | File attributes/OneDrive placeholders can be inventoried without opening bytes; actual FFprobe inspection requires already-local bytes or a separately approved managed hydration. The explicit ingest operation has a 1 GiB source ceiling; its supported codec inspection limits include H.264 Main/High, HEVC Main/Main 10 and up to 600 seconds. This is not a promise of derivative support. | WI-0210 for new compatibility classes; WI-0207 for online-only availability |
 | **2. Still poster available** | Versioned durable JPEGs for explicitly admitted Rec.709 SDR videos, checked by revision, exclusions, integrity and derivative root | HLG/PQ, missing colour information and several unapproved formats are recorded without silently producing misleading SDR output. A private HLG preview exists but is **not** a production poster profile. Some indexed videos have no poster. | WI-0210 if the archive inventory selects this gap; two existing missing posters remain a separate deferred operator choice |
-| **3. Playable local proxy available** | WI-0189 publishes seekable bounded H.264/AAC MP4 under an app-owned local cache (720p default, 540p optional) for admitted local videos | Shared worker currently selects supported Rec.709 SDR H.264/HEVC inputs, known rotations, selected pixel/audio formats, coded dimensions 16–4096, duration 0.2–600 s and at most **256 MiB source bytes**; retention and per-proxy caps are separate. A cached proxy may exist while the original is online-only. | WI-0210 for widened inputs; WI-0207 for managed hydration, WI-0152 completed for actual browser playback |
+| **3. Playable local proxy available** | WI-0189 publishes seekable H.264/AAC MP4 (720p default / compact 540p), and completed WI-0210 adds an **explicit local-only one-step 720p full-range Rec.709 `yuvj420p` preset** with independent source and limited-range output checks. **One newly published and played** production video is maintainer-verified. | Each preset has distinct admission and versioned receipts. Existing 256 MiB source, 0.2–600 s, geometry 16–4096, codec/audio/rotation, privacy/exclusion and photo-first bounds remain. The new profile demands actual full-range BT.709 evidence and excludes auxiliary data/metadata; no HLG/PQ, unknown colour/rotation or automatic online-only hydration. Remaining 11 metadata candidates are **not** independently proven. | WI-0210 completed for the first full-range playable-proxy class; WI-0207 separately owns managed hydration/release; WI-0152 completed browser playback |
 | **4. Searchable frame evidence** | WI-0190 stores timestamped caption/embedding samples for selected current eligible local proxies; WI-0191 reads them via opt-in Caption/Visual/Combined Video Search | Evidence is a separate deliberate processing step, not produced by cataloguing or playback. Search reads at most 256 eligible candidate revisions and does not check original/proxy bytes at query time. Frame samples do not establish full motion, sound or unsampled scenes. | WI-0210 if new examples warrant sampling evaluation; further ranking/scale follow-up only after meaningful growth |
 | **5. Face evidence (future)** | Not delivered; photo identities are never inferred from video merely because frames have captions | Bounded prototype and human reviewed identity-governance decision come first; full temporal tracking and production integration require a later approved scope | WI-0155, staged experiment |
 
@@ -22,9 +22,11 @@ not imply that the file is absent, excluded or unreadable.
   trigger hydration from a browser request.
 - **Container and codec:** MOV/MP4 H.264/HEVC represent the initial
   subset; inspecting an input does not guarantee successful transcode.
-- **Colour and levels:** currently approved production path is Rec.709
-  SDR. HLG/PQ and Rec.709 full-range variants may require separate
-  *tested* conversions and output-policy versions.
+- **Colour and levels:** current production paths include standard
+  Rec.709 SDR and the **separately opted-in, locally verified full-range
+  Rec.709 `yuvj420p` → limited-range proxy**. Each has independent
+  admitted profiles. HLG/PQ and unspecified transfer remain unsupported
+  for automatic playable-proxy production.
 - **Geometry and duration:** metadata inspection, normal proxy
   generation and selected one-shot FrameEvidence commands have
   different limits. In particular the production worker uses a
@@ -34,6 +36,22 @@ not imply that the file is absent, excluded or unreadable.
   playback; WI-0152's controlled local/phone serving and seeking are delivered.
 - **Search relevance:** a video remains visible in the Videos library
   even when not among search-eligible FrameEvidence revisions.
+
+## WI-0210 delivered compatibility expansion (2026-11-04)
+
+The maintainer accepted the first scoped `yuvj420p`
+Rec.709 full-range **playable proxy**, using the
+`rec709-fullrange-720p` profile. With local-only,
+single-video-step processing, one new derivative was
+published and played successfully. Sanitized job counts:
+Succeeded 27→28, Queued 0→0, Failed 0→0, LastResult
+`published`, without unexpected OneDrive hydration.
+The 12 archive metadata candidates remain only potential
+coverage; **1/12 has confirmed new production playback**
+and no inference is made about the other 11.
+No poster/frame/search, HLG or online-only support was
+added by this work item. See the
+[accepted one-step production runbook](video-fullrange-wi0210-production-acceptance.md).
 
 ## Choosing the first compatibility expansion
 
@@ -164,7 +182,7 @@ publication. Existing browser playback consumes the
 registered derivative. No rollout/actual-playable count
 is claimed before the [one-step operator acceptance](video-fullrange-wi0210-production-acceptance.md).
 
-Production still does not admit this pixel class.
+Historical note: the restrictions above applied before the final merged production integration. **After PR #734, this exact local-only Rec.709 full-range class is approved through its distinct opt-in profile; one published proxy has passed playback.**
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
