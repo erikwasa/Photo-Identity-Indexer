@@ -83,7 +83,7 @@
     gap: 0.65rem;
 }
 
-.settings-group-content ::deep input:not([type="checkbox"]),
+.settings-group-content ::deep input:not([type="checkbox"]):not([type="radio"]),
 .settings-group-content ::deep select {
     min-height: 2.35rem;
     padding-top: 0.35rem;
