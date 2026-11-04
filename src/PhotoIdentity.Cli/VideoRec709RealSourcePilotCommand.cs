@@ -223,14 +223,16 @@ public static class VideoRec709RealSourcePilotCommandRunner
                     if (!File.Exists(json) ||
                         (File.GetAttributes(json) & FileAttributes.ReparsePoint) != 0 ||
                         new FileInfo(json).Length is < 20 or > 65536)
-                        throw new InvalidDataException("Input probe evidence absent or unbounded.");
+                        throw new VideoFullRangeInputRejectionException("source-probe-data-invalid");
                     byte[] evidence = await File.ReadAllBytesAsync(json, ct);
                     VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                         evidence, selected.Inspection, selected.Bytes);
                     verifiedInput = true;
                 });
-            if (!inputProbe.Completed || inputProbe.ExitCode != 0 || !verifiedInput)
-                throw new InvalidDataException("Selected source range was not independently proven.");
+            if (!inputProbe.Started || !inputProbe.Completed ||
+                inputProbe.ExitCode != 0 || !verifiedInput)
+                throw new VideoFullRangeInputRejectionException(
+                    "source-probe-execution-incomplete");
             inputProven = true;
 
             stage = "range-conversion";
@@ -332,7 +334,9 @@ public static class VideoRec709RealSourcePilotCommandRunner
                     stage = cleanupFailed ? "review-cleanup" : stage,
                     reason = cleanupFailed
                         ? "private-review-cleanup-refused"
-                        : VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(error)
+                        : error is VideoFullRangeInputRejectionException input
+                            ? input.ReasonCode
+                            : VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(error)
                 });
             return 1;
         }
