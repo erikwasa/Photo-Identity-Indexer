@@ -73,10 +73,10 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
                 VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                     Encoding.UTF8.GetBytes(valid), mismatch, SourceSize));
 
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 Encoding.UTF8.GetBytes(valid), Current(), 256L * 1024 * 1024 + 1));
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 Encoding.UTF8.GetBytes(valid), Current(), SourceSize + 1));
     }
@@ -114,10 +114,10 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
             Current() with { DisplayRotationDegrees = 0 };
         VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
             noRotation, zero, SourceSize);
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 noRotation, Current(), SourceSize));
-        Assert.Throws<InvalidDataException>(() =>
+        Assert.Throws<VideoFullRangeInputRejectionException>(() =>
             VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
                 Encoding.UTF8.GetBytes(rotated), zero, SourceSize));
     }
