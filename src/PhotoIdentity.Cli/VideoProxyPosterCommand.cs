@@ -228,7 +228,10 @@ public static class VideoProxyPosterCommandRunner
                 throw new InvalidDataException("Proxy poster dimensions exceeded bounds.");
             VideoPilotMetadata still = await probe.ProbeAsync(temporaryPoster, token);
             if (still.VideoCodec != "mjpeg" || still.Width != width || still.Height != height ||
-                still.RotationDegrees is not null and not 0 || still.HasLocation)
+                still.RotationDegrees is not null and not 0 || still.HasLocation ||
+                still.HasCreationTime || still.GpsLatitude.HasValue ||
+                still.GpsLongitude.HasValue || still.CameraMake is not null ||
+                still.CameraModel is not null)
                 throw new InvalidDataException("Generated JPEG failed independent output proof.");
             // A source-derived orientation must be preserved (no crop or stretch).
             double inputAspect = (double)input.Width.Value / input.Height.Value;
