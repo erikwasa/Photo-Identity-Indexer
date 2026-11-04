@@ -120,6 +120,14 @@ public sealed class PostgresVideoLibraryRepositoryTests
             Assert.Equal(AssetRevisionId.From(currentRevision), video.RevisionId);
             Assert.Equal(18m, video.DurationSeconds);
             Assert.True(video.HasPoster);
+            VideoLibraryCoverage counts = await library.GetCoverageAsync();
+            Assert.Equal(1, counts.TotalVideos);
+            Assert.Equal(1, counts.VideosWithPosters);
+            Assert.Equal(0, counts.PlayableVideos);
+            Assert.Equal(0, counts.PlayableWithPosters);
+            Assert.Equal(0, counts.PlayableMissingPosters);
+            Assert.Equal(0, counts.UninspectedOrUnsupported);
+            Assert.Empty((await library.ListAsync(0, 24, playableOnly: true)).Items);
             Assert.False(page.HasMore);
             Assert.Empty((await library.ListAsync(1, 24)).Items);
 
@@ -137,6 +145,7 @@ public sealed class PostgresVideoLibraryRepositoryTests
 
             await excluded.ExcludeAsync(SourceId.From(source), "private/clip.mov", now.AddMinutes(2));
             Assert.Empty((await library.ListAsync(0, 24)).Items);
+            Assert.Equal(0, (await library.GetCoverageAsync()).TotalVideos);
             Assert.Null(await library.GetPosterBytesAsync(
                 AssetRevisionId.From(currentRevision), derivatives));
         }
