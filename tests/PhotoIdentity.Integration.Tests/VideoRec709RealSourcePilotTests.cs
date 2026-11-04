@@ -62,6 +62,20 @@ public sealed class VideoRec709RealSourcePilotTests
     }
 
     [Fact]
+    public void Real_source_probe_failure_reporting_is_sanitized()
+    {
+        Exception input = new VideoFullRangeInputRejectionException(
+            "source-bt709-signalling-unproven");
+        Assert.Equal("source-bt709-signalling-unproven",
+            VideoRec709RealSourcePilotCommandRunner.ClassifyFailure(input));
+        Assert.Equal("invalid-media-evidence",
+            VideoRec709RealSourcePilotCommandRunner.ClassifyFailure(
+                new InvalidDataException("private/original-path.mov")));
+        Assert.Throws<ArgumentException>(() =>
+            new VideoFullRangeInputRejectionException("private-media-path"));
+    }
+
+    [Fact]
     public void Real_media_scratch_requires_an_empty_marked_system_temp_child()
     {
         if (!OperatingSystem.IsWindows()) return;
