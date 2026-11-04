@@ -26,7 +26,7 @@ playable proxy is now verified**. The other 11 are potential,
 not production success claims. Standard SDR/compact encoding,
 HDR/HLG, posters, searchable frames, absent rotation and
 online-only release/hydration remain separate boundaries.
-M30 retains other proposed work, including WI-0207. See the
+M30 remains open and is now `ready` under the canonical status rules (other M30 work items remain proposed), including WI-0207. See the
 [final acceptance](../../operations/video-fullrange-wi0210-production-acceptance.md)
 and [completed WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md).
 
