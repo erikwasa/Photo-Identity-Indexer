@@ -70,6 +70,22 @@ public sealed class VideoProxyPosterCommandTests
     }
 
     [Fact]
+    public void Independently_rejects_black_or_missing_brightness_evidence()
+    {
+        string synthetic = "[Parsed_metadata_1] lavfi.signalstats.YAVG=126.228";
+        Assert.Equal(126.228, VideoProxyPosterCommandRunner.ParseBrightness(synthetic), 3);
+        Assert.Equal(0, VideoProxyPosterCommandRunner.ParseBrightness(
+            "lavfi.signalstats.YAVG=0"));
+        Assert.Throws<InvalidDataException>(() =>
+            VideoProxyPosterCommandRunner.ParseBrightness("no verified stats"));
+        IReadOnlyList<string> flags = VideoProxyPosterCommandRunner.BuildBrightnessArguments(
+            "C:\\derived\\poster.jpg");
+        Assert.Contains("signalstats,metadata=print:key=lavfi.signalstats.YAVG", flags);
+        Assert.Contains("file", flags);
+        Assert.Contains("-frames:v", flags);
+    }
+
+    [Fact]
     public void Output_receipt_path_is_immutable_and_versioned()
     {
         AssetRevisionId revision = AssetRevisionId.From(Guid.NewGuid());
