@@ -102,14 +102,15 @@ public static class VideoRec709FullRangeEvaluationProfile
                 streams.GetArrayLength() is < 1 or > 4)
                 throw Reject("source-stream-layout-unsupported");
 
-            // A MOV/MP4 camera source may also carry separate timecode and
-            // telemetry tracks. These do not authorize any broader video,
-            // audio or metadata handling: the encoding profile maps only
-            // the first video and optional first audio; -dn and
-            // -map_metadata -1 forbid ancillary-track publication.
-            // Accept only exact MOV four-character codes, never arbitrary
-            // data streams or user-specified stream maps.
-            int videos = 0, audios = 0, timecodes = 0, telemetry = 0;
+            // A MOV/MP4 camera may have auxiliary data tracks whose private
+            // four-character codes and codec names are not safely enumerable.
+            // Only codec_type=data is ignored, for up to TWO input tracks
+            // within the overall 4-stream limit. The fixed encoder maps only
+            // the proven video and optional audio; never data. No codec tags,
+            // telemetry or GPS payloads are extracted or reported.
+            // No other non-A/V stream types (including subtitles/attachments)
+            // are approved and no broader colour/codec gate is changed.
+            int videos = 0, audios = 0, dataTracks = 0;
             foreach (JsonElement stream in streams.EnumerateArray())
             {
                 switch (Text(stream, "codec_type"))
@@ -142,17 +143,9 @@ public static class VideoRec709FullRangeEvaluationProfile
                             throw Reject("source-audio-layout-mismatch");
                         break;
                     case "data":
-                        string? code = Text(stream, "codec_tag_string");
-                        string? dataCodec = Text(stream, "codec_name");
-                        if (code == "tmcd" &&
-                            dataCodec is (null or "none" or "bin_data") &&
-                            ++timecodes == 1)
-                            break;
-                        if (code == "gpmd" &&
-                            dataCodec is (null or "none" or "bin_data") &&
-                            ++telemetry == 1)
-                            break;
-                        throw Reject("source-ancillary-stream-unapproved");
+                        if (++dataTracks > 2)
+                            throw Reject("source-ancillary-stream-unapproved");
+                        break;
                     default:
                         throw Reject("source-stream-layout-unsupported");
                 }
@@ -186,7 +179,20 @@ public static class VideoRec709FullRangeEvaluationProfile
         int colour = args.IndexOf("-color_primaries");
         if (colour < 0)
             throw new InvalidOperationException("Missing baseline Rec.709 output flags.");
-        args.InsertRange(colour, ["-color_range", "tv"]);
+        // Source stream-level tags can otherwise be implicitly mapped with
+        // selected A/V streams, even though auxiliary data is unmapped.
+        // Disable both global (baseline) and stream-level metadata copying.
+        int streamMetadata = args.IndexOf("-map_metadata");
+        if (streamMetadata < 0 || streamMetadata + 1 >= args.Count ||
+            args[streamMetadata + 1] != "-1" ||
+            args.IndexOf("-dn") < 0 || args.IndexOf("-sn") < 0 ||
+            args.IndexOf("-map_chapters") < 0 ||
+            args.Count(x => x == "-map") != 2 ||
+            !args.Contains("0:v:0") || !args.Contains("0:a:0?"))
+            throw new InvalidOperationException(
+                "Full-range evaluation requires a fixed A/V-only output map.");
+        args.InsertRange(streamMetadata + 2, ["-map_metadata:s", "-1"]);
+        args.InsertRange(colour + 2, ["-color_range", "tv"]);
         return args;
     }
 
