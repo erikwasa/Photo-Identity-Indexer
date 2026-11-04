@@ -334,13 +334,17 @@ public static class VideoRec709RealSourcePilotCommandRunner
                     stage = cleanupFailed ? "review-cleanup" : stage,
                     reason = cleanupFailed
                         ? "private-review-cleanup-refused"
-                        : error is VideoFullRangeInputRejectionException input
-                            ? input.ReasonCode
-                            : VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(error)
+                        : ClassifyFailure(error)
                 });
             return 1;
         }
     }
+
+    /// <summary>Only allowlisted diagnostic categories; no private media values.</summary>
+    internal static string ClassifyFailure(Exception error) =>
+        error is VideoFullRangeInputRejectionException input
+            ? input.ReasonCode
+            : VideoSyntheticProxyPilotCommandRunner.ClassifyFailure(error);
 
     private static async Task<VideoExecutionPermit> InspectAsync(
         Func<CancellationToken, Task<bool>> allowed, CancellationToken ct) =>
