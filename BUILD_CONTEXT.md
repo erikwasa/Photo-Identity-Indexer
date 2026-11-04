@@ -1,5 +1,27 @@
 # Build context
 
+**Current M30 status — 2026-11-04: WI-0210 COMPLETED.**
+After merged PR #734 and six passing CI jobs, the maintainer
+reported a successful one-step, local-only production
+Rec.709 full-range `yuvj420p` playable-proxy publication
+and **visual browser playback PASS**. Succeeded jobs
+27→28 (+1), queued 0→0, failed 0→0, LastResult
+`published`, no unexpected OneDrive hydration.
+Earlier explicit one-video input full-range BT.709 proof,
+limited-range H.264/AAC output, source SHA integrity
+and visual acceptance also passed. Archive census:
+12 isolated pixel-only metadata candidates, only **1
+new production playable proxy verified**. Do not
+claim cohort-wide compatibility; HDR/HLG, unknown
+rotation, posters, frame evidence and WI-0207 online-only
+hydration remain outside this accepted WI.
+No repeat local testing requested for WI-0210.
+M30 itself remains in progress for other planned items.
+See docs/operations/video-fullrange-wi0210-production-acceptance.md
+and docs/delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md.
+
+**Historical development notes below (not current instructions):**
+
 **Current handoff — M30 WI-0210 archive census (2026-11-03):**
 PR #720 has merged. WI-0152 is maintainer-accepted, completed and
 archived with desktop/phone full-height native playback verified.
