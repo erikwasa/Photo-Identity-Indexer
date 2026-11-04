@@ -296,6 +296,30 @@ and the [M30 milestone](../milestones/M30-video-media-support.md).
   colour/orientation/playback, one substantial production-integration
   PR should implement the exact playable-proxy stage and measure
   actual newly playable videos; no more preparatory CLI checkpoints.
+- **2026-11-04 real-video operator acceptance — input probe failed safely:**
+  Following merged PR #730, approved pinned tools, the private
+  12/12 current local shortlist and the new command's no-read dry-run
+  all **passed**. The maintainer explicitly opted in to reading one
+  current already-local original, but the single trial returned
+  `status=trial-failed`, `stage=input-probe`,
+  `reason=invalid-media-evidence`,
+  `inputFullRangeProven=false` and no encoded review proxy.
+  `originalBytesOpened=true` conservatively indicates the
+  stage was attempted; no OneDrive hydration, DB writes, jobs,
+  production change or published derivatives occurred.
+  A successful SHA/staging metadata gate does not prove actual
+  full-range colour. The error category is insufficient to
+  determine which *specific* FFprobe check rejected the source.
+- **Current correction within the real-source evaluation slice:**
+  Preserve every strict input requirement, but return sanitized
+  allowlisted reasons for independent source range, BT.709,
+  stream, geometry, rotation, duration and probe-execution
+  rejections. Add synthetic/contract fixtures and
+  CLI reporting regression tests under CI; preserve
+  no-original-access default and no production policy expansion.
+  A single optional post-merge real-media re-evaluation may
+  establish the underlying rejection reason; no further
+  preparatory work items or blind retries.
 ## Completion notes
 
 - Status: in_progress. The previous 58-video `unknown` figures
