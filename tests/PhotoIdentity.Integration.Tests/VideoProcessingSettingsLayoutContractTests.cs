@@ -35,6 +35,29 @@ public sealed class VideoProcessingSettingsLayoutContractTests
     }
 
     [Fact]
+    public void Shared_input_rules_do_not_style_checkboxes_like_textfields()
+    {
+        string repo = ResolveRepositoryRoot();
+        string globals = File.ReadAllText(Path.Combine(
+            repo, "src", "PhotoIdentity.Web", "wwwroot", "css", "app.css"));
+        string settings = File.ReadAllText(Path.Combine(
+            repo, "src", "PhotoIdentity.Web", "Pages", "Settings.razor.css"));
+
+        Assert.Contains(
+            "input:not([type=\"checkbox\"]):not([type=\"radio\"]),",
+            globals, StringComparison.Ordinal);
+        Assert.Contains("input[type=\"checkbox\"],", globals,
+            StringComparison.Ordinal);
+        Assert.Contains("input[type=\"radio\"] {", globals,
+            StringComparison.Ordinal);
+        Assert.Contains("width: 1.1rem;", globals, StringComparison.Ordinal);
+        Assert.Contains("min-height: 1.1rem;", globals, StringComparison.Ordinal);
+        Assert.Contains(
+            "input:not([type=\"checkbox\"]):not([type=\"radio\"]),",
+            settings, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Settings_save_and_status_refresh_remain_in_view_without_form_collapse()
     {
         (string page, string css) = Sources();
