@@ -201,6 +201,80 @@ rotation as expected; do not silently widen the filter. Share
 only sanitized `stage` and `reason`, never source IDs,
 paths or probe JSON.
 
+### When the input probe rejects a real archive video
+
+The first maintained-host trial on **2026-11-04** returned
+`status=trial-failed`, `stage=input-probe`,
+`reason=invalid-media-evidence`, `originalBytesOpened=true`,
+`inputFullRangeProven=false`, no OneDrive hydration, no queue,
+no production change and **no encoded review proxy**. The earlier
+private shortlist and independently authorized SHA proof succeeded,
+but they do not establish full-range BT.709 signalling.
+
+The general `invalid-media-evidence` code conflated several
+independent gates. Updated builds expose an **allowlisted,
+sanitized input-rejection reason**, including:
+
+- `source-full-range-unproven` — FFprobe did not explicitly
+  establish `color_range=pc`
+- `source-bt709-signalling-unproven` — colour primaries, transfer
+  or matrix were not explicitly all BT.709
+- `source-pixel-format-unproven` — actual probed pixel format
+  differed from the exact admitted class
+- `source-geometry-mismatch`, `source-rotation-unproven`
+  or `source-audio-layout-mismatch` — source inspection and
+  registered revision were not demonstrably consistent
+- `source-size-or-duration-mismatch`,
+  `source-video-codec-mismatch`,
+  `source-stream-layout-unsupported`,
+  `source-container-unapproved`,
+  `source-registered-class-ineligible`,
+  `source-probe-data-invalid` or
+  `source-probe-execution-incomplete` — other fail-closed
+  validation categories
+
+These values contain **no raw metadata**, source identifiers,
+paths, SHA digests or FFprobe JSON. Rejection is not permission
+to convert or to silently relax input colour guards.
+
+**Only after the diagnostics PR merges into `main`**, an
+operator who separately decides to authorize another real read
+may repeat Steps 2–5 with a **fresh uniquely marked, empty
+evaluation directory**. Do not reuse the previous failed
+workspace or test unrelated candidates blindly. On failure,
+share *only* the sanitized `$trial.failure.stage` and
+`$trial.failure.reason`. If no repeated source read is
+authorized, retain the first trial as an inconclusive input
+evaluation and do not claim that the format is playable.
+
+#### Safe cleanup of a failed trial
+
+No playback is available when `reviewProxyRetained=false`.
+After the CLI process has terminated, clean up the existing
+workspace **only** when it contains its sole ownership marker:
+
+~~~powershell
+$expectedPrefix = Join-Path ([IO.Path]::GetFullPath(
+    [IO.Path]::GetTempPath())) "wi0210-real-evaluation-"
+if ([string]::IsNullOrWhiteSpace($scratch) -or
+    -not ([IO.Path]::GetFullPath($scratch)).StartsWith(
+        $expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Unrecognized evaluation scratch directory."
+}
+$marker = Join-Path $scratch ".photoidentity-real-video-evaluation"
+if (-not [IO.File]::Exists($marker) -or
+    [IO.File]::ReadAllText($marker) -cne
+        "wi0210-private-real-video-evaluation-v1") {
+    throw "Unrecognized ownership marker."
+}
+$remaining = @(Get-ChildItem -LiteralPath $scratch -Force)
+if ($remaining.Count -ne 1 -or
+    $remaining[0].Name -cne ".photoidentity-real-video-evaluation") {
+    throw "Unexpected contents remain; inspect privately before cleanup."
+}
+Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction Stop
+~~~
+
 ### 6. Visually review the private proxy, then delete it
 
 ~~~powershell
