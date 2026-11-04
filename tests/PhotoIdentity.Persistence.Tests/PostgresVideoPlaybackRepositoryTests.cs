@@ -1,4 +1,6 @@
 using Npgsql;
+using System.Security.Cryptography;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Postgres;
@@ -140,6 +142,7 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             Assert.Equal(0, coverage.PlayableWithPosters);
             Assert.Equal(1, coverage.PlayableMissingPosters);
             Assert.Equal(1, coverage.UninspectedOrUnsupported);
+            Assert.Single(await browse.ListMissingProxyPostersAsync(3));
             string file = Path.Combine(cache, VideoDerivativeArtifactPath.ForLease(lease)
                 .Replace('/', Path.DirectorySeparatorChar));
             var playback = new PostgresVideoPlaybackRepository(database);
@@ -153,7 +156,37 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                 Assert.Equal(mp4, read);
                 opened.Stream.Position = 17; // source handle is seekable
                 Assert.Equal(0, opened.Stream.ReadByte());
+
+                // Synthetic poster publication is fenced by the same proxy
+                // source lock. No private source file is present in this test.
+                string posterRoot = Path.Combine(folder, "posters");
+                string tool = new('d', 64);
+                string relativePoster = $"video-posters/wi0211-proxy-still-v1/{revision:D}/{tool}.jpg";
+                string posterPath = Path.Combine(posterRoot,
+                    relativePoster.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(posterPath)!);
+                byte[] jpeg = new byte[128];
+                jpeg[0] = 0xff; jpeg[1] = 0xd8;
+                jpeg[2] = 0xff; jpeg[3] = 0xc0; jpeg[4] = 0; jpeg[5] = 17;
+                jpeg[6] = 8; jpeg[7] = 1; jpeg[8] = 104;
+                jpeg[9] = 2; jpeg[10] = 128;
+                jpeg[^2] = 0xff; jpeg[^1] = 0xd9;
+                await File.WriteAllBytesAsync(posterPath, jpeg);
+                string checksum = Convert.ToHexString(SHA256.HashData(jpeg)).ToLowerInvariant();
+                var posterEvidence = new VideoStillPoster(AssetRevisionId.From(revision),
+                    "wi0211-proxy-still-v1", tool, checksum, relativePoster,
+                    jpeg.Length, 640, 360, DateTimeOffset.UtcNow);
+                await Assert.ThrowsAsync<InvalidDataException>(() =>
+                    opened.PublishProxyPosterAsync(posterEvidence with
+                    { PosterRelativePath = "../wrong.jpg" }));
+                Assert.True(await opened.PublishProxyPosterAsync(posterEvidence));
+                Assert.Equal(jpeg, await browse.GetPosterBytesAsync(
+                    AssetRevisionId.From(revision), posterRoot));
             }
+            Assert.Empty(await browse.ListMissingProxyPostersAsync(3));
+            VideoLibraryCoverage afterPoster = await browse.GetCoverageAsync();
+            Assert.Equal(1, afterPoster.PlayableWithPosters);
+            Assert.Equal(0, afterPoster.PlayableMissingPosters);
 
             mp4[20] = 42;
             await File.WriteAllBytesAsync(file, mp4);
