@@ -17,3 +17,9 @@ public sealed record VideoLibraryResponse(
     int Offset,
     int Limit,
     bool HasMore);
+
+/// <summary>Aggregate read-only counts only, never private source identifiers.</summary>
+public sealed record VideoLibraryCoverageResponse(
+    long TotalVideos, long PlayableVideos, long VideosWithPosters,
+    long PlayableWithPosters, long PlayableMissingPosters,
+    long UninspectedOrUnsupported);
