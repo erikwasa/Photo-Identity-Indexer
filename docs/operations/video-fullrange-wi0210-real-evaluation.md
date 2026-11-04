@@ -201,6 +201,46 @@ rotation as expected; do not silently widen the filter. Share
 only sanitized `stage` and `reason`, never source IDs,
 paths or probe JSON.
 
+### Known auxiliary camera streams (bounded, not a broader media admission)
+
+A second explicitly authorized evaluation of the same current local
+revision reported `input-probe` /
+`source-stream-layout-unsupported`, with **no conversion, output
+proxy, hydration, database writes, jobs or publication**. The current
+input validator only admitted one video and zero/one audio stream;
+this can reject ordinary MOV/MP4 camera files with a separate
+timecode or telemetry stream.
+
+The correction admits a maximum of **four total streams**, with
+**exactly one** admitted video, **at most one** accepted audio
+matching the registered revision and **at most one each** of these
+specifically tagged data tracks:
+
+- `codec_type=data`, `codec_tag_string=tmcd` — MOV timecode
+- `codec_type=data`, `codec_tag_string=gpmd` — GoPro-style
+  camera telemetry, potentially including sensitive GPS data
+
+Those are **not** video/audio candidates and are **not exported**.
+The fixed experimental FFmpeg recipe already selects only
+`0:v:0` and optional `0:a:0?`, disables data/subtitle
+mapping, and discards source metadata/chapters. FFprobe retrieves
+only the stream's four-character format code, never telemetry
+payloads or location tags. Unknown/duplicate auxiliary tracks,
+additional audio or video, subtitles, missing tags, oversize stream
+lists and every other mismatch still fail closed. A specifically
+tagged timecode/telemetry stream does **not** prove colour
+compatibility: `color_range=pc` and full BT.709 signalling
+remain mandatory.
+
+This is a **plausible explanation, not proof of what your selected
+original contains**. Do not print or share private stream metadata,
+probe JSON, GPS, video paths or revision IDs. If the PR merges and
+the operator separately authorizes another one-video local read,
+start from a **fresh private marked scratch root** and use the
+existing Steps 2–5 once. The result either advances the real
+conversion or provides another sanitized, fail-closed reason
+without widening production worker policy.
+
 ### When the input probe rejects a real archive video
 
 The first maintained-host trial on **2026-11-04** returned
