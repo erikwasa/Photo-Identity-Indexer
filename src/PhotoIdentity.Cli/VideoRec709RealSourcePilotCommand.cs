@@ -292,6 +292,13 @@ public static class VideoRec709RealSourcePilotCommandRunner
                 throw new InvalidOperationException(
                     "Final source or video-lane authorization was revoked.");
             afterIntegrity = true;
+            // Clean the staged copy before reporting successful review
+            // output. The await-using fallback disposal is idempotent.
+            await staged.DisposeAsync();
+            if (!File.Exists(reviewFile) ||
+                (File.GetAttributes(reviewFile) & FileAttributes.ReparsePoint) != 0 ||
+                new FileInfo(reviewFile).Length is < 128 or > VideoProxyCandidateProfile.MaximumOutputBytes)
+                throw new InvalidDataException("Private review copy was not safely retained.");
 
             Write(output, "validated", false, opened, inputProven, outputValidated,
                 afterIntegrity, retained, playable, null);
