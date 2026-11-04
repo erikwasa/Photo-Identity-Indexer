@@ -93,6 +93,25 @@ collection. CI owns contract/negative tests. After
 merge, only one separately approved real-media evaluation
 and visual review; then one production-proxy vertical slice
 if accepted. No more speculative camera-tag allowlists.
+**2026-11-04 WI-0210 accepted evaluation and product handoff:**
+One privately authorized real `yuvj420p` Rec.709 video
+passed full-range input, limited-range 720p H.264/AAC
+output, post-trial original SHA and visual playback/
+colour/orientation/audio review. No hydration, catalogue
+writes, queue or production derivative. Experimental
+proof is **one real video, not 12 production unlocks**.
+The current substantial product PR introduces distinct
+`rec709-fullrange-720p` opt-in local-only single-step
+preference, exact pixel admission, lease-fenced source
+stage + independent full-range FFprobe **before FFmpeg**,
+independent limited-range output verification, and
+existing receipt/browser publishing. Standard/compact
+unchanged; no HDR, online-only, poster or frame widening.
+CI validates automated contracts. Only after merge,
+the maintainer explicitly chooses a one-step
+archive video run and validates one new playable receipt,
+then reports aggregate before/after counts. See
+docs/operations/video-fullrange-wi0210-production-acceptance.md.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.
