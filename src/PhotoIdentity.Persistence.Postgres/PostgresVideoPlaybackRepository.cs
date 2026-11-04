@@ -87,7 +87,8 @@ public sealed class PostgresVideoPlaybackRepository(PostgresCatalogueDatabase da
                   AND job.policy_version = 'wi0188-v1'
                   AND job.preset_version IN (
                     'wi0188-sdr-h264-aac-720p-pilot-v1',
-                    'wi0189-sdr-h264-aac-540p-compact-v1')
+                    'wi0189-sdr-h264-aac-540p-compact-v1',
+                    'wi0210-rec709-fullrange-720p-production-v1')
                   AND revision.media_kind = 'video'
                   AND asset.media_kind = 'video'
                   AND asset.deleted_at_utc IS NULL

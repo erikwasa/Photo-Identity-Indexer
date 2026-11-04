@@ -55,7 +55,8 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                          AND job.policy_version = 'wi0188-v1'
                          AND job.preset_version IN (
                            'wi0188-sdr-h264-aac-720p-pilot-v1',
-                           'wi0189-sdr-h264-aac-540p-compact-v1')
+                           'wi0189-sdr-h264-aac-540p-compact-v1',
+                            'wi0210-rec709-fullrange-720p-production-v1')
                          AND metadata.inspection_status = 'supported'
                          AND metadata.color_transfer = 'bt709'
                    ) AS has_playable_proxy

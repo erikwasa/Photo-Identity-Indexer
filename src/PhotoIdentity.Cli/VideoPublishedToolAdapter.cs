@@ -15,7 +15,9 @@ public sealed class VideoPublishedToolAdapter(
     VideoToolExecutionBudget budget,
     Func<string, string, IReadOnlyList<string>> approvedArguments,
     Func<string, CancellationToken, Task>? validateBeforePublish = null,
-    VideoProxyRetentionLimits? publicationQuota = null)
+    VideoProxyRetentionLimits? publicationQuota = null,
+    Func<string, Func<CancellationToken, Task<VideoExecutionPermit>>,
+        CancellationToken, Task>? validateStagedInput = null)
     : IVideoPublishedDerivativeAdapter
 {
     public string? RequiredDerivativeKind => "PlayableProxy";
@@ -32,6 +34,7 @@ public sealed class VideoPublishedToolAdapter(
             await new VideoUnpublishedToolAttempt(database).RunAsync(
                 lease, executablePath, scratchRoot, budget, approvedArguments,
                 token: token,
+                validateStagedInput: validateStagedInput,
                 onValidatedSuccessfulExit: async (workspace, publicationToken) =>
                 {
                     // The child has fully exited. The staged original has

@@ -7,6 +7,24 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**2026-11-04 WI-0210 real-media acceptance:** One
+explicitly authorized already-local full-range Rec.709
+`yuvj420p` camera source passed independent input FFprobe,
+full-to-limited 720p output, post-trial SHA/source integrity
+and human visual playback/colour/orientation/audio review.
+It produced only a temporary private proxy; **zero newly
+published production videos** are confirmed. The next
+product integration keeps the current SDR default and
+compact profiles untouched while adding a separately
+versioned local-only, operator-selected one-step
+Rec.709 full-range playable-proxy path through the
+existing photo-first queue, guarded staged input,
+independent output validator, publication receipt and
+browser playback. Never infer acceptance for all 12
+metadata candidates, HDR, or online-only sources. See
+[WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md)
+and [single production acceptance runbook](../../operations/video-fullrange-wi0210-production-acceptance.md).
+
 ## Scheduling status
 
 **Current handoff, 2026-11-03:** PR #720 merged; WI-0152's

@@ -21,6 +21,13 @@ public sealed record VideoProcessingPreferences(
     public void Validate()
     {
         _ = VideoProxyEncodingProfiles.Resolve(EncodingProfile);
+        // New archive subtype is deliberately local-only and one-step in
+        // its first production acceptance. No implicit OneDrive download,
+        // backlog drain or automatic class-wide admission.
+        if (VideoProxyEncodingProfiles.IsRec709FullRange(EncodingProfile) &&
+            (IncludeOnlineOnly || (Enabled && !StopAfterOneVideoStepPerAdvance)))
+            throw new ArgumentException(
+                "Rec.709 full-range requires local-only, single-step video processing.");
         if (RetentionAgeHours is not (48 or 168 or 720))
             throw new ArgumentException(
                 "Video retention age must be 48 hours, 7 days or 30 days.");
