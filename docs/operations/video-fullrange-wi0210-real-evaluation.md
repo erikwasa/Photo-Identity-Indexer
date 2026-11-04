@@ -241,6 +241,51 @@ existing Steps 2–5 once. The result either advances the real
 conversion or provides another sanitized, fail-closed reason
 without widening production worker policy.
 
+### Bounded, never-mapped input data tracks (latest correction)
+
+The next operator-authorized retry, after PR #732 merged, failed at
+`input-probe` with `source-ancillary-stream-unapproved`.
+It still produced **no proxy**, did not establish colour, and
+requested **no hydration, database writes, jobs or publication**.
+This identifies a `codec_type=data` track that failed the two-tag
+allowlist; it does **not** disclose or establish its private codec
+tag, camera model, contents, GPS coordinates or payload.
+
+An input `data` stream is **not an additional playable stream**.
+The revised experimental evaluation instead allows **up to two
+streams typed `data`**, with **at most four total streams** and
+still exactly one fully validated video plus zero/one matching
+audio. It does not depend on vendor-specific data codec names
+or four-character tags. Extra video/audio, subtitles, attachments,
+unknown or untyped streams, and more than two data tracks
+remain rejected. The independent full-range `color_range=pc`,
+BT.709 signalling, geometry, rotation, registered revision,
+approved exact bytes, controlled processor and output format
+checks are unchanged.
+
+The existing encoder uses a fixed `-map 0:v:0` and optional
+`-map 0:a:0?`, never maps data, and uses `-dn`, `-sn`,
+`-map_metadata -1` and `-map_chapters -1`. The evaluation
+additionally uses `-map_metadata:s -1` so selected A/V stream
+tags are not automatically copied. The independent output
+FFprobe rejects any extra output data streams. The input
+probe no longer requests the data track's format tag or
+any user/location metadata. Neither FFprobe nor the CLI
+returns an auxiliary payload. This is a bounded local
+discard policy, **not** a claim that all arbitrary media or
+all metadata-bearing containers can be handled safely.
+
+Once the change is merged into `main`, the maintainer may
+**separately authorize one real evaluation of the same current
+locally available original** with a **fresh, marked temp
+directory** using the existing Steps 1–5. The read is not
+authorized automatically by the PR or by this text. If it
+passes automated checks, proceed to the same single human
+visual inspection and cleanup. If it fails another gate,
+stop and share only the sanitized `stage` and `reason`.
+Do not blindly test further private originals or broaden
+production eligibility.
+
 ### When the input probe rejects a real archive video
 
 The first maintained-host trial on **2026-11-04** returned

@@ -123,6 +123,18 @@ stream inventory or a claim of working full-range colour;
 real input colour/geometry, conversion and visual acceptance
 are still pending. See
 [the real-video evaluation runbook](video-fullrange-wi0210-real-evaluation.md).
+**Most recent live source gate (2026-11-04):**
+The third authorized real-file input probe failed safely with
+`source-ancillary-stream-unapproved`. A `data` stream is present
+but did not satisfy the vendor-code allowlist from PR #732.
+This is **not** a proven Rec.709 colour defect, and no proxy
+was produced. The next correction admits at most two declared
+but unselected data streams, never maps their payloads,
+suppresses global and stream-level metadata, independently
+verifies the output, and keeps the exact Rec.709/full-range
+and single-video/optional-audio requirements. No production
+cohort or stage-delivered counts change until real visual
+acceptance.
 Production still does not admit this pixel class.
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).

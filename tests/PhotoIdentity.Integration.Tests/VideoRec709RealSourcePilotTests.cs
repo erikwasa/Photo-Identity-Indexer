@@ -148,8 +148,12 @@ public sealed class VideoRec709RealSourcePilotTests
         Assert.Contains("-protocol_whitelist", args);
         Assert.Contains("file", args);
         Assert.Contains("-show_entries", args);
-        Assert.Contains(args, item => item.Contains(
+        // Only A/V technical fields and stream type are needed.
+        // Unmapped camera data codec tags and location metadata are not read.
+        Assert.DoesNotContain(args, item => item.Contains(
             "codec_tag_string", StringComparison.Ordinal));
+        Assert.DoesNotContain(args, item => item.Contains(
+            "stream_tags=location", StringComparison.Ordinal));
         Assert.Contains("-o", args);
         Assert.Contains(Path.Combine(scratch, "probe.json"), args);
         Assert.Equal(input, args.Last());

@@ -79,6 +79,20 @@ Rec.709/full-range and privacy/worker gates. Actual original
 stream types remain unproven; a single new opt-in
 post-merge local trial may validate. Avoid additional small
 check-only PRs or broad compatibility guesses.
+PR #732 merged, and the next private opt-in real sample
+failed safely at `input-probe` with
+`source-ancillary-stream-unapproved` (typed data
+track not in narrow camera-code allowlist); no output,
+hydration, DB mutations, worker or derivative effects.
+Do not infer its private codec/tag/GPS or a colour failure.
+Next revision within WI-0210: permit at most 2 **unmapped
+codec_type=data** tracks, 4 total streams, keep exact
+A/V-only map and full-range BT.709 gate, also suppress
+stream-level output metadata and remove input codec-tag
+collection. CI owns contract/negative tests. After
+merge, only one separately approved real-media evaluation
+and visual review; then one production-proxy vertical slice
+if accepted. No more speculative camera-tag allowlists.
 No production video worker admission is authorized.
 Real local-source proof, `color_range`, and colour-quality
 verification are required before any production policy expansion.
