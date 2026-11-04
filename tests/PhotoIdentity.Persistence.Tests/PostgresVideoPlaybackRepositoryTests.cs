@@ -28,8 +28,11 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             root, job, relative.Replace(".mp4", ".mov"), out _));
     }
 
-    [Fact]
-    public async Task Current_retained_proxy_is_read_without_original_and_denies_tamper_eviction_and_exclusion()
+    [Theory]
+    [InlineData("wi0188-sdr-h264-aac-720p-pilot-v1")]
+    [InlineData("wi0210-rec709-fullrange-720p-production-v1")]
+    public async Task Current_retained_proxy_is_read_without_original_and_denies_tamper_eviction_and_exclusion(
+        string publishedPreset)
     {
         string? admin = Environment.GetEnvironmentVariable(
             "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
@@ -101,7 +104,7 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             await queue.EnqueueAsync(
                 new VideoDerivativeJobIdentity(AssetRevisionId.From(revision),
                     VideoDerivativeKind.PlayableProxy, "wi0188-v1",
-                    "wi0188-sdr-h264-aac-720p-pilot-v1", new string('c', 64)),
+                    publishedPreset, new string('c', 64)),
                 budget, new VideoProcessingCandidate(true, false, true, true,
                     5000, 12000, 0));
             VideoProcessingJobLease lease = Assert.IsType<VideoProcessingJobLease>(
