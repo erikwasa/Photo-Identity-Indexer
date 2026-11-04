@@ -134,7 +134,7 @@ public static class VideoProcessingEndpoints
         catch (ArgumentException)
         {
             return Results.BadRequest(new ArchiveErrorResponse(
-                "Choose an approved video profile and retention age (48 hours, 7 days or 30 days); quota override requires valid paired limits."));
+                "Choose an approved video profile and retention age; the Rec.709 full-range profile requires local-only, one-step processing, and quota overrides require paired valid limits."));
         }
         bool quotaOrProfileChanged =
             existing.MaximumCacheMiB != requested.MaximumCacheMiB ||
