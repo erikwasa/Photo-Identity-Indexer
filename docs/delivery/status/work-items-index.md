@@ -22,6 +22,8 @@ Current work items: **16**. Archived terminal items: **193**.
 | [WI-0205](../work-items/WI-0205-continuous-photo-quality-rating.md) Evaluate and productize a provenance-bearing continuous photo-quality rating | M40 | proposed | unassigned | [YAML](work-items/active/WI-0205.yaml) |
 | [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) Verify opt-in OneDrive-only video hydration and safe online-only release | M30 | proposed | unassigned | [YAML](work-items/active/WI-0207.yaml) |
 
+| [WI-0211](../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md) Make video browsing recognizable with verified posters | M30 | proposed | unassigned | [YAML](work-items/active/WI-0211.yaml) |
+
 Historical items stay queryable without opening the archive directory:
 
 ```powershell
