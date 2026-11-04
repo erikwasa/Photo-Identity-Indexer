@@ -5,6 +5,21 @@ to `main` and its required CI checks pass.** This is a single, explicit
 Windows production-verification session; CI owns all synthetic unit,
 disposable PostgreSQL, package, launcher and documentation tests.
 
+## Final maintained-host result — PASS (2026-11-04)
+
+Following merged PR #734 and successful six-job CI,
+the maintainer completed the **one-step, local-only Rec.709
+full-range production acceptance**. One new registered
+playable proxy was published and visually inspected in
+Photo Identity: **playback PASS**. Succeeded jobs **27→28
+(+1)**, queued **0→0**, failed **0→0**, LastResult
+`published`; **no unexpected OneDrive hydration**.
+The accepted new durable proxy is distinct from the
+earlier temporary experimental proxy. WI-0210 is
+**completed**, not a promise to convert all 12 metadata
+candidates. The instructions below are retained as a
+reproducible procedure, **not a request to rerun the test**.
+
 ## What is already accepted, and what is not
 
 On 2026-11-04 the maintainer explicitly authorized reading one current,
@@ -13,8 +28,7 @@ real-video evaluation passed independent full-range BT.709 input
 inspection, 720p limited-range H.264/AAC output, original SHA recheck,
 and **human visual colour/orientation/audio/play/seek** acceptance.
 It reported no hydration, catalogue mutation, job or published
-derivative. One original is accepted; **zero newly published and
-played production proxies** are yet verified. Do not rerun that
+derivative. The initial real-source evaluation accepted one original; it did not itself publish a production derivative. The later production acceptance above confirmed **one** new published and playable proxy. Do not rerun that
 experimental conversion or independently hash the original merely
 to repeat accepted evidence.
 
@@ -164,10 +178,7 @@ Provide:
   photo-work regression observed: yes/no
 
 Expected acceptance is **one additional genuinely playable
-production proxy**, not all 12 candidates. Continue to report
-**12 metadata-potential, one real evaluation accepted, and
-zero production additions verified** until this step is actually
-performed and confirmed. If one source fails independent probe,
+production proxy**, not all 12 candidates. Accepted scope: **12 metadata-potential, one real evaluation accepted, and one new production playable proxy confirmed**. No claim is made that all 12 were encoded or reviewed. If one source fails independent probe,
 stop that exact step rather than weakening colour gates,
 processing other sources automatically, or claiming WI-0210
 completed.
