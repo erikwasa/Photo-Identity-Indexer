@@ -188,6 +188,10 @@ public static class Program
                     await VideoPosterCleanupCommandRunner.RunAsync(
                         VideoPosterCleanupOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "posters-from-proxies" =>
+                    await VideoProxyPosterCommandRunner.RunAsync(
+                        VideoProxyPosterOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "posters" =>
                     await VideoPosterCommandRunner.RunAsync(
                         VideoPosterOptions.Parse(args.Skip(2).ToArray()),
@@ -526,6 +530,10 @@ public static class Program
                                      stale SDR JPEG posters, never photo derivatives)
 
               video posters --enable-video --source DIR --derivatives DIR
+            video posters-from-proxies --enable-video --cache-root DIR --derivatives DIR
+                --ffmpeg PATH --ffmpeg-sha256 HASH --ffprobe PATH --ffprobe-sha256 HASH
+                --postgres-connection-env NAME --database NAME [--max-videos 1..3]
+                [--timeout-seconds 30..90] [--apply]
                             --ffmpeg ABSOLUTE_EXE
                             --postgres-connection-env NAME --database DB
                             [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
