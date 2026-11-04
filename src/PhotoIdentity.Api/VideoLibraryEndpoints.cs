@@ -11,6 +11,7 @@ public static class VideoLibraryEndpoints
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/videos", ListAsync);
+        endpoints.MapGet("/api/videos/coverage", GetCoverageAsync);
         endpoints.MapGet("/api/videos/{revisionId}/poster", GetPosterAsync);
         endpoints.MapMethods("/api/videos/{revisionId}/play",
             ["GET", "HEAD"], GetPlaybackAsync);
@@ -28,7 +29,7 @@ public static class VideoLibraryEndpoints
             "PhotoIdentity", "video-derivatives");
 
     private static async Task<IResult> ListAsync(
-        int? offset, int? limit,
+        int? offset, int? limit, bool? playableOnly,
         PostgresVideoLibraryRepository videos, IConfiguration settings,
         HttpContext context, CancellationToken token)
     {
@@ -39,7 +40,7 @@ public static class VideoLibraryEndpoints
         if (start < 0 || count is < 1 or > 60)
             return Results.BadRequest(new { error = "Invalid bounded video page." });
 
-        VideoLibraryPage page = await videos.ListAsync(start, count, token);
+        VideoLibraryPage page = await videos.ListAsync(start, count, playableOnly ?? false, token);
         return Results.Ok(new VideoLibraryResponse(
             page.Items.Select(item => new VideoLibraryItemResponse(
                 item.RevisionId.ToString(), item.InspectionStatus,
@@ -47,6 +48,20 @@ public static class VideoLibraryEndpoints
                 item.RotationDegrees, item.CaptureAtUtc, item.HasPoster,
                 item.HasPlayableProxy)).ToArray(),
             page.Offset, page.Limit, page.HasMore));
+    }
+
+    private static async Task<IResult> GetCoverageAsync(
+        PostgresVideoLibraryRepository videos, IConfiguration settings,
+        HttpContext context, CancellationToken token)
+    {
+        DisableCaching(context);
+        if (!Enabled(settings)) return Results.NotFound();
+        VideoLibraryCoverage coverage = await videos.GetCoverageAsync(token);
+        return Results.Ok(new VideoLibraryCoverageResponse(
+            coverage.TotalVideos, coverage.PlayableVideos,
+            coverage.VideosWithPosters, coverage.PlayableWithPosters,
+            coverage.PlayableMissingPosters,
+            coverage.UninspectedOrUnsupported));
     }
 
     private static string ProxyRoot(IConfiguration settings) =>
