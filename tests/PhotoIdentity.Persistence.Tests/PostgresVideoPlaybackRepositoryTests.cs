@@ -118,6 +118,11 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             await File.WriteAllBytesAsync(output, mp4);
             Assert.True(await new VideoDerivativeFilePublisher(database)
                 .PublishAsync(lease, cache, output));
+            VideoLibraryPage visible = await new PostgresVideoLibraryRepository(database)
+                .ListAsync(0, 24);
+            Assert.Contains(visible.Items, x =>
+                x.RevisionId == AssetRevisionId.From(revision) &&
+                x.HasPlayableProxy);
             string file = Path.Combine(cache, VideoDerivativeArtifactPath.ForLease(lease)
                 .Replace('/', Path.DirectorySeparatorChar));
             var playback = new PostgresVideoPlaybackRepository(database);
