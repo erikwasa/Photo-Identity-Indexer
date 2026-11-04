@@ -20,6 +20,62 @@
     }
     else
     {
+        <section class="video-settings-status" aria-labelledby="video-queue-heading">
+            <div class="video-settings-status-heading">
+                <div>
+                    <h3 id="video-queue-heading">Video queue and status</h3>
+                    <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
+                </div>
+                <button class="button secondary" type="button"
+                        disabled="@(Saving || Loading)" @onclick="RefreshStatusAsync">
+                    @(Loading ? "Refreshing…" : "Refresh video status")
+                </button>
+            </div>
+        <div class="review-filter-grid video-settings-queue-grid">
+            <div><span class="field-label">Pending</span><strong>@Status.Queued</strong></div>
+            <div><span class="field-label">Processing</span><strong>@(Status.Processing ? "Yes" : "No")</strong></div>
+            <div><span class="field-label">Completed</span><strong>@Status.Succeeded</strong></div>
+            <div><span class="field-label">Failed</span><strong>@Status.Failed</strong></div>
+            <div><span class="field-label">Cancelled</span><strong>@Status.Cancelled</strong></div>
+            <div><span class="field-label">Recovery needed</span><strong>@Status.ExpiredLeases</strong></div>
+        </div>
+        @if (Status.Recent is { Count: > 0 })
+        {
+            <details class="video-settings-recent">
+                <summary>Recent video jobs (@Status.Recent.Count)</summary>
+                <div class="archive-table-wrap">
+                <table class="archive-table">
+                    <thead>
+                        <tr><th>Job</th><th>Status</th><th>Attempts</th>
+                            <th>Progress</th><th>Failure</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (VideoJobRow job in Status.Recent)
+                        {
+                            <tr>
+                                <td><code>@job.JobId.ToString("N")[..8]</code></td>
+                                <td>@job.Status</td>
+                                <td>@job.Attempts</td>
+                                <td>@job.ProgressPercent%</td>
+                                <td>@(job.FailureCode ?? "—")</td>
+                                <td>
+                                    @if (job.Status is "failed" or "cancelled")
+                                    {
+                                        <button class="button secondary" disabled="@Saving"
+                                                @onclick="() => RetryAsync(job.JobId)">
+                                            Retry
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                </div>
+            </details>
+        }
+        </section>
+
         <form class="video-settings-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <div class="video-settings-action-strip">
                 <button class="button primary" type="submit" disabled="@Saving">
@@ -174,8 +230,12 @@
             </div>
         }
 
-        <section class="review-filter-panel" aria-labelledby="video-retention-heading">
-            <h3 id="video-retention-heading">Review local proxy cleanup</h3>
+        <details class="video-settings-maintenance">
+            <summary id="video-retention-heading">Advanced storage maintenance — proxy cleanup</summary>
+            <div class="video-settings-maintenance-content">
+                <p class="field-help">Optional storage recovery, not part of normal playback.
+                    Previewing never deletes files; removal requires another explicit confirmation.
+                    Leave this closed unless you intend to reclaim registered proxy storage.</p>
             <p class="field-help">
                 Only app-generated, registered video proxy copies are eligible.
                 The review checks up to 8 registered entries using their
@@ -229,54 +289,9 @@
                     Originals were not selected for deletion.
                 </p>
             }
-        </section>
-
-        <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
-        <h3>Video queue</h3>
-        <div class="review-filter-grid">
-            <div><span class="field-label">Pending</span><strong>@Status.Queued</strong></div>
-            <div><span class="field-label">Processing</span><strong>@(Status.Processing ? "Yes" : "No")</strong></div>
-            <div><span class="field-label">Completed</span><strong>@Status.Succeeded</strong></div>
-            <div><span class="field-label">Failed</span><strong>@Status.Failed</strong></div>
-            <div><span class="field-label">Cancelled</span><strong>@Status.Cancelled</strong></div>
-            <div><span class="field-label">Recovery needed</span><strong>@Status.ExpiredLeases</strong></div>
-        </div>
-        @if (Status.Recent is { Count: > 0 })
-        {
-            <h3>Recent video jobs</h3>
-            <div class="archive-table-wrap">
-                <table class="archive-table">
-                    <thead>
-                        <tr><th>Job</th><th>Status</th><th>Attempts</th>
-                            <th>Progress</th><th>Failure</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (VideoJobRow job in Status.Recent)
-                        {
-                            <tr>
-                                <td><code>@job.JobId.ToString("N")[..8]</code></td>
-                                <td>@job.Status</td>
-                                <td>@job.Attempts</td>
-                                <td>@job.ProgressPercent%</td>
-                                <td>@(job.FailureCode ?? "—")</td>
-                                <td>
-                                    @if (job.Status is "failed" or "cancelled")
-                                    {
-                                        <button class="button secondary" disabled="@Saving"
-                                                @onclick="() => RetryAsync(job.JobId)">
-                                            Retry
-                                        </button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
             </div>
-        }
-        <button class="button secondary" disabled="@Saving" @onclick="LoadAsync">
-            Refresh video status
-        </button>
+        </details>
+
     }
 </section>
 
@@ -334,7 +349,11 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    // A status refresh updates only the server snapshot; it must not
+    // overwrite unsaved form choices or remove the form and reset scroll.
+    private Task RefreshStatusAsync() => LoadAsync(synchronizeForm: false);
+
+    private async Task LoadAsync(bool synchronizeForm = true)
     {
         Loading = true;
         Error = null;
@@ -344,7 +363,7 @@
         {
             Status = await Http.GetFromJsonAsync<VideoSettingsResponse>(
                 "api/video-processing/settings");
-            if (Status is not null)
+            if (Status is not null && synchronizeForm)
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
@@ -357,6 +376,8 @@
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
                 MaximumProxyMiB = Status.MaximumProxyMiB ?? 256;
             }
+            if (Status is not null && !synchronizeForm)
+                Message = "Video status refreshed.";
         }
         catch (Exception)
         {
