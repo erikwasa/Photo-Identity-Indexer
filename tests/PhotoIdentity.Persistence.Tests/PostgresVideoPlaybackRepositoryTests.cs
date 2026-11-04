@@ -147,6 +147,8 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                 .Replace('/', Path.DirectorySeparatorChar));
             var playback = new PostgresVideoPlaybackRepository(database);
 
+            string posterRoot = Path.Combine(folder, "posters");
+            byte[] jpeg = new byte[128];
             await using (VideoPlaybackLease? opened = await playback.OpenCurrentAsync(
                 AssetRevisionId.From(revision), cache))
             {
@@ -159,13 +161,11 @@ public sealed class PostgresVideoPlaybackRepositoryTests
 
                 // Synthetic poster publication is fenced by the same proxy
                 // source lock. No private source file is present in this test.
-                string posterRoot = Path.Combine(folder, "posters");
                 string tool = new('d', 64);
                 string relativePoster = $"video-posters/wi0211-proxy-still-v1/{revision:D}/{tool}.jpg";
                 string posterPath = Path.Combine(posterRoot,
                     relativePoster.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(posterPath)!);
-                byte[] jpeg = new byte[128];
                 jpeg[0] = 0xff; jpeg[1] = 0xd8;
                 jpeg[2] = 0xff; jpeg[3] = 0xc0; jpeg[4] = 0; jpeg[5] = 17;
                 jpeg[6] = 8; jpeg[7] = 1; jpeg[8] = 104;
@@ -180,9 +180,9 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                     opened.PublishProxyPosterAsync(posterEvidence with
                     { PosterRelativePath = "../wrong.jpg" }));
                 Assert.True(await opened.PublishProxyPosterAsync(posterEvidence));
-                Assert.Equal(jpeg, await browse.GetPosterBytesAsync(
-                    AssetRevisionId.From(revision), posterRoot));
             }
+            Assert.Equal(jpeg, await browse.GetPosterBytesAsync(
+                AssetRevisionId.From(revision), posterRoot));
             Assert.Empty(await browse.ListMissingProxyPostersAsync(3));
             VideoLibraryCoverage afterPoster = await browse.GetCoverageAsync();
             Assert.Equal(1, afterPoster.PlayableWithPosters);
