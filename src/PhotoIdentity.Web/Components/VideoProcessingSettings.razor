@@ -44,7 +44,7 @@
             <details class="video-settings-recent">
                 <summary>Recent video jobs (@Status.Recent.Count)</summary>
                 <div class="archive-table-wrap">
-                <table class="archive-table">
+                    <table class="archive-table">
                     <thead>
                         <tr><th>Job</th><th>Status</th><th>Attempts</th>
                             <th>Progress</th><th>Failure</th><th>Action</th></tr>
@@ -70,7 +70,7 @@
                             </tr>
                         }
                     </tbody>
-                </table>
+                    </table>
                 </div>
             </details>
         }
@@ -215,7 +215,7 @@
             </fieldset>
             <p class="field-help video-settings-save-hint">Use the Save button above to apply your changes.</p>
             <p class="field-help">
-                These preferences are saved immediately. Use Advance archive
+                Changes take effect after Save. Use Advance archive
                 to start processing; use Pause archive to interrupt it.
                 An interrupted video restarts from scratch when retried.
             </p>
@@ -361,9 +361,13 @@
         ConfirmRetention = false;
         try
         {
-            Status = await Http.GetFromJsonAsync<VideoSettingsResponse>(
-                "api/video-processing/settings");
-            if (Status is not null && synchronizeForm)
+            VideoSettingsResponse? refreshed =
+                await Http.GetFromJsonAsync<VideoSettingsResponse>(
+                    "api/video-processing/settings");
+            if (refreshed is null)
+                throw new InvalidDataException("No video status was returned.");
+            Status = refreshed;
+            if (synchronizeForm)
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
