@@ -447,6 +447,74 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
 
     }
 
+    [Fact]
+    public void Production_rec709_profile_is_opt_in_versioned_and_exactly_pixel_scoped()
+    {
+        var full = VideoProxyEncodingProfiles.Resolve(
+            VideoProxyEncodingProfiles.Rec709FullRangeKey);
+        Assert.Equal("wi0210-rec709-fullrange-720p-production-v1", full.Version);
+        Assert.NotEqual(VideoProxyEncodingProfiles.Standard.Version, full.Version);
+        Assert.NotEqual(VideoProxyEncodingProfiles.Compact.Version, full.Version);
+        Assert.Equal(720, full.MaximumDimension);
+        Assert.False(VideoProxyCandidateProfile.Eligible(Current()));
+        Assert.True(VideoProxyEncodingProfiles.IsEligible(full, Current()));
+        Assert.False(VideoProxyEncodingProfiles.IsEligible(
+            VideoProxyEncodingProfiles.Standard, Current()));
+        Assert.False(VideoProxyEncodingProfiles.IsEligible(
+            VideoProxyEncodingProfiles.Compact, Current()));
+        foreach (VideoRevisionInspection rejected in new[]
+        {
+            Current() with { PixelFormat = "yuv420p" },
+            Current() with { ColorTransfer = "arib-std-b67" },
+            Current() with { DisplayRotationDegrees = null },
+            Current() with { InspectionStatus = "unsupported" },
+            Current() with { AudioCodec = "opus" }
+        })
+            Assert.False(VideoProxyEncodingProfiles.IsEligible(full, rejected));
+
+        string source = Path.GetFullPath("already-verified-staged.mov");
+        string workspace = Path.GetFullPath("owned-proxy-workspace");
+        Assert.Equal(
+            VideoRec709FullRangeEvaluationProfile.BuildArguments(source, workspace),
+            full.BuildArguments(source, workspace));
+        string[] args = [.. full.BuildArguments(source, workspace)];
+        string Arg(string option) => args[Array.IndexOf(args, option) + 1];
+        Assert.Contains("in_range=full:out_range=limited", Arg("-vf"));
+        Assert.Equal("tv", Arg("-color_range"));
+        Assert.Equal("-1", Arg("-map_metadata:s"));
+        Assert.Equal("-1", Arg("-map_metadata"));
+        Assert.Equal(2, args.Count(x => x == "-map"));
+        Assert.Contains("-sn", args);
+        Assert.Contains("-dn", args);
+    }
+
+    [Fact]
+    public void Production_input_probe_requires_fullrange_signalling_with_unmapped_data()
+    {
+        var full = VideoProxyEncodingProfiles.Rec709FullRange;
+        Assert.True(VideoProxyEncodingProfiles.IsEligible(full, Current()));
+
+        string withData = WithAncillaryStreams(
+            InputProbe(), ("private", "opaque"), ("another", "opaque"));
+        VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+            Encoding.UTF8.GetBytes(withData), Current(), SourceSize);
+        foreach ((string before, string after, string reason) in new[]
+        {
+            ("\"color_range\":\"pc\"", "\"color_range\":\"tv\"",
+                "source-full-range-unproven"),
+            ("\"color_primaries\":\"bt709\"", "\"color_primaries\":\"bt2020\"",
+                "source-bt709-signalling-unproven"),
+        })
+        {
+            string invalid = withData.Replace(before, after);
+            Assert.NotEqual(withData, invalid);
+            var failure = Assert.Throws<VideoFullRangeInputRejectionException>(() =>
+                VideoRec709FullRangeEvaluationProfile.ValidateInputProbeJson(
+                    Encoding.UTF8.GetBytes(invalid), Current(), SourceSize));
+            Assert.Equal(reason, failure.ReasonCode);
+        }
+    }
+
     private static string SyntheticInputProbe() => """
         {"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3.0","size":"4096"},
          "streams":[
