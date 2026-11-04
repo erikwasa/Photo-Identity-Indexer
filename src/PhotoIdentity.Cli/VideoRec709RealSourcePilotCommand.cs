@@ -356,7 +356,7 @@ public static class VideoRec709RealSourcePilotCommandRunner
         "-v", "error", "-hide_banner", "-protocol_whitelist", "file",
         "-probesize", "2097152", "-analyzeduration", "2000000",
         "-show_streams", "-show_format", "-show_entries",
-        "format=format_name,duration,size:stream=codec_type,codec_name,pix_fmt,width,height,color_range,color_transfer,color_primaries,color_space,channels:stream_tags=rotate:stream_side_data=rotation",
+        "format=format_name,duration,size:stream=codec_type,codec_name,codec_tag_string,pix_fmt,width,height,color_range,color_transfer,color_primaries,color_space,channels:stream_tags=rotate:stream_side_data=rotation",
         "-of", "json", "-o", Path.Combine(workspace, "probe.json"),
         "-i", staged
     ];
