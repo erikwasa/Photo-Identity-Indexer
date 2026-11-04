@@ -176,8 +176,7 @@ public static class VideoRec709FullRangeEvaluationProfile
             "force_original_aspect_ratio=decrease:force_divisible_by=2," +
             "fps=30,format=yuv420p";
 
-        int colour = args.IndexOf("-color_primaries");
-        if (colour < 0)
+        if (args.IndexOf("-color_primaries") < 0)
             throw new InvalidOperationException("Missing baseline Rec.709 output flags.");
         // Source stream-level tags can otherwise be implicitly mapped with
         // selected A/V streams, even though auxiliary data is unmapped.
@@ -192,7 +191,7 @@ public static class VideoRec709FullRangeEvaluationProfile
             throw new InvalidOperationException(
                 "Full-range evaluation requires a fixed A/V-only output map.");
         args.InsertRange(streamMetadata + 2, ["-map_metadata:s", "-1"]);
-        args.InsertRange(colour + 2, ["-color_range", "tv"]);
+        args.InsertRange(args.IndexOf("-color_primaries"), ["-color_range", "tv"]);
         return args;
     }
 
