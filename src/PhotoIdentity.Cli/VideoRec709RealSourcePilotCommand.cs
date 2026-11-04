@@ -262,6 +262,10 @@ public static class VideoRec709RealSourcePilotCommandRunner
                     if (!await Allowed(ct))
                         throw new InvalidOperationException("Source authorization was revoked.");
                     File.Copy(candidate, partialReview, overwrite: false);
+                    if (new FileInfo(partialReview).Length !=
+                        new FileInfo(candidate).Length)
+                        throw new InvalidDataException(
+                            "Private review copy differs from validated output.");
                     // Review is only exposed as a playable filename after
                     // a complete, validated copy; never expose half-written
                     // private output from an interrupted tool callback.
@@ -282,6 +286,11 @@ public static class VideoRec709RealSourcePilotCommandRunner
                     selected.Sha256, selected.Bytes, deadline.Token);
             if (!after.Verified || !after.SourceMetadataStable)
                 throw new InvalidDataException("Original source integrity changed.");
+            // The revision, exclusion, stopped lane and photo-priority
+            // decision must still hold AFTER the last no-recall read.
+            if (!await Allowed(deadline.Token))
+                throw new InvalidOperationException(
+                    "Final source or video-lane authorization was revoked.");
             afterIntegrity = true;
 
             Write(output, "validated", false, opened, inputProven, outputValidated,
