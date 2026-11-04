@@ -530,16 +530,21 @@ public static class Program
                                      stale SDR JPEG posters, never photo derivatives)
 
               video posters --enable-video --source DIR --derivatives DIR
-            video posters-from-proxies --enable-video --cache-root DIR --derivatives DIR
-                --ffmpeg PATH --ffmpeg-sha256 HASH --ffprobe PATH --ffprobe-sha256 HASH
-                --postgres-connection-env NAME --database NAME [--max-videos 1..3]
-                [--timeout-seconds 30..90] [--apply]
                             --ffmpeg ABSOLUTE_EXE
                             --postgres-connection-env NAME --database DB
                             [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
                             [--apply]
                             (dry-run by default; only creates bounded revision-bound
                              SDR JPEG posters for previously indexed local videos)
+
+              video posters-from-proxies --enable-video --cache-root DIR --derivatives DIR
+                            --ffmpeg PATH --ffmpeg-sha256 HASH
+                            --ffprobe PATH --ffprobe-sha256 HASH
+                            --postgres-connection-env NAME --database DB
+                            [--max-videos COUNT (1..3)] [--timeout-seconds SECONDS (30..90)]
+                            [--apply]
+                            (dry-run by default; --apply creates only bounded verified
+                             JPEG stills from already published local video proxies)
 
               video pilot --enable-video --source DIR --derivatives DIR
                           --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
