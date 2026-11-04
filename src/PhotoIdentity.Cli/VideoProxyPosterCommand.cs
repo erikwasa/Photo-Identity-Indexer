@@ -144,6 +144,7 @@ public static class VideoProxyPosterCommandRunner
             return 0;
         }
 
+        await RequireIdleVideoLaneAsync(database, token);
         string ffmpeg = await RequirePinnedToolAsync(
             options.FfmpegPath, options.FfmpegSha256, token);
         string ffprobe = await RequirePinnedToolAsync(
@@ -243,6 +244,7 @@ public static class VideoProxyPosterCommandRunner
                 FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous))
                 posterHash = Convert.ToHexString(await SHA256.HashDataAsync(image, token))
                     .ToLowerInvariant();
+            VideoDerivativeCacheGuard.AssertNoLinks(directory);
             if (File.Exists(target))
                 throw new InvalidDataException("Unregistered poster destination already exists.");
             File.Move(temporaryPoster, target, overwrite: false);
@@ -273,6 +275,21 @@ public static class VideoProxyPosterCommandRunner
             else Directory.CreateDirectory(dir);
             VideoDerivativeCacheGuard.AssertNoLinks(dir);
         }
+    }
+
+    private static async Task RequireIdleVideoLaneAsync(
+        PostgresCatalogueDatabase database, CancellationToken token)
+    {
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand check = connection.CreateCommand();
+        check.CommandText = """
+            SELECT (enabled AND NOT paused)
+                OR EXISTS (SELECT 1 FROM video_processing_jobs WHERE status = 'running')
+            FROM video_processing_control WHERE singleton_id = 1;
+            """;
+        if (await check.ExecuteScalarAsync(token) is not false)
+            throw new InvalidOperationException(
+                "Pause the Archive and allow running video work to stop before poster backfill.");
     }
 
     private static async Task<string> RequirePinnedToolAsync(
