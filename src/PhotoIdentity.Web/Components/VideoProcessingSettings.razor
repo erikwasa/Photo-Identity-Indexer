@@ -43,7 +43,7 @@
                 <div>
                     <label class="field-label" for="video-processing-online">
                         <input id="video-processing-online" type="checkbox"
-                               @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled)" />
+                               @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled || EncodingProfile == "rec709-fullrange-720p")" />
                         Include online-only videos
                     </label>
                     <p>Off by default. Allows bounded OneDrive downloads for video
@@ -78,12 +78,20 @@
                         @bind="EncodingProfile" disabled="@Saving">
                     <option value="standard-720p">Standard 720p — current default</option>
                     <option value="compact-540p">Compact 540p — smaller picture / lower bitrate</option>
+                    <option value="rec709-fullrange-720p">Rec.709 full-range 720p — evaluated camera-video compatibility (local only)</option>
                 </select>
                 <p class="field-help">
-                    Both are bounded SDR H.264/AAC MP4 presets with fast-start
-                    seeking and automatic orientation. The compact preset may
-                    reduce file size and detail; actual quality and encoding
-                    time will be measured on local videos. Selecting a different
+                    The standard and compact presets retain their existing SDR
+                    H.264/AAC behavior. Rec.709 full-range is a separate,
+                    explicitly selected 720p profile for locally available
+                    yuvj420p camera videos. Its independent input probe must
+                    establish full-range BT.709 before encoding. It refuses
+                    online-only processing and requires "Stop each Archive
+                    advance after one video step" when enabled; uncheck
+                    "Include online-only videos" before selecting it. No
+                    files are read or processed merely by choosing a profile.
+                    The compact preset may reduce file size and detail; actual
+                    quality and encoding time are measured on local videos. Selecting a different
                     preset creates a distinct durable job for that source
                     revision; it never rewrites existing proxies or starts
                     processing on its own. Pause active video processing
