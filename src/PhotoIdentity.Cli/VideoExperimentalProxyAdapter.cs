@@ -60,9 +60,14 @@ public sealed class VideoExperimentalProxyAdapter(
             async (output, checkToken) =>
             {
                 var liveSafety = new PostgresVideoLeaseSafetyProbe(database);
-                _ = await validator.ValidateAsync(output,
-                    inspectToken => liveSafety.CheckAsync(lease, inspectToken),
+                VideoProxyInspection validated = await validator.ValidateAsync(
+                    output, inspectToken => liveSafety.CheckAsync(lease, inspectToken),
                     checkToken);
+                if (fullRange && (evidence is null ||
+                    !VideoRec709RealSourcePilotCommandRunner.MatchesExpectedOutput(
+                        evidence, validated)))
+                    throw new InvalidDataException(
+                        "Full-range proxy duration, audio or orientation does not match the registered source.");
             }, publicationQuota,
             validateStagedInput: fullRange
                 ? ValidateFullRangeStagedSourceAsync
