@@ -96,6 +96,28 @@ public static class VideoProxyPosterCommandRunner
         ];
     }
 
+    public static IReadOnlyList<string> BuildBrightnessArguments(string jpeg) =>
+    [
+        "-nostdin", "-hide_banner", "-loglevel", "info",
+        "-protocol_whitelist", "file", "-i", jpeg,
+        "-map", "0:v:0", "-frames:v", "1", "-an", "-sn", "-dn",
+        "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG",
+        "-f", "null", "-"
+    ];
+
+    public static double ParseBrightness(string diagnostics)
+    {
+        Match value = Regex.Match(diagnostics,
+            @"lavfi\.signalstats\.YAVG=([0-9]+(?:\.[0-9]+)?)",
+            RegexOptions.CultureInvariant);
+        if (!value.Success || !double.TryParse(value.Groups[1].Value,
+                NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture,
+                out double brightness) || !double.IsFinite(brightness) ||
+            brightness is < 0 or > 255)
+            throw new InvalidDataException("Poster brightness could not be independently checked.");
+        return brightness;
+    }
+
     public static async Task<int> RunAsync(
         VideoProxyPosterOptions options, TextWriter output, CancellationToken token = default)
     {
@@ -194,6 +216,12 @@ public static class VideoProxyPosterCommandRunner
             await RunFfmpegAsync(ffmpeg, BuildRenderArguments(
                 temporaryProxy, temporaryPoster, (decimal)input.DurationSeconds.Value),
                 timeoutSeconds, token);
+            // Reject an all-black or near-black representative frame rather
+            // than registering an indistinguishable thumbnail.
+            string brightnessEvidence = await RunFfmpegAsync(
+                ffmpeg, BuildBrightnessArguments(temporaryPoster), timeoutSeconds, token);
+            if (ParseBrightness(brightnessEvidence) < 24)
+                throw new InvalidDataException("Representative video frame is too dark.");
             (int width, int height) = VideoPosterCommandRunner.ReadJpegDimensions(temporaryPoster);
             if (width > 960 || height > 960)
                 throw new InvalidDataException("Proxy poster dimensions exceeded bounds.");
@@ -287,7 +315,7 @@ public static class VideoProxyPosterCommandRunner
         return root;
     }
 
-    private static async Task RunFfmpegAsync(
+    private static async Task<string> RunFfmpegAsync(
         string ffmpeg, IReadOnlyList<string> arguments,
         int timeoutSeconds, CancellationToken token)
     {
@@ -308,10 +336,13 @@ public static class VideoProxyPosterCommandRunner
             Task<string> stdout = process.StandardOutput.ReadToEndAsync();
             Task<string> stderr = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync(deadline.Token);
-            _ = await stdout.WaitAsync(deadline.Token);
-            _ = await stderr.WaitAsync(deadline.Token);
+            string standardOutput = await stdout.WaitAsync(deadline.Token);
+            string standardError = await stderr.WaitAsync(deadline.Token);
+            if (standardOutput.Length > 65536 || standardError.Length > 65536)
+                throw new InvalidDataException("Media tool diagnostic limit exceeded.");
             if (process.ExitCode != 0)
                 throw new InvalidDataException("Verified proxy could not produce a poster.");
+            return standardOutput + "\n" + standardError;
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
