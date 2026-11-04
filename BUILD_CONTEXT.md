@@ -16,7 +16,7 @@ claim cohort-wide compatibility; HDR/HLG, unknown
 rotation, posters, frame evidence and WI-0207 online-only
 hydration remain outside this accepted WI.
 No repeat local testing requested for WI-0210.
-M30 itself remains in progress for other planned items.
+M30 remains open, with generated status `ready` because its remaining scoped work items are proposed.
 See docs/operations/video-fullrange-wi0210-production-acceptance.md
 and docs/delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md.
 
