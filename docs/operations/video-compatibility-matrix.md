@@ -135,6 +135,35 @@ verifies the output, and keeps the exact Rec.709/full-range
 and single-video/optional-audio requirements. No production
 cohort or stage-delivered counts change until real visual
 acceptance.
+**Maintainer real-media acceptance (2026-11-04):**
+after PR #733, a deliberately selected, already-local
+`yuvj420p` Rec.709 source passed independent actual
+full-range input FFprobe, limited-range H.264/AAC
+720p output, original integrity recheck and human
+visual/playback/colour/orientation/audio review.
+One private review proxy was retained, then operator
+cleanup; the experimental command wrote no database
+receipt and published no durable derivative. This
+is one accepted real example, **not** 12 production
+playable proxies.
+
+**Production slice now under review:** expose a
+distinct `rec709-fullrange-720p` preset under
+explicit local-only, one-video-step operator settings.
+The photo-first queue selects only the exact
+`yuvj420p` candidate class for this preset;
+the normal SDR presets are unchanged. Before
+production conversion, a pinned FFprobe independently
+validates the lease/SHA-staged source and the exact
+full-range BT.709, geometry, rotation, audio, container,
+duration and ancillary-data bounds from the accepted
+experiment. FFmpeg maps only validated A/V, strips
+all metadata and data, and independent output probing
+checks limited-range Rec.709 before lease-fenced
+publication. Existing browser playback consumes the
+registered derivative. No rollout/actual-playable count
+is claimed before the [one-step operator acceptance](video-fullrange-wi0210-production-acceptance.md).
+
 Production still does not admit this pixel class.
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
