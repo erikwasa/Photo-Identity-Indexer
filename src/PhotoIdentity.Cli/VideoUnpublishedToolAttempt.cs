@@ -22,7 +22,9 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
         VideoToolExecutionBudget limits,
         Func<string, string, IReadOnlyList<string>> approvedArguments,
         CancellationToken token = default,
-        Func<string, CancellationToken, Task>? onValidatedSuccessfulExit = null)
+        Func<string, CancellationToken, Task>? onValidatedSuccessfulExit = null,
+        Func<string, Func<CancellationToken, Task<VideoExecutionPermit>>,
+            CancellationToken, Task>? validateStagedInput = null)
     {
         ArgumentNullException.ThrowIfNull(lease);
         ArgumentNullException.ThrowIfNull(limits);
@@ -65,6 +67,22 @@ public sealed class VideoUnpublishedToolAttempt(PostgresCatalogueDatabase databa
                 lease, workToken.Token);
             if (!afterStage.Allowed)
                 return new(false, false, afterStage.ReasonCode, null);
+
+            // A profile-specific independently pinned input probe runs only
+            // against the already SHA-verified staged copy. It shares the
+            // lease heartbeat and photo-first cancellation; no FFmpeg process
+            // is started unless its strict source contract passes.
+            if (validateStagedInput is not null)
+            {
+                failureStage = "source-validation";
+                await validateStagedInput(staged.FilePath,
+                    checkToken => safety.CheckAsync(lease, checkToken),
+                    workToken.Token);
+                VideoExecutionPermit afterValidation = await safety.CheckAsync(
+                    lease, workToken.Token);
+                if (!afterValidation.Allowed)
+                    return new(false, false, afterValidation.ReasonCode, null);
+            }
 
             failureStage = "tool-execution";
             var guarded = new VideoGuardedToolExecutor(new VideoToolProcessSupervisor());
