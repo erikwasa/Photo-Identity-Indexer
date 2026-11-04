@@ -1,0 +1,127 @@
+/* Scoped to Video processing; never change checkbox sizing in other forms. */
+.video-settings-check-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    max-width: 100%;
+    min-height: 2.2rem;
+    line-height: 1.35;
+    margin-bottom: 0.35rem;
+    cursor: pointer;
+}
+
+.video-settings-check-row input[type="checkbox"] {
+    box-sizing: border-box;
+    inline-size: 1.05rem;
+    block-size: 1.05rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    min-height: 1.05rem;
+    min-width: 1.05rem;
+    max-width: 1.05rem;
+    margin: 0;
+    padding: 0;
+    flex: 0 0 1.05rem;
+    border-radius: 0.22rem;
+    accent-color: #0b7168;
+}
+
+.video-settings-form {
+    display: grid;
+    gap: 0.6rem;
+}
+
+/* Keep Save plus feedback at the current editing position under the
+   existing sticky top navigation. The form stays mounted on refresh. */
+.video-settings-action-strip {
+    position: sticky;
+    top: 5rem;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem 0.85rem;
+    padding: 0.5rem 0.65rem;
+    background: #f7f7f1;
+    border: 1px solid #d7dfd5;
+    border-radius: 0.65rem;
+    box-shadow: 0 2px 9px rgba(17, 48, 42, 0.08);
+}
+
+.video-settings-action-strip button {
+    flex: 0 0 auto;
+}
+
+.video-settings-feedback {
+    flex: 1 1 14rem;
+    min-width: 0;
+    font-size: 0.88rem;
+    font-weight: 650;
+}
+
+.video-settings-feedback--success { color: #136648; }
+.video-settings-feedback--error { color: #a12b2b; }
+
+.video-settings-status {
+    padding: 0.75rem;
+    background: #f3f6f2;
+    border: 1px solid #dce3db;
+    border-radius: 0.8rem;
+}
+
+.video-settings-status-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.video-settings-status-heading h3 { margin: 0 0 0.25rem; }
+.video-settings-status-heading .field-help { margin: 0; }
+.video-settings-queue-grid { margin-top: 0.65rem; }
+
+.video-settings-queue-grid > div {
+    display: grid;
+    gap: 0.1rem;
+}
+
+.video-settings-queue-grid .field-label { margin-bottom: 0; }
+
+.video-settings-recent,
+.video-settings-maintenance {
+    margin-top: 0.7rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #d5dfd6;
+    border-radius: 0.65rem;
+}
+
+.video-settings-recent > summary,
+.video-settings-maintenance > summary {
+    cursor: pointer;
+    font-weight: 650;
+    color: #35534b;
+}
+
+.video-settings-recent .archive-table-wrap {
+    margin-top: 0.65rem;
+}
+
+.video-settings-maintenance-content {
+    display: grid;
+    gap: 0.55rem;
+    padding-top: 0.65rem;
+}
+
+.video-settings-save-hint { margin: 0; }
+
+@media (max-width: 680px) {
+    .video-settings-action-strip {
+        top: 4.6rem;
+        padding: 0.45rem;
+    }
+
+    .video-settings-status-heading {
+        align-items: flex-start;
+    }
+}

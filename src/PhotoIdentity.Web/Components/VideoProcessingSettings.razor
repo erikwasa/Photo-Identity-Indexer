@@ -10,7 +10,7 @@
         </div>
     </div>
 
-    @if (Loading)
+    @if (Loading && Status is null)
     {
         <div class="empty-state compact">Loading video settings…</div>
     }
@@ -20,19 +20,79 @@
     }
     else
     {
-        @if (!string.IsNullOrWhiteSpace(Error))
+        <section class="video-settings-status" aria-labelledby="video-queue-heading">
+            <div class="video-settings-status-heading">
+                <div>
+                    <h3 id="video-queue-heading">Video queue and status</h3>
+                    <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
+                </div>
+                <button class="button secondary" type="button"
+                        disabled="@(Saving || Loading)" @onclick="RefreshStatusAsync">
+                    @(Loading ? "Refreshing…" : "Refresh video status")
+                </button>
+            </div>
+        <div class="review-filter-grid video-settings-queue-grid">
+            <div><span class="field-label">Pending</span><strong>@Status.Queued</strong></div>
+            <div><span class="field-label">Processing</span><strong>@(Status.Processing ? "Yes" : "No")</strong></div>
+            <div><span class="field-label">Completed</span><strong>@Status.Succeeded</strong></div>
+            <div><span class="field-label">Failed</span><strong>@Status.Failed</strong></div>
+            <div><span class="field-label">Cancelled</span><strong>@Status.Cancelled</strong></div>
+            <div><span class="field-label">Recovery needed</span><strong>@Status.ExpiredLeases</strong></div>
+        </div>
+        @if (Status.Recent is { Count: > 0 })
         {
-            <div class="notice error" role="alert">@Error</div>
+            <details class="video-settings-recent">
+                <summary>Recent video jobs (@Status.Recent.Count)</summary>
+                <div class="archive-table-wrap">
+                    <table class="archive-table">
+                    <thead>
+                        <tr><th>Job</th><th>Status</th><th>Attempts</th>
+                            <th>Progress</th><th>Failure</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (VideoJobRow job in Status.Recent)
+                        {
+                            <tr>
+                                <td><code>@job.JobId.ToString("N")[..8]</code></td>
+                                <td>@job.Status</td>
+                                <td>@job.Attempts</td>
+                                <td>@job.ProgressPercent%</td>
+                                <td>@(job.FailureCode ?? "—")</td>
+                                <td>
+                                    @if (job.Status is "failed" or "cancelled")
+                                    {
+                                        <button class="button secondary" disabled="@Saving"
+                                                @onclick="() => RetryAsync(job.JobId)">
+                                            Retry
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    </table>
+                </div>
+            </details>
         }
-        @if (!string.IsNullOrWhiteSpace(Message))
-        {
-            <div class="notice success" role="status">@Message</div>
-        }
+        </section>
 
-        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <form class="video-settings-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="video-settings-action-strip">
+                <button class="button primary" type="submit" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save video settings")
+                </button>
+                @if (!string.IsNullOrWhiteSpace(Error))
+                {
+                    <span class="video-settings-feedback video-settings-feedback--error" role="alert">@Error</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(Message))
+                {
+                    <span class="video-settings-feedback video-settings-feedback--success" role="status">@Message</span>
+                }
+            </div>
             <div class="review-filter-grid">
                 <div>
-                    <label class="field-label" for="video-processing-enabled">
+                    <label class="field-label video-settings-check-row" for="video-processing-enabled">
                         <input id="video-processing-enabled" type="checkbox"
                                @bind="Enabled" disabled="@Saving" />
                         Process videos
@@ -41,7 +101,7 @@
                        after photo processing. No parallel video jobs.</p>
                 </div>
                 <div>
-                    <label class="field-label" for="video-processing-online">
+                    <label class="field-label video-settings-check-row" for="video-processing-online">
                         <input id="video-processing-online" type="checkbox"
                                @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled || EncodingProfile == "rec709-fullrange-720p")" />
                         Include online-only videos
@@ -53,7 +113,7 @@
             </div>
             <fieldset class="review-filter-panel">
                 <legend class="field-label">Bounded video verification</legend>
-                <label class="field-label" for="video-processing-one-step">
+                <label class="field-label video-settings-check-row" for="video-processing-one-step">
                     <input id="video-processing-one-step" type="checkbox"
                            @bind="StopAfterOneVideoStepPerAdvance"
                            disabled="@Saving" />
@@ -78,24 +138,19 @@
                         @bind="EncodingProfile" disabled="@Saving">
                     <option value="standard-720p">Standard 720p — current default</option>
                     <option value="compact-540p">Compact 540p — smaller picture / lower bitrate</option>
-                    <option value="rec709-fullrange-720p">Rec.709 full-range 720p — evaluated camera-video compatibility (local only)</option>
+                    <option value="rec709-fullrange-720p">Rec.709 full-range 720p — validated local compatibility</option>
                 </select>
                 <p class="field-help">
-                    The standard and compact presets retain their existing SDR
-                    H.264/AAC behavior. Rec.709 full-range is a separate,
-                    explicitly selected 720p profile for locally available
-                    yuvj420p camera videos. Its independent input probe must
-                    establish full-range BT.709 before encoding. It refuses
-                    online-only processing and requires "Stop each Archive
-                    advance after one video step" when enabled; uncheck
-                    "Include online-only videos" before selecting it. No
-                    files are read or processed merely by choosing a profile.
-                    The compact preset may reduce file size and detail; actual
-                    quality and encoding time are measured on local videos. Selecting a different
-                    preset creates a distinct durable job for that source
-                    revision; it never rewrites existing proxies or starts
-                    processing on its own. Pause active video processing
-                    before changing profiles.
+                    Standard 720p and Compact 540p remain the existing SDR
+                    presets. Rec.709 full-range is a separately validated,
+                    opt-in 720p profile for locally available yuvj420p videos.
+                    Each selected original must still independently prove full-range
+                    BT.709; this does not approve all videos. It requires
+                    online-only processing off and one-video-step mode on.
+                    Choosing a preset does not read videos, start jobs or
+                    replace existing proxies; a future Archive advance may
+                    create a distinct durable job. Pause the Archive before
+                    changing an active processing profile.
                 </p>
             </fieldset>
             <fieldset class="review-filter-panel">
@@ -118,7 +173,7 @@
             </fieldset>
             <fieldset class="review-filter-panel">
                 <legend class="field-label">Local video proxy storage</legend>
-                <label class="field-label" for="video-processing-quota-override">
+                <label class="field-label video-settings-check-row" for="video-processing-quota-override">
                     <input id="video-processing-quota-override" type="checkbox"
                            @bind="OverrideProxyLimits" disabled="@Saving" />
                     Override launcher proxy limits
@@ -158,13 +213,9 @@
                     Archive run before changing the limits.
                 </p>
             </fieldset>
-            <div class="card-actions">
-                <button class="button primary" type="submit" disabled="@Saving">
-                    @(Saving ? "Saving…" : "Save video settings")
-                </button>
-            </div>
+            <p class="field-help video-settings-save-hint">Use the Save button above to apply your changes.</p>
             <p class="field-help">
-                These preferences are saved immediately. Use Advance archive
+                Changes take effect after Save. Use Advance archive
                 to start processing; use Pause archive to interrupt it.
                 An interrupted video restarts from scratch when retried.
             </p>
@@ -179,13 +230,18 @@
             </div>
         }
 
-        <section class="review-filter-panel" aria-labelledby="video-retention-heading">
-            <h3 id="video-retention-heading">Review local proxy cleanup</h3>
+        <details class="video-settings-maintenance">
+            <summary id="video-retention-heading">Advanced storage maintenance — proxy cleanup</summary>
+            <div class="video-settings-maintenance-content">
+                <p class="field-help">Optional storage recovery, not part of normal playback.
+                    Previewing never deletes files; removal requires another explicit confirmation.
+                    Leave this closed unless you intend to reclaim registered proxy storage.</p>
             <p class="field-help">
                 Only app-generated, registered video proxy copies are eligible.
                 The review checks up to 8 registered entries using their
-                stored SHA-256 hashes. Copies younger than 48 hours are
-                protected unless they are already invalid. Originals are
+                stored SHA-256 hashes. Copies younger than the selected
+                retention period (@RetentionAgeHours hours) are protected unless
+                they are already invalid. Originals are
                 never deleted. The video lane must be fully disabled and
                 paused, with no running jobs. Cleanup never runs automatically.
             </p>
@@ -206,7 +262,7 @@
                 </div>
                 @if (plan.Planned > 0 && plan.PlanFingerprint is not null)
                 {
-                    <label class="field-label" for="video-retention-confirm">
+                    <label class="field-label video-settings-check-row" for="video-retention-confirm">
                         <input id="video-retention-confirm" type="checkbox"
                                @bind="ConfirmRetention" disabled="@Saving" />
                         I understand that these generated proxy copies will be
@@ -234,54 +290,9 @@
                     Originals were not selected for deletion.
                 </p>
             }
-        </section>
-
-        <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
-        <h3>Video queue</h3>
-        <div class="review-filter-grid">
-            <div><span class="field-label">Pending</span><strong>@Status.Queued</strong></div>
-            <div><span class="field-label">Processing</span><strong>@(Status.Processing ? "Yes" : "No")</strong></div>
-            <div><span class="field-label">Completed</span><strong>@Status.Succeeded</strong></div>
-            <div><span class="field-label">Failed</span><strong>@Status.Failed</strong></div>
-            <div><span class="field-label">Cancelled</span><strong>@Status.Cancelled</strong></div>
-            <div><span class="field-label">Recovery needed</span><strong>@Status.ExpiredLeases</strong></div>
-        </div>
-        @if (Status.Recent is { Count: > 0 })
-        {
-            <h3>Recent video jobs</h3>
-            <div class="archive-table-wrap">
-                <table class="archive-table">
-                    <thead>
-                        <tr><th>Job</th><th>Status</th><th>Attempts</th>
-                            <th>Progress</th><th>Failure</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (VideoJobRow job in Status.Recent)
-                        {
-                            <tr>
-                                <td><code>@job.JobId.ToString("N")[..8]</code></td>
-                                <td>@job.Status</td>
-                                <td>@job.Attempts</td>
-                                <td>@job.ProgressPercent%</td>
-                                <td>@(job.FailureCode ?? "—")</td>
-                                <td>
-                                    @if (job.Status is "failed" or "cancelled")
-                                    {
-                                        <button class="button secondary" disabled="@Saving"
-                                                @onclick="() => RetryAsync(job.JobId)">
-                                            Retry
-                                        </button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
             </div>
-        }
-        <button class="button secondary" disabled="@Saving" @onclick="LoadAsync">
-            Refresh video status
-        </button>
+        </details>
+
     }
 </section>
 
@@ -339,7 +350,11 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    // A status refresh updates only the server snapshot; it must not
+    // overwrite unsaved form choices or remove the form and reset scroll.
+    private Task RefreshStatusAsync() => LoadAsync(synchronizeForm: false);
+
+    private async Task LoadAsync(bool synchronizeForm = true)
     {
         Loading = true;
         Error = null;
@@ -347,9 +362,13 @@
         ConfirmRetention = false;
         try
         {
-            Status = await Http.GetFromJsonAsync<VideoSettingsResponse>(
-                "api/video-processing/settings");
-            if (Status is not null)
+            VideoSettingsResponse? refreshed =
+                await Http.GetFromJsonAsync<VideoSettingsResponse>(
+                    "api/video-processing/settings");
+            if (refreshed is null)
+                throw new InvalidDataException("No video status was returned.");
+            Status = refreshed;
+            if (synchronizeForm)
             {
                 Enabled = Status.Enabled;
                 IncludeOnlineOnly = Status.IncludeOnlineOnly;
@@ -362,6 +381,8 @@
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
                 MaximumProxyMiB = Status.MaximumProxyMiB ?? 256;
             }
+            if (Status is not null && !synchronizeForm)
+                Message = "Video status refreshed.";
         }
         catch (Exception)
         {

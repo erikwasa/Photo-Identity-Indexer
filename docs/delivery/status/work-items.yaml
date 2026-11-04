@@ -202,3 +202,20 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+- id: WI-0211
+  title: Make video browsing recognizable with verified posters
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+  blockers:
+  - WI-0151
+  - WI-0152
+  - WI-0189
+  - WI-0210
+  blocker_notes: []
+  evidence:
+  - type: maintainer-observation
+    value: '2026-11-04: Maintainer provided screenshots of /videos with mostly indistinguishable black Video placeholders; opening multiple videos is required to identify content. Existing WI-0151 delivered manual durable poster producer and WI-0210 delivered playable proxies but neither established broad automatic poster coverage. A new bounded opt-in work item is needed.'
+  - type: documentation
+    value: docs/delivery/work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
