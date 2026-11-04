@@ -123,6 +123,16 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             Assert.Contains(visible.Items, x =>
                 x.RevisionId == AssetRevisionId.From(revision) &&
                 x.HasPlayableProxy);
+            var browse = new PostgresVideoLibraryRepository(database);
+            VideoLibraryPage playable = await browse.ListAsync(0, 24, playableOnly: true);
+            Assert.Equal(AssetRevisionId.From(revision), Assert.Single(playable.Items).RevisionId);
+            VideoLibraryCoverage coverage = await browse.GetCoverageAsync();
+            Assert.Equal(1, coverage.TotalVideos);
+            Assert.Equal(1, coverage.PlayableVideos);
+            Assert.Equal(0, coverage.VideosWithPosters);
+            Assert.Equal(0, coverage.PlayableWithPosters);
+            Assert.Equal(1, coverage.PlayableMissingPosters);
+            Assert.Equal(0, coverage.UninspectedOrUnsupported);
             string file = Path.Combine(cache, VideoDerivativeArtifactPath.ForLease(lease)
                 .Replace('/', Path.DirectorySeparatorChar));
             var playback = new PostgresVideoPlaybackRepository(database);
@@ -156,6 +166,8 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                     DateTimeOffset.UtcNow);
             Assert.Null(await playback.OpenCurrentAsync(
                 AssetRevisionId.From(revision), cache));
+            Assert.Equal(0, (await browse.GetCoverageAsync()).TotalVideos);
+            Assert.Empty((await browse.ListAsync(0, 24, playableOnly: true)).Items);
 
             // Remove only this disposable test exclusion, then advance the
             // catalogue's current revision. The old proxy must stay hidden.
@@ -177,6 +189,9 @@ public sealed class PostgresVideoPlaybackRepositoryTests
             }
             Assert.Null(await playback.OpenCurrentAsync(
                 AssetRevisionId.From(revision), cache));
+            Assert.Equal(1, (await browse.GetCoverageAsync()).TotalVideos);
+            Assert.Equal(0, (await browse.GetCoverageAsync()).PlayableVideos);
+            Assert.Empty((await browse.ListAsync(0, 24, playableOnly: true)).Items);
         }
         finally
         {
