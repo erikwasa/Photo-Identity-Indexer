@@ -111,7 +111,7 @@ if (-not $selection.readOnly -or
 $selection | Select-Object candidateCount, locallyMatchedCount
 $selection.candidates | Format-Table revisionId, sourceBytes, durationSeconds, codedOrientation, hasAudio -AutoSize
 
-$revision = [Guid](Read-Host "Choose one local candidate UUID privately")
+$revision = [Guid]::Parse((Read-Host "Choose one local candidate UUID privately"))
 if (@($selection.candidates | Where-Object {
     [Guid]$_.revisionId -eq $revision
 }).Count -ne 1) {
