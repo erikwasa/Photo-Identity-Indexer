@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using PhotoIdentity.Core.Catalogue;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 
@@ -10,10 +11,76 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// client cancellation; no original file is ever opened.
 /// </summary>
 public sealed class VideoPlaybackLease(
-    FileStream stream, NpgsqlTransaction transaction, NpgsqlConnection connection)
+    FileStream stream, NpgsqlTransaction transaction, NpgsqlConnection connection,
+    AssetRevisionId revisionId)
     : IAsyncDisposable
 {
     public FileStream Stream { get; } = stream;
+
+    /// <summary>
+    /// Publish one still under the SAME source lock that guarded verified proxy
+    /// bytes. Calling code must verify bounded JPEG bytes and geometry first.
+    /// This does not read originals and cannot replace any existing poster.
+    /// </summary>
+    public async Task<bool> PublishProxyPosterAsync(
+        VideoStillPoster poster, CancellationToken token = default)
+    {
+        if (poster.RevisionId != revisionId ||
+            poster.PosterProfileId != "wi0211-proxy-still-v1" ||
+            poster.ToolSha256.Length != 64 || poster.PosterSha256.Length != 64 ||
+            poster.EncodedBytes is < 100 or > 8 * 1024 * 1024 ||
+            poster.Width is < 1 or > 960 || poster.Height is < 1 or > 960 ||
+            !poster.PosterRelativePath.Equals(
+                $"video-posters/wi0211-proxy-still-v1/{revisionId.Value:D}/{poster.ToolSha256}.jpg",
+                StringComparison.Ordinal) ||
+            !poster.ToolSha256.All(static c => c is >= '0' and <= '9' or >= 'a' and <= 'f') ||
+            !poster.PosterSha256.All(static c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
+            throw new InvalidDataException("Untrusted proxy-derived poster evidence.");
+
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO video_still_posters (
+                asset_revision_id, poster_profile_id, tool_sha256,
+                poster_sha256, poster_relative_path, encoded_bytes,
+                width, height, generated_at_utc)
+            SELECT @revision, @profile, @tool, @hash, @path,
+                   @bytes, @width, @height, @generated
+            WHERE EXISTS (
+                SELECT 1 FROM asset_revisions revision
+                JOIN assets asset ON asset.id = revision.asset_id
+                JOIN video_revision_metadata m ON m.asset_revision_id = revision.id
+                WHERE revision.id = @revision AND asset.media_kind = 'video'
+                  AND revision.media_kind = 'video' AND asset.deleted_at_utc IS NULL
+                  AND m.inspection_status = 'supported' AND m.color_transfer = 'bt709'
+                  AND revision.id = (
+                      SELECT newest.id FROM asset_revisions newest
+                      WHERE newest.asset_id = asset.id AND newest.media_kind = 'video'
+                      ORDER BY newest.observed_at_utc DESC, newest.id DESC LIMIT 1)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM source_copy_exclusions excluded
+                      WHERE excluded.source_id = asset.source_id
+                        AND excluded.source_key = asset.source_key))
+              AND NOT EXISTS (
+                SELECT 1 FROM video_still_posters existing
+                WHERE existing.asset_revision_id = @revision
+                  AND existing.poster_profile_id IN (
+                    'wi0151-sdr-still-v1', 'wi0211-proxy-still-v1'))
+            ON CONFLICT (asset_revision_id, poster_profile_id, tool_sha256) DO NOTHING;
+            """;
+        command.Parameters.AddWithValue("revision", poster.RevisionId.Value);
+        command.Parameters.AddWithValue("profile", poster.PosterProfileId);
+        command.Parameters.AddWithValue("tool", poster.ToolSha256);
+        command.Parameters.AddWithValue("hash", poster.PosterSha256);
+        command.Parameters.AddWithValue("path", poster.PosterRelativePath);
+        command.Parameters.AddWithValue("bytes", poster.EncodedBytes);
+        command.Parameters.AddWithValue("width", poster.Width);
+        command.Parameters.AddWithValue("height", poster.Height);
+        command.Parameters.AddWithValue("generated", poster.GeneratedAtUtc.ToUniversalTime());
+        bool inserted = await command.ExecuteNonQueryAsync(token) == 1;
+        if (inserted) await transaction.CommitAsync(token);
+        return inserted;
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -161,7 +228,7 @@ public sealed class PostgresVideoPlaybackRepository(PostgresCatalogueDatabase da
                 mp4Header[6] != (byte)'y' || mp4Header[7] != (byte)'p')
                 throw new InvalidDataException("Registered proxy is not an MP4.");
             stream.Position = 0;
-            return new VideoPlaybackLease(stream, transaction, connection);
+            return new VideoPlaybackLease(stream, transaction, connection, revisionId);
         }
         catch
         {
