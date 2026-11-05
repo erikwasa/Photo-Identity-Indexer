@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Npgsql;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.Cli;
@@ -224,6 +225,12 @@ public static class VideoProxyPosterCommandRunner
             await playback.OpenCurrentAsync(revisionId, cache, attempt);
         if (lease is null) return false;
         if (await lease.HasRegisteredPosterAsync(attempt)) return false;
+        // A retained MP4 may be 256 MiB. Reserve space for a full staged
+        // proxy copy + bounded JPEG plus the shared 512 MiB spare headroom.
+        // Saving the switch alone performs no capacity/media checks.
+        VideoScratchCapacityGuard.EnsureCapacity(
+            derivative,
+            PostgresVideoPlaybackRepository.MaximumPlaybackBytes + MaximumJpegBytes);
         var probe = new VideoPilotMediaTools(
             ffprobe, TimeSpan.FromSeconds(60));
         return await ProcessOneAsync(
