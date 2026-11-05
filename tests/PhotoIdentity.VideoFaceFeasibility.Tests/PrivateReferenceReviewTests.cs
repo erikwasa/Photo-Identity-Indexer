@@ -211,7 +211,8 @@ public sealed class PrivateReferenceReviewTests
     {
         EmbeddingVector reference = new(new float[] { 1, 0, 0 });
         EmbeddingVector unrelated = new(new float[] { -1, 0, 0 });
-        EmbeddingVector observed = new(new float[] { 0.54f, 0.8417f, 0 }).Normalize();
+        EmbeddingVector observed = new EmbeddingVector(
+            new float[] { 0.54f, 0.8417f, 0 }).Normalize();
         VideoFaceReferenceMatcher matcher = new(
             [new VideoFaceReferenceEmbedding("R01", reference),
              new VideoFaceReferenceEmbedding("R02", unrelated)]);
