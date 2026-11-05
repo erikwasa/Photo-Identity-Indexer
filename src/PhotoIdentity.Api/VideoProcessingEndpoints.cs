@@ -78,6 +78,7 @@ public sealed record VideoProcessingSettingsResponse(
     bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
     long Cancelled, long ExpiredLeases, string LastResult,
+    string LastPosterResult,
     IReadOnlyList<VideoProcessingJobOperatorRow> Recent,
     VideoAttemptFailureDiagnostic? LastAttemptFailure);
 
@@ -114,7 +115,8 @@ public static class VideoProcessingEndpoints
         var recent = await inspector.ListRecentAsync(12, token);
         return Results.Ok(ToResponse(preferences.Current, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
-            processor.LastResult, recent, processor.LastAttemptFailure));
+            processor.LastResult, processor.LastPosterResult,
+            recent, processor.LastAttemptFailure));
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -180,7 +182,8 @@ public static class VideoProcessingEndpoints
         var recent = await inspector.ListRecentAsync(12, token);
         return Results.Ok(ToResponse(saved, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
-            processor.LastResult, recent, processor.LastAttemptFailure));
+            processor.LastResult, processor.LastPosterResult,
+            recent, processor.LastAttemptFailure));
     }
 
     private static async Task<IResult> PreviewRetentionAsync(
@@ -321,6 +324,7 @@ public static class VideoProcessingEndpoints
         VideoProcessingPreferences settings,
         VideoProcessingQueueOverview status,
         bool processing, bool configured, string lastResult,
+        string lastPosterResult,
         IReadOnlyList<VideoProcessingJobOperatorRow> recent,
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
@@ -330,5 +334,6 @@ public static class VideoProcessingEndpoints
             settings.AutomaticPostersForNewProxies,
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
-            status.ExpiredLeases, lastResult, recent, lastAttemptFailure);
+            status.ExpiredLeases, lastResult, lastPosterResult,
+            recent, lastAttemptFailure);
 }
