@@ -26,8 +26,8 @@ In the **explicit opt-in** reference mode, provide a *separate*, private
 reference manifest with 1–6 operator-approved local stills, each containing
 **exactly one detected face**. Every reference gets an artificial alias
 `R01`–`R99` (no real names). Frame and reference filenames must have no
-directory components, and two byte-identical photos cannot be used as a
-reference and a video frame. The tool compares SFace cosine embeddings
+directory components, and no byte-identical photos may occur across
+references or between a reference and a video frame. The tool compares SFace cosine embeddings
 in memory and writes a **brand-new, private JSON review report** to a
 separate folder only when both `--references` and `--private-report`
 are present. It refuses existing reports and paths inside the repository
@@ -35,7 +35,10 @@ or either input folder. Normal stdout remains aggregate-only.
 
 Review fields are sampled frame number/time, detected face ordinal,
 candidate alias (or null), cosine score, runner-up score, score gap and
-`reviewStatus`. Possible values: `review-candidate`,
+`reviewStatus`. The report includes the exact detector/embedder model IDs
+and SHA-256 digests for reproducibility. The aggregate elapsed time in
+reference mode includes preparing the approved reference stills as well
+as frame analysis. Possible values: `review-candidate`,
 `single-reference-uncertain`, `ambiguous`,
 `below-exploratory-threshold`. The deliberately *uncalibrated*
 pilot-only thresholds are cosine >= 0.80 and gap >= 0.05.
