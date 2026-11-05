@@ -518,7 +518,7 @@ public sealed class PrivateReferenceReviewTests
     public void Multi_observation_grouping_can_bridge_view_variation_without_rewriting_baseline()
     {
         EmbeddingVector frontal = new(new float[] { 1, 0, 0 });
-        EmbeddingVector intermediate = new(new float[] { 0.8f, 0.6f, 0 });
+        EmbeddingVector intermediate = new(new float[] { 0.85f, 0.5267827f, 0 });
         EmbeddingVector angled = new(new float[] { 0.5f, 0.8660254f, 0 });
 
         VideoFaceCoverageGrouper baseline = new();
