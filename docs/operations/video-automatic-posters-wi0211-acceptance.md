@@ -14,7 +14,9 @@ When enabled, only a **newly and durably published playable proxy**
 during an already operator-started, photo-first Archive advance can
 trigger the one JPEG still. The poster step uses the existing
 revision-bound verified proxy and pinned FFmpeg/FFprobe tools, not
-the original video. Existing poster receipts are skipped. A poster
+the original video. It checks for enough private scratch capacity
+for a full 256 MiB proxy copy, bounded JPEG and a 512 MiB free-space
+reserve; insufficient space is a poster-only failure. Existing poster receipts are skipped. A poster
 failure cannot invalidate the successful playable MP4 receipt.
 
 ## 1. Update and run synthetic integration tests
@@ -91,8 +93,10 @@ $before | Select-Object totalVideos,playableVideos,videosWithPosters,playableMis
    published by this authorized step.
 4. Refresh Video processing status after completion. The normal
    Last processing result still reports publication; the separate
-   Last automatic poster result is created/skipped/failed. A skipped
-   outcome is valid when a registered poster already exists; a failed
+   Last automatic poster result is created, skipped,
+   skipped-photo-priority or failed. A skipped outcome is valid when a
+   registered poster already exists; photo priority defers optional work.
+   A failed
    outcome must not undo MP4 publication or playable serving.
 5. Compare the read-only counts:
 
