@@ -1,5 +1,37 @@
 # Build context
 
+**Current M30 handoff — 2026-11-05: WI-0207 checkpoint 2 ACCEPTED;
+shared managed-hydration admission checkpoint 3 under review.**
+The maintained Windows operator confirmed PR #749 merged and
+27 focused preflight/release-guard integration tests passed,
+0 failed/skipped; build succeeded in 26.3 seconds. Checkpoint
+1's aggregate local inventory remains 9 current video
+candidates without proxies: 2 local and 7 pinned-local,
+0 online-only, 0 queued/running dependents or managed receipts.
+No private original was opened, hydrated or released by
+that read-only preflight.
+
+Checkpoint 3 routes opted-in video hydration through the
+existing photo-managed capacity service with configured
+disk reserve, shared managed bytes and concurrent operations.
+A precise current revision/source/exclusion and no-symlink
+fence is checked before the durable ownership receipt is
+claimed, BEFORE OneDrive +p. Photo-managed LRU cleanup counts
+the video bytes but must never auto-unpin a video-owned
+original, because OneDrive +p does not distinguish app/user
+pinning. Successful proxy/poster behavior remains unaffected.
+This is NOT complete eligible release or authorization to
+turn on online-only video work. Additional dependent-job,
+restart and safe pin/release policy work remains before a
+separately approved real online-only video test.
+
+See docs/operations/video-onedrive-wi0207-shared-admission.md,
+and docs/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md.
+No further production media action is needed for this
+synthetic/disposable PostgreSQL checkpoint.
+
+**Historical handoffs follow.**
+
 **Current WI-0207 handoff — 2026-11-05: checkpoint 1 ACCEPTED; checkpoint 2 under review.**
 The maintained Windows preflight passed 16/16 synthetic tests and its
 read-only command exited 0 with original reads=0, hydrations=0,
