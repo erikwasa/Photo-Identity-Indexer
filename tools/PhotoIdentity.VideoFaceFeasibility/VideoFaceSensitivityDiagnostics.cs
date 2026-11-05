@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.VideoFaceFeasibility;
@@ -32,6 +33,10 @@ public sealed record VideoFaceSensitivityDiagnostics(
     IReadOnlyList<VideoFaceFrameDetectionDiagnostic> FrameDetections,
     IReadOnlyList<VideoFaceRankedDiagnostic> RankedFaces)
 {
+    // Absent in the normal private diagnostic run (only explicit --coverage enables it).
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceCoverageReview? Coverage { get; init; }
+
     // Values selected for a sensitivity *comparison*, not verified cutoffs.
     public static readonly IReadOnlyList<double> SimilarityThresholds =
         Array.AsReadOnly(new[] { 0.363, 0.45, 0.60, 0.80 });
