@@ -273,13 +273,24 @@ public sealed class VideoArchiveProcessingService(
                             Path.Combine(Environment.GetFolderPath(
                                 Environment.SpecialFolder.LocalApplicationData),
                                 "PhotoIdentity", "video-derivatives");
-                        bool created = await VideoProxyPosterCommandRunner
-                            .TryCreateForPublishedProxyAsync(
-                                database, AssetRevisionId.From(publishedCandidate.RevisionId),
-                                cache, posterRoot, ffmpeg, ffmpegHash,
-                                ffprobe, ffprobeHash, token);
-                        Volatile.Write(ref _lastPosterResult,
-                            created ? "created" : "skipped");
+                        // Newly arrived photo work always takes priority
+                        // over this optional post-publication enhancement.
+                        if ((await new PostgresVideoPhotoPriorityProbe(database)
+                                .GetAsync(token)).PhotoWorkActive)
+                        {
+                            Volatile.Write(ref _lastPosterResult,
+                                "skipped-photo-priority");
+                        }
+                        else
+                        {
+                            bool created = await VideoProxyPosterCommandRunner
+                                .TryCreateForPublishedProxyAsync(
+                                    database, AssetRevisionId.From(publishedCandidate.RevisionId),
+                                    cache, posterRoot, ffmpeg, ffmpegHash,
+                                    ffprobe, ffprobeHash, token);
+                            Volatile.Write(ref _lastPosterResult,
+                                created ? "created" : "skipped");
+                        }
                     }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
