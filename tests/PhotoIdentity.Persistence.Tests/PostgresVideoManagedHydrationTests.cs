@@ -105,13 +105,23 @@ public sealed class PostgresVideoManagedHydrationTests
         }
         finally
         {
-            await using NpgsqlCommand drop = server.CreateCommand();
-            drop.CommandText = $"""
-                SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-                WHERE datname = '{name}' AND pid <> pg_backend_pid();
-                DROP DATABASE "{name}";
-                """;
-            await drop.ExecuteNonQueryAsync();
+            // DROP DATABASE must be a standalone PostgreSQL statement;
+            // combining it with SELECT in one command can cause an
+            // implicit transaction block and make cleanup fail.
+            await using (NpgsqlCommand terminate = server.CreateCommand())
+            {
+                terminate.CommandText = $"""
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE datname = '{name}' AND pid <> pg_backend_pid();
+                    """;
+                await terminate.ExecuteNonQueryAsync();
+            }
+            await using (NpgsqlCommand drop = server.CreateCommand())
+            {
+                drop.CommandText = $"DROP DATABASE \"{name}\";";
+                await drop.ExecuteNonQueryAsync();
+            }
         }
     }
 }
