@@ -71,8 +71,11 @@ public sealed class VideoFaceExperimentTests
         string dir = CreateTempDirectory();
         try
         {
-            await File.WriteAllBytesAsync(Path.Combine(dir, "one.png"), [1, 2, 3, 4]);
-            await File.WriteAllBytesAsync(Path.Combine(dir, "two.png"), [5, 6, 7, 8]);
+            // Fake decoder avoids native/model dependencies; valid PNG signatures are still required.
+            await File.WriteAllBytesAsync(Path.Combine(dir, "one.png"),
+                [137, 80, 78, 71, 13, 10, 26, 10, 1]);
+            await File.WriteAllBytesAsync(Path.Combine(dir, "two.png"),
+                [137, 80, 78, 71, 13, 10, 26, 10, 2]);
             string manifest = Path.Combine(dir, "frames.json");
             await File.WriteAllTextAsync(manifest, JsonSerializer.Serialize(new
             {
