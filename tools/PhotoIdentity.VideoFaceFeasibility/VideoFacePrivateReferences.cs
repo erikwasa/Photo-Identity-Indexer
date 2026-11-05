@@ -29,7 +29,12 @@ public sealed record VideoFacePrivateReview(
     string EmbedderModelId,
     string EmbedderSha256,
     VideoFaceAggregate Aggregate,
-    IReadOnlyList<VideoFaceReferenceFinding> Findings);
+    IReadOnlyList<VideoFaceReferenceFinding> Findings)
+{
+    // Absent unless the operator explicitly enables private sensitivity diagnostics.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceSensitivityDiagnostics? Diagnostics { get; init; }
+}
 
 public sealed record VideoFaceReferenceEmbedding(string Alias, EmbeddingVector Embedding);
 
@@ -147,18 +152,7 @@ public sealed class VideoFaceReferenceMatcher
             throw new ArgumentOutOfRangeException(nameof(frameNumber));
         }
 
-        var ranked = _references
-            .Select(reference => new
-            {
-                reference.Alias,
-                Score = query.CosineSimilarity(reference.Embedding),
-            })
-            .OrderByDescending(result => result.Score)
-            .ThenBy(result => result.Alias, StringComparer.Ordinal)
-            .ToArray();
-
-        double top = ranked[0].Score;
-        double? second = ranked.Length > 1 ? ranked[1].Score : null;
+        var (bestAlias, top, second) = Rank(query);
         double? gap = second is null ? null : top - second.Value;
         string status = top < ExploratoryCandidateSimilarity
             ? "below-exploratory-threshold"
@@ -173,10 +167,47 @@ public sealed class VideoFaceReferenceMatcher
             timestampMs,
             faceNumber,
             // A below-threshold result must not present a person candidate.
-            top < ExploratoryCandidateSimilarity ? null : ranked[0].Alias,
+            top < ExploratoryCandidateSimilarity ? null : bestAlias,
             Math.Round(top, 4),
             second is null ? null : Math.Round(second.Value, 4),
             gap is null ? null : Math.Round(gap.Value, 4),
             status);
+    }
+
+    public VideoFaceRankedDiagnostic Diagnose(
+        int frameNumber, long timestampMs, int faceNumber, EmbeddingVector query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (frameNumber < 1 || timestampMs < 0 || faceNumber < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frameNumber));
+        }
+
+        var (bestAlias, bestScore, runnerUp) = Rank(query);
+        return new VideoFaceRankedDiagnostic(
+            frameNumber,
+            timestampMs,
+            faceNumber,
+            bestAlias, // Private diagnostic only; can be completely wrong.
+            Math.Round(bestScore, 4),
+            runnerUp is null ? null : Math.Round(runnerUp.Value, 4),
+            runnerUp is null ? null : Math.Round(bestScore - runnerUp.Value, 4),
+            VideoFaceSensitivityDiagnostics.Compare(bestScore, runnerUp));
+    }
+
+    private (string Alias, double Score, double? RunnerUp) Rank(EmbeddingVector query)
+    {
+        var ranked = _references
+            .Select(reference => new
+            {
+                reference.Alias,
+                Score = query.CosineSimilarity(reference.Embedding),
+            })
+            .OrderByDescending(result => result.Score)
+            .ThenBy(result => result.Alias, StringComparer.Ordinal)
+            .ToArray();
+
+        return (ranked[0].Alias, ranked[0].Score,
+            ranked.Length > 1 ? ranked[1].Score : null);
     }
 }
