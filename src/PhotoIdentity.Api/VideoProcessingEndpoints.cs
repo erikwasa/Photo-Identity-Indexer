@@ -30,9 +30,7 @@ public sealed record VideoProcessingSettingsUpdate(
         string selectedProfile = EncodingProfile ?? existing.EncodingProfile;
         int retentionAge = RetentionAgeHours ?? existing.RetentionAgeHours;
         bool singleVideoStep = StopAfterOneVideoStepPerAdvance ??
-                               existing.StopAfterOneVideoStepPerAdvance ||
-            existing.AutomaticPostersForNewProxies !=
-                requested.AutomaticPostersForNewProxies;
+                               existing.StopAfterOneVideoStepPerAdvance;
         bool autoPosters = AutomaticPostersForNewProxies ??
                            existing.AutomaticPostersForNewProxies;
         if (OverrideProxyLimits is null)
@@ -151,7 +149,9 @@ public static class VideoProcessingEndpoints
                 requested.EncodingProfile, StringComparison.Ordinal) ||
             existing.RetentionAgeHours != requested.RetentionAgeHours ||
             existing.StopAfterOneVideoStepPerAdvance !=
-                requested.StopAfterOneVideoStepPerAdvance;
+                requested.StopAfterOneVideoStepPerAdvance ||
+            existing.AutomaticPostersForNewProxies !=
+                requested.AutomaticPostersForNewProxies;
         if (quotaOrProfileChanged && processor.IsProcessing)
             return Results.Conflict(new ArchiveErrorResponse(
                 "Pause archive processing before changing video proxy limits, encoding profile, automatic posters or run limit."));
