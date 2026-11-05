@@ -25,6 +25,7 @@
                 <div>
                     <h3 id="video-queue-heading">Video queue and status</h3>
                     <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
+                    <p class="field-help">Last automatic poster result: <code>@Status.LastPosterResult</code></p>
                 </div>
                 <button class="button secondary" type="button"
                         disabled="@(Saving || Loading)" @onclick="RefreshStatusAsync">
@@ -328,7 +329,8 @@
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
-        string LastResult, IReadOnlyList<VideoJobRow> Recent);
+        string LastResult, string LastPosterResult,
+        IReadOnlyList<VideoJobRow> Recent);
     private sealed record VideoRetentionReport(
         bool DryRun, int Inspected, int Planned, int Invalid, int Missing,
         int Corrupt, int QuotaSelected, int Revoked, int FilesDeleted,
