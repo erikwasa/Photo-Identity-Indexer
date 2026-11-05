@@ -95,6 +95,11 @@ public sealed class PrivateReferenceReviewTests
                 selection, frames, referenceSet, refs);
 
             Assert.Equal(2, evaluated.ReferenceCount);
+            Assert.Equal("fake-detector", evaluated.DetectorModelId);
+            Assert.Equal(new string('a', 64), evaluated.DetectorSha256);
+            Assert.Equal("fake-embedder", evaluated.EmbedderModelId);
+            Assert.Equal(new string('b', 64), evaluated.EmbedderSha256);
+            Assert.True(evaluated.Aggregate.ElapsedMilliseconds >= 0);
             Assert.Equal(2, evaluated.Aggregate.FramesExamined);
             Assert.Equal(2, evaluated.Aggregate.EmbeddingsCalculated);
             Assert.Equal(0, evaluated.Aggregate.AdjacentPossibleRepeatPairs);
@@ -164,6 +169,34 @@ public sealed class PrivateReferenceReviewTests
                 new VideoFaceFrameSet(1, [new VideoFaceFrame(0, "frame.png")]),
                 frames,
                 new VideoFaceReferenceSet(1, [new VideoFaceReference("R01", "copy.png")]),
+                refs));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Byte_identical_references_are_rejected_before_frame_evaluation()
+    {
+        string root = TempDir();
+        try
+        {
+            string frames = Directory.CreateDirectory(Path.Combine(root, "frames")).FullName;
+            string refs = Directory.CreateDirectory(Path.Combine(root, "refs")).FullName;
+            await WritePngStub(frames, "frame.png", 1);
+            byte[] copy = await WritePngStub(refs, "one.png", 3);
+            await File.WriteAllBytesAsync(Path.Combine(refs, "two.png"), copy);
+
+            VideoFaceExperiment experiment = new(
+                new MarkedDecoder(), new OneFaceDetector(), new PassAligner(), new MarkedEmbedder());
+            await Assert.ThrowsAsync<ArgumentException>(() => experiment.RunWithReferencesAsync(
+                new VideoFaceFrameSet(1, [new VideoFaceFrame(1000, "frame.png")]),
+                frames,
+                new VideoFaceReferenceSet(1,
+                    [new VideoFaceReference("R01", "one.png"),
+                     new VideoFaceReference("R02", "two.png")]),
                 refs));
         }
         finally
