@@ -220,7 +220,7 @@ public sealed class VideoFaceExperiment
             }
 
             prepared.Add(new VideoFaceReferenceEmbedding(
-                referenceSet.References[i].Alias, embedding));
+                referenceSet.References![i].Alias, embedding));
         }
 
         // Include time spent preparing the reference models in the overall measured runtime.
