@@ -1,6 +1,26 @@
 # Build context
 
-**Current M30 status — 2026-11-04: WI-0210 COMPLETED.**
+**Current M30 handoff — 2026-11-05: WI-0211 COMPLETED (bounded scope).**
+PRs #738, #739 and #742 merged, with passing Windows CI.
+The maintained Windows operator verified five focused CLI tests (5/5),
+one previously published proxy yielding one new durable JPEG
+(created=1, failed=0, original reads/hydration=0), registered
+posters 1→2, playable-without-poster 15→14 and playable proxy count
+unchanged at 16. Native play/pause/seek passed. After the #742
+poster-framing fix, the maintainer confirmed that complete images
+look good in the gallery. This is acceptance of the **opt-in verified
+proxy-to-poster capability**, not majority coverage: 14 playable
+videos still lack posters. Further population is deliberately
+operator-authorized, not browser-triggered, and no second production
+test or OneDrive hydration is required for closeout. The canonical
+work item is archived; milestone M30 remains ready/open for unrelated
+proposed items. Next M30 work item has not been selected.
+See docs/delivery/work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+and docs/operations/video-proxy-posters-wi0211-acceptance.md.
+
+**Historical notes below:**
+
+**Historical M30 status — 2026-11-04: WI-0210 COMPLETED.**
 After merged PR #734 and six passing CI jobs, the maintainer
 reported a successful one-step, local-only production
 Rec.709 full-range `yuvj420p` playable-proxy publication
