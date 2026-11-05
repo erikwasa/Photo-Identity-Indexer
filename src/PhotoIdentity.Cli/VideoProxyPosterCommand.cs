@@ -160,6 +160,11 @@ public static class VideoProxyPosterCommandRunner
                 await using VideoPlaybackLease? lease =
                     await playback.OpenCurrentAsync(revision, cache, token);
                 if (lease is null) { skipped++; continue; }
+                if (await lease.HasRegisteredPosterAsync(token))
+                {
+                    skipped++;
+                    continue;
+                }
                 if (await ProcessOneAsync(
                     lease, revision, derivative, ffmpeg,
                     options.FfmpegSha256, probe, options.TimeoutSeconds, token))
@@ -218,6 +223,7 @@ public static class VideoProxyPosterCommandRunner
         await using VideoPlaybackLease? lease =
             await playback.OpenCurrentAsync(revisionId, cache, attempt);
         if (lease is null) return false;
+        if (await lease.HasRegisteredPosterAsync(attempt)) return false;
         var probe = new VideoPilotMediaTools(
             ffprobe, TimeSpan.FromSeconds(60));
         return await ProcessOneAsync(
