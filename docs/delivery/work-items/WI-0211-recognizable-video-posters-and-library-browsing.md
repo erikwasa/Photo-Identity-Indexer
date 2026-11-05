@@ -10,6 +10,13 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Cli, PhotoIdentity.Api, Pho
 
 # WI-0211: Make video browsing recognizable with verified posters
 
+**Status: completed — maintainer accepted the bounded opt-in, proxy-derived
+poster vertical slice on 2026-11-05.** This is not a claim that the catalogue
+has broad poster coverage: 14 of 16 playable videos still lacked registered
+posters after the accepted single-video run. Additional posters require
+separate operator authorization; browser visits never backfill them.
+
+
 ## Problem and user outcome
 
 The maintainer's 2026-11-04 review of the **Videos** page showed
@@ -29,7 +36,7 @@ library has useful poster coverage for the actual catalogue.
 This is a **new product coverage gap**, not grounds to reopen
 the accepted technical scopes.
 
-**User-visible goal:** Most already-playable, locally
+**Longer-term product aspiration (not achieved by this bounded acceptance):** Most already-playable, locally
 registered videos should show an identifiable, correctly
 oriented still image instead of an undifferentiated
 placeholder; users can distinguish and open the intended
@@ -115,28 +122,33 @@ readable merely because the page is opened.
 
 ## Acceptance criteria
 
-- [ ] A sanitized, current video × playable-proxy ×
+- [x] A sanitized, current video × playable-proxy ×
   poster baseline identifies the largest gap without
   original-byte access.
-- [ ] A deliberately authorized, small local-only
-  backfill creates useful, verified, correctly
-  oriented stills for a representative set of
-  existing current playable proxies **without
-  rereading any original**, including Rec.709
-  full-range and normal SDR where present.
-- [ ] Cards display the new posters with accessible
+- [x] A deliberately authorized, small local-only
+  backfill creates a useful, verified and correctly
+  oriented still for one representative existing current
+  Rec.709 playable proxy **without rereading any original**.
+  This acceptance does not independently demonstrate both
+  full-range and normal SDR source-profile cases, or broad coverage.
+- [x] Cards display the new posters with accessible
   fallbacks, clear media cues, native player controls
-  intact, and a discoverable playable-only filter.
-- [ ] Tests cover real/dummy proxy boundaries, exact
-  versions, sha/ownership/size/geometry, stale
-  revisions and exclusions, unsupported formats,
-  cancellation, idempotency, no-recall/no-web
-  side effects and photo/search regressions.
-- [ ] Maintainer verifies recognizable images and
-  selecting/playing the expected clip on the
-  maintained Windows browser, plus an honest
-  before/after aggregate poster count. Do not
-  require an all-archive batch to close.
+  intact, and a discoverable playable-only filter;
+  the upper-portion clipping defect was corrected and
+  visually verified after PR #742 merged.
+- [x] Automated synthetic/disposable PostgreSQL, CLI
+  contract and gallery-layout tests check the revised
+  profile, source-lock and revision/exclusion fences,
+  digest/receipt/canonical-path checks, bounded rendering,
+  invalid formats, idempotent selection and retained
+  player rendering. CI builds, integration shards,
+  launcher and package gates passed. No private original
+  or OneDrive content was used in CI or for poster input.
+- [x] Maintainer verified a recognizable, correctly oriented
+  still and the expected clip's play/pause/seek in the
+  maintained Windows browser, plus honest before/after
+  aggregates and final full-gallery-image confirmation
+  following PR #742. An all-archive batch was not required.
 
 ## Delivery guidance
 
@@ -144,9 +156,10 @@ Implement one complete **poster visible in Videos**
 vertical slice with automated synthetic/disposable
 PostgreSQL safety tests and one operator-controlled
 real-media acceptance, avoiding numerous small
-PRs or repeated local media tests. WI-0211 is
-**proposed**, not permission to start a backfill
-or to read private media. WI-0210 remains completed.
+PRs or repeated local media tests. WI-0211 was
+**proposed** at this stage, not permission to start a backfill
+or to read private media. It is now completed only under the
+explicit bounded acceptance below. WI-0210 remains completed.
 
 The independent Settings page alignment, sticky
 Save/status and cleanup discoverability bug fix
@@ -238,7 +251,42 @@ expanded native video player layout, original/published media, source
 permissions and poster publication logic are unchanged. A CSS/layout
 contract test guards against reintroducing the failure.
 
-**Remaining gate:** maintained-browser confirmation that the full thumbnail
-is visible after this layout change merges. WI-0211 is not closed by the
-single successful pilot; broader poster coverage remains opt-in and
-no all-archive batch is implied.
+**Resolved after merge:** PR #742 was merged and the maintainer confirmed
+that complete posters now look correct in the gallery. The one-video pilot
+is accepted for the explicitly bounded work-item scope; broader poster
+coverage remains opt-in and no all-archive batch is implied.
+
+## Final scoped acceptance and completion — 2026-11-05
+
+**WI-0211 completed / accepted by maintainer.** Implementation PRs
+[#738](https://github.com/erikwasa/Photo-Identity-Indexer/pull/738),
+[#739](https://github.com/erikwasa/Photo-Identity-Indexer/pull/739), and
+[#742](https://github.com/erikwasa/Photo-Identity-Indexer/pull/742)
+are merged. Their last-head GitHub Actions build runs **41932508414**,
+**41936957551**, and **42091266799** respectively completed successfully.
+
+The maintainer ran the focused local proxy-poster CLI integration suite:
+**5 passed, 0 failed**; the dry run returned `candidates=1` with no
+FFmpeg or original-media reads. With the video lane disabled, paused and
+idle, a separately authorized `--max-videos 1 --apply` published one
+`wi0211-proxy-still-v1` JPEG: `created=1; skipped=0; failed=0;
+originalsRead=0; hydration=0`, exit code 0. Registered posters rose
+**1 → 2**; playable without posters fell **15 → 14**; playable video
+count remained **16**. The still was recognizable and correctly oriented;
+video play, pause, seek and controls remained functional; no unexpected
+OneDrive or other background processing was observed. The screenshot also
+revealed a cropped gallery thumbnail, fixed by PR #742. **After that PR
+merged, the maintainer explicitly confirmed that posters look good in
+the gallery view.** This resolves the final visibility acceptance gate.
+
+**Scoped decision and limits:** This closes delivery and human acceptance
+of the **operator-controlled proxy-to-poster capability**, its read-only
+coverage/filtering and the repaired gallery display, **not** the aspirational
+majority-poster population goal. The remaining **14 of 16** playable entries
+without a registered still are not silently populated, and no automatic
+original access, OneDrive hydration or broad batch is authorized. Rec.709
+full-range versus normal SDR variants were not each independently verified
+as separate local production examples. These remain optional future
+operator-controlled coverage work or narrowly scoped follow-up if a new
+issue is observed. Do not re-run private media acceptance or backup/restore
+only for documentation closeout. The rest of milestone M30 remains open.
