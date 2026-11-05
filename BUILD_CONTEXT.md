@@ -1,5 +1,29 @@
 # Build context
 
+**Current handoff — 2026-11-05: M30 WI-0207 STARTED.**
+PR #746 merged and completed WI-0211's opt-in proxy posters,
+new-video automatic poster setting and gallery presentation. This
+next work item verifies **opt-in OneDrive-only video hydration and safe
+online-only release**; WI-0153 manual metadata/mixed collections
+remain intentionally deferred. Checkpoint 1 introduces a bounded
+read-only Windows video availability/ownership audit, without media
+reads, OneDrive pin/hydration/release calls or database writes.
+The existing video worker unconditionally requests release in its
+per-attempt finally when it hydrated the original. The current
+contract requires keeping app-hydrated bytes local while pending/
+active dependent work still needs them and protecting pre-existing
+or user-pinned local originals. That cross-job/pinning release
+policy remains unverified and is NOT authorized for production
+acceptance simply by this preflight.
+Read docs/operations/video-onedrive-wi0207-readonly-preflight.md
+and docs/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md.
+After PR merge, run the no-media synthetic tests and sanitized
+attribute audit; then implement the explicit durable ownership
+and dependent-aware release safeguards before one separately
+approved real online-only video trial. M30 is in progress and
+WI-0207 is open; do not re-run WI-0211 media testing.
+
+
 **Current handoff — 2026-11-05: WI-0211 accepted and completed (scoped).**
 The maintainer accepted the full poster/gallery implementation and
 default-OFF **Automatically create a poster for newly processed videos**
