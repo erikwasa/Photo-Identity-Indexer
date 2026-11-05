@@ -2,13 +2,11 @@
 
 This experimental tool lives on the long-running `wi-0155` integration branch,
 not on `main`. Feature PRs target `wi-0155` until the maintainer chooses a
-small production slice or closes the feasibility experiment. **PRs #740 and #741 are
-merged into `wi-0155`; checkpoint 3 introduces opt-in diagnostic
-experiments following the first approved real-media pilot.**
+small production slice or closes the feasibility experiment. **PRs #740, #741 and #745 are merged into `wi-0155`; checkpoint 4 adds an opt-in timeline-coverage experiment.**
 
 ## Scope and limits
 
-The prototype accepts **one private JSON manifest** naming **1–12 already
+The normal prototype accepts **one private JSON manifest** naming **1–12 already
 extracted JPEG/PNG frames** from one expressly selected clip, with relative
 timestamps in strictly increasing order, maximum 10 minutes. Input frames
 must be ordinary files immediately beside the manifest, at most 8 MiB each.
@@ -52,9 +50,10 @@ contents, aliases, scores, timestamps or private paths into the repository,
 CI, chats, tickets or public PR reviews. No real pilot accuracy is claimed
 before a human-reviewed local run.
 
-The project has **no PostgreSQL, worker, API, OneDrive or video-file
+The model CLI has **no PostgreSQL, worker, API, OneDrive or video-file
 dependency**. It reads only the manifest, explicitly named still frames
-and already-installed approved models. It does **not** create crops,
+and already-installed approved models. Checkpoint 4 has a separate
+operator-invoked local FFmpeg sampler that explicitly reads one approved local clip. It does **not** create crops,
 embeddings on disk, identity assignments, catalogue writes, or any
 automatic video source or OneDrive hydration. Outputs exclude file
 paths, face images, vectors, person IDs and identifiers. Repeated
@@ -441,3 +440,135 @@ The diagnostic report is a new, sensitive biometric-derived JSON file.
 It must stay in an operator-controlled **non-synced** folder. Delete it
 when no longer needed. No database access, worker, OneDrive hydration
 or original-video modification is involved.
+
+
+## Checkpoint 4 — sample the full timeline to look for additional people
+
+The maintainer confirmed a second person is visible elsewhere in the
+video, but neither of the two original hand-selected stills contains
+that person. This is a **sampling coverage failure**, not evidence
+that the detector cannot see the second person's face. YuNet at 0.9
+detected only frame 1 (confidence 0.9082); at 0.7 it also detected
+frame 2 (confidence 0.8962). The correct known reference ranked
+first for both frames, with cosine scores 0.5402 and 0.6571.
+These two frames cannot establish whole-video person coverage.
+
+Checkpoint 4 adds a separate, explicit private PowerShell sampling
+script. It uses the maintainer's already approved local FFmpeg and
+FFprobe binaries, one explicitly approved *already local* video,
+and a selected window of at most 10 minutes. It creates 12, 24
+or 36 evenly spaced frame stills in a new folder under
+%LOCALAPPDATA%\PhotoIdentity\Temp\wi0155\coverage.
+No OneDrive placeholders, linked or cloud-recall source files,
+unattended jobs, network calls, original modifications or catalogue
+writes are allowed. If a video exceeds ten minutes, choose a
+specific window and repeat separately for other windows if necessary.
+
+The model CLI retains its normal twelve-frame limit. Explicit
+--coverage --diagnostics with --references and --private-report
+permits 36 pre-extracted stills for one private experiment.
+Only the private report contains optional cross-frame appearance
+groups: G0001-style temporary aliases, first-seen frame/time and
+observation counts, plus a separate per-face assignment. Each
+same-frame detection is assigned to a different tentative group.
+Grouping compares **in-memory embeddings** at an uncalibrated 0.80
+repeat threshold. **Groups do not establish unique people**:
+one person may split into several groups; distinct people may merge.
+No vectors, crops or identities are written to disk.
+
+### Run locally after merging the checkpoint-4 PR
+
+Use PowerShell 7.6 in the separate WI-0155 worktree, not in WI-0211.
+Run the normal synthetic model tests and documentation checks above.
+Then set an explicitly approved, already-local clip and the verified
+FFmpeg model paths. The following script makes a new private manifest
+and runs YuNet at diagnostic confidence 0.7.
+
+~~~powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer-WI0155"
+
+# Replace these with your verified already-local paths.
+$video = "D:\Private\ApprovedLocalClip.mp4"
+$ffmpegPath = (Get-Command ffmpeg.exe -ErrorAction Stop).Source
+$modelDir = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\Tools\WI0155\Models'
+$pilotRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\Temp\wi0155\pilot-01'
+$referenceManifest = Join-Path $pilotRoot 'references\references.json'
+$reviewDir = Join-Path $pilotRoot 'reviews'
+
+$sampleParams = @{
+    VideoPath = $video
+    FfmpegPath = $ffmpegPath
+    ApprovePrivateLocalVideo = $true
+    FrameCount = 36
+}
+$coverage = & .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 @sampleParams
+
+if (-not $coverage -or -not (Test-Path -LiteralPath $coverage.ManifestPath -PathType Leaf)) {
+    throw 'No private coverage manifest created.'
+}
+if (-not (Test-Path -LiteralPath $referenceManifest -PathType Leaf)) {
+    throw 'Previously approved reference manifest missing.'
+}
+New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
+
+$stills = @(Get-ChildItem -LiteralPath $coverage.FramesDirectory -Filter '*.jpg' -File)
+$before = @($stills | Get-FileHash -Algorithm SHA256)
+$reportPath = Join-Path $reviewDir ('coverage-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '.json')
+
+$argsForPilot = @(
+    'run', '--project', 'tools/PhotoIdentity.VideoFaceFeasibility',
+    '-c', 'Release', '--', '--manifest', $coverage.ManifestPath,
+    '--references', $referenceManifest, '--private-report', $reportPath,
+    '--model-dir', $modelDir, '--root', (Get-Location).Path,
+    '--diagnostics', '--detector-confidence', '0.7', '--coverage'
+)
+& dotnet @argsForPilot
+if ($LASTEXITCODE -ne 0) { throw 'Private timeline coverage pilot failed.' }
+
+$after = @($stills | Get-FileHash -Algorithm SHA256)
+if ((@($before.Hash) -join ',') -ne (@($after.Hash) -join ',')) {
+    throw 'Input image hashes changed.'
+}
+
+$private = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+[pscustomobject]@{
+    FramesExamined = $private.aggregate.framesExamined
+    FramesWithDetectedFaces = $private.aggregate.framesWithFaces
+    FaceObservations = $private.aggregate.facesDetected
+    PossibleAppearanceGroups = $private.diagnostics.coverage.possibleAppearanceGroups
+    ElapsedMilliseconds = $private.aggregate.elapsedMilliseconds
+}
+~~~
+
+For videos longer than ten minutes, add WindowStartSeconds and
+WindowLengthSeconds (no more than 600 seconds) to the sampleParams
+hashtable. The manifest timestamps are relative to the *selected
+window*. Reports from different windows are independent and
+their temporary group aliases cannot be compared across runs.
+
+### Inspect and verify coverage privately
+
+~~~powershell
+$private.diagnostics.coverage.groups |
+    Format-Table groupAlias, firstFrameNumber, firstTimestampMs, observations
+$private.diagnostics.coverage.assignments |
+    Where-Object reviewStatus -eq 'needs-distinct-face-review' |
+    Format-Table frameNumber, timestampMs, faceNumber, groupAlias, closestPreviousSimilarity
+# Open the extracted JPG stills locally to check if the second person
+# actually appears in any sample and whether their face is detected.
+~~~
+
+**Human pilot acceptance questions:** Did any selected still show the
+second person? If yes, was their face detected at confidence 0.7?
+Did grouping split one person or combine unrelated faces? If the
+person was absent from all stills, this is a *sampling* miss,
+not a detector or matcher failure. Even 36 samples can miss a
+short appearance: manually inspect a targeted interval and add
+more deliberately selected samples rather than claiming complete
+coverage. Whole-video tracking is not implemented.
+
+These are private biometric-derived reports. Do not post frame
+timestamps, face-level similarities, temporary group aliases,
+private file paths, reference mappings or any photographs to PRs
+or chats. Share only non-identifying counts and review conclusions.
+Delete private derivatives when no longer needed.
