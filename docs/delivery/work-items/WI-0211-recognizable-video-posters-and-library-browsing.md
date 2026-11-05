@@ -10,6 +10,12 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Cli, PhotoIdentity.Api, Pho
 
 # WI-0211: Make video browsing recognizable with verified posters
 
+**Completion: maintainer accepted 2026-11-05, scoped to the verified
+poster capability and future-video automation.** This does not mean most
+catalogue videos have already received posters. Existing gaps require
+explicitly approved backfill; the automatic setting applies only to
+newly published proxies.
+
 ## Problem and user outcome
 
 The maintainer's 2026-11-04 review of the **Videos** page showed
@@ -113,39 +119,43 @@ readable merely because the page is opened.
 - Making the Videos browse endpoint perform
   FFmpeg/inference or create database writes.
 
-## Acceptance criteria
+## Acceptance criteria — final scoped result
 
-- [ ] A sanitized, current video × playable-proxy ×
-  poster baseline identifies the largest gap without
-  original-byte access.
-- [ ] A **default-off**, persisted Video processing setting
-  enables or disables automatic still creation after a **new,
-  durable PlayableProxy publication** during an explicitly
-  operator-started Archive advance. The setting does not
-  authorize original reads, OneDrive hydration, existing-video
-  backfill, browsing side effects or a new background worker.
-  Failure to create a poster leaves successful MP4 publication
-  and play/seek intact. Verify toggle persistence, disable,
-  bounded one-video acceptance and gallery display.
-- [ ] A deliberately authorized, small local-only
-  backfill creates useful, verified, correctly
-  oriented stills for a representative set of
-  existing current playable proxies **without
-  rereading any original**, including Rec.709
-  full-range and normal SDR where present.
-- [ ] Cards display the new posters with accessible
-  fallbacks, clear media cues, native player controls
-  intact, and a discoverable playable-only filter.
-- [ ] Tests cover real/dummy proxy boundaries, exact
-  versions, sha/ownership/size/geometry, stale
-  revisions and exclusions, unsupported formats,
-  cancellation, idempotency, no-recall/no-web
-  side effects and photo/search regressions.
-- [ ] Maintainer verifies recognizable images and
-  selecting/playing the expected clip on the
-  maintained Windows browser, plus an honest
-  before/after aggregate poster count. Do not
-  require an all-archive batch to close.
+- [x] A sanitized, current video × playable-proxy × poster coverage
+  baseline is available without original-byte access, including a
+  playable-only gallery filter. Registered evidence is counted honestly.
+- [x] The persisted **Automatically create a poster for newly processed
+  videos** Settings checkbox defaults **OFF** and controls optional
+  automatic poster extraction only after the existing operator-started
+  Archive phase durably publishes a **new** playable proxy.
+  The maintainer confirmed the checkbox works and a new video
+  automatically received a poster while being processed (PR #744).
+  Saving/browsing do not trigger media work; older proxies are not
+  backfilled by the switch.
+- [x] A separate approved, small, manual proxy-only backfill generated
+  one verified and correctly oriented representative JPEG without
+  rereading an original. This is a bounded single-video acceptance,
+  **not** independent proof for every Rec.709 range/codec variant.
+- [x] The gallery shows complete posters without cropping, provides
+  appropriate missing-poster fallbacks and playable-only filtering,
+  and preserves the native player. The maintainer confirmed full
+  gallery posters look good after PR #742; play, pause and seek
+  passed on the earlier representative video.
+- [x] Synthetic, disposable PostgreSQL and UI/CLI integration tests
+  cover opt-in persistence, current/exclusion fences, canonical
+  poster/proxy paths, hash/size/format, bounded output, rejection
+  of unsupported/dark images, duplicate selection, source locks,
+  and no gallery-triggered processing. Final-head CI passed for
+  all four implementation PRs. The new auto-poster continuation
+  preserves successful proxy publication if a poster fails;
+  no deliberately induced production failure was required.
+- [x] Maintained Windows acceptance: earlier one-video proxy-to-poster
+  pilot and before/after aggregate coverage passed; the repaired
+  full-image gallery was visually accepted; after the automatic
+  setting merged, the maintainer confirmed the checkbox functions
+  and a poster is created when processing a new video. No new
+  numeric coverage snapshot was supplied for that last check,
+  so none is inferred.
 
 ## Delivery guidance
 
@@ -153,15 +163,14 @@ Implement one complete **poster visible in Videos**
 vertical slice with automated synthetic/disposable
 PostgreSQL safety tests and one operator-controlled
 real-media acceptance, avoiding numerous small
-PRs or repeated local media tests. WI-0211 is
-**proposed**, not permission to start a backfill
-or to read private media. WI-0210 remains completed.
+PRs or repeated local media tests. WI-0211 began as **proposed**; this is historical delivery
+guidance, not permission to start further private-media
+backfills. WI-0210 remains completed.
 
 The independent Settings page alignment, sticky
 Save/status and cleanup discoverability bug fix
-may ship alongside this work-item **proposal**
-because it does not process or modify video media.
-Its implementation should not be mistaken for
+was a separate visual cleanup and did not itself process
+or modify media; its implementation was not treated as
 poster functionality.
 
 ## Implementation checkpoint 1 — read-only coverage and usable filtering (2026-11-05)
@@ -183,11 +192,10 @@ After merge, the optional maintained-browser and sanitized aggregate
 verification is documented in
 [`video-poster-coverage-wi0211.md`](../../operations/video-poster-coverage-wi0211.md).
 
-**Not completed:** the new versioned, opt-in proxy-to-poster producer,
-retained-cache validation and safe JPEG publication/serving, recognizability
-and color/rotation acceptance, and real before/after poster population.
-Do not mark any whole-work-item acceptance criteria complete or close
-WI-0211 based only on this checkpoint.
+**Historical checkpoint 1:** the producer and visual acceptance were
+not yet implemented at this stage; later PRs and maintainer checks
+completed the bounded vertical slice. Do not treat this first
+checkpoint alone as full acceptance.
 
 ## Implementation checkpoint 2 — opt-in poster from a retained proxy (2026-11-05)
 
@@ -217,11 +225,10 @@ contracts are covered by CLI tests. No private media is used in CI.
 The maintained-host procedure and exact PowerShell commands are in
 [`video-proxy-posters-wi0211-acceptance.md`](../../operations/video-proxy-posters-wi0211-acceptance.md).
 
-**Pending acceptance:** CI, Windows operator approval of a one-proxy
-backfill, human evaluation of visual recognizability, empty/dark-frame
-selection, color, rotation, playback continuity and before/after
-aggregate counts. Do not close WI-0211 or infer all-catalogue coverage.
-The command is never triggered by the browse page or Settings.
+**Historical checkpoint 2:** later CI and maintained-host one-proxy
+acceptance passed, as recorded below. The command is never
+triggered by the browse page or Settings; all-catalogue coverage
+was neither requested nor implied.
 
 ## Maintained Windows acceptance and gallery framing correction (2026-11-05)
 
@@ -283,10 +290,56 @@ MP4. The total continuation is separately bounded to 90 seconds.
 Existing local-only and optional online-only video source policy
 is unchanged; poster extraction itself reads only the proxy.
 
-**Verification remaining:** passing PR CI and an ordinary Windows
-Settings toggle persistence/display check, plus one explicitly
-operator-authorized newly processed eligible video when one is
-naturally available. Use
+**Verification resolved:** PR #744 merged, final-head CI passed, and
+the maintainer confirmed the Settings checkbox works and an automatically
+created poster appeared while processing a new video. The bounded
+Windows procedure remains in
 [`video-automatic-posters-wi0211-acceptance.md`](../../operations/video-automatic-posters-wi0211-acceptance.md).
-Do not close WI-0211 from the earlier one-poster manual pilot alone.
-PR #743 remains draft pending this checkpoint's acceptance.
+The pre-auto closeout draft PR #743 was superseded by the final
+post-acceptance closeout.
+
+## Final acceptance and closeout — 2026-11-05
+
+**WI-0211 completed for the explicitly scoped functional outcome.**
+Merged implementation PRs
+[#738](https://github.com/erikwasa/Photo-Identity-Indexer/pull/738)
+(read-only coverage and filtering),
+[#739](https://github.com/erikwasa/Photo-Identity-Indexer/pull/739)
+(approved bounded proxy-derived poster creation),
+[#742](https://github.com/erikwasa/Photo-Identity-Indexer/pull/742)
+(complete thumbnail framing) and
+[#744](https://github.com/erikwasa/Photo-Identity-Indexer/pull/744)
+(default-off automatic new-proxy poster setting) all passed their
+final-head GitHub Actions checks; the auto-poster run is
+[#3588](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/42100316309).
+
+**Earlier measured Windows acceptance:** selected integration tests
+5 passed/0 failed; metadata preview found 1 candidate; a separately
+authorized single-proxy poster operation returned `created=1`,
+`skipped=0`, `failed=0`, `originalsRead=0`, `hydration=0`, exit 0.
+Registered posters increased **1 → 2**, playable videos missing
+posters decreased **15 → 14**, and playable videos stayed **16**.
+The maintained-browser poster was recognizable/correctly oriented;
+the native video played, paused and sought; no unexpected OneDrive
+or other activity was observed. The maintainer later confirmed that
+the corrected gallery displays complete posters.
+
+**New automatic-poster acceptance:** after PR #744 merged, the
+maintainer explicitly reported **"Checkbox works. Poster created
+when processing new video."** This confirms the requested practical
+new-video behavior. No new before/after aggregate counts, separate
+new-video player test, or deliberate poster-failure scenario were
+reported; such results must not be invented. The code and tests
+enforce the independent poster-only failure behavior.
+
+**Limits kept after completion:** The automatic switch is **OFF
+by default**, is saved through existing video preferences, and
+only operates after a newly successful, operator-authorized
+playable-proxy publication; gallery viewing/Settings Save never
+starts it. Existing playable videos lacking posters are not
+automatically populated. The prior known **14 missing posters
+among 16 playable videos** is a historical snapshot from the
+manual acceptance and is **not** asserted to be current after
+the newly processed video. Unsupported/HDR sources and universal
+Rec.709 variants are not claimed supported by this one-video
+acceptance. M30 stays open for its other work items.

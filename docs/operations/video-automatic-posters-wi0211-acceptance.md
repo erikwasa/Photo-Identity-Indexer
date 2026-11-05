@@ -1,8 +1,15 @@
 # WI-0211 — automatic posters for newly processed videos
 
-**Implementation under review. Do not authorize new media processing until
-the PR has passed CI and merged.** This is distinct from the earlier
-manually authorized one-proxy poster backfill.
+**Accepted on the maintained Windows host, 2026-11-05.** The
+automatic-poster implementation PR #744 merged with passing CI.
+The maintainer confirmed that the Settings checkbox works and a
+poster was created automatically when processing a new video.
+This runbook is retained for future verification, not a request
+to process another video solely for work-item closeout.
+
+This is distinct from the earlier manually authorized one-proxy
+poster backfill. Future video processing always requires the
+established Archive operator authorization.
 
 The new Settings → Video processing checkbox is:
 
@@ -40,7 +47,7 @@ if ($LASTEXITCODE -ne 0) { throw "Generated documentation drift." }
 No migration, PostgreSQL backup/restore or original-byte test is
 required solely for this Settings and proxy-only continuation change.
 
-## 2. Check OFF/ON/OFF Settings persistence without processing
+## 2. Verify Settings persistence without processing (accepted in practice)
 
 1. Restart the maintained Photo Identity app under its existing
    launcher configuration so the merged code is active.
@@ -70,7 +77,7 @@ $settings = Invoke-RestMethod "$apiBase/api/video-processing/settings"
 }
 ~~~
 
-## 3. One future new-video step, only when separately authorized
+## 3. Future newly published video, only when separately authorized
 
 If there is no eligible new proxy awaiting processing, do NOT force
 one just to validate the toggle. The automatic path has no backlog
@@ -138,3 +145,29 @@ enabling this switch alone does not change those counts.
 Report sanitized aggregate counts and PASS/FAIL. Do not share personal
 photos, video frames, paths, job/revision IDs, GPS, hashes or database
 credentials in PRs, CI logs or chat.
+
+## Maintainer completion record — 2026-11-05
+
+The complete thumbnail/gallery-framing fix and the earlier manually
+authorized one-proxy still were accepted first. The later new-video
+automatic option was then merged via PR #744. Its final-head GitHub
+Actions [run #3588](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/42100316309)
+passed. The maintainer subsequently reported that the automatic-poster
+checkbox **works** and a poster was **created when processing a new
+video**. This closes the new automatic behavior's maintained-host gate.
+
+The previously measured registered-poster increase **1 → 2**,
+playable-without-poster decrease **15 → 14**, and unchanged
+**16** playable videos belong to the **earlier manual pilot**.
+They are not current coverage numbers after the new-video check.
+No new aggregate counts, intentional poster-failure test or
+fresh native-player check were supplied for the new video; do
+not describe any of those as independently accepted.
+
+The setting continues to default OFF for new/legacy preference files,
+does not backfill already published proxies and never causes browsing
+or saving Settings to process videos. The poster-only stage is
+optional during an authorized Archive run and leaves an already
+successful playable proxy unaffected if still production fails.
+Do **not** rerun private media processing, backup/restore or a
+previous acceptance script merely to close WI-0211.
