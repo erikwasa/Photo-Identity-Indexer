@@ -179,6 +179,52 @@ public static class VideoProxyPosterCommandRunner
         return failed == 0 ? 0 : 1;
     }
 
+    /// <summary>
+    /// WI-0211 optional continuation of an ALREADY operator-authorized,
+    /// durably published video-proxy attempt. The caller must only invoke
+    /// after the video worker has observed a succeeded PlayableProxy receipt.
+    /// No archive original is opened and no unregistered input path is
+    /// accepted; the source-locked playback lease rechecks every receipt.
+    ///
+    /// This is deliberately distinct from the idle-lane-only bulk CLI:
+    /// it runs in the same foreground Archive advance after that individual
+    /// video job has completed. Poster failure never revokes the proxy.
+    /// </summary>
+    public static async Task<bool> TryCreateForPublishedProxyAsync(
+        PostgresCatalogueDatabase database, AssetRevisionId revisionId,
+        string proxyCacheRoot, string posterRoot,
+        string ffmpegPath, string ffmpegSha256,
+        string ffprobePath, string ffprobeSha256,
+        CancellationToken token = default)
+    {
+        if (revisionId.IsEmpty)
+            throw new ArgumentException("A published current revision is required.");
+        // Total deadline bounds all root checks, lease verification, input
+        // staging, tool probes, rendering, JPEG proof and publication.
+        using CancellationTokenSource bounded =
+            CancellationTokenSource.CreateLinkedTokenSource(token);
+        bounded.CancelAfter(TimeSpan.FromSeconds(90));
+        CancellationToken attempt = bounded.Token;
+        string cache = await VideoDerivativeCacheGuard.ValidateAsync(
+            database, proxyCacheRoot, attempt);
+        string derivative = await ValidatePosterRootAsync(
+            database, posterRoot, cache, attempt);
+        string ffmpeg = await RequirePinnedToolAsync(
+            ffmpegPath, ffmpegSha256, attempt);
+        string ffprobe = await RequirePinnedToolAsync(
+            ffprobePath, ffprobeSha256, attempt);
+
+        var playback = new PostgresVideoPlaybackRepository(database);
+        await using VideoPlaybackLease? lease =
+            await playback.OpenCurrentAsync(revisionId, cache, attempt);
+        if (lease is null) return false;
+        var probe = new VideoPilotMediaTools(
+            ffprobe, TimeSpan.FromSeconds(60));
+        return await ProcessOneAsync(
+            lease, revisionId, derivative, ffmpeg, ffmpegSha256,
+            probe, timeoutSeconds: 60, attempt);
+    }
+
     private static async Task<bool> ProcessOneAsync(
         VideoPlaybackLease lease, AssetRevisionId revision,
         string derivativeRoot, string ffmpeg, string ffmpegHash,
