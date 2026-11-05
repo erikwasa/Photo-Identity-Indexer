@@ -26,6 +26,7 @@ public sealed record VideoFaceAggregate(
 public static class VideoFaceFrameSetLoader
 {
     public const int MaximumFrames = 12;
+    public const int MaximumCoverageFrames = 36;
     public const long MaximumTimestampMs = 600_000;
     public const int MaximumFrameBytes = 8 * 1024 * 1024;
     private const int MaximumManifestBytes = 16 * 1024;
@@ -38,7 +39,8 @@ public static class VideoFaceFrameSetLoader
 
     public static async Task<VideoFaceFrameSet> LoadAsync(
         string manifestPath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool coverage = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
         string path = Path.GetFullPath(manifestPath);
@@ -57,16 +59,19 @@ public static class VideoFaceFrameSetLoader
 
         VideoFaceFrameSet set = JsonSerializer.Deserialize<VideoFaceFrameSet>(bytes, InputOptions)
             ?? throw new ArgumentException("The frame manifest is empty.");
-        Validate(set);
+        Validate(set, coverage);
         return set;
     }
 
-    public static void Validate(VideoFaceFrameSet set)
+    public static void Validate(VideoFaceFrameSet set, bool coverage = false)
     {
         ArgumentNullException.ThrowIfNull(set);
-        if (set.SchemaVersion != 1 || set.Frames is not { Count: >= 1 and <= MaximumFrames })
+        int maximum = coverage ? MaximumCoverageFrames : MaximumFrames;
+        if (set.SchemaVersion != 1 || set.Frames is null ||
+            set.Frames.Count < 1 || set.Frames.Count > maximum)
         {
-            throw new ArgumentException("Expected schemaVersion 1 and between 1 and 12 selected frames.");
+            throw new ArgumentException(
+                $"Expected schemaVersion 1 and between 1 and {maximum} selected frames.");
         }
 
         long previous = -1;
@@ -150,7 +155,8 @@ public sealed class VideoFaceExperiment
     {
         VideoFacePrivateReview result = await RunCoreAsync(
             set, manifestDirectory, matcher: null, diagnostics: false,
-            requestedDetectorConfidence: 0.9, cancellationToken: cancellationToken);
+            coverage: false, requestedDetectorConfidence: 0.9,
+            cancellationToken: cancellationToken);
         return result.Aggregate;
     }
 
@@ -161,8 +167,14 @@ public sealed class VideoFaceExperiment
         string referenceDirectory,
         bool diagnostics = false,
         double requestedDetectorConfidence = 0.9,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool coverage = false)
     {
+        if (coverage && !diagnostics)
+        {
+            throw new ArgumentException("Coverage requires explicit private diagnostics.");
+        }
+
         if (diagnostics)
         {
             if (requestedDetectorConfidence is not (0.5 or 0.7 or 0.9))
@@ -179,7 +191,7 @@ public sealed class VideoFaceExperiment
         }
 
         long fullRunStarted = Stopwatch.GetTimestamp();
-        VideoFaceFrameSetLoader.Validate(set);
+        VideoFaceFrameSetLoader.Validate(set, coverage);
         VideoFaceReferenceSetLoader.Validate(referenceSet);
         ArgumentException.ThrowIfNullOrWhiteSpace(referenceDirectory);
 
@@ -245,7 +257,7 @@ public sealed class VideoFaceExperiment
         // No original, catalogue, identity data or embeddings are written by the experiment.
         VideoFacePrivateReview review = await RunCoreAsync(
             set, manifestDirectory, new VideoFaceReferenceMatcher(prepared),
-            diagnostics, requestedDetectorConfidence, cancellationToken);
+            diagnostics, coverage, requestedDetectorConfidence, cancellationToken);
         return review with
         {
             Aggregate = review.Aggregate with
@@ -261,10 +273,11 @@ public sealed class VideoFaceExperiment
         string manifestDirectory,
         VideoFaceReferenceMatcher? matcher,
         bool diagnostics,
+        bool coverage,
         double requestedDetectorConfidence,
         CancellationToken cancellationToken)
     {
-        VideoFaceFrameSetLoader.Validate(set);
+        VideoFaceFrameSetLoader.Validate(set, coverage);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
         // Preflight all selected paths before invoking a model.
         string[] files = set.Frames!.Select(frame =>
@@ -278,6 +291,9 @@ public sealed class VideoFaceExperiment
         List<VideoFaceReferenceFinding> findings = [];
         List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
         List<VideoFaceRankedDiagnostic> rankedFaces = [];
+        VideoFaceCoverageGrouper? coverageGrouper = coverage
+            ? new VideoFaceCoverageGrouper()
+            : null;
         List<EmbeddingVector>? previous = null;
         long previousTimestamp = -1;
 
@@ -338,6 +354,8 @@ public sealed class VideoFaceExperiment
                         rankedFaces.Add(matcher.Diagnose(
                             index + 1, timestamp, faceIndex + 1, current[faceIndex]));
                     }
+                    coverageGrouper?.Observe(
+                        index + 1, timestamp, faceIndex + 1, current[faceIndex]);
                 }
             }
 
@@ -379,6 +397,12 @@ public sealed class VideoFaceExperiment
             Diagnostics = diagnostics
                 ? new VideoFaceSensitivityDiagnostics(
                     requestedDetectorConfidence, frameDetections, rankedFaces)
+                {
+                    Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
+                        coverageGrouper.Groups.Count,
+                        coverageGrouper.Groups,
+                        coverageGrouper.Assignments),
+                }
                 : null,
         };
     }
