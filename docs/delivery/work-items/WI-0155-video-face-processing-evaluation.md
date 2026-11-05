@@ -76,8 +76,9 @@ catalogue or biometric governance during exploratory work.
 
 ## Completion notes
 
-- Status: proposed; video face recognition remains a desired feature,
-  but the first workitem is only a feasibility/prototype decision.
+- Status: in_progress on the isolated `wi-0155` integration branch.
+  Video recognition remains a desired feature, but this work item
+  stays a bounded feasibility/prototype decision.
 
 ## Experimental development checkpoint — 2026-11-05
 
@@ -183,3 +184,58 @@ automatic catalogue writes remain out of scope. Do not commit any
 real identities, reference mappings, face coordinates, frame-level
 biometric scores or private reports. See the
 [local sensitivity runbook](../../operations/video-face-feasibility-wi0155.md).
+
+## Experimental development checkpoint 4 — search for people across the clip (2026-11-05)
+
+The maintainer's repeat pilot provided decisive additional local evidence:
+
+- With YuNet detector confidence **0.9**, only the first of two sampled
+  frames yielded a detection (detector confidence **0.9082**).
+- At detector confidence **0.7**, **both** frames yielded a detection:
+  frame 2 scored **0.8962**, just below the original 0.9 cutoff.
+- Both face observations had the **correct reference ranked first**,
+  using a private pseudonym. Cosine scores were **0.5402** and **0.6571**.
+  Neither passed the existing, deliberately conservative 0.80 review cutoff.
+- The operator also confirmed **another different person appears elsewhere
+  in the same video but is absent from both selected frames**. The prior
+  pilot therefore says nothing about whole-video person coverage; it
+  evaluated two observations of one person, not every person in the clip.
+
+**Decision:** Before tuning SFace cutoffs or recommending production person
+discovery, the evaluation must **sample the video timeline**, count detected
+faces including any without reference matches, and check what distinct
+appearances are missed. Two early manually selected frames are not an
+adequate coverage evaluation, however well they match a known person.
+
+The next experimental checkpoint adds an **operator-invoked local
+PowerShell timeline sampler** using the maintainer's approved FFmpeg and
+FFprobe executables. It processes exactly **one expressly approved,
+already-local** video, within an expressly selected **<=10 minute window**,
+and writes **12, 24 or 36** evenly spread JPEG samples plus their
+relative timestamp manifest to a new private non-repository directory.
+The sampler refuses linked, offline and cloud-recall inputs; it does not
+scan archives, hydrate OneDrive, persist identities, or modify the original.
+It is not invoked by Photo Identity, startup, browsing or any worker.
+
+An explicit `--coverage --diagnostics` mode raises the feasibility CLI's
+manifest limit from **12 to 36** selected frames, requires the existing
+approved private reference manifest and a new private report, and adds
+cross-frame **heuristic face-appearance groups**. Each newly encountered
+appearance receives a private group alias, first-seen sample/time and
+observation count. Grouping uses an **uncalibrated 0.80 SFace repeat
+cutoff** and prevents two faces in one frame from being assigned to the
+same group. Groups are **not unique people**, person identities, tracks or
+reliable counts of individuals: one person may split into multiple groups
+and unrelated people can accidentally merge. Their purpose is to
+prioritize **human inspection of potentially different visible faces**,
+including people absent from the reference set. Raw embedding vectors
+and face crops are never written.
+
+**Acceptance still open.** A new private local video pilot must check
+whether the *second* known-to-operator person is actually sampled and
+detected, inspect false splits/merges, note short appearances that were
+missed, and then decide whether targeted additional frames or a
+separately scoped tracking/sampling approach is needed. Even 36 samples
+cannot guarantee every person is seen. Do not change production
+confidence defaults or create canonical identity assignments from
+this experiment. See the [coverage runbook](../../operations/video-face-feasibility-wi0155.md).
