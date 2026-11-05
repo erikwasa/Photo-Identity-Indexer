@@ -228,5 +228,62 @@ Tests use only synthetic pin, status, exclusion/currentness
 and dependent/photo-work combinations; **no original
 OneDrive video transfer was exercised**. See
 [the follow-up Windows verification guide](../../operations/video-onedrive-wi0207-release-guard.md).
-CI and local synthetic confirmation are pending for this PR.
-WI-0207 stays **in progress**.
+**Maintained-host result:** PR #749 merged and the maintainer ran
+the combined checkpoint 1+2 integration filter: **27 passed,
+0 failed, 0 skipped**, build succeeded in **26.3 seconds**.
+This accepts the conservative release-guard checkpoint. No
+original video or OneDrive transfer was needed. WI-0207
+remains **in progress** for durable ownership and actual
+safe release.
+
+## Development checkpoint 3 — shared managed-hydration admission (2026-11-05)
+
+The next implementation uses the **existing photo managed-hydration
+capacity service and PostgreSQL ownership receipts** for authorized
+online-only video source requests. It does not add a new downloader
+or cache. The existing operator-controlled Archive run and
+default-off Include online-only videos setting remain prerequisites.
+
+The new `VideoManagedHydrationCoordinator` re-reads the precise
+current source revision under catalogue/exclusion fences, checks
+that the registered path is a contained local descendant without
+linked ancestors, refuses an already active source-level lease,
+active release or resumed photo work, then admits the request
+through `ArchiveHydrationCapacityService`. The same configured
+free-space reserve, maximum managed bytes and concurrency apply
+to photo and video originals. The coordinator persists a revision
+ownership receipt **before** the OneDrive +p hydration request.
+A failed request therefore retains a durable conservative
+record instead of leaving an untracked app-pinned original.
+A later video processing attempt touches ownership as needed.
+
+The shared capacity service now distinguishes video leases using
+the **catalogued revision media kind**. Video leases contribute to
+the same managed byte and transfer budget, but **are not selected
+for automatic photo-cache LRU release**, even when local. Their
++p pin bit cannot currently distinguish an app pin from a
+subsequent user "Always keep on this device" pin. The separate
+video cleanup guard from checkpoint 2 still checks current
+revision, exclusions, dependent jobs, photo priority and
+live pin/availability state before release. Any permitted
+release request is tracked durably and reconciled by the
+existing managed hydration service. This is intentionally
+fail-closed rather than silently overriding user pin choices.
+
+**Scope limit:** Shared admission and durable ownership are
+implemented here, but **reliable eligible release of the
+app-hydrated, pinned video file remains unresolved**. This is
+not permission to flip the online-only switch in production.
+There is no fully validated distinction between user-held
+and app-held pins, no final video-dependent lease coordination
+across crashes, and no real online-only video transfer
+acceptance yet. A disposable PostgreSQL test covers typed
+persistent video/photo leases and their receipt lifecycle;
+synthetic contracts assert the shared-budget and no-auto-unpin
+fences. The read-only local baseline is already accepted
+and need not be repeated.
+
+See the
+[checkpoint 3 Windows verification runbook](../../operations/video-onedrive-wi0207-shared-admission.md).
+WI-0207 stays **in progress** until the final safeguards
+and separately authorized real-media pilot are accepted.

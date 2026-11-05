@@ -48,7 +48,8 @@ public sealed class PostgresArchiveHydrationRepository :
                 COALESCE(
                     usage.last_needed_at_utc,
                     hydration.requested_at_utc),
-                hydration.release_requested_at_utc
+                hydration.release_requested_at_utc,
+                COALESCE(revision.media_kind = 'video', TRUE) AS is_video
             FROM asset_revision_managed_hydrations AS hydration
             INNER JOIN asset_revisions AS revision
                 ON revision.id = hydration.asset_revision_id
@@ -81,7 +82,8 @@ public sealed class PostgresArchiveHydrationRepository :
                 reader.GetFieldValue<DateTimeOffset>(6),
                 reader.IsDBNull(7)
                     ? null
-                    : reader.GetFieldValue<DateTimeOffset>(7)));
+                    : reader.GetFieldValue<DateTimeOffset>(7),
+                reader.GetBoolean(8)));
         }
 
         return values;

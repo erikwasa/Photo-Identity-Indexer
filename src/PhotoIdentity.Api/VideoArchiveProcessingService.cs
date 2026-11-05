@@ -21,6 +21,7 @@ public sealed class VideoArchiveProcessingService(
     VideoProcessingPreferencesStore preferences,
     IConfiguration configuration,
     IOneDriveFilesOnDemandPlatform oneDrive,
+    VideoManagedHydrationCoordinator managedHydration,
     ILogger<VideoArchiveProcessingService> logger)
 {
     private const long MaxSourceBytes = 256L * 1024 * 1024;
@@ -220,7 +221,11 @@ public sealed class VideoArchiveProcessingService(
                             OneDriveSyncClientAvailability.Unavailable)
                             throw new InvalidOperationException(
                                 "OneDrive is unavailable for video hydration.");
-                        await oneDrive.RequestHydrationAsync(ownedPath, token);
+                        // Use the same durable revision receipt and capacity/
+                        // concurrent-operation gate as photo hydration. No
+                        // video request may bypass configured storage limits.
+                        await managedHydration.RequestForSelectedAsync(
+                            candidate, ownedPath, token);
                         ownedHydration = true;
                         using CancellationTokenSource hydrationTimeout =
                             CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -328,6 +333,10 @@ public sealed class VideoArchiveProcessingService(
                     {
                         using CancellationTokenSource cleanup =
                             new(TimeSpan.FromSeconds(15));
+                        // Retain persistent ownership across Archive cycles
+                        // and process restarts, even if the video job fails.
+                        await managedHydration.TouchAsync(
+                            candidate.RevisionId, cleanup.Token);
                         var availability = oneDrive.GetState(ownedPath);
                         (bool current, bool dependents) =
                             await ReadVideoReleaseEvidenceAsync(
@@ -341,6 +350,8 @@ public sealed class VideoArchiveProcessingService(
                         {
                             await oneDrive.RequestOnlineOnlyAsync(
                                 ownedPath, cleanup.Token);
+                            await managedHydration.MarkRequestedReleaseAsync(
+                                candidate.RevisionId, cleanup.Token);
                         }
                         else
                         {

@@ -118,6 +118,7 @@ public partial class Program
         builder.Services.AddSingleton<PostgresVideoPlaybackRepository>();
         builder.Services.AddSingleton<PostgresVideoSearchRepository>();
         builder.Services.AddSingleton<VideoProcessingPreferencesStore>();
+        builder.Services.AddSingleton<VideoManagedHydrationCoordinator>();
         builder.Services.AddSingleton<VideoArchiveProcessingService>();
         builder.Services.AddSingleton<IPhotoSearchRepository>(
             services => services.GetRequiredService<PostgresPhotoSearchRepository>());

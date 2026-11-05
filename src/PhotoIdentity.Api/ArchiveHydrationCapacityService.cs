@@ -497,7 +497,8 @@ public sealed class ArchiveHydrationCapacityService
                 lease.LastNeededAtUtc,
                 lease.IsReleaseRequested,
                 lease.AssetRevisionId,
-                lease.AssetId);
+                lease.AssetId,
+                lease.IsVideo);
             if (await ObserveLeaseAsync(normalized, cancellationToken) is ObservedManagedLease value)
             {
                 observed.Add(value);
@@ -576,6 +577,10 @@ public sealed class ArchiveHydrationCapacityService
                 (excludedKey is null ||
                     !string.Equals(item.Lease.Key, excludedKey, StringComparison.Ordinal)) &&
                 !_slideshowLeases.IsProtected(item.Lease.RevisionId, item.Lease.AssetId) &&
+                // Video +p pins are indistinguishable from user pins.
+                // The shared capacity budget counts these managed bytes,
+                // but MUST NOT auto-evict them through photo LRU cleanup.
+                !item.Lease.IsVideo &&
                 !item.Lease.IsReleaseRequested &&
                 item.State.Availability == AssetAvailability.Local &&
                 item.Path is not null)
@@ -642,7 +647,8 @@ public sealed class ArchiveHydrationCapacityService
         DateTimeOffset LastNeededAtUtc,
         bool IsReleaseRequested,
         AssetRevisionId? RevisionId,
-        AssetId AssetId)
+        AssetId AssetId,
+        bool IsVideo = false)
     {
         public AssetId? SourceAssetId => RevisionId is null ? AssetId : null;
     }
