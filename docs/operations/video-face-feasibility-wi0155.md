@@ -309,8 +309,12 @@ opt-in diagnostic report adds:
   reference stills must continue to contain exactly one detected face.
 
 A hypothetical `would-suggest-for-review` is **not an identity claim**.
-The 0.363 cutoff is included as an exploratory comparison point, not
-as a recommended or validated deployment threshold. The comparison
+The 0.363 cutoff is included as an exploratory comparison point because
+[OpenCV's SFace tutorial](https://docs.opencv.org/4.11.0/d0/dd4/tutorial_dnn_face.html)
+reports that value for its **LFW benchmark**. That benchmark does not
+validate any cutoff for these video frames, reference photos, preprocessing
+steps or personal collection. The value is **not** a recommended deployment
+threshold. The comparison
 does not change the main `findings` review statuses or the baseline
 similarity threshold. Only private JSON files contain ranked aliases
 and frame-level evidence.
