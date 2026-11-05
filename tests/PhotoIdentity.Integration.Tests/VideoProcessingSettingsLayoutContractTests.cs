@@ -17,7 +17,8 @@ public sealed class VideoProcessingSettingsLayoutContractTests
         foreach (string id in new[]
         {
             "video-processing-enabled", "video-processing-online",
-            "video-processing-one-step", "video-processing-quota-override",
+            "video-processing-one-step", "video-processing-auto-posters",
+            "video-processing-quota-override",
             "video-retention-confirm"
         })
         {
@@ -79,6 +80,29 @@ public sealed class VideoProcessingSettingsLayoutContractTests
         Assert.Contains("if (synchronizeForm)", page);
         Assert.Contains("Status = refreshed;", page);
         Assert.DoesNotContain("@onclick=\"LoadAsync\"", page);
+    }
+
+    [Fact]
+    public void New_poster_toggle_requires_save_and_never_triggers_browse_work()
+    {
+        (string page, _) = Sources();
+        Assert.Contains("Automatically create a poster for newly processed videos", page);
+        Assert.Contains("@bind=\"AutomaticPostersForNewProxies\"", page);
+        Assert.Contains("AutomaticPostersForNewProxies = Status.AutomaticPostersForNewProxies;", page);
+        Assert.Contains("RetentionAgeHours, StopAfterOneVideoStepPerAdvance,", page);
+        Assert.Contains("AutomaticPostersForNewProxies));", page);
+        Assert.Contains("not the original video", page);
+        Assert.Contains("This does not backfill older videos", page);
+
+        string repo = ResolveRepositoryRoot();
+        string worker = File.ReadAllText(Path.Combine(repo, "src",
+            "PhotoIdentity.Api", "VideoArchiveProcessingService.cs"));
+        string library = File.ReadAllText(Path.Combine(repo, "src",
+            "PhotoIdentity.Web", "Pages", "Videos.razor"));
+        Assert.Contains("ShouldCreateAutomaticPoster(cyclePreferences, result)", worker);
+        Assert.Contains("TryCreateForPublishedProxyAsync(", worker);
+        Assert.DoesNotContain("TryCreateForPublishedProxyAsync", library);
+        Assert.DoesNotContain("VideoProxyPosterCommandRunner", library);
     }
 
     [Fact]
