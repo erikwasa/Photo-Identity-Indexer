@@ -1,5 +1,27 @@
 # Build context
 
+**Current WI-0207 handoff — 2026-11-05: checkpoint 1 ACCEPTED; checkpoint 2 under review.**
+The maintained Windows preflight passed 16/16 synthetic tests and its
+read-only command exited 0 with original reads=0, hydrations=0,
+releases=0. Of 9 current metadata-supported videos lacking published
+playable proxies, 2 were local and 7 pinned-local, with no
+online-only candidates, queued/running video jobs or app-managed
+hydration receipts. These live filesystem attribute counts are not
+media-integrity proofs. Do not manufacture an online-only source.
+
+Checkpoint 2 is a conservative safety patch: before cleanup can
+unpin/release an original, the video worker checks current revision
+and exclusions, queued/running jobs, photo priority and Windows
+Files On-Demand state. An originally local file is never released,
+and pinned originals are now retained because the current app's
++p pin cannot be distinguished from a user pin. This may leave
+some application-hydrated bytes local and is NOT completion of
+durable shared hydration ownership, capacity enforcement or
+eligible release. WI-0207 remains in progress. Keep Include
+online-only videos OFF until the reviewed shared-ownership and
+real one-video acceptance are ready. Check
+docs/operations/video-onedrive-wi0207-release-guard.md.
+
 **Current handoff — 2026-11-05: M30 WI-0207 STARTED.**
 PR #746 merged and completed WI-0211's opt-in proxy posters,
 new-video automatic poster setting and gallery presentation. This
