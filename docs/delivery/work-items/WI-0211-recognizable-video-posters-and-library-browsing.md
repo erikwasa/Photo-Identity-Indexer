@@ -273,9 +273,11 @@ execute the continuation, and **only after** its video worker has
 verified a genuinely successful durable `PlayableProxy` publication.
 The continuation revalidates the source-locked playback lease,
 approved pinned FFmpeg/FFprobe, cache and poster roots, and output.
-A registered WI-0151/WI-0211 poster is skipped without rerendering;
-other video revisions, search/viewer requests and background idle
-tasks are never backfilled. Any failure is reported as a sanitized
+A registered WI-0151/WI-0211 poster is skipped without rerendering.
+A new photo-priority signal defers this optional stage; private
+scratch-capacity admission preserves a 512 MiB reserve beyond the
+worst-case 256 MiB proxy copy and bounded JPEG. Other video revisions,
+search/viewer requests and background idle tasks are never backfilled. Any failure is reported as a sanitized
 poster-only outcome and does **not** invalidate the already-published
 MP4. The total continuation is separately bounded to 90 seconds.
 Existing local-only and optional online-only video source policy
