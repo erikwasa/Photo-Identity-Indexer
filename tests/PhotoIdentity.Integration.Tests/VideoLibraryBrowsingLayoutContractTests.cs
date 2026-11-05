@@ -48,7 +48,7 @@ public sealed class VideoLibraryBrowsingLayoutContractTests
 
         // The aspect-ratio stage must size the image, not the image's
         // intrinsic height. Otherwise overflow:hidden clips the bottom.
-        string poster = css.Split(".video-library-poster img {", 2)[1].Split('}', 2)[0];
+        string poster = CssRules(css, ".video-library-poster img");
         Assert.Contains("position: absolute;", poster);
         Assert.Contains("inset: 0;", poster);
         Assert.Contains("width: 100%;", poster);
@@ -61,12 +61,23 @@ public sealed class VideoLibraryBrowsingLayoutContractTests
 
         // The expanded video player has a separately responsive stage and
         // stays uncropped with the native controls in place.
-        string player = css.Split(".video-library-player {", 2)[1].Split('}', 2)[0];
+        string player = CssRules(css, ".video-library-player");
         Assert.Contains("height: auto;", player);
         Assert.Contains("max-height: 75dvh;", player);
         Assert.Contains("object-fit: contain;", player);
         Assert.Contains("video-library-poster--playing", css);
         Assert.Contains("video-library-player\" controls playsinline preload=\"metadata\"", page);
+    }
+
+    private static string CssRules(string css, string selector)
+    {
+        string open = selector + " {";
+        int start = css.IndexOf(open, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Missing CSS selector {selector}.");
+        start += open.Length;
+        int end = css.IndexOf('}', start);
+        Assert.True(end > start, $"Unclosed CSS selector {selector}.");
+        return css[start..end];
     }
 
     private static string RepositoryRoot()
