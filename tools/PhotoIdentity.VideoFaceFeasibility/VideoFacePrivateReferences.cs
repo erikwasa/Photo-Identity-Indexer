@@ -110,6 +110,8 @@ public sealed class VideoFaceReferenceMatcher
     public const double ExploratoryCandidateSimilarity = 0.80;
     public const double ExploratoryGap = 0.05;
 
+    public int ReferenceCount => _references.Count;
+
     private readonly IReadOnlyList<VideoFaceReferenceEmbedding> _references;
 
     public VideoFaceReferenceMatcher(IReadOnlyList<VideoFaceReferenceEmbedding> references)
