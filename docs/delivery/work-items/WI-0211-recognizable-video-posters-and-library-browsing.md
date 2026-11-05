@@ -118,6 +118,15 @@ readable merely because the page is opened.
 - [ ] A sanitized, current video × playable-proxy ×
   poster baseline identifies the largest gap without
   original-byte access.
+- [ ] A **default-off**, persisted Video processing setting
+  enables or disables automatic still creation after a **new,
+  durable PlayableProxy publication** during an explicitly
+  operator-started Archive advance. The setting does not
+  authorize original reads, OneDrive hydration, existing-video
+  backfill, browsing side effects or a new background worker.
+  Failure to create a poster leaves successful MP4 publication
+  and play/seek intact. Verify toggle persistence, disable,
+  bounded one-video acceptance and gallery display.
 - [ ] A deliberately authorized, small local-only
   backfill creates useful, verified, correctly
   oriented stills for a representative set of
@@ -242,3 +251,40 @@ contract test guards against reintroducing the failure.
 is visible after this layout change merges. WI-0211 is not closed by the
 single successful pilot; broader poster coverage remains opt-in and
 no all-archive batch is implied.
+
+## Implementation checkpoint 3 — optional automatically created posters (2026-11-05)
+
+The maintainer confirmed that the **entire poster looks good** in the
+gallery after merged PR #742. The first opt-in one-proxy poster flow
+and browse experience were already accepted. Before the separate
+administrative closeout PR #743 merged, the maintainer identified
+one important additional requirement: a newly processed video
+should optionally receive a poster **without running a second CLI**.
+
+This checkpoint extends the same work item with a persistent, explicit
+`AutomaticPostersForNewProxies` setting in Settings → Video processing.
+It defaults to **off**, including when loading an older preferences JSON.
+Save updates the active preference without restarting the application
+and never starts processing. The setting is independent of whether
+the existing video processing lane is enabled.
+
+Only the existing **operator-started photo-first Archive advance** may
+execute the continuation, and **only after** its video worker has
+verified a genuinely successful durable `PlayableProxy` publication.
+The continuation revalidates the source-locked playback lease,
+approved pinned FFmpeg/FFprobe, cache and poster roots, and output.
+A registered WI-0151/WI-0211 poster is skipped without rerendering;
+other video revisions, search/viewer requests and background idle
+tasks are never backfilled. Any failure is reported as a sanitized
+poster-only outcome and does **not** invalidate the already-published
+MP4. The total continuation is separately bounded to 90 seconds.
+Existing local-only and optional online-only video source policy
+is unchanged; poster extraction itself reads only the proxy.
+
+**Verification remaining:** passing PR CI and an ordinary Windows
+Settings toggle persistence/display check, plus one explicitly
+operator-authorized newly processed eligible video when one is
+naturally available. Use
+[`video-automatic-posters-wi0211-acceptance.md`](../../operations/video-automatic-posters-wi0211-acceptance.md).
+Do not close WI-0211 from the earlier one-poster manual pilot alone.
+PR #743 remains draft pending this checkpoint's acceptance.
