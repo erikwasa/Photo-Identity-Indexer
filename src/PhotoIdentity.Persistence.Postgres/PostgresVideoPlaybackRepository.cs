@@ -18,6 +18,26 @@ public sealed class VideoPlaybackLease(
     public FileStream Stream { get; } = stream;
 
     /// <summary>
+    /// Skip re-rendering an already registered still. This read is performed
+    /// under the same source-row authorization lock as the proxy byte proof.
+    /// It does not touch source media or existing JPEG bytes.
+    /// </summary>
+    public async Task<bool> HasRegisteredPosterAsync(CancellationToken token = default)
+    {
+        await using NpgsqlCommand query = connection.CreateCommand();
+        query.Transaction = transaction;
+        query.CommandText = """
+            SELECT EXISTS (
+                SELECT 1 FROM video_still_posters poster
+                WHERE poster.asset_revision_id = @revision
+                  AND poster.poster_profile_id IN (
+                    'wi0151-sdr-still-v1', 'wi0211-proxy-still-v1'));
+            """;
+        query.Parameters.AddWithValue("revision", revisionId.Value);
+        return await query.ExecuteScalarAsync(token) is true;
+    }
+
+    /// <summary>
     /// Publish one still under the SAME source lock that guarded verified proxy
     /// bytes. Calling code must verify bounded JPEG bytes and geometry first.
     /// This does not read originals and cannot replace any existing poster.

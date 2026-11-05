@@ -1,5 +1,23 @@
 # Build context
 
+**Current handoff — 2026-11-05: WI-0211 automatic posters IN PROGRESS.**
+The maintainer accepted the manual one-proxy JPEG producer and full gallery
+framing (PRs #738, #739 and #742 merged): one new registered still,
+poster coverage 1→2, missing among 16 playable videos 15→14,
+correctly oriented recognizable image and working play/pause/seek,
+with no unexpected OneDrive work. Before closing the item, the maintainer
+requested a default-OFF persistent setting to create a poster automatically
+after a newly successful proxy publication in the operator-started
+photo-first Archive advance. This is PR #744. Existing posters are not
+reprocessed, browsing and Settings Save do not execute FFmpeg, and failures
+cannot undo a published playable proxy. The prior closeout PR #743 is
+held as DRAFT pending CI, the maintained-host toggle persistence check,
+and one suitably eligible authorized new-video acceptance when available.
+Do not force media processing merely to close documentation. M30 remains open.
+See docs/operations/video-automatic-posters-wi0211-acceptance.md.
+
+**Historical handoff notes follow.**
+
 **Current M30 status — 2026-11-04: WI-0210 COMPLETED.**
 After merged PR #734 and six passing CI jobs, the maintainer
 reported a successful one-step, local-only production

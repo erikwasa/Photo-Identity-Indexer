@@ -28,8 +28,15 @@ public sealed class VideoArchiveProcessingService(
     private readonly object _activeLock = new();
     private CancellationTokenSource? _active;
     private string _lastResult = "not-run";
+    private string _lastPosterResult = "not-run";
     private VideoAttemptFailureDiagnostic? _lastAttemptFailure;
     public string LastResult => Volatile.Read(ref _lastResult);
+    public string LastPosterResult => Volatile.Read(ref _lastPosterResult);
+
+    public static bool ShouldCreateAutomaticPoster(
+        VideoProcessingPreferences options, VideoWorkerCycleResult result) =>
+        options.AutomaticPostersForNewProxies && result.Published &&
+        string.Equals(result.ReasonCode, "published", StringComparison.Ordinal);
     // Deliberately not cleared by a later no-admissible-job cycle.
     // In-memory only: restarting the API resets this diagnostic.
     public VideoAttemptFailureDiagnostic? LastAttemptFailure =>
@@ -121,8 +128,9 @@ public sealed class VideoArchiveProcessingService(
             }
             await VideoDerivativeCacheGuard.ValidateAsync(database, cache, token);
             preflightStage = "quota-configuration";
+            VideoProcessingPreferences cyclePreferences = preferences.Current;
             VideoProxyRetentionLimits? publicationQuota =
-                preferences.Current.ResolvePublicationQuota(configuration);
+                cyclePreferences.ResolvePublicationQuota(configuration);
             VideoProxyEncodingProfile encodingProfile =
                 VideoProxyEncodingProfiles.Resolve(
                     preferences.Current.EncodingProfile);
@@ -256,6 +264,48 @@ public sealed class VideoArchiveProcessingService(
                             selectedJobId: selectedJobId,
                             requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
+                if (candidate is { } publishedCandidate &&
+                    ShouldCreateAutomaticPoster(cyclePreferences, result))
+                {
+                    try
+                    {
+                        string posterRoot = configuration["PhotoIdentity:VideoPosterRoot"] ??
+                            Path.Combine(Environment.GetFolderPath(
+                                Environment.SpecialFolder.LocalApplicationData),
+                                "PhotoIdentity", "video-derivatives");
+                        // Newly arrived photo work always takes priority
+                        // over this optional post-publication enhancement.
+                        if ((await new PostgresVideoPhotoPriorityProbe(database)
+                                .GetAsync(token)).PhotoWorkActive)
+                        {
+                            Volatile.Write(ref _lastPosterResult,
+                                "skipped-photo-priority");
+                        }
+                        else
+                        {
+                            bool created = await VideoProxyPosterCommandRunner
+                                .TryCreateForPublishedProxyAsync(
+                                    database, AssetRevisionId.From(publishedCandidate.RevisionId),
+                                    cache, posterRoot, ffmpeg, ffmpegHash,
+                                    ffprobe, ffprobeHash, token);
+                            Volatile.Write(ref _lastPosterResult,
+                                created ? "created" : "skipped");
+                        }
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception)
+                    {
+                        // The playable MP4 is already durably published.
+                        // Poster failure cannot downgrade, revoke or retry that
+                        // video job. Never log source paths or tool stderr.
+                        Volatile.Write(ref _lastPosterResult, "failed");
+                        logger.LogWarning(
+                            "Optional poster creation failed after video proxy publication.");
+                    }
+                }
                 if (result.Failure is not null)
                     Volatile.Write(ref _lastAttemptFailure,
                         VideoAttemptFailureDiagnostics.Sanitize(result.Failure));

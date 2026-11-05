@@ -153,6 +153,7 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                 AssetRevisionId.From(revision), cache))
             {
                 Assert.NotNull(opened);
+                Assert.False(await opened.HasRegisteredPosterAsync());
                 byte[] read = new byte[mp4.Length];
                 await opened.Stream.ReadExactlyAsync(read);
                 Assert.Equal(mp4, read);
@@ -180,6 +181,12 @@ public sealed class PostgresVideoPlaybackRepositoryTests
                     opened.PublishProxyPosterAsync(posterEvidence with
                     { PosterRelativePath = "../wrong.jpg" }));
                 Assert.True(await opened.PublishProxyPosterAsync(posterEvidence));
+            }
+            await using (VideoPlaybackLease? alreadyPoster = await playback.OpenCurrentAsync(
+                AssetRevisionId.From(revision), cache))
+            {
+                Assert.NotNull(alreadyPoster);
+                Assert.True(await alreadyPoster.HasRegisteredPosterAsync());
             }
             Assert.Equal(jpeg, await browse.GetPosterBytesAsync(
                 AssetRevisionId.From(revision), posterRoot));
