@@ -127,8 +127,59 @@ low scores, ambiguity, single-reference uncertainty, copied-frame
 rejection, private report restrictions and unchanged input hashes.
 See the [checkpoint 2 runbook](../../operations/video-face-feasibility-wi0155.md).
 
-**Status:** implementation proposed for review on the `wi-0155` branch.
-A small real, operator-approved clip/reference pilot and recorded
-human evaluation of misses, false suggestions and review burden
-remain required. Do not mark the overall WI acceptance criteria
-completed on the basis of fake-model or CI tests alone.
+**Status:** checkpoint 2 merged as PR #741 into `wi-0155`; local synthetic
+tests and first approved private real-media pilot completed. The pilot
+revealed both a missed detection and a suppressed known-person
+suggestion. Further comparison with known-positive and known-negative
+cases, and a maintainer product decision, remain required.
+
+## Experimental development checkpoint 3 — first pilot findings and diagnosis (2026-11-05)
+
+The maintainer verified the merged PRs #740 and #741 in the separate
+WI-0155 Windows worktree. Local build/tests, CLI help, docs validation and
+generation, governed YuNet/SFace model verification, private report writing,
+and source-image SHA-256 invariance passed.
+
+**Pilot observations (operator-supplied, one approved clip):**
+two selected still frames, the same person visible in both and present
+in one independently selected reference photo; YuNet detected a face
+in **one of the two frames**, produced one embedding, and the
+experimental matcher made **no known-person suggestion**. Total elapsed
+processing was about **1.35 seconds**, with human review taking a few
+seconds. This is one small pilot, **not a population detection or
+recognition-rate estimate**. The withheld suggestion is a known-positive
+miss; the private ranking of the correct reference is not yet established.
+Neither input images nor catalogue data were modified.
+
+This creates distinct questions that require separate evidence:
+
+- **Detection:** Why did one of the two selected frames produce no
+  detection? The face may have been small, angled, blurred, poorly lit or
+  below YuNet's current confidence setting. A visible person is not
+  necessarily a detector-visible face; human inspection must confirm.
+- **Matching:** For the frame where a face was detected, did the true
+  reference rank first but fall below the exploratory cosine cutoff,
+  or was the highest-ranking reference actually the wrong person?
+  Lowering a threshold without finding out could introduce false positives.
+- **Reviewability:** Withhold automatic labels; compare a handful of
+  deliberately chosen known-positive, unknown-person and difficult
+  frames, recording human burden and clearly incorrect suggestions.
+
+The third experimental PR adds **explicit private diagnostic mode**
+to the local CLI. It records per-selected-frame detector counts and
+confidence ranges, plus the highest-ranked reference *even when
+the default threshold suppresses it* and a read-only sensitivity
+comparison at cosine cutoffs `0.363`, `0.45`, `0.60`, `0.80`.
+Optional YuNet confidence settings `0.5`, `0.7`, `0.9` allow
+separate local runs to compare a missed frame. None of these cutoffs
+is calibrated or promoted to a production setting. Diagnostics are
+strictly opt-in, written to an explicitly selected new **private**
+report outside Git, and not printed to stdout.
+
+**Work-item state:** in progress, not complete. Initial functionality
+and a single real pilot are available; quantitative accuracy claims,
+production adoption, video frame sampling, durable identities and
+automatic catalogue writes remain out of scope. Do not commit any
+real identities, reference mappings, face coordinates, frame-level
+biometric scores or private reports. See the
+[local sensitivity runbook](../../operations/video-face-feasibility-wi0155.md).
