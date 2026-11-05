@@ -160,6 +160,7 @@ public sealed class VideoFaceExperiment
         string referenceDirectory,
         CancellationToken cancellationToken = default)
     {
+        long fullRunStarted = Stopwatch.GetTimestamp();
         VideoFaceFrameSetLoader.Validate(set);
         VideoFaceReferenceSetLoader.Validate(referenceSet);
         ArgumentException.ThrowIfNullOrWhiteSpace(referenceDirectory);
@@ -179,6 +180,7 @@ public sealed class VideoFaceExperiment
         }
 
         List<VideoFaceReferenceEmbedding> prepared = [];
+        HashSet<string> referenceDigests = [];
         for (int i = 0; i < referenceFiles.Length; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -190,6 +192,11 @@ public sealed class VideoFaceExperiment
             }
 
             byte[] originalHash = SHA256.HashData(bytes);
+            if (!referenceDigests.Add(Convert.ToHexString(originalHash)))
+            {
+                throw new ArgumentException("Approved references must be distinct photos.");
+            }
+
             using MemoryStream stream = new(bytes, writable: false);
             ImageFrame image = await _decoder.DecodeAsync(
                 stream, new DecodeOptions(new ImageSize(1600, 1600)), cancellationToken);
@@ -216,9 +223,18 @@ public sealed class VideoFaceExperiment
                 referenceSet.References[i].Alias, embedding));
         }
 
+        // Include time spent preparing the reference models in the overall measured runtime.
         // No original, catalogue, identity data or embeddings are written by the experiment.
-        return await RunCoreAsync(
+        VideoFacePrivateReview review = await RunCoreAsync(
             set, manifestDirectory, new VideoFaceReferenceMatcher(prepared), cancellationToken);
+        return review with
+        {
+            Aggregate = review.Aggregate with
+            {
+                ElapsedMilliseconds = Math.Round(
+                    Stopwatch.GetElapsedTime(fullRunStarted).TotalMilliseconds, 3),
+            },
+        };
     }
 
     private async Task<VideoFacePrivateReview> RunCoreAsync(
@@ -317,7 +333,14 @@ public sealed class VideoFaceExperiment
             adjacentPairs,
             Math.Round(Stopwatch.GetElapsedTime(started).TotalMilliseconds, 3));
         return new VideoFacePrivateReview(
-            1, matcher?.ReferenceCount ?? 0, aggregate, findings);
+            1,
+            matcher?.ReferenceCount ?? 0,
+            _detector.Descriptor.Id.Value,
+            _detector.Descriptor.ModelHash.Value,
+            _embedder.Descriptor.Id.Value,
+            _embedder.Descriptor.ModelHash.Value,
+            aggregate,
+            findings);
     }
 
     private static async Task<byte[]> ReadApprovedStillAsync(
