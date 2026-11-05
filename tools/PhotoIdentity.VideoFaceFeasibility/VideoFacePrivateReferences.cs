@@ -24,6 +24,10 @@ public sealed record VideoFaceReferenceFinding(
 public sealed record VideoFacePrivateReview(
     int SchemaVersion,
     int ReferenceCount,
+    string DetectorModelId,
+    string DetectorSha256,
+    string EmbedderModelId,
+    string EmbedderSha256,
     VideoFaceAggregate Aggregate,
     IReadOnlyList<VideoFaceReferenceFinding> Findings);
 
