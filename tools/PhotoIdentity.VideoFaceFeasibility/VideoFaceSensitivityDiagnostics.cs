@@ -28,7 +28,7 @@ public sealed record VideoFaceRankedDiagnostic(
     IReadOnlyList<VideoFaceThresholdCheck> ThresholdChecks);
 
 public sealed record VideoFaceSensitivityDiagnostics(
-    double DetectorConfidenceThreshold,
+    double RequestedDetectorConfidenceThreshold,
     IReadOnlyList<VideoFaceFrameDetectionDiagnostic> FrameDetections,
     IReadOnlyList<VideoFaceRankedDiagnostic> RankedFaces)
 {
