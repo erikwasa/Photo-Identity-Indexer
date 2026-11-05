@@ -130,6 +130,23 @@
                 </p>
             </fieldset>
             <fieldset class="review-filter-panel">
+                <legend class="field-label">Video posters</legend>
+                <label class="field-label video-settings-check-row" for="video-processing-auto-posters">
+                    <input id="video-processing-auto-posters" type="checkbox"
+                           @bind="AutomaticPostersForNewProxies" disabled="@Saving" />
+                    Automatically create a poster for newly processed videos
+                </label>
+                <p class="field-help">
+                    Off by default. When enabled, a successfully published playable
+                    video proxy gets one verified, bounded JPEG poster during that
+                    same operator-started Archive advance. It uses the retained proxy,
+                    not the original video. Poster failure does not invalidate the
+                    playable video. This does not backfill older videos, hydrate
+                    online-only originals or process anything when you browse the
+                    gallery. Changes take effect after Save and the next Archive run.
+                </p>
+            </fieldset>
+            <fieldset class="review-filter-panel">
                 <legend class="field-label">Video proxy encoding</legend>
                 <label class="field-label" for="video-processing-encoding-profile">
                     Output quality and size
@@ -307,6 +324,7 @@
         int? MaximumCacheMiB, int? MaximumProxyMiB,
         string EncodingProfile, int RetentionAgeHours,
         bool StopAfterOneVideoStepPerAdvance,
+        bool AutomaticPostersForNewProxies,
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
@@ -322,7 +340,8 @@
         bool Enabled, bool IncludeOnlineOnly,
         int? MaximumCacheMiB, int? MaximumProxyMiB,
         bool OverrideProxyLimits, string EncodingProfile,
-        int RetentionAgeHours, bool StopAfterOneVideoStepPerAdvance);
+        int RetentionAgeHours, bool StopAfterOneVideoStepPerAdvance,
+        bool AutomaticPostersForNewProxies);
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
@@ -335,6 +354,7 @@
     private string EncodingProfile = "standard-720p";
     private int RetentionAgeHours = 48;
     private bool StopAfterOneVideoStepPerAdvance;
+    private bool AutomaticPostersForNewProxies;
     private int? MaximumCacheMiB = 1024;
     private int? MaximumProxyMiB = 256;
     private bool Loading = true;
@@ -376,6 +396,7 @@
                 RetentionAgeHours = Status.RetentionAgeHours;
                 StopAfterOneVideoStepPerAdvance =
                     Status.StopAfterOneVideoStepPerAdvance;
+                AutomaticPostersForNewProxies = Status.AutomaticPostersForNewProxies;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
@@ -505,7 +526,8 @@
                     OverrideProxyLimits ? MaximumCacheMiB : null,
                     OverrideProxyLimits ? MaximumProxyMiB : null,
                     OverrideProxyLimits, EncodingProfile,
-                    RetentionAgeHours, StopAfterOneVideoStepPerAdvance));
+                    RetentionAgeHours, StopAfterOneVideoStepPerAdvance,
+                    AutomaticPostersForNewProxies));
             if (!response.IsSuccessStatusCode)
             {
                 ErrorResponse? failure = null;
@@ -523,6 +545,7 @@
                 RetentionAgeHours = Status.RetentionAgeHours;
                 StopAfterOneVideoStepPerAdvance =
                     Status.StopAfterOneVideoStepPerAdvance;
+                AutomaticPostersForNewProxies = Status.AutomaticPostersForNewProxies;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
