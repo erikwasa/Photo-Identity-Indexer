@@ -1,9 +1,12 @@
 id: WI-0155
 title: Evaluate face discovery and identity processing inside video
 milestone: M30
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0155-video-face-processing-evaluation.md
+started_at: 2026-11-05
+last_updated_at: 2026-11-05
+branch: wi-0155
 blockers:
 - WI-0151
 - WI-0188
@@ -11,3 +14,11 @@ blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/740
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/741
+- type: maintainer_verification
+  value: 2026-11-05 private two-frame one-clip pilot completed with 8 of 8 local verification checks passed, one detector hit, no known-person suggestion, source file hashes unchanged and human review of a few seconds; further diagnostics needed
+- type: documentation
+  value: docs/operations/video-face-feasibility-wi0155.md
