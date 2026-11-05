@@ -179,3 +179,37 @@ retained-cache validation and safe JPEG publication/serving, recognizability
 and color/rotation acceptance, and real before/after poster population.
 Do not mark any whole-work-item acceptance criteria complete or close
 WI-0211 based only on this checkpoint.
+
+## Implementation checkpoint 2 — opt-in poster from a retained proxy (2026-11-05)
+
+A dedicated, dry-run-first CLI now selects **at most three** current,
+visible, nonexcluded video revisions with a registered supported
+PlayableProxy but no recognized poster. Apply mode uses the existing
+revision-fenced, digest-verified MP4 playback lease; that same PostgreSQL
+source lock stays held across copying the proxy to isolated scratch,
+independent pinned FFprobe inspection, bounded pinned FFmpeg JPEG rendering,
+output inspection and immutable still-poster SQL registration.
+
+Profile `wi0211-proxy-still-v1` uses a deterministic partial-clip
+representative-frame extraction and crop-free 960px maximum JPEG. It
+refuses unapproved FFmpeg/FFprobe hashes, absent/overlapping or linked
+cache/poster roots, unsupported proxy color/format/rotation, stale or
+excluded revisions, extra originals, and any duplicate existing poster.
+Existing original-backed WI-0151 posters take precedence. Poster serving
+checks this new profile under the established current-revision, exclusion,
+canonical-path, file signature and checksum guard. Missing or corrupt
+registered stills still have an honest UI fallback; playable proxies remain
+playable if still extraction fails.
+
+New disposable PostgreSQL tests exercise source-locked synthetic poster
+publication, saved-file delivery, existing proxy compatibility, exclusion,
+and current-revision fences. Opt-in argument/pinning and rendering-recipe
+contracts are covered by CLI tests. No private media is used in CI.
+The maintained-host procedure and exact PowerShell commands are in
+[`video-proxy-posters-wi0211-acceptance.md`](../../operations/video-proxy-posters-wi0211-acceptance.md).
+
+**Pending acceptance:** CI, Windows operator approval of a one-proxy
+backfill, human evaluation of visual recognizability, empty/dark-frame
+selection, color, rotation, playback continuity and before/after
+aggregate counts. Do not close WI-0211 or infer all-catalogue coverage.
+The command is never triggered by the browse page or Settings.

@@ -74,7 +74,7 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                 SELECT poster.asset_revision_id
                 FROM video_still_posters poster
                 WHERE poster.asset_revision_id = latest.id
-                  AND poster.poster_profile_id = 'wi0151-sdr-still-v1'
+                  AND poster.poster_profile_id IN ('wi0151-sdr-still-v1', 'wi0211-proxy-still-v1')
                   AND metadata.inspection_status = 'supported'
                   AND metadata.color_transfer = 'bt709'
                 ORDER BY poster.generated_at_utc DESC, poster.tool_sha256
@@ -157,6 +157,30 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
             reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5));
     }
 
+    /// <summary>Bounded, database-only candidates; authorization and file
+    /// verification happen again inside the proxy lease before publication.</summary>
+    public async Task<IReadOnlyList<AssetRevisionId>> ListMissingProxyPostersAsync(
+        int maximum, CancellationToken token = default)
+    {
+        if (maximum is < 1 or > 8)
+            throw new ArgumentOutOfRangeException(nameof(maximum));
+        await _exclusions.EnsureReadyAsync(token);
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand query = connection.CreateCommand();
+        query.CommandText = $"""
+            SELECT id FROM ({CurrentVideoSql}) AS catalogue
+            WHERE has_playable_proxy AND NOT has_poster
+            ORDER BY sort_at DESC, id DESC
+            LIMIT @limit;
+            """;
+        query.Parameters.AddWithValue("limit", maximum);
+        List<AssetRevisionId> ids = [];
+        await using NpgsqlDataReader reader = await query.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+            ids.Add(AssetRevisionId.From(reader.GetGuid(0)));
+        return ids;
+    }
+
     /// <summary>
     /// Returns validated JPEG bytes, never a filesystem path/handle. Source
     /// lock spans the authorization check and file read, so an exclusion
@@ -176,18 +200,20 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
         command.Transaction = transaction;
         command.CommandText = """
             SELECT poster.poster_relative_path, poster.poster_sha256,
-                   poster.encoded_bytes, source.root_locator
+                   poster.encoded_bytes, source.root_locator, poster.poster_profile_id
             FROM asset_revisions revision
             JOIN assets asset ON asset.id = revision.asset_id
             JOIN sources source ON source.id = asset.source_id
             JOIN video_revision_metadata metadata ON metadata.asset_revision_id = revision.id
             JOIN LATERAL (
                 SELECT stored.poster_relative_path, stored.poster_sha256,
-                       stored.encoded_bytes, stored.tool_sha256
+                       stored.encoded_bytes, stored.tool_sha256, stored.poster_profile_id
                 FROM video_still_posters stored
                 WHERE stored.asset_revision_id = revision.id
-                  AND stored.poster_profile_id = 'wi0151-sdr-still-v1'
-                ORDER BY stored.generated_at_utc DESC, stored.tool_sha256
+                  AND stored.poster_profile_id IN ('wi0151-sdr-still-v1', 'wi0211-proxy-still-v1')
+                ORDER BY CASE WHEN stored.poster_profile_id = 'wi0151-sdr-still-v1'
+                              THEN 0 ELSE 1 END,
+                         stored.generated_at_utc DESC, stored.tool_sha256
                 LIMIT 1
             ) poster ON TRUE
             WHERE revision.id = @revision
@@ -208,7 +234,7 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
             """;
         command.Parameters.Add(new NpgsqlParameter("revision", NpgsqlDbType.Uuid)
             { Value = revisionId.Value });
-        string? relative = null, sha = null, archiveRoot = null;
+        string? relative = null, sha = null, archiveRoot = null, posterProfile = null;
         long bytes = 0;
         await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(token))
         {
@@ -218,20 +244,21 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                 sha = reader.GetString(1);
                 bytes = reader.GetInt64(2);
                 archiveRoot = reader.GetString(3);
+                posterProfile = reader.GetString(4);
             }
         }
-        if (relative is null || sha is null || archiveRoot is null)
+        if (relative is null || sha is null || archiveRoot is null || posterProfile is null)
             return null;
 
         byte[] result = await ReadVerifiedJpegAsync(
-            derivativeRoot, archiveRoot, revisionId, relative, sha, bytes, token);
+            derivativeRoot, archiveRoot, revisionId, posterProfile, relative, sha, bytes, token);
         await transaction.CommitAsync(token);
         return result;
     }
 
     private static async Task<byte[]> ReadVerifiedJpegAsync(
         string derivativeRoot, string originalRoot, AssetRevisionId revision,
-        string relative, string sha256, long expectedBytes, CancellationToken token)
+        string posterProfile, string relative, string sha256, long expectedBytes, CancellationToken token)
     {
         string root = Path.GetFullPath(derivativeRoot);
         string originals = Path.GetFullPath(originalRoot);
@@ -252,7 +279,8 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
         string[] parts = relative.Split('/');
         if (parts.Length != 4 ||
             parts[0] != "video-posters" ||
-            parts[1] != PosterProfile ||
+            !((parts[1] == PosterProfile && posterProfile == PosterProfile) ||
+              (parts[1] == "wi0211-proxy-still-v1" && posterProfile == "wi0211-proxy-still-v1")) ||
             parts[2] != revision.Value.ToString("D") ||
             parts[3].Length != 68 ||
             !parts[3].EndsWith(".jpg", StringComparison.Ordinal) ||

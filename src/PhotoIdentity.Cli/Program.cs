@@ -188,6 +188,10 @@ public static class Program
                     await VideoPosterCleanupCommandRunner.RunAsync(
                         VideoPosterCleanupOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 1 && args[1] == "posters-from-proxies" =>
+                    await VideoProxyPosterCommandRunner.RunAsync(
+                        VideoProxyPosterOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 1 && args[1] == "posters" =>
                     await VideoPosterCommandRunner.RunAsync(
                         VideoPosterOptions.Parse(args.Skip(2).ToArray()),
@@ -532,6 +536,15 @@ public static class Program
                             [--apply]
                             (dry-run by default; only creates bounded revision-bound
                              SDR JPEG posters for previously indexed local videos)
+
+              video posters-from-proxies --enable-video --cache-root DIR --derivatives DIR
+                            --ffmpeg PATH --ffmpeg-sha256 HASH
+                            --ffprobe PATH --ffprobe-sha256 HASH
+                            --postgres-connection-env NAME --database DB
+                            [--max-videos COUNT (1..3)] [--timeout-seconds SECONDS (30..90)]
+                            [--apply]
+                            (dry-run by default; --apply creates only bounded verified
+                             JPEG stills from already published local video proxies)
 
               video pilot --enable-video --source DIR --derivatives DIR
                           --ffprobe ABSOLUTE_EXE --ffmpeg ABSOLUTE_EXE
