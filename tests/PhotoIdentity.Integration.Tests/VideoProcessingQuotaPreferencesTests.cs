@@ -122,6 +122,79 @@ public sealed class VideoProcessingQuotaPreferencesTests
     }
 
     [Fact]
+    public async Task Automatic_posters_default_off_and_persist_without_reset_by_legacy_updates()
+    {
+        string root = Path.Combine(Path.GetTempPath(),
+            "wi0211-auto-poster-prefs-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(root, "preferences.json");
+        try
+        {
+            // A prior app installation does not implicitly consent to
+            // additional FFmpeg work just because its video lane was enabled.
+            await File.WriteAllTextAsync(path,
+                """{"Enabled":true,"IncludeOnlineOnly":false}""");
+            var store = new VideoProcessingPreferencesStore(path, new(false, false));
+            Assert.True(store.Current.Enabled);
+            Assert.False(store.Current.AutomaticPostersForNewProxies);
+
+            VideoProcessingPreferences enabled =
+                new VideoProcessingSettingsUpdate(true, false,
+                    AutomaticPostersForNewProxies: true)
+                    .MergeWith(store.Current);
+            await store.SaveAsync(enabled);
+
+            var restarted = new VideoProcessingPreferencesStore(path, new(false, false));
+            Assert.True(restarted.Current.AutomaticPostersForNewProxies);
+
+            // Older clients and quota reset updates must preserve this
+            // independent explicit choice rather than silently clearing it.
+            VideoProcessingPreferences legacy =
+                new VideoProcessingSettingsUpdate(true, false)
+                    .MergeWith(restarted.Current);
+            Assert.True(legacy.AutomaticPostersForNewProxies);
+            VideoProcessingPreferences resetQuota =
+                new VideoProcessingSettingsUpdate(true, false,
+                    OverrideProxyLimits: false).MergeWith(legacy);
+            Assert.True(resetQuota.AutomaticPostersForNewProxies);
+
+            VideoProcessingPreferences disabled =
+                new VideoProcessingSettingsUpdate(true, false,
+                    AutomaticPostersForNewProxies: false)
+                    .MergeWith(resetQuota);
+            await restarted.SaveAsync(disabled);
+            Assert.False(new VideoProcessingPreferencesStore(path, new(false, false))
+                .Current.AutomaticPostersForNewProxies);
+
+            await File.WriteAllTextAsync(path, "{invalid JSON");
+            var corrupted = new VideoProcessingPreferencesStore(path,
+                new(true, true, AutomaticPostersForNewProxies: true));
+            Assert.False(corrupted.Current.Enabled);
+            Assert.False(corrupted.Current.AutomaticPostersForNewProxies);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(false, true, "published", false)]
+    [InlineData(true, true, "published", true)]
+    [InlineData(true, false, "published", false)]
+    [InlineData(true, true, "retry-pending", false)]
+    [InlineData(true, true, "failed", false)]
+    [InlineData(true, false, "no-admissible-job", false)]
+    public void Automatic_poster_requires_explicit_consent_and_durable_new_proxy_publication(
+        bool enabled, bool published, string outcome, bool expected)
+    {
+        var prefs = new VideoProcessingPreferences(
+            Enabled: true, IncludeOnlineOnly: false,
+            AutomaticPostersForNewProxies: enabled);
+        var cycle = new PhotoIdentity.Cli.VideoWorkerCycleResult(
+            Claimed: true, Published: published, ReasonCode: outcome);
+        Assert.Equal(expected,
+            VideoArchiveProcessingService.ShouldCreateAutomaticPoster(prefs, cycle));
+    }
+
+    [Fact]
     public void Legacy_bool_only_API_update_preserves_existing_quota_overrides()
     {
         VideoProcessingPreferences existing = new(false, false, 1024, 128);
