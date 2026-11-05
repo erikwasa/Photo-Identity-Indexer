@@ -1,5 +1,36 @@
 # Build context
 
+**Current WI-0207 handoff — 2026-11-06: shared managed-hydration checkpoint 3 ACCEPTED.**
+PR #750 merged. Maintained Windows integration filter passed
+**30 succeeded / 0 failed / 0 skipped**; one real **disposable
+PostgreSQL** video/photo ownership persistence test executed and
+passed with the existing test admin variable present. Both
+documentation validation and generate --check passed. No
+production PostgreSQL writes, original video reads, OneDrive
+hydration/release or Archive processing were performed. The
+standalone PowerShell else error and missing
+$integrationPassed reporting variable were display-only and
+did not affect the actual passing test runs. No retesting is
+required for this checkpoint.
+
+Checkpoint 3 reuses the shared photo/video managed-hydration
+capacity gate and durable PostgreSQL lease receipt before any
+authorized OneDrive +p video request. Existing video pin leases
+count toward managed bytes but are protected from automatic
+photo-cache LRU eviction. The unresolved app/user +p distinction
+still prevents safe general auto-release; video dependent-job
+reuse/restart recovery and one separately authorized real
+online-only video hydrate/process/reuse/release acceptance remain
+outstanding. **WI-0207 stays in progress; leave Include online-only
+videos OFF.** Next development should address these release and
+coordination safeguards; do not fabricate an online-only test
+candidate.
+
+See docs/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md
+and docs/operations/video-onedrive-wi0207-shared-admission.md.
+
+**Historical handoffs follow.**
+
 **Current M30 handoff — 2026-11-05: WI-0207 checkpoint 2 ACCEPTED;
 shared managed-hydration admission checkpoint 3 under review.**
 The maintained Windows operator confirmed PR #749 merged and

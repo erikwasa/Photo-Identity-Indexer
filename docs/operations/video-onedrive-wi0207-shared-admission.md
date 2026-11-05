@@ -26,6 +26,8 @@ if ($LASTEXITCODE -ne 0) { throw "Cannot update main." }
 
 dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter "FullyQualifiedName~VideoManagedHydrationAdmissionTests|FullyQualifiedName~VideoHydrationReleaseGuardTests|FullyQualifiedName~VideoOnlineOnlyPreflightTests"
 if ($LASTEXITCODE -ne 0) { throw "WI-0207 synthetic admission tests failed." }
+$integrationPassed = $true
+Write-Host "WI-0207 integration checks: PASS"
 ~~~
 
 These tests use synthetic states and static safeguards and do not
@@ -53,7 +55,7 @@ if ($adminAvailable) {
         throw "WI-0207 disposable PostgreSQL test failed."
     }
 }
-else {
+if (-not $adminAvailable) {
     Write-Host "Disposable PostgreSQL persistence test NOT EXECUTED."
 }
 ~~~
@@ -71,7 +73,26 @@ if ($LASTEXITCODE -ne 0) { throw "Generated docs are stale." }
 Write-Host "WI-0207 checkpoint 3 docs: PASS"
 ~~~
 
-## 4. Remaining acceptance gates
+## 4. Maintained Windows acceptance recorded — 2026-11-06
+
+After PR #750 merged, the maintainer ran the selected tests and
+reported **30 integration tests passed**, **1 real disposable
+PostgreSQL ownership test passed** (admin environment variable
+present), and both documentation validation and generated-doc
+checks passed. Production video and OneDrive operations were not
+performed. **Do not rerun these tests solely to correct the
+summary's reporting variables.**
+
+The session also demonstrated two benign PowerShell display
+issues: entering an `else` clause as a later standalone
+command does not attach it to the earlier `if` statement, and
+an uninitialized `$integrationPassed` variable prints
+`NOT VERIFIED` even after the test runner itself reported
+30 passing tests. The commands above now assign that variable
+when tests succeed and use a separate `if (-not ...)` in place
+of a detachable `else` clause.
+
+## 5. Remaining acceptance gates
 
 This is not completion of WI-0207. The app's +p pin is indistinguishable
 from a user selecting "Always keep on this device". Video receipts
