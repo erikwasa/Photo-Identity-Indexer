@@ -369,6 +369,143 @@ public sealed class PrivateReferenceReviewTests
             "not-read", diagnostics: true, requestedDetectorConfidence: 0.123));
     }
 
+    [Fact]
+    public void Coverage_grouper_requires_human_review_and_keeps_simultaneous_faces_separate()
+    {
+        VideoFaceCoverageGrouper grouper = new();
+        EmbeddingVector a = new(new float[] { 1, 0, 0 });
+        EmbeddingVector b = new(new float[] { 0, 1, 0 });
+
+        VideoFaceCoverageAssignment first = grouper.Observe(1, 1000, 1, a);
+        VideoFaceCoverageAssignment simultaneous = grouper.Observe(1, 1000, 2, a);
+        VideoFaceCoverageAssignment other = grouper.Observe(2, 2000, 1, b);
+        VideoFaceCoverageAssignment repeated = grouper.Observe(3, 3000, 1, a);
+
+        Assert.Equal("G0001", first.GroupAlias);
+        Assert.Equal("needs-distinct-face-review", first.ReviewStatus);
+        Assert.Equal("G0002", simultaneous.GroupAlias);
+        Assert.Equal("G0003", other.GroupAlias);
+        Assert.Equal("G0001", repeated.GroupAlias);
+        Assert.Equal("possible-repeat", repeated.ReviewStatus);
+        Assert.Equal(3, grouper.Groups.Count);
+        Assert.Equal(2, grouper.Groups[0].Observations);
+        Assert.Throws<ArgumentException>(() => grouper.Observe(3, 3000, 1, a));
+        Assert.Equal(4, grouper.Assignments.Count);
+    }
+
+    [Fact]
+    public async Task Coverage_is_explicitly_limited_and_preserves_default_frame_budget()
+    {
+        string root = TempDir();
+        try
+        {
+            string manifest = Path.Combine(root, "frames.json");
+            VideoFaceFrameSet selected = new(1,
+                Enumerable.Range(1, 36)
+                    .Select(i => new VideoFaceFrame(i * 1000, $"f{i:00}.png")).ToList());
+            VideoFaceFrameSetLoader.Validate(selected, coverage: true);
+            Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(selected));
+
+            await File.WriteAllTextAsync(manifest, JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                frames = selected.Frames!.Select(f => new
+                {
+                    timestampMs = f.TimestampMs,
+                    file = f.File,
+                }),
+            }));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                VideoFaceFrameSetLoader.LoadAsync(manifest));
+
+            VideoFaceFrameSet actual = await VideoFaceFrameSetLoader.LoadAsync(
+                manifest, coverage: true);
+            Assert.Equal(36, actual.Frames!.Count);
+            Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(
+                new VideoFaceFrameSet(1,
+                    Enumerable.Range(1, 37).Select(i =>
+                        new VideoFaceFrame(i * 1000, $"f{i:00}.png")).ToList()),
+                coverage: true));
+            Assert.Equal(2, await Program.Main(
+                ["--manifest", "absent.json", "--coverage"]));
+            Assert.Equal(2, await Program.Main(
+                ["--manifest", "absent.json", "--coverage", "--diagnostics"]));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Private_24_frame_coverage_groups_are_in_memory_and_do_not_change_images()
+    {
+        string root = TempDir();
+        try
+        {
+            string frames = Directory.CreateDirectory(Path.Combine(root, "frames")).FullName;
+            string refs = Directory.CreateDirectory(Path.Combine(root, "refs")).FullName;
+            string reviews = Directory.CreateDirectory(Path.Combine(root, "reviews")).FullName;
+            string repo = Directory.CreateDirectory(Path.Combine(root, "repo")).FullName;
+
+            List<VideoFaceFrame> samples = [];
+            for (int i = 0; i < 24; i++)
+            {
+                string file = $"sample-{i + 1:00}.png";
+                await WritePngStub(frames, file, (byte)(i % 2 == 0 ? 1 : 2));
+                samples.Add(new VideoFaceFrame((i + 1) * 1000, file));
+            }
+            await WritePngStub(refs, "reference-01.png", 3);
+            await WritePngStub(refs, "reference-02.png", 4);
+
+            string[] files = Directory.GetFiles(frames).Concat(Directory.GetFiles(refs))
+                .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+            byte[][] original = files.Select(File.ReadAllBytes).ToArray();
+            VideoFaceExperiment experiment = new(
+                new MarkedDecoder(), new OneFaceDetector(),
+                new PassAligner(), new MarkedEmbedder());
+
+            VideoFacePrivateReview result = await experiment.RunWithReferencesAsync(
+                new VideoFaceFrameSet(1, samples), frames,
+                new VideoFaceReferenceSet(1,
+                    [new VideoFaceReference("R01", "reference-01.png"),
+                     new VideoFaceReference("R02", "reference-02.png")]),
+                refs, diagnostics: true, requestedDetectorConfidence: 0.7,
+                coverage: true);
+
+            Assert.Equal(24, result.Aggregate.FramesExamined);
+            Assert.Equal(24, result.Aggregate.EmbeddingsCalculated);
+            Assert.Equal(24, result.Findings.Count);
+            VideoFaceCoverageReview coverage = Assert.IsType<VideoFaceCoverageReview>(
+                result.Diagnostics!.Coverage);
+            Assert.Equal(2, coverage.PossibleAppearanceGroups);
+            Assert.Equal(24, coverage.Assignments.Count);
+            Assert.Equal(2, coverage.Groups.Count);
+            Assert.Equal(12, coverage.Groups[0].Observations);
+            Assert.Equal(12, coverage.Groups[1].Observations);
+
+            string reportPath = Path.Combine(reviews, "coverage-private.json");
+            await VideoFacePrivateReportWriter.WriteAsync(
+                reportPath, repo, frames, refs, result);
+            string reportText = await File.ReadAllTextAsync(reportPath);
+            Assert.DoesNotContain("reference-01.png", reportText);
+            Assert.DoesNotContain("sample-01.png", reportText);
+            Assert.DoesNotContain("\"embedding\"", reportText, StringComparison.OrdinalIgnoreCase);
+            using JsonDocument json = JsonDocument.Parse(reportText);
+            Assert.Equal(2, json.RootElement.GetProperty("diagnostics")
+                .GetProperty("coverage").GetProperty("possibleAppearanceGroups").GetInt32());
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                Assert.Equal(original[i], await File.ReadAllBytesAsync(files[i]));
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static async Task<byte[]> WritePngStub(string root, string name, byte marker)
     {
         byte[] content = [137, 80, 78, 71, 13, 10, 26, 10, marker];
