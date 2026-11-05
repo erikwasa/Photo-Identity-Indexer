@@ -37,13 +37,17 @@ An offline model test cannot establish photo/video identity accuracy.
 
 ## Windows checks without personal media
 
-On a clean checkout of the experimental feature branch:
+**Do not switch branches in the WI-0211 working directory.** Use a
+separate detached worktree for reading and testing this experimental PR.
+A detached worktree is intentional here: it does not create commits on
+the long-lived integration branch.
 
 ```powershell
 cd "C:\Kod\codex\Photo Identity Indexer"
 git fetch origin
-git switch wi-0155-offline-frame-feasibility
-git pull --ff-only origin wi-0155-offline-frame-feasibility
+$wi0155Root = "C:\Kod\codex\Photo Identity Indexer-WI0155"
+git worktree add --detach $wi0155Root origin/wi-0155-offline-frame-feasibility
+Set-Location $wi0155Root
 
 dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
 
