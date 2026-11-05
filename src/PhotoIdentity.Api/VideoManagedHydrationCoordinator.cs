@@ -30,13 +30,25 @@ public sealed class VideoManagedHydrationCoordinator(
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         // The public service method may never be used as an arbitrary
         // caller-supplied OneDrive path action.
+        if (!Path.IsPathFullyQualified(candidate.Root) ||
+            candidate.Root.StartsWith(@"\\", StringComparison.Ordinal) ||
+            Path.IsPathRooted(candidate.Key) ||
+            candidate.Key.Contains(':'))
+            throw new InvalidOperationException(
+                "Catalogue video path is not a safe local archive locator.");
+        string root = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(candidate.Root));
         string expectedPath = Path.GetFullPath(Path.Combine(
-            candidate.Root,
-            candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
-        if (!string.Equals(expectedPath, Path.GetFullPath(sourcePath),
+            root, candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
+        if (!expectedPath.StartsWith(
+                root + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(expectedPath, Path.GetFullPath(sourcePath),
                 StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
                 "Selected video original does not match its catalogue locator.");
+        VideoDerivativeCacheGuard.AssertNoLinks(
+            Path.GetDirectoryName(expectedPath)!);
 
         AssetRevisionLookup? revision =
             await ReadCurrentVideoRevisionAsync(candidate, token);
