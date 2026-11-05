@@ -25,7 +25,8 @@ public static class Program
             Console.WriteLine(
                 "Usage: dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -- " +
                 "--manifest <private-frames.json> [--root <repo>] [--model-dir <installed-model-dir>] " +
-                "[--references <private-references.json> --private-report <new-private-report.json>]");
+                "[--references <private-references.json> --private-report <new-private-report.json>] " +
+                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>]]");
             return 0;
         }
 
@@ -55,7 +56,7 @@ public static class Program
             await verifier.VerifyOrThrowAsync(embedderPath, embedderManifest);
 
             using YuNetFaceDetector detector = new(
-                detectorManifest, detectorPath, new YuNetDetectorOptions { ConfidenceThreshold = 0.9 });
+                detectorManifest, detectorPath, new YuNetDetectorOptions { ConfidenceThreshold = options.DetectorConfidence });
             using SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
             VideoFaceExperiment experiment = new(
                 new OpenCvImageDecoder(),
@@ -73,7 +74,9 @@ public static class Program
                 string referenceDirectory = Path.GetDirectoryName(
                     Path.GetFullPath(options.References!))!;
                 VideoFacePrivateReview review = await experiment.RunWithReferencesAsync(
-                    set, manifestDirectory, referenceSet, referenceDirectory);
+                    set, manifestDirectory, referenceSet, referenceDirectory,
+                    diagnostics: options.Diagnostics,
+                    requestedDetectorConfidence: options.DetectorConfidence);
                 await VideoFacePrivateReportWriter.WriteAsync(
                     options.PrivateReport!, repositoryRoot, manifestDirectory,
                     referenceDirectory, review);
@@ -113,7 +116,9 @@ public static class Program
         string? RepositoryRoot,
         string? ModelDirectory,
         string? References,
-        string? PrivateReport)
+        string? PrivateReport,
+        bool Diagnostics,
+        double DetectorConfidence)
     {
         public static Options Parse(string[] args)
         {
@@ -122,9 +127,21 @@ public static class Program
             string? models = null;
             string? references = null;
             string? privateReport = null;
+            string? detectorConfidence = null;
+            bool diagnostics = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string name = args[i];
+                if (name == "--diagnostics")
+                {
+                    if (diagnostics)
+                    {
+                        throw new ArgumentException("The diagnostic flag may appear only once.");
+                    }
+
+                    diagnostics = true;
+                    continue;
+                }
                 if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
                 {
                     throw new ArgumentException("Every option requires a nonempty value.");
@@ -148,6 +165,9 @@ public static class Program
                     case "--private-report" when privateReport is null:
                         privateReport = value;
                         break;
+                    case "--detector-confidence" when detectorConfidence is null:
+                        detectorConfidence = value;
+                        break;
                     default:
                         throw new ArgumentException("Unknown or repeated option.");
                 }
@@ -159,12 +179,36 @@ public static class Program
                     "--references and --private-report must be supplied together.");
             }
 
+            if (diagnostics && references is null)
+            {
+                throw new ArgumentException(
+                    "--diagnostics requires --references and --private-report.");
+            }
+
+            if (!diagnostics && detectorConfidence is not null)
+            {
+                throw new ArgumentException(
+                    "--detector-confidence is available only with --diagnostics.");
+            }
+
+            double threshold = detectorConfidence switch
+            {
+                null => 0.9,
+                "0.5" => 0.5,
+                "0.7" => 0.7,
+                "0.9" => 0.9,
+                _ => throw new ArgumentException(
+                    "Supported diagnostic detector confidence thresholds: 0.5, 0.7, 0.9."),
+            };
+
             return new Options(
                 manifest ?? throw new ArgumentException("--manifest is required."),
                 root,
                 models,
                 references,
-                privateReport);
+                privateReport,
+                diagnostics,
+                threshold);
         }
     }
 }

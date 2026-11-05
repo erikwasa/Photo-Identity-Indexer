@@ -149,7 +149,8 @@ public sealed class VideoFaceExperiment
         CancellationToken cancellationToken = default)
     {
         VideoFacePrivateReview result = await RunCoreAsync(
-            set, manifestDirectory, matcher: null, cancellationToken);
+            set, manifestDirectory, matcher: null, diagnostics: false,
+            requestedDetectorConfidence: 0.9, cancellationToken: cancellationToken);
         return result.Aggregate;
     }
 
@@ -158,8 +159,25 @@ public sealed class VideoFaceExperiment
         string manifestDirectory,
         VideoFaceReferenceSet referenceSet,
         string referenceDirectory,
+        bool diagnostics = false,
+        double requestedDetectorConfidence = 0.9,
         CancellationToken cancellationToken = default)
     {
+        if (diagnostics)
+        {
+            if (requestedDetectorConfidence is not (0.5 or 0.7 or 0.9))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(requestedDetectorConfidence),
+                    "Diagnostics permit detector confidence 0.5, 0.7 or 0.9 only.");
+            }
+        }
+        else if (requestedDetectorConfidence != 0.9)
+        {
+            throw new ArgumentException(
+                "Non-default detector confidence requires explicitly enabled diagnostics.");
+        }
+
         long fullRunStarted = Stopwatch.GetTimestamp();
         VideoFaceFrameSetLoader.Validate(set);
         VideoFaceReferenceSetLoader.Validate(referenceSet);
@@ -226,7 +244,8 @@ public sealed class VideoFaceExperiment
         // Include time spent preparing the reference models in the overall measured runtime.
         // No original, catalogue, identity data or embeddings are written by the experiment.
         VideoFacePrivateReview review = await RunCoreAsync(
-            set, manifestDirectory, new VideoFaceReferenceMatcher(prepared), cancellationToken);
+            set, manifestDirectory, new VideoFaceReferenceMatcher(prepared),
+            diagnostics, requestedDetectorConfidence, cancellationToken);
         return review with
         {
             Aggregate = review.Aggregate with
@@ -241,6 +260,8 @@ public sealed class VideoFaceExperiment
         VideoFaceFrameSet set,
         string manifestDirectory,
         VideoFaceReferenceMatcher? matcher,
+        bool diagnostics,
+        double requestedDetectorConfidence,
         CancellationToken cancellationToken)
     {
         VideoFaceFrameSetLoader.Validate(set);
@@ -255,6 +276,8 @@ public sealed class VideoFaceExperiment
         int totalEmbeddings = 0;
         int adjacentPairs = 0;
         List<VideoFaceReferenceFinding> findings = [];
+        List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
+        List<VideoFaceRankedDiagnostic> rankedFaces = [];
         List<EmbeddingVector>? previous = null;
         long previousTimestamp = -1;
 
@@ -283,6 +306,12 @@ public sealed class VideoFaceExperiment
                 framesWithFaces++;
             }
 
+            if (diagnostics)
+            {
+                frameDetections.Add(VideoFaceSensitivityDiagnostics.DescribeFrame(
+                    index + 1, set.Frames![index].TimestampMs, detections));
+            }
+
             List<EmbeddingVector> current = [];
             foreach (DetectedFaceCandidate face in detections)
             {
@@ -304,6 +333,11 @@ public sealed class VideoFaceExperiment
                 {
                     findings.Add(matcher.FindCandidate(
                         index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                    if (diagnostics)
+                    {
+                        rankedFaces.Add(matcher.Diagnose(
+                            index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                    }
                 }
             }
 
@@ -340,7 +374,13 @@ public sealed class VideoFaceExperiment
             _embedder.Descriptor.Id.Value,
             _embedder.Descriptor.ModelHash.Value,
             aggregate,
-            findings);
+            findings)
+        {
+            Diagnostics = diagnostics
+                ? new VideoFaceSensitivityDiagnostics(
+                    requestedDetectorConfidence, frameDetections, rankedFaces)
+                : null,
+        };
     }
 
     private static async Task<byte[]> ReadApprovedStillAsync(

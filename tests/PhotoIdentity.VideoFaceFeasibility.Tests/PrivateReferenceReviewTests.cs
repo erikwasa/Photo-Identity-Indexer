@@ -95,6 +95,7 @@ public sealed class PrivateReferenceReviewTests
                 selection, frames, referenceSet, refs);
 
             Assert.Equal(2, evaluated.ReferenceCount);
+            Assert.Null(evaluated.Diagnostics); // No diagnostic data without explicit opt-in.
             Assert.Equal("fake-detector", evaluated.DetectorModelId);
             Assert.Equal(new string('a', 64), evaluated.DetectorSha256);
             Assert.Equal("fake-embedder", evaluated.EmbedderModelId);
@@ -205,6 +206,169 @@ public sealed class PrivateReferenceReviewTests
         }
     }
 
+    [Fact]
+    public void Diagnostic_sensitivity_shows_suppressed_top_rank_without_changing_default_matching()
+    {
+        EmbeddingVector reference = new(new float[] { 1, 0, 0 });
+        EmbeddingVector unrelated = new(new float[] { -1, 0, 0 });
+        EmbeddingVector observed = new EmbeddingVector(
+            new float[] { 0.54f, 0.8417f, 0 }).Normalize();
+        VideoFaceReferenceMatcher matcher = new(
+            [new VideoFaceReferenceEmbedding("R01", reference),
+             new VideoFaceReferenceEmbedding("R02", unrelated)]);
+
+        VideoFaceReferenceFinding baseline = matcher.FindCandidate(1, 1000, 1, observed);
+        Assert.Null(baseline.CandidateAlias);
+        Assert.Equal("below-exploratory-threshold", baseline.ReviewStatus);
+
+        VideoFaceRankedDiagnostic diagnostic = matcher.Diagnose(1, 1000, 1, observed);
+        Assert.Equal("R01", diagnostic.TopReferenceAlias);
+        Assert.InRange(diagnostic.TopSimilarity, 0.53, 0.55);
+        Assert.Collection(diagnostic.ThresholdChecks,
+            result =>
+            {
+                Assert.Equal(0.363, result.SimilarityThreshold);
+                Assert.Equal("would-suggest-for-review", result.Outcome);
+            },
+            result =>
+            {
+                Assert.Equal(0.45, result.SimilarityThreshold);
+                Assert.Equal("would-suggest-for-review", result.Outcome);
+            },
+            result =>
+            {
+                Assert.Equal(0.60, result.SimilarityThreshold);
+                Assert.Equal("below-threshold", result.Outcome);
+            },
+            result =>
+            {
+                Assert.Equal(0.80, result.SimilarityThreshold);
+                Assert.Equal("below-threshold", result.Outcome);
+            });
+        Assert.Throws<ArgumentException>(() =>
+            VideoFaceSensitivityDiagnostics.Compare(double.NaN, 0));
+    }
+
+    [Fact]
+    public void Diagnostic_threshold_sweep_expresses_single_reference_and_ambiguity()
+    {
+        Assert.All(VideoFaceSensitivityDiagnostics.Compare(0.9, null),
+            outcome => Assert.Equal("single-reference-uncertain", outcome.Outcome));
+        Assert.All(VideoFaceSensitivityDiagnostics.Compare(0.95, 0.94),
+            outcome => Assert.Equal("ambiguous", outcome.Outcome));
+        Assert.All(VideoFaceSensitivityDiagnostics.Compare(0.1, 0.01),
+            outcome => Assert.Equal("below-threshold", outcome.Outcome));
+    }
+
+    [Fact]
+    public async Task Private_diagnostics_include_zero_detection_frames_without_changing_media()
+    {
+        string root = TempDir();
+        try
+        {
+            string frames = Directory.CreateDirectory(Path.Combine(root, "frames")).FullName;
+            string refs = Directory.CreateDirectory(Path.Combine(root, "refs")).FullName;
+            string reviews = Directory.CreateDirectory(Path.Combine(root, "reviews")).FullName;
+            string repo = Directory.CreateDirectory(Path.Combine(root, "repo")).FullName;
+            await WritePngStub(frames, "one.png", 1);
+            await WritePngStub(frames, "two.png", 2);
+            await WritePngStub(refs, "ref-one.png", 3);
+            await WritePngStub(refs, "ref-two.png", 4);
+            string[] files = Directory.GetFiles(frames).Concat(Directory.GetFiles(refs)).ToArray();
+            byte[][] original = files.Select(File.ReadAllBytes).ToArray();
+
+            VideoFaceFrameSet selection = new(1,
+                [new VideoFaceFrame(1000, "one.png"), new VideoFaceFrame(3000, "two.png")]);
+            VideoFaceReferenceSet references = new(1,
+                [new VideoFaceReference("R01", "ref-one.png"),
+                 new VideoFaceReference("R02", "ref-two.png")]);
+
+            VideoFaceExperiment experiment = new(
+                new MarkedDecoder(), new OneFaceDetector(missSecondFrame: true),
+                new PassAligner(), new MarkedEmbedder());
+            VideoFacePrivateReview evaluation = await experiment.RunWithReferencesAsync(
+                selection, frames, references, refs,
+                diagnostics: true, requestedDetectorConfidence: 0.7);
+
+            Assert.Equal(1, evaluation.Aggregate.FacesDetected);
+            VideoFaceSensitivityDiagnostics diag = Assert.IsType<VideoFaceSensitivityDiagnostics>(
+                evaluation.Diagnostics);
+            Assert.Equal(0.7, diag.RequestedDetectorConfidenceThreshold);
+            Assert.Collection(diag.FrameDetections,
+                first =>
+                {
+                    Assert.Equal(1, first.FrameNumber);
+                    Assert.Equal(1, first.FacesDetected);
+                    Assert.Equal(0.95, first.HighestConfidence);
+                },
+                second =>
+                {
+                    Assert.Equal(2, second.FrameNumber);
+                    Assert.Equal(3000, second.TimestampMs);
+                    Assert.Equal(0, second.FacesDetected);
+                    Assert.Null(second.LowestConfidence);
+                    Assert.Null(second.HighestConfidence);
+                });
+            Assert.Single(diag.RankedFaces);
+            Assert.Equal("R01", diag.RankedFaces[0].TopReferenceAlias);
+
+            string output = Path.Combine(reviews, "sensitivity.json");
+            await VideoFacePrivateReportWriter.WriteAsync(
+                output, repo, frames, refs, evaluation);
+            using JsonDocument json = JsonDocument.Parse(await File.ReadAllBytesAsync(output));
+            Assert.Equal(2,
+                json.RootElement.GetProperty("diagnostics")
+                    .GetProperty("frameDetections").GetArrayLength());
+            Assert.Equal(1,
+                json.RootElement.GetProperty("diagnostics")
+                    .GetProperty("rankedFaces").GetArrayLength());
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                Assert.Equal(original[i], await File.ReadAllBytesAsync(files[i]));
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Cli_rejects_implicit_diagnostics_duplicate_flags_and_unapproved_thresholds()
+    {
+        string[][] invalid =
+        [
+            ["--manifest", "does-not-exist.json", "--diagnostics"],
+            ["--manifest", "does-not-exist.json", "--detector-confidence", "0.7"],
+            ["--manifest", "does-not-exist.json", "--diagnostics", "--diagnostics"],
+            ["--manifest", "does-not-exist.json", "--references", "ref.json",
+             "--private-report", "new.json", "--detector-confidence", "0.7"],
+            ["--manifest", "does-not-exist.json", "--references", "ref.json",
+             "--private-report", "new.json", "--diagnostics", "--detector-confidence", "0.2"],
+        ];
+
+        foreach (string[] arguments in invalid)
+        {
+            Assert.Equal(2, await Program.Main(arguments));
+        }
+    }
+
+    [Fact]
+    public async Task Non_default_detector_confidence_requires_diagnostics()
+    {
+        VideoFaceExperiment experiment = new(
+            new MarkedDecoder(), new OneFaceDetector(), new PassAligner(), new MarkedEmbedder());
+        await Assert.ThrowsAsync<ArgumentException>(() => experiment.RunWithReferencesAsync(
+            new VideoFaceFrameSet(1, [new VideoFaceFrame(0, "a.png")]),
+            "not-read", new VideoFaceReferenceSet(1, [new VideoFaceReference("R01", "b.png")]),
+            "not-read", requestedDetectorConfidence: 0.7));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => experiment.RunWithReferencesAsync(
+            new VideoFaceFrameSet(1, [new VideoFaceFrame(0, "a.png")]),
+            "not-read", new VideoFaceReferenceSet(1, [new VideoFaceReference("R01", "b.png")]),
+            "not-read", diagnostics: true, requestedDetectorConfidence: 0.123));
+    }
+
     private static async Task<byte[]> WritePngStub(string root, string name, byte marker)
     {
         byte[] content = [137, 80, 78, 71, 13, 10, 26, 10, marker];
@@ -238,6 +402,11 @@ public sealed class PrivateReferenceReviewTests
 
     private sealed class OneFaceDetector : IFaceDetector
     {
+        private readonly bool _missSecondFrame;
+
+        public OneFaceDetector(bool missSecondFrame = false) =>
+            _missSecondFrame = missSecondFrame;
+
         public ModelDescriptor Descriptor { get; } = new(
             new ModelId("fake-detector"),
             ModelRole.FaceDetection,
@@ -249,6 +418,11 @@ public sealed class PrivateReferenceReviewTests
         public Task<IReadOnlyList<DetectedFaceCandidate>> DetectAsync(
             ImageFrame frame, CancellationToken cancellationToken)
         {
+            if (_missSecondFrame && frame.Data[0] == 2)
+            {
+                return Task.FromResult<IReadOnlyList<DetectedFaceCandidate>>([]);
+            }
+
             IReadOnlyList<DetectedFaceCandidate> faces =
             [
                 new DetectedFaceCandidate(
