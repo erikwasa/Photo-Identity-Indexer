@@ -136,3 +136,10 @@ Write-Host ('Frame count: {0}' -f $frames.Count)
 Write-Host ('Window length (seconds): {0:F2}' -f $window)
 Write-Host ('Local output: {0}' -f $output)
 Write-Host 'No person identities have been inferred; short appearances may still be missed.'
+[pscustomobject]@{
+    ManifestPath = Join-Path $output 'frames.json'
+    FramesDirectory = $output
+    FrameCount = $frames.Count
+    WindowStartSeconds = $WindowStartSeconds
+    WindowLengthSeconds = $window
+}
