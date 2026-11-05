@@ -167,3 +167,66 @@ aggregate preflight; then a bounded, reviewed shared-ownership
 and dependent-job-aware release change, with focused fake/cloud
 state tests before separately authorized single-real-video
 acceptance. The work item remains open.
+
+## Maintained Windows verification — checkpoint 1 accepted (2026-11-05)
+
+After PR #747 merged, the maintainer ran the focused
+`VideoOnlineOnlyPreflightTests`: **16 passed, 0 failed**; build
+succeeded. The newly added read-only OneDrive preflight returned
+**exit code 0** with `readOnly=true`, and reported **no original
+content opened, hydration requested or release requested**.
+
+The sanitized live aggregate covered **9** supported current
+video candidates without published playable proxies: **2 local**
+and **7 pinned-local**. **0 online-only** candidates, **0
+queued/running dependent jobs**, and **0 active managed-hydration
+receipts** were observed. These are metadata/attribute-only
+point-in-time classifications, not verified original bytes
+or authorization to change pinning. As there was no online-only
+candidate in the audited cohort, **no real download or release
+acceptance has occurred**. This checkpoint is accepted and
+does not need to be repeated solely to proceed.
+
+## Development checkpoint 2 — conservative release guard (2026-11-05)
+
+The existing video's per-attempt `finally` had called
+`RequestOnlineOnlyAsync` whenever that attempt had initiated
+OneDrive hydration. New `VideoHydrationReleaseGuard` logic
+now checks, using fresh evidence before considering any release:
+
+- The request was initiated by Photo Identity for that video,
+  not a pre-existing locally available original.
+- The revision is still current, active, unexcluded and
+  belongs to the approved video catalogue.
+- No queued/running dependent video jobs remain for that
+  revision and photo-first processing is not active.
+- Windows currently reports the original fully local
+  **and unpinned**. Downloading, unavailable/error and
+  any pinned state fail closed.
+- Failed database reads or status checks preserve the
+  original; successful playable proxy output is not
+  undone to force cleanup.
+
+A OneDrive Files On-Demand `+p` pin is shared by both
+application-initiated hydration and an explicit user
+"Always keep on this device" choice. The current API
+cannot conclusively distinguish them after hydration.
+**Consequently, a pinned video remains local** under the
+conservative guard even when the app originally requested
+hydration. This is a safety-oriented intermediate change,
+not proof of complete storage reclamation. It avoids
+unpinning user-pinned originals, at the cost of possibly
+retaining app-requested video bytes. Existing photo
+managed-hydration ownership/capacity policy remains to
+be safely integrated and proved for video, together with
+crash/restart recovery and eventually eligible release
+without overriding user choices. The separate
+`Include online-only videos` setting must remain OFF
+during this checkpoint.
+
+Tests use only synthetic pin, status, exclusion/currentness
+and dependent/photo-work combinations; **no original
+OneDrive video transfer was exercised**. See
+[the follow-up Windows verification guide](../../operations/video-onedrive-wi0207-release-guard.md).
+CI and local synthetic confirmation are pending for this PR.
+WI-0207 stays **in progress**.
