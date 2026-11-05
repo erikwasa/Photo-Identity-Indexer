@@ -105,3 +105,30 @@ miss/duplicate review and a smallest-production-slice decision
 remain pending. None of the work-item acceptance checkboxes is
 fulfilled by implementation alone. See
 [the experimental Windows procedure](../../operations/video-face-feasibility-wi0155.md).
+
+## Experimental development checkpoint 2 — private reference review
+
+A second standalone evaluation stage adds `--references` and
+`--private-report` to the **opt-in local-only** feasibility CLI.
+Up to six independently approved single-face stills carry numeric
+pseudonyms `R01`–`R99`. For the selected video frames, the tool can now
+compare existing SFace embeddings against those references and record
+timestamped, face-ordinal **tentative suggestions**, a runner-up
+similarity, score gap and explicit uncertainty status. Only a new
+private, non-repository report receives those details; stdout remains
+aggregate-only. Input stills, catalogue, canonical identities and model
+artifacts remain unchanged.
+
+The similarity and gap thresholds are exploratory—not calibrated
+person recognition or authorization to assign identity. A
+byte-identical video frame cannot double as a reference.
+The new tests exercise pseudonym validation, relative-path controls,
+low scores, ambiguity, single-reference uncertainty, copied-frame
+rejection, private report restrictions and unchanged input hashes.
+See the [checkpoint 2 runbook](../../operations/video-face-feasibility-wi0155.md).
+
+**Status:** implementation proposed for review on the `wi-0155` branch.
+A small real, operator-approved clip/reference pilot and recorded
+human evaluation of misses, false suggestions and review burden
+remain required. Do not mark the overall WI acceptance criteria
+completed on the basis of fake-model or CI tests alone.
