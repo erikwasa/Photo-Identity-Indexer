@@ -1,122 +1,209 @@
-# WI-0211 — proxy-derived poster backfill (Windows)
+# WI-0211 — operator-controlled proxy-derived video posters (Windows)
 
-**Do not perform real-media backfill before this PR merges, CI passes, and
-the operator expressly approves a bounded local run.** The safe preview below
-is database-only and never touches original or proxy media bytes. The apply
-path reads **only already retained, SHA-validated MP4 proxies**, not originals,
-and produces a new versioned JPEG under the approved derivative root.
-The browser is passive: opening Videos or refreshing status never invokes it.
+**Maintainer-accepted on 2026-11-05 for the bounded one-proxy vertical
+slice and full-gallery layout correction.** Five focused local tests
+passed, one previously published proxy generated one correct poster,
+native playback and seek worked, and the maintainer confirmed that
+the gallery now displays complete posters following PR #742.
 
-## Preconditions
+Registered poster count increased **1 → 2**; playable without stills
+decreased **15 → 14**; playable video count stayed **16**. No unexpected
+OneDrive hydration or processing was observed. The 14 remaining
+missing posters require separate opt-in future backfill; no automatic
+batch was authorized. **Do not repeat --apply solely for this work
+item's documentation closeout.**
 
-- Run from merged main; use the established PostgreSQL connection and approved
-  launcher. Avoid running archive advances, proxy cleanup, and source exclusion
-  operations during the acceptance session.
-- Identify the actual approved video proxy cache root configured by
-  PhotoIdentity__VideoProcessing__CacheRoot (or its app-local default).
-- Identify the same video poster root configured by PhotoIdentity__VideoPosterRoot
-  (or its app-local default). Both directories must already exist, be disjoint,
-  and must not overlap original source roots.
-- Use the approved digest-pinned FFmpeg and FFprobe binaries. Compare their
-  hashes with the *previously approved* values; calculating a new SHA does not
-  authorize an unapproved executable.
-- Use the existing PostgreSQL connection environment variable and catalogue
-  database. Do not print the connection string.
+The CLI works from previously published, hash-verified local MP4
+proxies, not original video bytes. The browser never invokes the CLI.
 
-## 1. Update code and prepare the parameters
+## 1. Read the existing launcher and approved tools
+
+Run from the repository root in PowerShell 7. The launcher uses a
+settings object containing four approved executable settings, the proxy
+cache root and the existing poster derivative root. Never supply ad hoc
+tool hashes or create replacement roots to bypass validation.
 
 ~~~powershell
 cd "C:\Kod\codex\Photo Identity Indexer"
 git switch main
 git pull --ff-only origin main
+$ErrorActionPreference = "Stop"
 
-# Replace these only if your launcher has different approved roots.
-$cacheRoot = Join-Path $env:LOCALAPPDATA "PhotoIdentity\video-worker-cache"
-$posterRoot = Join-Path $env:LOCALAPPDATA "PhotoIdentity\video-derivatives"
+$candidates = @(
+    $env:PHOTOIDENTITY_LAUNCHER_CONFIG
+    (Join-Path (Get-Location).Path "PhotoIdentity.launcher.json")
+    (Join-Path (Get-Location).Path "launch.json")
+    (Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json")
+    (Join-Path $env:LOCALAPPDATA "PhotoIdentity\launch.json")
+)
+$launcherPath = $candidates | Where-Object {
+    $_ -and (Test-Path -LiteralPath (
+        [Environment]::ExpandEnvironmentVariables($_)
+    ) -PathType Leaf)
+} | Select-Object -First 1
+if (-not $launcherPath) { throw "Approved launcher config missing." }
+$launcherPath = (Resolve-Path -LiteralPath (
+    [Environment]::ExpandEnvironmentVariables($launcherPath)
+)).Path
+$launcher = Get-Content -LiteralPath $launcherPath -Raw | ConvertFrom-Json
+if (-not $launcher.settings) { throw "Launcher settings missing." }
 
-$ffmpeg = (Read-Host "Approved absolute ffmpeg.exe path").Trim('"')
-$ffprobe = (Read-Host "Approved absolute ffprobe.exe path").Trim('"')
-$approvedFfmpegSha = (Read-Host "Previously approved FFmpeg SHA-256").Trim().ToLowerInvariant()
-$approvedFfprobeSha = (Read-Host "Previously approved FFprobe SHA-256").Trim().ToLowerInvariant()
+.\Start-PhotoIdentity.ps1 -ConfigurationPath $launcherPath -ValidateConfigurationOnly
+$approved = .\Get-PhotoIdentityApprovedVideoTools.ps1 -ConfigurationPath $launcherPath
+$ffmpeg = $approved.FfmpegPath
+$ffmpegSha = $approved.FfmpegSha256
+$ffprobe = $approved.FfprobePath
+$ffprobeSha = $approved.FfprobeSha256
 
+$settings = $launcher.settings
+function Get-ConfiguredRoot {
+    param([string]$Name, [string]$Default)
+    $property = $settings.PSObject.Properties[$Name]
+    $value = if ($property -and
+        -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+        [string]$property.Value
+    } else { $Default }
+    return [IO.Path]::GetFullPath(
+        [Environment]::ExpandEnvironmentVariables($value)
+    )
+}
+$cacheRoot = Get-ConfiguredRoot "PhotoIdentity__VideoProcessing__CacheRoot" (Join-Path $env:LOCALAPPDATA "PhotoIdentity\video-worker-cache")
+$posterRoot = Get-ConfiguredRoot "PhotoIdentity__VideoPosterRoot" (Join-Path $env:LOCALAPPDATA "PhotoIdentity\video-derivatives")
 if (-not (Test-Path -LiteralPath $cacheRoot -PathType Container) -or
     -not (Test-Path -LiteralPath $posterRoot -PathType Container)) {
-    throw "Use the existing configured cache and poster roots."
+    throw "Use existing configured cache and derivative roots."
 }
-if (-not (Test-Path -LiteralPath $ffmpeg -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $ffprobe -PathType Leaf)) {
-    throw "Use already approved FFmpeg/FFprobe executables."
-}
-if ((Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant() -ne $approvedFfmpegSha -or
-    (Get-FileHash -LiteralPath $ffprobe -Algorithm SHA256).Hash.ToLowerInvariant() -ne $approvedFfprobeSha) {
-    throw "Tool digest mismatch. Do not continue."
-}
-$connectionVariable = "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING"
-if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($connectionVariable))) {
-    throw "Use the established PostgreSQL connection environment."
-}
-$database = (Read-Host "Existing PostgreSQL catalogue database name").Trim()
-if ($database -notmatch '^[a-z][a-z0-9_]{0,62}$') { throw "Invalid catalogue database name." }
+Write-Host "Launcher, approved FFmpeg/FFprobe hashes and roots: PASS"
+~~~
 
+The tool helper verifies both files, recorded SHA-256 hashes and
+absence of linked paths. The poster CLI additionally verifies cache
+ownership, digest, revision/exclusion, and separation from originals.
+
+## 2. Resolve PostgreSQL settings without printing credentials
+
+The launcher stores an environment-variable **name**. This script
+reads its existing value, verifies an explicit database name and
+puts the credential into the current PowerShell process environment.
+
+~~~powershell
+$connectionVariable = ([string]$launcher.postgresConnectionEnvironmentVariable).Trim()
+if ($connectionVariable -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+    throw "Invalid PostgreSQL environment variable name."
+}
+$connectionString = $null
+foreach ($scope in @("Process", "User", "Machine")) {
+    $value = [Environment]::GetEnvironmentVariable($connectionVariable, $scope)
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+        $connectionString = $value
+        break
+    }
+}
+if ([string]::IsNullOrWhiteSpace($connectionString)) {
+    throw "Existing PostgreSQL credentials not found."
+}
+[Environment]::SetEnvironmentVariable($connectionVariable, $connectionString, "Process")
+$dbMatch = [regex]::Match(
+    $connectionString, '(?i)(?:^|;)\s*Database\s*=\s*([^;]+)'
+)
+if (-not $dbMatch.Success) { throw "No explicit Database= value." }
+$databaseName = $dbMatch.Groups[1].Value.Trim()
+if ($databaseName -cnotmatch '^[a-z][a-z0-9_]{0,62}$') {
+    throw "Database name fails bounded CLI validation."
+}
+Remove-Variable connectionString, dbMatch, value -ErrorAction SilentlyContinue
+Write-Host "PostgreSQL settings: PASS"
+~~~
+
+Never print the connection string (it includes the password).
+PowerShell elseif/else clauses must remain in the same statement;
+this version deliberately uses one regex lookup instead of generic
+provider-independent dictionary parsing.
+
+## 3. Ensure the video lane is paused and idle
+
+~~~powershell
+$statusArgs = @(
+    "run", "--project", "src/PhotoIdentity.Cli", "-c", "Release", "--",
+    "video", "jobs", "status",
+    "--postgres-connection-env", $connectionVariable,
+    "--database", $databaseName
+)
+$statusOutput = dotnet @statusArgs
+if ($LASTEXITCODE -ne 0) { throw "Video status failed." }
+$status = ($statusOutput | Out-String) | ConvertFrom-Json
+if ($status.overview.running -ne 0) {
+    throw "Running video work must stop before poster extraction."
+}
+if ($status.control.enabled -and -not $status.control.paused) {
+    throw "Video lane must be paused before poster extraction."
+}
+Write-Host "Video lane paused/disabled and idle: PASS"
+~~~
+
+If necessary, use the existing explicit video jobs pause operator
+action, then recheck. Do not cancel queued work solely for this test.
+
+## 4. Metadata-only preview
+
+~~~powershell
 $posterArgs = @(
     "run", "--project", "src/PhotoIdentity.Cli", "-c", "Release", "--",
     "video", "posters-from-proxies", "--enable-video",
-    "--cache-root", $cacheRoot,
-    "--derivatives", $posterRoot,
-    "--ffmpeg", $ffmpeg, "--ffmpeg-sha256", $approvedFfmpegSha,
-    "--ffprobe", $ffprobe, "--ffprobe-sha256", $approvedFfprobeSha,
+    "--cache-root", $cacheRoot, "--derivatives", $posterRoot,
+    "--ffmpeg", $ffmpeg, "--ffmpeg-sha256", $ffmpegSha,
+    "--ffprobe", $ffprobe, "--ffprobe-sha256", $ffprobeSha,
     "--postgres-connection-env", $connectionVariable,
-    "--database", $database,
-    "--max-videos", "1",
+    "--database", $databaseName, "--max-videos", "1",
     "--timeout-seconds", "60"
 )
+$preview = dotnet @posterArgs
+$exitCode = $LASTEXITCODE
+$preview
+if ($exitCode -ne 0) { throw "Poster preview failed." }
 ~~~
 
-If a launcher override is active, replace the two root variables with its
-*actual* configured paths before running. Do not use --apply to discover
-candidate counts.
+Expected: WI-0211 dry run: candidates=N; applied=0;
+originalsRead=0; ffmpegRuns=0. N is 0 or 1. No poster, proxy
+or original media bytes are opened by the preview.
 
-## 2. Safe metadata-only preview
+## 5. Optional future one-poster generation — requires separate approval
+
+**Already completed for WI-0211 acceptance. Do not run this again
+without a new, deliberate operator decision.** After a successful
+preview with one candidate, enough private local disk space for a
+temporary verified proxy copy (at least 512 MiB free), approved
+tool hashes, and an idle video lane, the authorized operator may run:
 
 ~~~powershell
-dotnet @posterArgs
-if ($LASTEXITCODE -ne 0) { throw "Proxy poster preview failed." }
+# Only with separate operator authorization for one local proxy poster.
+$applyOutput = dotnet @posterArgs --apply
+$applyCode = $LASTEXITCODE
+$applyOutput
+if ($applyCode -ne 0) {
+    throw "Poster generation failed: stop and investigate, do not retry blindly."
+}
 ~~~
 
-Expected sanitized output resembles:
-WI-0211 dry run: candidates=N; applied=0; originalsRead=0; ffmpegRuns=0
-N is 0 or 1 in this one-video invocation. No media bytes or private filenames
-are read, and no posters or jobs are created.
+Successful output resembles: WI-0211 proxy poster backfill:
+created=1; skipped=0; failed=0; originalsRead=0; hydration=0.
 
-## 3. Explicit one-proxy local acceptance
+## 6. Visual check
 
-**Only with separate operator approval.** Pause the Archive first. The next
-command intentionally reads the previously published proxy, stages a verified
-temporary private copy (up to 256 MiB) and publishes one versioned JPEG.
+With the local app running, inspect the read-only
+/api/videos/coverage before and after a new authorized run.
+The new poster should increase registered poster coverage by one
+without changing playable-proxy coverage. Refresh /videos, confirm
+the entire recognizable still fits within the card, and verify the
+related video's native play/pause/seek controls. Repeat the
+preview only to check that the already registered still is not
+selected again; no second apply is part of this acceptance.
 
-~~~powershell
-# Only after you deliberately authorize one local proxy-poster operation:
-dotnet @posterArgs --apply
-if ($LASTEXITCODE -ne 0) { throw "Proxy poster backfill failed." }
-~~~
-
-Successful aggregate output resembles:
-WI-0211 proxy poster backfill: created=1; skipped=0; failed=0; originalsRead=0; hydration=0
-
-## 4. Visual acceptance
-
-1. Refresh /videos in the Windows browser. The registered poster count
-   should increase by one if a previously missing still was created.
-2. Inspect recognizable subject, portrait orientation, undistorted aspect ratio,
-   SDR colors, and whether the selected frame is blank/dark.
-3. Open the expected clip. Verify play, pause, seek, and native controls.
-4. Repeat the safe preview; it must not select the same published poster again.
-   Another missing candidate may still be offered.
-5. Confirm no OneDrive hydration, original-video reads, proxy replacement,
-   unexpected photo work, or background processing.
-
-Report only aggregate counts and PASS/FAIL; do not paste private media,
-source paths, revision UUIDs, personal metadata, screenshots or connection
-credentials into CI/PRs/chat. This validates one bounded representative,
-not an all-archive migration. An unsuccessful JPEG does not revoke the
-existing playable proxy.
+**Recorded successful acceptance (2026-11-05):** five local tests
+passed; created=1, exit code 0, no unexpected OneDrive activity.
+Registered posters 1 → 2, playable missing posters 15 → 14,
+playable count unchanged at 16. The maintainer verified the
+correct orientation, recognizable content, play/pause/seek, and,
+after PR #742 merged, that full gallery posters look good.
+Do not share filenames, private poster images, source paths,
+revision IDs, GPS or PostgreSQL credentials in CI/PRs/chat.
