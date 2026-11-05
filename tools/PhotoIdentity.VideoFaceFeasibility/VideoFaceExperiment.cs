@@ -148,6 +148,101 @@ public sealed class VideoFaceExperiment
         string manifestDirectory,
         CancellationToken cancellationToken = default)
     {
+        VideoFacePrivateReview result = await RunCoreAsync(
+            set, manifestDirectory, matcher: null, cancellationToken);
+        return result.Aggregate;
+    }
+
+    public async Task<VideoFacePrivateReview> RunWithReferencesAsync(
+        VideoFaceFrameSet set,
+        string manifestDirectory,
+        VideoFaceReferenceSet referenceSet,
+        string referenceDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        long fullRunStarted = Stopwatch.GetTimestamp();
+        VideoFaceFrameSetLoader.Validate(set);
+        VideoFaceReferenceSetLoader.Validate(referenceSet);
+        ArgumentException.ThrowIfNullOrWhiteSpace(referenceDirectory);
+
+        string[] selectedFrames = set.Frames!.Select(frame =>
+            VideoFaceFrameSetLoader.ResolveApprovedFrame(manifestDirectory, frame.File)).ToArray();
+        string[] referenceFiles = referenceSet.References!.Select(reference =>
+            VideoFaceFrameSetLoader.ResolveApprovedFrame(referenceDirectory, reference.File)).ToArray();
+
+        // A renamed copy of a selected frame is not an independent known-person reference.
+        // Reject identical file contents before any model work, without revealing file names.
+        HashSet<string> frameDigests = [];
+        foreach (string path in selectedFrames)
+        {
+            byte[] bytes = await ReadApprovedStillAsync(path, cancellationToken);
+            frameDigests.Add(Convert.ToHexString(SHA256.HashData(bytes)));
+        }
+
+        List<VideoFaceReferenceEmbedding> prepared = [];
+        HashSet<string> referenceDigests = [];
+        for (int i = 0; i < referenceFiles.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string referencePath = referenceFiles[i];
+            byte[] bytes = await ReadApprovedStillAsync(referencePath, cancellationToken);
+            if (frameDigests.Contains(Convert.ToHexString(SHA256.HashData(bytes))))
+            {
+                throw new ArgumentException("Reference images must be distinct from selected video frames.");
+            }
+
+            byte[] originalHash = SHA256.HashData(bytes);
+            if (!referenceDigests.Add(Convert.ToHexString(originalHash)))
+            {
+                throw new ArgumentException("Approved references must be distinct photos.");
+            }
+
+            using MemoryStream stream = new(bytes, writable: false);
+            ImageFrame image = await _decoder.DecodeAsync(
+                stream, new DecodeOptions(new ImageSize(1600, 1600)), cancellationToken);
+            IReadOnlyList<DetectedFaceCandidate> detected = await _detector.DetectAsync(
+                image, cancellationToken);
+            if (detected.Count != 1)
+            {
+                throw new ArgumentException(
+                    "Each approved reference still must contain exactly one detected face.");
+            }
+
+            var protocol = _embedder.Descriptor.AlignmentProtocol
+                ?? throw new InvalidOperationException("The embedding model has no alignment protocol.");
+            AlignedFace aligned = await _aligner.AlignAsync(
+                image, detected[0], protocol, cancellationToken);
+            EmbeddingVector embedding = await _embedder.EmbedAsync(aligned, cancellationToken);
+            byte[] after = await File.ReadAllBytesAsync(referencePath, cancellationToken);
+            if (!SHA256.HashData(after).AsSpan().SequenceEqual(originalHash))
+            {
+                throw new InvalidOperationException("A reference photo changed during the experiment.");
+            }
+
+            prepared.Add(new VideoFaceReferenceEmbedding(
+                referenceSet.References![i].Alias, embedding));
+        }
+
+        // Include time spent preparing the reference models in the overall measured runtime.
+        // No original, catalogue, identity data or embeddings are written by the experiment.
+        VideoFacePrivateReview review = await RunCoreAsync(
+            set, manifestDirectory, new VideoFaceReferenceMatcher(prepared), cancellationToken);
+        return review with
+        {
+            Aggregate = review.Aggregate with
+            {
+                ElapsedMilliseconds = Math.Round(
+                    Stopwatch.GetElapsedTime(fullRunStarted).TotalMilliseconds, 3),
+            },
+        };
+    }
+
+    private async Task<VideoFacePrivateReview> RunCoreAsync(
+        VideoFaceFrameSet set,
+        string manifestDirectory,
+        VideoFaceReferenceMatcher? matcher,
+        CancellationToken cancellationToken)
+    {
         VideoFaceFrameSetLoader.Validate(set);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
         // Preflight all selected paths before invoking a model.
@@ -159,6 +254,7 @@ public sealed class VideoFaceExperiment
         int totalFaces = 0;
         int totalEmbeddings = 0;
         int adjacentPairs = 0;
+        List<VideoFaceReferenceFinding> findings = [];
         List<EmbeddingVector>? previous = null;
         long previousTimestamp = -1;
 
@@ -166,24 +262,7 @@ public sealed class VideoFaceExperiment
         {
             cancellationToken.ThrowIfCancellationRequested();
             string file = files[index];
-            byte[] input = await File.ReadAllBytesAsync(file, cancellationToken);
-            if (input.Length is < 1 or > VideoFaceFrameSetLoader.MaximumFrameBytes)
-            {
-                throw new InvalidOperationException("Frame contents changed after preflight.");
-            }
-
-            // An extension alone is not a trusted media signature.
-            string extension = Path.GetExtension(file);
-            bool jpeg = input.Length >= 3 &&
-                input[0] == 0xFF && input[1] == 0xD8 && input[2] == 0xFF;
-            bool png = input.Length >= 8 &&
-                input.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
-            if (!(jpeg && (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                            extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))) &&
-                !(png && extension.Equals(".png", StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new ArgumentException("The selected frame signature does not match its JPEG/PNG extension.");
-            }
+            byte[] input = await ReadApprovedStillAsync(file, cancellationToken);
 
             byte[] before = SHA256.HashData(input);
             using MemoryStream stream = new(input, writable: false);
@@ -219,6 +298,15 @@ public sealed class VideoFaceExperiment
             }
 
             long timestamp = set.Frames![index].TimestampMs;
+            if (matcher is not null)
+            {
+                for (int faceIndex = 0; faceIndex < current.Count; faceIndex++)
+                {
+                    findings.Add(matcher.FindCandidate(
+                        index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                }
+            }
+
             if (previous is not null &&
                 timestamp - previousTimestamp <= MaximumAdjacentGapMs)
             {
@@ -236,7 +324,7 @@ public sealed class VideoFaceExperiment
             previousTimestamp = timestamp;
         }
 
-        return new VideoFaceAggregate(
+        VideoFaceAggregate aggregate = new(
             1,
             files.Length,
             framesWithFaces,
@@ -244,6 +332,40 @@ public sealed class VideoFaceExperiment
             totalEmbeddings,
             adjacentPairs,
             Math.Round(Stopwatch.GetElapsedTime(started).TotalMilliseconds, 3));
+        return new VideoFacePrivateReview(
+            1,
+            matcher?.ReferenceCount ?? 0,
+            _detector.Descriptor.Id.Value,
+            _detector.Descriptor.ModelHash.Value,
+            _embedder.Descriptor.Id.Value,
+            _embedder.Descriptor.ModelHash.Value,
+            aggregate,
+            findings);
+    }
+
+    private static async Task<byte[]> ReadApprovedStillAsync(
+        string file,
+        CancellationToken cancellationToken)
+    {
+        byte[] input = await File.ReadAllBytesAsync(file, cancellationToken);
+        if (input.Length is < 1 or > VideoFaceFrameSetLoader.MaximumFrameBytes)
+        {
+            throw new InvalidOperationException("Selected still contents changed after preflight.");
+        }
+
+        string extension = Path.GetExtension(file);
+        bool jpeg = input.Length >= 3 &&
+            input[0] == 0xFF && input[1] == 0xD8 && input[2] == 0xFF;
+        bool png = input.Length >= 8 &&
+            input.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+        if (!(jpeg && (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                        extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))) &&
+            !(png && extension.Equals(".png", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ArgumentException("Selected still signature does not match its JPEG/PNG extension.");
+        }
+
+        return input;
     }
 
     public static int CountPossibleRepeatPairs(

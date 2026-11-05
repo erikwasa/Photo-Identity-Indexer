@@ -24,7 +24,8 @@ public static class Program
         {
             Console.WriteLine(
                 "Usage: dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -- " +
-                "--manifest <private-frames.json> [--root <repo>] [--model-dir <installed-model-dir>]");
+                "--manifest <private-frames.json> [--root <repo>] [--model-dir <installed-model-dir>] " +
+                "[--references <private-references.json> --private-report <new-private-report.json>]");
             return 0;
         }
 
@@ -33,6 +34,9 @@ public static class Program
             Options options = Options.Parse(args);
             // All inputs are pre-extracted, operator-selected local image files.
             VideoFaceFrameSet set = await VideoFaceFrameSetLoader.LoadAsync(options.Manifest);
+            VideoFaceReferenceSet? referenceSet = options.References is null
+                ? null
+                : await VideoFaceReferenceSetLoader.LoadAsync(options.References);
             string repositoryRoot = Path.GetFullPath(options.RepositoryRoot ?? Directory.GetCurrentDirectory());
             string modelDirectory = Path.GetFullPath(options.ModelDirectory ??
                 Path.Combine(repositoryRoot, "models", "files"));
@@ -59,8 +63,30 @@ public static class Program
                 new OpenCvFaceAligner(),
                 embedder);
 
-            VideoFaceAggregate result = await experiment.RunAsync(set, manifestDirectory);
+            VideoFaceAggregate result;
+            if (referenceSet is null)
+            {
+                result = await experiment.RunAsync(set, manifestDirectory);
+            }
+            else
+            {
+                string referenceDirectory = Path.GetDirectoryName(
+                    Path.GetFullPath(options.References!))!;
+                VideoFacePrivateReview review = await experiment.RunWithReferencesAsync(
+                    set, manifestDirectory, referenceSet, referenceDirectory);
+                await VideoFacePrivateReportWriter.WriteAsync(
+                    options.PrivateReport!, repositoryRoot, manifestDirectory,
+                    referenceDirectory, review);
+                result = review.Aggregate;
+            }
+
+            // Do not include aliases, timestamps, file paths, scores or vectors in stdout.
             Console.WriteLine(JsonSerializer.Serialize(result, OutputJson));
+            if (referenceSet is not null)
+            {
+                Console.WriteLine("private-review-written: true");
+            }
+
             return 0;
         }
         catch (Exception exception) when (exception is ArgumentException or JsonException)
@@ -82,13 +108,20 @@ public static class Program
         }
     }
 
-    private sealed record Options(string Manifest, string? RepositoryRoot, string? ModelDirectory)
+    private sealed record Options(
+        string Manifest,
+        string? RepositoryRoot,
+        string? ModelDirectory,
+        string? References,
+        string? PrivateReport)
     {
         public static Options Parse(string[] args)
         {
             string? manifest = null;
             string? root = null;
             string? models = null;
+            string? references = null;
+            string? privateReport = null;
             for (int i = 0; i < args.Length; i++)
             {
                 string name = args[i];
@@ -109,15 +142,29 @@ public static class Program
                     case "--model-dir" when models is null:
                         models = value;
                         break;
+                    case "--references" when references is null:
+                        references = value;
+                        break;
+                    case "--private-report" when privateReport is null:
+                        privateReport = value;
+                        break;
                     default:
                         throw new ArgumentException("Unknown or repeated option.");
                 }
             }
 
+            if ((references is null) != (privateReport is null))
+            {
+                throw new ArgumentException(
+                    "--references and --private-report must be supplied together.");
+            }
+
             return new Options(
                 manifest ?? throw new ArgumentException("--manifest is required."),
                 root,
-                models);
+                models,
+                references,
+                privateReport);
         }
     }
 }
