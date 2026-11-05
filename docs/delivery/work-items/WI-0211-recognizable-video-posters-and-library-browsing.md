@@ -213,3 +213,32 @@ backfill, human evaluation of visual recognizability, empty/dark-frame
 selection, color, rotation, playback continuity and before/after
 aggregate counts. Do not close WI-0211 or infer all-catalogue coverage.
 The command is never triggered by the browse page or Settings.
+
+## Maintained Windows acceptance and gallery framing correction (2026-11-05)
+
+The maintainer verified the proxy-derived poster vertical slice against an
+approved local, already-retained playable proxy. The focused CLI integration
+suite passed (5 of 5). The metadata-only preview reported one candidate,
+the single authorized apply published exactly one still with exit code zero,
+and the video lane remained disabled/paused and idle. Registered poster
+coverage increased from **1 to 2** for **16** existing playable videos;
+playable videos lacking posters decreased from **15 to 14**. The maintainer
+confirmed the poster was recognizable, correctly oriented, and that the
+related native video player still played, paused and sought normally. No
+unexpected OneDrive or other processing was observed.
+
+Visual review also identified an **additional gallery-only clipping bug**:
+the JPEG thumbnail element could retain an intrinsic height inside its
+fixed-aspect grid stage, so `overflow: hidden` showed only the upper portion
+of an otherwise valid still. The targeted fix absolutely positions the
+`img` at `inset: 0` inside the existing relative `16:10` stage and uses
+`object-fit: contain` and centered positioning. The resulting complete
+JPEG is letterboxed as needed rather than stretched or cropped. The
+expanded native video player layout, original/published media, source
+permissions and poster publication logic are unchanged. A CSS/layout
+contract test guards against reintroducing the failure.
+
+**Remaining gate:** maintained-browser confirmation that the full thumbnail
+is visible after this layout change merges. WI-0211 is not closed by the
+single successful pilot; broader poster coverage remains opt-in and
+no all-archive batch is implied.
