@@ -7,7 +7,32 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
-**2026-11-04 new scoped follow-up — WI-0211 proposed:** The
+**Current M30 checkpoint — 2026-11-05: WI-0207 IN PROGRESS.**
+WI-0211's complete video posters and default-off automatic poster
+setting are maintainer-accepted and archived (PR #746 merged).
+The next selected unblocked priority is
+[WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md)
+before deliberately deferred metadata/collection WI-0153 and slideshow
+WI-0154.
+
+The first WI-0207 development slice is a bounded **read-only
+OneDrive Files On-Demand preflight**, checking at most 64 current
+supported, nonexcluded video revisions without published proxies.
+It reports only aggregate online-only/pinned/local/error counts,
+queued/running dependent-job evidence and existing managed hydration
+receipts; no original bytes, files, source IDs, FFmpeg, OneDrive pin or
+release command, processing job or PostgreSQL migration are touched.
+See [the local Windows preflight](../../operations/video-onedrive-wi0207-readonly-preflight.md).
+
+The existing video worker's unconditional per-attempt release of
+just-hydrated originals has **not yet** been proven compatible with
+retention for queued/active dependent video jobs or user pinning.
+This is the next safety implementation gate, followed by one
+separately authorized real OneDrive video test. Do not enable
+online-only video work merely for checkpoint 1. M30 remains open.
+
+
+**Historical 2026-11-04 scoped follow-up — WI-0211 proposed at the time:** The
 maintainer's Videos screenshot shows widespread indistinguishable
 dark `Video` placeholders despite a successful new
 production playable proxy under completed WI-0210.
