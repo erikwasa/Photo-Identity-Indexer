@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md
 started_at: 2026-11-05
 last_updated_at: 2026-11-05
-branch: wi0207-readonly-onedrive-video-preflight
+branch: wi0207-conservative-video-hydration-release-guard
 blockers:
 - WI-0188
 blocker_notes: []
@@ -14,6 +14,10 @@ evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
 - type: implementation
-  value: '2026-11-05: Checkpoint 1 introduces a no-media, read-only Windows OneDrive attribute preflight for at most 64 current supported video revisions lacking a proxy, with sanitized aggregate availability, pinned and dependent/managed-receipt counts. Safety review identified that the current video finally release does not check pending dependent jobs or user pinning; no production hydration is authorized. Local aggregate-only verification is pending.'
+  value: '2026-11-05: Checkpoint 1 introduces a no-media, read-only Windows OneDrive attribute preflight for at most 64 current supported video revisions lacking a proxy, with sanitized aggregate availability, pinned and dependent/managed-receipt counts. Safety review identified that the current video finally release does not check pending dependent jobs or user pinning; no production hydration is authorized. Maintainer confirmed 16 focused tests passed, CLI exit 0, 9 eligible: 2 local, 7 pinned-local, 0 online-only, 0 dependents/managed records, no original opens/hydration/releases.'
 - type: documentation
   value: docs/operations/video-onedrive-wi0207-readonly-preflight.md
+- type: implementation
+  value: '2026-11-05: Checkpoint 2 adds fail-closed OneDrive video original release guard checking current revision/exclusion, live pin/local state, queued/running dependent derivative jobs and photo-first priority before any possible cleanup release. Pinned originals are always retained because the +p app pin is indistinguishable from user pin. Synthetic tests and CI pending. Durable shared hydration ownership and real online-only acceptance remain open.'
+- type: documentation
+  value: docs/operations/video-onedrive-wi0207-release-guard.md

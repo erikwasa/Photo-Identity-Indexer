@@ -313,22 +313,48 @@ public sealed class VideoArchiveProcessingService(
             }
             finally
             {
-                // Never use File.Delete on a OneDrive original. Do not touch
-                // a file that was already locally present before our request.
+                // A video worker may not clear an app/user pin simply because
+                // its attempt completed. Check current source eligibility and
+                // dependent jobs through a fresh database read, as well as
+                // current Files On-Demand state and photo priority.
+                //
+                // +p makes app and user pinning indistinguishable: a pinned
+                // file is always retained here. WI-0207 must establish
+                // durable pin ownership before general automatic release.
+                // Already-local originals are never considered for release.
                 if (ownedHydration && ownedPath is not null)
                 {
                     try
                     {
                         using CancellationTokenSource cleanup =
                             new(TimeSpan.FromSeconds(15));
-                        await oneDrive.RequestOnlineOnlyAsync(ownedPath, cleanup.Token);
+                        var availability = oneDrive.GetState(ownedPath);
+                        (bool current, bool dependents) =
+                            await ReadVideoReleaseEvidenceAsync(
+                                database, candidate.RevisionId, cleanup.Token);
+                        bool photoWork = (await new PostgresVideoPhotoPriorityProbe(
+                                database).GetAsync(cleanup.Token)).PhotoWorkActive;
+                        string decision = VideoHydrationReleaseGuard.Evaluate(
+                            ownedHydration, availability, current,
+                            dependents, photoWork);
+                        if (decision == VideoHydrationReleaseGuard.ReleaseAllowed)
+                        {
+                            await oneDrive.RequestOnlineOnlyAsync(
+                                ownedPath, cleanup.Token);
+                        }
+                        else
+                        {
+                            logger.LogInformation(
+                                "Managed video source retained under WI-0207 safety guard: {ReasonCode}.",
+                                decision);
+                        }
                     }
-                    catch (Exception exception) when (
-                        exception is IOException or UnauthorizedAccessException
-                            or OperationCanceledException)
+                    catch (Exception)
                     {
+                        // Do not undo successful playable MP4 publication and
+                        // never log private source paths or platform errors.
                         logger.LogWarning(
-                            "An app-initiated video hydration could not be released; original left intact.");
+                            "Managed video source release check failed; original retained.");
                     }
                 }
             }
@@ -392,6 +418,57 @@ public sealed class VideoArchiveProcessingService(
             InvalidOperationException => "video-safety-or-configuration-rejected",
             _ => "video-attempt-failed"
         };
+    }
+
+    /// <summary>
+    /// One fresh read of the current revision/exclusion fence and all
+    /// queued/running derivative jobs for this revision. No original
+    /// bytes or queue state are changed. Any query failure defers release.
+    /// </summary>
+    private static async Task<(bool Current, bool Dependents)>
+        ReadVideoReleaseEvidenceAsync(
+            PostgresCatalogueDatabase database,
+            Guid revisionId, CancellationToken token)
+    {
+        await using NpgsqlConnection conn =
+            await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand query = conn.CreateCommand();
+        query.CommandText = """
+            SELECT
+              EXISTS (
+                SELECT 1 FROM asset_revisions revision
+                JOIN assets asset ON asset.id=revision.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE revision.id=@revision
+                  AND revision.media_kind='video'
+                  AND asset.media_kind='video'
+                  AND asset.deleted_at_utc IS NULL
+                  AND source.kind='local-folder'
+                  AND revision.id=(
+                    SELECT latest.id FROM asset_revisions latest
+                    WHERE latest.asset_id=asset.id
+                      AND latest.media_kind='video'
+                    ORDER BY latest.observed_at_utc DESC,latest.id DESC
+                    LIMIT 1)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM source_copy_exclusions excluded
+                    WHERE excluded.source_id=asset.source_id
+                      AND excluded.source_key=asset.source_key)
+              ),
+              EXISTS (
+                SELECT 1 FROM video_processing_jobs job
+                WHERE job.asset_revision_id=@revision
+                  AND job.status IN ('queued','running')
+                  AND job.cancellation_requested_at_utc IS NULL
+              );
+            """;
+        query.Parameters.AddWithValue("revision", revisionId);
+        await using NpgsqlDataReader reader =
+            await query.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token))
+            throw new InvalidOperationException(
+                "Video release evidence was not returned.");
+        return (reader.GetBoolean(0), reader.GetBoolean(1));
     }
 
     private string Required(string key)
