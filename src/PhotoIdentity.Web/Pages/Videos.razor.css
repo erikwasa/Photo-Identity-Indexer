@@ -33,10 +33,19 @@
     overflow: visible;
     display: block;
 }
+/* The poster stage has a fixed 16:10 aspect ratio. A grid item with
+   height: 100% can retain its intrinsic image height in some browsers,
+   leaving only its upper portion visible behind overflow:hidden.
+   Anchor the image to the stage itself so contain scales the entire JPEG
+   inside that frame. This does not affect the independent native player. */
 .video-library-poster img {
+    position: absolute;
+    inset: 0;
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: contain;
+    object-position: center;
 }
 .video-library-placeholder {
     letter-spacing: .14em;
