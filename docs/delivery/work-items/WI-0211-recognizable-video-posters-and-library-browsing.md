@@ -247,10 +247,10 @@ expanded native video player layout, original/published media, source
 permissions and poster publication logic are unchanged. A CSS/layout
 contract test guards against reintroducing the failure.
 
-**Remaining gate:** maintained-browser confirmation that the full thumbnail
-is visible after this layout change merges. WI-0211 is not closed by the
-single successful pilot; broader poster coverage remains opt-in and
-no all-archive batch is implied.
+**Gallery gate resolved:** after PR #742 merged, the maintainer confirmed
+that full posters now look good in the video gallery. WI-0211 remains
+open for the newly requested automatic-poster option documented below;
+broader poster coverage remains opt-in and no all-archive batch is implied.
 
 ## Implementation checkpoint 3 — optional automatically created posters (2026-11-05)
 
