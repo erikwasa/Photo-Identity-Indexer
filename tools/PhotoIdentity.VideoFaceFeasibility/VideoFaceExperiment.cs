@@ -27,8 +27,8 @@ public static class VideoFaceFrameSetLoader
 {
     public const int MaximumFrames = 12;
     public const long MaximumTimestampMs = 600_000;
-    public const long MaximumFrameBytes = 8 * 1024 * 1024;
-    private const long MaximumManifestBytes = 16 * 1024;
+    public const int MaximumFrameBytes = 8 * 1024 * 1024;
+    private const int MaximumManifestBytes = 16 * 1024;
     private static readonly JsonSerializerOptions InputOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -218,7 +218,7 @@ public sealed class VideoFaceExperiment
                 totalEmbeddings++;
             }
 
-            long timestamp = set.Frames[index].TimestampMs;
+            long timestamp = set.Frames![index].TimestampMs;
             if (previous is not null &&
                 timestamp - previousTimestamp <= MaximumAdjacentGapMs)
             {
