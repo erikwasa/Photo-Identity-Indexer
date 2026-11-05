@@ -21,7 +21,8 @@ public sealed record ArchiveManagedHydrationLeaseState(
     string SourceKey,
     DateTimeOffset RequestedAtUtc,
     DateTimeOffset LastNeededAtUtc,
-    DateTimeOffset? ReleaseRequestedAtUtc)
+    DateTimeOffset? ReleaseRequestedAtUtc,
+    bool IsVideo = false)
 {
     public bool IsReleaseRequested =>
         ReleaseRequestedAtUtc is not null;
