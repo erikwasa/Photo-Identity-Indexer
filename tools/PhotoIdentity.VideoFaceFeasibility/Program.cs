@@ -26,7 +26,7 @@ public static class Program
                 "Usage: dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -- " +
                 "--manifest <private-frames.json> [--root <repo>] [--model-dir <installed-model-dir>] " +
                 "[--references <private-references.json> --private-report <new-private-report.json>] " +
-                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>]]");
+                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>] [--coverage]]");
             return 0;
         }
 
@@ -34,7 +34,8 @@ public static class Program
         {
             Options options = Options.Parse(args);
             // All inputs are pre-extracted, operator-selected local image files.
-            VideoFaceFrameSet set = await VideoFaceFrameSetLoader.LoadAsync(options.Manifest);
+            VideoFaceFrameSet set = await VideoFaceFrameSetLoader.LoadAsync(
+                options.Manifest, coverage: options.Coverage);
             VideoFaceReferenceSet? referenceSet = options.References is null
                 ? null
                 : await VideoFaceReferenceSetLoader.LoadAsync(options.References);
@@ -76,7 +77,8 @@ public static class Program
                 VideoFacePrivateReview review = await experiment.RunWithReferencesAsync(
                     set, manifestDirectory, referenceSet, referenceDirectory,
                     diagnostics: options.Diagnostics,
-                    requestedDetectorConfidence: options.DetectorConfidence);
+                    requestedDetectorConfidence: options.DetectorConfidence,
+                    coverage: options.Coverage);
                 await VideoFacePrivateReportWriter.WriteAsync(
                     options.PrivateReport!, repositoryRoot, manifestDirectory,
                     referenceDirectory, review);
@@ -118,7 +120,8 @@ public static class Program
         string? References,
         string? PrivateReport,
         bool Diagnostics,
-        double DetectorConfidence)
+        double DetectorConfidence,
+        bool Coverage)
     {
         public static Options Parse(string[] args)
         {
@@ -129,6 +132,7 @@ public static class Program
             string? privateReport = null;
             string? detectorConfidence = null;
             bool diagnostics = false;
+            bool coverage = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string name = args[i];
@@ -142,6 +146,17 @@ public static class Program
                     diagnostics = true;
                     continue;
                 }
+                if (name == "--coverage")
+                {
+                    if (coverage)
+                    {
+                        throw new ArgumentException("The coverage flag may appear only once.");
+                    }
+
+                    coverage = true;
+                    continue;
+                }
+
                 if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
                 {
                     throw new ArgumentException("Every option requires a nonempty value.");
@@ -191,6 +206,12 @@ public static class Program
                     "--detector-confidence is available only with --diagnostics.");
             }
 
+            if (coverage && !diagnostics)
+            {
+                throw new ArgumentException(
+                    "--coverage requires --diagnostics, --references and --private-report.");
+            }
+
             double threshold = detectorConfidence switch
             {
                 null => 0.9,
@@ -208,7 +229,8 @@ public static class Program
                 references,
                 privateReport,
                 diagnostics,
-                threshold);
+                threshold,
+                coverage);
         }
     }
 }

@@ -155,13 +155,14 @@ jobs:
           python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_*.py" -v
           exit $LASTEXITCODE
 
-      - name: Parse offline quality-evaluation PowerShell runners
+      - name: Parse offline quality-evaluation and WI-0155 coverage PowerShell runners
         shell: pwsh
         run: |
           $scripts = @(
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_collection_shadow_simulation.ps1'
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_manual_quality_suggestions.ps1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -174,6 +175,12 @@ jobs:
             if ($parseErrors.Count -gt 0) {
               $parseErrors | ForEach-Object { Write-Host "$script : $($_.Message)" }
               throw "PowerShell parser rejected $script"
+            }
+          }
+          $coverageRunner = Get-Command './tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
+          foreach ($required in @('VideoPath','FfmpegPath','ApprovePrivateLocalVideo','FrameCount','WindowStartSeconds','WindowLengthSeconds')) {
+            if (-not $coverageRunner.Parameters.ContainsKey($required)) {
+              throw "WI-0155 coverage sampler is missing -$required"
             }
           }
           $runner = Get-Command './tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
