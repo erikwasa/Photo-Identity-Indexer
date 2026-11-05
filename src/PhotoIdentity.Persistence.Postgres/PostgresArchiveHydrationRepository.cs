@@ -49,7 +49,7 @@ public sealed class PostgresArchiveHydrationRepository :
                     usage.last_needed_at_utc,
                     hydration.requested_at_utc),
                 hydration.release_requested_at_utc,
-                COALESCE(revision.media_kind = 'video', FALSE) AS is_video
+                COALESCE(revision.media_kind = 'video', TRUE) AS is_video
             FROM asset_revision_managed_hydrations AS hydration
             INNER JOIN asset_revisions AS revision
                 ON revision.id = hydration.asset_revision_id
