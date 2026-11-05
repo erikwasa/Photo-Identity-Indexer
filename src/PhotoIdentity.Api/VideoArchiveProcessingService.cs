@@ -264,7 +264,8 @@ public sealed class VideoArchiveProcessingService(
                             selectedJobId: selectedJobId,
                             requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
-                if (ShouldCreateAutomaticPoster(cyclePreferences, result))
+                if (candidate is { } publishedCandidate &&
+                    ShouldCreateAutomaticPoster(cyclePreferences, result))
                 {
                     try
                     {
@@ -274,7 +275,7 @@ public sealed class VideoArchiveProcessingService(
                                 "PhotoIdentity", "video-derivatives");
                         bool created = await VideoProxyPosterCommandRunner
                             .TryCreateForPublishedProxyAsync(
-                                database, AssetRevisionId.From(candidate.RevisionId),
+                                database, AssetRevisionId.From(publishedCandidate.RevisionId),
                                 cache, posterRoot, ffmpeg, ffmpegHash,
                                 ffprobe, ffprobeHash, token);
                         Volatile.Write(ref _lastPosterResult,
