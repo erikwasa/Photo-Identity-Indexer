@@ -21,6 +21,11 @@ public sealed record VideoFaceCoverageAssignment(
     double? ClosestPreviousSimilarity,
     string ReviewStatus);
 
+public sealed record VideoFaceCoverageReview(
+    int PossibleAppearanceGroups,
+    IReadOnlyList<VideoFaceCoverageGroup> Groups,
+    IReadOnlyList<VideoFaceCoverageAssignment> Assignments);
+
 public sealed class VideoFaceCoverageGrouper
 {
     // An exploratory conservative grouping threshold, NOT a unique-person threshold.
