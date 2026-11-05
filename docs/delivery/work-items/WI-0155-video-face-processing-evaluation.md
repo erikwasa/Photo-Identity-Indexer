@@ -239,3 +239,55 @@ separately scoped tracking/sampling approach is needed. Even 36 samples
 cannot guarantee every person is seen. Do not change production
 confidence defaults or create canonical identity assignments from
 this experiment. See the [coverage runbook](../../operations/video-face-feasibility-wi0155.md).
+
+## Experimental checkpoint 5 — evidence-led grouping sensitivity (2026-11-05)
+
+The maintainer completed the **36-frame local coverage pilot** from merged PR #748.
+This pilot found **19 frames with faces**, **21 detected face observations**,
+and produced **14 tentative groups** in roughly **4.5 seconds**. The second
+known-to-operator person was visible in samples 32–36 and was detected, so
+the original two-frame coverage omission was addressed.
+
+Private manual viewing indicates that the first person appears through
+much of the earlier part of the clip and the second appears towards the
+end; they are not simultaneously present. The known zero-detection
+samples included poor-quality views (blur, partial face, odd camera angle),
+which may not be useful for recognition even if found. **Further lowering
+YuNet confidence is not a priority from this evidence.** Keep the
+diagnostic 0.7 selection for repeatability; it is not a production default.
+
+**The grouping algorithm, not person discovery, is the current gap.**
+A first-observation exemplar and conservative repeat cutoff 0.80
+produced 14 provisional groups, many with only one observation.
+For the last sequence, frame 32 started a group and frame 33 started
+a second despite the operator observing the same person in both;
+the closest similarity was about 0.62. Frames 34–36 then repeated
+the latter group's observation with scores near 0.87–0.90.
+Frames 14 and 17 generated two detections each, although the
+operator reports no simultaneous appearance of the two known people.
+Without reviewing boxes and face pairs, those must **not** be
+treated as proof of two different people.
+
+The next isolated checkpoint adds a **read-only comparison inside the
+same opt-in private `--coverage` JSON report**. It retains the
+unchanged baseline first-exemplar/0.80 grouping, and separately
+replays the **same in-memory observed embeddings** using a
+bounded multi-observation group bank at comparison cutoffs
+**0.60, 0.70 and 0.80**. It also records private same-frame face-pair
+bounding-box overlap and embedding cosine as **potential duplicate
+review hints**. Neither low-cutoff merges nor overlapping boxes are
+automated identity decisions. The new comparison is for detecting
+false splits **and false merges**, not selecting a universal threshold.
+
+The operator will rerun the already extracted 36 JPEG stills and
+reference manifest without rereading the original video. Human review
+should check whether sample 32 can be grouped with 33–36,
+whether earlier appearances reduce excessive fragmentation,
+and whether samples 14/17 were duplicate detections or genuinely
+distinct image content. All private face-level evidence stays local;
+only non-identifying aggregate outcomes should be shared.
+
+**Open:** Select a robust grouping method and obtain contrasting
+human-labelled examples before declaring a smallest production slice.
+Do not persist canonical person identities, clips' face vectors or
+unreviewed group assignments.
