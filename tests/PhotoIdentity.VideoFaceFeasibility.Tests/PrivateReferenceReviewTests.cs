@@ -334,6 +334,26 @@ public sealed class PrivateReferenceReviewTests
     }
 
     [Fact]
+    public async Task Cli_rejects_implicit_diagnostics_duplicate_flags_and_unapproved_thresholds()
+    {
+        string[][] invalid =
+        [
+            ["--manifest", "does-not-exist.json", "--diagnostics"],
+            ["--manifest", "does-not-exist.json", "--detector-confidence", "0.7"],
+            ["--manifest", "does-not-exist.json", "--diagnostics", "--diagnostics"],
+            ["--manifest", "does-not-exist.json", "--references", "ref.json",
+             "--private-report", "new.json", "--detector-confidence", "0.7"],
+            ["--manifest", "does-not-exist.json", "--references", "ref.json",
+             "--private-report", "new.json", "--diagnostics", "--detector-confidence", "0.2"],
+        ];
+
+        foreach (string[] arguments in invalid)
+        {
+            Assert.Equal(2, await Program.Main(arguments));
+        }
+    }
+
+    [Fact]
     public async Task Non_default_detector_confidence_requires_diagnostics()
     {
         VideoFaceExperiment experiment = new(
