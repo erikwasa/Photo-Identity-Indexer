@@ -132,7 +132,38 @@ References: [ADR-0007](../../decisions/ADR-0007-permanent-archive-bounded-storag
 [WI-0152](WI-0152-video-serving-playback.md) and
 [shared video runbook](../../operations/video-processing-shared-archive-verification.md).
 
-## Current status
+## Current status — 2026-11-05
 
-**Proposed.** No real online-only video hydration/release or
-cross-stage reuse has yet been verified on the maintained system.
+**In progress — checkpoint 1 read-only audit proposed for CI/local
+verification.** WI-0211 is now completed and archived. WI-0207 is
+the next selected, unblocked M30 work item, ahead of the intentionally
+deferred WI-0153 metadata/collections work.
+
+This checkpoint adds a no-media, attribute-only Windows CLI
+preflight at video onedrive preflight. It selects at most 64 current,
+supported, nonexcluded video revisions lacking a published playable
+proxy; checks a repeated-read-only PostgreSQL snapshot and current
+OneDrive Files On-Demand attributes; and outputs only aggregate
+standard/full-range, online-only/local/pinned/error categories,
+queued/running derivative counts and existing app-managed hydration
+receipt counts. It never prints IDs, private paths or filenames,
+opens source bytes, migrates schema, runs FFprobe/FFmpeg, hydrates,
+pins/unpins or enqueues jobs. Results do NOT independently approve
+a source format or transfer. See the
+[Windows read-only preflight runbook](../../operations/video-onedrive-wi0207-readonly-preflight.md).
+
+**Observed safety gap requiring a later implementation checkpoint:**
+the existing video worker currently releases a just-hydrated video
+original inside its per-attempt finally block without first checking
+whether already planned dependent jobs still need the original or
+whether the user has pinned the file. It also does not yet
+demonstrate durable shared managed hydration ownership with the
+photo capacity/release policy. No production online-only test has
+been run. Until this contract is addressed, do not enable
+online-only video work merely to complete this audit.
+
+**Next:** passing PR CI and one maintainer-executed read-only
+aggregate preflight; then a bounded, reviewed shared-ownership
+and dependent-job-aware release change, with focused fake/cloud
+state tests before separately authorized single-real-video
+acceptance. The work item remains open.
