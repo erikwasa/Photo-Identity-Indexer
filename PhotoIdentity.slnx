@@ -22,4 +22,6 @@
   <Project Path="tools/PhotoIdentity.Models/PhotoIdentity.Models.csproj" />
   <Project Path="tools/PhotoIdentity.PhotoQualityEvaluation/PhotoIdentity.PhotoQualityEvaluation.csproj" />
   <Project Path="tools/PhotoIdentity.ReviewVerification/PhotoIdentity.ReviewVerification.csproj" />
+  <Project Path="tools/PhotoIdentity.VideoFaceFeasibility/PhotoIdentity.VideoFaceFeasibility.csproj" />
+  <Project Path="tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj" />
 </Solution>
