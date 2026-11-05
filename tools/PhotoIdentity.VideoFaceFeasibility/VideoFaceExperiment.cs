@@ -294,6 +294,8 @@ public sealed class VideoFaceExperiment
         VideoFaceCoverageGrouper? coverageGrouper = coverage
             ? new VideoFaceCoverageGrouper()
             : null;
+        List<VideoFaceCoverageObservation> coverageSamples = [];
+        List<VideoFaceSameFramePair> sameFramePairs = [];
         List<EmbeddingVector>? previous = null;
         long previousTimestamp = -1;
 
@@ -343,6 +345,12 @@ public sealed class VideoFaceExperiment
             }
 
             long timestamp = set.Frames![index].TimestampMs;
+            if (coverageGrouper is not null && current.Count > 1)
+            {
+                sameFramePairs.AddRange(VideoFaceCoverageSensitivity.DescribeSameFrame(
+                    index + 1, detections, current));
+            }
+
             if (matcher is not null)
             {
                 for (int faceIndex = 0; faceIndex < current.Count; faceIndex++)
@@ -354,8 +362,19 @@ public sealed class VideoFaceExperiment
                         rankedFaces.Add(matcher.Diagnose(
                             index + 1, timestamp, faceIndex + 1, current[faceIndex]));
                     }
-                    coverageGrouper?.Observe(
-                        index + 1, timestamp, faceIndex + 1, current[faceIndex]);
+                    if (coverageGrouper is not null)
+                    {
+                        if (coverageSamples.Count >= 256)
+                        {
+                            throw new InvalidOperationException(
+                                "Private grouping sensitivity is limited to 256 face observations.");
+                        }
+
+                        coverageSamples.Add(new VideoFaceCoverageObservation(
+                            index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                        coverageGrouper.Observe(
+                            index + 1, timestamp, faceIndex + 1, current[faceIndex]);
+                    }
                 }
             }
 
@@ -401,7 +420,12 @@ public sealed class VideoFaceExperiment
                     Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
                         coverageGrouper.Groups.Count,
                         coverageGrouper.Groups,
-                        coverageGrouper.Assignments),
+                        coverageGrouper.Assignments)
+                    {
+                        GroupingComparisons = VideoFaceCoverageSensitivity.Compare(
+                            coverageSamples),
+                        SameFramePairs = sameFramePairs,
+                    },
                 }
                 : null,
         };
