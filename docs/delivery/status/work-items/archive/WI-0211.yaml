@@ -1,0 +1,35 @@
+id: WI-0211
+title: Make video browsing recognizable with verified posters
+milestone: M30
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+started_at: 2026-11-05
+completed_at: 2026-11-05
+verified_at: 2026-11-05
+verified_by: maintainer
+last_updated_at: 2026-11-05
+branch: wi0211-proxy-derived-posters
+blockers:
+- WI-0151
+- WI-0152
+- WI-0189
+- WI-0210
+blocker_notes: []
+evidence:
+- type: maintainer-observation
+  value: '2026-11-04: Maintainer provided screenshots of /videos with mostly indistinguishable black Video placeholders; opening multiple videos is required to identify content. Existing WI-0151 delivered manual durable poster producer and WI-0210 delivered playable proxies but neither established broad automatic poster coverage. A new bounded opt-in work item is needed.'
+- type: documentation
+  value: docs/delivery/work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/738
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/739
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/742
+- type: ci-verification
+  value: '2026-11-05: All merged implementation PRs passed GitHub Actions final-head CI: #738 run 41932508414, #739 run 41936957551, #742 run 42091266799 (build/test, integration, launcher and package checks).'
+- type: maintainer-verification
+  value: '2026-11-05: Windows local selected integration suite 5/5 PASS, dry-run candidate=1 and no media execution. Video lane disabled, paused, idle. One explicitly approved source-free proxy poster --apply: created=1, skipped=0, failed=0, originalsRead=0, hydration=0, exit 0. Coverage registered posters 1->2 and missing among playable 15->14; playable unchanged 16. Recognizable correct-orientation still; native play/pause/seek pass; no unexpected OneDrive or other processing.'
+- type: maintainer-acceptance
+  value: '2026-11-05: PR #742 clipping fix merged; maintainer confirmed full posters look good in gallery view. Final gallery visibility gate passed. WI-0211 accepted/completed for bounded opt-in workflow and one verified proxy-derived JPEG, not broad backfill; 14 of 16 playable entries still lacked registered posters, with no automatic original/hydration access and no claim that both Rec.709 range variants were separately production tested.'
