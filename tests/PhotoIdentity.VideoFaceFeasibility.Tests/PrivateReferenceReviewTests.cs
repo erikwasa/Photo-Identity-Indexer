@@ -483,6 +483,10 @@ public sealed class PrivateReferenceReviewTests
             Assert.Equal(2, coverage.Groups.Count);
             Assert.Equal(12, coverage.Groups[0].Observations);
             Assert.Equal(12, coverage.Groups[1].Observations);
+            Assert.Equal(3, coverage.GroupingComparisons!.Count);
+            Assert.Empty(coverage.SameFramePairs!);
+            Assert.All(coverage.GroupingComparisons!, comparison =>
+                Assert.Equal(24, comparison.Assignments.Count));
 
             string reportPath = Path.Combine(reviews, "coverage-private.json");
             await VideoFacePrivateReportWriter.WriteAsync(
@@ -494,6 +498,10 @@ public sealed class PrivateReferenceReviewTests
             using JsonDocument json = JsonDocument.Parse(reportText);
             Assert.Equal(2, json.RootElement.GetProperty("diagnostics")
                 .GetProperty("coverage").GetProperty("possibleAppearanceGroups").GetInt32());
+            Assert.Equal(3, json.RootElement.GetProperty("diagnostics")
+                .GetProperty("coverage").GetProperty("groupingComparisons").GetArrayLength());
+            Assert.Equal(0, json.RootElement.GetProperty("diagnostics")
+                .GetProperty("coverage").GetProperty("sameFramePairs").GetArrayLength());
 
             for (int i = 0; i < files.Length; i++)
             {
@@ -504,6 +512,94 @@ public sealed class PrivateReferenceReviewTests
         {
             Directory.Delete(root, true);
         }
+    }
+
+    [Fact]
+    public void Multi_observation_grouping_can_bridge_view_variation_without_rewriting_baseline()
+    {
+        EmbeddingVector frontal = new(new float[] { 1, 0, 0 });
+        EmbeddingVector intermediate = new(new float[] { 0.85f, 0.5267827f, 0 });
+        EmbeddingVector angled = new(new float[] { 0.5f, 0.8660254f, 0 });
+
+        VideoFaceCoverageGrouper baseline = new();
+        VideoFaceCoverageGrouper multi = new(
+            repeatSimilarityThreshold: 0.80, useMultipleObservations: true);
+        foreach ((int frame, EmbeddingVector embedding) in new[]
+        {
+            (1, frontal), (2, intermediate), (3, angled),
+        })
+        {
+            baseline.Observe(frame, frame * 1000, 1, embedding);
+            multi.Observe(frame, frame * 1000, 1, embedding);
+        }
+
+        Assert.Equal(2, baseline.Groups.Count);
+        Assert.Single(multi.Groups);
+        Assert.Equal(3, multi.Groups[0].Observations);
+        // Multiple observations never become canonical identity evidence.
+        Assert.All(multi.Assignments, assignment =>
+            Assert.StartsWith("G", assignment.GroupAlias));
+    }
+
+    [Fact]
+    public void Threshold_comparisons_expose_low_threshold_false_merge_risk()
+    {
+        EmbeddingVector first = new(new float[] { 1, 0, 0 });
+        EmbeddingVector second = new(new float[] { 0.62f, 0.7846018f, 0 });
+        VideoFaceCoverageObservation[] observations =
+        [
+            new(1, 1000, 1, first),
+            new(2, 2000, 1, second),
+        ];
+        IReadOnlyList<VideoFaceCoverageComparison> comparisons =
+            VideoFaceCoverageSensitivity.Compare(observations);
+        Assert.Equal(new[] { 0.60, 0.70, 0.80 },
+            comparisons.Select(c => c.RepeatSimilarityThreshold).ToArray());
+        Assert.Equal(1, comparisons[0].PossibleAppearanceGroups);
+        Assert.Equal(2, comparisons[1].PossibleAppearanceGroups);
+        Assert.Equal(2, comparisons[2].PossibleAppearanceGroups);
+        Assert.All(comparisons, comparison =>
+        {
+            Assert.Equal(2, comparison.Assignments.Count);
+            Assert.Equal("multi-observation-max", comparison.Strategy);
+        });
+        Assert.Throws<ArgumentException>(() =>
+            VideoFaceCoverageSensitivity.Compare(
+                Enumerable.Repeat(observations[0], 257).ToArray()));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new VideoFaceCoverageGrouper(repeatSimilarityThreshold: 0.1));
+    }
+
+    [Fact]
+    public void Same_frame_pairs_are_review_hints_and_never_collapse_detections()
+    {
+        DetectedFaceCandidate first = new(
+            new NormalizedBoundingBox(0.2, 0.2, 0.3, 0.3),
+            new NormalizedFaceLandmarks(
+                new NormalizedPoint(0.3, 0.3),
+                new NormalizedPoint(0.4, 0.3),
+                new NormalizedPoint(0.35, 0.4),
+                new NormalizedPoint(0.3, 0.45),
+                new NormalizedPoint(0.4, 0.45)),
+            0.75);
+        DetectedFaceCandidate second = new(
+            new NormalizedBoundingBox(0.22, 0.22, 0.3, 0.3),
+            first.Landmarks, 0.74);
+        EmbeddingVector vector = new(new float[] { 1, 0, 0 });
+        var pairs = VideoFaceCoverageSensitivity.DescribeSameFrame(
+            14, [first, second], [vector, vector]);
+        VideoFaceSameFramePair pair = Assert.Single(pairs);
+        Assert.Equal(14, pair.FrameNumber);
+        Assert.Equal("possible-duplicate-review", pair.ReviewStatus);
+        Assert.True(pair.BoundingBoxIntersectionOverUnion > 0.40);
+        Assert.Equal(1, pair.EmbeddingCosineSimilarity);
+
+        VideoFaceCoverageGrouper grouper = new(
+            repeatSimilarityThreshold: 0.60, useMultipleObservations: true);
+        grouper.Observe(14, 14000, 1, vector);
+        grouper.Observe(14, 14000, 2, vector);
+        Assert.Equal(2, grouper.Groups.Count);
+        Assert.Equal(2, grouper.Assignments.Count);
     }
 
     private static async Task<byte[]> WritePngStub(string root, string name, byte marker)

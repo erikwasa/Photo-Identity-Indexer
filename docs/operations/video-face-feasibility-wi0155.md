@@ -572,3 +572,129 @@ timestamps, face-level similarities, temporary group aliases,
 private file paths, reference mappings or any photographs to PRs
 or chats. Share only non-identifying counts and review conclusions.
 Delete private derivatives when no longer needed.
+
+
+## Checkpoint 5 — private grouping sensitivity using existing 36-frame pilot
+
+**Reuse the 36 private JPEG stills extracted in checkpoint 4.** No
+need to rerun FFmpeg, access the original video or change model settings.
+
+In the maintainer's first 36-frame local pilot, the second person
+appeared in samples 32–36 and was detected. Across all samples,
+21 face observations were found in 19/36 sampled frames; baseline
+grouping produced 14 tentative groups. Several zero-detection frames
+had blurred, extreme-angle or partially hidden faces, where an
+embedding might not be useful. The outstanding issue is therefore
+excessive **group fragmentation**, not raw detector sensitivity.
+
+The private diagnostics.coverage output now includes:
+
+- groupingComparisons: multi-observation grouping at cosine thresholds
+  0.60, 0.70 and 0.80, with at most eight in-memory exemplars per
+  temporary group. Each comparison has independently numbered
+  aliases and its own tentative assignments, group count and
+  single-observation-group count. The original coverage.groups and
+  coverage.assignments are still the **unchanged first-exemplar/0.80
+  baseline**.
+- sameFramePairs: for frames with two or more detections, compares
+  normalized bounding-box overlap and embedding similarity. A high
+  IoU (>=0.40) or cosine (>=0.85) produces a private
+  possible-duplicate-review hint. No detection is automatically
+  removed or assigned an identity.
+
+A low threshold or multi-exemplar maximum can falsely **merge different
+people**, while a high threshold can split the same person. None of
+these diagnostics determines how many unique people are present.
+Same-frame detections are still kept separate in all comparisons,
+even if they may be duplicates; the operator must inspect the images.
+
+### Explicit local re-evaluation (after PR merge)
+
+Refresh the separate WI-0155 worktree and pass the focused
+tests and docs checks first. Then use PowerShell 7.6:
+
+~~~powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer-WI0155"
+
+# EDIT: select the existing 36-frame private manifest, not the video.
+$coverageManifest = "C:\Path\To\Private\coverage-XXXX\frames.json"
+
+$pilotRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\Temp\wi0155\pilot-01'
+$referenceManifest = Join-Path $pilotRoot 'references\references.json'
+$reviews = Join-Path $pilotRoot 'reviews'
+
+# EDIT if the approved models are in a different existing folder.
+$modelDir = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\Tools\WI0155\Models'
+
+foreach ($file in @($coverageManifest, $referenceManifest)) {
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        throw 'An approved private manifest is missing.'
+    }
+}
+
+$stills = @(Get-ChildItem -LiteralPath (Split-Path $coverageManifest -Parent) -File |
+    Where-Object { $_.Extension -in '.jpg', '.jpeg', '.png' })
+$before = @($stills | Get-FileHash -Algorithm SHA256)
+New-Item -ItemType Directory -Path $reviews -Force | Out-Null
+
+$reportPath = Join-Path $reviews (
+    'grouping-sensitivity-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '.json')
+
+$runArgs = @(
+    'run', '--project', 'tools/PhotoIdentity.VideoFaceFeasibility',
+    '-c', 'Release', '--',
+    '--manifest', $coverageManifest,
+    '--references', $referenceManifest,
+    '--private-report', $reportPath,
+    '--model-dir', $modelDir,
+    '--root', (Get-Location).Path,
+    '--diagnostics', '--detector-confidence', '0.7', '--coverage'
+)
+& dotnet @runArgs
+if ($LASTEXITCODE -ne 0) { throw 'Grouping sensitivity failed.' }
+
+$after = @($stills | Get-FileHash -Algorithm SHA256)
+if ((@($before.Hash) -join ',') -ne (@($after.Hash) -join ',')) {
+    throw 'Approved input stills changed.'
+}
+$private = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+
+# Non-identifying summary; not a number of unique people.
+[pscustomobject]@{
+    FramesExamined = $private.aggregate.framesExamined
+    FacesDetected = $private.aggregate.facesDetected
+    BaselineGroups = $private.diagnostics.coverage.possibleAppearanceGroups
+    DurationMs = $private.aggregate.elapsedMilliseconds
+}
+$private.diagnostics.coverage.groupingComparisons |
+    Select-Object strategy, repeatSimilarityThreshold,
+        possibleAppearanceGroups, singleObservationGroups |
+    Format-Table
+~~~
+
+### Review possible false splits and same-frame duplicate detections
+
+~~~powershell
+# Private detail: do not upload to GitHub or paste into chat.
+foreach ($comparison in $private.diagnostics.coverage.groupingComparisons) {
+    Write-Host "Threshold $($comparison.repeatSimilarityThreshold)"
+    $comparison.assignments |
+        Where-Object { $_.frameNumber -in @(32,33,34,35,36) } |
+        Format-Table frameNumber, faceNumber, groupAlias,
+            closestPreviousSimilarity, reviewStatus
+}
+
+$private.diagnostics.coverage.sameFramePairs |
+    Where-Object { $_.frameNumber -in @(14,17) } |
+    Format-Table frameNumber, firstFaceNumber, secondFaceNumber,
+        boundingBoxIntersectionOverUnion, embeddingCosineSimilarity, reviewStatus
+~~~
+
+Privately review the existing JPEGs for frames 14, 17 and 32–36.
+Did 32 join 33–36? Did any lower cutoff incorrectly merge the two
+different people? Are the two detections in frames 14/17 overlapping
+boxes on one face or two genuine face images? Report only **aggregate
+comparison counts** and generalized human observations, never
+group aliases, face-level scores, exact timestamps, private paths,
+images or reports. A real human-reviewed negative control is required
+before adopting any grouping threshold in production.

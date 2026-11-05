@@ -24,7 +24,12 @@ public sealed record VideoFaceCoverageAssignment(
 public sealed record VideoFaceCoverageReview(
     int PossibleAppearanceGroups,
     IReadOnlyList<VideoFaceCoverageGroup> Groups,
-    IReadOnlyList<VideoFaceCoverageAssignment> Assignments);
+    IReadOnlyList<VideoFaceCoverageAssignment> Assignments)
+{
+    // Extra private evidence: absent in reports produced by earlier checkpoints.
+    public IReadOnlyList<VideoFaceCoverageComparison>? GroupingComparisons { get; init; }
+    public IReadOnlyList<VideoFaceSameFramePair>? SameFramePairs { get; init; }
+}
 
 public sealed class VideoFaceCoverageGrouper
 {
@@ -39,12 +44,29 @@ public sealed class VideoFaceCoverageGrouper
         public int FirstFrameNumber { get; } = firstFrameNumber;
         public long FirstTimestampMs { get; } = firstTimestampMs;
         public EmbeddingVector Exemplar { get; } = exemplar;
+        public List<EmbeddingVector> RecentExemplars { get; } = [exemplar];
         public int Observations { get; set; } = 1;
         public int LastFrameNumber { get; set; } = firstFrameNumber;
     }
 
     private readonly List<Group> _groups = [];
     private readonly List<VideoFaceCoverageAssignment> _assignments = [];
+    private readonly double _repeatSimilarityThreshold;
+    private readonly bool _useMultipleObservations;
+
+    public VideoFaceCoverageGrouper(
+        double repeatSimilarityThreshold = ExploratoryRepeatSimilarity,
+        bool useMultipleObservations = false)
+    {
+        if (!double.IsFinite(repeatSimilarityThreshold) ||
+            repeatSimilarityThreshold < 0.5 || repeatSimilarityThreshold > 0.95)
+        {
+            throw new ArgumentOutOfRangeException(nameof(repeatSimilarityThreshold));
+        }
+
+        _repeatSimilarityThreshold = repeatSimilarityThreshold;
+        _useMultipleObservations = useMultipleObservations;
+    }
 
     public IReadOnlyList<VideoFaceCoverageGroup> Groups =>
         _groups.Select(group => new VideoFaceCoverageGroup(
@@ -82,7 +104,9 @@ public sealed class VideoFaceCoverageGrouper
                 continue;
             }
 
-            double score = embedding.CosineSimilarity(group.Exemplar);
+            double score = _useMultipleObservations
+                ? group.RecentExemplars.Max(existing => embedding.CosineSimilarity(existing))
+                : embedding.CosineSimilarity(group.Exemplar);
             if (score > bestScore)
             {
                 bestScore = score;
@@ -91,13 +115,29 @@ public sealed class VideoFaceCoverageGrouper
         }
 
         bool possibleRepeat = best is not null &&
-            bestScore >= ExploratoryRepeatSimilarity;
+            bestScore >= _repeatSimilarityThreshold;
         Group match;
         if (possibleRepeat)
         {
             match = best!;
             match.Observations++;
             match.LastFrameNumber = frameNumber;
+
+            if (_useMultipleObservations)
+            {
+                // Keep the first embedding as an anchor plus at most seven
+                // further observations. Bounded memory and comparisons;
+                // these exemplars must never be serialized.
+                if (match.RecentExemplars.Count < 8)
+                {
+                    match.RecentExemplars.Add(embedding);
+                }
+                else
+                {
+                    int slot = 1 + ((match.Observations - 9) % 7);
+                    match.RecentExemplars[slot] = embedding;
+                }
+            }
         }
         else
         {
