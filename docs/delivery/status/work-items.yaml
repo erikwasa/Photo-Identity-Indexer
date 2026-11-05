@@ -205,9 +205,12 @@ work_items:
 - id: WI-0211
   title: Make video browsing recognizable with verified posters
   milestone: M30
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+  started_at: 2026-11-05
+  last_updated_at: 2026-11-05
+  branch: wi0211-automatic-posters-for-new-proxies
   blockers:
   - WI-0151
   - WI-0152
@@ -219,3 +222,13 @@ work_items:
     value: '2026-11-04: Maintainer provided screenshots of /videos with mostly indistinguishable black Video placeholders; opening multiple videos is required to identify content. Existing WI-0151 delivered manual durable poster producer and WI-0210 delivered playable proxies but neither established broad automatic poster coverage. A new bounded opt-in work item is needed.'
   - type: documentation
     value: docs/delivery/work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/738
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/739
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/742
+  - type: maintainer-verification
+    value: '2026-11-05: Five focused integration tests passed; one authorized proxy-derived still was published (created=1, failed=0, originalsRead=0, hydration=0, exit 0), with poster coverage 1->2 and playable missing posters 15->14 for 16 playable clips. Maintainer accepted orientation, recognizable content and play/pause/seek; after PR #742 merged, complete gallery posters were visually accepted.'
+  - type: implementation
+    value: '2026-11-05: Requested automatic-poster option for future newly processed proxies, default off. PR #744 in review; old closeout PR #743 held as draft until new preference, worker integration and maintained-host behavior are accepted.'
