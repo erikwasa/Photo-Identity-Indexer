@@ -7,6 +7,11 @@ using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Cli;
 
+/// <summary>Reportable only fixed, non-sensitive dimensions.</summary>
+public sealed record VideoOnlineOnlyPreflightObservation(
+    string Status, bool FullRange, bool QueuedOrRunning,
+    bool ActiveManagedHydration);
+
 /// <summary>
 /// WI-0207 checkpoint 1: read-only current-video metadata plus Windows
 /// Files On-Demand attribute inspection. Not a hydration request, an
@@ -162,18 +167,45 @@ public static class VideoOnlineOnlyPreflightCommandRunner
 
         IOneDriveFilesOnDemandPlatform oneDrive =
             new WindowsOneDriveFilesOnDemandPlatform();
-        Dictionary<string, int> counts = new(StringComparer.Ordinal);
-        int queuedWork = 0, activeManaged = 0, standard = 0, fullRange = 0;
+        List<VideoOnlineOnlyPreflightObservation> observations = [];
         foreach (EligibleVideo row in rows)
         {
             token.ThrowIfCancellationRequested();
-            string category = ReadFileStatus(row, oneDrive);
-            counts[category] = counts.TryGetValue(category, out int count)
+            observations.Add(new(
+                ReadFileStatus(row, oneDrive),
+                row.Pixel == "yuvj420p",
+                row.Queued, row.Managed));
+        }
+        WriteReport(output, observations);
+        return 0;
+    }
+
+    /// <summary>
+    /// Unit-testable sanitized output. Never accept a private string as
+    /// a status label; unknown labels become a fixed generic category.
+    /// This helper takes no source paths, UUIDs or filenames at all.
+    /// </summary>
+    public static void WriteReport(
+        TextWriter output, IReadOnlyList<VideoOnlineOnlyPreflightObservation> items)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(items);
+        if (items.Count > MaximumCandidates)
+            throw new ArgumentOutOfRangeException(nameof(items));
+
+        string[] allowed =
+        [
+            "online-only", "pinned-downloading", "downloading",
+            "local", "pinned-local", "unavailable", "unknown-or-error",
+            "unsafe-source"
+        ];
+        Dictionary<string, int> counts = new(StringComparer.Ordinal);
+        foreach (VideoOnlineOnlyPreflightObservation item in items)
+        {
+            string status = allowed.Contains(item.Status, StringComparer.Ordinal)
+                ? item.Status : "unknown-or-error";
+            counts[status] = counts.TryGetValue(status, out int count)
                 ? checked(count + 1) : 1;
-            if (row.Queued) queuedWork++;
-            if (row.Managed) activeManaged++;
-            if (row.Pixel == "yuvj420p") fullRange++;
-            else standard++;
         }
 
         output.WriteLine(JsonSerializer.Serialize(new
@@ -188,12 +220,13 @@ public static class VideoOnlineOnlyPreflightCommandRunner
             ffmpegInvoked = false,
             candidateSelectionOnly = true,
             operatorAuthorizationRequired = true,
-            catalogueCurrentSupportedWithoutPublishedProxy = rows.Count,
-            standardOrCompactProfileCandidates = standard,
-            fullRangeProfileCandidates = fullRange,
-            queuedOrRunningDependents = queuedWork,
-            activePhotoManagedHydrationRecords = activeManaged,
-            attributesObserved = rows.Count,
+            catalogueCurrentSupportedWithoutPublishedProxy = items.Count,
+            standardOrCompactProfileCandidates = items.Count(x => !x.FullRange),
+            fullRangeProfileCandidates = items.Count(x => x.FullRange),
+            queuedOrRunningDependents = items.Count(x => x.QueuedOrRunning),
+            activePhotoManagedHydrationRecords =
+                items.Count(x => x.ActiveManagedHydration),
+            attributesObserved = items.Count,
             availability = counts.OrderBy(x => x.Key, StringComparer.Ordinal)
                 .Select(x => new { status = x.Key, count = x.Value }).ToArray(),
             caveat = "Metadata and attributes are not proof of actual local bytes, ongoing source eligibility, cross-job hydration ownership or processing success."
@@ -201,7 +234,6 @@ public static class VideoOnlineOnlyPreflightCommandRunner
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         }));
-        return 0;
     }
 
     /// <summary>
