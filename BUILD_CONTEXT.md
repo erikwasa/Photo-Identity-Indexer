@@ -1,20 +1,33 @@
 # Build context
 
-**Current handoff — 2026-11-05: WI-0211 automatic posters IN PROGRESS.**
-The maintainer accepted the manual one-proxy JPEG producer and full gallery
-framing (PRs #738, #739 and #742 merged): one new registered still,
-poster coverage 1→2, missing among 16 playable videos 15→14,
-correctly oriented recognizable image and working play/pause/seek,
-with no unexpected OneDrive work. Before closing the item, the maintainer
-requested a default-OFF persistent setting to create a poster automatically
-after a newly successful proxy publication in the operator-started
-photo-first Archive advance. This is PR #744. Existing posters are not
-reprocessed, browsing and Settings Save do not execute FFmpeg, and failures
-cannot undo a published playable proxy. The prior closeout PR #743 is
-held as DRAFT pending CI, the maintained-host toggle persistence check,
-and one suitably eligible authorized new-video acceptance when available.
-Do not force media processing merely to close documentation. M30 remains open.
-See docs/operations/video-automatic-posters-wi0211-acceptance.md.
+**Current handoff — 2026-11-05: WI-0211 accepted and completed (scoped).**
+The maintainer accepted the full poster/gallery implementation and
+default-OFF **Automatically create a poster for newly processed videos**
+setting. PRs #738 (coverage/filter), #739 (bounded, manually approved
+proxy-derived JPEG), #742 (complete poster framing) and #744
+(automatic poster on new, durably published proxy) are merged, and
+their final-head CI succeeded. PR #744 run #3588 passed.
+On the maintained Windows host, 5 focused poster tests passed, and
+one approved manual proxy-derived poster yielded created=1, failed=0,
+originalsRead=0, hydration=0, registered posters 1→2, missing among
+16 playable proxies 15→14, recognizable orientation and working
+play/pause/seek without unexpected OneDrive activity. The maintainer
+then confirmed complete posters display properly after PR #742, and
+**after PR #744** explicitly verified that the new checkbox works
+and a poster is created when processing a new video.
+
+The manual pilot's counts are historical and NOT asserted as
+current after the newly processed video. The default-off auto
+setting only applies to future, newly published playable proxies
+during an operator-started Archive advance. Older proxy gaps are
+not backfilled automatically; opening /videos or saving Settings
+never causes original reads, hydration or FFmpeg processing.
+WI-0211's canonical status is archived/completed; remaining M30
+items remain open, with milestone status ready. The earlier
+pre-auto closeout draft PR #743 was superseded and must not be merged.
+No repeat of private-media acceptance is needed solely for closeout.
+See docs/delivery/work-items/WI-0211-recognizable-video-posters-and-library-browsing.md
+and docs/operations/video-automatic-posters-wi0211-acceptance.md.
 
 **Historical handoff notes follow.**
 
