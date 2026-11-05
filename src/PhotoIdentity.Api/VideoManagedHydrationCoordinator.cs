@@ -17,6 +17,7 @@ namespace PhotoIdentity.Api;
 public sealed class VideoManagedHydrationCoordinator(
     PostgresCatalogueDatabase database,
     IArchiveHydrationRepository ownership,
+    IArchiveSourceHydrationRepository sourceOwnership,
     ArchiveHydrationCapacityService capacity,
     IOneDriveFilesOnDemandPlatform oneDrive,
     TimeProvider timeProvider)
@@ -27,12 +28,27 @@ public sealed class VideoManagedHydrationCoordinator(
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        // The public service method may never be used as an arbitrary
+        // caller-supplied OneDrive path action.
+        string expectedPath = Path.GetFullPath(Path.Combine(
+            candidate.Root,
+            candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
+        if (!string.Equals(expectedPath, Path.GetFullPath(sourcePath),
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "Selected video original does not match its catalogue locator.");
 
         AssetRevisionLookup? revision =
             await ReadCurrentVideoRevisionAsync(candidate, token);
         if (revision is null)
             throw new InvalidOperationException(
                 "Current video revision, exclusion or source identity changed.");
+
+        ArchiveManagedSourceHydrationState? pendingSource =
+            await sourceOwnership.GetAsync(revision.AssetId, token);
+        if (pendingSource is { IsActive: true })
+            throw new InvalidOperationException(
+                "A source-level managed hydration already owns this asset.");
 
         ArchiveManagedHydrationState? existing =
             await ownership.GetAsync(revision.RevisionId, token);
@@ -50,6 +66,14 @@ public sealed class VideoManagedHydrationCoordinator(
                 if (await ReadCurrentVideoRevisionAsync(candidate, token) is null)
                     throw new InvalidOperationException(
                         "Video source changed before hydration admission.");
+                if ((await new PostgresVideoPhotoPriorityProbe(database)
+                        .GetAsync(token)).PhotoWorkActive)
+                    throw new InvalidOperationException(
+                        "Photo work has priority over video hydration.");
+                if (await sourceOwnership.GetAsync(
+                        revision.AssetId, token) is { IsActive: true })
+                    throw new InvalidOperationException(
+                        "Source-level managed hydration is already active.");
                 OneDriveFilesOnDemandState state = oneDrive.GetState(sourcePath);
                 if (state.Availability != AssetAvailability.OnlineOnly ||
                     state.IsPinned)
