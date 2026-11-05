@@ -172,6 +172,19 @@ public sealed class VideoFaceExperiment
                 throw new InvalidOperationException("Frame contents changed after preflight.");
             }
 
+            // An extension alone is not a trusted media signature.
+            string extension = Path.GetExtension(file);
+            bool jpeg = input.Length >= 3 &&
+                input[0] == 0xFF && input[1] == 0xD8 && input[2] == 0xFF;
+            bool png = input.Length >= 8 &&
+                input.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+            if (!(jpeg && (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                            extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase))) &&
+                !(png && extension.Equals(".png", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new ArgumentException("The selected frame signature does not match its JPEG/PNG extension.");
+            }
+
             byte[] before = SHA256.HashData(input);
             using MemoryStream stream = new(input, writable: false);
             ImageFrame image = await _decoder.DecodeAsync(
@@ -180,6 +193,11 @@ public sealed class VideoFaceExperiment
                 cancellationToken);
             IReadOnlyList<DetectedFaceCandidate> detections =
                 await _detector.DetectAsync(image, cancellationToken);
+            if (detections.Count > 32)
+            {
+                throw new InvalidOperationException("The frame exceeded the 32-face exploratory limit.");
+            }
+
             totalFaces += detections.Count;
             if (detections.Count > 0)
             {
