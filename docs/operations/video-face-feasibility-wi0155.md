@@ -2,9 +2,9 @@
 
 This experimental tool lives on the long-running `wi-0155` integration branch,
 not on `main`. Feature PRs target `wi-0155` until the maintainer chooses a
-small production slice or closes the feasibility experiment. **PR #740 is
-merged into `wi-0155`; the current checkpoint adds an optional reference
-comparison and an explicit private review report.**
+small production slice or closes the feasibility experiment. **PRs #740 and #741 are
+merged into `wi-0155`; checkpoint 3 introduces opt-in diagnostic
+experiments following the first approved real-media pilot.**
 
 ## Scope and limits
 
@@ -60,9 +60,10 @@ automatic video source or OneDrive hydration. Outputs exclude file
 paths, face images, vectors, person IDs and identifiers. Repeated
 observations are aggregated, not published.
 
-This is **not** yet a video face-recognition feature. Known-person
-suggestions, representative stills, sensitivity comparisons and any
-production persistence must be decided after a private human pilot.
+This is **not** yet a production video face-recognition feature. A
+tentative offline suggestion path now exists; threshold sensitivity
+diagnostics, accuracy evaluation, representative still selection and any
+production persistence require explicit further decisions.
 An offline model test cannot establish photo/video identity accuracy.
 
 ## Windows checks without personal media
@@ -150,8 +151,8 @@ against the maintained catalogue or modify Photo Identity settings.
 Use a few deliberately selected frames and record privately:
 the number of visible faces versus detections, obvious misses, repeated
 detections and ambiguous faces; overall elapsed time; whether the
-selected frame still offers a useful person view. Only later consider an
-approved, **read-only** private known-person reference comparison.
+selected frame still offers a useful person view. The approved **read-only** private known-person reference comparison
+is now available, but its accuracy remains uncalibrated.
 No identity labels, inferred names or biometric evidence are to be
 published in source control.
 
@@ -269,3 +270,170 @@ dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- --he
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
+
+
+## Checkpoint 3 — approved pilot and opt-in sensitivity diagnosis
+
+The maintainer's first private pilot of merged PR #741 used two
+operator-selected frames containing the same person, also represented
+in one reference photograph. The face detector returned a face in only
+one frame; one embedding was computed; no known-person candidate passed
+the existing experimental threshold. End-to-end processing took roughly
+1.35 seconds, and human review a few seconds. File hashes were
+unchanged. These observations are not statistically representative, and
+the true reference's private ranking is still unknown.
+
+Do not infer that lowering the similarity threshold will solve
+recognition. First establish **whether the highest-ranked reference is
+actually the known person**. Then evaluate difficult and unknown-person
+frames; a more permissive threshold can increase false suggestions.
+Likewise, a person appearing in a frame does not necessarily mean a
+recognizable face is visible.
+
+Checkpoint 3 adds `--diagnostics` **only** alongside
+`--references` and `--private-report`. The ordinary reference
+experiment keeps its original YuNet confidence 0.9, similarity cutoff
+0.80, uncertainty rules and aggregate-only console output. The
+opt-in diagnostic report adds:
+
+- `diagnostics.frameDetections`: every selected frame ordinal and
+  timestamp, count of detected faces, and lowest/highest detector
+  confidence (null if none). This includes frames with zero detections.
+- `diagnostics.rankedFaces`: for every detected face, the highest
+  cosine-ranked *reference pseudonym even if the existing threshold
+  suppressed it*, top score, runner-up score, score gap and the **hypothetical**
+  review outcome at similarity cutoffs 0.363, 0.45, 0.60 and 0.80.
+- `diagnostics.requestedDetectorConfidenceThreshold`: the explicitly
+  selected YuNet confidence for that run. Accepted values: 0.9 (default),
+  0.7 and 0.5. This affects both reference and video-frame detection;
+  reference stills must continue to contain exactly one detected face.
+
+A hypothetical `would-suggest-for-review` is **not an identity claim**.
+The 0.363 cutoff is included as an exploratory comparison point, not
+as a recommended or validated deployment threshold. The comparison
+does not change the main `findings` review statuses or the baseline
+similarity threshold. Only private JSON files contain ranked aliases
+and frame-level evidence.
+
+### Refresh separate WI-0155 checkout after PR merge
+
+Do not change the WI-0211 checkout.
+
+```powershell
+$mainRepo = "C:\Kod\codex\Photo Identity Indexer"
+$wi0155Root = "C:\Kod\codex\Photo Identity Indexer-WI0155"
+
+git -C $mainRepo fetch origin
+if ($LASTEXITCODE -ne 0) { throw 'Fetch failed.' }
+$changes = @(git -C $wi0155Root status --porcelain)
+if ($changes.Count -gt 0) { throw 'Review WI-0155 uncommitted files first.' }
+git -C $wi0155Root switch --detach origin/wi-0155
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 checkout failed.' }
+Set-Location $wi0155Root
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Focused tests failed.' }
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- --help
+if ($LASTEXITCODE -ne 0) { throw 'CLI help failed.' }
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw 'Docs validation failed.' }
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+if ($LASTEXITCODE -ne 0) { throw 'Docs generation check failed.' }
+```
+
+### Explicit private rerun — 0.9 baseline, then 0.7
+
+Reuse the approved `pilot-01` photographs and manifest files
+**outside the repository**. Do not change or upload the source images.
+Install the governed YuNet/SFace model binaries if needed (see above);
+point `$modelDir` to the folder that already contains both approved
+ONNX files. The following uses the same private input photos for both
+runs so that only the configured detector confidence changes:
+
+```powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer-WI0155"
+
+$pilotRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\Temp\wi0155\pilot-01'
+$frames = Join-Path $pilotRoot 'frames\frames.json'
+$references = Join-Path $pilotRoot 'references\references.json'
+$reviews = Join-Path $pilotRoot 'reviews'
+$modelDir = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\Tools\WI0155\Models'
+# If your models are installed elsewhere, adjust $modelDir above.
+New-Item -ItemType Directory -Force -Path $reviews | Out-Null
+
+$photos = @(
+    Get-ChildItem (Join-Path $pilotRoot 'frames') -File |
+        Where-Object { $_.Extension -in '.jpg', '.jpeg', '.png' }
+    Get-ChildItem (Join-Path $pilotRoot 'references') -File |
+        Where-Object { $_.Extension -in '.jpg', '.jpeg', '.png' }
+)
+$before = @($photos | Get-FileHash -Algorithm SHA256)
+$reports = @()
+
+foreach ($confidence in @('0.9', '0.7')) {
+    $reportPath = Join-Path $reviews (
+        'diagnostic-' + ($confidence -replace '\.', '') + '-' +
+        (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '.json')
+
+    dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+        --manifest $frames `
+        --references $references `
+        --private-report $reportPath `
+        --model-dir $modelDir `
+        --root (Get-Location).Path `
+        --diagnostics `
+        --detector-confidence $confidence
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Private diagnostics failed at detector confidence $confidence."
+    }
+    $reports += $reportPath
+}
+
+$after = @($photos | Get-FileHash -Algorithm SHA256)
+if ((@($before.Hash) -join ',') -ne (@($after.Hash) -join ',')) {
+    throw 'Selected input photos changed.'
+}
+
+# Safe aggregate-only comparison; do not paste private detailed reports.
+foreach ($path in $reports) {
+    $result = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    [pscustomobject]@{
+        DetectorConfidence = $result.diagnostics.requestedDetectorConfidenceThreshold
+        FramesExamined = $result.aggregate.framesExamined
+        FramesWithDetections = $result.aggregate.framesWithFaces
+        FacesDetected = $result.aggregate.facesDetected
+        DurationMs = $result.aggregate.elapsedMilliseconds
+    }
+}
+```
+
+Optionally add a separate `0.5` run if 0.7 still misses the face;
+the more permissive configuration is only a local diagnostic, not
+permission to enable it in production. If a reference still now
+contains more than one detected face, the experiment rejects it:
+choose a clearer independent single-face reference rather than
+silently selecting one.
+
+To inspect the private evidence **only on your own machine**:
+
+```powershell
+$private = Get-Content -LiteralPath $reports[0] -Raw | ConvertFrom-Json
+$private.diagnostics.frameDetections |
+    Format-Table frameNumber, timestampMs, facesDetected, lowestConfidence, highestConfidence
+$private.diagnostics.rankedFaces |
+    Format-List frameNumber, faceNumber, topReferenceAlias, topSimilarity, scoreGap, thresholdChecks
+```
+
+Compare the ranked alias with your *private* reference mapping to
+determine whether the correct person ranked first. Repeat, if desired,
+with a few known-positive and unknown-person frames, tracking wrong
+top-ranked references and increased false suggestions as well as
+recovered detections. Do not log names, video paths, face-level scores,
+the private alias mapping or detailed reports in GitHub or this chat.
+Share only non-identifying aggregate test conclusions.
+
+The diagnostic report is a new, sensitive biometric-derived JSON file.
+It must stay in an operator-controlled **non-synced** folder. Delete it
+when no longer needed. No database access, worker, OneDrive hydration
+or original-video modification is involved.
