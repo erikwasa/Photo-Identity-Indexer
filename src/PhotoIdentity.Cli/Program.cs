@@ -77,6 +77,11 @@ public static class Program
                         VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
                 "video" when args.Length > 2 &&
+                    args[1] == "onedrive" && args[2] == "preflight" =>
+                    await VideoOnlineOnlyPreflightCommandRunner.RunAsync(
+                        VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+                "video" when args.Length > 2 &&
                     args[1] == "compatibility" && args[2] == "local-check" =>
                     await VideoCompatibilityLocalCheckCommandRunner.RunAsync(
                         VideoCompatibilitySurveyOptions.Parse(args.Skip(3).ToArray()),
@@ -320,6 +325,13 @@ public static class Program
                                        (read-only aggregate current-video inventory;
                                         no media opens, OneDrive hydration or jobs;
                                         cached availability is NOT a live file probe)
+              video onedrive preflight --postgres-connection-env NAME --database DB
+                                       (WI-0207 aggregate-only live Windows
+                                        Files On-Demand attributes of up to 64
+                                        current supported videos lacking proxies;
+                                        no source byte reads, pin/hydrate/release,
+                                        queue writes or schema changes;
+                                        output contains no paths or identifiers)
               video compatibility local-check --postgres-connection-env NAME --database DB
                                        (read-only Windows file-attribute availability
                                         for exact Rec.709 yuvj420p metadata candidates;
