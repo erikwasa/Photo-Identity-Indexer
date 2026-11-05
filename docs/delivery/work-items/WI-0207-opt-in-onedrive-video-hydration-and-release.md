@@ -287,3 +287,42 @@ See the
 [checkpoint 3 Windows verification runbook](../../operations/video-onedrive-wi0207-shared-admission.md).
 WI-0207 stays **in progress** until the final safeguards
 and separately authorized real-media pilot are accepted.
+
+## Maintained Windows acceptance — checkpoint 3 (2026-11-06)
+
+**Checkpoint 3 accepted; WI-0207 remains in progress.** After PR
+[#750](https://github.com/erikwasa/Photo-Identity-Indexer/pull/750)
+merged, the maintainer ran the combined
+`VideoManagedHydrationAdmissionTests`,
+`VideoHydrationReleaseGuardTests` and
+`VideoOnlineOnlyPreflightTests` filter against the maintained
+Windows checkout: **30 succeeded, 0 failed, 0 skipped** (3.1 s
+test duration; 34.0 s total build). The previously configured
+disposable PostgreSQL administrator variable was **present**;
+the real `PostgresVideoManagedHydrationTests` filter **executed
+one test and passed** (0 failed or skipped; 5.5 s build). This
+confirms persisted video/photo ownership-record type and lifecycle
+in a temporary database, rather than merely a test that silently
+returns because its test credential is absent.
+
+`PhotoIdentity.Docs validate` returned "Documentation registries
+and links are valid"; `generate --check` passed. No production
+PostgreSQL database, original-video bytes, OneDrive hydration/release
+or Archive advance were used.
+
+Two PowerShell output quirks do **not** change the acceptance:
+the `else` clause was run later as a separate command after the
+successful `if` and produced a parser/command error, and the
+final summary printed `IntegrationTests: NOT VERIFIED` because
+the separate reporting variable `$integrationPassed` had
+not been assigned in that shell. The authoritative test runner
+output explicitly confirms all 30 integration tests passed.
+No repeat test is required simply to correct a display variable.
+
+**Still open:** The indistinguishable app/user OneDrive `+p`
+pin prevents safe automatic release of pinned video originals.
+Cross-job/crash recovery and the one explicitly authorized
+real online-only hydrate/process/reuse/release example still
+require separate implementation and verification.
+`Include online-only videos` stays OFF until those gates are
+met; do not manufacture an online-only sample for this checkpoint.
