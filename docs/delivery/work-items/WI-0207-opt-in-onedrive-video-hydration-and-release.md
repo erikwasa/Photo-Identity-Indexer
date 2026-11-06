@@ -365,7 +365,10 @@ an explicit **resume-current-managed-local** path:
   with a database-side PostgreSQL LIMIT so normal photo hydration
   records are never loaded for this reconciliation.
   Only a file **already** reported online-only and unpinned
-  can have its old release receipt closed. All other cases
+  can have its old release receipt closed by an **atomic
+    PostgreSQL update requiring the same video receipt still to be
+    active and release-requested**. A concurrently superseded or
+    already-closed receipt is not counted as newly closed. All other cases
   leave ownership intact; the pass does **not** call OneDrive
   pin, unpin, hydrate, release or any original-byte API.
 - Fixed aggregate counts and reason codes omit all private
