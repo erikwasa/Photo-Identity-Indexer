@@ -91,14 +91,24 @@ public sealed class PostgresVideoManagedHydrationTests
                 x => x.AssetRevisionId == AssetRevisionId.From(videoRevision))
                 .IsVideo);
 
+            Assert.Empty(await managed.GetPendingVideoReleasesAsync(16));
             await managed.TouchAsync(AssetRevisionId.From(videoRevision),
                 now.AddMinutes(1));
             await managed.MarkReleaseRequestedAsync(
                 AssetRevisionId.From(videoRevision), now.AddMinutes(2));
+            ArchiveManagedHydrationLeaseState pending =
+                Assert.Single(await restarted.GetPendingVideoReleasesAsync(16));
+            Assert.Equal(AssetRevisionId.From(videoRevision),
+                pending.AssetRevisionId);
+            Assert.True(pending.IsVideo);
+            Assert.True(pending.IsReleaseRequested);
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                managed.GetPendingVideoReleasesAsync(17));
             Assert.True((await restarted.GetAsync(
                 AssetRevisionId.From(videoRevision)))!.IsReleaseRequested);
             await managed.MarkReleasedAsync(
                 AssetRevisionId.From(videoRevision), now.AddMinutes(3));
+            Assert.Empty(await restarted.GetPendingVideoReleasesAsync(16));
             Assert.DoesNotContain(await restarted.GetActiveLeasesAsync(),
                 x => x.AssetRevisionId == AssetRevisionId.From(videoRevision));
             Assert.Single(await restarted.GetActiveLeasesAsync());
