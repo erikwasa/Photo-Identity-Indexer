@@ -300,6 +300,35 @@ public sealed class PostgresArchiveHydrationRepository :
                 "Managed hydration ownership was unavailable after release request.");
     }
 
+    /// <summary>
+    /// Safe when a prior release was already requested and Windows now
+    /// reports online-only. Concurrent confirmations are idempotent.
+    /// Do not close unrequested, already released or non-video receipts.
+    /// </summary>
+    public async Task<bool> TryMarkVideoReleaseConfirmedAsync(
+        AssetRevisionId revisionId, DateTimeOffset releasedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE asset_revision_managed_hydrations hydration
+            SET released_at_utc = @released
+            WHERE hydration.asset_revision_id = @revision
+              AND hydration.released_at_utc IS NULL
+              AND hydration.release_requested_at_utc IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM asset_revisions revision
+                WHERE revision.id = hydration.asset_revision_id
+                  AND revision.media_kind = 'video'
+              );
+            """;
+        command.Parameters.AddWithValue("revision", revisionId.Value);
+        command.Parameters.AddWithValue("released", releasedAtUtc.ToUniversalTime());
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
     public async Task MarkReleasedAsync(
         AssetRevisionId revisionId,
         DateTimeOffset releasedAtUtc,
