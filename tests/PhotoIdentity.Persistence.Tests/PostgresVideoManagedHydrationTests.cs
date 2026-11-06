@@ -1,5 +1,6 @@
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
