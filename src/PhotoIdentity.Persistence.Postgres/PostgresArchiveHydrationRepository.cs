@@ -121,7 +121,7 @@ public sealed class PostgresArchiveHydrationRepository :
               ON usage.asset_revision_id = hydration.asset_revision_id
             WHERE hydration.released_at_utc IS NULL
               AND hydration.release_requested_at_utc IS NOT NULL
-              AND COALESCE(revision.media_kind = 'video', TRUE)
+              AND revision.media_kind = 'video'
             ORDER BY hydration.release_requested_at_utc,
                      hydration.asset_revision_id
             LIMIT @maximum;
