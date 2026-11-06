@@ -99,6 +99,17 @@ public interface IArchiveHydrationRepository
         DateTimeOffset requestedAtUtc,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Atomically confirm an already requested video release, but never
+    /// close a lease whose release request was cleared or superseded.
+    /// Implementations without atomic support fail closed.
+    /// </summary>
+    Task<bool> TryMarkVideoReleaseConfirmedAsync(
+        AssetRevisionId revisionId,
+        DateTimeOffset releasedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
     Task MarkReleasedAsync(
         AssetRevisionId revisionId,
         DateTimeOffset releasedAtUtc,
