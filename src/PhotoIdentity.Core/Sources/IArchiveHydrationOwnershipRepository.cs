@@ -64,6 +64,26 @@ public interface IArchiveHydrationRepository
     Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>> GetActiveLeasesAsync(
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Bounded read of durable, previously requested video release receipts.
+    /// Fallback keeps test/alternate persistence implementations compatible.
+    /// PostgreSQL overrides this with a database-side LIMIT so operator
+    /// Archive advances do not scan every managed photo hydration.
+    /// This must not issue any OneDrive operation.
+    /// </summary>
+    async Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
+        GetPendingVideoReleasesAsync(
+            int maximum,
+            CancellationToken cancellationToken = default)
+    {
+        if (maximum is < 1 or > 16)
+            throw new ArgumentOutOfRangeException(nameof(maximum));
+        return (await GetActiveLeasesAsync(cancellationToken))
+            .Where(item => item.IsVideo && item.IsReleaseRequested)
+            .Take(maximum)
+            .ToArray();
+    }
+
     Task<ArchiveManagedHydrationState> ClaimAsync(
         AssetRevisionId revisionId,
         DateTimeOffset requestedAtUtc,
