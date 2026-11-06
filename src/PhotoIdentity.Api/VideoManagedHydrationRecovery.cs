@@ -24,12 +24,9 @@ public sealed class VideoManagedHydrationRecovery(
     public async Task<VideoManagedHydrationRecoverySummary> ReconcileAsync(
         CancellationToken token = default)
     {
-        IReadOnlyList<ArchiveManagedHydrationLeaseState> active =
-            await ownership.GetActiveLeasesAsync(token);
-        ArchiveManagedHydrationLeaseState[] pending = active
-            .Where(x => x.IsVideo && x.IsReleaseRequested)
-            .Take(MaximumReceiptsPerAdvance)
-            .ToArray();
+        IReadOnlyList<ArchiveManagedHydrationLeaseState> pending =
+            await ownership.GetPendingVideoReleasesAsync(
+                MaximumReceiptsPerAdvance, token);
 
         int reconciled = 0, retained = 0, failed = 0;
         foreach (ArchiveManagedHydrationLeaseState lease in pending)
