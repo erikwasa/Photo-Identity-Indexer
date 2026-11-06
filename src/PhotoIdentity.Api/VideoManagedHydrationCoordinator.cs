@@ -9,6 +9,33 @@ using PhotoIdentity.Source.OneDriveSync;
 namespace PhotoIdentity.Api;
 
 /// <summary>
+/// Stable safety decision for local app-owned receipts after restart.
+/// </summary>
+public enum VideoManagedLocalReuseDisposition
+{
+    Unowned,
+    Reuse,
+    ReleasePending,
+    NoLongerLocal
+}
+
+public static class VideoManagedLocalReusePolicy
+{
+    public static VideoManagedLocalReuseDisposition Evaluate(
+        ArchiveManagedHydrationState? ownership,
+        OneDriveFilesOnDemandState state)
+    {
+        if (ownership is not { IsActive: true })
+            return VideoManagedLocalReuseDisposition.Unowned;
+        if (ownership.IsReleaseRequested)
+            return VideoManagedLocalReuseDisposition.ReleasePending;
+        return state.Availability == AssetAvailability.Local
+            ? VideoManagedLocalReuseDisposition.Reuse
+            : VideoManagedLocalReuseDisposition.NoLongerLocal;
+    }
+}
+
+/// <summary>
 /// WI-0207 shared-budget bridge for already-authorized video Archive work.
 /// No downloader, background worker or new per-video storage cache.
 /// Persist an app-owned revision receipt before any OneDrive +p request,
@@ -28,27 +55,7 @@ public sealed class VideoManagedHydrationCoordinator(
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
-        // The public service method may never be used as an arbitrary
-        // caller-supplied OneDrive path action.
-        if (!Path.IsPathFullyQualified(candidate.Root) ||
-            candidate.Root.StartsWith(@"\\", StringComparison.Ordinal) ||
-            Path.IsPathRooted(candidate.Key) ||
-            candidate.Key.Contains(':'))
-            throw new InvalidOperationException(
-                "Catalogue video path is not a safe local archive locator.");
-        string root = Path.TrimEndingDirectorySeparator(
-            Path.GetFullPath(candidate.Root));
-        string expectedPath = Path.GetFullPath(Path.Combine(
-            root, candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
-        if (!expectedPath.StartsWith(
-                root + Path.DirectorySeparatorChar,
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(expectedPath, Path.GetFullPath(sourcePath),
-                StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                "Selected video original does not match its catalogue locator.");
-        VideoDerivativeCacheGuard.AssertNoLinks(
-            Path.GetDirectoryName(expectedPath)!);
+        ValidateSelectedSourcePath(candidate, sourcePath);
 
         AssetRevisionLookup? revision =
             await ReadCurrentVideoRevisionAsync(candidate, token);
@@ -114,6 +121,78 @@ public sealed class VideoManagedHydrationCoordinator(
         if (!admitted.Allowed)
             throw new InvalidOperationException(
                 "Shared managed hydration budget denied video source admission.");
+    }
+
+
+    /// <summary>
+    /// Recover a prior app-owned local video after a pause, failed attempt
+    /// or process restart. This performs no new OneDrive operations. A
+    /// previously local user-owned original has no managed receipt and
+    /// is never claimed/released by this path. Active release refuses
+    /// reuse rather than racing an outstanding +u request.
+    /// </summary>
+    public async Task<bool> ResumeIfManagedLocalAsync(
+        VideoArchiveCandidate candidate, string sourcePath,
+        CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ValidateSelectedSourcePath(candidate, sourcePath);
+
+        AssetRevisionId revisionId = AssetRevisionId.From(candidate.RevisionId);
+        ArchiveManagedHydrationState? stored =
+            await ownership.GetAsync(revisionId, token);
+        if (stored is not { IsActive: true })
+            return false; // Pre-existing local user original: no ownership claim.
+
+        AssetRevisionLookup? current =
+            await ReadCurrentVideoRevisionAsync(candidate, token);
+        if (current is null)
+            throw new InvalidOperationException(
+                "Managed video source is no longer current or authorized.");
+
+        if (await sourceOwnership.GetAsync(
+                current.AssetId, token) is { IsActive: true })
+            throw new InvalidOperationException(
+                "Source-level hydration already owns this video asset.");
+
+        OneDriveFilesOnDemandState state = oneDrive.GetState(sourcePath);
+        VideoManagedLocalReuseDisposition decision =
+            VideoManagedLocalReusePolicy.Evaluate(stored, state);
+        if (decision != VideoManagedLocalReuseDisposition.Reuse)
+            throw new InvalidOperationException(
+                "Previously app-hydrated video is releasing or no longer local.");
+
+        await capacity.TouchAsync(revisionId, token);
+        return true;
+    }
+
+    private static void ValidateSelectedSourcePath(
+        VideoArchiveCandidate candidate, string sourcePath)
+    {
+        // Never treat a caller-provided path as permission to hydrate.
+        // Only the exact current catalogue candidate is allowed.
+        if (!Path.IsPathFullyQualified(candidate.Root) ||
+            candidate.Root.StartsWith(@"\\", StringComparison.Ordinal) ||
+            Path.IsPathRooted(candidate.Key) ||
+            candidate.Key.Contains(':'))
+            throw new InvalidOperationException(
+                "Catalogue video path is not a safe local archive locator.");
+
+        string root = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(candidate.Root));
+        string expectedPath = Path.GetFullPath(Path.Combine(
+            root, candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
+        if (!expectedPath.StartsWith(
+                root + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(expectedPath, Path.GetFullPath(sourcePath),
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "Selected video original does not match its catalogue locator.");
+
+        VideoDerivativeCacheGuard.AssertNoLinks(
+            Path.GetDirectoryName(expectedPath)!);
     }
 
     public Task TouchAsync(Guid revisionId, CancellationToken token = default) =>

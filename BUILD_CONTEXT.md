@@ -1,5 +1,36 @@
 # Build context
 
+**Current handoff — 2026-11-06: WI-0207 checkpoint 3 accepted,
+checkpoint 4 in implementation review.** The maintained Windows
+operator confirmed that PR #752 documentation verification passed:
+both docs validate and generate --check, and all 5 expected
+canonical WI-0207 status fields were True. This confirms the
+earlier accepted 30/30 focused integration tests and 1/1 real
+disposable PostgreSQL test after PR #750. No new original media
+tests or PostgreSQL production writes occurred.
+
+Next code checkpoint 4 reuses a persisted managed video lease
+when an already-local original is selected for a retry or after
+a restart. It never claims previously user-local unowned files,
+refuses active release state and revalidates the precise
+current/excluded video source before touching use. A separate
+operator-started, metadata-only reconciliation checks up to 16
+previously release-requested **video** managed receipts, using
+a PostgreSQL-side LIMIT and closing a receipt only when the
+file is already online-only and unpinned. It never requests
+new OneDrive hydration, pin/unpin, deletion or media reads;
+unknown/pinned/error states retain durable ownership.
+
+WI-0207 remains in progress. No safe release of the app +p
+pin is claimed: it cannot yet be distinguished from a user
+Always keep locally pin. Full cross-job race-free release
+admission and a separately authorized real online-only
+hydrate/process/reuse/release pilot remain open. **Keep
+Include online-only videos OFF.**
+See docs/operations/video-onedrive-wi0207-restart-recovery.md.
+
+**Historical handoffs follow.**
+
 **Current WI-0207 handoff — 2026-11-06: shared managed-hydration checkpoint 3 ACCEPTED.**
 PR #750 merged. Maintained Windows integration filter passed
 **30 succeeded / 0 failed / 0 skipped**; one real **disposable
