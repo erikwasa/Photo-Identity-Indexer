@@ -68,7 +68,7 @@ public sealed class VideoManagedHydrationRecovery(
         }
 
         return new VideoManagedHydrationRecoverySummary(
-            pending.Length, reconciled, retained, failed);
+            pending.Count, reconciled, retained, failed);
     }
 
     public static bool CanCloseReleaseReceipt(
