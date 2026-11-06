@@ -233,7 +233,7 @@ public sealed class VideoManagedHydrationRecoveryTests
         Assert.Contains("ownership.GetAsync(revisionId, token)", coordinator);
         Assert.Contains("await capacity.TouchAsync(revisionId, token)", coordinator);
         Assert.Contains("if (stored is not { IsActive: true })", coordinator);
-        Assert.Contains("await ownership.MarkReleasedAsync(", recovery);
+        Assert.Contains("TryMarkVideoReleaseConfirmedAsync(", recovery);
         Assert.Contains("GetPendingVideoReleasesAsync(", recovery);
         Assert.DoesNotContain("RequestOnlineOnlyAsync(", recovery);
         Assert.DoesNotContain("RequestHydrationAsync(", recovery);
@@ -301,16 +301,25 @@ public sealed class VideoManagedHydrationRecoveryTests
             AssetRevisionId id, DateTimeOffset when,
             CancellationToken token = default) =>
             throw new NotSupportedException("No cloud release in synthetic test.");
-        public Task MarkReleasedAsync(
+        public Task<bool> TryMarkVideoReleaseConfirmedAsync(
             AssetRevisionId id, DateTimeOffset when,
             CancellationToken token = default)
         {
             if (RejectMarkReleased)
                 throw new InvalidOperationException(
                     "Synthetic database rejected released receipt.");
+            if (!leases.Any(x => x.AssetRevisionId == id &&
+                x.IsVideo && x.IsReleaseRequested))
+                return Task.FromResult(false);
             Released.Add(id);
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
+
+        public Task MarkReleasedAsync(
+            AssetRevisionId id, DateTimeOffset when,
+            CancellationToken token = default) =>
+            throw new InvalidOperationException(
+                "Recovery must use only atomic video release confirmation.");
     }
 
     private sealed class FakeOneDrive(
