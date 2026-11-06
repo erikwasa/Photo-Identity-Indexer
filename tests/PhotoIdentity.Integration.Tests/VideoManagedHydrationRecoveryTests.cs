@@ -196,7 +196,7 @@ public sealed class VideoManagedHydrationRecoveryTests
         Assert.Contains("await capacity.TouchAsync(revisionId, token)", coordinator);
         Assert.Contains("if (stored is not { IsActive: true })", coordinator);
         Assert.Contains("await ownership.MarkReleasedAsync(", recovery);
-        Assert.Contains("x.IsVideo && x.IsReleaseRequested", recovery);
+        Assert.Contains("GetPendingVideoReleasesAsync(", recovery);
         Assert.DoesNotContain("RequestOnlineOnlyAsync(", recovery);
         Assert.DoesNotContain("RequestHydrationAsync(", recovery);
         Assert.DoesNotContain("FileStream(", recovery);
