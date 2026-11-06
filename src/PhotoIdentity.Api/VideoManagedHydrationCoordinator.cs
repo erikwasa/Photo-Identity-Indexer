@@ -170,27 +170,29 @@ public sealed class VideoManagedHydrationCoordinator(
     private static void ValidateSelectedSourcePath(
         VideoArchiveCandidate candidate, string sourcePath)
     {
-    // The public service method may never be used as an arbitrary
-    // caller-supplied OneDrive path action.
-    if (!Path.IsPathFullyQualified(candidate.Root) ||
-    candidate.Root.StartsWith(@"\\", StringComparison.Ordinal) ||
-    Path.IsPathRooted(candidate.Key) ||
-    candidate.Key.Contains(':'))
-    throw new InvalidOperationException(
-    "Catalogue video path is not a safe local archive locator.");
-    string root = Path.TrimEndingDirectorySeparator(
-    Path.GetFullPath(candidate.Root));
-    string expectedPath = Path.GetFullPath(Path.Combine(
-    root, candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
-    if (!expectedPath.StartsWith(
-    root + Path.DirectorySeparatorChar,
-    StringComparison.OrdinalIgnoreCase) ||
-    !string.Equals(expectedPath, Path.GetFullPath(sourcePath),
-    StringComparison.OrdinalIgnoreCase))
-    throw new InvalidOperationException(
-    "Selected video original does not match its catalogue locator.");
-    VideoDerivativeCacheGuard.AssertNoLinks(
-    Path.GetDirectoryName(expectedPath)!);
+        // Never treat a caller-provided path as permission to hydrate.
+        // Only the exact current catalogue candidate is allowed.
+        if (!Path.IsPathFullyQualified(candidate.Root) ||
+            candidate.Root.StartsWith(@"\\", StringComparison.Ordinal) ||
+            Path.IsPathRooted(candidate.Key) ||
+            candidate.Key.Contains(':'))
+            throw new InvalidOperationException(
+                "Catalogue video path is not a safe local archive locator.");
+
+        string root = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(candidate.Root));
+        string expectedPath = Path.GetFullPath(Path.Combine(
+            root, candidate.Key.Replace('/', Path.DirectorySeparatorChar)));
+        if (!expectedPath.StartsWith(
+                root + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(expectedPath, Path.GetFullPath(sourcePath),
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "Selected video original does not match its catalogue locator.");
+
+        VideoDerivativeCacheGuard.AssertNoLinks(
+            Path.GetDirectoryName(expectedPath)!);
     }
 
     public Task TouchAsync(Guid revisionId, CancellationToken token = default) =>
