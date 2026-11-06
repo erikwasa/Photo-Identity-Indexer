@@ -102,7 +102,7 @@ public sealed class PostgresVideoManagedHydrationTests
                 pending.AssetRevisionId);
             Assert.True(pending.IsVideo);
             Assert.True(pending.IsReleaseRequested);
-            Assert.Throws<ArgumentOutOfRangeException>(() =>
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
                 managed.GetPendingVideoReleasesAsync(17));
             Assert.True((await restarted.GetAsync(
                 AssetRevisionId.From(videoRevision)))!.IsReleaseRequested);
