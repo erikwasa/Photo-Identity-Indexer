@@ -224,6 +224,8 @@ public sealed class VideoManagedHydrationRecoveryTests
             "src", "PhotoIdentity.Api", "VideoManagedHydrationCoordinator.cs"));
         string recovery = File.ReadAllText(Path.Combine(root,
             "src", "PhotoIdentity.Api", "VideoManagedHydrationRecovery.cs"));
+        string capacity = File.ReadAllText(Path.Combine(root,
+            "src", "PhotoIdentity.Api", "ArchiveHydrationCapacityService.cs"));
         string program = File.ReadAllText(Path.Combine(root,
             "src", "PhotoIdentity.Api", "Program.cs"));
 
@@ -234,6 +236,8 @@ public sealed class VideoManagedHydrationRecoveryTests
         Assert.Contains("await capacity.TouchAsync(revisionId, token)", coordinator);
         Assert.Contains("if (stored is not { IsActive: true })", coordinator);
         Assert.Contains("TryMarkVideoReleaseConfirmedAsync(", recovery);
+        Assert.Contains("TryMarkVideoReleaseConfirmedAsync(", capacity);
+        Assert.Contains("if (lease.IsVideo && state.IsPinned)", capacity);
         Assert.Contains("GetPendingVideoReleasesAsync(", recovery);
         Assert.DoesNotContain("RequestOnlineOnlyAsync(", recovery);
         Assert.DoesNotContain("RequestHydrationAsync(", recovery);
