@@ -16,7 +16,9 @@ never claimed or automatically released by this recovery path.
 On an operator-started video Archive advance, a bounded PostgreSQL
 query returns at most 16 existing release-requested video receipts.
 Only when Windows metadata already reports an original online-only
-and unpinned does the recovery service mark the receipt released.
+and unpinned does the recovery service **conditionally** mark the
+receipt released. The PostgreSQL update requires the release request
+to remain outstanding; it never closes a newer or unrelated receipt.
 All local, pinned, downloading, missing, linked, unknown or error
 states retain ownership. The recovery pass never issues a new
 OneDrive download, pin, unpin, eviction or source-byte read.
