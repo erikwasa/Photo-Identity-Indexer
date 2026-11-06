@@ -150,6 +150,44 @@ public sealed class VideoManagedHydrationRecoveryTests
     }
 
     [Fact]
+    public async Task Failed_receipt_update_preserves_ownership_without_one_drive_mutation()
+    {
+        string root = NewScratchDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "2026"));
+            var lease = MakeLease(root, "2026/synthetic.mov", true, true);
+            var repository = new FakeOwnership([lease])
+            {
+                RejectMarkReleased = true
+            };
+            var platform = new FakeOneDrive(
+                new Dictionary<string, OneDriveFilesOnDemandState>
+                {
+                    [Path.Combine(root, "2026", "synthetic.mov")] =
+                        new(AssetAvailability.OnlineOnly, false, true)
+                });
+            var recovery = new VideoManagedHydrationRecovery(
+                repository, platform, TimeProvider.System);
+
+            VideoManagedHydrationRecoverySummary result =
+                await recovery.ReconcileAsync();
+
+            Assert.Equal(1, result.Inspected);
+            Assert.Equal(0, result.Reconciled);
+            Assert.Equal(0, result.Retained);
+            Assert.Equal(1, result.Failed);
+            Assert.Empty(repository.Released);
+            Assert.Equal(0, platform.HydrationRequests);
+            Assert.Equal(0, platform.ReleaseRequests);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void Recovery_rejects_unsafe_roots_traversal_and_linked_ancestors()
     {
         string root = NewScratchDirectory();
@@ -243,6 +281,7 @@ public sealed class VideoManagedHydrationRecoveryTests
         : IArchiveHydrationRepository
     {
         public List<AssetRevisionId> Released { get; } = [];
+        public bool RejectMarkReleased { get; set; }
 
         public Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
             GetActiveLeasesAsync(CancellationToken cancellationToken = default) =>
@@ -266,6 +305,9 @@ public sealed class VideoManagedHydrationRecoveryTests
             AssetRevisionId id, DateTimeOffset when,
             CancellationToken token = default)
         {
+            if (RejectMarkReleased)
+                throw new InvalidOperationException(
+                    "Synthetic database rejected released receipt.");
             Released.Add(id);
             return Task.CompletedTask;
         }
@@ -282,7 +324,7 @@ public sealed class VideoManagedHydrationRecoveryTests
         public OneDriveFilesOnDemandState GetState(string path)
         {
             MetadataChecks++;
-            return states.TryGetValue(path, out OneDriveFilesOnDemandState? state)
+            return states.TryGetValue(path, out OneDriveFilesOnDemandState state)
                 ? state : new(AssetAvailability.Unavailable, false, false);
         }
 
