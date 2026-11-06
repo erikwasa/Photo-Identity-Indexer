@@ -337,8 +337,11 @@ public sealed class VideoManagedHydrationRecoveryTests
         public OneDriveFilesOnDemandState GetState(string path)
         {
             MetadataChecks++;
-            return states.TryGetValue(path, out OneDriveFilesOnDemandState state)
-                ? state : new(AssetAvailability.Unavailable, false, false);
+            return states.TryGetValue(
+                    path, out OneDriveFilesOnDemandState? state) &&
+                    state is not null
+                ? state
+                : new(AssetAvailability.Unavailable, false, false);
         }
 
         public Task RequestHydrationAsync(
