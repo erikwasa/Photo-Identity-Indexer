@@ -106,8 +106,12 @@ public sealed class PostgresVideoManagedHydrationTests
                 managed.GetPendingVideoReleasesAsync(17));
             Assert.True((await restarted.GetAsync(
                 AssetRevisionId.From(videoRevision)))!.IsReleaseRequested);
-            await managed.MarkReleasedAsync(
-                AssetRevisionId.From(videoRevision), now.AddMinutes(3));
+            Assert.False(await managed.TryMarkVideoReleaseConfirmedAsync(
+                AssetRevisionId.From(photoRevision), now.AddMinutes(3)));
+            Assert.True(await managed.TryMarkVideoReleaseConfirmedAsync(
+                AssetRevisionId.From(videoRevision), now.AddMinutes(3)));
+            Assert.False(await managed.TryMarkVideoReleaseConfirmedAsync(
+                AssetRevisionId.From(videoRevision), now.AddMinutes(4)));
             Assert.Empty(await restarted.GetPendingVideoReleasesAsync(16));
             Assert.DoesNotContain(await restarted.GetActiveLeasesAsync(),
                 x => x.AssetRevisionId == AssetRevisionId.From(videoRevision));
