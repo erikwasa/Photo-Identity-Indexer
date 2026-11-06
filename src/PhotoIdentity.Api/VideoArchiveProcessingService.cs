@@ -22,6 +22,7 @@ public sealed class VideoArchiveProcessingService(
     IConfiguration configuration,
     IOneDriveFilesOnDemandPlatform oneDrive,
     VideoManagedHydrationCoordinator managedHydration,
+    VideoManagedHydrationRecovery hydrationRecovery,
     ILogger<VideoArchiveProcessingService> logger)
 {
     private const long MaxSourceBytes = 256L * 1024 * 1024;
@@ -148,6 +149,17 @@ public sealed class VideoArchiveProcessingService(
                 return false;
             }
 
+            // Reconcile at most 16 *already requested* managed-video
+            // releases after a crash/restart. Only confirm receipts whose
+            // source already reports online-only; never issue new OneDrive
+            // pin, download, eviction or unpin requests from this pass.
+            VideoManagedHydrationRecoverySummary recovery =
+                await hydrationRecovery.ReconcileAsync(token);
+            if (recovery.Reconciled > 0 || recovery.Failed > 0)
+                logger.LogInformation(
+                    "Managed video release receipt reconciliation: confirmed={Confirmed}; retained={Retained}; failed={Failed}.",
+                    recovery.Reconciled, recovery.Retained, recovery.Failed);
+
             // Recover expired claims after a crashed process before making
             // another attempt; never reset completed derivative receipts.
             await new PostgresVideoProcessingJobRepository(database)
@@ -239,6 +251,19 @@ public sealed class VideoArchiveProcessingService(
                             await Task.Delay(TimeSpan.FromSeconds(2),
                                 hydrationTimeout.Token);
                         }
+                    }
+                    else
+                    {
+                        // If a prior authorized Archive attempt hydrated
+                        // this source, recover its durable ownership after a
+                        // pause, worker crash or queued derivative retry.
+                        // Ordinary pre-existing local videos have no receipt
+                        // and are NEVER made app-owned by this lookup.
+                        ownedPath = ResolveOwnedSourcePath(
+                            candidate.Root, candidate.Key);
+                        ownedHydration = await managedHydration
+                            .ResumeIfManagedLocalAsync(
+                                candidate, ownedPath, token);
                     }
 
                     string local = source.GetLocalPath(reference);
