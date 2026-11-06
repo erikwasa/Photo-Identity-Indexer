@@ -46,9 +46,14 @@ public sealed class VideoManagedHydrationRecovery(
                 OneDriveFilesOnDemandState state = platform.GetState(sourcePath);
                 if (CanCloseReleaseReceipt(lease, state))
                 {
-                    await ownership.MarkReleasedAsync(
-                        lease.AssetRevisionId, timeProvider.GetUtcNow(), token);
-                    reconciled++;
+                    // The database transition is conditional: a pending
+                    // release may have been superseded after this metadata
+                    // check. Never close a new/unrequested managed lease.
+                    bool confirmed = await ownership
+                        .TryMarkVideoReleaseConfirmedAsync(
+                            lease.AssetRevisionId, timeProvider.GetUtcNow(), token);
+                    if (confirmed) reconciled++;
+                    else retained++;
                 }
                 else
                 {
