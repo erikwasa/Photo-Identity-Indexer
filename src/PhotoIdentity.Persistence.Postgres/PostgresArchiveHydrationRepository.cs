@@ -89,6 +89,63 @@ public sealed class PostgresArchiveHydrationRepository :
         return values;
     }
 
+    /// <summary>
+    /// Bounded database-side selection of only release-requested video
+    /// managed receipts; unlike GetActiveLeasesAsync this does not load
+    /// the entire photo-managed archive on each operator video step.
+    /// </summary>
+    public async Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
+        GetPendingVideoReleasesAsync(
+            int maximum, CancellationToken cancellationToken = default)
+    {
+        if (maximum is < 1 or > 16)
+            throw new ArgumentOutOfRangeException(nameof(maximum));
+
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT hydration.asset_revision_id, revision.asset_id,
+                   revision.size_bytes, source.root_locator,
+                   asset.source_key, hydration.requested_at_utc,
+                   COALESCE(usage.last_needed_at_utc,
+                            hydration.requested_at_utc),
+                   hydration.release_requested_at_utc,
+                   TRUE AS is_video
+            FROM asset_revision_managed_hydrations hydration
+            JOIN asset_revisions revision
+              ON revision.id = hydration.asset_revision_id
+            JOIN assets asset ON asset.id = revision.asset_id
+            JOIN sources source ON source.id = asset.source_id
+            LEFT JOIN asset_revision_managed_hydration_usage usage
+              ON usage.asset_revision_id = hydration.asset_revision_id
+            WHERE hydration.released_at_utc IS NULL
+              AND hydration.release_requested_at_utc IS NOT NULL
+              AND COALESCE(revision.media_kind = 'video', TRUE)
+            ORDER BY hydration.release_requested_at_utc,
+                     hydration.asset_revision_id
+            LIMIT @maximum;
+            """;
+        command.Parameters.AddWithValue("maximum", maximum);
+        List<ArchiveManagedHydrationLeaseState> result = [];
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new ArchiveManagedHydrationLeaseState(
+                AssetRevisionId.From(reader.GetGuid(0)),
+                AssetId.From(reader.GetGuid(1)),
+                reader.GetInt64(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                reader.GetFieldValue<DateTimeOffset>(6),
+                reader.GetFieldValue<DateTimeOffset>(7),
+                reader.GetBoolean(8)));
+        }
+        return result;
+    }
+
     public async Task<ArchiveManagedHydrationState> ClaimAsync(
         AssetRevisionId revisionId,
         DateTimeOffset requestedAtUtc,
