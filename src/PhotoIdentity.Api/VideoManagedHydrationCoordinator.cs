@@ -111,11 +111,12 @@ public sealed class VideoManagedHydrationCoordinator(
                     await ownership.ClaimAsync(
                         revision.RevisionId, timeProvider.GetUtcNow(), token);
 
-                // Claim is durable BEFORE requesting +p. A failed request
-                // leaves a conservatively tracked lease, not an untracked
-                // app-pinned original. The shared budget counts it as soon
-                // as it becomes local/downloading.
-                await oneDrive.RequestHydrationAsync(sourcePath, token);
+                // Claim is durable before a transient Cloud Files hydration.
+                // Unlike photo hydration, this video-specific request does
+                // NOT set the +p pin bit: it can be safely offered back to
+                // OneDrive when no dependent jobs need the bytes.
+                await oneDrive.RequestUnpinnedVideoHydrationAsync(
+                    sourcePath, token);
             }, token);
 
         if (!admitted.Allowed)
@@ -193,6 +194,85 @@ public sealed class VideoManagedHydrationCoordinator(
 
         VideoDerivativeCacheGuard.AssertNoLinks(
             Path.GetDirectoryName(expectedPath)!);
+    }
+
+    /// <summary>
+    /// After derivative completion or on a later operator-started idle
+    /// sweep, request release of only a still-authorized, still-unpinned
+    /// app-owned video. Source-row locking and the enqueue/restart release
+    /// gate ensure new derivative jobs cannot race the committed request.
+    /// </summary>
+    public async Task<bool> ReleaseIfIdleAsync(
+        VideoArchiveCandidate candidate, string path,
+        CancellationToken token = default)
+    {
+        ValidateSelectedSourcePath(candidate, path);
+        if (await ReadCurrentVideoRevisionAsync(candidate, token) is null)
+            return false;
+        return await TryRequestReleaseAsync(
+            AssetRevisionId.From(candidate.RevisionId), path, token);
+    }
+
+    public async Task<int> ReleaseIdleBatchAsync(
+        int maximum = 4, CancellationToken token = default)
+    {
+        if (maximum is < 1 or > 8)
+            throw new ArgumentOutOfRangeException(nameof(maximum));
+        var idle = await ownership.GetIdleVideoHydrationsAsync(maximum, token);
+        int requested = 0;
+        foreach (ArchiveManagedHydrationLeaseState lease in idle)
+        {
+            token.ThrowIfCancellationRequested();
+            string? path = VideoManagedHydrationRecovery.TryResolveMetadataPath(
+                lease.RootLocator, lease.SourceKey);
+            if (path is null) continue;
+            try
+            {
+                if (await TryRequestReleaseAsync(
+                        lease.AssetRevisionId, path, token))
+                    requested++;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // Local bytes and durable receipt remain; the next
+                // operator Archive advance may retry a pending release.
+                // Do not return private paths or cloud-provider details.
+            }
+        }
+        return requested;
+    }
+
+    private async Task<bool> TryRequestReleaseAsync(
+        AssetRevisionId revisionId, string path, CancellationToken token)
+    {
+        ArchiveManagedHydrationState? managed =
+            await ownership.GetAsync(revisionId, token);
+        if (managed is not { IsActive: true } || managed.IsReleaseRequested)
+            return false;
+        if ((await new PostgresVideoPhotoPriorityProbe(database)
+                .GetAsync(token)).PhotoWorkActive)
+            return false;
+
+        OneDriveFilesOnDemandState current = oneDrive.GetState(path);
+        if (current.Availability != AssetAvailability.Local ||
+            current.IsPinned)
+            return false;
+
+        // Source row serialization + a pending-release fence makes
+        // new video enqueues/restarts wait and then refuse the release
+        // window; queued/running jobs veto release.
+        if (!await ownership.TryRequestIdleVideoReleaseAsync(
+                revisionId, timeProvider.GetUtcNow(), token))
+            return false;
+
+        // Request only +u; never clear an app/user +p pin.
+        // If the sync client refuses, leave the pending durable receipt.
+        await oneDrive.RequestUnpinnedVideoReleaseAsync(path, token);
+        return true;
     }
 
     public Task TouchAsync(Guid revisionId, CancellationToken token = default) =>
