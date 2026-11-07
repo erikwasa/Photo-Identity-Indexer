@@ -133,9 +133,12 @@ public sealed class VideoArchiveProcessingService(
             VideoProcessingPreferences cyclePreferences = preferences.Current;
             VideoProxyRetentionLimits? publicationQuota =
                 cyclePreferences.ResolvePublicationQuota(configuration);
-            VideoProxyEncodingProfile encodingProfile =
+            VideoProxyEncodingProfile quality =
                 VideoProxyEncodingProfiles.Resolve(
                     preferences.Current.EncodingProfile);
+            VideoProxyEncodingProfile fullRangeConversion =
+                VideoProxyEncodingProfiles.ResolveForInput(
+                    quality.Key, fullRange: true);
             preflightStage = "runtime";
             var control = new PostgresVideoProcessingControlRepository(database);
             VideoProcessingControlState state = await control.GetAsync(token);
@@ -174,9 +177,10 @@ public sealed class VideoArchiveProcessingService(
                 await VideoArchiveCandidateSelector.SelectLocalFirstAsync(
                     preferences.Current.IncludeOnlineOnly,
                     include => FindOldestQueuedAsync(coverage, include,
-                        encodingProfile.Version, ffmpegHash, token),
+                        quality.Version, fullRangeConversion.Version,
+                        ffmpegHash, token),
                     include => FindPendingAsync(coverage, ffmpegHash, include,
-                        encodingProfile.Version, token));
+                        quality.Version, fullRangeConversion.Version, token));
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
@@ -189,7 +193,7 @@ public sealed class VideoArchiveProcessingService(
                     candidate = await FindPendingAsync(
                         coverage, ffmpegHash,
                         preferences.Current.IncludeOnlineOnly,
-                        encodingProfile.Version, token);
+                        quality.Version, fullRangeConversion.Version, token);
             }
             if (candidate is null)
             {
@@ -205,6 +209,11 @@ public sealed class VideoArchiveProcessingService(
                         : discovered ? "video-inspected" : "no-eligible-video");
                 return discovered || releaseRequests > 0;
             }
+            // Both pending and queued selections bind the same admitted
+            // metadata class; the worker independently proves staged bytes.
+            VideoProxyEncodingProfile encodingProfile =
+                VideoProxyEncodingProfiles.ResolveForInput(
+                    quality.Key, candidate.IsFullRange);
             bool ownedHydration = false;
             string? ownedPath = null;
             try
@@ -688,13 +697,15 @@ public sealed class VideoArchiveProcessingService(
     /// </summary>
     private async Task<VideoArchiveCandidate?> FindOldestQueuedAsync(
         ArchiveCoverageState coverage, bool includeOnlineOnly,
-        string presetVersion, string toolSha256, CancellationToken token)
+        string sdrPresetVersion, string fullRangePresetVersion,
+        string toolSha256, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
         query.CommandText = """
             SELECT job.id, revision.id, source.id, source.root_locator,
-                   asset.source_key, revision.size_bytes
+                   asset.source_key, revision.size_bytes,
+                   (metadata.pixel_format='yuvj420p')
             FROM video_processing_jobs job
             JOIN asset_revisions revision ON revision.id=job.asset_revision_id
             JOIN assets asset ON asset.id=revision.asset_id
@@ -703,7 +714,9 @@ public sealed class VideoArchiveProcessingService(
             WHERE job.status='queued'
               AND job.derivative_kind='PlayableProxy'
               AND job.policy_version='wi0188-v1'
-              AND job.preset_version=@preset AND job.tool_sha256=@tool
+              AND job.preset_version=(CASE
+                  WHEN metadata.pixel_format='yuvj420p' THEN @fullrange
+                  ELSE @preset END) AND job.tool_sha256=@tool
               AND job.cancellation_requested_at_utc IS NULL
               AND job.attempt_count<3 AND job.available_at_utc<=now()
               AND revision.media_kind='video' AND asset.media_kind='video'
@@ -712,6 +725,15 @@ public sealed class VideoArchiveProcessingService(
               AND revision.size_bytes=job.source_bytes
               AND revision.size_bytes BETWEEN 1 AND @max
               AND metadata.inspection_status='supported'
+              AND metadata.color_transfer='bt709'
+              AND metadata.video_codec IN ('h264','hevc')
+              AND metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')
+              AND (metadata.audio_codec IS NULL OR
+                   metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
+              AND metadata.coded_width BETWEEN 16 AND 4096
+              AND metadata.coded_height BETWEEN 16 AND 4096
+              AND metadata.duration_seconds BETWEEN 0.2 AND 600
+              AND metadata.display_rotation_degrees IN (0,90,-90,180,-180)
               AND revision.id=(
                   SELECT latest.id FROM asset_revisions latest
                   WHERE latest.asset_id=asset.id AND latest.media_kind='video'
@@ -723,7 +745,8 @@ public sealed class VideoArchiveProcessingService(
             ORDER BY job.requested_at_utc, job.id;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
-        query.Parameters.AddWithValue("preset", presetVersion);
+        query.Parameters.AddWithValue("preset", sdrPresetVersion);
+        query.Parameters.AddWithValue("fullrange", fullRangePresetVersion);
         query.Parameters.AddWithValue("tool", toolSha256);
         List<VideoArchiveCandidate> candidates = [];
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
@@ -731,7 +754,8 @@ public sealed class VideoArchiveProcessingService(
             while (await reader.ReadAsync(token))
                 candidates.Add(new VideoArchiveCandidate(
                     reader.GetGuid(1), reader.GetGuid(2), reader.GetString(3),
-                    reader.GetString(4), reader.GetInt64(5), reader.GetGuid(0)));
+                    reader.GetString(4), reader.GetInt64(5), reader.GetGuid(0),
+                    reader.GetBoolean(6)));
         }
         return await VideoArchiveCandidateSelector.SelectAsync(
             coverage, candidates, includeOnlineOnly, ReadAvailabilityAsync, token);
@@ -739,13 +763,15 @@ public sealed class VideoArchiveProcessingService(
 
     private async Task<VideoArchiveCandidate?> FindPendingAsync(
         ArchiveCoverageState coverage, string toolSha256,
-        bool includeOnlineOnly, string presetVersion, CancellationToken token)
+        bool includeOnlineOnly, string sdrPresetVersion,
+        string fullRangePresetVersion, CancellationToken token)
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
         query.CommandText = """
             SELECT revision.id, source.id, source.root_locator,
-                   asset.source_key, revision.size_bytes
+                   asset.source_key, revision.size_bytes,
+                   (metadata.pixel_format='yuvj420p')
             FROM asset_revisions revision
             JOIN assets asset ON asset.id=revision.asset_id
             JOIN sources source ON source.id=asset.source_id
@@ -755,9 +781,7 @@ public sealed class VideoArchiveProcessingService(
               AND metadata.inspection_status='supported'
               AND metadata.color_transfer='bt709'
               AND metadata.video_codec IN ('h264','hevc')
-              AND ((@fullrange AND metadata.pixel_format='yuvj420p')
-                   OR (NOT @fullrange AND
-                       metadata.pixel_format IN ('yuv420p','yuv420p10le')))
+              AND metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')
               AND (metadata.audio_codec IS NULL OR
                    metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
               AND metadata.coded_width BETWEEN 16 AND 4096
@@ -777,22 +801,24 @@ public sealed class VideoArchiveProcessingService(
                   SELECT 1 FROM video_processing_jobs job
                   WHERE job.asset_revision_id=revision.id
                     AND job.derivative_kind='PlayableProxy'
-                    AND job.preset_version=@preset AND job.tool_sha256=@tool
+                    AND job.preset_version=(CASE
+                  WHEN metadata.pixel_format='yuvj420p' THEN @fullrange
+                  ELSE @preset END) AND job.tool_sha256=@tool
                     AND job.policy_version='wi0188-v1')
             ORDER BY metadata.duration_seconds, revision.id;
             """;
         query.Parameters.AddWithValue("max", MaxSourceBytes);
-        query.Parameters.AddWithValue("preset", presetVersion);
+        query.Parameters.AddWithValue("preset", sdrPresetVersion);
+        query.Parameters.AddWithValue("fullrange", fullRangePresetVersion);
         query.Parameters.AddWithValue("tool", toolSha256);
-        query.Parameters.AddWithValue("fullrange",
-            presetVersion == VideoProxyEncodingProfiles.Rec709FullRange.Version);
         List<VideoArchiveCandidate> candidates = [];
         await using (NpgsqlDataReader reader = await query.ExecuteReaderAsync(token))
         {
             while (await reader.ReadAsync(token))
                 candidates.Add(new VideoArchiveCandidate(
                     reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2),
-                    reader.GetString(3), reader.GetInt64(4)));
+                    reader.GetString(3), reader.GetInt64(4), null,
+                    reader.GetBoolean(5)));
         }
         return await VideoArchiveCandidateSelector.SelectAsync(
             coverage, candidates, includeOnlineOnly, ReadAvailabilityAsync, token);
@@ -811,7 +837,7 @@ public sealed class VideoArchiveProcessingService(
 /// <summary>A catalogue video revision and optional existing queued job.</summary>
 public sealed record VideoArchiveCandidate(
     Guid RevisionId, Guid SourceId, string Root, string Key, long Size,
-    Guid? JobId = null);
+    Guid? JobId = null, bool IsFullRange = false);
 
 /// <summary>
 /// Shared local-first selection for the queued and newly inspected lanes.
