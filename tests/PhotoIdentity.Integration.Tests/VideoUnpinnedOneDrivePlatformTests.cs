@@ -70,13 +70,13 @@ public sealed class VideoUnpinnedOneDrivePlatformTests
     }
 
     [Fact]
-    public void Default_platform_methods_fail_closed_without_transient_cloud_support()
+    public async Task Default_platform_methods_fail_closed_without_transient_cloud_support()
     {
         IOneDriveFilesOnDemandPlatform legacy = new LegacyPlatform();
-        Assert.Throws<NotSupportedException>(
+        await Assert.ThrowsAsync<NotSupportedException>(
             () => legacy.RequestUnpinnedVideoHydrationAsync(
                 "synthetic-video-only.mov"));
-        Assert.Throws<NotSupportedException>(
+        await Assert.ThrowsAsync<NotSupportedException>(
             () => legacy.RequestUnpinnedVideoReleaseAsync(
                 "synthetic-video-only.mov"));
     }
