@@ -28,6 +28,12 @@ transparent. Implemented a consolidated next PR:
   previously release-requested unpinned local videos after
   a crash. Registered playable proxies remain independent
   of local original availability.
+- Online-only *metadata discovery* is deliberately local-only.
+  The old pre-inspection source-hydration code used +p and
+  -p without an immutable managed revision receipt, so
+  this PR refuses it. One-video pilot must use an existing
+  current supported inspected video; never-inspected clips
+  require normal local inspection first.
 - Focused synthetic and disposable PostgreSQL tests;
   one complete Windows local acceptance runbook:
   docs/operations/video-onedrive-wi0207-full-local-acceptance.md.
