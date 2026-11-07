@@ -51,3 +51,10 @@ evidence:
   value: docs/operations/video-onedrive-wi0207-full-local-acceptance.md
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/755
+
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/759
+- type: maintainer-verification
+  value: '2026-11-08: Maintained Windows live WI-0207 accepted for an already-inspected SDR source: all focused integration/disposable PostgreSQL/docs and preflight checks passed; one authorized online-only unpinned original hydrated exclusively, Standard 720p playable proxy published (+1 succeeded, 31 to 32), original returned online-only/unpinned and remained so during proxy replay, no collateral hydration or user-pinned file changes. Zero queued/running/failed jobs afterwards; dependent jobs before release not separately observed. This accepts the existing managed hydration/release path, not first-time online-only metadata discovery.'
+- type: implementation
+  value: '2026-11-08: Follow-up scope identified: online-only unknown MOV/MP4 originals cannot enter the current revision-locked hydration lane; one folder had five online-only clips (four within size cap), no eligible Archive video, while DB-wide preflight had nine supported candidates, none online-only. Add safe provisional source-level admission, unpinned hydration, inspection, ownership promotion and release/recovery; clarify last-idle result versus published; one new live first-time placeholder acceptance deferred until the entire implementation and CI are ready.'
