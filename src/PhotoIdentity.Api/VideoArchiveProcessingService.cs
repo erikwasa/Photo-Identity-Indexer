@@ -30,9 +30,13 @@ public sealed class VideoArchiveProcessingService(
     private readonly object _activeLock = new();
     private CancellationTokenSource? _active;
     private string _lastResult = "not-run";
+    private string _lastActivityResult = "not-run";
     private string _lastPosterResult = "not-run";
     private VideoAttemptFailureDiagnostic? _lastAttemptFailure;
     public string LastResult => Volatile.Read(ref _lastResult);
+    // Last substantive outcome is not cleared by a later empty Archive scan.
+    // This is in-memory operator feedback; durable job history is PostgreSQL.
+    public string LastActivityResult => Volatile.Read(ref _lastActivityResult);
     public string LastPosterResult => Volatile.Read(ref _lastPosterResult);
 
     public static bool ShouldCreateAutomaticPoster(
@@ -207,6 +211,10 @@ public sealed class VideoArchiveProcessingService(
                 // completed-job and interrupted-attempt cleanup gap.
                 int releaseRequests = await managedHydration
                     .ReleaseIdleBatchAsync(4, token);
+                if (discovery != VideoDiscoveryOutcome.None)
+                    Volatile.Write(ref _lastActivityResult,
+                        discovery == VideoDiscoveryOutcome.Unsupported
+                            ? "video-inspected-unsupported" : "video-inspected");
                 Volatile.Write(ref _lastResult,
                     releaseRequests > 0
                         ? "video-managed-release-requested"
@@ -317,6 +325,7 @@ public sealed class VideoArchiveProcessingService(
                             selectedJobId: selectedJobId,
                             requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
+                Volatile.Write(ref _lastActivityResult, result.ReasonCode);
                 if (candidate is { } publishedCandidate &&
                     ShouldCreateAutomaticPoster(cyclePreferences, result))
                 {
@@ -424,11 +433,13 @@ public sealed class VideoArchiveProcessingService(
         catch (OperationCanceledException) when (active.IsCancellationRequested)
         {
             Volatile.Write(ref _lastResult, "paused");
+            Volatile.Write(ref _lastActivityResult, "paused");
             return true; // Archive pause or shutdown; lease fencing handles retry.
         }
         catch (OperationCanceledException)
         {
             Volatile.Write(ref _lastResult, "source-timeout");
+            Volatile.Write(ref _lastActivityResult, "source-timeout");
             return false;
         }
         catch (Exception exception)
@@ -437,6 +448,7 @@ public sealed class VideoArchiveProcessingService(
             // native exception messages are returned to clients or logs.
             string code = ClassifyFailure(exception, preflightStage);
             Volatile.Write(ref _lastResult, code);
+            Volatile.Write(ref _lastActivityResult, code);
             logger.LogWarning("Video processing ended with {Code}.", code);
             return false;
         }
@@ -689,6 +701,7 @@ public sealed class VideoArchiveProcessingService(
                 using CancellationTokenSource timeout =
                     CancellationTokenSource.CreateLinkedTokenSource(token);
                 timeout.CancelAfter(TimeSpan.FromMinutes(5));
+                Volatile.Write(ref _lastResult, "video-inspection-hydrating");
                 await managedHydration.RequestForUninspectedAsync(
                     provisional, local, timeout.Token);
                 while (await videos.GetAvailabilityAsync(
