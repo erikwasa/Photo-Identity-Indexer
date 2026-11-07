@@ -23,7 +23,7 @@ public static class VideoFaceCatalogueEvidenceReader
             SELECT face_occurrence_id, action_kind, person_id,
                    ROW_NUMBER() OVER (
                        PARTITION BY face_occurrence_id ORDER BY id DESC) AS position
-            FROM review_actions
+            FROM public.review_actions
             WHERE action_kind IN ('assign', 'unknown', 'reject')
               AND reversed_at_utc IS NULL
         ),
@@ -34,10 +34,10 @@ public static class VideoFaceCatalogueEvidenceReader
               AND person_id IS NOT NULL
             UNION
             SELECT label.face_occurrence_id, label.person_id
-            FROM person_labels AS label
+            FROM public.person_labels AS label
             WHERE label.label_kind = 'confirmed'
               AND NOT EXISTS (
-                  SELECT 1 FROM review_actions AS action
+                  SELECT 1 FROM public.review_actions AS action
                   WHERE action.face_occurrence_id = label.face_occurrence_id)
         ),
         eligible AS (
@@ -49,13 +49,13 @@ public static class VideoFaceCatalogueEvidenceReader
                        ORDER BY embedding.created_at_utc DESC, embedding.id DESC
                    ) AS unique_photo_rank
             FROM confirmed
-            JOIN people AS person ON person.id = confirmed.person_id
+            JOIN public.people AS person ON person.id = confirmed.person_id
                 AND person.merged_into_person_id IS NULL
-            JOIN face_occurrences AS face ON face.id = confirmed.face_occurrence_id
-            JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
-            JOIN assets AS asset ON asset.id = revision.asset_id
-            JOIN face_crops AS crop ON crop.face_occurrence_id = face.id
-            JOIN embeddings AS embedding ON embedding.face_crop_id = crop.id
+            JOIN public.face_occurrences AS face ON face.id = confirmed.face_occurrence_id
+            JOIN public.asset_revisions AS revision ON revision.id = face.asset_revision_id
+            JOIN public.assets AS asset ON asset.id = revision.asset_id
+            JOIN public.face_crops AS crop ON crop.face_occurrence_id = face.id
+            JOIN public.embeddings AS embedding ON embedding.face_crop_id = crop.id
             WHERE confirmed.person_id = ANY(@people)
               AND asset.deleted_at_utc IS NULL
               AND asset.media_kind = 'photo'
@@ -64,7 +64,7 @@ public static class VideoFaceCatalogueEvidenceReader
               AND embedding.model_hash = @model_hash
               AND crop.crop_protocol = @alignment
               AND NOT EXISTS (
-                  SELECT 1 FROM asset_revisions AS newer
+                  SELECT 1 FROM public.asset_revisions AS newer
                   WHERE newer.asset_id = revision.asset_id
                     AND (newer.observed_at_utc > revision.observed_at_utc
                          OR (newer.observed_at_utc = revision.observed_at_utc
@@ -137,6 +137,12 @@ public static class VideoFaceCatalogueEvidenceReader
             await readonlyCommand.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await using (var schema = new NpgsqlCommand(
+            "SET LOCAL search_path TO pg_catalog, public;", connection, transaction))
+        {
+            await schema.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         // READ ONLY on a transaction is not a substitute for a least-privilege
         // login. Fail closed if the actual session role can write ANY public table,
         // create a table, or elevate privileges. No role setup is attempted here.
@@ -169,7 +175,7 @@ public static class VideoFaceCatalogueEvidenceReader
         long lastEmbedding;
         await using (var version = new NpgsqlCommand("""
             SELECT clock_timestamp(), pg_current_snapshot()::text,
-                   COALESCE((SELECT MAX(id) FROM review_actions), 0),
+                   COALESCE((SELECT MAX(id) FROM public.review_actions), 0),
                    COALESCE((SELECT MAX(id) FROM embeddings
                        WHERE model_id = @model_id AND model_hash = @model_hash), 0);
             """, connection, transaction))
