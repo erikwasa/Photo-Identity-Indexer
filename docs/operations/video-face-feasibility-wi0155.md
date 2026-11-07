@@ -852,3 +852,149 @@ Neither choice is pre-decided. It is acceptable to complete
 feasibility with a documented decision and a separate production
 follow-up; do not interpret experimental PR merges as permission
 to merge the entire branch into main.
+
+
+## Checkpoint 6 — read-only catalogue evidence across several videos (experimental PR)
+
+This new checkpoint supersedes the older statements above that catalogue
+access and a multi-clip command are not implemented. It remains on **wi-0155**,
+not main. The original manual-reference command remains available and unchanged.
+No API, UI, worker, production matcher, identity assignment or schema migration
+is involved.
+
+The standalone command accepts a **private case manifest** containing 1–32
+explicitly chosen canonical person UUIDs and **2–4** distinct already-local
+video frame manifests (1–36 frames per clip). Each clip still has its own
+maximum-ten-minute, timestamped coverage frame set. The entire cohort uses
+**one** PostgreSQL REPEATABLE READ / READ ONLY evidence snapshot loaded into
+memory before video inference begins. The transaction is rolled back before
+inference and never performs writes. Only the currently eligible latest
+assigned/confirmed faces from non-merged people and current nondeleted photo
+revisions participate. Unknown, rejected, reversed, merged, superseded and
+incompatible evidence is excluded. The selected SFace model ID, exact SHA-256,
+128 dimensions and five-point crop alignment must match the approved model.
+At most three independent source-photo exemplars are used **per person**.
+
+Ranking is by person (best exemplar per person), not by reference-photo count;
+the runner-up is a different person. A high cosine score, or highest score
+among many sampled frames, is NOT proof of identity. There are no calibrated
+video identification cutoffs. Diagnostics retain weak/ambiguous rankings
+privately without forcing an unknown face into a known person. A per-clip
+rank summary is **not** a person count, a track or a verified identification.
+
+### Database role setup, separately performed by the operator
+
+The command accepts **only loopback PostgreSQL** on localhost, 127.0.0.1 or
+::1, and requires PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING, a separate
+connection string for a dedicated role. It rejects any role that can CREATE
+a database/schema, write any public table, or elevate to superuser/role admin.
+The transaction is also expressly READ ONLY. Do not reuse the application's
+normal connection credentials.
+
+A PostgreSQL administrator may use this example in a **separate maintenance
+session**, after replacing the database name and selecting a private password.
+No role-creation or GRANT command is performed by the experiment:
+
+~~~sql
+CREATE ROLE wi0155_reader LOGIN PASSWORD '<supply-private-unique-password>';
+GRANT CONNECT ON DATABASE photoidentity TO wi0155_reader;
+GRANT USAGE ON SCHEMA public TO wi0155_reader;
+GRANT SELECT ON TABLE
+    public.assets, public.asset_revisions, public.face_occurrences,
+    public.face_crops, public.embeddings, public.people,
+    public.person_labels, public.review_actions
+TO wi0155_reader;
+~~~
+
+Never grant INSERT, UPDATE, DELETE, TRUNCATE, CREATE, role inheritance,
+or superuser permissions to this role. Ensure no pre-existing PUBLIC/role
+privilege grants defeat least privilege. Database ACL setup is a separate
+maintainer/DBA action, not a change to Photo Identity.
+
+### Private case manifest and trial
+
+Use the approved existing FFmpeg frame sampler separately for the already
+known baseline and at least one new, diverse, approved **fully local** clip.
+Include a known positive and an intentionally *unknown to this selected
+gallery* negative. Do not use online-only media, any source in OneDrive, or
+unapproved videos. To find canonical people, use the application or a
+local read-only SQL session; a read-only query against public.people can
+display IDs and names privately. Never commit or share that mapping.
+
+Store this file **outside every Git worktree** in its own local nonsynced
+folder, separate from the frame folders. Replace both sample UUIDs and
+absolute frame-manifest paths privately; the example UUIDs are placeholders:
+
+~~~json
+{
+  "schemaVersion": 1,
+  "people": [
+    { "alias": "P01", "personId": "11111111-1111-4111-8111-111111111111" },
+    { "alias": "P02", "personId": "22222222-2222-4222-8222-222222222222" }
+  ],
+  "clips": [
+    { "alias": "V01", "manifest": "C:\\Private\\wi0155\\clip01\\selected-frames.json" },
+    { "alias": "V02", "manifest": "C:\\Private\\wi0155\\clip02\\selected-frames.json" }
+  ]
+}
+~~~
+
+P01/P02 and V01/V02 are *operator-supplied aliases*, not people discovered
+automatically. Every selected person must have at least one eligible exact-model
+exemplar; missing person evidence fails the whole trial rather than silently
+assuming a negative outcome. All reports are brand-new private JSON files, never
+overwritten and never written into the repository or any input folder.
+No names, person IDs, embeddings, original file paths or face images appear
+in report output or standard output. Reported frame times, ranks, scores,
+aliases and the snapshot token are still private biometric-derived evidence.
+
+~~~powershell
+# PowerShell 7.6 — use the separate WI-0155 worktree at merged wi-0155 HEAD.
+Set-Location "C:\Kod\codex\Photo Identity Indexer-WI0155"
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw "WI-0155 tests failed" }
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw "Docs validation failed" }
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+if ($LASTEXITCODE -ne 0) { throw "Generated docs out of date" }
+
+# EDIT paths and local DB name/port. Keep cases and report in different folders.
+$privateCases = "C:\Private\wi0155\catalogue-cases\cases.json"
+$privateReport = "C:\Private\wi0155\reports\catalogue-trial-01.json"
+if (Test-Path -LiteralPath $privateReport) {
+    throw "Choose a new report filename"
+}
+$readOnlyPassword = Read-Host "Separate WI-0155 read-only DB password" -MaskInput
+$env:PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING = (
+    "Host=127.0.0.1;Port=5432;Database=photoidentity;" +
+    "Username=wi0155_reader;Password=$readOnlyPassword"
+)
+Remove-Variable readOnlyPassword
+
+try {
+    $argsForTrial = @("--catalogue-cases", $privateCases,
+        "--private-report", $privateReport, "--root", (Get-Location).Path,
+        "--detector-confidence", "0.7")
+    dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- @argsForTrial
+    if ($LASTEXITCODE -ne 0) { throw "Private catalogue trial failed" }
+}
+finally {
+    Remove-Item Env:PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING -ErrorAction SilentlyContinue
+}
+~~~
+
+Only share **aggregate, non-identifying** outcomes. Inspect the report
+privately (the operator-held case file maps alias to person). For each clip:
+count distinct people actually seen by a human; how many have at least one
+usable detected face; which known people have correct rank-1 at least once;
+wrong, weak, ambiguous and missing suggestions; false known-person
+suggestions for deliberately excluded people; and redundant review observations.
+Also note total runtime, missed sampling windows and usable/borderline/
+unusable quality. No tool-derived group count equals the number of people.
+The CLI does **not** automatically determine the visual quality or human
+ground truth. Repeat the complete cohort when the catalogue changes, because
+separate invocations do not share a database snapshot.
+
+**Acceptance remains open** until those private real-video observations
+are reviewed by the maintainer. The choice between small in-app integration
+and a separate video-recognition component remains explicitly deferred.
