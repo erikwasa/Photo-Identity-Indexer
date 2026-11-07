@@ -448,22 +448,25 @@ public sealed class VideoManagedHydrationCoordinator(
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ValidateSelectedSourcePath(candidate, sourcePath);
 
+        AssetRevisionLookup? current =
+            await ReadCurrentVideoRevisionAsync(candidate, token);
+        if (current is null)
+            throw new InvalidOperationException(
+                "Video source is no longer current or authorized.");
+
+        // Check provisional ownership BEFORE deciding this is an unowned
+        // pre-existing local video. A failed transfer or a pending +u must
+        // never race proxy decoding as if the original were user-local.
+        if (await sourceOwnership.GetAsync(
+                current.AssetId, token) is { IsActive: true })
+            throw new InvalidOperationException(
+                "Source-level video hydration still owns or releases this asset.");
+
         AssetRevisionId revisionId = AssetRevisionId.From(candidate.RevisionId);
         ArchiveManagedHydrationState? stored =
             await ownership.GetAsync(revisionId, token);
         if (stored is not { IsActive: true })
             return false; // Pre-existing local user original: no ownership claim.
-
-        AssetRevisionLookup? current =
-            await ReadCurrentVideoRevisionAsync(candidate, token);
-        if (current is null)
-            throw new InvalidOperationException(
-                "Managed video source is no longer current or authorized.");
-
-        if (await sourceOwnership.GetAsync(
-                current.AssetId, token) is { IsActive: true })
-            throw new InvalidOperationException(
-                "Source-level hydration already owns this video asset.");
 
         OneDriveFilesOnDemandState state = oneDrive.GetState(sourcePath);
         VideoManagedLocalReuseDisposition decision =
