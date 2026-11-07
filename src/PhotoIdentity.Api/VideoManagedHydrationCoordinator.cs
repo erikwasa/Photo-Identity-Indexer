@@ -209,10 +209,12 @@ public sealed class VideoManagedHydrationCoordinator(
 
         if (state.Availability == AssetAvailability.OnlineOnly)
         {
-            // No data to release if hydration was requested but never started.
-            await sourceOwnership.MarkReleasedAsync(
-                observation.AssetId, timeProvider.GetUtcNow(), token);
-            return true;
+            // An interrupted synchronous CfHydratePlaceholder can complete
+            // AFTER its caller has cancelled. Do not close source ownership
+            // merely because bytes were not yet local at this instant.
+            // The next operator-controlled inspection/recovery retains this
+            // lease until an actual eligible release can be established.
+            return false;
         }
         if (state.Availability != AssetAvailability.Local ||
             !MatchesProvisionalObservation(observation, path))
