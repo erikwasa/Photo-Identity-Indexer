@@ -155,6 +155,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
         ReadObservationAsync(
             """
             WHERE asset.source_id = @id
+              AND asset.media_kind = 'photo'
               AND asset.deleted_at_utc IS NULL
               AND observation.verification_state <> 'verified'
             ORDER BY
