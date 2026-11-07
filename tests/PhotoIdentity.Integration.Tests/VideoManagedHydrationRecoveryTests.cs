@@ -188,6 +188,52 @@ public sealed class VideoManagedHydrationRecoveryTests
     }
 
     [Fact]
+    public async Task Pending_unpinned_release_retries_without_clearing_pin_and_confirms_later()
+    {
+        string root = NewScratchDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "2026"));
+            var lease = MakeLease(root, "2026/unpinned.mov", true, true);
+            string path = Path.Combine(root, "2026", "unpinned.mov");
+            var states = new Dictionary<string, OneDriveFilesOnDemandState>
+            {
+                [path] = new(AssetAvailability.Local, false, false)
+            };
+            var repository = new FakeOwnership([lease]);
+            var platform = new FakeOneDrive(states);
+            var recovery = new VideoManagedHydrationRecovery(
+                repository, platform, TimeProvider.System);
+
+            var first = await recovery.ReconcileAsync();
+            Assert.Equal(1, first.Inspected);
+            Assert.Equal(0, first.Reconciled);
+            Assert.Equal(1, first.Retained);
+            Assert.Equal(1, platform.UnpinnedVideoReleaseRequests);
+            Assert.Equal(0, platform.ReleaseRequests); // Never invokes -p.
+            Assert.Empty(repository.Released);
+
+            // A separate sync client reports that +u has completed.
+            states[path] = new(AssetAvailability.OnlineOnly, false, true);
+            var second = await recovery.ReconcileAsync();
+            Assert.Equal(1, second.Reconciled);
+            Assert.Equal(1, platform.UnpinnedVideoReleaseRequests);
+            Assert.Equal([lease.AssetRevisionId], repository.Released);
+
+            // A user's pin prevents even reissuing +u on an outstanding
+            // receipt; the app never chooses to clear that pin.
+            states[path] = new(AssetAvailability.Local, true, false);
+            var third = await recovery.ReconcileAsync();
+            Assert.Equal(0, third.Reconciled);
+            Assert.Equal(1, platform.UnpinnedVideoReleaseRequests);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void Recovery_rejects_unsafe_roots_traversal_and_linked_ancestors()
     {
         string root = NewScratchDirectory();
@@ -240,6 +286,8 @@ public sealed class VideoManagedHydrationRecoveryTests
         Assert.Contains("if (lease.IsVideo && state.IsPinned)", capacity);
         Assert.Contains("GetPendingVideoReleasesAsync(", recovery);
         Assert.DoesNotContain("RequestOnlineOnlyAsync(", recovery);
+        Assert.Contains("RequestUnpinnedVideoReleaseAsync(", recovery);
+        Assert.Contains("CanRetryVideoReleaseAsync(", recovery);
         Assert.DoesNotContain("RequestHydrationAsync(", recovery);
         Assert.DoesNotContain("FileStream(", recovery);
         Assert.Contains("AddSingleton<VideoManagedHydrationRecovery>()", program);
@@ -286,6 +334,11 @@ public sealed class VideoManagedHydrationRecoveryTests
     {
         public List<AssetRevisionId> Released { get; } = [];
         public bool RejectMarkReleased { get; set; }
+        public Task<bool> CanRetryVideoReleaseAsync(
+            AssetRevisionId id, CancellationToken token = default) =>
+            Task.FromResult(leases.Any(
+                x => x.AssetRevisionId == id &&
+                    x.IsVideo && x.IsReleaseRequested));
 
         public Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
             GetActiveLeasesAsync(CancellationToken cancellationToken = default) =>
@@ -333,6 +386,7 @@ public sealed class VideoManagedHydrationRecoveryTests
         public int MetadataChecks { get; private set; }
         public int HydrationRequests { get; private set; }
         public int ReleaseRequests { get; private set; }
+        public int UnpinnedVideoReleaseRequests { get; private set; }
 
         public OneDriveFilesOnDemandState GetState(string path)
         {
@@ -356,6 +410,13 @@ public sealed class VideoManagedHydrationRecoveryTests
         {
             ReleaseRequests++;
             throw new InvalidOperationException("Forbidden release.");
+        }
+
+        public Task RequestUnpinnedVideoReleaseAsync(
+            string path, CancellationToken token = default)
+        {
+            UnpinnedVideoReleaseRequests++;
+            return Task.CompletedTask; // Asynchronous cloud metadata request.
         }
     }
 }

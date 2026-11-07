@@ -100,6 +100,33 @@ public interface IArchiveHydrationRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Return up to the requested limit of current, unexcluded app-managed
+    /// videos no longer needed by queued/running derivative work.
+    /// </summary>
+    Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
+        GetIdleVideoHydrationsAsync(
+            int maximum, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ArchiveManagedHydrationLeaseState>>([]);
+
+    /// <summary>
+    /// Gate an app-owned release under the same source row lock used when
+    /// new video jobs are enqueued. Once granted, subsequent enqueue must
+    /// reject an outstanding release until the original is rehydrated.
+    /// </summary>
+    Task<bool> TryRequestIdleVideoReleaseAsync(
+        AssetRevisionId revisionId, DateTimeOffset requestedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
+    /// <summary>
+    /// Check that a previously requested video release is still authorized
+    /// and has no queued/running derivative dependencies before retry.
+    /// </summary>
+    Task<bool> CanRetryVideoReleaseAsync(
+        AssetRevisionId revisionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
+    /// <summary>
     /// Atomically confirm an already requested video release, but never
     /// close a lease whose release request was cleared or superseded.
     /// Implementations without atomic support fail closed.

@@ -1,5 +1,58 @@
 # Build context
 
+**Current handoff — 2026-11-07: WI-0207 one-PR end-to-end
+candidate, awaiting CI and single real local acceptance.**
+PR #754 merged after the maintained operator accepted
+checkpoint 4: 35/35 focused integration tests, 1/1 actual
+disposable PostgreSQL receipt test, and docs validation/
+generation checks. No real OneDrive hydration was run.
+
+The maintainer explicitly asked to stop fragmenting WI-0207
+into many checkpoint PRs and get the **entire work item ready
+for local review after the next PR**, preferring a pragmatic
+working path over perfection as long as shortcuts are
+transparent. Implemented a consolidated next PR:
+
+- Opt-in video-only Windows CfHydratePlaceholder through the
+  *existing OneDrive sync provider*, avoiding persistent
+  +p pinning. Photo hydration remains unchanged; app-managed
+  source-size/free-space/concurrency caps remain.
+- Durable app hydration ownership before requesting bytes.
+  Release only if the current source remains authorized,
+  unpinned and has no queued/running video derivatives.
+  SQL serializes release admission against normal enqueue
+  and explicit terminal-job restart under the source lock;
+  jobs refuse a pending managed video release.
+- End-of-job +u-only release (never -p), a bounded idle
+  sweep on operator-started Archive advances, and retry of
+  previously release-requested unpinned local videos after
+  a crash. Registered playable proxies remain independent
+  of local original availability.
+- Online-only *metadata discovery* is deliberately local-only.
+  The old pre-inspection source-hydration code used +p and
+  -p without an immutable managed revision receipt, so
+  this PR refuses it. One-video pilot must use an existing
+  current supported inspected video; never-inspected clips
+  require normal local inspection first.
+- Focused synthetic and disposable PostgreSQL tests;
+  one complete Windows local acceptance runbook:
+  docs/operations/video-onedrive-wi0207-full-local-acceptance.md.
+
+**Deliberate limits:** no new background cleanup daemon,
+Windows-only native hydration (can outlive a canceled wait),
+a narrow check-to-+u user pin race, and preserved legacy
+app +p video receipts (never auto-clear old ambiguous pins).
+If the Cloud Files operation is unsupported, fail closed
+instead of silently permanently pinning. Do not claim
+full media acceptance until the operator explicitly approves
+and exercises **one** current supported online-only video,
+verifies its local processing/proxy playback, and its
+eventual return to online-only. No original files or
+production database were changed by this development step.
+**WI-0207 stays in progress** until that evidence is accepted.
+
+**Historical handoffs follow.**
+
 
 **Current handoff — 2026-11-07: WI-0207 checkpoint 4 accepted.**
 PR #753 merged; final-head GitHub Actions #3625 passed.

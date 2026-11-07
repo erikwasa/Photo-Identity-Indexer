@@ -28,10 +28,10 @@ public sealed class VideoManagedHydrationAdmissionTests
 
         Assert.Contains("ExecuteHydrationAdmissionAsync(", source);
         Assert.Contains("ownership.ClaimAsync(", source);
-        Assert.Contains("await oneDrive.RequestHydrationAsync(", source);
+        Assert.Contains("await oneDrive.RequestUnpinnedVideoHydrationAsync(", source);
         Assert.True(source.IndexOf("await ownership.ClaimAsync(",
             StringComparison.Ordinal) <
-            source.IndexOf("await oneDrive.RequestHydrationAsync(",
+            source.IndexOf("await oneDrive.RequestUnpinnedVideoHydrationAsync(",
                 StringComparison.Ordinal));
         Assert.Contains("sourceOwnership.GetAsync(", source);
         Assert.Contains("asset.deleted_at_utc IS NULL", source);
@@ -47,7 +47,10 @@ public sealed class VideoManagedHydrationAdmissionTests
         Assert.DoesNotContain("await oneDrive.RequestHydrationAsync(ownedPath",
             worker);
         Assert.Contains("managedHydration.TouchAsync(", worker);
-        Assert.Contains("managedHydration.MarkRequestedReleaseAsync(", worker);
+        Assert.Contains("managedHydration.ReleaseIfIdleAsync(", worker);
+        Assert.Contains("ReleaseIdleBatchAsync(", worker);
+        Assert.Contains("TryRequestIdleVideoReleaseAsync(", source);
+        Assert.Contains("RequestUnpinnedVideoReleaseAsync(", source);
         Assert.Contains("AddSingleton<VideoManagedHydrationCoordinator>()",
             program);
     }

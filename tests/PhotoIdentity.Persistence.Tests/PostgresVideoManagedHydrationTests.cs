@@ -61,6 +61,12 @@ public sealed class PostgresVideoManagedHydrationTests
                         4096,now(),'video/quicktime','video'),
                            (@photoRevision,@photoAsset,repeat('b',64),
                         512,now(),'image/jpeg','photo');
+                    INSERT INTO video_revision_metadata (
+                        asset_revision_id,inspection_status,color_transfer,
+                        duration_seconds,inspected_at_utc,tool_sha256,
+                        inspection_profile_id)
+                    VALUES (@videoRevision,'supported','bt709',6,now(),
+                            repeat('d',64),'synthetic');
                     """;
                 seed.Parameters.AddWithValue("source", source);
                 seed.Parameters.AddWithValue("videoAsset", videoAsset);
@@ -93,10 +99,55 @@ public sealed class PostgresVideoManagedHydrationTests
                 .IsVideo);
 
             Assert.Empty(await managed.GetPendingVideoReleasesAsync(16));
+            Assert.False(await managed.TryRequestIdleVideoReleaseAsync(
+                AssetRevisionId.From(photoRevision), now.AddMinutes(1)));
+            Assert.Single(await managed.GetIdleVideoHydrationsAsync(8));
+
+            // A queued derivative keeps the app-owned video local.
+            Guid job = Guid.NewGuid();
+            await using (NpgsqlConnection db = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand enqueue = db.CreateCommand())
+            {
+                enqueue.CommandText = """
+                    INSERT INTO video_processing_jobs(
+                        id,asset_revision_id,idempotency_key,derivative_kind,
+                        policy_version,preset_version,tool_sha256,
+                        source_bytes,reserved_temporary_bytes,requested_frames)
+                    VALUES (
+                        @job,@revision,@key,'PlayableProxy','wi0207-fixture',
+                        'synthetic',repeat('c',64),4096,8192,0);
+                    """;
+                enqueue.Parameters.AddWithValue("job", job);
+                enqueue.Parameters.AddWithValue("revision", videoRevision);
+                enqueue.Parameters.AddWithValue("key", new string('e',64));
+                await enqueue.ExecuteNonQueryAsync();
+            }
+            Assert.False(await managed.TryRequestIdleVideoReleaseAsync(
+                AssetRevisionId.From(videoRevision), now.AddMinutes(1)));
+            Assert.Empty(await managed.GetIdleVideoHydrationsAsync(8));
+            await using (NpgsqlConnection db = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand finish = db.CreateCommand())
+            {
+                finish.CommandText = """
+                    UPDATE video_processing_jobs
+                    SET status='succeeded',completed_at_utc=now()
+                    WHERE id=@job;
+                    """;
+                finish.Parameters.AddWithValue("job", job);
+                await finish.ExecuteNonQueryAsync();
+            }
+            Assert.Single(await managed.GetIdleVideoHydrationsAsync(8));
             await managed.TouchAsync(AssetRevisionId.From(videoRevision),
                 now.AddMinutes(1));
-            await managed.MarkReleaseRequestedAsync(
-                AssetRevisionId.From(videoRevision), now.AddMinutes(2));
+            Assert.True(await managed.TryRequestIdleVideoReleaseAsync(
+                AssetRevisionId.From(videoRevision), now.AddMinutes(2)));
+            Assert.False(await managed.TryRequestIdleVideoReleaseAsync(
+                AssetRevisionId.From(videoRevision), now.AddMinutes(3)));
+            Assert.Empty(await managed.GetIdleVideoHydrationsAsync(8));
+            Assert.True(await managed.CanRetryVideoReleaseAsync(
+                AssetRevisionId.From(videoRevision)));
+            Assert.False(await managed.CanRetryVideoReleaseAsync(
+                AssetRevisionId.From(photoRevision)));
             ArchiveManagedHydrationLeaseState pending =
                 Assert.Single(await restarted.GetPendingVideoReleasesAsync(16));
             Assert.Equal(AssetRevisionId.From(videoRevision),

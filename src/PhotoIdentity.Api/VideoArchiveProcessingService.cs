@@ -149,10 +149,10 @@ public sealed class VideoArchiveProcessingService(
                 return false;
             }
 
-            // Reconcile at most 16 *already requested* managed-video
-            // releases after a crash/restart. Only confirm receipts whose
-            // source already reports online-only; never issue new OneDrive
-            // pin, download, eviction or unpin requests from this pass.
+            // Reconcile at most 16 pending managed-video release receipts.
+            // Confirm online-only state, or retry the +u-only operation
+            // for a still-local, unpinned, authorized prior request.
+            // Never perform a new hydration or clear an existing pin.
             VideoManagedHydrationRecoverySummary recovery =
                 await hydrationRecovery.ReconcileAsync(token);
             if (recovery.Reconciled > 0 || recovery.Failed > 0)
@@ -193,11 +193,17 @@ public sealed class VideoArchiveProcessingService(
             }
             if (candidate is null)
             {
-                // Never claim an unrelated queued job when the current
-                // coverage has no admissible video.
+                // Release previously managed, no-longer-needed video
+                // originals even when there is no new job this cycle.
+                // A bounded, operator-initiated sweep closes the
+                // completed-job and interrupted-attempt cleanup gap.
+                int releaseRequests = await managedHydration
+                    .ReleaseIdleBatchAsync(4, token);
                 Volatile.Write(ref _lastResult,
-                    discovered ? "video-inspected" : "no-eligible-video");
-                return discovered;
+                    releaseRequests > 0
+                        ? "video-managed-release-requested"
+                        : discovered ? "video-inspected" : "no-eligible-video");
+                return discovered || releaseRequests > 0;
             }
             bool ownedHydration = false;
             string? ownedPath = null;
@@ -236,12 +242,12 @@ public sealed class VideoArchiveProcessingService(
                         // Use the same durable revision receipt and capacity/
                         // concurrent-operation gate as photo hydration. No
                         // video request may bypass configured storage limits.
-                        await managedHydration.RequestForSelectedAsync(
-                            candidate, ownedPath, token);
-                        ownedHydration = true;
                         using CancellationTokenSource hydrationTimeout =
                             CancellationTokenSource.CreateLinkedTokenSource(token);
                         hydrationTimeout.CancelAfter(TimeSpan.FromMinutes(5));
+                        await managedHydration.RequestForSelectedAsync(
+                            candidate, ownedPath, hydrationTimeout.Token);
+                        ownedHydration = true;
                         while (await source.GetAvailabilityAsync(
                             reference, hydrationTimeout.Token) != AssetAvailability.Local)
                         {
@@ -348,10 +354,10 @@ public sealed class VideoArchiveProcessingService(
                 // dependent jobs through a fresh database read, as well as
                 // current Files On-Demand state and photo priority.
                 //
-                // +p makes app and user pinning indistinguishable: a pinned
-                // file is always retained here. WI-0207 must establish
-                // durable pin ownership before general automatic release.
-                // Already-local originals are never considered for release.
+                // New video hydration does not +p. If the user pins the
+                // original meanwhile (or a legacy app +p receipt exists),
+                // its pin is never cleared by video cleanup.
+                // Pre-existing user-local originals remain unowned.
                 if (ownedHydration && ownedPath is not null)
                 {
                     try
@@ -373,10 +379,12 @@ public sealed class VideoArchiveProcessingService(
                             dependents, photoWork);
                         if (decision == VideoHydrationReleaseGuard.ReleaseAllowed)
                         {
-                            await oneDrive.RequestOnlineOnlyAsync(
-                                ownedPath, cleanup.Token);
-                            await managedHydration.MarkRequestedReleaseAsync(
-                                candidate.RevisionId, cleanup.Token);
+                            // Never clear +p. Transient, unpinned app
+                            // hydrations are offered back with +u only.
+                            // The committed release admission is serialized
+                            // with new queued/restarted derivative jobs.
+                            await managedHydration.ReleaseIfIdleAsync(
+                                candidate, ownedPath, cleanup.Token);
                         }
                         else
                         {
@@ -600,7 +608,10 @@ public sealed class VideoArchiveProcessingService(
                 excluded.Add(reader.GetString(0));
         }
 
-        SourceAsset? onlineCandidate = null;
+        // Do not hydrate a never-inspected online-only source just to
+        // discover its metadata. Its immutable revision does not yet exist
+        // for durable video managed-lease admission. Only already-catalogued
+        // supported video revisions may use opt-in transient hydration.
         SourceAsset? localCandidate = null;
         // A bounded discovery scan of metadata only. No content bytes are
         // opened until a single candidate has been chosen.
@@ -620,9 +631,7 @@ public sealed class VideoArchiveProcessingService(
                         localCandidate ??= video;
                         break;
                     }
-                    if (preferences.Current.IncludeOnlineOnly &&
-                        video.Availability == AssetAvailability.OnlineOnly)
-                        onlineCandidate ??= video;
+
                 }
             }
             catch (DirectoryNotFoundException)
@@ -633,87 +642,43 @@ public sealed class VideoArchiveProcessingService(
             if (localCandidate is not null) break;
         }
 
-        SourceAsset? selected = localCandidate ?? onlineCandidate;
+        SourceAsset? selected = localCandidate;
         if (selected is null) return false;
-        bool hydratedByUs = false;
-        string? hydratedPath = null;
-        try
-        {
-            if (selected.Availability == AssetAvailability.OnlineOnly)
-            {
-                hydratedPath = ResolveOwnedSourcePath(
-                    sourceState.RootLocator, selected.Reference.ItemKey);
-                VideoScratchCapacityGuard.EnsureCapacity(
-                    sourceState.RootLocator, selected.SizeBytes);
-                if (oneDrive.GetSyncClientAvailability() ==
-                    OneDriveSyncClientAvailability.Unavailable)
-                    throw new InvalidOperationException(
-                        "OneDrive is unavailable for video metadata retrieval.");
-                await oneDrive.RequestHydrationAsync(hydratedPath, token);
-                hydratedByUs = true;
-                using CancellationTokenSource timeout =
-                    CancellationTokenSource.CreateLinkedTokenSource(token);
-                timeout.CancelAfter(TimeSpan.FromMinutes(5));
-                while (await videos.GetAvailabilityAsync(
-                    selected.Reference, timeout.Token) != AssetAvailability.Local)
-                {
-                    if ((await new PostgresVideoPhotoPriorityProbe(database)
-                            .GetAsync(timeout.Token)).PhotoWorkActive)
-                        return false;
-                    await Task.Delay(TimeSpan.FromSeconds(2), timeout.Token);
-                }
-            }
-            if (await videos.GetAvailabilityAsync(selected.Reference, token) !=
-                AssetAvailability.Local)
-                return false;
 
-            string local = videos.GetLocalPath(selected.Reference);
-            FileInfo file = new(local);
-            if (!VideoIngestCommandRunner.MatchesObservation(selected, file))
-                return false;
-            var probe = new VideoPilotMediaTools(ffprobe, TimeSpan.FromSeconds(20));
-            VideoPilotMetadata media = await probe.ProbeAsync(local, token);
-            byte[] digest;
-            await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
-                digest = await SHA256.HashDataAsync(original, token);
-            if (!VideoIngestCommandRunner.MatchesObservation(selected, file) ||
-                await videos.GetAvailabilityAsync(selected.Reference, token) !=
-                    AssetAvailability.Local)
-                return false;
-            var verified = new VerifiedLocalVideo(sourceState,
-                new SourceAsset(selected.Reference, selected.RelativePath,
-                    selected.MediaType, selected.SizeBytes,
-                    selected.LastWriteTimeUtc, AssetAvailability.Local),
-                new Sha256Digest(Convert.ToHexString(digest).ToLowerInvariant()),
-                DateTimeOffset.UtcNow);
-            RegisteredVideoRevision revision =
-                await new PostgresVideoAssetRepository(database)
-                    .RegisterVerifiedAsync(verified, token);
-            await new PostgresVideoEvidenceRepository(database)
-                .SaveInspectionAsync(VideoIngestCommandRunner.BuildInspection(
-                    revision.RevisionId, media, Required("FfprobeSha256"),
-                    DateTimeOffset.UtcNow), token);
-            return true;
-        }
-        finally
-        {
-            if (hydratedByUs && hydratedPath is not null)
-            {
-                try
-                {
-                    using CancellationTokenSource cleanup =
-                        new(TimeSpan.FromSeconds(15));
-                    await oneDrive.RequestOnlineOnlyAsync(hydratedPath, cleanup.Token);
-                }
-                catch (Exception exception) when (
-                    exception is IOException or UnauthorizedAccessException
-                        or OperationCanceledException)
-                {
-                    logger.LogWarning(
-                        "App-initiated video inspection hydration could not be released.");
-                }
-            }
-        }
+        // This metadata-inspection lane is strictly local-only; it never
+        // pins or dehydrates a source. Pre-inspected current revisions are
+        // eligible for the separate opt-in managed hydration lane.
+        if (await videos.GetAvailabilityAsync(selected.Reference, token) !=
+            AssetAvailability.Local)
+            return false;
+
+        string local = videos.GetLocalPath(selected.Reference);
+        FileInfo file = new(local);
+        if (!VideoIngestCommandRunner.MatchesObservation(selected, file))
+            return false;
+        var probe = new VideoPilotMediaTools(ffprobe, TimeSpan.FromSeconds(20));
+        VideoPilotMetadata media = await probe.ProbeAsync(local, token);
+        byte[] digest;
+        await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
+            digest = await SHA256.HashDataAsync(original, token);
+        if (!VideoIngestCommandRunner.MatchesObservation(selected, file) ||
+            await videos.GetAvailabilityAsync(selected.Reference, token) !=
+                AssetAvailability.Local)
+            return false;
+        var verified = new VerifiedLocalVideo(sourceState,
+            new SourceAsset(selected.Reference, selected.RelativePath,
+                selected.MediaType, selected.SizeBytes,
+                selected.LastWriteTimeUtc, AssetAvailability.Local),
+            new Sha256Digest(Convert.ToHexString(digest).ToLowerInvariant()),
+            DateTimeOffset.UtcNow);
+        RegisteredVideoRevision revision =
+            await new PostgresVideoAssetRepository(database)
+                .RegisterVerifiedAsync(verified, token);
+        await new PostgresVideoEvidenceRepository(database)
+            .SaveInspectionAsync(VideoIngestCommandRunner.BuildInspection(
+                revision.RevisionId, media, Required("FfprobeSha256"),
+                DateTimeOffset.UtcNow), token);
+        return true;
     }
 
     /// <summary>

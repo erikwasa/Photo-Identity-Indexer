@@ -62,7 +62,8 @@ public sealed class VideoHydrationReleaseGuardTests
         Assert.Contains("oneDrive.GetState(ownedPath)", worker);
         Assert.Contains(
             "if (decision == VideoHydrationReleaseGuard.ReleaseAllowed)", worker);
-        Assert.Contains("await oneDrive.RequestOnlineOnlyAsync(", worker);
+        Assert.Contains("await managedHydration.ReleaseIfIdleAsync(", worker);
+        Assert.DoesNotContain("await oneDrive.RequestOnlineOnlyAsync(", worker);
         Assert.DoesNotContain("File.Delete(ownedPath", worker);
     }
 
