@@ -222,3 +222,11 @@ excluded from playable proxy production, and output quality remains
 only Standard 720p or Compact 540p. Never-inspected online-only
 acceptance is **not yet claimed**; defer new live-media verification
 until the development PR's CI passes.
+
+**Internal eligibility consolidation (draft PR #761):** Source eligibility
+for queued and newly inspected video is routed through one
+`VideoApprovedInputPolicy`, while independent Standard/Compact proxy
+recipes remain unchanged. Format extensions must define an approved
+source conversion and prove output before the shared eligibility
+policy is widened; the UI never acquires a format-specific output
+preset. The real first-inspection OneDrive outcome remains pending.
