@@ -239,6 +239,8 @@ public sealed class VideoManagedHydrationCoordinator(
                   AND observed.observed_last_write_ticks=@ticks
                   AND NOT EXISTS (
                     SELECT 1 FROM asset_revisions revision
+                    JOIN video_revision_metadata inspection
+                      ON inspection.asset_revision_id=revision.id
                     WHERE revision.asset_id=asset.id AND revision.media_kind='video')
                   AND NOT EXISTS (
                     SELECT 1 FROM source_copy_exclusions exclusion
@@ -377,6 +379,8 @@ public sealed class VideoManagedHydrationCoordinator(
                   AND observed.observed_media_type=@media
                   AND NOT EXISTS (
                     SELECT 1 FROM asset_revisions revision
+                    JOIN video_revision_metadata inspection
+                      ON inspection.asset_revision_id=revision.id
                     WHERE revision.asset_id=asset.id AND revision.media_kind='video')
                   AND NOT EXISTS (
                     SELECT 1 FROM source_copy_exclusions exclusion
@@ -412,6 +416,9 @@ public sealed class VideoManagedHydrationCoordinator(
                     SELECT newest.id FROM asset_revisions newest
                     WHERE newest.asset_id=asset.id AND newest.media_kind='video'
                     ORDER BY newest.observed_at_utc DESC,newest.id DESC LIMIT 1)
+                  AND EXISTS (
+                    SELECT 1 FROM video_revision_metadata inspection
+                    WHERE inspection.asset_revision_id=revision.id)
                   AND NOT EXISTS (
                     SELECT 1 FROM source_copy_exclusions exclusion
                     WHERE exclusion.source_id=asset.source_id
