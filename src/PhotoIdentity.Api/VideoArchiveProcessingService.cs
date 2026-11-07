@@ -149,10 +149,10 @@ public sealed class VideoArchiveProcessingService(
                 return false;
             }
 
-            // Reconcile at most 16 *already requested* managed-video
-            // releases after a crash/restart. Only confirm receipts whose
-            // source already reports online-only; never issue new OneDrive
-            // pin, download, eviction or unpin requests from this pass.
+            // Reconcile at most 16 pending managed-video release receipts.
+            // Confirm online-only state, or retry the +u-only operation
+            // for a still-local, unpinned, authorized prior request.
+            // Never perform a new hydration or clear an existing pin.
             VideoManagedHydrationRecoverySummary recovery =
                 await hydrationRecovery.ReconcileAsync(token);
             if (recovery.Reconciled > 0 || recovery.Failed > 0)
@@ -193,11 +193,17 @@ public sealed class VideoArchiveProcessingService(
             }
             if (candidate is null)
             {
-                // Never claim an unrelated queued job when the current
-                // coverage has no admissible video.
+                // Release previously managed, no-longer-needed video
+                // originals even when there is no new job this cycle.
+                // A bounded, operator-initiated sweep closes the
+                // completed-job and interrupted-attempt cleanup gap.
+                int releaseRequests = await managedHydration
+                    .ReleaseIdleBatchAsync(4, token);
                 Volatile.Write(ref _lastResult,
-                    discovered ? "video-inspected" : "no-eligible-video");
-                return discovered;
+                    releaseRequests > 0
+                        ? "video-managed-release-requested"
+                        : discovered ? "video-inspected" : "no-eligible-video");
+                return discovered || releaseRequests > 0;
             }
             bool ownedHydration = false;
             string? ownedPath = null;
@@ -348,10 +354,10 @@ public sealed class VideoArchiveProcessingService(
                 // dependent jobs through a fresh database read, as well as
                 // current Files On-Demand state and photo priority.
                 //
-                // +p makes app and user pinning indistinguishable: a pinned
-                // file is always retained here. WI-0207 must establish
-                // durable pin ownership before general automatic release.
-                // Already-local originals are never considered for release.
+                // New video hydration does not +p. If the user pins the
+                // original meanwhile (or a legacy app +p receipt exists),
+                // its pin is never cleared by video cleanup.
+                // Pre-existing user-local originals remain unowned.
                 if (ownedHydration && ownedPath is not null)
                 {
                     try
@@ -373,10 +379,12 @@ public sealed class VideoArchiveProcessingService(
                             dependents, photoWork);
                         if (decision == VideoHydrationReleaseGuard.ReleaseAllowed)
                         {
-                            await oneDrive.RequestOnlineOnlyAsync(
-                                ownedPath, cleanup.Token);
-                            await managedHydration.MarkRequestedReleaseAsync(
-                                candidate.RevisionId, cleanup.Token);
+                            // Never clear +p. Transient, unpinned app
+                            // hydrations are offered back with +u only.
+                            // The committed release admission is serialized
+                            // with new queued/restarted derivative jobs.
+                            await managedHydration.ReleaseIfIdleAsync(
+                                candidate, ownedPath, cleanup.Token);
                         }
                         else
                         {
