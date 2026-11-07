@@ -515,7 +515,8 @@ public sealed class ArchiveHydrationCapacityService
                 lease.LastNeededAtUtc,
                 lease.IsReleaseRequested,
                 null,
-                lease.AssetId);
+                lease.AssetId,
+                lease.IsVideo);
             if (await ObserveLeaseAsync(normalized, cancellationToken) is ObservedManagedLease value)
             {
                 observed.Add(value);
