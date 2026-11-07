@@ -11,7 +11,8 @@ public sealed record VideoManagedHydrationRecoverySummary(
 /// WI-0207 operator-started recovery of durable video release receipts.
 /// The only permitted mutation is marking an already-requested release
 /// complete AFTER Files On-Demand reports the original is online-only.
-/// Never issues a new hydration, pin, unpin, eviction or original-byte read.
+/// Only a previously authorized, pending, local *unpinned* release can
+/// be retried with +u; no pin clearing, new hydration or original-byte read.
 /// Unknown, pinned, corrupt and unreachable states retain ownership.
 /// </summary>
 public sealed class VideoManagedHydrationRecovery(
@@ -54,6 +55,20 @@ public sealed class VideoManagedHydrationRecovery(
                             lease.AssetRevisionId, timeProvider.GetUtcNow(), token);
                     if (confirmed) reconciled++;
                     else retained++;
+                }
+                else if (lease.IsVideo && lease.IsReleaseRequested &&
+                    state.Availability == AssetAvailability.Local &&
+                    !state.IsPinned &&
+                    await ownership.CanRetryVideoReleaseAsync(
+                        lease.AssetRevisionId, token))
+                {
+                    // The previous release request may have failed after
+                    // its durable admission was committed. Retries are
+                    // bounded by operator-started advances and must never
+                    // clear a user pin: +u only after fresh metadata.
+                    await platform.RequestUnpinnedVideoReleaseAsync(
+                        sourcePath, token);
+                    retained++; // Confirm only on a later OnlineOnly observation.
                 }
                 else
                 {
