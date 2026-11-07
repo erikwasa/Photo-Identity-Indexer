@@ -652,9 +652,11 @@ public sealed class VideoArchiveProcessingService(
                 await foreach (SourceAsset video in videos.EnumerateAsync(
                     new SourceScanOptions(folder), token))
                 {
-                    if (video.SizeBytes is < 1 or > MaxSourceBytes ||
-                        inspected.Contains(video.Reference.ItemKey) ||
-                        excluded.Contains(video.Reference.ItemKey))
+                    if (!VideoFirstInspectionAdmission.CanDiscover(
+                            video,
+                            inspected.Contains(video.Reference.ItemKey),
+                            excluded.Contains(video.Reference.ItemKey),
+                            preferences.Current.IncludeOnlineOnly))
                         continue;
                     if (video.Availability == AssetAvailability.Local)
                     {
@@ -994,6 +996,30 @@ public sealed class VideoArchiveProcessingService(
             SourceId.From(candidate.SourceId), candidate.Root);
         return source.GetAvailabilityAsync(
             new SourceAssetReference(source.SourceId, candidate.Key), token);
+    }
+}
+
+/// <summary>
+/// Source-metadata-only first-inspection admission. No placeholder is opened,
+/// unpinned, hydrated or registered by this eligibility check. Existing
+/// video job/revision selectors apply their independent durable fences.
+/// </summary>
+public static class VideoFirstInspectionAdmission
+{
+    public static bool CanDiscover(
+        SourceAsset source, bool alreadyInspected, bool excluded,
+        bool includeOnlineOnly)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (alreadyInspected || excluded ||
+            source.SizeBytes is < 1 or > 256L * 1024 * 1024 ||
+            source.MediaType is not ("video/mp4" or "video/quicktime") ||
+            Path.GetExtension(source.Reference.ItemKey).ToLowerInvariant()
+                is not (".mov" or ".mp4"))
+            return false;
+        return source.Availability == AssetAvailability.Local ||
+            (includeOnlineOnly &&
+             source.Availability == AssetAvailability.OnlineOnly);
     }
 }
 
