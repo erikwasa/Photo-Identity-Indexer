@@ -242,12 +242,12 @@ public sealed class VideoArchiveProcessingService(
                         // Use the same durable revision receipt and capacity/
                         // concurrent-operation gate as photo hydration. No
                         // video request may bypass configured storage limits.
-                        await managedHydration.RequestForSelectedAsync(
-                            candidate, ownedPath, token);
-                        ownedHydration = true;
                         using CancellationTokenSource hydrationTimeout =
                             CancellationTokenSource.CreateLinkedTokenSource(token);
                         hydrationTimeout.CancelAfter(TimeSpan.FromMinutes(5));
+                        await managedHydration.RequestForSelectedAsync(
+                            candidate, ownedPath, hydrationTimeout.Token);
+                        ownedHydration = true;
                         while (await source.GetAvailabilityAsync(
                             reference, hydrationTimeout.Token) != AssetAvailability.Local)
                         {
