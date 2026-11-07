@@ -69,7 +69,22 @@ public static class VideoFaceCatalogueRunner
                 string folder = Path.GetDirectoryName(Path.GetFullPath(clip.Manifest))!;
                 VideoFacePrivateReview review = await experiment.RunWithPreparedMatcherAsync(
                     frames, folder, matcher, options.DetectorConfidence);
-                reviews.Add(new VideoFaceCatalogueClipReview(clip.Alias, review));
+                var personRanks = review.Diagnostics!.RankedFaces
+                    .GroupBy(face => face.TopReferenceAlias, StringComparer.Ordinal)
+                    .Select(group => new VideoFaceCataloguePersonRankSummary(
+                        group.Key,
+                        group.Count(),
+                        group.Max(face => face.TopSimilarity),
+                        review.Findings.Count(f => f.CandidateAlias == group.Key &&
+                            f.ReviewStatus == "review-candidate")))
+                    .OrderBy(s => s.Alias, StringComparer.Ordinal)
+                    .ToArray();
+                reviews.Add(new VideoFaceCatalogueClipReview(clip.Alias, review)
+                {
+                    PersonRankSummaries = personRanks,
+                    BelowThresholdObservations = review.Findings.Count(
+                        f => f.ReviewStatus == "below-exploratory-threshold"),
+                });
             }
 
             await VideoFaceCatalogueReportWriter.WriteAsync(
