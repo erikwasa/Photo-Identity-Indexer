@@ -126,6 +126,305 @@ public sealed class VideoManagedHydrationCoordinator(
 
 
     /// <summary>
+    /// First inspection of an online-only video uses durable source identity:
+    /// the content revision/hash does not exist yet. Photo hydration never
+    /// handles this lane; Claim happens BEFORE unpinned Cloud Files hydration.
+    /// </summary>
+    public async Task RequestForUninspectedAsync(
+        ArchiveSourceObservationSnapshot observation, string sourcePath,
+        CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        ValidateProvisionalPath(observation, sourcePath);
+        if (observation.ObservedSizeBytes is < 1 or > 256L * 1024 * 1024 ||
+            observation.MediaType is not ("video/mp4" or "video/quicktime"))
+            throw new InvalidOperationException("Uninspected video exceeds admission bounds.");
+
+        ArchiveManagedSourceHydrationState? existing =
+            await sourceOwnership.GetAsync(observation.AssetId, token);
+        if (existing is { IsActive: true, IsReleaseRequested: true })
+            throw new InvalidOperationException("Provisional video source is releasing.");
+
+        ArchiveHydrationAdmission admitted =
+            await capacity.ExecuteSourceHydrationAdmissionAsync(
+                observation, async () =>
+                {
+                    if (!await IsCurrentProvisionalAsync(observation, token))
+                        throw new InvalidOperationException(
+                            "Uninspected source identity, metadata or exclusion changed.");
+                    if ((await new PostgresVideoPhotoPriorityProbe(database)
+                            .GetAsync(token)).PhotoWorkActive)
+                        throw new InvalidOperationException(
+                            "Photo work has priority over video inspection.");
+                    if (await sourceOwnership.GetAsync(
+                            observation.AssetId, token) is
+                            { IsActive: true, IsReleaseRequested: true })
+                        throw new InvalidOperationException(
+                            "Uninspected video is already being released.");
+
+                    OneDriveFilesOnDemandState state = oneDrive.GetState(sourcePath);
+                    if (state.Availability != AssetAvailability.OnlineOnly ||
+                        state.IsPinned)
+                        throw new InvalidOperationException(
+                            "Video first inspection requires an unpinned online-only placeholder.");
+                    if (!MatchesProvisionalObservation(observation, sourcePath))
+                        throw new InvalidOperationException(
+                            "Video placeholder changed before inspection admission.");
+
+                    await sourceOwnership.ClaimAsync(
+                        observation.AssetId, timeProvider.GetUtcNow(), token);
+                    await oneDrive.RequestUnpinnedVideoHydrationAsync(sourcePath, token);
+                }, token);
+        if (!admitted.Allowed)
+            throw new InvalidOperationException(
+                "Shared source hydration capacity denied video first inspection.");
+    }
+
+    public Task<bool> PromoteInspectedSourceAsync(
+        AssetId assetId, AssetRevisionId revisionId,
+        CancellationToken token = default) =>
+        sourceOwnership.TransferToRevisionAsync(
+            assetId, revisionId, timeProvider.GetUtcNow(), token);
+
+    /// <summary>
+    /// A failed, interrupted or unsupported pre-revision inspection must not
+    /// leak app-owned local bytes. Release is source-locked, revision-empty,
+    /// unpinned and protected against source mutation or user-owned copies.
+    /// </summary>
+    public async Task<bool> ReleaseUninspectedAsync(
+        ArchiveSourceObservationSnapshot observation, string path,
+        CancellationToken token = default)
+    {
+        ValidateProvisionalPath(observation, path);
+        if (!await IsCurrentProvisionalAsync(observation, token))
+            return false;
+        ArchiveManagedSourceHydrationState? lease =
+            await sourceOwnership.GetAsync(observation.AssetId, token);
+        if (lease is not { IsActive: true }) return false;
+        if ((await new PostgresVideoPhotoPriorityProbe(database)
+                .GetAsync(token)).PhotoWorkActive)
+            return false;
+        OneDriveFilesOnDemandState state = oneDrive.GetState(path);
+        if (state.IsPinned) return false;
+
+        if (state.Availability == AssetAvailability.OnlineOnly)
+        {
+            // No data to release if hydration was requested but never started.
+            await sourceOwnership.MarkReleasedAsync(
+                observation.AssetId, timeProvider.GetUtcNow(), token);
+            return true;
+        }
+        if (state.Availability != AssetAvailability.Local ||
+            !MatchesProvisionalObservation(observation, path))
+            return false;
+
+        await using NpgsqlConnection conn = await database.OpenConnectionAsync(token);
+        await using NpgsqlTransaction transaction =
+            await conn.BeginTransactionAsync(token);
+        // Source-row fencing is shared with exclusion and verified-revision
+        // writes; a new revision would transfer this receipt instead.
+        await using (NpgsqlCommand check = conn.CreateCommand())
+        {
+            check.Transaction = transaction;
+            check.CommandText = """
+                SELECT source.id FROM archive_source_managed_hydrations lease
+                JOIN assets asset ON asset.id=lease.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                JOIN archive_source_observations observed ON observed.asset_id=asset.id
+                WHERE lease.asset_id=@asset AND lease.released_at_utc IS NULL
+                  AND asset.media_kind='video' AND asset.deleted_at_utc IS NULL
+                  AND source.id=@source AND source.root_locator=@root
+                  AND asset.source_key=@key
+                  AND observed.observed_size_bytes=@size
+                  AND observed.observed_last_write_ticks=@ticks
+                  AND NOT EXISTS (
+                    SELECT 1 FROM asset_revisions revision
+                    WHERE revision.asset_id=asset.id AND revision.media_kind='video')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM source_copy_exclusions exclusion
+                    WHERE exclusion.source_id=asset.source_id
+                      AND exclusion.source_key=asset.source_key)
+                FOR UPDATE OF source, lease;
+                """;
+            check.Parameters.AddWithValue("asset", observation.AssetId.Value);
+            check.Parameters.AddWithValue("source", observation.SourceId.Value);
+            check.Parameters.AddWithValue("root", observation.RootLocator);
+            check.Parameters.AddWithValue("key", observation.SourceKey);
+            check.Parameters.AddWithValue("size", observation.ObservedSizeBytes);
+            check.Parameters.AddWithValue("ticks", observation.ObservedLastWriteTimeUtc.UtcTicks);
+            if (await check.ExecuteScalarAsync(token) is not Guid)
+                return false;
+        }
+        // Recheck pinned state immediately before durable release request.
+        if (oneDrive.GetState(path) is not
+            { Availability: AssetAvailability.Local, IsPinned: false })
+            return false;
+        await using (NpgsqlCommand update = conn.CreateCommand())
+        {
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE archive_source_managed_hydrations
+                SET release_requested_at_utc=COALESCE(
+                    release_requested_at_utc,@now)
+                WHERE asset_id=@asset AND released_at_utc IS NULL;
+                """;
+            update.Parameters.AddWithValue("asset", observation.AssetId.Value);
+            update.Parameters.AddWithValue("now", timeProvider.GetUtcNow());
+            if (await update.ExecuteNonQueryAsync(token) != 1)
+                return false;
+        }
+        await transaction.CommitAsync(token);
+        // Native platform refuses if it is pinned in the meantime.
+        await oneDrive.RequestUnpinnedVideoReleaseAsync(path, token);
+        return true;
+    }
+
+    /// <summary>
+    /// Operator-started bounded recovery of unfinished source-level video
+    /// hydration; no background scanner and no arbitrary photo source release.
+    /// </summary>
+    public async Task ReconcileUninspectedAsync(CancellationToken token = default)
+    {
+        var repository = new PostgresVideoProvisionalRepository(database);
+        foreach (ProvisionalVideoHydration pending in
+                 await repository.GetActiveAsync(8, token))
+        {
+            token.ThrowIfCancellationRequested();
+            ArchiveSourceObservationSnapshot observation = pending.Observation;
+            try
+            {
+                var selected = new VideoArchiveCandidate(
+                    Guid.Empty, observation.SourceId.Value,
+                    observation.RootLocator, observation.SourceKey,
+                    observation.ObservedSizeBytes);
+                string path = ResolveProvisionalPath(observation);
+                OneDriveFilesOnDemandState state = oneDrive.GetState(path);
+                if (state.IsPinned) continue;
+                if (pending.ReleaseRequested)
+                {
+                    if (pending.LatestRevisionId is null)
+                        await ReleaseUninspectedAsync(observation, path, token);
+                    continue;
+                }
+                if (pending.LatestRevisionId is AssetRevisionId revision &&
+                    state.Availability == AssetAvailability.Local)
+                {
+                    // Registration succeeded before crash, but ownership
+                    // promotion did not. Never silently lose the source lease.
+                    if (await IsCurrentRegisteredAsync(
+                            selected, revision, token))
+                        await PromoteInspectedSourceAsync(
+                            observation.AssetId, revision, token);
+                }
+                // Still uninspected: the normal bounded discovery lane resumes
+                // an already-local or online-only placeholder on this advance.
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // Retain the conservative durable lease for a later advance.
+            }
+        }
+    }
+
+    private static string ResolveProvisionalPath(
+        ArchiveSourceObservationSnapshot observation) =>
+        Path.GetFullPath(Path.Combine(observation.RootLocator,
+            observation.SourceKey.Replace('/', Path.DirectorySeparatorChar)));
+
+    private static void ValidateProvisionalPath(
+        ArchiveSourceObservationSnapshot observation, string path)
+    {
+        var candidate = new VideoArchiveCandidate(
+            Guid.Empty, observation.SourceId.Value, observation.RootLocator,
+            observation.SourceKey, observation.ObservedSizeBytes);
+        ValidateSelectedSourcePath(candidate, path);
+        if (observation.VerificationState !=
+                ArchiveSourceObservationVerificationState.Unverified)
+            throw new InvalidOperationException(
+                "Only an unverified video source can enter provisional hydration.");
+    }
+
+    private static bool MatchesProvisionalObservation(
+        ArchiveSourceObservationSnapshot observation, string path)
+    {
+        FileInfo file = new(path);
+        file.Refresh();
+        return file.Exists &&
+            file.Length == observation.ObservedSizeBytes &&
+            file.LastWriteTimeUtc == observation.ObservedLastWriteTimeUtc.UtcDateTime;
+    }
+
+    private async Task<bool> IsCurrentProvisionalAsync(
+        ArchiveSourceObservationSnapshot observation, CancellationToken token)
+    {
+        await using NpgsqlConnection conn = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT EXISTS(
+                SELECT 1 FROM archive_source_observations observed
+                JOIN assets asset ON asset.id=observed.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE asset.id=@asset AND asset.media_kind='video'
+                  AND asset.deleted_at_utc IS NULL
+                  AND source.id=@source AND source.kind='local-folder'
+                  AND source.root_locator=@root AND asset.source_key=@key
+                  AND observed.observed_size_bytes=@size
+                  AND observed.observed_last_write_ticks=@ticks
+                  AND observed.observed_media_type=@media
+                  AND NOT EXISTS (
+                    SELECT 1 FROM asset_revisions revision
+                    WHERE revision.asset_id=asset.id AND revision.media_kind='video')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM source_copy_exclusions exclusion
+                    WHERE exclusion.source_id=asset.source_id
+                      AND exclusion.source_key=asset.source_key));
+            """;
+        cmd.Parameters.AddWithValue("asset", observation.AssetId.Value);
+        cmd.Parameters.AddWithValue("source", observation.SourceId.Value);
+        cmd.Parameters.AddWithValue("root", observation.RootLocator);
+        cmd.Parameters.AddWithValue("key", observation.SourceKey);
+        cmd.Parameters.AddWithValue("size", observation.ObservedSizeBytes);
+        cmd.Parameters.AddWithValue("ticks", observation.ObservedLastWriteTimeUtc.UtcTicks);
+        cmd.Parameters.AddWithValue("media", observation.MediaType);
+        return await cmd.ExecuteScalarAsync(token) is true;
+    }
+
+    private async Task<bool> IsCurrentRegisteredAsync(
+        VideoArchiveCandidate selected, AssetRevisionId revision,
+        CancellationToken token)
+    {
+        await using NpgsqlConnection conn = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT EXISTS(
+                SELECT 1 FROM asset_revisions revision
+                JOIN assets asset ON asset.id=revision.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE revision.id=@revision AND revision.media_kind='video'
+                  AND asset.media_kind='video' AND asset.deleted_at_utc IS NULL
+                  AND source.id=@source AND source.root_locator=@root
+                  AND asset.source_key=@key
+                  AND revision.id=(
+                    SELECT newest.id FROM asset_revisions newest
+                    WHERE newest.asset_id=asset.id AND newest.media_kind='video'
+                    ORDER BY newest.observed_at_utc DESC,newest.id DESC LIMIT 1)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM source_copy_exclusions exclusion
+                    WHERE exclusion.source_id=asset.source_id
+                      AND exclusion.source_key=asset.source_key));
+            """;
+        cmd.Parameters.AddWithValue("revision", revision.Value);
+        cmd.Parameters.AddWithValue("source", selected.SourceId);
+        cmd.Parameters.AddWithValue("root", selected.Root);
+        cmd.Parameters.AddWithValue("key", selected.Key);
+        return await cmd.ExecuteScalarAsync(token) is true;
+    }
+
+    /// <summary>
     /// Recover a prior app-owned local video after a pause, failed attempt
     /// or process restart. This performs no new OneDrive operations. A
     /// previously local user-owned original has no managed receipt and
