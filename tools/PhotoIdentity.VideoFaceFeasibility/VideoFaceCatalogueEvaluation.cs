@@ -210,9 +210,21 @@ public sealed record VideoFaceCatalogueProvenance(
     long LatestReviewActionId,
     long LatestEmbeddingId);
 
+/// <summary>Top-rank observations, NOT unique people detected or identities assigned.</summary>
+public sealed record VideoFaceCataloguePersonRankSummary(
+    string Alias,
+    int TopRankObservations,
+    double BestTopRankSimilarity,
+    int StrongReviewCandidates);
+
 public sealed record VideoFaceCatalogueClipReview(
     string Alias,
-    VideoFacePrivateReview Review);
+    VideoFacePrivateReview Review)
+{
+    public IReadOnlyList<VideoFaceCataloguePersonRankSummary> PersonRankSummaries { get; init; }
+        = [];
+    public int BelowThresholdObservations { get; init; }
+}
 
 public sealed record VideoFaceCatalogueEvaluationReport(
     int SchemaVersion,
