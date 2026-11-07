@@ -535,6 +535,11 @@ public sealed class ArchiveHydrationCapacityService
             : _platform.GetState(path);
         if (lease.IsReleaseRequested && state.Availability == AssetAvailability.OnlineOnly)
         {
+            // A pinned video is never safe to treat as already released,
+            // even if a platform reports an inconsistent availability bit.
+            if (lease.IsVideo && state.IsPinned)
+                return new ObservedManagedLease(lease, path, state);
+
             DateTimeOffset observedAt = _timeProvider.GetUtcNow();
 
             // Persist observed availability before closing the managed lease. If the process stops
@@ -547,7 +552,22 @@ public sealed class ArchiveHydrationCapacityService
 
             if (lease.RevisionId is AssetRevisionId revisionId)
             {
-                await _hydrations.MarkReleasedAsync(revisionId, observedAt, cancellationToken);
+                if (lease.IsVideo)
+                {
+                    // The photo storage accounting pass must not bypass
+                    // WI-0207's atomic release-request fence. A superseded
+                    // or concurrent receipt remains active.
+                    bool confirmed = await _hydrations
+                        .TryMarkVideoReleaseConfirmedAsync(
+                            revisionId, observedAt, cancellationToken);
+                    if (!confirmed)
+                        return new ObservedManagedLease(lease, path, state);
+                }
+                else
+                {
+                    await _hydrations.MarkReleasedAsync(
+                        revisionId, observedAt, cancellationToken);
+                }
             }
             else if (lease.SourceAssetId is AssetId sourceAssetId)
             {

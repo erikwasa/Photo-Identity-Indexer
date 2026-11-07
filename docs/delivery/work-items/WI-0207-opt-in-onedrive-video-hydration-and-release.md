@@ -326,3 +326,73 @@ real online-only hydrate/process/reuse/release example still
 require separate implementation and verification.
 `Include online-only videos` stays OFF until those gates are
 met; do not manufacture an online-only sample for this checkpoint.
+
+## Documentation closeout verified — checkpoint 3 (2026-11-06)
+
+After documentation PR
+[#752](https://github.com/erikwasa/Photo-Identity-Indexer/pull/752)
+merged, the maintainer ran the maintained PowerShell verification.
+The documentation validator returned **"Documentation registries and
+links are valid."**, the generated documentation
+check returned exit code 0, and **all five** explicit canonical
+WI-0207 acceptance-record checks returned **True**:
+work item exists, remains in progress, PR #750 is recorded, and
+the 30/30 integration and 1/1 disposable-PostgreSQL test outcomes
+are recorded. No media or database tests need repeating to
+close checkpoint 3's documentation gate.
+
+## Development checkpoint 4 — resume and reconcile durable video receipts (2026-11-06)
+
+The existing managed-hydration receipt survives process shutdown,
+but a previously app-hydrated original that appeared local on the
+next selected Archive video step was previously handled as though
+it were just another ordinary local original. Checkpoint 4 adds
+an explicit **resume-current-managed-local** path:
+
+- For a local selected video, read an existing revision ownership
+  receipt; **do not claim anything** if no active receipt exists.
+  This is how pre-existing local/pinned user originals remain
+  independent of the managed cache.
+- Revalidate the exact current, unexcluded video revision, source
+  identity and path; reject a conflicting source-managed receipt,
+  an outstanding release request or a newly nonlocal state.
+  Reassert and touch durable usage only while processing is
+  authorized. Subsequent cleanup still protects user/app pins
+  and queued/running derivative dependents.
+- At each already operator-authorized video advance (after the
+  photo-first gate), a bounded recovery pass reads up to
+  **16 previously release-requested video receipts**, selected
+  with a database-side PostgreSQL LIMIT so normal photo hydration
+  records are never loaded for this reconciliation.
+  Only a file **already** reported online-only and unpinned
+  can have its old release receipt closed by an **atomic
+    PostgreSQL update requiring the same video receipt still to be
+    active and release-requested**. A concurrently superseded or
+    already-closed receipt is not counted as newly closed. All other cases
+  leave ownership intact; the pass does **not** call OneDrive
+  pin, unpin, hydrate, release or any original-byte API.
+- Fixed aggregate counts and reason codes omit all private
+  paths, IDs and platform errors. Cancellation propagates;
+  unexpected metadata or database receipt-update failures
+  preserve the record instead of misreporting it as released.
+- New fake-platform integration tests cover unowned versus
+  active managed local originals, pending release, local/pinned/
+  downloading/offline/error states, path escapes, the 16-receipt
+  cap, and a failed record update. The existing disposable
+  PostgreSQL test now checks the new bounded pending-video
+  receipt query before, during and after a release request.
+
+Read the
+[checkpoint 4 Windows verification guide](../../operations/video-onedrive-wi0207-restart-recovery.md).
+**Checkpoint 4 CI and maintained Windows verification are pending.**
+The accepted earlier 30 integration tests and one disposable
+PostgreSQL test remain historical checkpoint-3 acceptance.
+
+**WI-0207 is still in progress:** This is release-*receipt*
+reconciliation, **not** authorization to release app-pinned video
+original bytes. Because the OneDrive +p attribute does not prove
+whether the user subsequently pinned a file, physical release of
+pinned video originals is still prohibited. Race-free coordinated
+release admission relative to new dependent jobs, safe eventual
+storage reclamation and one separately approved real online-only
+video test remain open. Keep the online-only video switch OFF.

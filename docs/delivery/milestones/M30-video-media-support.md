@@ -7,6 +7,23 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**WI-0207 update — 2026-11-06:** PR #750's managed photo/video
+admission was accepted locally (30/30 synthetic integration
+tests, 1/1 disposable PostgreSQL lease test); PR #752's
+documentation acceptance then passed both documentation checks
+and all five canonical status assertions. Checkpoint 4 is
+under development to restore managed-local video lease
+ownership across restart/retries, and to reconcile at most
+16 **already requested** video release receipts only when
+Files On-Demand reports online-only/unpinned. No OneDrive pin,
+unpin, hydration or media read is part of this checkpoint.
+
+WI-0207 is **not completed**: safe eventual app-pinned release,
+race-free dependent-job coordination and one explicitly authorized
+real online-only video acceptance remain open. Keep online-only
+video processing OFF until those gates pass.
+
+
 **Current M30 checkpoint — 2026-11-05: WI-0207 IN PROGRESS.**
 WI-0211's complete video posters and default-off automatic poster
 setting are maintainer-accepted and archived (PR #746 merged).
