@@ -81,6 +81,29 @@ public sealed class PostgresVideoAssetRepository(PostgresCatalogueDatabase datab
                 throw new InvalidOperationException("The source copy is excluded and must not be indexed.");
         }
 
+        // First-time online-only inspection has an app-managed SOURCE lease
+        // until a verified revision exists. Never race a pending +u release
+        // by registering and processing this source as if it were user-local.
+        await using (NpgsqlCommand pending = connection.CreateCommand())
+        {
+            pending.Transaction = transaction;
+            pending.CommandText = """
+                SELECT EXISTS(
+                    SELECT 1 FROM assets asset
+                    JOIN archive_source_managed_hydrations lease
+                      ON lease.asset_id=asset.id
+                    WHERE asset.source_id=@source AND asset.source_key=@key
+                      AND asset.media_kind='video'
+                      AND lease.released_at_utc IS NULL
+                      AND lease.release_requested_at_utc IS NOT NULL);
+                """;
+            pending.Parameters.AddWithValue("source", sourceId.Value);
+            pending.Parameters.AddWithValue("key", sourceKey);
+            if (await pending.ExecuteScalarAsync(cancellationToken) is true)
+                throw new InvalidOperationException(
+                    "Video source release is in progress; registration refused.");
+        }
+
         Guid proposedAsset = Guid.NewGuid();
         Guid assetId;
         await using (NpgsqlCommand asset = connection.CreateCommand())
