@@ -309,3 +309,97 @@ Do not mark WI-0207 completed until the maintainer has
 reported one approved real example. If the real pilot finds a
 concrete failure, fix that *specific* failure rather than
 reopening a broad redesign.
+
+## 8. Follow-up acceptance: first inspection of a never-inspected online-only video (PR #761)
+
+**The preceding Step 1–7 runbook describes the previously-inspected
+path that the maintainer already accepted on 2026-11-08. Do not
+repeat that live test.** The new code in draft PR #761 adds the
+missing provisional discovery path; no new real-media authorization
+is implied by the PR or this runbook.
+
+Only after PR #761 merges and all CI/disposable PostgreSQL/docs tests
+pass, perform **one** additional controlled Windows verification:
+
+1. Update `main` using the Step 1 commands; confirm your existing
+   approved FFmpeg/FFprobe, launcher, storage policy and production
+   backup remain valid. No new FFmpeg pinning or backup-retention work.
+2. Choose **one never-inspected** current unexcluded MOV/MP4 original,
+   **online-only and unpinned** from the selected included-folder
+   scope, with a FileInfo size between 1 byte and 256 MiB. Keep the
+   source path private; read its Windows file attributes with the
+   `Get-Wi0207PilotState` helper from Step 3. Do **not** use Explorer
+   `Always keep on this device`, `Free up space`, copy, SHA or
+   FFprobe manually; that would bypass the feature under test.
+3. Ensure no other local video or pending derivative job in the
+   selected coverage will take priority. Set video processing ON,
+   **Include online-only videos ON**, Standard 720p or Compact 540p,
+   automatic poster OFF (unless independently desired), and optional
+   **Stop each Archive advance after one video step ON** for control.
+   Save. Record aggregate status and set aside source filenames/IDs.
+4. Trigger **Advance archive once**, observing that the single
+   placeholder is registered provisionally, hydrated without +p,
+   hash-verified/FFprobe-inspected, and either queued for a supported
+   proxy or durably classified unsupported. The worker may complete
+   the first inspection and proxy in the same Archive cycle. A
+   bounded second explicit Advance is acceptable for a separately
+   queued step, but never run an unrestricted backlog for the test.
+5. For a supported video, verify the published proxy on desktop:
+   play, pause, seek, colour, orientation, and audio where relevant.
+   Confirm no unrelated original hydrated. For unsupported input,
+   expect no proxy, an unsupported inspection outcome, no automatic
+   repeated download and a managed release. This is a negative-path
+   observation, **not** a substitute for the successful supported
+   first-time proxy test if such a source is available.
+6. Pause Archive, turn **Include online-only videos OFF**, save,
+   and confirm that the inspected source returns to **online-only,
+   unpinned** once no dependent work needs it. A recovery Archive
+   advance can retry an interrupted +u; the source must not be
+   manually unpinned or deleted to manufacture a pass. With the
+   source still online-only, replay the proxy; verify it causes no
+   hydration. Check existing user-local and pinned originals
+   remain unchanged.
+7. In video Settings distinguish **Latest Archive video step**
+   (`no-eligible-video` can be legitimate after an idle cycle)
+   from **Last substantive video outcome** (`published`,
+   `video-inspected`, `video-inspected-unsupported` or a failure).
+   The latter is an in-memory value since application startup.
+   `not-run` for automatic posters indicates no attempt since start.
+
+Local repeatable focused checks after merge, run in PowerShell 7.6:
+
+~~~powershell
+$ErrorActionPreference = "Stop"
+cd "C:\Kod\codex\Photo Identity Indexer"
+git switch main
+git pull --ff-only origin main
+
+$filter = @(
+    "FullyQualifiedName~VideoFirstInspectionAdmissionTests"
+    "FullyQualifiedName~VideoManagedHydrationAdmissionTests"
+    "FullyQualifiedName~VideoUnpinnedOneDrivePlatformTests"
+    "FullyQualifiedName~VideoManagedHydrationRecoveryTests"
+    "FullyQualifiedName~VideoHydrationReleaseGuardTests"
+) -join "|"
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter $filter
+if ($LASTEXITCODE -ne 0) { throw "First-inspection integration tests failed." }
+
+# Run ONLY when the existing disposable-test admin variable is set.
+if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING)) {
+    dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj -c Release --filter "FullyQualifiedName~PostgresVideoManagedHydrationTests"
+    if ($LASTEXITCODE -ne 0) { throw "Disposable PostgreSQL tests failed." }
+}
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw "Documentation validation failed." }
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+if ($LASTEXITCODE -ne 0) { throw "Generated docs drift." }
+~~~
+
+Report no private filenames, directory paths, IDs, frame content or
+connection strings. Record aggregate before/after status, one new
+supported inspection, one new proxy or explicit unsupported result,
+initial and final original states, pin changes, unchanged other
+sources, and whether proxy replay rehydrated anything. If CI or the
+new live test reveals a focused defect, keep WI-0207 `in_progress`
+and patch that issue without repeating the previously accepted
+hydration/release acceptance.
