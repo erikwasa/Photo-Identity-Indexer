@@ -157,8 +157,31 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
         Guid jobId, CancellationToken token = default)
     {
         if (jobId == Guid.Empty) return false;
-        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlConnection connection =
+            await database.OpenConnectionAsync(token);
+        await using NpgsqlTransaction transaction =
+            await connection.BeginTransactionAsync(token);
+
+        // Serialize this explicit restart with managed video release
+        // admission and ordinary enqueue under the same source lock.
+        await using (NpgsqlCommand lockSource = connection.CreateCommand())
+        {
+            lockSource.Transaction = transaction;
+            lockSource.CommandText = """
+                SELECT source.id FROM video_processing_jobs job
+                JOIN asset_revisions revision ON revision.id=job.asset_revision_id
+                JOIN assets asset ON asset.id=revision.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE job.id=@id AND source.kind='local-folder'
+                FOR UPDATE OF source;
+                """;
+            lockSource.Parameters.AddWithValue("id", jobId);
+            if (await lockSource.ExecuteScalarAsync(token) is not Guid)
+                return false;
+        }
+
         await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             UPDATE video_processing_jobs job
             SET status='queued', attempt_count=0, progress_percent=0,
@@ -170,6 +193,11 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
               AND NOT EXISTS (
                   SELECT 1 FROM video_published_derivatives receipt
                   WHERE receipt.job_id=job.id)
+              AND NOT EXISTS (
+                  SELECT 1 FROM asset_revision_managed_hydrations managed
+                  WHERE managed.asset_revision_id=job.asset_revision_id
+                    AND managed.released_at_utc IS NULL
+                    AND managed.release_requested_at_utc IS NOT NULL)
               AND EXISTS (
                   SELECT 1 FROM asset_revisions revision
                   JOIN assets asset ON asset.id=revision.asset_id
@@ -193,7 +221,9 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                           AND excluded.source_key=asset.source_key));
             """;
         command.Parameters.AddWithValue("id", jobId);
-        return await command.ExecuteNonQueryAsync(token) == 1;
+        bool restarted = await command.ExecuteNonQueryAsync(token) == 1;
+        await transaction.CommitAsync(token);
+        return restarted;
     }
 
     public async Task<int> RecoverExpiredAsync(CancellationToken token = default)
