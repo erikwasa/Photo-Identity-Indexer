@@ -174,6 +174,20 @@ function Assert-AvailableSpace {
     Write-Host ("Available Windows space for {0}: {1:N2} GiB ({2}); actual dump size may exceed the minimum." -f $Purpose, ($free / 1GB), $driveRoot)
 }
 
+function Assert-DistinctBackupDestination {
+    param([string]$BackupPath, [string]$CopyPath)
+    if ([string]::Equals([IO.Path]::GetFullPath($BackupPath), [IO.Path]::GetFullPath($CopyPath),
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'OneDrive destination is the same as the local backup file. Select a separate directory.'
+    }
+}
+
+function Publish-BackupFile {
+    param([string]$Source, [string]$Destination)
+    # The two-argument File.Move refuses a destination collision on Windows.
+    [IO.File]::Move($Source, $Destination)
+}
+
 function Get-LauncherEnvironmentValue {
     param([Parameter(Mandatory=$true)][string]$Name)
     foreach ($scope in @('Process','User','Machine')) {
@@ -281,9 +295,7 @@ if ($CopyToOneDrive) {
     [System.IO.Directory]::CreateDirectory($OneDriveDirectory) | Out-Null
     $cloudDump = Join-Path $OneDriveDirectory (Split-Path -Leaf $OutputPath)
     $cloudReport = "$cloudDump.json"
-    if ([string]::Equals($cloudDump, $OutputPath, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'OneDrive destination is the same as the local backup file. Select a separate directory.'
-    }
+    Assert-DistinctBackupDestination -BackupPath $OutputPath -CopyPath $cloudDump
     Assert-AvailableSpace -Directory $OneDriveDirectory -MinimumBytes ([long]$MinimumFreeGiB * 1GB) -Purpose 'OneDrive staging'
     if ((Test-Path -LiteralPath $cloudDump) -or (Test-Path -LiteralPath $cloudReport)) {
         throw 'OneDrive destination already exists; refusing to overwrite.'
@@ -322,7 +334,7 @@ try {
     # Publish the final filename only after verification succeeds.
     # File.Move refuses an unexpected destination collision instead of
     # replacing a backup created by another process after preflight.
-    [IO.File]::Move($partPath, $OutputPath)
+    Publish-BackupFile -Source $partPath -Destination $OutputPath
 
     $report = [ordered]@{
         capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
@@ -347,7 +359,7 @@ try {
         Copy-Item -LiteralPath $OutputPath -Destination $cloudPart -ErrorAction Stop
         $cloudSha256 = (Get-FileHash -LiteralPath $cloudPart -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($cloudSha256 -ne $sha256) { throw 'OneDrive copy checksum mismatch.' }
-        [IO.File]::Move($cloudPart, $cloudDump)
+        Publish-BackupFile -Source $cloudPart -Destination $cloudDump
         $cloudPart = $null
         Copy-Item -LiteralPath $reportPath -Destination $cloudReport -ErrorAction Stop
         Write-Host "OneDrive folder copy: $cloudDump"
