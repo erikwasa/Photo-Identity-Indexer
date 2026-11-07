@@ -522,6 +522,16 @@ The earlier photo-hydration behavior is unaffected.
    choice and is never automatically unpinned. The live
    pilot uses a newly authorized, initially unpinned
    online-only video.
+5. **Never-inspected online-only sources are not recalled
+   merely for metadata registration.** The historical video
+   discovery code used `+p` before an immutable revision
+   receipt existed and `-p` in cleanup. It is now strictly
+   local-only, preventing unsafe user-pin changes. An
+   online-only video must already have a current, supported
+   inspection record to enter the opt-in video hydration
+   worker. To process a never-inspected video, the operator
+   must first make it local and allow normal inspection;
+   this is deliberately outside the single-video pilot.
 
 These are intentionally scoped shortcuts for a single
 maintainer-verified work-item completion, not a claim that
