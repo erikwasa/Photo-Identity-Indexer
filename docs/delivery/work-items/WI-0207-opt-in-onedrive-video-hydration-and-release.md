@@ -396,3 +396,45 @@ pinned video originals is still prohibited. Race-free coordinated
 release admission relative to new dependent jobs, safe eventual
 storage reclamation and one separately approved real online-only
 video test remain open. Keep the online-only video switch OFF.
+
+## Maintained Windows acceptance — checkpoint 4 (2026-11-07)
+
+**Checkpoint 4 is locally accepted; WI-0207 remains in progress.**
+After PR [#753](https://github.com/erikwasa/Photo-Identity-Indexer/pull/753)
+merged and the final-head GitHub Actions run #3625 passed, the
+maintainer ran the targeted
+`VideoManagedHydrationRecoveryTests`,
+`VideoManagedHydrationAdmissionTests`, and
+`VideoHydrationReleaseGuardTests` filter on the maintained
+Windows PowerShell 7.6 checkout. The runner reported **35
+succeeded, 0 failed, 0 skipped**, a 3.3-second test duration
+and successful 37.1-second build.
+
+The existing disposable PostgreSQL administrator connection
+was available; `PostgresVideoManagedHydrationTests` **actually
+executed 1 test and passed**, 0 failures, with a successful
+6.0-second build. The test uses a temporary database, not
+`photoidentity_main`. `PhotoIdentity.Docs validate` reported
+"Documentation registries and links are valid"; the generated
+documentation check also succeeded.
+
+PowerShell later received a separate standalone `else` statement
+after the successful PostgreSQL `if` block and rejected it
+because the original conditional had already completed. This
+was a shell presentation error, **not** a test failure;
+nothing needs rerunning to correct that output.
+
+**Verified scope:** synthetic tests for existing app-managed
+original reuse across retries/restarts, unowned local-source
+protection, bounded pending-release-receipt reconciliation,
+safe-path rules, atomic release confirmation and error handling,
+plus disposable PostgreSQL receipt persistence. No real
+OneDrive hydrate/unpin/release or original-video processing
+was performed or authorized.
+
+**Next WI-0207 development gates:** prove race-free coordination
+between release admission and new queued/running dependent jobs;
+design an app/user pin policy that can safely free eligible
+managed bytes without clearing a user pin; then separately
+authorize a single real online-only video hydrate/process/reuse/
+release trial. Keep **Include online-only videos OFF**. 
