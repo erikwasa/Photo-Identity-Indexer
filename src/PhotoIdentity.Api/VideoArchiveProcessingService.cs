@@ -168,6 +168,10 @@ public sealed class VideoArchiveProcessingService(
             await new PostgresVideoProcessingJobRepository(database)
                 .RecoverExpiredAsync(token);
 
+            // A bounded operator-started recovery pass handles source-level
+            // provisional video leases left by cancellation or a crash.
+            await managedHydration.ReconcileUninspectedAsync(token);
+
             // A retryable queued job takes priority. Its original may have
             // become online-only since enqueue/restart; never claim it blindly
             // or hydrate it unless the separate opt-in is active.
@@ -184,12 +188,12 @@ public sealed class VideoArchiveProcessingService(
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
-            bool discovered = false;
+            VideoDiscoveryOutcome discovery = VideoDiscoveryOutcome.None;
             if (candidate is null)
             {
-                discovered = await RegisterNextVideoAsync(
+                discovery = await RegisterNextVideoAsync(
                     coverage, ffprobe, token);
-                if (discovered)
+                if (discovery != VideoDiscoveryOutcome.None)
                     candidate = await FindPendingAsync(
                         coverage, ffmpegHash,
                         preferences.Current.IncludeOnlineOnly,
@@ -206,8 +210,12 @@ public sealed class VideoArchiveProcessingService(
                 Volatile.Write(ref _lastResult,
                     releaseRequests > 0
                         ? "video-managed-release-requested"
-                        : discovered ? "video-inspected" : "no-eligible-video");
-                return discovered || releaseRequests > 0;
+                        : discovery == VideoDiscoveryOutcome.Unsupported
+                            ? "video-inspected-unsupported"
+                        : discovery == VideoDiscoveryOutcome.Supported
+                            ? "video-inspected"
+                        : "no-eligible-video");
+                return discovery != VideoDiscoveryOutcome.None || releaseRequests > 0;
             }
             // Both pending and queued selections bind the same admitted
             // metadata class; the worker independently proves staged bytes.
@@ -354,7 +362,8 @@ public sealed class VideoArchiveProcessingService(
                 if (result.Failure is not null)
                     Volatile.Write(ref _lastAttemptFailure,
                         VideoAttemptFailureDiagnostics.Sanitize(result.Failure));
-                return result.Claimed || candidate is not null || discovered;
+                return result.Claimed || candidate is not null ||
+                    discovery != VideoDiscoveryOutcome.None;
             }
             finally
             {
