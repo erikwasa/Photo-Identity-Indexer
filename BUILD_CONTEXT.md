@@ -1,5 +1,36 @@
 # Build context
 
+
+**Current handoff — 2026-11-07: WI-0207 checkpoint 4 accepted.**
+PR #753 merged; final-head GitHub Actions #3625 passed.
+Maintained-host PowerShell 7.6 verification passed 35/35
+targeted integration tests, 1/1 real disposable PostgreSQL
+managed-hydration test and the two documentation commands
+(`validate`, `generate --check`). A subsequently entered
+standalone `else` was rejected by PowerShell but occurred
+after the successful test. No rerun is necessary. No private
+original video, production PostgreSQL catalogue, OneDrive
+hydration or pin/release operation was exercised for acceptance.
+
+The code now resumes already-managed local video originals on
+a later authorized retry/restart, and reconciles at most
+16 previously release-requested video receipts per operator
+video advance using metadata-only observation and conditional
+atomic PostgreSQL confirmation. It does not claim ordinary
+user-local sources, nor request new OneDrive pin/unpin or
+source-byte reads during reconciliation.
+
+**WI-0207 remains in progress.** The next substantial
+development step is race-free admission/retention versus new
+dependent video jobs, then a safe user-versus-app pin ownership
+and release policy, and finally one separately approved real
+online-only video hydrate/process/reuse/release test.
+Until then **Include online-only videos OFF**.
+See docs/operations/video-onedrive-wi0207-restart-recovery.md
+and docs/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md.
+
+**Historical handoffs follow.**
+
 **Current handoff — 2026-11-06: WI-0207 checkpoint 3 accepted,
 checkpoint 4 in implementation review.** The maintained Windows
 operator confirmed that PR #752 documentation verification passed:
