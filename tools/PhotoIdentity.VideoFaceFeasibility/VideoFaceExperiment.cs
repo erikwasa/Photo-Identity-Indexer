@@ -268,10 +268,35 @@ public sealed class VideoFaceExperiment
         };
     }
 
+    /// <summary>
+    /// Catalogue vectors are loaded by the separate read-only adapter before inference.
+    /// This method never opens the database, reads canonical IDs or writes observations.
+    /// </summary>
+    public async Task<VideoFacePrivateReview> RunWithPreparedMatcherAsync(
+        VideoFaceFrameSet set,
+        string manifestDirectory,
+        IVideoFaceCandidateMatcher matcher,
+        double detectorConfidence,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(matcher);
+        if (detectorConfidence is not (0.5 or 0.7 or 0.9))
+        {
+            throw new ArgumentOutOfRangeException(nameof(detectorConfidence));
+        }
+
+        // Include up to 36 pre-extracted local frames, without requiring
+        // heuristic groups/tracks to identify a person.
+        return await RunCoreAsync(set, manifestDirectory, matcher,
+            diagnostics: true, coverage: true,
+            requestedDetectorConfidence: detectorConfidence,
+            cancellationToken: cancellationToken);
+    }
+
     private async Task<VideoFacePrivateReview> RunCoreAsync(
         VideoFaceFrameSet set,
         string manifestDirectory,
-        VideoFaceReferenceMatcher? matcher,
+        IVideoFaceCandidateMatcher? matcher,
         bool diagnostics,
         bool coverage,
         double requestedDetectorConfidence,
@@ -291,7 +316,7 @@ public sealed class VideoFaceExperiment
         List<VideoFaceReferenceFinding> findings = [];
         List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
         List<VideoFaceRankedDiagnostic> rankedFaces = [];
-        VideoFaceCoverageGrouper? coverageGrouper = coverage
+        VideoFaceCoverageGrouper? coverageGrouper = coverage && matcher is VideoFaceReferenceMatcher
             ? new VideoFaceCoverageGrouper()
             : null;
         List<VideoFaceCoverageObservation> coverageSamples = [];
