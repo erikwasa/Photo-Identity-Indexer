@@ -619,3 +619,67 @@ failed build, source validation, queue selection, encoding or
 managed-release defect. Record the failure and its scope in this
 section, rerun only targeted tests and the affected acceptance step,
 and do not reopen earlier accepted WI-0207 checkpoints.
+
+## Maintained Windows real acceptance — previously inspected source (2026-11-08)
+
+**Core WI-0207 opt-in hydrate/process/release path: PASS on the maintained host.**
+After PR #759 merged, the maintainer confirmed: updated main and approved
+launcher/FFmpeg/FFprobe, restorable backup, focused integration tests,
+disposable PostgreSQL test, documentation validation and read-only OneDrive
+preflight all passed. One already inspected, supported **SDR** original was
+initially **online-only and unpinned**. With separate online-only opt-in,
+one controlled Archive step hydrated only that source, published a **Standard
+720p** playable proxy and successfully released the original back to
+**online-only, unpinned**. Desktop play/pause/seek, colour, orientation and
+audio passed; proxy playback after release did not rehydrate the original;
+existing pinned originals were unchanged. Video job totals:
+succeeded **31 to 32**, queued **0**, running **0**, failed **0**.
+Dependent jobs were not directly observed before the release, but the durable
+release fence and zero post-run queued/running jobs provide supporting evidence.
+This acceptance does **not** establish first-time inspection of an online-only
+placeholder or 540p/full-range real-video acceptance.
+
+**Usability/functional gap discovered immediately afterwards:** In one selected
+folder, five MOV/MP4 originals were all online-only (four within the 256 MiB
+worker limit); Archive reported `no-eligible-video` although online-only was
+enabled. A database-wide metadata preflight returned nine supported candidates
+(two local, seven pinned-local), **zero online-only**. The existing discovery
+loop deliberately restricts *uninspected* video metadata registration to
+already-local originals, while managed hydration requires a verified revision.
+This leaves never-inspected online-only videos unprocessable without manual
+Explorer materialization and a separate Archive inspection. The previous
+local-only restriction was a defensible release-safety shortcut, but it is
+not an adequate normal operator workflow.
+
+**New acceptance criterion (follow-up within WI-0207):** An operator-started,
+included-folder-scoped, opt-in Archive step must discover a previously
+uninspected, currently online-only unpinned MOV/MP4 placeholder using metadata
+only; acquire durable *source-level* ownership and the existing shared
+storage/concurrency budget *before* any unpinned Cloud Files hydration;
+independently probe/hash/register the resulting local revision; choose the
+approved Standard/Compact source-specific converter if supported; retain local
+bytes through dependent processing; and eventually release app-owned originals
+back to online-only without changing user pins. Unsupported, oversized, changed,
+excluded, cancelled and interrupted sources must fail closed and not create
+unbounded repeated downloads. Persist enough progress to recover after a
+process restart. Keep photo-first, one-worker, current-revision/exclusion,
+source SHA, approved tools and proxy-output checks.
+
+**Settings/status improvement:** `LastResult=no-eligible-video` describes
+only the *latest idle worker cycle* and can overwrite a preceding `published`
+even though succeeded increased 31→32. Separate the last substantive video
+outcome from the latest scan/idle reason, and show useful aggregate discovery
+states without disclosing source names, paths or UUIDs. Automatic poster
+`not-run` is normal when no poster attempt occurred.
+
+**Development and verification plan:** Prefer one focused development PR for
+source-level first-time online-only admission, safe retry/release, status
+semantics and tests, with documentation and PR #759 acceptance evidence tracked
+together. Only split if CI or a concrete ownership/recovery defect requires
+another patch. Complete CI plus synthetic/disposable PostgreSQL verification
+before asking the maintainer for another local test. The subsequent **single**
+new live acceptance begins with a **never-inspected online-only** original,
+verifies controlled inspection, supported proxy or durable unsupported
+classification, and eventual safe release. Previously accepted real hydration/
+release and earlier WI-0207 checkpoints are not to be repeated.
+WI-0207 remains `in_progress` pending this newly agreed behavior.
