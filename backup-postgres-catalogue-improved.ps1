@@ -169,7 +169,7 @@ function Assert-AvailableSpace {
         throw "Cannot check Windows free space for $Purpose at '$Directory'. Choose a reachable local volume. $($_.Exception.Message)"
     }
     if ($free -lt $MinimumBytes) {
-        throw ("Insufficient Windows free space for {0}: {1:N2} GiB available; {2:N2} GiB minimum. No backup started or copied." -f $Purpose, ($free / 1GB), ($MinimumBytes / 1GB))
+        throw ("Insufficient Windows free space for {0}: {1:N2} GiB available; {2:N2} GiB minimum. Operation stopped; any completed local backup remains." -f $Purpose, ($free / 1GB), ($MinimumBytes / 1GB))
     }
     Write-Host ("Available Windows space for {0}: {1:N2} GiB ({2}); actual dump size may exceed the minimum." -f $Purpose, ($free / 1GB), $driveRoot)
 }
