@@ -10,6 +10,20 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+**Current direction (maintainer, 2026-11-07):** Judge the experiment by whether a
+video yields **at least one useful, human-reviewable face observation per
+visible person** and, when an eligible known-person reference exists, a
+credible ranked match to the **existing Photo Identity catalogue**. Correct
+tracking or consolidation of every frame is not a prerequisite. Evaluate a
+small, diverse set of **additional expressly approved local videos** before
+choosing a production slice. All WI-0155 development, evaluation and
+documentation changes stay isolated from `main` on the long-lived
+`wi-0155` integration branch (or an independently isolated prototype)
+**until near work-item completion**, when the maintainer explicitly decides
+whether to integrate into Photo Identity or retain video recognition as a
+separate component. Neither integration nor independence has been selected.
+The historical checkpoints below remain as evidence, not current priorities.
+
 ## Product direction (maintainer 2026-11-02)
 
 **Face recognition in videos is wanted**, but the architecture,
@@ -54,25 +68,78 @@ a mandatory gate or excuse to reimplement the production data model.
 - Face processing as a prerequisite for ordinary video playback,
   captions, collection browsing or online-only hydration.
 
-## Acceptance criteria — initial evaluation only
+## Acceptance criteria — revised, feasibility only (2026-11-07)
 
-- [ ] A small approved real clip/frame set shows whether existing
-  models can find and suggest known people, with explicit examples
-  of duplicates, misses and uncertainty.
-- [ ] Basic runtime/review burden is recorded; a rough, reproducible
-  comparison is sufficient for the initial decision.
-- [ ] Maintainer reviews the prototype and identifies the desired
-  user behavior and a smallest safe production follow-up, or records
-  why further experimentation is needed. No unreviewed canonical
-  assignments or original-file changes occur.
-- [ ] Any complex tracking, production persistence or full-scale
-  benchmarking becomes a **separately scoped workitem** only when
-  evidence shows it is worth doing.
+These are **requirements for evidence and a decision**, not acceptance of
+production recognition, a numerical accuracy guarantee, or authorization to
+modify the maintained catalogue. Existing exploratory evidence is valuable,
+but the following criteria remain open pending a human-reviewed multi-video
+evaluation and the final architecture decision.
+
+- [ ] **Person-level usefulness across more than one video:** the existing
+  pilot plus at least one additional *expressly approved, already-local*
+  video (target two or three varied new clips if practical) are reviewed
+  privately. Record the manually observed people, how many yielded **at
+  least one usable detected face**, and which appearances remained
+  unknown, missed or unreviewable. No compulsory per-frame recall target.
+- [ ] **Existing-catalogue known-person matching evaluated:** deliberately
+  opt in to a bounded **read-only** eligible-exemplar view of the actual
+  PostgreSQL Photo Identity catalogue, or an independently controlled
+  equivalent read-only snapshot. Verify exact SFace model ID/hash and
+  compatible alignment before scoring; use only current eligible
+  assignments, not Unknown/Rejected/superseded evidence. Compare video
+  findings to human-known positive and negative cases; report correct
+  rank-1, weak/ambiguous suggestions and wrong known-person suggestions.
+  A database integration is **not yet implemented** by the existing CLI.
+- [ ] **One useful observation can suffice:** for a known person, one
+  sufficiently informative, reviewable video frame may support a
+  *suggestion for human review*; additional frames count as useful only
+  if they provide stronger and reliable ranking evidence or a better
+  manually reviewable view. Do not treat maximum raw similarity over
+  many frames as confirmed identity; monitor false suggestions and
+  uncertainty. Continue examining a video for **other** people after one
+  known-person candidate is found.
+- [ ] **Unknown and multiple-person cases:** include at least one
+  intentionally unknown-to-the-gallery person (or equivalent negative
+  case) and a case with people at different times or simultaneously.
+  Unknown faces may remain without candidate labels; never force them to
+  an existing person merely because it is the best score.
+- [ ] **Bounded runtime and review burden:** record frames examined,
+  approximate processing time and human assessment of usability
+  (e.g., usable/borderline/unusable), redundant suggestions and
+  meaningful candidate improvements. Human ease of identification is
+  qualitative and is **not claimed as a precise model metric**.
+- [ ] **Privacy, provenance and read-only safety:** prove the explicit
+  experiment cannot change source photos/videos, production canonical
+  people, review history, embeddings, suggestions or matching policy;
+  no background ingestion, cloud hydration, automatic assignments,
+  implicit worker jobs or third-party black-box processing. Biometric
+  frames, embeddings, names, IDs, paths and detailed reports stay
+  private, outside Git/CI/issues/chat.
+- [ ] **Architecture decision and scoped follow-up:** near completion,
+  the maintainer evaluates evidence and explicitly chooses either a
+  carefully bounded integration into the main application **or** a
+  separately maintained video-recognition component with an appropriate
+  identity-data boundary. Document interface, operational ownership,
+  security, retention, test plan and rollout/rollback (or no-go) before
+  any PR targets `main`.
+- [ ] **No premature tracking or persistence:** deduplication,
+  temporal tracking, cross-video association, UI review workflow,
+  catalogue writeback, large-scale calibration and full benchmarking
+  remain separate work unless findings demonstrate a concrete need.
+  Extra group-count improvements are not themselves acceptance
+  criteria.
 
 ## Verification requirements
 
-Bounded prototype and maintainer review. No changes to production
-catalogue or biometric governance during exploratory work.
+Bounded, explicit local prototype plus maintainer review; private
+multi-video, per-person and negative-case observations. For any
+catalogue-backed experiment, demonstrate exact-model compatibility,
+eligible-exemplar filtering, read-only access, stable/provenanced
+snapshot use and no persisted or canonical changes. Do not silently
+apply the photo matcher’s score thresholds to video or confuse
+YuNet pilot detections with the permanent CenterFace archive profile.
+No change to production biometric governance during exploration.
 
 ## Completion notes
 
@@ -291,3 +358,108 @@ only non-identifying aggregate outcomes should be shared.
 human-labelled examples before declaring a smallest production slice.
 Do not persist canonical person identities, clips' face vectors or
 unreviewed group assignments.
+
+## Requirements decision record — 2026-11-07
+
+### Confirmed user requirements
+
+1. **Purpose is identifying people, not producing perfect face tracks.**
+   A single usable face sample can be enough to propose an identification
+   for review. Additional observations of an already proposed person
+   matter only if they materially improve supported similarity/ranking
+   evidence or present a clearer image to a human.
+2. **Reuse the existing identified-person catalogue.** The maintained
+   PostgreSQL database already has canonical people, reviewed face-person
+   assignments and eligible SFace exemplars. Separate operator-created
+   reference photos were a safety measure for checkpoints 1–5, **not
+   the desired permanent identity source**.
+3. **Evaluate on more videos before choosing architecture.** Expand from
+   the existing two-person pilot to a few diverse private videos,
+   covering known and unknown cases and ideally different appearances
+   within a scene. Do not equate group count with identified-person
+   coverage.
+4. **Keep work isolated until near completion.** Feature branches and
+   experiment documentation PRs must target `wi-0155`, not `main`.
+   The experimental CLI, prototype database adapter and any matching
+   logic must remain out of normal Photo Identity startup, worker
+   orchestration, scheduled jobs, video processing and UI paths. A
+   stand-alone separate repository/component remains a valid final
+   outcome. Only a late, explicit maintainer architecture decision can
+   authorize a main-branch integration proposal.
+5. **Local/private, explicitly approved processing.** Inputs are
+   approved local clips; no OneDrive on-demand hydration, automatic
+   catalogue writes or unvetted external inference. Neither source
+   media nor canonical identity state may be modified.
+
+### Newly clarified acceptance measures
+
+- **Person discovery yield**, reviewed per video: number of manually
+  observed people versus number with at least one useful detected face,
+  not percentage of individual frames that contain a detection.
+- **Known-person candidate usefulness**: a reviewer can find the
+  right person among explicitly ranked, exact-model suggestions
+  when eligible catalogue evidence exists; wrong and ambiguous
+  suggestions are counted too. Distinguish detection, ranking,
+  threshold suppression and actual identity confirmation.
+- **Unknown-person rejection**: a face absent from the catalogue
+  must be allowed to remain unknown instead of receiving an
+  unsupported identification.
+- **Review effort and redundancy**: how many observations a reviewer
+  must examine to get useful evidence per person, with optional
+  best-view selection. More sampled frames have value only when they
+  locate another person or improve identification/review.
+- **Provenance/isolation gate**: catalogue-backed matching may **read**
+  a bounded current, eligible, same-model exemplar snapshot, but
+  cannot invoke production regeneration, auto-assignment, or writes.
+  Changed identity evidence during evaluation must be detected or
+  separately re-snapshotted rather than silently mixed.
+- **Late integration decision gate**: before any merge to main,
+  choose in-app integration vs a separate service/CLI/component,
+  document costs/ownership/private-data transport (if separate),
+  user review/acceptance and rollback. It is permissible to finish
+  feasibility with a decision and subsequent separately scoped
+  production work instead of immediate app integration.
+
+### Open design questions — not committed requirements
+
+- How to access PostgreSQL exemplars safely: in-process read-only
+  repository adapter versus an operator-approved, locally confined
+  read-only snapshot or narrowly scoped interface; how to enforce
+  least privilege and catalogue-evidence freshness.
+- Which exemplars to select or cap per person, especially when
+  automatic photo assignments are eligible, while preserving fair
+  person-level ranking and avoiding dominance by people with many
+  photos.
+- How to select one/few representative video frames without
+  hiding a different person or over-optimizing highest cosine;
+  whether any deduplication is necessary at all.
+- How to handle unknown-person review, uncertain candidates,
+  human-selected representative frames, and future persistence.
+- Exact production deployment boundary: Photo Identity integrated
+  module versus stand-alone video recognition with a controlled
+  read-only identity interface. **Do not settle this during
+  early experiments.**
+
+### Evidence so far and next experiment
+
+The accepted single-video, 36-frame pilot produced 21 face
+observations across 19 frames and detected the second person
+missing from the original two-frame sample. Private grouping
+sensitivity yielded 14 baseline groups, versus 12/11/9 tentative
+groups using multi-observation cosine cutoffs 0.80/0.70/0.60.
+At 0.60, the five late appearances of the second person were
+in one tentative group, and no group overlapped the early and
+late observation windows; **this is not a calibrated identity
+threshold**. Frames 14 and 17 contained two non-overlapping,
+low-similarity detections requiring visual interpretation.
+
+These historical grouping results are now **diagnostics only**:
+fragmentation is not the primary success measure. The next
+substantial experiment should first establish a bounded
+catalogue-backed read-only identity gallery contract, then run
+the current clip and additional approved videos against known
+and deliberately unknown people. No main-branch work or
+production automatic-assignment behavior is authorized.
+
+See the [experimental operator runbook](../../operations/video-face-feasibility-wi0155.md)
+and [recognition/identity matching governance](../../architecture/identity-matching.md).

@@ -1,8 +1,21 @@
 # WI-0155 — isolated offline video-face feasibility checkpoint
 
-This experimental tool lives on the long-running `wi-0155` integration branch,
-not on `main`. Feature PRs target `wi-0155` until the maintainer chooses a
-small production slice or closes the feasibility experiment. **PRs #740, #741 and #745 are merged into `wi-0155`; checkpoint 4 adds an opt-in timeline-coverage experiment.**
+This experimental tool remains on the long-running WI-0155 integration
+branch (wi-0155), **not main**. All development PRs target wi-0155
+until a specific **near-completion maintainer decision** to either integrate
+video recognition into Photo Identity or keep it as a separate component.
+No video recognition is added to the normal production API, worker,
+UI or media processing flow merely by merging a prototype PR.
+PRs #740, #741, #745, #748 and #751 are merged into wi-0155.
+
+**Current direction — 2026-11-07:** Identify at least one useful
+face observation per visible person, test existing-catalogue
+known-person suggestions and unknown handling, and examine a small
+number of additional local videos. Historical grouping sensitivity is
+a diagnostic, **not an acceptance target**. The current experiment
+**does not yet read PostgreSQL**: manually supplied reference photos
+do not equal real catalogue identity matching. See the revised
+[WI-0155 requirements](../delivery/work-items/WI-0155-video-face-processing-evaluation.md).
 
 ## Scope and limits
 
@@ -698,3 +711,144 @@ comparison counts** and generalized human observations, never
 group aliases, face-level scores, exact timestamps, private paths,
 images or reports. A real human-reviewed negative control is required
 before adopting any grouping threshold in production.
+
+
+## Current multi-video, person-level plan — 2026-11-07
+
+The accepted 36-frame pilot found both human-observed people, despite
+14 fragmented baseline groups. A later private comparison yielded
+12/11/9 tentative groups at multi-observation thresholds 0.80/0.70/0.60,
+but fewer groups are not a goal in themselves. Many missed faces
+were blurry, partially occluded or viewed at difficult angles:
+detecting every low-quality face does not ensure identification.
+
+**New success unit:** a person, not a frame or a heuristic group.
+A single good, human-reviewable observation may suffice to suggest
+one known person. More observations are useful when they discover
+someone else, strengthen reliable ranking evidence or provide a
+clearer frame for human review. **Continue sampling through the
+video after a known person is found**, because another person may
+appear later. Do not turn the highest similarity across many samples
+into automatic identity confirmation: evaluate incorrect suggestions,
+rank-2 competition and uncertainty as well.
+
+### What is implemented versus planned
+
+**Already available:** one expressly approved, fully local video
+per run; a bounded set of 12/24/36 timestamped extracted frames;
+YuNet/SFace and optional diagnostics at detector confidence 0.7;
+1–6 separately approved single-face reference photographs;
+private review reports and grouping experiments. Each additional
+video has a separate frame manifest and private report.
+
+**Not yet implemented:** read-only loading of the Photo Identity
+catalogue, an exact-model eligible known-person gallery,
+a production-equivalent identity suggestion policy for video,
+person-level best-frame selection, an unknown-rejection-calibrated
+decision, or aggregation of multiple videos in one command.
+Do not invent a database CLI switch or treat the current
+--references mode as catalogue-backed.
+
+**Next engineering increment, still isolated on wi-0155:** explicitly
+approved, bounded, least-privilege read-only catalogue adapter or
+operator-controlled local snapshot. Use only eligible current
+assigned-person exemplars, filter Unknown/Rejected/reversed/
+superseded evidence and merged people according to Photo Identity
+identity-matching rules, and require the exact SFace model ID,
+SHA-256 hash and compatible alignment/preprocessing. Preserve
+one stable evidence/version snapshot; fail closed on incompatible
+models, stale evidence or incomplete reads. Do not trigger matcher
+regeneration, auto-assignment or any PostgreSQL writes. Production
+photo detection uses CenterFace while the video experiment uses
+YuNet; that difference requires evaluation rather than an
+assumption of equal recognition quality.
+
+### Additional private videos
+
+Keep the existing two-person video as the repeatable baseline.
+Add at least **one**, preferably **two or three**, diverse explicitly
+approved fully local clips: one with several people (ideally
+overlapping appearances), one with varied angles/movement, and
+an intentionally unknown-to-gallery person or equivalent negative
+case. A visible person is not always represented by a usable face.
+
+For each clip, repeat the checkpoint-4 FFmpeg extraction with
+the existing *explicitly approved* local binary, then run the
+checkpoint-4 private-reference diagnostic only if the approved
+reference set is relevant. The existing tool is **single-video**,
+so do not combine manifests or group aliases across clips.
+
+~~~powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer-WI0155"
+
+# EDIT: expressly approved, already-local video and PINNED FFmpeg.
+$video = "C:\Private\ApprovedExtraVideo.mp4"
+$ffmpegPath = "C:\Private\ApprovedTools\ffmpeg.exe"
+
+$params = @{
+    VideoPath = $video
+    FfmpegPath = $ffmpegPath
+    ApprovePrivateLocalVideo = $true
+    FrameCount = 36
+}
+$coverage = & .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 @params
+
+if (-not $coverage -or -not (Test-Path -LiteralPath $coverage.ManifestPath -PathType Leaf)) {
+    throw 'Private frame sampler did not create a manifest.'
+}
+
+# Use the checkpoint-4 CLI example with this new private manifest,
+# approved reference photos, and a NEW private report path.
+# It has NO PostgreSQL catalogue mode yet.
+~~~
+
+For videos longer than ten minutes, specify a bounded window and
+inspect subsequent windows separately. Do not claim complete person
+coverage from one short sample if someone appears later.
+
+### Private human-reviewed per-clip evidence
+
+Keep these notes **locally outside Git, CI and synced folders**:
+
+- Number of human-observed distinct people, people with at least
+  one detected **usable** face, and people missing from sampled frames.
+- For people known to an eligible reference gallery, correct
+  rank-1 at least once, wrong/ambiguous/below-threshold suggestions;
+  distinguish the current manually curated references from the
+  not-yet-implemented database gallery.
+- Unknown-to-gallery examples: whether faces remain unknown rather
+  than receiving unsupported known-person labels.
+- Whether an additional frame materially improved ranking evidence
+  or was visibly better for review; count redundant review effort.
+- Frames sampled, time spent, unusable/borderline/usable examples.
+  A qualitative reviewer judgment is sufficient initially; it is
+  not a precise numerical model-quality metric.
+
+Only non-identifying totals and generalized review findings
+should be copied into work-item notes or chat. Never publish
+names, person IDs, file paths, individual scores, embeddings,
+face images or private report contents.
+
+### Isolation and final architecture gate
+
+All prototype code, tests and docs continue on wi-0155 and
+its child feature branches; all such PRs **target wi-0155, not main**.
+Do not add implicit Photo Identity startup, UI, API, worker, migration,
+or automatic original-hydration changes during this work item.
+
+**Near WI-0155 completion only**, review the additional video evidence,
+catalogue matching/unknown handling, privacy and operating costs,
+and obtain an explicit maintainer decision between:
+
+1. An integrated, separately approved minimal video-recognition
+   slice in Photo Identity, with its own main-branch PR and
+   tests/rollback/review protections; or
+2. Keeping video recognition as a separately operated tool,
+   module or service, using a deliberately governed, narrow
+   read-only identity-data interface/snapshot and documented
+   privacy, authentication, update and retention boundaries.
+
+Neither choice is pre-decided. It is acceptable to complete
+feasibility with a documented decision and a separate production
+follow-up; do not interpret experimental PR merges as permission
+to merge the entire branch into main.
