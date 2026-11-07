@@ -48,7 +48,8 @@ public sealed class PostgresArchiveSourceHydrationRepository :
                 COALESCE(
                     usage.last_needed_at_utc,
                     hydration.requested_at_utc),
-                hydration.release_requested_at_utc
+                hydration.release_requested_at_utc,
+                asset.media_kind = 'video'
             FROM archive_source_managed_hydrations AS hydration
             INNER JOIN assets AS asset
                 ON asset.id = hydration.asset_id
@@ -80,7 +81,8 @@ public sealed class PostgresArchiveSourceHydrationRepository :
                 reader.GetFieldValue<DateTimeOffset>(5),
                 reader.IsDBNull(6)
                     ? null
-                    : reader.GetFieldValue<DateTimeOffset>(6)));
+                    : reader.GetFieldValue<DateTimeOffset>(6),
+                reader.GetBoolean(7)));
         }
 
         return values;
