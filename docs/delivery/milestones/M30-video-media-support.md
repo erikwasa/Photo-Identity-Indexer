@@ -7,6 +7,21 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+
+**WI-0207 acceptance update — 2026-11-07:** PR #753 merged;
+the maintainer confirmed 35 focused integration tests passed,
+one disposable PostgreSQL release-receipt test actually executed
+and passed, plus documentation `validate` and
+`generate --check`. The separate PowerShell `else`
+parsing error after the successful test run is not a test
+failure. Checkpoint 4 is accepted, without any new media
+transfer authorization. Safe race-free dependent-job release
+coordination, app/user pin ownership distinction and the
+operator-approved real online-only video acceptance remain
+open. M30/WI-0207 are still in progress; keep online-only
+videos OFF.
+
+
 **WI-0207 update — 2026-11-06:** PR #750's managed photo/video
 admission was accepted locally (30/30 synthetic integration
 tests, 1/1 disposable PostgreSQL lease test); PR #752's

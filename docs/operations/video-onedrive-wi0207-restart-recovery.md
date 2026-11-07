@@ -111,3 +111,24 @@ but does not authorize automatic release of app-pinned originals
 or prove race-free coordination with newly queued dependent jobs.
 Those and one separately authorized real online-only hydrate,
 process, reuse and release trial remain open.
+
+## Maintainer acceptance — 2026-11-07
+
+**Checkpoint 4 PASS.** On merged PR #753, the maintained
+PowerShell 7.6 checkout passed 35 focused integration tests,
+one actual disposable PostgreSQL ownership test, and
+documentation `validate` / `generate --check`. These
+results are accepted and **do not require repetition** solely
+to update this document.
+
+If entering commands separately, do not paste a standalone
+`else` after a completed `if` statement. PowerShell
+does not attach it retroactively. The documented independent
+`if (-not $postgresExecuted)` branch avoids this
+shell parsing issue.
+
+The test evidence verifies only synthetic/disposable-database
+behavior. It does not authorize original-media access,
+OneDrive pinning changes, or production release. Keep the
+online-only video option disabled until the remaining WI-0207
+safety and live pilot gates have been approved.
