@@ -61,6 +61,12 @@ public sealed class PostgresVideoManagedHydrationTests
                         4096,now(),'video/quicktime','video'),
                            (@photoRevision,@photoAsset,repeat('b',64),
                         512,now(),'image/jpeg','photo');
+                    INSERT INTO video_revision_metadata (
+                        asset_revision_id,inspection_status,color_transfer,
+                        duration_seconds,inspected_at_utc,tool_sha256,
+                        inspection_profile_id)
+                    VALUES (@videoRevision,'supported','bt709',6,now(),
+                            repeat('d',64),'synthetic');
                     """;
                 seed.Parameters.AddWithValue("source", source);
                 seed.Parameters.AddWithValue("videoAsset", videoAsset);
@@ -113,8 +119,7 @@ public sealed class PostgresVideoManagedHydrationTests
                     """;
                 enqueue.Parameters.AddWithValue("job", job);
                 enqueue.Parameters.AddWithValue("revision", videoRevision);
-                enqueue.Parameters.AddWithValue("key",
-                    "wi0207-queued-" + Guid.NewGuid().ToString("N"));
+                enqueue.Parameters.AddWithValue("key", new string('e',64));
                 await enqueue.ExecuteNonQueryAsync();
             }
             Assert.False(await managed.TryRequestIdleVideoReleaseAsync(
