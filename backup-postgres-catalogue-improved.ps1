@@ -29,7 +29,8 @@ param(
     [string]$DatabaseName,
     [string]$OutputPath,
     [string]$ConfigurationPath,
-    [string]$ContainerName = 'postgres-postgres-1',
+    [string]$ContainerName,
+    [ValidateRange(1, 1024)][int]$MinimumFreeGiB = 4,
     [switch]$CopyToOneDrive,
     [string]$OneDriveDirectory
 )
@@ -134,6 +135,59 @@ function Invoke-PodmanBinary {
     }
 }
 
+# Default to the service in this checkout's Compose project rather than a
+# potentially stale, hardcoded container name. Explicit override is retained.
+function Resolve-PostgresContainer {
+    if (-not [string]::IsNullOrWhiteSpace($ContainerName)) { return $ContainerName }
+    $composeDirectory = Join-Path $PSScriptRoot 'deploy\\postgres'
+    if (-not (Test-Path -LiteralPath $composeDirectory -PathType Container)) {
+        throw 'PostgreSQL Compose directory is missing.'
+    }
+    Push-Location -LiteralPath $composeDirectory
+    try {
+        $ids = @(& $podmanExe compose ps -q postgres)
+        $ids = @($ids | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+        if ($LASTEXITCODE -ne 0 -or $ids.Count -ne 1) {
+            throw 'Could not resolve exactly one running PostgreSQL Compose container. Start the service or supply -ContainerName.'
+        }
+        return $ids[0]
+    }
+    finally { Pop-Location }
+}
+
+# A minimum-space preflight is not a size prediction: pg_dump compression
+# varies. The OneDrive copy is checked again against the actual dump size.
+function Assert-AvailableSpace {
+    param([string]$Directory, [long]$MinimumBytes, [string]$Purpose)
+    try {
+        $driveRoot = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($Directory))
+        $drive = [IO.DriveInfo]::new($driveRoot)
+        if (-not $drive.IsReady) { throw 'Volume is not ready.' }
+        $free = [long]$drive.AvailableFreeSpace
+    }
+    catch {
+        throw "Cannot check Windows free space for $Purpose at '$Directory'. Choose a reachable local volume. $($_.Exception.Message)"
+    }
+    if ($free -lt $MinimumBytes) {
+        throw ("Insufficient Windows free space for {0}: {1:N2} GiB available; {2:N2} GiB minimum. Operation stopped; any completed local backup remains." -f $Purpose, ($free / 1GB), ($MinimumBytes / 1GB))
+    }
+    Write-Host ("Available Windows space for {0}: {1:N2} GiB ({2}); actual dump size may exceed the minimum." -f $Purpose, ($free / 1GB), $driveRoot)
+}
+
+function Assert-DistinctBackupDestination {
+    param([string]$BackupPath, [string]$CopyPath)
+    if ([string]::Equals([IO.Path]::GetFullPath($BackupPath), [IO.Path]::GetFullPath($CopyPath),
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'OneDrive destination is the same as the local backup file. Select a separate directory.'
+    }
+}
+
+function Publish-BackupFile {
+    param([string]$Source, [string]$Destination)
+    # The two-argument File.Move refuses a destination collision on Windows.
+    [IO.File]::Move($Source, $Destination)
+}
+
 function Get-LauncherEnvironmentValue {
     param([Parameter(Mandatory=$true)][string]$Name)
     foreach ($scope in @('Process','User','Machine')) {
@@ -207,6 +261,8 @@ if ([string]::IsNullOrWhiteSpace($DatabaseName)) {
     $selection = 'launcher'
 }
 
+$ContainerName = Resolve-PostgresContainer
+
 # Ensure Podman can reach the target container and it has the catalogue markers.
 # Database name is passed through an environment variable, not interpolated
 # into SQL or shell commands.
@@ -225,6 +281,8 @@ $reportPath = "$OutputPath.json"
 $directory = Split-Path -Parent $OutputPath
 [System.IO.Directory]::CreateDirectory($directory) | Out-Null
 
+Assert-AvailableSpace -Directory $directory -MinimumBytes ([long]$MinimumFreeGiB * 1GB) -Purpose 'local backup'
+
 if ((Test-Path -LiteralPath $OutputPath) -or (Test-Path -LiteralPath $reportPath)) {
     throw 'Backup or metadata file already exists; existing backups will not be overwritten.'
 }
@@ -237,6 +295,8 @@ if ($CopyToOneDrive) {
     [System.IO.Directory]::CreateDirectory($OneDriveDirectory) | Out-Null
     $cloudDump = Join-Path $OneDriveDirectory (Split-Path -Leaf $OutputPath)
     $cloudReport = "$cloudDump.json"
+    Assert-DistinctBackupDestination -BackupPath $OutputPath -CopyPath $cloudDump
+    Assert-AvailableSpace -Directory $OneDriveDirectory -MinimumBytes ([long]$MinimumFreeGiB * 1GB) -Purpose 'OneDrive staging'
     if ((Test-Path -LiteralPath $cloudDump) -or (Test-Path -LiteralPath $cloudReport)) {
         throw 'OneDrive destination already exists; refusing to overwrite.'
     }
@@ -272,7 +332,9 @@ try {
 
     $sha256 = (Get-FileHash -LiteralPath $partPath -Algorithm SHA256).Hash.ToLowerInvariant()
     # Publish the final filename only after verification succeeds.
-    Move-Item -LiteralPath $partPath -Destination $OutputPath
+    # File.Move refuses an unexpected destination collision instead of
+    # replacing a backup created by another process after preflight.
+    Publish-BackupFile -Source $partPath -Destination $OutputPath
 
     $report = [ordered]@{
         capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
@@ -291,12 +353,13 @@ try {
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
     if ($CopyToOneDrive) {
+        Assert-AvailableSpace -Directory $OneDriveDirectory -MinimumBytes ([long]$size + 64MB) -Purpose 'OneDrive copy'
         Write-Host 'Copying verified backup to OneDrive folder...'
         $cloudPart = "$cloudDump.uploading-$([Guid]::NewGuid().ToString('N'))"
         Copy-Item -LiteralPath $OutputPath -Destination $cloudPart -ErrorAction Stop
         $cloudSha256 = (Get-FileHash -LiteralPath $cloudPart -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($cloudSha256 -ne $sha256) { throw 'OneDrive copy checksum mismatch.' }
-        Move-Item -LiteralPath $cloudPart -Destination $cloudDump
+        Publish-BackupFile -Source $cloudPart -Destination $cloudDump
         $cloudPart = $null
         Copy-Item -LiteralPath $reportPath -Destination $cloudReport -ErrorAction Stop
         Write-Host "OneDrive folder copy: $cloudDump"
