@@ -72,7 +72,7 @@ public sealed class CatalogueEvidenceTests
     }
 
     [Fact]
-    public void Explicit_case_scope_requires_several_unique_local_clips_and_pseudonyms()
+    public async Task Explicit_case_scope_requires_several_unique_local_clips_and_pseudonyms()
     {
         string root = Path.Combine(Path.GetTempPath(), "wi0155-catalogue-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -122,10 +122,9 @@ public sealed class CatalogueEvidenceTests
             Assert.DoesNotContain(first, json, StringComparison.Ordinal);
             Assert.DoesNotContain(second, json, StringComparison.Ordinal);
             Assert.DoesNotContain(selection.People![0].PersonId.ToString(), json, StringComparison.Ordinal);
-            Assert.ThrowsAsync<ArgumentException>(() =>
+            await Assert.ThrowsAsync<ArgumentException>(() =>
                 VideoFaceCatalogueReportWriter.WriteAsync(reportPath, repo,
-                    Path.Combine(casesDir, "cases.json"), [first, second], report))
-                .GetAwaiter().GetResult();
+                    Path.Combine(casesDir, "cases.json"), [first, second], report));
         }
         finally
         {
