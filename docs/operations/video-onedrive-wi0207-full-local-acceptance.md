@@ -15,7 +15,13 @@ external cloud API, new downloader or second original cache is added.
 automatically, and do not change any existing user-pinned video
 just to create an example. The initial, previously verified
 preflight found 9 candidates with no proxies: 2 local and
-7 user-pinned local; none online-only. Those counts may have
+7 pinned local; none online-only. **The pilot must use one
+already-catalogued current video with supported inspection
+metadata**. Never-inspected online-only videos are skipped
+rather than being automatically pinned and downloaded just
+to collect metadata. If your intended clip was never
+inspected, first make it local and let the normal local
+inspection run before the approved online-only pilot. Those counts may have
 changed since. If no suitable online-only video is available,
 the operator can select an appropriate **unpinned** catalogued
 test clip and manually use Explorer **Free up space** after
