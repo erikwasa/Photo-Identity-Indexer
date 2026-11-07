@@ -24,8 +24,16 @@
             <div class="video-settings-status-heading">
                 <div>
                     <h3 id="video-queue-heading">Video queue and status</h3>
-                    <p class="field-help">Last processing result: <code>@Status.LastResult</code></p>
-                    <p class="field-help">Last automatic poster result: <code>@Status.LastPosterResult</code></p>
+                    <p class="field-help">Latest Archive video step: <code>@Status.LastResult</code></p>
+                    <p class="field-help">Last substantive video outcome (since app start): <code>@Status.LastActivityResult</code></p>
+                    <p class="field-help">
+                        <code>no-eligible-video</code> means this particular scan had no
+                        eligible video left; it does not undo a previously published
+                        proxy. A first-time online-only inspection requires its
+                        separate opt-in and may precede a proxy publication.
+                    </p>
+                    <p class="field-help">Latest automatic poster result: <code>@Status.LastPosterResult</code>
+                        (not-run means no automatic poster was attempted since app start).</p>
                 </div>
                 <button class="button secondary" type="button"
                         disabled="@(Saving || Loading)" @onclick="RefreshStatusAsync">
@@ -164,6 +172,9 @@
                     verified full-range Rec.709. The worker selects the
                     source-appropriate conversion automatically. Unsupported
                     HDR and unknown colour remain excluded.
+                    With online-only processing enabled, a previously
+                    uninspected MOV/MP4 source can be hydrated for bounded
+                    first inspection under the same managed storage policy.
                     Online-only processing requires its separate opt-in;
                     one-video-step mode is optional for either quality.
                     Choosing an output quality does not read videos, start jobs
@@ -331,7 +342,8 @@
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
         string LastResult, string LastPosterResult,
-        IReadOnlyList<VideoJobRow> Recent);
+        IReadOnlyList<VideoJobRow> Recent,
+        string LastActivityResult = "not-run");
     private sealed record VideoRetentionReport(
         bool DryRun, int Inspected, int Planned, int Invalid, int Missing,
         int Corrupt, int QuotaSelected, int Revoked, int FilesDeleted,
