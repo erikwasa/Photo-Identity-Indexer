@@ -237,53 +237,50 @@ public sealed class VideoProcessingQuotaPreferencesTests
         Assert.Equal(1024, existing.MaximumCacheMiB);
     }
 
-    [Fact]
-    public async Task Fullrange_profile_requires_explicit_local_only_one_step_operator_selection()
+    [Theory]
+    [InlineData("standard-720p", false, false)]
+    [InlineData("standard-720p", true, false)]
+    [InlineData("standard-720p", true, true)]
+    [InlineData("compact-540p", false, false)]
+    [InlineData("compact-540p", true, false)]
+    [InlineData("compact-540p", true, true)]
+    public void Quality_preset_is_independent_of_online_only_and_one_step(
+        string quality, bool onlineOnly, bool oneStep)
     {
-        string profile = PhotoIdentity.Cli.VideoProxyEncodingProfiles.Rec709FullRangeKey;
-        var inactive = new VideoProcessingPreferences(false, false,
-            EncodingProfile: profile);
-        inactive.Validate();
-        Assert.False(inactive.Enabled);
+        new VideoProcessingPreferences(true, onlineOnly,
+            EncodingProfile: quality,
+            StopAfterOneVideoStepPerAdvance: oneStep).Validate();
+    }
 
-        var approved = inactive with
-        {
-            Enabled = true, StopAfterOneVideoStepPerAdvance = true
-        };
-        approved.Validate();
-        Assert.False(approved.IncludeOnlineOnly);
-        Assert.Throws<ArgumentException>(() =>
-            (approved with { IncludeOnlineOnly = true }).Validate());
-        Assert.Throws<ArgumentException>(() =>
-            (approved with { StopAfterOneVideoStepPerAdvance = false }).Validate());
-        Assert.Throws<ArgumentException>(() =>
-            (inactive with { IncludeOnlineOnly = true }).Validate());
-
-        // Existing default / compact profiles retain their current settings.
-        new VideoProcessingPreferences(true, true).Validate();
-        new VideoProcessingPreferences(true, true,
-            EncodingProfile: PhotoIdentity.Cli.VideoProxyEncodingProfiles.CompactKey)
-            .Validate();
-
+    [Fact]
+    public async Task Persisted_legacy_rec709_choice_migrates_to_standard_without_disabling_processing()
+    {
         string path = Path.Combine(Path.GetTempPath(),
-            "wi0210-operator-prefs-" + Guid.NewGuid().ToString("N") + ".json");
+            "wi0207-output-quality-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
-            var store = new VideoProcessingPreferencesStore(path,
-                new(false, false));
-            await store.SaveAsync(inactive);
-            Assert.Equal(profile,
-                new VideoProcessingPreferencesStore(path, new(false, false))
-                    .Current.EncodingProfile);
-            await store.SaveAsync(approved);
-            Assert.True(new VideoProcessingPreferencesStore(path, new(false, false))
-                .Current.StopAfterOneVideoStepPerAdvance);
-            Assert.True(new VideoProcessingPreferencesStore(path, new(false, false))
-                .Current.Enabled);
-            string saved = File.ReadAllText(path);
+            await File.WriteAllTextAsync(path,
+                """{"Enabled":true,"IncludeOnlineOnly":false,"EncodingProfile":"rec709-fullrange-720p","StopAfterOneVideoStepPerAdvance":true}""");
+            var store = new VideoProcessingPreferencesStore(path, new(false, false));
+            Assert.Equal("standard-720p", store.Current.EncodingProfile);
+            Assert.True(store.Current.Enabled);
+            Assert.True(store.Current.StopAfterOneVideoStepPerAdvance);
+            var changed = store.Current with
+            {
+                IncludeOnlineOnly = true,
+                StopAfterOneVideoStepPerAdvance = false
+            };
+            await store.SaveAsync(changed);
+            var restarted = new VideoProcessingPreferencesStore(path, new(false, false));
+            Assert.True(restarted.Current.Enabled);
+            Assert.True(restarted.Current.IncludeOnlineOnly);
+            Assert.False(restarted.Current.StopAfterOneVideoStepPerAdvance);
+            Assert.Equal("standard-720p", restarted.Current.EncodingProfile);
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                store.SaveAsync(approved with { IncludeOnlineOnly = true }));
-            Assert.Equal(saved, File.ReadAllText(path));
+                store.SaveAsync(changed with
+                {
+                    EncodingProfile = PhotoIdentity.Cli.VideoProxyEncodingProfiles.Rec709FullRangeKey
+                }));
         }
         finally
         {

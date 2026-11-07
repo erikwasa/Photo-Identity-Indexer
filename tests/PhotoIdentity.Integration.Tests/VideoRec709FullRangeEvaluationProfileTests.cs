@@ -489,6 +489,49 @@ public sealed class VideoRec709FullRangeEvaluationProfileTests
     }
 
     [Fact]
+    public void Both_output_qualities_accept_fullrange_and_standard_input_classes()
+    {
+        var full = Current();
+        var sdr = full with { PixelFormat = "yuv420p" };
+        var unapproved = full with { ColorTransfer = "arib-std-b67" };
+        foreach (string quality in new[]
+        {
+            VideoProxyEncodingProfiles.StandardKey,
+            VideoProxyEncodingProfiles.CompactKey
+        })
+        {
+            var converter = VideoProxyEncodingProfiles.ResolveForInput(quality, true);
+            var defaultConverter = VideoProxyEncodingProfiles.ResolveForInput(quality, false);
+            Assert.True(VideoProxyEncodingProfiles.IsEligible(converter, full));
+            Assert.True(VideoProxyEncodingProfiles.IsEligible(defaultConverter, sdr));
+            Assert.False(VideoProxyEncodingProfiles.IsEligible(converter, unapproved));
+            Assert.False(VideoProxyEncodingProfiles.IsEligible(defaultConverter, full));
+            Assert.NotEqual(defaultConverter.Version, converter.Version);
+        }
+        Assert.Equal(VideoProxyEncodingProfiles.Rec709FullRange.Version,
+            VideoProxyEncodingProfiles.ResolveForInput(
+                VideoProxyEncodingProfiles.StandardKey, true).Version);
+        var compact = VideoProxyEncodingProfiles.ResolveForInput(
+            VideoProxyEncodingProfiles.CompactKey, true);
+        Assert.Equal(540, compact.MaximumDimension);
+        string source = Path.GetFullPath("approved-staged-fullrange.mov");
+        string workspace = Path.GetFullPath("private-compact-workspace");
+        string[] args = [.. compact.BuildArguments(source, workspace)];
+        string Arg(string key) => args[Array.IndexOf(args, key) + 1];
+        Assert.Contains("scale=w=540:h=540:in_range=full:out_range=limited",
+            Arg("-vf"));
+        Assert.Equal("26", Arg("-crf"));
+        Assert.Equal("1400k", Arg("-maxrate"));
+        Assert.Equal("2800k", Arg("-bufsize"));
+        Assert.Equal("80k", Arg("-b:a"));
+        Assert.Equal("tv", Arg("-color_range"));
+        Assert.Equal("-1", Arg("-map_metadata:s"));
+        Assert.Throws<ArgumentException>(() =>
+            VideoProxyEncodingProfiles.ResolveForInput(
+                VideoProxyEncodingProfiles.Rec709FullRangeKey, true));
+    }
+
+    [Fact]
     public void Production_input_probe_requires_fullrange_signalling_with_unmapped_data()
     {
         var full = VideoProxyEncodingProfiles.Rec709FullRange;

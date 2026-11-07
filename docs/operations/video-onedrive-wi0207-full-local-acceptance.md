@@ -187,9 +187,14 @@ approved Windows configuration:
 1. Confirm only the intended Archive included folder is selected;
    photo-first processing, already-local videos, and other
    eligible work take priority.
-2. In **Settings → Video processing**, enable normal video
-   processing and **Include online-only videos** for this test.
-   Do not change pre-existing user-pinning preferences.
+2. In **Settings → Video processing**, choose **Standard 720p** or
+   **Compact 540p** (the output quality, not an input format). Enable
+   normal video processing and independently enable **Include
+   online-only videos** for this test. Rec.709 full-range input uses
+   the approved source-specific conversion automatically under
+   either quality. Optionally enable **Stop each Archive advance
+   after one video step** for a small controlled trial; it is not
+   required by the format. Do not change existing user pins.
 3. Start the **operator-triggered Archive Run**. Verify only the
    chosen video gets downloaded by the OneDrive sync client.
    Inspect sanitized worker status; do not run bulk CLI jobs.

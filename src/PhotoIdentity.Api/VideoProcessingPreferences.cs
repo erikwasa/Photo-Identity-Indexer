@@ -21,14 +21,9 @@ public sealed record VideoProcessingPreferences(
 {
     public void Validate()
     {
-        _ = VideoProxyEncodingProfiles.Resolve(EncodingProfile);
-        // New archive subtype is deliberately local-only and one-step in
-        // its first production acceptance. No implicit OneDrive download,
-        // backlog drain or automatic class-wide admission.
-        if (VideoProxyEncodingProfiles.IsRec709FullRange(EncodingProfile) &&
-            (IncludeOnlineOnly || (Enabled && !StopAfterOneVideoStepPerAdvance)))
-            throw new ArgumentException(
-                "Rec.709 full-range requires local-only, single-step video processing.");
+        // Output quality does not grant source admission or online-only consent.
+        if (!VideoProxyEncodingProfiles.IsOutputQualityKey(EncodingProfile))
+            throw new ArgumentException("Select Standard 720p or Compact 540p.");
         if (RetentionAgeHours is not (48 or 168 or 720))
             throw new ArgumentException(
                 "Video retention age must be 48 hours, 7 days or 30 days.");
@@ -124,6 +119,10 @@ public sealed class VideoProcessingPreferencesStore
             var value = JsonSerializer.Deserialize<VideoProcessingPreferences>(
                 File.ReadAllText(path));
             if (value is null) return new(false, false);
+            // Migrate the prior WI-0210 720p full-range UI choice without
+            // disabling processing or resetting its separate operator settings.
+            if (value.EncodingProfile == VideoProxyEncodingProfiles.Rec709FullRangeKey)
+                value = value with { EncodingProfile = VideoProxyEncodingProfiles.StandardKey };
             value.Validate();
             return value;
         }

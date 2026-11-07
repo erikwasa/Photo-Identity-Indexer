@@ -106,6 +106,22 @@ public sealed class VideoProcessingSettingsLayoutContractTests
     }
 
     [Fact]
+    public void Output_quality_is_independent_from_supported_inputs_and_online_consent()
+    {
+        (string page, _) = Sources();
+        Assert.Contains("<option value=\"standard-720p\">", page);
+        Assert.Contains("<option value=\"compact-540p\">", page);
+        Assert.DoesNotContain("<option value=\"rec709-fullrange-720p\">", page);
+        Assert.DoesNotContain("EncodingProfile == \"rec709-fullrange-720p\"", page);
+        string root = ResolveRepositoryRoot();
+        string worker = File.ReadAllText(Path.Combine(root,
+            "src", "PhotoIdentity.Api", "VideoArchiveProcessingService.cs"));
+        Assert.Contains("metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')", worker);
+        Assert.Contains("VideoProxyEncodingProfiles.ResolveForInput(", worker);
+        Assert.Contains("WHEN metadata.pixel_format='yuvj420p' THEN @fullrange", worker);
+    }
+
+    [Fact]
     public void Destructive_cleanup_is_advanced_only_and_still_requires_confirmation()
     {
         (string page, _) = Sources();
