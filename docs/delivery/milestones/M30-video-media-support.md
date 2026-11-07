@@ -7,6 +7,33 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+
+**2026-11-07 WI-0155 experimental video-face feasibility direction:**
+The maintainer has clarified that success is **at least one useful,
+human-reviewable face observation per visible person**, including
+credible suggestion of an existing identified person when eligible
+matching evidence is available—not perfect temporal face grouping
+or recall of every low-quality appearance. Additional approved local
+videos, known-positive and unknown-to-gallery cases and low review
+burden precede production selection. The current standalone
+WI-0155 CLI has *not* connected to PostgreSQL; the next proposed
+checkpoint is a bounded, explicitly authorized, **read-only**
+eligible-exemplar catalogue interface with exact SFace model
+provenance and no canonical identity mutation.
+
+**Isolation is deliberate and remains mandatory.** WI-0155 and
+its feature PRs stay on the long-lived experimental **wi-0155**
+branch, not main. No integration, worker hookup, automatic
+assignment or production-media processing is approved. **Only
+near WI-0155 completion**, after a multi-video human review,
+will the maintainer decide whether video recognition should be
+integrated into Photo Identity through a separately scoped,
+reviewed main-branch change, or remain a separate component with
+a controlled identity-data interface. Both outcomes remain open.
+See the [revised WI-0155 criteria](../work-items/WI-0155-video-face-processing-evaluation.md)
+and the [isolated operator runbook](../../operations/video-face-feasibility-wi0155.md).
+
+
 **2026-11-04 new scoped follow-up — WI-0211 proposed:** The
 maintainer's Videos screenshot shows widespread indistinguishable
 dark `Video` placeholders despite a successful new
