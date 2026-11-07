@@ -170,6 +170,43 @@ public sealed class PostgresVideoProvisionalRepository(PostgresCatalogueDatabase
     }
 
     /// <summary>
+    /// Find an existing app-managed provisional video for a source key.
+    /// Local originals without an active source lease are never claimed
+    /// merely because they happen to be present during Archive inspection.
+    /// </summary>
+    public async Task<ArchiveSourceObservationSnapshot?> GetActiveSourceAsync(
+        SourceId sourceId, string sourceKey, CancellationToken token = default)
+    {
+        await using NpgsqlConnection conn = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT asset.id, source.root_locator, observed.observed_size_bytes,
+                   observed.observed_last_write_ticks,
+                   observed.observed_media_type, observed.observed_at_utc
+            FROM assets asset
+            JOIN sources source ON source.id=asset.source_id
+            JOIN archive_source_observations observed ON observed.asset_id=asset.id
+            JOIN archive_source_managed_hydrations receipt ON receipt.asset_id=asset.id
+            WHERE asset.source_id=@source AND asset.source_key=@key
+              AND asset.media_kind='video' AND asset.deleted_at_utc IS NULL
+              AND receipt.released_at_utc IS NULL
+              AND observed.verification_state='unverified';
+            """;
+        cmd.Parameters.AddWithValue("source", sourceId.Value);
+        cmd.Parameters.AddWithValue("key", sourceKey);
+        await using NpgsqlDataReader reader = await cmd.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token) || reader.IsDBNull(3)) return null;
+        return new ArchiveSourceObservationSnapshot(
+            AssetId.From(reader.GetGuid(0)), sourceId,
+            reader.GetString(1), sourceKey, reader.GetInt64(2),
+            new DateTimeOffset(reader.GetInt64(3), TimeSpan.Zero),
+            reader.GetString(4), reader.GetFieldValue<DateTimeOffset>(5),
+            AssetAvailability.Local,
+            ArchiveSourceObservationVerificationState.Unverified,
+            null, null);
+    }
+
+    /// <summary>
     /// Bounded, metadata-only recovery of provisional VIDEO ownership.
     /// Photo source verification/leases never enter this path.
     /// </summary>
