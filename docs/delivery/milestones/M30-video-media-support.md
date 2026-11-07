@@ -10,7 +10,9 @@ depends_on: [M19, M22, M24, M27]
 **WI-0207 full-local-review candidate — 2026-11-07:** The maintainer
 accepted checkpoint 4 (35 focused integration tests, 1 disposable
 PostgreSQL test, docs validation, PR #754 merged). The next consolidated
-PR replaces video-only +p hydration with the Windows Cloud Files
+PR makes uninspected online-only metadata discovery local-only
+to avoid earlier unsafe pre-revision +p/-p operations, and
+replaces supported-revision video-only +p hydration with the Windows Cloud Files
 full-range transient hydration API, without changing photo hydration;
 adds a source-locked/no-pending-job release gate that blocks new
 enqueue/restart while a release is outstanding; and requests +u
