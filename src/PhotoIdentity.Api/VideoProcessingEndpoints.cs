@@ -80,7 +80,8 @@ public sealed record VideoProcessingSettingsResponse(
     long Cancelled, long ExpiredLeases, string LastResult,
     string LastPosterResult,
     IReadOnlyList<VideoProcessingJobOperatorRow> Recent,
-    VideoAttemptFailureDiagnostic? LastAttemptFailure);
+    VideoAttemptFailureDiagnostic? LastAttemptFailure,
+    string LastActivityResult = "not-run");
 
 /// <summary>
 /// Operator settings only. No arbitrary source paths, executable paths,
@@ -116,6 +117,7 @@ public static class VideoProcessingEndpoints
         return Results.Ok(ToResponse(preferences.Current, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
             processor.LastResult, processor.LastPosterResult,
+            processor.LastActivityResult,
             recent, processor.LastAttemptFailure));
     }
 
@@ -183,6 +185,7 @@ public static class VideoProcessingEndpoints
         return Results.Ok(ToResponse(saved, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
             processor.LastResult, processor.LastPosterResult,
+            processor.LastActivityResult,
             recent, processor.LastAttemptFailure));
     }
 
@@ -324,7 +327,7 @@ public static class VideoProcessingEndpoints
         VideoProcessingPreferences settings,
         VideoProcessingQueueOverview status,
         bool processing, bool configured, string lastResult,
-        string lastPosterResult,
+        string lastPosterResult, string lastActivityResult,
         IReadOnlyList<VideoProcessingJobOperatorRow> recent,
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
         new(settings.Enabled, settings.IncludeOnlineOnly,
@@ -335,5 +338,5 @@ public static class VideoProcessingEndpoints
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
             status.ExpiredLeases, lastResult, lastPosterResult,
-            recent, lastAttemptFailure);
+            recent, lastAttemptFailure, lastActivityResult);
 }
