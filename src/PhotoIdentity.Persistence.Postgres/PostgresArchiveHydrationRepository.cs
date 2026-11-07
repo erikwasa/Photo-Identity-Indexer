@@ -146,6 +146,186 @@ public sealed class PostgresArchiveHydrationRepository :
         return result;
     }
 
+    /// <summary>
+    /// Bounded operator-only idle scan; no source byte reads or cloud writes.
+    /// Leaves active, queued and running derivatives' originals untouched.
+    /// </summary>
+    public async Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
+        GetIdleVideoHydrationsAsync(
+            int maximum, CancellationToken cancellationToken = default)
+    {
+        if (maximum is < 1 or > 16)
+            throw new ArgumentOutOfRangeException(nameof(maximum));
+
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT hydration.asset_revision_id, revision.asset_id,
+                   revision.size_bytes, source.root_locator, asset.source_key,
+                   hydration.requested_at_utc,
+                   COALESCE(usage.last_needed_at_utc,
+                            hydration.requested_at_utc),
+                   hydration.release_requested_at_utc,
+                   TRUE AS is_video
+            FROM asset_revision_managed_hydrations hydration
+            JOIN asset_revisions revision
+              ON revision.id=hydration.asset_revision_id
+            JOIN assets asset ON asset.id=revision.asset_id
+            JOIN sources source ON source.id=asset.source_id
+            LEFT JOIN asset_revision_managed_hydration_usage usage
+              ON usage.asset_revision_id=hydration.asset_revision_id
+            WHERE hydration.released_at_utc IS NULL
+              AND hydration.release_requested_at_utc IS NULL
+              AND revision.media_kind='video' AND asset.media_kind='video'
+              AND asset.deleted_at_utc IS NULL
+              AND source.kind='local-folder'
+              AND revision.id=(
+                  SELECT latest.id FROM asset_revisions latest
+                  WHERE latest.asset_id=asset.id AND latest.media_kind='video'
+                  ORDER BY latest.observed_at_utc DESC,latest.id DESC LIMIT 1)
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_copy_exclusions excluded
+                  WHERE excluded.source_id=asset.source_id
+                    AND excluded.source_key=asset.source_key)
+              AND NOT EXISTS (
+                  SELECT 1 FROM video_processing_jobs job
+                  WHERE job.asset_revision_id=revision.id
+                    AND job.status IN ('queued','running'))
+            ORDER BY COALESCE(usage.last_needed_at_utc,
+                              hydration.requested_at_utc),
+                     hydration.asset_revision_id
+            LIMIT @maximum;
+            """;
+        command.Parameters.AddWithValue("maximum", maximum);
+        List<ArchiveManagedHydrationLeaseState> result = [];
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new ArchiveManagedHydrationLeaseState(
+                AssetRevisionId.From(reader.GetGuid(0)),
+                AssetId.From(reader.GetGuid(1)),
+                reader.GetInt64(2), reader.GetString(3), reader.GetString(4),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                reader.GetFieldValue<DateTimeOffset>(6),
+                reader.IsDBNull(7)
+                    ? null : reader.GetFieldValue<DateTimeOffset>(7),
+                reader.GetBoolean(8)));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Same source row lock as PostgresVideoProcessingJobRepository.EnqueueAsync.
+    /// All new enqueues reject a release-pending revision. A release request
+    /// cannot overtake a job that has already committed as queued/running.
+    /// </summary>
+    public async Task<bool> TryRequestIdleVideoReleaseAsync(
+        AssetRevisionId revisionId, DateTimeOffset requestedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction =
+            await connection.BeginTransactionAsync(cancellationToken);
+        await using (NpgsqlCommand lockSource = connection.CreateCommand())
+        {
+            lockSource.Transaction = transaction;
+            lockSource.CommandText = """
+                SELECT source.id FROM asset_revisions revision
+                JOIN assets asset ON asset.id=revision.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE revision.id=@revision
+                  AND revision.media_kind='video'
+                  AND asset.media_kind='video'
+                  AND asset.deleted_at_utc IS NULL
+                  AND source.kind='local-folder'
+                  AND revision.id=(
+                      SELECT latest.id FROM asset_revisions latest
+                      WHERE latest.asset_id=asset.id
+                        AND latest.media_kind='video'
+                      ORDER BY latest.observed_at_utc DESC,latest.id DESC LIMIT 1)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM source_copy_exclusions excluded
+                      WHERE excluded.source_id=asset.source_id
+                        AND excluded.source_key=asset.source_key)
+                FOR UPDATE OF source;
+                """;
+            lockSource.Parameters.AddWithValue(
+                "revision", revisionId.Value);
+            if (await lockSource.ExecuteScalarAsync(cancellationToken)
+                is not Guid)
+                return false;
+        }
+        int changed;
+        await using (NpgsqlCommand release = connection.CreateCommand())
+        {
+            release.Transaction = transaction;
+            release.CommandText = """
+                UPDATE asset_revision_managed_hydrations hydration
+                SET release_requested_at_utc=@requested
+                WHERE hydration.asset_revision_id=@revision
+                  AND hydration.released_at_utc IS NULL
+                  AND hydration.release_requested_at_utc IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM video_processing_jobs job
+                      WHERE job.asset_revision_id=@revision
+                        AND job.status IN ('queued','running'))
+                  AND EXISTS (
+                      SELECT 1 FROM asset_revisions revision
+                      WHERE revision.id=@revision
+                        AND revision.media_kind='video');
+                """;
+            release.Parameters.AddWithValue("revision", revisionId.Value);
+            release.Parameters.AddWithValue(
+                "requested", requestedAtUtc.ToUniversalTime());
+            changed = await release.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return changed == 1;
+    }
+
+    public async Task<bool> CanRetryVideoReleaseAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1 FROM asset_revision_managed_hydrations hydration
+                JOIN asset_revisions revision
+                  ON revision.id=hydration.asset_revision_id
+                JOIN assets asset ON asset.id=revision.asset_id
+                JOIN sources source ON source.id=asset.source_id
+                WHERE hydration.asset_revision_id=@revision
+                  AND hydration.released_at_utc IS NULL
+                  AND hydration.release_requested_at_utc IS NOT NULL
+                  AND revision.media_kind='video'
+                  AND asset.media_kind='video'
+                  AND asset.deleted_at_utc IS NULL
+                  AND source.kind='local-folder'
+                  AND revision.id=(
+                      SELECT latest.id FROM asset_revisions latest
+                      WHERE latest.asset_id=asset.id
+                        AND latest.media_kind='video'
+                      ORDER BY latest.observed_at_utc DESC,latest.id DESC LIMIT 1)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM source_copy_exclusions excluded
+                      WHERE excluded.source_id=asset.source_id
+                        AND excluded.source_key=asset.source_key)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM video_processing_jobs job
+                      WHERE job.asset_revision_id=@revision
+                        AND job.status IN ('queued','running'))
+            );
+            """;
+        command.Parameters.AddWithValue("revision", revisionId.Value);
+        return await command.ExecuteScalarAsync(cancellationToken) is true;
+    }
+
     public async Task<ArchiveManagedHydrationState> ClaimAsync(
         AssetRevisionId revisionId,
         DateTimeOffset requestedAtUtc,
