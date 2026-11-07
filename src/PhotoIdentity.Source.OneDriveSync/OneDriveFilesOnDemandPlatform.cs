@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Source.OneDriveSync;
@@ -38,6 +40,23 @@ public interface IOneDriveFilesOnDemandPlatform
     Task RequestHydrationAsync(string path, CancellationToken cancellationToken = default);
 
     Task RequestOnlineOnlyAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Video-only transient hydration: uses the existing Windows cloud sync
+    /// provider without setting a persistent pin. Fail closed on alternate
+    /// platform implementations until explicitly supported.
+    /// </summary>
+    Task RequestUnpinnedVideoHydrationAsync(
+        string path, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Transient video hydration is unsupported.");
+
+    /// <summary>
+    /// Video-only release: never clears a user pin. Request online-only only
+    /// if Files On-Demand still reports local and unpinned.
+    /// </summary>
+    Task RequestUnpinnedVideoReleaseAsync(
+        string path, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Unpinned video release is unsupported.");
 }
 
 /// <summary>
@@ -114,6 +133,67 @@ public sealed class WindowsOneDriveFilesOnDemandPlatform : IOneDriveFilesOnDeman
         // Clear an app-owned pin first, then explicitly request online-only state. If the second
         // operation fails the ownership record remains active so the caller can safely retry.
         await RunAttribAsync("-p", path, cancellationToken);
+        await RunAttribAsync("+u", path, cancellationToken);
+    }
+
+    // Cloud Files API: both these calls are serviced by the already
+    // registered OneDrive sync provider. There is no new cloud connector.
+    [DllImport("CldApi.dll", ExactSpelling = true)]
+    private static extern int CfHydratePlaceholder(
+        SafeFileHandle fileHandle, long startingOffset, long length,
+        uint flags, IntPtr overlapped);
+
+    public async Task RequestUnpinnedVideoHydrationAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException(
+                "Transient cloud-file video hydration requires Windows.");
+
+        OneDriveFilesOnDemandState before = GetState(path);
+        if (before.Availability != AssetAvailability.OnlineOnly || before.IsPinned)
+            throw new InvalidOperationException(
+                "Video hydration requires a currently unpinned online-only source.");
+
+        // CfHydratePlaceholder is synchronous with this handle. Run on a
+        // worker thread so operator pause/timeout can cancel the wait.
+        // A native request already issued can continue after cancellation;
+        // the durable managed receipt remains active for safe recovery.
+        await Task.Run(() =>
+        {
+            using SafeFileHandle handle = File.OpenHandle(
+                path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete, FileOptions.None);
+            // CF_EOF (-1) requests the entire bounded video original.
+            int result = CfHydratePlaceholder(handle, 0L, -1L, 0, IntPtr.Zero);
+            if (result < 0)
+                throw new IOException(
+                    "Windows Cloud Files rejected transient video hydration.");
+        }, cancellationToken).WaitAsync(cancellationToken);
+
+        // A user can pin the source while it is being hydrated; never
+        // clear that pin, and let later cleanup observe it as protected.
+    }
+
+    public async Task RequestUnpinnedVideoReleaseAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException(
+                "Unpinned OneDrive video release requires Windows.");
+
+        OneDriveFilesOnDemandState current = GetState(path);
+        if (current.Availability != AssetAvailability.Local || current.IsPinned)
+            throw new InvalidOperationException(
+                "An unpinned local video is required for managed release.");
+
+        // Deliberately do NOT execute attrib -p: that could remove a
+        // user-requested Always keep on this device pin. +u asks the
+        // existing sync provider to evict only unpinned local bytes.
+        // A user pin set in the tiny check-to-attrib race remains a
+        // known Windows attribute limitation; verify in real pilot.
         await RunAttribAsync("+u", path, cancellationToken);
     }
 
