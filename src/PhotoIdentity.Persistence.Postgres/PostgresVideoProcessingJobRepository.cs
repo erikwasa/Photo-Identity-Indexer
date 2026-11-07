@@ -93,6 +93,11 @@ public sealed class PostgresVideoProcessingJobRepository(PostgresCatalogueDataba
                           SELECT 1 FROM source_copy_exclusions excluded
                           WHERE excluded.source_id = asset.source_id
                             AND excluded.source_key = asset.source_key)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM asset_revision_managed_hydrations managed
+                          WHERE managed.asset_revision_id = revision.id
+                            AND managed.released_at_utc IS NULL
+                            AND managed.release_requested_at_utc IS NOT NULL)
                 );
                 """;
             authorized.Parameters.AddWithValue("revision", identity.RevisionId.Value);
