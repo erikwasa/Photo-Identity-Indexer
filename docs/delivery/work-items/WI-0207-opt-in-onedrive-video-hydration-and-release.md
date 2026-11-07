@@ -683,3 +683,13 @@ verifies controlled inspection, supported proxy or durable unsupported
 classification, and eventual safe release. Previously accepted real hydration/
 release and earlier WI-0207 checkpoints are not to be repeated.
 WI-0207 remains `in_progress` pending this newly agreed behavior.
+
+**Source-format extensibility after the accepted live review:** Draft PR #761
+introduces a single `VideoApprovedInputPolicy` for the queued and
+newly discovered Archive selectors and post-inspection approval. Both
+output qualities use this internal admission policy. A future source
+class still needs an explicitly validated conversion recipe, source
+probe and output proof before admission; adding a third operator quality
+choice is not how source compatibility is extended. The current
+Rec.709 SDR and full-range classes retain their existing durable recipe
+identities; HDR is not admitted merely by being discovered.
