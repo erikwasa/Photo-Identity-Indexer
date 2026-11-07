@@ -608,7 +608,10 @@ public sealed class VideoArchiveProcessingService(
                 excluded.Add(reader.GetString(0));
         }
 
-        SourceAsset? onlineCandidate = null;
+        // Do not hydrate a never-inspected online-only source just to
+        // discover its metadata. Its immutable revision does not yet exist
+        // for durable video managed-lease admission. Only already-catalogued
+        // supported video revisions may use opt-in transient hydration.
         SourceAsset? localCandidate = null;
         // A bounded discovery scan of metadata only. No content bytes are
         // opened until a single candidate has been chosen.
@@ -628,9 +631,7 @@ public sealed class VideoArchiveProcessingService(
                         localCandidate ??= video;
                         break;
                     }
-                    if (preferences.Current.IncludeOnlineOnly &&
-                        video.Availability == AssetAvailability.OnlineOnly)
-                        onlineCandidate ??= video;
+
                 }
             }
             catch (DirectoryNotFoundException)
@@ -641,87 +642,43 @@ public sealed class VideoArchiveProcessingService(
             if (localCandidate is not null) break;
         }
 
-        SourceAsset? selected = localCandidate ?? onlineCandidate;
+        SourceAsset? selected = localCandidate;
         if (selected is null) return false;
-        bool hydratedByUs = false;
-        string? hydratedPath = null;
-        try
-        {
-            if (selected.Availability == AssetAvailability.OnlineOnly)
-            {
-                hydratedPath = ResolveOwnedSourcePath(
-                    sourceState.RootLocator, selected.Reference.ItemKey);
-                VideoScratchCapacityGuard.EnsureCapacity(
-                    sourceState.RootLocator, selected.SizeBytes);
-                if (oneDrive.GetSyncClientAvailability() ==
-                    OneDriveSyncClientAvailability.Unavailable)
-                    throw new InvalidOperationException(
-                        "OneDrive is unavailable for video metadata retrieval.");
-                await oneDrive.RequestHydrationAsync(hydratedPath, token);
-                hydratedByUs = true;
-                using CancellationTokenSource timeout =
-                    CancellationTokenSource.CreateLinkedTokenSource(token);
-                timeout.CancelAfter(TimeSpan.FromMinutes(5));
-                while (await videos.GetAvailabilityAsync(
-                    selected.Reference, timeout.Token) != AssetAvailability.Local)
-                {
-                    if ((await new PostgresVideoPhotoPriorityProbe(database)
-                            .GetAsync(timeout.Token)).PhotoWorkActive)
-                        return false;
-                    await Task.Delay(TimeSpan.FromSeconds(2), timeout.Token);
-                }
-            }
-            if (await videos.GetAvailabilityAsync(selected.Reference, token) !=
-                AssetAvailability.Local)
-                return false;
 
-            string local = videos.GetLocalPath(selected.Reference);
-            FileInfo file = new(local);
-            if (!VideoIngestCommandRunner.MatchesObservation(selected, file))
-                return false;
-            var probe = new VideoPilotMediaTools(ffprobe, TimeSpan.FromSeconds(20));
-            VideoPilotMetadata media = await probe.ProbeAsync(local, token);
-            byte[] digest;
-            await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
-                digest = await SHA256.HashDataAsync(original, token);
-            if (!VideoIngestCommandRunner.MatchesObservation(selected, file) ||
-                await videos.GetAvailabilityAsync(selected.Reference, token) !=
-                    AssetAvailability.Local)
-                return false;
-            var verified = new VerifiedLocalVideo(sourceState,
-                new SourceAsset(selected.Reference, selected.RelativePath,
-                    selected.MediaType, selected.SizeBytes,
-                    selected.LastWriteTimeUtc, AssetAvailability.Local),
-                new Sha256Digest(Convert.ToHexString(digest).ToLowerInvariant()),
-                DateTimeOffset.UtcNow);
-            RegisteredVideoRevision revision =
-                await new PostgresVideoAssetRepository(database)
-                    .RegisterVerifiedAsync(verified, token);
-            await new PostgresVideoEvidenceRepository(database)
-                .SaveInspectionAsync(VideoIngestCommandRunner.BuildInspection(
-                    revision.RevisionId, media, Required("FfprobeSha256"),
-                    DateTimeOffset.UtcNow), token);
-            return true;
-        }
-        finally
-        {
-            if (hydratedByUs && hydratedPath is not null)
-            {
-                try
-                {
-                    using CancellationTokenSource cleanup =
-                        new(TimeSpan.FromSeconds(15));
-                    await oneDrive.RequestOnlineOnlyAsync(hydratedPath, cleanup.Token);
-                }
-                catch (Exception exception) when (
-                    exception is IOException or UnauthorizedAccessException
-                        or OperationCanceledException)
-                {
-                    logger.LogWarning(
-                        "App-initiated video inspection hydration could not be released.");
-                }
-            }
-        }
+        // This metadata-inspection lane is strictly local-only; it never
+        // pins or dehydrates a source. Pre-inspected current revisions are
+        // eligible for the separate opt-in managed hydration lane.
+        if (await videos.GetAvailabilityAsync(selected.Reference, token) !=
+            AssetAvailability.Local)
+            return false;
+
+        string local = videos.GetLocalPath(selected.Reference);
+        FileInfo file = new(local);
+        if (!VideoIngestCommandRunner.MatchesObservation(selected, file))
+            return false;
+        var probe = new VideoPilotMediaTools(ffprobe, TimeSpan.FromSeconds(20));
+        VideoPilotMetadata media = await probe.ProbeAsync(local, token);
+        byte[] digest;
+        await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
+            digest = await SHA256.HashDataAsync(original, token);
+        if (!VideoIngestCommandRunner.MatchesObservation(selected, file) ||
+            await videos.GetAvailabilityAsync(selected.Reference, token) !=
+                AssetAvailability.Local)
+            return false;
+        var verified = new VerifiedLocalVideo(sourceState,
+            new SourceAsset(selected.Reference, selected.RelativePath,
+                selected.MediaType, selected.SizeBytes,
+                selected.LastWriteTimeUtc, AssetAvailability.Local),
+            new Sha256Digest(Convert.ToHexString(digest).ToLowerInvariant()),
+            DateTimeOffset.UtcNow);
+        RegisteredVideoRevision revision =
+            await new PostgresVideoAssetRepository(database)
+                .RegisterVerifiedAsync(verified, token);
+        await new PostgresVideoEvidenceRepository(database)
+            .SaveInspectionAsync(VideoIngestCommandRunner.BuildInspection(
+                revision.RevisionId, media, Required("FfprobeSha256"),
+                DateTimeOffset.UtcNow), token);
+        return true;
     }
 
     /// <summary>
