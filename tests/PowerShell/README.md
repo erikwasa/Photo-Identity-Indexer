@@ -26,3 +26,16 @@ pwsh -NoProfile -File .\tests\PowerShell\postgres-restore-disposable.integration
 ~~~
 
 Real Windows/Podman acceptance is documented separately in [the WI-0208 operator procedure](../../docs/operations/postgres-wi0208-verification.md).
+
+The Windows streaming PostgreSQL backup helper has source-free tests for
+native stdout/stdin byte handling, failure exit propagation, collision-safe
+publication, space preflight and path guards. They use `cmd.exe` instead of
+Podman, never touch production, and run in Windows CI:
+
+~~~powershell
+pwsh -NoProfile -File .\tests\PowerShell\postgres-streaming-backup.tests.ps1
+~~~
+
+A real PostgreSQL backup, independently downloaded OneDrive copy and isolated
+restore still require the manual operator checks documented in
+[PostgreSQL production operations](../../docs/operations/postgresql-operations.md).
