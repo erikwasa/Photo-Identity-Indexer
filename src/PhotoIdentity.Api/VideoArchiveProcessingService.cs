@@ -844,16 +844,7 @@ public sealed class VideoArchiveProcessingService(
 
     private static bool CanEncodeInspectedVideo(
         VideoRevisionInspection inspection, long sourceBytes) =>
-        inspection.InspectionStatus == "supported" &&
-        inspection.ColorTransfer == "bt709" &&
-        inspection.VideoCodec is ("h264" or "hevc") &&
-        inspection.PixelFormat is ("yuv420p" or "yuv420p10le" or "yuvj420p") &&
-        inspection.AudioCodec is (null or "aac" or "pcm_s16le" or "pcm_s24le") &&
-        inspection.CodedWidth is >= 16 and <= 4096 &&
-        inspection.CodedHeight is >= 16 and <= 4096 &&
-        inspection.DisplayRotationDegrees is (0 or 90 or -90 or 180 or -180) &&
-        inspection.DurationSeconds is >= 0.2m and <= 600m &&
-        sourceBytes is >= 1 and <= MaxSourceBytes;
+        VideoApprovedInputPolicy.IsApproved(inspection, sourceBytes);
 
     /// <summary>
     /// Select an eligible queued job only within the current archive coverage.
@@ -867,7 +858,7 @@ public sealed class VideoArchiveProcessingService(
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
-        query.CommandText = """
+        query.CommandText = $"""
             SELECT job.id, revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes,
                    (metadata.pixel_format='yuvj420p')
@@ -889,16 +880,7 @@ public sealed class VideoArchiveProcessingService(
               AND source.kind='local-folder'
               AND revision.size_bytes=job.source_bytes
               AND revision.size_bytes BETWEEN 1 AND @max
-              AND metadata.inspection_status='supported'
-              AND metadata.color_transfer='bt709'
-              AND metadata.video_codec IN ('h264','hevc')
-              AND metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')
-              AND (metadata.audio_codec IS NULL OR
-                   metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
-              AND metadata.coded_width BETWEEN 16 AND 4096
-              AND metadata.coded_height BETWEEN 16 AND 4096
-              AND metadata.duration_seconds BETWEEN 0.2 AND 600
-              AND metadata.display_rotation_degrees IN (0,90,-90,180,-180)
+              {{VideoApprovedInputPolicy.MetadataPredicate}}
               AND revision.id=(
                   SELECT latest.id FROM asset_revisions latest
                   WHERE latest.asset_id=asset.id AND latest.media_kind='video'
@@ -933,7 +915,7 @@ public sealed class VideoArchiveProcessingService(
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
-        query.CommandText = """
+        query.CommandText = $"""
             SELECT revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes,
                    (metadata.pixel_format='yuvj420p')
@@ -943,16 +925,7 @@ public sealed class VideoArchiveProcessingService(
             JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
             WHERE revision.media_kind='video' AND asset.media_kind='video'
               AND asset.deleted_at_utc IS NULL AND source.kind='local-folder'
-              AND metadata.inspection_status='supported'
-              AND metadata.color_transfer='bt709'
-              AND metadata.video_codec IN ('h264','hevc')
-              AND metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')
-              AND (metadata.audio_codec IS NULL OR
-                   metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
-              AND metadata.coded_width BETWEEN 16 AND 4096
-              AND metadata.coded_height BETWEEN 16 AND 4096
-              AND metadata.duration_seconds BETWEEN 0.2 AND 600
-              AND metadata.display_rotation_degrees IN (0,90,-90,180,-180)
+              {{VideoApprovedInputPolicy.MetadataPredicate}}
               AND revision.size_bytes BETWEEN 1 AND @max
               AND revision.id=(
                   SELECT latest.id FROM asset_revisions latest
