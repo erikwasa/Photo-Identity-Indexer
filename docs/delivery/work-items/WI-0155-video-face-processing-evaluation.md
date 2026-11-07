@@ -463,3 +463,47 @@ production automatic-assignment behavior is authorized.
 
 See the [experimental operator runbook](../../operations/video-face-feasibility-wi0155.md)
 and [recognition/identity matching governance](../../architecture/identity-matching.md).
+
+
+## Experimental checkpoint 6 — catalogue snapshot and multi-video ranking (2026-11-07, proposed)
+
+The isolated WI-0155 feature branch adds an **opt-in experimental** path in
+the existing standalone video-face CLI. A private cohort manifest explicitly
+selects **1–32 canonical people** and **2–4 separate already-local videos**.
+The operator supplies each video's existing bounded timestamped frame manifest;
+no automatic archive scan or video hydration occurs.
+
+A dedicated local PostgreSQL **SELECT-only** login (not the application's
+writable connection) is mandatory. A guarded REPEATABLE READ, READ ONLY
+transaction selects at most three distinct-current-photo SFace exemplars
+per explicitly selected eligible person. The reader requires the exact
+approved SFace FP32 ID/hash, 128-dimensional vector format, and
+sface-five-point-v1 alignment, and excludes merged identities, obsolete
+revisions, reversed/Unknown/Rejected latest review decisions and
+incompatible data. It records a private snapshot token plus review and
+embedding high-watermarks. The transaction closes before decoding video
+frames. All clips are compared with the **same in-memory snapshot**, so
+writes or new reviews during a video run cannot silently change the gallery.
+
+The new ranker competes **between people**, never between multiple photos
+of the same person for the top-two places. The report preserves candidate
+suppression at experimental cutoffs, unsuppressed private diagnostics,
+per-person top-rank observations and no-candidate counts for human review.
+It makes **no** canonical assignments or claims about calibrated
+identification, usable-frame quality, distinct detected people, or unknown
+precision. Full temporal tracking, production matcher regeneration and UI
+integration remain out of scope. The original private-reference CLI is
+untouched in normal use.
+
+**Acceptance is not complete:** code and synthetic tests alone do not prove
+the role ACL or data-shape compatibility with the maintainer's live
+PostgreSQL database, or that correct people are ranked against the actual
+gallery. Local verification of the safe SQL path, model integrity and
+input/output invariance, followed by the approved multiple-video
+positive/negative human review, remains required. Record false suggestions
+and any missing eligible exemplar before deciding on the minimum production
+slice. Keep all results private. No branch promotion to main is authorized.
+
+The [checkpoint 6 operator procedure](../../operations/video-face-feasibility-wi0155.md)
+defines read-only role setup, bounded case files and PowerShell 7.6 trial
+commands. Both integrate-into-app and remain-separate outcomes are still open.

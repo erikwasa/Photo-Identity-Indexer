@@ -20,13 +20,21 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        if (args.Contains("--catalogue-cases", StringComparer.Ordinal))
+        {
+            return await VideoFaceCatalogueRunner.RunAsync(args);
+        }
+
         if (args.Length == 1 && args[0] is "--help" or "-h")
         {
             Console.WriteLine(
                 "Usage: dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -- " +
                 "--manifest <private-frames.json> [--root <repo>] [--model-dir <installed-model-dir>] " +
                 "[--references <private-references.json> --private-report <new-private-report.json>] " +
-                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>] [--coverage]]");
+                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>] [--coverage]]\n" +
+                "Catalogue: --catalogue-cases <private-2-to-4-clips.json> " +
+                "--private-report <new-private-report.json> [--root <repo>] " +
+                "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>]");
             return 0;
         }
 

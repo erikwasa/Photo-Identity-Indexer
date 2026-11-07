@@ -67,6 +67,8 @@ work_items:
     value: 2026-11-07 private 36-frame one-clip pilot found both operator-observed people, 19 frames with faces and 21 face detections; a second sensitivity experiment compared baseline 14 groups with 12/11/9 multi-observation groups at 0.80/0.70/0.60; grouping remains exploratory and source hashes unchanged
   - type: maintainer_verification
     value: 2026-11-07 maintainer redirected feasibility toward one useful observation per person across more approved local videos, read-only recognition from eligible existing identified-person catalogue evidence, and explicit deferred integrate-versus-separate decision; work stays on wi-0155
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/757
   - type: documentation
     value: docs/operations/video-face-feasibility-wi0155.md
 - id: WI-0186
