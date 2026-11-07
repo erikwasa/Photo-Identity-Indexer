@@ -437,4 +437,111 @@ between release admission and new queued/running dependent jobs;
 design an app/user pin policy that can safely free eligible
 managed bytes without clearing a user pin; then separately
 authorize a single real online-only video hydrate/process/reuse/
-release trial. Keep **Include online-only videos OFF**. 
+release trial. Keep **Include online-only videos OFF**.
+
+## Development checkpoint 5 — single-PR full local review candidate (2026-11-07)
+
+The maintainer requested completing the remaining WI-0207 implementation
+and moving to one full local acceptance review in as few PRs as
+possible, **ideally the next PR**. This checkpoint changes the
+new-video hydration strategy, preserving all previous accepted
+checkpoint 1–4 evidence and retaining `status: in_progress`
+until a real operator-approved OneDrive example succeeds.
+
+### New video-only transient hydration and release
+
+The previous app video hydration used OneDrive `attrib +p`,
+making the subsequent pin indistinguishable from a user's
+"Always keep on this device" choice. This prevented safe
+automatic release. Newly authorized video hydration now uses
+Windows **`CfHydratePlaceholder`**, which asks the *existing*
+OneDrive Windows sync provider to materialize the bounded
+original without setting its pin bit. It makes no direct cloud
+API call and needs no separate copy or downloader. Photo
+hydration remains unchanged.
+
+After the selected video proxy job and optional downstream
+work finish, the worker checks live Files On-Demand attributes,
+existing managed ownership, current revision and exclusions,
+photo priority, and queued/running derivative dependencies.
+It requests an **idle video release under the same PostgreSQL
+source row lock used by enqueue/restart**. Future enqueues
+and explicit failed-job restarts must refuse a managed video
+that has an outstanding release. Only an unpinned, app-owned,
+locally present video can have `attrib +u` requested.
+**Video release never invokes `attrib -p`**.
+
+The user can inspect playback through the current registered
+proxy while the original is online-only; the new hydration path
+is reached only by an authorized Archive worker with the
+independent online-only opt-in enabled.
+
+### Complete bounded cleanup without a background worker
+
+The worker requests release at the end of eligible processing
+and runs a bounded idle-ownership sweep if no new video
+candidate is ready. Existing checkpoint-4 recovery of at most
+16 release-requested receipts is extended: if the file is
+already online-only, it is reconciled atomically; if a prior
+release was requested but the file remains **local and
+unpinned**, and revision/job eligibility still holds, the
+operator-started recovery can retry `+u` without `-p`.
+A failed release leaves its durable ownership record active,
+never deletes authoritative original bytes, and can be
+retried on a later operator Archive run.
+
+All automated checks use synthetic OneDrive data or a
+**disposable PostgreSQL database**. The new SQL test covers
+queued derivative work blocking release, transition to
+eligibility after a terminal job, idempotent release
+admission and pending receipt confirmation. Platform
+contract tests verify that new video hydration uses no
+`+p` and new video release uses no `-p`.
+The earlier photo-hydration behavior is unaffected.
+
+### Deliberate simplifications and consequences
+
+1. **Windows Cloud Files API only:** The chosen machine must
+   support `CfHydratePlaceholder`. We fail closed if it does
+   not; there is no automatic fallback to permanent pinning.
+   A synchronous native hydration may outlive cancellation
+   of the worker's bounded wait. Durable ownership keeps it
+   accounted for until a later Archive action.
+2. **No separate cleanup scheduler:** Release is requested on
+   job completion or a subsequent operator-initiated Archive
+   advance. After an interrupted run, managed bytes can
+   remain local until the next authorized operation.
+3. **Tiny pin-state race:** A last-moment user pin between
+   observing unpinned metadata and the provider receiving
+   `+u` cannot be made fully atomic using the existing
+   attribute interface. The app never clears an explicit
+   pin itself. The single controlled test must avoid
+   concurrently pinning that clip.
+4. **Historical pinned receipts remain local:** Old video
+   `+p` hydration cannot be distinguished from user
+   choice and is never automatically unpinned. The live
+   pilot uses a newly authorized, initially unpinned
+   online-only video.
+
+These are intentionally scoped shortcuts for a single
+maintainer-verified work-item completion, not a claim that
+every possible OneDrive driver/outage/pin race has been tested.
+
+**The full local review is now the next acceptance gate**, not
+another indefinite synthetic checkpoint. The maintained
+operator must select **one** current supported unexcluded
+video (at most 256 MiB) with no registered playable
+proxy, confirm its initial online-only/unpinned state,
+authorize controlled Archive processing, verify publication
+and playback, and observe the original's eventual return
+to online-only after safe job completion. The test is
+**not automatically authorized by merging this PR**;
+it explicitly changes local OneDrive availability. Use the
+[full Windows local acceptance runbook](../../operations/video-onedrive-wi0207-full-local-acceptance.md).
+
+**No real OneDrive transfer, release or live completion
+evidence has been run for this checkpoint.** WI-0207 must
+remain `in_progress` until CI and the maintainer's
+one-video verification pass. If a concrete pilot issue
+appears, fix that issue rather than expand the project
+into a new general hydration subsystem.
