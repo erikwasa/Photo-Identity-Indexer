@@ -31,7 +31,7 @@ try {
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
     }, $true))
-    foreach ($name in @('Quote-WindowsArgument', 'Invoke-PodmanBinary', 'Assert-AvailableSpace', 'Resolve-PostgresContainer')) {
+    foreach ($name in @('Quote-WindowsArgument', 'Invoke-PodmanBinary', 'Assert-AvailableSpace', 'Resolve-PostgresContainer', 'Assert-DistinctBackupDestination', 'Publish-BackupFile')) {
         $match = @($functions | Where-Object Name -eq $name)
         Check ($match.Count -eq 1) "exactly one helper named $name"
         . ([scriptblock]::Create($match[0].Extent.Text))
@@ -41,6 +41,18 @@ try {
     Check ((Quote-WindowsArgument 'simple') -ceq 'simple') 'plain native argument'
     Check ((Quote-WindowsArgument 'C:\some dir\file') -ceq '"C:\some dir\file"') 'spaces in native argument'
     Check ((Quote-WindowsArgument 'C:\some dir\') -ceq '"C:\some dir\\"') 'trailing slash in quoted native argument'
+
+    $local = Join-Path $temp 'local.dump'
+    $remote = Join-Path $temp 'remote.dump'
+    Refuse { Assert-DistinctBackupDestination -BackupPath $local -CopyPath $local } 'same output and cloud destination'
+    Assert-DistinctBackupDestination -BackupPath $local -CopyPath $remote
+    Check $true 'distinct cloud destination accepted'
+
+    [IO.File]::WriteAllText($local, 'original backup')
+    [IO.File]::WriteAllText($remote, 'existing remote backup')
+    Refuse { Publish-BackupFile -Source $local -Destination $remote } 'never overwrite existing backup'
+    Check (([IO.File]::ReadAllText($local) -ceq 'original backup') -and
+        ([IO.File]::ReadAllText($remote) -ceq 'existing remote backup')) 'collision preserves both files'
 
     $ContainerName = 'disposable-override'
     Check ((Resolve-PostgresContainer) -ceq 'disposable-override') 'explicit container override avoids Podman discovery'
@@ -59,7 +71,7 @@ try {
     Invoke-PodmanBinary -Arguments @('/d', '/c', 'echo stream-payload') -StdoutPath $stdoutPath
     $bytes = [IO.File]::ReadAllBytes($stdoutPath)
     $expected = [System.Text.Encoding]::ASCII.GetBytes("stream-payload`r`n")
-    Check ([System.Linq.Enumerable]::SequenceEqual([byte[]]$bytes, [byte[]]$expected)) 'native stdout is copied byte-for-byte'
+    Check (($bytes -join ',') -ceq ($expected -join ',')) 'native stdout is copied byte-for-byte'
 
     $stdinPath = Join-Path $temp 'stdin.txt'
     [IO.File]::WriteAllText($stdinPath, 'synthetic-only-input')
