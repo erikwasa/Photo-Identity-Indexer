@@ -307,7 +307,22 @@ public sealed class VideoManagedHydrationCoordinator(
                 if (pending.ReleaseRequested)
                 {
                     if (pending.LatestRevisionId is null)
-                        await ReleaseUninspectedAsync(observation, path, token);
+                    {
+                        if (state.Availability == AssetAvailability.OnlineOnly &&
+                            await IsCurrentProvisionalAsync(observation, token))
+                        {
+                            // The earlier local +u request has now actually
+                            // made this same unpinned placeholder online-only.
+                            await sourceOwnership.MarkReleasedAsync(
+                                observation.AssetId, timeProvider.GetUtcNow(), token);
+                        }
+                        else if (state.Availability == AssetAvailability.Local)
+                        {
+                            // Retry only the old authorized release request.
+                            await ReleaseUninspectedAsync(
+                                observation, path, token);
+                        }
+                    }
                     continue;
                 }
                 if (pending.LatestRevisionId is AssetRevisionId revision &&
