@@ -555,3 +555,67 @@ remain `in_progress` until CI and the maintainer's
 one-video verification pass. If a concrete pilot issue
 appears, fix that issue rather than expand the project
 into a new general hydration subsystem.
+
+## WI-0207 follow-up: input support independent of output quality (2026-11-07)
+
+**Agreed requirement:** Video settings offer **Standard 720p** and
+**Compact 540p** only. These select the output dimensions, bitrate and
+durable conversion recipe—not which input media classes Photo Identity
+accepts. Any newly *approved* playable-proxy input class must
+automatically be considered under both output qualities, not require
+another operator-selectable source-format preset.
+
+**Current approved classes:** BT.709 SDR `yuv420p`/`yuv420p10le`
+and validated full-range Rec.709 `yuvj420p`, in the existing
+codec, container, rotation, geometry, duration and source-size limits.
+Full-range originals still require an exact staged input FFprobe
+colour-range/BT.709 proof and independent limited-range output checks.
+HLG/PQ, unknown transfer/rotation and otherwise unapproved formats
+remain excluded. Input eligibility does not imply that every
+metadata-matching source is independently validated.
+
+**Run-control correction:** The initial WI-0210 full-range 720p
+rollout required local-only, one-video-step Archive operation.
+Remove those format-specific constraints. **Include online-only
+videos** stays separately default-off and explicitly authorized;
+video workers stay sequential, photo-first and quota bounded.
+The one-video-step mode remains an optional test throttle for
+both quality choices. An online-only video still requires a
+*current already-inspected* supported revision before the worker
+can authorize hydration; unknown online-only originals are not
+hydrated merely to inspect metadata.
+
+**Planned and implemented in one PR candidate:**
+1. Migrate the old saved `rec709-fullrange-720p` quality choice to
+   Standard 720p on preference load without clearing the processing
+   switch, online-only consent, or one-step setting. New settings
+   writes accept only Standard/Compact.
+2. Reuse unchanged SDR 720p/540p durable versions and the existing
+   WI-0210 full-range 720p job version. Add a distinct **540p
+   full-range conversion** version. Do not silently rewrite existing
+   published proxies or reuse a changed recipe under an existing
+   source-class/version pair.
+3. Both pending and queued Archive selectors match the full
+   supported input set independent of output quality; the actual
+   approved conversion is chosen by the source class under the
+   selected quality. Continue staged-source proof, source SHA,
+   output signalling checks, approved FFmpeg/FFprobe, lease/revision
+   and exclusion fencing, photo priority, privacy metadata stripping
+   and managed OneDrive ownership/release.
+4. Update settings text, compatibility matrix, full local runbook
+   and focused synthetic tests for both quality/source combinations,
+   persistence migration and independent run controls.
+
+**Required acceptance:** GitHub CI/build/docs checks plus one
+operator-approved WI-0207 online-only current, inspected video
+hydrate → proxy → playback → safe eventual release test on the
+maintained Windows PC; optionally validate the new 540p full-range
+conversion using one deliberately chosen real source. Unit and
+disposable-database tests cannot claim a real OneDrive/colour
+acceptance. Keep WI-0207 **in progress** until that test passes.
+
+**If one PR is insufficient:** Limit a follow-up PR to a concrete
+failed build, source validation, queue selection, encoding or
+managed-release defect. Record the failure and its scope in this
+section, rerun only targeted tests and the affected acceptance step,
+and do not reopen earlier accepted WI-0207 checkpoints.
