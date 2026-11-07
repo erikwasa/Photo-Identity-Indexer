@@ -104,7 +104,7 @@
                 <div>
                     <label class="field-label video-settings-check-row" for="video-processing-online">
                         <input id="video-processing-online" type="checkbox"
-                               @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled || EncodingProfile == "rec709-fullrange-720p")" />
+                               @bind="IncludeOnlineOnly" disabled="@(Saving || !Enabled)" />
                         Include online-only videos
                     </label>
                     <p>Off by default. Allows bounded OneDrive downloads for video
@@ -156,17 +156,18 @@
                         @bind="EncodingProfile" disabled="@Saving">
                     <option value="standard-720p">Standard 720p — current default</option>
                     <option value="compact-540p">Compact 540p — smaller picture / lower bitrate</option>
-                    <option value="rec709-fullrange-720p">Rec.709 full-range 720p — validated local compatibility</option>
                 </select>
                 <p class="field-help">
-                    Standard 720p and Compact 540p remain the existing SDR
-                    presets. Rec.709 full-range is a separately validated,
-                    opt-in 720p profile for locally available yuvj420p videos.
-                    Each selected original must still independently prove full-range
-                    BT.709; this does not approve all videos. It requires
-                    online-only processing off and one-video-step mode on.
-                    Choosing a preset does not read videos, start jobs or
-                    replace existing proxies; a future Archive advance may
+                    Standard 720p offers higher resolution and quality.
+                    Compact 540p produces smaller proxy files. Both choices
+                    accept all approved input formats, including independently
+                    verified full-range Rec.709. The worker selects the
+                    source-appropriate conversion automatically. Unsupported
+                    HDR and unknown colour remain excluded.
+                    Online-only processing requires its separate opt-in;
+                    one-video-step mode is optional for either quality.
+                    Choosing an output quality does not read videos, start jobs
+                    or replace existing proxies. A later Archive advance may
                     create a distinct durable job. Pause the Archive before
                     changing an active processing profile.
                 </p>
