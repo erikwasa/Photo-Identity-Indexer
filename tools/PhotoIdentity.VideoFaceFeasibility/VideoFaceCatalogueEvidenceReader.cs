@@ -58,6 +58,8 @@ public static class VideoFaceCatalogueEvidenceReader
             JOIN embeddings AS embedding ON embedding.face_crop_id = crop.id
             WHERE confirmed.person_id = ANY(@people)
               AND asset.deleted_at_utc IS NULL
+              AND asset.media_kind = 'photo'
+              AND revision.media_kind = 'photo'
               AND embedding.model_id = @model_id
               AND embedding.model_hash = @model_hash
               AND crop.crop_protocol = @alignment
