@@ -78,11 +78,57 @@ If multiple migrated/rehearsal databases remain in the server, select the accept
 
 Do not inspect PostgreSQL's physical data files to decide which database is production. Database names and server activity are the supported operational level; PostgreSQL's internal relation files and OID directories are not a safe authority-identification mechanism.
 
+### Windows streaming backup (avoids Podman dump staging)
+
+To back up the confirmed production catalogue without writing a temporary dump into
+the Podman virtual disk, use the streaming wrapper:
+
 ```powershell
 .\backup-postgres-catalogue-improved.ps1 `
-    -DatabaseName "photoidentity_rehearsal_20260910_214641_a808bde" `
-    -CopyToOneDrive
+    -DatabaseName 'photoidentity_main'
 ```
+
+The script discovers the running PostgreSQL container through this checkout's
+`deploy/postgres` Compose service. Use `-ContainerName` only when intentionally
+targeting a different already-verified container. It refuses missing catalogue
+markers, existing backup/report paths, and a OneDrive destination identical to
+the local backup. By default it requires at least **4 GiB free** on each
+destination volume before starting (`-MinimumFreeGiB` can override the minimum).
+The compressed archive size is not predictable: check sufficient Windows space
+for the **whole** backup; with `-CopyToOneDrive` budget for a second complete
+copy. The script rechecks the available OneDrive-copy space against the actual
+finished archive size.
+
+For an optional copy to the signed-in OneDrive sync directory, add
+`-CopyToOneDrive` (and optionally `-OneDriveDirectory 'D:\Path\To\OneDrive\DatabaseBackups'`).
+This copies files to a **local** sync directory, not directly to OneDrive's cloud.
+Verify that the backup appears in the OneDrive web UI and independently download
+and SHA-256-check the remote bytes before treating it as an independent recovery
+checkpoint; see [WI-0209 retention](postgres-wi0209-backup-retention.md).
+The `.dump` contains private data and is not encrypted by the script.
+
+The streaming wrapper checks the complete PostgreSQL custom-archive decode,
+SHA-256 and (if requested) the local copy's digest. **It does not perform a
+real database restore.** Its manifest explicitly says
+`restoreTestPerformed=false`. To qualify as a protected recovery checkpoint,
+stop Photo Identity *before* taking the backup and keep it stopped while running
+the isolated restore verifier below. Unlike streaming, that full verifier still
+stages the dump in Podman and creates a temporary restored database; reserve
+approximately another full database's worth of Podman storage. A normal live
+`pg_dump` is transactionally consistent if a full row-count comparison is not
+needed.
+
+Synthetic Windows tests (no Podman or production data):
+
+```powershell
+pwsh -NoProfile -File .\tests\PowerShell\postgres-streaming-backup.tests.ps1
+```
+
+The currently maintained streamed-backup implementation is a supervised
+operator path until a real Windows/Podman backup and restore acceptance run
+has been recorded. Interrupted runs may leave an exact
+`*.dump.partial-<guid>` file; inspect the specific file before removing it.
+Do not use wildcard cleanup in the backup directory.
 
 ### Identifying the active production database when rehearsals remain
 
