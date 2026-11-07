@@ -200,3 +200,25 @@ Historical note: the restrictions above applied before the final merged producti
 See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
 and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
 See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
+
+## WI-0207 live acceptance and first-time OneDrive discovery (2026-11-08)
+
+**Already-inspected online-only SDR video path: accepted on the maintained Windows
+host** after PR #759. A supported Standard 720p proxy was published,
+played and retained while its OneDrive original returned to online-only
+unpinned (successful jobs 31→32). Shared CI, disposable PostgreSQL and
+documentation checks passed. No changes to input-format acceptance were
+needed for this demonstration.
+
+**Pending follow-up (draft PR #761):** The first-visit workflow originally
+could inspect only locally available MOV/MP4. An unknown online-only
+placeholder had no verified content revision, and revision-locked
+hydration therefore skipped it despite opt-in. The follow-up introduces
+provisional source identity and the same shared managed hydration
+budget, creates a real revision only *after* reading/hashing the
+hydrated source, and uses the existing guarded output recipes when
+metadata is supported. Unsupported or non-BT.709 files must remain
+excluded from playable proxy production, and output quality remains
+only Standard 720p or Compact 540p. Never-inspected online-only
+acceptance is **not yet claimed**; defer new live-media verification
+until the development PR's CI passes.
