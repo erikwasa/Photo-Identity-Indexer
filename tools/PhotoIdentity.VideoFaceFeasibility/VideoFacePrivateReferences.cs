@@ -114,7 +114,16 @@ public static class VideoFaceReferenceSetLoader
 /// This is nearest-neighbour cosine evidence only, not identity recognition.
 /// All findings require human review; similarity and gap cutoffs are exploratory.
 /// </summary>
-public sealed class VideoFaceReferenceMatcher
+public interface IVideoFaceCandidateMatcher
+{
+    int ReferenceCount { get; }
+    VideoFaceReferenceFinding FindCandidate(
+        int frameNumber, long timestampMs, int faceNumber, EmbeddingVector query);
+    VideoFaceRankedDiagnostic Diagnose(
+        int frameNumber, long timestampMs, int faceNumber, EmbeddingVector query);
+}
+
+public sealed class VideoFaceReferenceMatcher : IVideoFaceCandidateMatcher
 {
     public const double ExploratoryCandidateSimilarity = 0.80;
     public const double ExploratoryGap = 0.05;
