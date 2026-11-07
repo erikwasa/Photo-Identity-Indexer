@@ -7,6 +7,25 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**WI-0207 full-local-review candidate — 2026-11-07:** The maintainer
+accepted checkpoint 4 (35 focused integration tests, 1 disposable
+PostgreSQL test, docs validation, PR #754 merged). The next consolidated
+PR replaces video-only +p hydration with the Windows Cloud Files
+full-range transient hydration API, without changing photo hydration;
+adds a source-locked/no-pending-job release gate that blocks new
+enqueue/restart while a release is outstanding; and requests +u
+only for existing app-owned, currently unpinned video originals.
+Release is attempted after work or during bounded operator-started
+Archive cleanup/retry. Known shortcuts are explicitly documented
+(Windows-only Cloud Files support, no background cleanup daemon,
+small pin-state race, preservation of old ambiguous +p receipts).
+**The next required checkpoint is the maintained user's one
+explicitly approved real online-only video local review.**
+WI-0207/M30 remain in progress until that test passes; no real
+OneDrive file is altered by CI.
+See docs/operations/video-onedrive-wi0207-full-local-acceptance.md.
+
+
 
 **WI-0207 acceptance update — 2026-11-07:** PR #753 merged;
 the maintainer confirmed 35 focused integration tests passed,
