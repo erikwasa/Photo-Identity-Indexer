@@ -238,7 +238,8 @@ public sealed class PostgresVideoDetailsRepository(
 
     public async Task SetPlaceAsync(
         AssetRevisionId revisionId, string? value, string source,
-        string actor, string? provider = null, CancellationToken cancellationToken = default)
+        string actor, string? provider = null, CancellationToken cancellationToken = default,
+        double? expectedLatitude = null, double? expectedLongitude = null)
     {
         if (source is not ("manual" or "automatic"))
             throw new ArgumentException("Invalid Place source.", nameof(source));
@@ -246,6 +247,22 @@ public sealed class PostgresVideoDetailsRepository(
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
         await LockCurrentVideoAsync(connection, transaction, revisionId, cancellationToken);
+        if (source == "automatic" && expectedLatitude is double latitude &&
+            expectedLongitude is double longitude)
+        {
+            await using NpgsqlCommand expected = connection.CreateCommand();
+            expected.Transaction = transaction;
+            expected.CommandText = """
+                SELECT 1 FROM video_revision_metadata
+                WHERE asset_revision_id = @revision
+                  AND gps_latitude = @latitude AND gps_longitude = @longitude;
+                """;
+            expected.Parameters.AddWithValue("revision", revisionId.Value);
+            expected.Parameters.AddWithValue("latitude", latitude);
+            expected.Parameters.AddWithValue("longitude", longitude);
+            if (await expected.ExecuteScalarAsync(cancellationToken) is null)
+                throw new InvalidOperationException("Video GPS changed before Place enrichment.");
+        }
         await using NpgsqlCommand last = connection.CreateCommand();
         last.Transaction = transaction;
         last.CommandText = """
