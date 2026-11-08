@@ -101,7 +101,7 @@ public static class VideoDetailsEndpoints
         // Require an explicit UTC designator or +/-HH:MM offset. A local
         // wall-clock string without zone must never silently become UTC.
         string value = request.Value?.Trim() ?? "";
-        if (!value.EndsWith('Z', StringComparison.OrdinalIgnoreCase) &&
+        if (!value.EndsWith("Z", StringComparison.OrdinalIgnoreCase) &&
             !System.Text.RegularExpressions.Regex.IsMatch(value, @"[+-]\d{2}:\d{2}$"))
             return Task.FromResult(Invalid());
         if (!DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture,
