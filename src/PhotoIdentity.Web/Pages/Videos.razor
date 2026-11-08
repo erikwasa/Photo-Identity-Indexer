@@ -81,9 +81,10 @@ else
                     }
                 </div>
                 <div class="video-library-card-body">
-                    <strong>@(video.CaptureAtUtc is DateTimeOffset date ? date.ToString("yyyy-MM-dd") : "Date unknown")</strong>
+                    <strong>@(video.CaptureAtUtc is DateTimeOffset date ? date.ToString("yyyy-MM-dd HH:mm 'UTC'") : "Recording time unknown")</strong>
                     <span>@FormatResolution(video.Width, video.Height, video.RotationDegrees)</span>
                     <span>@(video.InspectionStatus ?? "Not inspected")</span>
+                    <a class="button secondary" href="@($"/videos/{video.RevisionId}")">Video details &amp; people</a>
                     @if (video.HasPlayableProxy)
                     {
                         <button class="button secondary video-library-play-button"

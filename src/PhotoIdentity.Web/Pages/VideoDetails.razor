@@ -1,0 +1,297 @@
+@page "/videos/{RevisionId}"
+@using System.Globalization
+@using System.Net
+@inject HttpClient Http
+
+<PageTitle>Video details · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Video library · catalogue only</p>
+        <h1>Video details</h1>
+        <p>Recording information, location and manually tagged people. Opening this page never opens or downloads the original video.</p>
+    </div>
+    <a href="/videos" class="button secondary">Back to videos</a>
+</section>
+
+@if (Loading)
+{
+    <section class="empty-state compact"><p>Loading video details…</p></section>
+}
+else if (Details is null)
+{
+    <section class="empty-state compact" role="status">
+        <p>@(Error ?? "The video is no longer current or included in the library.")</p>
+        <a href="/videos">Return to video library</a>
+    </section>
+}
+else
+{
+    <section class="video-details-overview" aria-label="Video metadata">
+        <h2>@Details.FileName</h2>
+        <p class="video-details-muted">@(Details.InspectionStatus ?? "Not inspected") · @FormatDuration(Details.DurationSeconds)</p>
+        <dl class="video-details-facts">
+            <dt>Recorded</dt>
+            <dd>@(Details.EffectiveCaptureAtUtc?.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture) ?? "Unknown")</dd>
+            <dt>Recording time source</dt>
+            <dd>@Details.CaptureSource @(Details.CaptureTimeProvenance is null ? "" : "· " + Details.CaptureTimeProvenance)</dd>
+            <dt>Device make</dt><dd>@(Details.CameraMake ?? "Unknown")</dd>
+            <dt>Camera / model</dt><dd>@(Details.CameraModel ?? "Unknown")</dd>
+            <dt>Display resolution</dt><dd>@FormatResolution(Details)</dd>
+            <dt>Frame rate</dt><dd>@(Details.AverageFrameRate ?? "Unknown")</dd>
+            <dt>Embedded GPS</dt>
+            <dd>@(Details.Latitude is double lat && Details.Longitude is double lon
+                ? $"{lat.ToString("F6", CultureInfo.InvariantCulture)}, {lon.ToString("F6", CultureInfo.InvariantCulture)}"
+                : "Not provided")</dd>
+            <dt>Named Place</dt>
+            <dd>@(Details.Place?.Value ?? (Details.ManualPlaceOverride ? "Manually cleared" : "Unknown"))
+                @if (Details.Place is not null)
+                {
+                    <small>(@Details.Place.Source)</small>
+                }
+            </dd>
+        </dl>
+    </section>
+
+    <section class="video-details-editors" aria-label="Video catalogue edits">
+        <div class="video-details-panel">
+            <h2>Recording date and time</h2>
+            <p>Change the catalogue value without rewriting the video. Enter ISO 8601 with an explicit time-zone offset (for example, 2024-05-06T14:30:00+02:00). Displayed times are normalized to UTC.</p>
+            <label>
+                <span class="field-label">Override recording time</span>
+                <input type="text" maxlength="40" @bind="CaptureInput"
+                       placeholder="2024-05-06T14:30:00+02:00" disabled="@Busy" />
+            </label>
+            <div class="video-details-actions">
+                <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(CaptureInput))"
+                        @onclick="SetCaptureAsync">Save recording time</button>
+                <button class="button secondary" disabled="@Busy" @onclick="ClearCaptureAsync">Use extracted time</button>
+            </div>
+        </div>
+
+        <div class="video-details-panel">
+            <h2>Place</h2>
+            <p>Choose an existing Place or enter a hierarchical location. Manually selected or cleared Places take precedence over GeoNames.</p>
+            <label>
+                <span class="field-label">Place hierarchy</span>
+                <input type="text" maxlength="500" @bind="PlaceInput"
+                       placeholder="Sweden/Stockholm region/Norrtälje" disabled="@Busy" />
+            </label>
+            <details>
+                <summary>Choose an existing Place</summary>
+                <PlacePicker Label="Existing location"
+                             Value="@PlaceInput"
+                             ValueChanged="SelectPlaceAsync"
+                             Disabled="@Busy" />
+            </details>
+            <div class="video-details-actions">
+                <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(PlaceInput))"
+                        @onclick="SetPlaceAsync">Save Place</button>
+                <button class="button secondary" disabled="@Busy" @onclick="ClearPlaceAsync">Clear Place</button>
+                <button class="button secondary"
+                        disabled="@(Busy || Details.ManualPlaceOverride || Details.Latitude is null || Details.Longitude is null)"
+                        @onclick="ResolvePlaceAsync">Look up Place from GPS</button>
+            </div>
+            @if (Details.ManualPlaceOverride)
+            {
+                <small>The manually saved Place takes precedence; GeoNames will not overwrite it.</small>
+            }
+            <small>GPS lookup is an explicit, configured GeoNames request. Viewing details does not contact GeoNames.</small>
+        </div>
+
+        <div class="video-details-panel">
+            <h2>People appearing in this video</h2>
+            <p>Manual presence means the person appears somewhere in the clip. It does not detect a face or establish a timestamped identity.</p>
+            @if (Details.People.Count == 0)
+            {
+                <p>No manually tagged people.</p>
+            }
+            else
+            {
+                <ul class="video-details-people">
+                    @foreach (VideoDetailsPersonResponse person in Details.People)
+                    {
+                        <li @key="person.Id">
+                            <span>@person.DisplayName <small>Manual</small></span>
+                            <button class="button secondary" disabled="@Busy"
+                                    @onclick="() => RemovePersonAsync(person.Id)">Remove</button>
+                        </li>
+                    }
+                </ul>
+            }
+            <label>
+                <span class="field-label">Find a canonical person</span>
+                <input type="search" @bind="PersonSearch" @bind:event="oninput"
+                       placeholder="Search existing people" maxlength="100" disabled="@Busy" />
+            </label>
+            @if (PeopleError is not null)
+            {
+                <p role="status">@PeopleError</p>
+            }
+            else if (People.Count > 0)
+            {
+                <div class="video-details-person-options" aria-label="Matching known people">
+                    @foreach (VideoDetailsPersonPickerEntry person in MatchingPeople.Take(20))
+                    {
+                        <button class="button secondary" disabled="@Busy"
+                                @key="person.Id"
+                                @onclick="() => AddPersonAsync(person.Id)">
+                            Add @person.DisplayName
+                        </button>
+                    }
+                    @if (MatchingPeople.Count > 20)
+                    {
+                        <small>Showing the first 20 matches. Narrow the search.</small>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(Notice))
+{
+    <p class="notice" role="status" aria-live="polite">@Notice</p>
+}
+@if (!string.IsNullOrWhiteSpace(Error) && Details is not null)
+{
+    <p class="notice error" role="alert">@Error</p>
+}
+
+@code {
+    [Parameter]
+    public string RevisionId { get; set; } = string.Empty;
+
+    private VideoDetailsResponse? Details;
+    private IReadOnlyList<VideoDetailsPersonPickerEntry> People = [];
+    private string CaptureInput = "";
+    private string PlaceInput = "";
+    private string PersonSearch = "";
+    private string? Notice;
+    private string? Error;
+    private string? PeopleError;
+    private bool Loading;
+    private bool Busy;
+
+    private string Url => $"/api/videos/{Uri.EscapeDataString(RevisionId)}";
+    private IReadOnlyList<VideoDetailsPersonPickerEntry> MatchingPeople => People
+        .Where(person =>
+            !Details!.People.Any(tagged => tagged.Id == person.Id) &&
+            (PersonSearch.Trim().Length == 0 ||
+             person.DisplayName.Contains(PersonSearch.Trim(), StringComparison.OrdinalIgnoreCase)))
+        .Take(21)
+        .ToArray();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Loading = true;
+        Error = null;
+        Notice = null;
+        Details = null;
+        try
+        {
+            Details = await Http.GetFromJsonAsync<VideoDetailsResponse>(Url + "/details");
+            CaptureInput = Details?.EffectiveCaptureAtUtc?.ToString("yyyy-MM-ddTHH:mm:sszzz",
+                CultureInfo.InvariantCulture) ?? "";
+            PlaceInput = Details?.Place?.Value ?? "";
+            try
+            {
+                People = await Http.GetFromJsonAsync<VideoDetailsPersonPickerEntry[]>(
+                    "/api/review/people/maintenance") ?? [];
+            }
+            catch (Exception e) when (e is HttpRequestException or System.Text.Json.JsonException)
+            {
+                PeopleError = "The person picker is unavailable; video metadata is still accessible.";
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or System.Text.Json.JsonException)
+        {
+            Error = "Video Details is unavailable or this revision is no longer included.";
+        }
+        finally { Loading = false; }
+    }
+
+    private Task SelectPlaceAsync(string? value)
+    {
+        PlaceInput = value ?? "";
+        return Task.CompletedTask;
+    }
+
+    private async Task ChangeAsync(Func<Task<HttpResponseMessage>> request, string success)
+    {
+        if (Busy) return;
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            using HttpResponseMessage response = await request();
+            if (!response.IsSuccessStatusCode)
+            {
+                string message = $"The change was not saved (HTTP {(int)response.StatusCode}).";
+                try
+                {
+                    VideoDetailsErrorResponse? error =
+                        await response.Content.ReadFromJsonAsync<VideoDetailsErrorResponse>();
+                    if (!string.IsNullOrWhiteSpace(error?.Error)) message = error.Error;
+                }
+                catch (System.Text.Json.JsonException) { }
+                throw new InvalidOperationException(message);
+            }
+            Details = await response.Content.ReadFromJsonAsync<VideoDetailsResponse>()
+                ?? throw new InvalidDataException("The server returned no updated video details.");
+            CaptureInput = Details.EffectiveCaptureAtUtc?.ToString("yyyy-MM-ddTHH:mm:sszzz",
+                CultureInfo.InvariantCulture) ?? "";
+            PlaceInput = Details.Place?.Value ?? "";
+            Notice = success;
+        }
+        catch (Exception e) when (e is HttpRequestException or InvalidOperationException or
+                                     InvalidDataException or System.Text.Json.JsonException)
+        {
+            Error = e.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private Task SetCaptureAsync() => ChangeAsync(
+        () => Http.PutAsJsonAsync(Url + "/capture-time", new VideoDetailsCaptureTimeRequest(CaptureInput.Trim())),
+        "Recording time saved.");
+
+    private Task ClearCaptureAsync() => ChangeAsync(
+        () => Http.DeleteAsync(Url + "/capture-time"), "Extracted recording time restored.");
+
+    private Task SetPlaceAsync() => ChangeAsync(
+        () => Http.PutAsJsonAsync(Url + "/place", new VideoDetailsPlaceRequest(PlaceInput.Trim())),
+        "Manual Place saved.");
+
+    private Task ClearPlaceAsync() => ChangeAsync(
+        () => Http.DeleteAsync(Url + "/place"), "Manual Place cleared.");
+
+    private Task ResolvePlaceAsync() => ChangeAsync(
+        () => Http.PostAsync(Url + "/resolve-place", null),
+        "Place resolved from embedded GPS.");
+
+    private Task AddPersonAsync(string personId) => ChangeAsync(
+        () => Http.PostAsJsonAsync(Url + "/people", new VideoDetailsPersonRequest(personId)),
+        "Person tagged in video.");
+
+    private Task RemovePersonAsync(string personId) => ChangeAsync(
+        () => Http.DeleteAsync(Url + "/people/" + Uri.EscapeDataString(personId)),
+        "Manual person tag removed.");
+
+    private static string FormatResolution(VideoDetailsResponse details)
+    {
+        if (details.Width is not int w || details.Height is not int h)
+            return "Unknown";
+        if (details.RotationDegrees is int rotation && Math.Abs(rotation % 180) == 90)
+            (w, h) = (h, w);
+        return $"{w} × {h}";
+    }
+
+    private static string FormatDuration(decimal? seconds)
+    {
+        if (seconds is null || seconds < 0 || seconds > 86400) return "Unknown";
+        TimeSpan span = TimeSpan.FromSeconds((double)seconds.Value);
+        return span.TotalHours >= 1 ? span.ToString(@"h\:mm\:ss") : span.ToString(@"m\:ss");
+    }
+}

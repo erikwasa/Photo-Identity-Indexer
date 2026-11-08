@@ -10,6 +10,19 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 # WI-0212: Expose video metadata, Places and manual person presence
 
+**Development started 2026-11-08 on the isolated
+`wi-0212-video-details-metadata-people` branch.** A cohesive
+implementation candidate introduces PostgreSQL v39 video-only audit
+histories, a current/exclusion-guarded database-only Video Details API,
+manual recording-time/Place/person edits and a responsive Video Details
+page linked from Videos. Explicit GeoNames GPS lookup uses the already
+configured provider, with no network lookup from page load. No
+automatic background video geocoding is enabled. Original-media and
+photo/biometric/collection state remain untouched by ordinary edits.
+All work is **in progress**; neither CI nor final maintainer acceptance
+has been claimed. See [the combined acceptance procedure]
+(../../operations/video-details-wi0212-acceptance.md).
+
 ## Priority and relationship (maintainer 2026-11-08)
 
 **Near-term, independently deliverable video usability work.** Split from
@@ -132,6 +145,7 @@ No private GPS/people/video identifiers in Git/CI or reports.
 
 ## Completion notes
 
-- Status: ready, unassigned; development and local review not started.
+- Status: in_progress on the isolated implementation branch.
+- Final local verification is deferred until all development and CI pass; schema v39 requires backup and restored-database rehearsal before production startup.
 - Separate from WI-0153 collection membership and WI-0155 experimental
   face recognition.

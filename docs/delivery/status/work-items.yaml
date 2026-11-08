@@ -202,9 +202,12 @@ work_items:
 - id: WI-0212
   title: Expose video metadata, Places and manual person presence
   milestone: M30
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
+  started_at: 2026-11-08
+  last_updated_at: 2026-11-08
+  branch: wi-0212-video-details-metadata-people
   blockers:
   - WI-0151
   - WI-0152
@@ -212,7 +215,11 @@ work_items:
   - WI-0063
   - WI-0064
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: documentation
+    value: docs/operations/video-details-wi0212-acceptance.md
+  - type: implementation
+    value: '2026-11-08: Development candidate on isolated WI-0212 branch: PostgreSQL v39 video-only revision histories, guarded read-only video details, manual capture-time/Place/person changes, opt-in GeoNames lookup and responsive Video Details UI. CI, disposable PostgreSQL and final maintainer Windows/OneDrive acceptance remain pending.'
 - id: WI-0213
   title: Reevaluate video-level descriptions and search after face feasibility
   milestone: M30
