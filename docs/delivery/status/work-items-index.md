@@ -8,7 +8,7 @@ Current work items: **14**. Archived terminal items: **195**.
 |---|---|---|---|---|
 | [WI-0153](../work-items/WI-0153-video-metadata-collections.md) Integrate video with manual metadata and collection queries | M30 | proposed | unassigned | [YAML](work-items/active/WI-0153.yaml) |
 | [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) Integrate video clips into slideshow playback | M30 | proposed | unassigned | [YAML](work-items/active/WI-0154.yaml) |
-| [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | proposed | unassigned | [YAML](work-items/active/WI-0155.yaml) |
+| [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | in_progress | ai-agent | [YAML](work-items/active/WI-0155.yaml) |
 | [WI-0186](../work-items/WI-0186-scoped-semantic-caption-search.md) Scope visual and caption search with Smart Collection criteria | M36 | in_review | ai-agent | [YAML](work-items/active/WI-0186.yaml) |
 | [WI-0187](../work-items/WI-0187-search-creative-anchors.md) Use semantic and caption search results as Creative Collection anchors | M36 | in_review | ai-agent | [YAML](work-items/active/WI-0187.yaml) |
 | [WI-0196](../work-items/WI-0196-tv-portrait-benchmark-framing.md) Define TV portrait-viewing benchmark and safe-framing rules | M38 | ready | unassigned | [YAML](work-items/active/WI-0196.yaml) |
