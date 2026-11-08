@@ -10,14 +10,41 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## Current status — 2026-11-08
+
+**In progress on the long-lived `wi-0155` feature branch**, which remains
+separate from production `main`. Experimental development started on
+2026-11-05; PRs [#757](https://github.com/erikwasa/Photo-Identity-Indexer/pull/757)
+(read-only existing-catalogue identity evidence) and
+[#760](https://github.com/erikwasa/Photo-Identity-Indexer/pull/760)
+(higher-resolution, denser frame coverage) were merged into that feature
+branch, **not `main`**.
+
+The current feasibility question is whether a few explicitly approved local
+videos provide at least one *usable face observation per visible person*,
+and, when eligible existing Photo Identity identity evidence exists, useful
+**read-only, ranked known-person suggestions** for human review. Include
+unknown-to-gallery people, missed faces, ambiguous and incorrect matches,
+runtime and human review effort; do not mistake more detected frames or
+higher raw similarity for identification accuracy. No production catalogue
+writes, canonical identity assignments, background archive scans or
+automatic video hydration are authorized.
+
+The detailed experiments and evolving acceptance procedure remain on
+`wi-0155`. A final maintainer decision about **integration into Photo
+Identity versus a separate component** is deliberately deferred until
+multi-video review. This status update does not merge the prototype or
+approve production recognition.
+
 ## Product direction (maintainer 2026-11-02)
 
 **Face recognition in videos is wanted**, but the architecture,
 review UX and accuracy requirements are not fixed. This item should
 begin as a **bounded feasibility prototype and requirements discovery**,
 not automatically implement person tracks, a full review workflow,
-large retention schemes or a video-wide identity engine. It remains
-proposed behind playback/compatibility priority.
+large retention schemes or a video-wide identity engine. It was initially
+proposed behind playback/compatibility priority; the 2026-11-05
+isolated-feature-branch decision superseded that scheduling constraint.
 
 A prototype **may live in a separate experimental repository** if
 that best isolates dependencies and development churn. Such a
@@ -75,5 +102,5 @@ catalogue or biometric governance during exploratory work.
 
 ## Completion notes
 
-- Status: proposed; video face recognition remains a desired feature,
-  but the first workitem is only a feasibility/prototype decision.
+- Status: in_progress on `wi-0155`; the first work item is still a
+  feasibility/prototype decision, not production recognition acceptance.
