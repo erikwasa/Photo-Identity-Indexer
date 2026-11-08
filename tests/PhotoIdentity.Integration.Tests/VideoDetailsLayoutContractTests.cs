@@ -37,7 +37,11 @@ public sealed class VideoDetailsLayoutContractTests
         Assert.DoesNotContain("face_occurrences", repository, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("identity_suggestions", repository, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ffmpeg", details, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("OneDrive", repository, StringComparison.OrdinalIgnoreCase);
+        // Comments may describe OneDrive as an explicitly excluded dependency.
+        // Keep the boundary guard on implementation lines, not documentation.
+        string implementation = string.Join('\n', repository.Split('\n')
+            .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
+        Assert.DoesNotContain("OneDrive", implementation, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Root()
