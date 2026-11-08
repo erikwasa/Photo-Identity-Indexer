@@ -348,7 +348,7 @@ else
         "vp9" => "VP9",
         "mpeg4" => "MPEG-4",
         null or "" => "Unknown",
-        _ => codec
+        _ => codec ?? "Unknown"
     };
 
     private static string FormatAudioCodec(string? codec) => codec?.ToLowerInvariant() switch
@@ -358,7 +358,7 @@ else
         "opus" => "Opus",
         "pcm_s16le" => "PCM (16-bit)",
         null or "" => "Unknown",
-        _ => codec
+        _ => codec ?? "Unknown"
     };
 
     private static string FormatBitDepth(string? pixelFormat)
