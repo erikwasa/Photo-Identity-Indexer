@@ -1041,3 +1041,111 @@ a new private report filename. Compare per-video face counts and
 person-level review findings; a higher detection count alone does not
 prove improved identification. Detector confidence 0.5/0.7/0.9 is
 unchanged. Existing private manifests remain valid.
+
+## Checkpoint 8 — source fidelity and temporary-frame lifecycle requirements (2026-11-08)
+
+**Status: requirements and acceptance criteria only; not implemented.**
+The operator verified the 180-frame V03 extraction and dimensions locally.
+Visual quality improved slightly but remained insufficient for confidently
+reviewing distant faces. The complete catalogue evaluation is **deferred**
+until the fidelity changes are implemented; do not mark identification
+acceptance as passed.
+
+### Grounded V03 source evidence
+
+Approved local FFprobe inspection of V03 reported HEVC, coded dimensions
+**1920 × 1080**, pixel format **yuv420p10le** (10-bit 4:2:0), and
+**-90° rotation** metadata. Its intended presentation is portrait.
+The current 3840-pixel longest-side extraction cap therefore does **not**
+explain the poor quality for this source: simply raising that cap cannot
+recover detail not present in a 1920 × 1080 source. JPEG encoding, color
+conversion, orientation handling, sampling position and the downstream
+image decoder must be checked separately. Paused/zoomed playback is a
+human visual reference, not proof that the source has higher pixel count.
+
+### New requirements (proposed; scoped to WI-0155 feasibility)
+
+- **WI0155-FID-01 — Preserve source spatial detail.** Extract at native
+  decoded video resolution, preserving display orientation and aspect
+  ratio without upscaling or unnecessary resampling. Record coded
+  dimensions, display dimensions, rotation and extracted dimensions
+  privately for reproducibility. A source smaller than the maximum
+  permitted dimensions must not be scaled up. A larger source must
+  have an explicit, documented bounded policy rather than silent loss.
+- **WI0155-FID-02 — Avoid additional lossy intermediate encoding.**
+  Provide a lossless (e.g. PNG) or equivalent lossless decoded-frame
+  path for comparative experiments. Preserve source-derived color
+  fidelity as far as the detector/decoder support it, document
+  10-bit-to-8-bit conversion when unavoidable, and avoid implying that
+  lossless extraction can restore HEVC-compressed source detail.
+- **WI0155-FID-03 — End-to-end decode fidelity.** Verify that the .NET
+  image decoder and inference pipeline do not re-downscale frames
+  unexpectedly. Record the dimensions actually presented to detection,
+  not only those of the extracted file. Distinguish frame sharpness
+  from model input-size limits and face-pixel dimensions.
+- **WI0155-SAMPLE-01 — Separate sampling from fidelity.** Preserve
+  configurable 36/120/180-frame comparisons with equivalent source
+  processing. Permit selecting useful timestamps or windows for
+  short-lived appearances without treating more detections as
+  identification success. Evaluate later whether adaptive or
+  motion/quality-based selection is warranted.
+- **WI0155-TEMP-01 — Bounded, local, disposable workspace.** Treat
+  extracted frames as temporary working data in a dedicated local,
+  nonsynced folder, with explicit byte/count/time budgets and
+  predictable failure on exhaustion. Never implicitly hydrate an
+  online-only OneDrive original or scan unapproved media.
+- **WI0155-TEMP-02 — Safe cleanup and recovery.** Clean intermediates
+  only after required analysis outputs have been safely persisted and
+  verified; define retention for failed/interrupted runs and a
+  deliberate retry/cleanup operation. Never delete the original video,
+  approved user input, or selected retained outputs. Do not
+  automatically delete the operator's existing private evidence.
+- **WI0155-ART-01 — Selective retention.** Support explicit retention
+  decisions for useful face crops, a representative/poster frame,
+  clip boundaries or clips, captions and review metadata as those
+  capabilities are introduced. Retained image assets may be
+  downscaled/compressed **after** their intended use is established,
+  with a reviewable quality policy. These downstream capabilities
+  are not promised by the present experiment.
+- **WI0155-ARCH-01 — Avoid redundant intermediates.** Evaluate
+  streaming decoded frames directly into analysis or reusing a
+  decoded frame for multiple approved tasks. Treat this as an
+  architectural option, not a prerequisite for the immediate
+  source-fidelity experiment.
+- **WI0155-SAFE-01 — Preserve isolation.** Changes remain on wi-0155
+  or child branches, read-only toward the existing PostgreSQL
+  catalogue, with no production background scanning, automatic
+  identity assignments, UI/API/worker integration or original
+  modification.
+
+### Acceptance evidence for the next increment
+
+1. On the same approved V03 clip, capture source metadata and show
+   that lossless extraction yields correctly oriented **1080 × 1920**
+   display frames (or explain any metadata-specific deviation),
+   without rescaling and without unintended color/orientation changes.
+2. Compare one or more *identical timestamps* extracted using the
+   previous JPEG path and the new lossless path. Report frame
+   dimensions, file sizes, visual face usability and any measured
+   detector-input dimensions. Do not claim a quality improvement
+   from comparing different moments.
+3. Run bounded 36- and 180-frame experiments only after the fidelity
+   path is verified. Record disk peak, processing duration and
+   detection counts; then review correct/incorrect/unknown catalogue
+   rankings privately, using person-level human ground truth.
+4. Demonstrate that the temporary workspace respects its configured
+   limit and that success/failure/retry cleanup does not touch
+   originals, retained outputs, other runs or operator-owned
+   pre-existing private evidence. Cleanup lifecycle implementation
+   may be a **separate** increment after fidelity verification.
+5. Keep existing 12-frame baseline behavior, manifest compatibility,
+   explicit approvals and privacy constraints intact; pass focused
+   tests and docs validation.
+
+**Implementation order:** (A) source-fidelity investigation and
+lossless, native-resolution extraction/decoding; (B) rerun the
+controlled V03 comparison; (C) bounded temporary workspace,
+safe cleanup and selective retention; (D) decide whether streaming
+or more intelligent sampling is justified by measured results.
+Do not merge the entire WI-0155 feasibility branch into main as
+part of this requirements update.
