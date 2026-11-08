@@ -693,3 +693,48 @@ probe and output proof before admission; adding a third operator quality
 choice is not how source compatibility is extended. The current
 Rec.709 SDR and full-range classes retain their existing durable recipe
 identities; HDR is not admitted merely by being discovered.
+
+## Maintainer final acceptance and WI-0207 closeout — 2026-11-08
+
+**Status: COMPLETED; verified by maintainer on the maintained Windows PC.**
+PR #761 merged on 2026-11-08 (merge commit
+`f91df89a9524ff4ace0e51da39e8f3f6ef5fa6a5`).
+Its final GitHub Actions run
+[42428320140](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/42428320140)
+passed **all six jobs**: build/test, both integration shards,
+launcher, package and change classification.
+
+**Final first-time-discovery live test: PASS.** The maintainer selected
+a previously **uninspected, online-only** video, with the **newly
+approved input-format class** per operator report. An explicitly
+authorized Archive run downloaded and inspected/processed the source,
+then returned its original to **online-only**. The resulting
+Photo Identity video played with working **audio, seeking, pausing,
+and colours**. No manual local-first inspection step was necessary.
+The exact source FFprobe tags, quality selection and job counters were
+not included in this final report and are not invented here.
+
+This completes the separate, earlier real acceptance for an
+**already-inspected SDR** source (Standard 720p proxy, success
+counter 31→32, no unintended hydration, unpinned source returned
+online-only, proxy replay stayed online-only, user-pinned sources
+unchanged) and the focused synthetic/disposable-PostgreSQL safety
+checks. The source-level pre-revision ownership/hydration gap is
+resolved for this controlled example. `no-eligible-video` continues
+to mean an idle Archive scan, not failure of the last published video;
+the settings now separately expose the last substantive result.
+
+**Accepted limitations, not remaining WI-0207 blockers:** the Windows
+Cloud Files/OneDrive provider and explicit online-only opt-in,
+256 MiB maximum, single-video/photo-first worker, current
+supported Rec.709 input classes with separately verified conversion
+recipes for Standard 720p and Compact 540p, managed release only when
+safe, operator-triggered retry after interruption (no daemon),
+legacy pinned originals never automatically unpinned, and the
+documented narrow last-moment user-pin/+u race. The live tests do
+not prove all video formats, interrupted transfers or independent
+real 540p quality. Those are not required for this scoped closeout.
+
+**Decision: WI-0207 completed.** Further compatibility expansions
+or broad fault-injection work require their own scoped approval rather
+than reopening the accepted OneDrive hydration/release work item.

@@ -1,5 +1,20 @@
 # WI-0207 — Full local acceptance: opt-in OneDrive-only video processing and release
 
+**Closeout note (2026-11-08): WI-0207 COMPLETED.** The maintainer
+accepted both real paths: (1) an already inspected SDR source hydrated,
+converted and safely released with proxy playback after release; and
+(2) a **previously never-inspected online-only source in the newly
+approved input-format class** automatically discovered, hydrated,
+inspected/processed and returned online-only, with in-app playback,
+sound, seeking, pausing and colours verified. PR #761 merged and
+all six final CI checks passed. No more local verification is required
+for WI-0207. **Sections 1–7 are the historical first-pilot instructions
+and Section 8 is the historical follow-up procedure; their earlier
+pending/skip statements are superseded by this closeout.** Keep this
+runbook as reproducible evidence, not a request to process another
+personal original.
+
+
 **Purpose:** Run **one** explicitly chosen, already-catalogued OneDrive
 video through opt-in hydration, proxy creation, retained playback,
 managed release and eventual online-only state. This is the **complete
