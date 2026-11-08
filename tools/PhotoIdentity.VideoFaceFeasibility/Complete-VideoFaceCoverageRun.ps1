@@ -48,10 +48,11 @@ if (-not [string]::Equals([IO.Path]::GetDirectoryName($run.TrimEnd('\','/')), $r
 $markerPath = Join-Path $run 'wi0155-run.json'
 [void](Assert-RegularPath -Path $markerPath -Directory $false)
 $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+$parsedRunId = [guid]::Empty
 if ($marker.schemaVersion -ne 1 -or
     $marker.kind -cne 'PhotoIdentity.WI0155.CoverageWorkspace' -or
     $marker.state -cnotin @('extracting','extracted') -or
-    -not [guid]::TryParse([string]$marker.runId, [ref]([guid]::Empty))) {
+    -not [guid]::TryParse([string]$marker.runId, [ref]$parsedRunId)) {
     throw 'Missing or invalid owned-workspace marker.'
 }
 
@@ -67,7 +68,7 @@ if (Test-Path -LiteralPath $manifestPath -PathType Leaf) {
     if ($manifest.schemaVersion -ne 1 -or @($manifest.frames).Count -lt 1 -or
         @($manifest.frames).Count -gt 180) { throw 'Invalid frame manifest.' }
     $frames = @($manifest.frames | ForEach-Object { [string]$_.file })
-    if (@($frames | Select-Object -Unique).Count -ne $frames.Count) {
+    if (@($frames | Sort-Object -Unique).Count -ne $frames.Count) {
         throw 'Duplicate frame names.'
     }
     foreach ($name in $frames) {
@@ -122,7 +123,8 @@ if (-not $AbandonRun) {
     }
     $report = [IO.Path]::GetFullPath($VerifiedReportPath)
     [void](Assert-RegularPath -Path $report -Directory $false)
-    if ($report.StartsWith($run + [IO.Path]::DirectorySeparatorChar, $comparison) -or
+    if ([string]::Equals($report, $run, $comparison) -or
+        $report.StartsWith($run + [IO.Path]::DirectorySeparatorChar, $comparison) -or
         $report.StartsWith($root + [IO.Path]::DirectorySeparatorChar, $comparison)) {
         throw 'Verification report must be outside the temporary coverage root.'
     }
@@ -144,7 +146,7 @@ if ($RetainFrames.Count -gt 0) {
         throw 'Create the retention directory explicitly before use.'
     }
     [void](Assert-RegularPath -Path $destination -Directory $true)
-    if (@($RetainFrames | Select-Object -Unique).Count -ne $RetainFrames.Count) {
+    if (@($RetainFrames | Sort-Object -Unique).Count -ne $RetainFrames.Count) {
         throw 'Duplicate retention requests.'
     }
     foreach ($name in $RetainFrames) {
