@@ -22,7 +22,7 @@ public sealed class VideoDetailsLayoutContractTests
         Assert.Contains("@page \"/videos/{RevisionId}\"", details);
         Assert.Contains("Manual presence means", details);
         Assert.Contains("Look up Place from GPS", details);
-        Assert.Contains("Review", details, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("It does not detect a face", details);
         Assert.Contains("/api/videos/{revisionId}/resolve-place", api);
         Assert.Contains("GetCachedAsync", api);
         Assert.Contains("ReverseGeocodeAsync", api);
