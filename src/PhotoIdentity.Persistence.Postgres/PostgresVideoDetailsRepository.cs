@@ -32,7 +32,12 @@ public sealed record VideoDetailsRecord(
     string? AverageFrameRate,
     VideoPlacePresence? Place,
     bool ManualPlaceOverride,
-    IReadOnlyList<VideoPersonPresence> People);
+    IReadOnlyList<VideoPersonPresence> People,
+    string? LastGpsResolvedPlace,
+    string? VideoCodec,
+    string? AudioCodec,
+    string? PixelFormat,
+    string? ColorTransfer);
 
 /// <summary>
 /// Video-only revision-scoped metadata and manual annotation boundary. Reads
@@ -74,7 +79,8 @@ public sealed class PostgresVideoDetailsRepository(
                    m.display_rotation_degrees, m.duration_seconds, m.average_frame_rate,
                    d.action_kind, d.captured_at_utc,
                    place.action_kind, place.source_kind, place.actor, place.created_at_utc,
-                   tag.display_name
+                   tag.display_name, auto_tag.display_name,
+                   m.video_codec, m.audio_codec, m.pixel_format, m.color_transfer
             FROM asset_revisions revision
             JOIN assets asset ON asset.id = revision.asset_id
             LEFT JOIN video_revision_metadata m ON m.asset_revision_id = revision.id
@@ -91,6 +97,15 @@ public sealed class PostgresVideoDetailsRepository(
                 ORDER BY id DESC LIMIT 1
             ) place ON TRUE
             LEFT JOIN photo_tags tag ON tag.id = place.tag_id
+            LEFT JOIN LATERAL (
+                SELECT gps_tag.display_name
+                FROM video_place_actions gps_action
+                JOIN photo_tags gps_tag ON gps_tag.id = gps_action.tag_id
+                WHERE gps_action.asset_revision_id = revision.id
+                  AND gps_action.action_kind = 'set'
+                  AND gps_action.source_kind = 'automatic'
+                ORDER BY gps_action.id DESC LIMIT 1
+            ) auto_tag ON TRUE
             WHERE revision.id = @revision AND {CurrentVideoPredicate};
             """;
         command.Parameters.AddWithValue("revision", revisionId.Value);
@@ -136,7 +151,12 @@ public sealed class PostgresVideoDetailsRepository(
                     reader.IsDBNull(10) ? null : reader.GetInt32(10),
                     reader.IsDBNull(11) ? null : reader.GetDecimal(11),
                     reader.IsDBNull(12) ? null : reader.GetString(12),
-                    place, manualPlace, []);
+                    place, manualPlace, [],
+                    reader.IsDBNull(20) ? null : PhotoPlacePath.Parse(reader.GetString(20)).DisplayValue,
+                    reader.IsDBNull(21) ? null : reader.GetString(21),
+                    reader.IsDBNull(22) ? null : reader.GetString(22),
+                    reader.IsDBNull(23) ? null : reader.GetString(23),
+                    reader.IsDBNull(24) ? null : reader.GetString(24));
             }
         }
         if (details is null) return null;
@@ -233,6 +253,39 @@ public sealed class PostgresVideoDetailsRepository(
         action.Parameters.AddWithValue("actor", Actor(actor));
         action.Parameters.AddWithValue("at", timeProvider.GetUtcNow().ToUniversalTime());
         await action.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Explicit operator choice to reinstate the last previously resolved GPS Place.
+    /// No geocoder, source media read, schema change or audit-history deletion.
+    /// </summary>
+    public async Task RestoreGpsPlaceAsync(
+        AssetRevisionId revisionId, string actor,
+        CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockCurrentVideoAsync(connection, transaction, revisionId, cancellationToken);
+        await using NpgsqlCommand restore = connection.CreateCommand();
+        restore.Transaction = transaction;
+        restore.CommandText = """
+            INSERT INTO video_place_actions
+                (asset_revision_id, tag_id, action_kind, source_kind,
+                 provider, actor, created_at_utc)
+            SELECT @revision, historical.tag_id, 'set', 'automatic',
+                   historical.provider, @actor, @at
+            FROM video_place_actions historical
+            WHERE historical.asset_revision_id = @revision
+              AND historical.action_kind = 'set'
+              AND historical.source_kind = 'automatic'
+            ORDER BY historical.id DESC LIMIT 1;
+            """;
+        restore.Parameters.AddWithValue("revision", revisionId.Value);
+        restore.Parameters.AddWithValue("actor", Actor(actor));
+        restore.Parameters.AddWithValue("at", timeProvider.GetUtcNow().ToUniversalTime());
+        if (await restore.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new InvalidOperationException("No previously resolved GPS Place is available.");
         await transaction.CommitAsync(cancellationToken);
     }
 
