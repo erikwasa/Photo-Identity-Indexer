@@ -185,6 +185,8 @@ public sealed class VideoDetailsPostgresTests
             Assert.Null(await repository.GetAsync(revision));
             await Assert.ThrowsAsync<KeyNotFoundException>(() => repository.SetPersonAsync(
                 revision, person, true, "test"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => repository.RestoreGpsPlaceAsync(
+                revision, "operator"));
 
             AssetRevisionId nextId = AssetRevisionId.From(nextRevision);
             Assert.NotNull(await repository.GetAsync(nextId));
@@ -209,6 +211,8 @@ public sealed class VideoDetailsPostgresTests
             Assert.Null(await repository.GetAsync(nextId));
             await Assert.ThrowsAsync<KeyNotFoundException>(() => repository.SetPlaceAsync(
                 nextId, "Sweden", "manual", "test"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => repository.RestoreGpsPlaceAsync(
+                nextId, "operator"));
             await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
             {
                 await using NpgsqlCommand counts = connection.CreateCommand();
