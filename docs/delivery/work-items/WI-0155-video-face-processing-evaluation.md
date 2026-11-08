@@ -507,3 +507,47 @@ slice. Keep all results private. No branch promotion to main is authorized.
 The [checkpoint 6 operator procedure](../../operations/video-face-feasibility-wi0155.md)
 defines read-only role setup, bounded case files and PowerShell 7.6 trial
 commands. Both integrate-into-app and remain-separate outcomes are still open.
+
+## Experimental checkpoint 11 — effective detector input and tiled comparison (2026-11-08)
+
+**Code proposed on isolated WI-0155 child branch; full local acceptance
+deferred.** Increasing coverage to 180 frames and preserving native
+decoded V03 resolution did not resolve distant-face visual quality.
+The original V03 is HEVC 1920 × 1080, yuv420p10le, -90° rotation.
+A second bottleneck was identified in the existing governed face
+detector: the default single-pass YuNet preprocessor maps the entire
+portrait image to the fixed 640 × 640 model input, irrespective of
+lossless source-frame extraction.
+
+**Requirements added/clarified for FID-03 and SAMPLE-01:**
+
+- Verify each native-lossless decoded frame still has the source's
+  expected display dimensions before it reaches the detector. Reject
+  unintended rescaling or rotation against an existing, private
+  extraction-metadata sidecar; remain compatible with older
+  manually prepared frame manifests without that sidecar.
+- Keep single-pass YuNet as the unchanged baseline. Compare the same
+  native PNG frame set and selected catalogue identities with an
+  **explicitly enabled**, existing governed YuNet multiscale/tiled
+  pipeline (initially 1024-pixel tiles, optionally 640), with
+  bounded operator controls; never silently change production.
+- Record decoded-frame resolution separately from the detector's
+  model tensor dimensions and tiling size in the **private** diagnostic
+  report. Also record a minimal per-frame proxy for face pixel
+  dimensions without exposing coordinates or identity data on stdout.
+- Use controlled same-timestamp comparisons. Measure face discovery
+  yield, human-confirmed right/incorrect/unknown suggestions and
+  runtime/storage cost, not face count alone. Multiscale inference
+  may improve small-face recall but cannot restore missing source
+  pixels and is not expected to fix image sharpness itself.
+
+The implementation remains a standalone opt-in video-face experiment
+targeting `wi-0155`, not `main`. Catalogue matching continues
+against the existing read-only snapshot, with no writes or automatic
+identity assignment. Physical V03 quality, exact effective face
+visibility, false detections and processing cost remain **unverified**
+until the combined Windows operator trial described in the
+[WI-0155 runbook](../../operations/video-face-feasibility-wi0155.md).
+The already-merged temporary frame lifecycle should be tested in
+that same acceptance session, after preservation of the original
+and confirmed report persistence.
