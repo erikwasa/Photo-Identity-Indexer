@@ -2,12 +2,14 @@
 
 ## Current delivery state
 
-PR #765 merged the WI-0212 implementation into `main`, and its final CI
-passed. **Maintained-host acceptance is still pending.** Before starting a
-v39 application against production, take a restorable backup and rehearse
-the v38 -> v39 upgrade on an isolated restored database using the guarded
-`catalogue rehearse-v39` command. That command is supplied by the follow-up
-rehearsal PR and must be merged and green before running these steps.
+PR #765 merged the WI-0212 implementation and PR #766 merged its guarded
+v38 -> v39 rehearsal gate. **Maintained-host v39 acceptance passed on
+2026-11-08.** The maintainer confirmed a current streaming backup, isolated
+full restore, guarded schema rehearsal, production v39 startup and functional
+checks. This document retains the original migration procedure for recovery
+and future reference; do not repeat the v38 rehearsal on an already migrated
+v39 production database. Follow-up user-experience requirements are recorded
+in the work item and need separate CI/local acceptance.
 
 ## Implemented boundary
 
@@ -54,9 +56,9 @@ The PostgreSQL test **does not actually execute** unless
 PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING is configured.
 Use a disposable PostgreSQL admin connection, never photoidentity_main.
 The fixture creates and deletes its own temporary test database.
-CI, documentation, and disposable PostgreSQL checks have passed on
-the implementation PR. The restored-database migration and real-video checks
-remain separate mandatory maintainer gates.
+CI, documentation, disposable PostgreSQL checks and the maintained-host
+restore/migration/real-video acceptance have all passed for the original v39
+delivery. The follow-up presentation changes require a separate verification.
 
 ## Required v38 -> v39 restore rehearsal (PowerShell 7.6)
 
@@ -201,6 +203,49 @@ Do not run that cleanup when investigating any failure.
 
 Share sanitized PASS/FAIL only. Do not upload names, GPS coordinates,
 filenames, original paths, PostgreSQL credentials or private frames.
+
+## Maintained-host verification evidence (2026-11-08)
+
+The maintainer reported **PASS** for git main, 10/10 focused automated
+tests, documentation validation, pre-existing streaming backup SHA-256,
+isolated restore, v38 -> v39 rehearsal, production v39 startup, video metadata,
+recording-time edit/restore, explicit GeoNames lookup, manual Place edits,
+manual person add/remove, online-only original retention, photo regression,
+and video playback/search regression. Initial reuse of an older backup failed
+exact row-count comparison after legitimate catalogue writes; a fresh backup
+resolved this without changing or rolling back source records.
+
+The real-video observations led to a follow-up draft PR for:
+- Local-time recording presentation and minute-resolution local input.
+- Simultaneous extracted/effective recording times when overridden.
+- Friendly fps, orientation, codecs, bit depth and HDR details already in v39.
+- Explicit restore of the last GPS-resolved Place after a manual override or
+  manual clear (history-only, no new GeoNames call).
+
+Still to be developed separately: vendor-specific Samsung model extraction
+(where FFprobe exposes the tag), persisted audio channel/sample-rate fields,
+and video bitrate (Mb/s). Existing metadata is revision-scoped; do not
+silently re-inspect online-only originals. Bitrate depends on codec/content
+and is not an objective picture-quality score.
+
+### Follow-up focused local checks (after merging follow-up PR)
+
+1. Rebuild and launch the updated application on already-migrated v39;
+   **no** new database migration or backup rehearsal is needed.
+2. In a browser with a non-UTC local zone, verify extracted UTC timestamps
+   are presented as correct browser-local wall-clock times.
+3. Enter a local `YYYY-MM-DD HH:MM` correction; save, refresh and confirm
+   both corrected and extracted times are visible in local time. Restore
+   extracted time; confirm manual-only details disappear.
+4. Compare a rational frame rate against displayed fps, and confirm
+   portrait/landscape and already-known video/audio codecs, bit depth, and
+   HDR signalling. Unknown fields must remain Unknown.
+5. With a clip already GPS-resolved, manually choose a different Place,
+   then choose **Restore previous GPS Place**; confirm the earlier canonical
+   result returns without GeoNames traffic. Repeat after **Clear Place**.
+   Test a clip with no previous resolved Place: no restore option should show.
+6. Reconfirm video details, person tagging and an online-only original do
+   not read original bytes, and photo/video regressions remain green.
 
 ## Deferred
 
