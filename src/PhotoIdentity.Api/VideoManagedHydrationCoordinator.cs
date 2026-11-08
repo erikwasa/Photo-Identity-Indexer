@@ -326,10 +326,13 @@ public sealed class VideoManagedHydrationCoordinator(
                     continue;
                 }
                 if (pending.LatestRevisionId is AssetRevisionId revision &&
-                    state.Availability == AssetAvailability.Local)
+                    state.Availability is AssetAvailability.Local or AssetAvailability.OnlineOnly)
                 {
-                    // Registration succeeded before crash, but ownership
-                    // promotion did not. Never silently lose the source lease.
+                    // Registration may have succeeded before a crash, even
+                    // if OneDrive independently freed its bytes afterwards.
+                    // Promote only a fully inspected, current verified
+                    // revision; a later worker must still use normal opt-in
+                    // admission for any new online-only hydration.
                     if (await IsCurrentRegisteredAsync(
                             selected, revision, token))
                         await PromoteInspectedSourceAsync(
