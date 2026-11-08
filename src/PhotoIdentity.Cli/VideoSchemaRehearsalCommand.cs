@@ -201,7 +201,7 @@ public static class VideoSchemaRehearsalCommandRunner
                 frameRows.GetInt64(2) != 0 || frameRows.GetInt64(3) != 1)
                 throw new InvalidDataException(
                     "v38 frame evidence migration was not empty, complete and isolated.");
-            output.WriteLine("Schema v37 -> v38 rehearsal passed on the isolated restored database.");
+            output.WriteLine($"Schema v37 -> v{PostgresCatalogueDatabase.CurrentSchemaVersion} rehearsal passed on the isolated restored database (including v38 frame evidence).");
             output.WriteLine($"Rehearsal database: {restoredName}");
             output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
             output.WriteLine("Frame evidence tables empty; existing photo/video table counts and control row preserved.");
