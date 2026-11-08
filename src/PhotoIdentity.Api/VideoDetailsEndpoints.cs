@@ -23,6 +23,7 @@ public static class VideoDetailsEndpoints
         endpoints.MapPut("/api/videos/{revisionId}/place", SetPlaceAsync);
         endpoints.MapDelete("/api/videos/{revisionId}/place", ClearPlaceAsync);
         endpoints.MapPost("/api/videos/{revisionId}/resolve-place", ResolvePlaceAsync);
+        endpoints.MapPost("/api/videos/{revisionId}/restore-gps-place", RestoreGpsPlaceAsync);
         return endpoints;
     }
 
@@ -153,6 +154,12 @@ public static class VideoDetailsEndpoints
         ApplyAsync(revisionId, repository, settings, context, token,
             id => repository.SetPlaceAsync(id, null, "manual", Actor,
                 cancellationToken: token));
+
+    private static Task<IResult> RestoreGpsPlaceAsync(
+        string revisionId, PostgresVideoDetailsRepository repository,
+        IConfiguration settings, HttpContext context, CancellationToken token) =>
+        ApplyAsync(revisionId, repository, settings, context, token,
+            id => repository.RestoreGpsPlaceAsync(id, Actor, token));
 
     private static async Task<IResult> ResolvePlaceAsync(
         string revisionId, PostgresVideoDetailsRepository repository,

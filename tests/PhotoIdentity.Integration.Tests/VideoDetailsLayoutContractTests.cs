@@ -22,8 +22,17 @@ public sealed class VideoDetailsLayoutContractTests
         Assert.Contains("@page \"/videos/{RevisionId}\"", details);
         Assert.Contains("Manual presence means", details);
         Assert.Contains("Look up Place from GPS", details);
+        Assert.Contains("Restore previous GPS Place", details);
+        Assert.Contains("datetime-local", details);
+        Assert.Contains("TimeZoneInfo.Local", details);
+        Assert.Contains("Original recording time (local)", details);
+        Assert.Contains("FormatFrameRate", details);
+        Assert.Contains("FormatBitDepth", details);
+        Assert.Contains("FormatVideoCodec", details);
         Assert.Contains("It does not detect a face", details);
         Assert.Contains("/api/videos/{revisionId}/resolve-place", api);
+        Assert.Contains("/api/videos/{revisionId}/restore-gps-place", api);
+        Assert.Contains("RestoreGpsPlaceAsync", repository);
         Assert.Contains("GetCachedAsync", api);
         Assert.Contains("ReverseGeocodeAsync", api);
         Assert.Contains("ManualPlaceOverride", api);

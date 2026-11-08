@@ -10,15 +10,14 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 # WI-0212: Expose video metadata, Places and manual person presence
 
-**Development merged in PR #765 on 2026-11-08; CI passed.** The
-PostgreSQL v39 video-only audit histories, guarded Video Details API,
-manual recording-time/Place/person edits and responsive Video Details
-page are present on `main`. GeoNames GPS lookup remains explicitly
-operator-triggered, not an automatic video background worker. Ordinary
-details and edits do not read source video bytes or change biometric,
-photo, or collection records. **WI-0212 remains in progress pending
-maintained-host acceptance.** A follow-up PR adds a guarded v38 -> v39
-restored-catalogue rehearsal gate, required before production startup.
+**Core implementation merged in PR #765, and the isolated v38 -> v39
+rehearsal gate merged in PR #766.** On 2026-11-08, the maintainer verified
+streaming-backup integrity, isolated restore, v38 -> v39 rehearsal,
+production v39 startup, video details/people/GeoNames, online-only safety,
+photo and video regressions. All reported gates passed. The work item remains
+in progress for follow-up usability observations below rather than because
+schema v39 acceptance is pending. GeoNames is explicitly triggered; browsing
+metadata never reads video originals.
 See [the combined acceptance procedure]
 (../../operations/video-details-wi0212-acceptance.md).
 
@@ -98,6 +97,50 @@ every source embeds reliable GPS, camera make/model or capture time.
    maintained Windows host, including missing metadata and an online-only
    source whose original is never recalled just for details.
 
+## Maintainer follow-up observations (2026-11-08)
+
+The accepted implementation exposed several presentation/metadata gaps on
+real MOV and MP4 videos. These are tracked here without claiming a renewed
+schema v39 migration or re-reading online-only originals:
+
+- Show **recording time in the browser's local time zone** and edit it with
+  `YYYY-MM-DD HH:MM` (browser-local date/time control). Convert the supplied
+  local instant to an explicit offset before calling the existing UTC-safe API;
+  reject ambiguous/nonexistent local DST times. When manually corrected,
+  display **both effective and originally extracted recording times**. Hide
+  raw `format:creation_time` provenance from the ordinary details grid.
+- Render rational frame rates as human-readable **fps** (e.g. a ratio near
+  29.92 becomes 29.92 fps) and identify portrait/landscape based on
+  orientation-correct display dimensions.
+- Expose the already persisted video and audio codec names (e.g. H.264,
+  H.265/HEVC, AAC), pixel bit depth and HDR transfer signalling when known.
+  Bit depth/HDR are source characteristics, **not objective image-quality
+  scores**. For additional useful quality context, assess **video bitrate
+  (Mb/s)**, with codec context; bitrate is not comparable across codecs or
+  scenes on its own. Do not fabricate bitrate from resolution.
+- Improve Place control: a manual clear is intentionally an audited override,
+  **not** removal of that override. Provide a guarded explicit action to
+  reinstate the most recent GPS-resolved Place from append-only history
+  without a new network lookup or source-media read. Keep exclusion/current
+  revision protections.
+- A Samsung sample had `SamsungModel` (vendor-specific) visible to a
+  metadata inspector but no projected camera make/model. An Apple sample
+  correctly showed Apple and iPhone 15 Pro, so the issue is not universal.
+  Assess whether the approved FFprobe metadata output exposes Samsung's tag;
+  ExifTool's proprietary tag groups are not guaranteed FFprobe fields.
+  Never infer make/model from filenames, codec, or device stereotypes.
+  Existing catalogued video metadata will not change just because a parser
+  gains a tag: selected, opt-in and guarded reinspection may be necessary.
+- Audio channel layout (e.g. mono) and sample rate (e.g. 44.1 kHz) and video
+  bitrate are **not currently persisted** in `video_revision_metadata`.
+  Any durable new projection requires a separately reviewed schema migration,
+  bounded source inspection on explicitly selected already-local videos,
+  and new acceptance/rehearsal gates. Do not silently hydrate OneDrive files.
+
+A focused follow-up branch implements the UI/local-time, formatting and
+reversible GPS-Place changes using existing v39 tables. The metadata-field
+extension and Samsung inspection remain pending separate approval/testing.
+
 ## Out of scope
 
 - WI-0153 manual photo/video collection membership and WI-0154 slideshow.
@@ -144,7 +187,11 @@ No private GPS/people/video identifiers in Git/CI or reports.
 
 ## Completion notes
 
-- Status: in_progress; implementation PR #765 merged with green CI.
-- Final maintainer acceptance remains pending: run the verified backup, full isolated restore and guarded v38 -> v39 rehearsal first; only then deploy the v39 app and check real video details, people, GPS, online-only and photo regressions.
+- Status: in_progress for the November 8 follow-up usability improvements.
+- Maintainer v39 acceptance **passed**: isolated restore and schema rehearsal,
+  production startup, real video metadata, manual time/Place/person edits,
+  GeoNames lookup, online-only safety and regression checks.
+- Focused no-schema-change follow-up awaiting CI and local UI acceptance;
+  vendor camera tags, audio detail and video bitrate still pending.
 - Separate from WI-0153 collection membership and WI-0155 experimental
   face recognition.
