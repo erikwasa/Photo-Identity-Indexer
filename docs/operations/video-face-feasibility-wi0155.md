@@ -1217,3 +1217,70 @@ The next substantial increment should implement the separate
 `TEMP-02` safe cleanup/recovery and `ART-01` selective retention
 requirements, without broadening the present standalone prototype into
 production.
+
+## Checkpoint 10 — explicit temporary workspace lifecycle (development; 2026-11-08)
+
+The WI-0155 sampler now creates `wi0155-run.json` as an **ownership
+marker before frame extraction starts**, updating it from `extracting`
+to `extracted` after the manifest and provenance metadata are written.
+This supports identifying interrupted runs without adopting or deleting
+pre-existing private experiment folders.
+
+The new `Complete-VideoFaceCoverageRun.ps1` provides **inspection by
+default** and **explicit** cleanup only for an immediate child of
+`%LOCALAPPDATA%\PhotoIdentity\Temp\wi0155\coverage` with a valid
+ownership marker. It rejects linked/offline/reparse-point entries,
+unexpected files and completed manifests inconsistent with their frames.
+It never recursively deletes a directory. Old unmarked runs are
+intentionally **not eligible** for this automated cleanup.
+
+A successful analysis run requires `-VerifiedReportPath` and
+`-ApproveCleanup`; the report must be a nonempty regular local file
+outside the coverage root. **This checks existence and placement, not
+the semantic correctness or provenance of the report**: the operator
+must review and approve its successful persistence first. An
+interrupted/failed extraction may instead use `-AbandonRun
+-ApproveCleanup`, but cannot retain frames or claim a successful
+report. The cleanup operation is never automatic.
+
+Optionally specify exact `-RetainFrames` names from a completed
+manifest and a pre-created `-RetentionDirectory` **outside the
+temporary root**. The tool copies selected originals without resizing,
+uses run-ID-prefixed names, refuses overwrite, verifies SHA-256 equality
+before deleting intermediates, and leaves the run in place if copying
+or verification fails. Future poster/crop/clip/caption selection and
+post-use image compression remain separate work; this increment
+retains original frame files only.
+
+```powershell
+# Inspect a new, marked run; no deletion:
+.\tools\PhotoIdentity.VideoFaceFeasibility\Complete-VideoFaceCoverageRun.ps1 `
+    -RunDirectory $native.FramesDirectory
+
+# Only AFTER separately verifying the private analysis report and
+# confirming that the temporary frames are no longer needed:
+$retention = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\retained'
+New-Item -ItemType Directory -Path $retention -Force | Out-Null
+
+.\tools\PhotoIdentity.VideoFaceFeasibility\Complete-VideoFaceCoverageRun.ps1 `
+    -RunDirectory $native.FramesDirectory `
+    -VerifiedReportPath $privateReport180 `
+    -RetainFrames @('frame-001.png') `
+    -RetentionDirectory $retention `
+    -ApproveCleanup
+
+# For a deliberately abandoned *new marked* failed run instead:
+# .\tools\PhotoIdentity.VideoFaceFeasibility\Complete-VideoFaceCoverageRun.ps1 `
+#     -RunDirectory $failedRunDirectory -AbandonRun -ApproveCleanup
+```
+
+**Acceptance remains deferred** until the source-fidelity and
+temporary-lifecycle increments can be verified together on the
+maintainer's Windows 11 / PowerShell 7.6 setup. Confirm inspection
+is non-destructive, incomplete and unexpected-file runs fail safely,
+retained bytes match their source hashes, no other run or original
+changes, and successful completion removes only the approved run.
+The broader temporary-data budget across *all* concurrent runs,
+semantic report-to-run binding, streaming frames, automated retry
+or crash recovery and selective compressed poster/clip/caption
+persistence are **not implemented**.
