@@ -296,7 +296,8 @@ public static class Program
               catalogue rehearse-v38 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (verified v37 isolated restore only;
-                                      apply v38, check retained counts/empty frames)
+                                      apply through the current schema, check
+                                      retained counts/empty frame evidence)
 
               catalogue rehearse-v39 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
