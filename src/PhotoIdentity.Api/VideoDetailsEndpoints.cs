@@ -187,10 +187,9 @@ public static class VideoDetailsEndpoints
                 if (result.Status != ReverseGeocodeStatus.Success || result.Place is null)
                     return Results.Conflict(new { error = "A Place could not be resolved from the embedded GPS. Try again later or set one manually." });
                 place = result.Place;
-                await cache.SaveCacheAsync(
-                    geocoder.ProviderName, geocoder.ContractKey,
-                    new PhotoPlaceEnrichmentCandidate(id, latitude, longitude),
-                    place.Place.DisplayValue, place.ProviderResultId, place.CountryCode, token);
+                // Reuse existing photo cache reads, but do not publish new
+                // video-derived coordinates to a global cache: source exclusion
+                // could occur while the external request is in flight.
             }
             // Recheck after I/O, including any manual Place edits while the
             // external request was in flight. The repository rechecks again
@@ -200,7 +199,8 @@ public static class VideoDetailsEndpoints
                 latest.Latitude != latitude || latest.Longitude != longitude)
                 return Results.Conflict(new { error = "The video metadata or location changed; no automatic Place was applied." });
             await repository.SetPlaceAsync(id, place.Place.DisplayValue,
-                "automatic", "geonames-video-lookup", geocoder.ProviderName, token);
+                "automatic", "geonames-video-lookup", geocoder.ProviderName, token,
+                expectedLatitude: latitude, expectedLongitude: longitude);
             VideoDetailsRecord? updated = await repository.GetAsync(id, token);
             return updated is null ? Results.NotFound() : Results.Ok(updated);
         }
@@ -211,6 +211,10 @@ public static class VideoDetailsEndpoints
         catch (ArgumentException)
         {
             return Invalid();
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.Conflict(new { error = "The video changed before the location lookup could be applied." });
         }
     }
 }
