@@ -7,6 +7,32 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**Current M30 handoff — 2026-11-08, after merged PR #762:** The basic
+video foundation is accepted: discovery/posters (WI-0150/0151/0211),
+bounded opt-in processing/proxies (WI-0188/0189), caption/embedding
+evidence and Video Search (WI-0190/0191), desktop/phone playback
+(WI-0152), one archive-driven format expansion (WI-0210) and safe
+opt-in real OneDrive hydration/release (WI-0207). The original
+online-only file returned online-only in the accepted local examples;
+this does **not** claim universal format or workload coverage.
+
+**The active M30 item is WI-0155**, a bounded read-only video face
+feasibility experiment on the long-lived `wi-0155` branch. It is
+`in_progress` but neither the prototype nor its evolving experimental
+documents are merged into `main`. It requires additional expressly
+approved local videos, person-level human evaluation against eligible
+existing catalogue evidence, unknown-person cases and a late
+integration-versus-separate-component decision. No automatic identity
+assignment is authorized.
+
+**WI-0153 and WI-0154 are intentionally deferred**, not completed:
+metadata/manual collection organization precedes any mixed-media
+slideshow decision, and video Smart Collection queries would need
+separate authorization. M30 remains `in_progress`; whether to implement
+these deferred items under M30 or move them to a later milestone must
+be decided deliberately at closeout. Dated checkpoint notes below are
+historical and do not override this handoff.
+
 **WI-0207 full-local-review candidate — 2026-11-07:** The maintainer
 accepted checkpoint 4 (35 focused integration tests, 1 disposable
 PostgreSQL test, docs validation, PR #754 merged). The next consolidated
@@ -706,7 +732,8 @@ Caption/Visual/Combined Video Search are **already delivered**
 performance regression was also resolved. No additional foundational
 processing system is required to restart the video roadmap.
 
-Remaining sequenced plan:
+Historical delivery sequence (planned before the November 2026
+acceptances; refer to the current handoff above for today's status):
 
 1. **WI-0152 — next / ready:** guarded HTTP range playback of existing
    local proxies on desktop and existing trusted-LAN HTTPS phone path.
@@ -760,12 +787,13 @@ Remaining sequenced plan:
 - [WI-0190](../work-items/WI-0190-video-frame-caption-embedding.md) — completed scoped frame descriptions/embeddings.
 - [WI-0191](../work-items/WI-0191-video-semantic-caption-search.md) — completed scoped video search.
 - [WI-0202](../work-items/WI-0202-photo-catalogue-query-performance-regression.md) — completed independent photo-query regression recovery.
-- [WI-0152](../work-items/WI-0152-video-serving-playback.md) — **next priority / ready**.
-- [WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md) — proposed first archive-driven format/size/duration expansion.
-- [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — proposed bounded real-OneDrive verification and managed reuse.
+- [WI-0152](../work-items/WI-0152-video-serving-playback.md) — completed and locally accepted desktop/phone playback.
+- [WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md) — completed one archive-driven input-class expansion.
+- [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — completed first-time and already-inspected online-only hydration/release acceptance.
+- [WI-0211](../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md) — completed recognizable posters and Videos library improvements.
 - [WI-0153](../work-items/WI-0153-video-metadata-collections.md) — deferred basic metadata/manual collections, no video Smart queries yet.
 - [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) — deferred mixed-media slideshows, depends on WI-0152 and WI-0153.
-- [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — later bounded face prototype; full feature scope not yet chosen.
+- [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — in progress on isolated `wi-0155`; bounded feasibility only, with final architecture choice still open.
 - [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) — retired without implementation.
 
 ## Completed first video slice — WI-0151 local acceptance (2026-10-19)
@@ -791,20 +819,21 @@ Completed foundations:
 
 Remaining initial M30 user-value outcomes:
 
-- [ ] **WI-0152:** current locally retained proxies play and seek
-  in the existing browser/phone experience, without original recall.
-- [ ] **WI-0210:** select and verify one archive-evidence-driven
-  compatibility expansion, not every possible media format.
+- [x] **WI-0152:** locally retained proxies play and seek on desktop
+  and phone, accepted after PR #720 without recalling the original.
+- [x] **WI-0210:** one archive-evidence-driven Rec.709 full-range
+  input-class expansion was locally verified after PR #734;
+  universal media-format support was not claimed.
 - [x] **WI-0207:** verified on the maintained Windows PC after
   PR #761, including an already-inspected SDR original and one
   previously uninspected online-only source in the newly approved
   input-format class. Both were safely processed and returned
   online-only, with successful in-app playback; CI and source
   ownership/release safety tests passed.
-- [ ] **WI-0155:** after higher-priority media work, record a bounded
-  feasibility prototype and a small next-production-slice decision
-  for desired video face recognition. Full tracking/recognition
-  production delivery is not a hidden gate here.
+- [ ] **WI-0155 (in progress):** review person-level detection and
+  read-only known-person suggestions across approved local videos;
+  record a bounded next-production-slice and architecture decision.
+  Full tracking or production recognition is not a hidden gate.
 
 Explicitly **not required for the above initial outcomes**:
 WI-0153 video collection integration, WI-0154 video slideshow
