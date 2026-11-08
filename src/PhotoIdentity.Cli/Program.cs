@@ -52,6 +52,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 37),
+                "catalogue" when args.Length > 1 && args[1] == "rehearse-v39" =>
+                    await VideoSchemaRehearsalCommandRunner.RunAsync(
+                        VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken, expectedRestoredSchemaVersion: 38),
                 "catalogue" when args.Length > 1 && args[1] is "rehearse-v35" or "rehearse-v36" or "rehearse-v37" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
@@ -293,6 +297,12 @@ public static class Program
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (verified v37 isolated restore only;
                                       apply v38, check retained counts/empty frames)
+
+              catalogue rehearse-v39 --postgres-connection-env NAME
+                                     --restore-report ABSOLUTE_REPORT_PATH
+                                     (verified v38 isolated restore only;
+                                      apply v39, preserve counts, check empty
+                                      annotation tables and exclusion purge)
 
               catalogue rehearse-v37 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
