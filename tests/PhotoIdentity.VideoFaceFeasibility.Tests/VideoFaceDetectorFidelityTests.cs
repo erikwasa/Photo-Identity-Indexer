@@ -28,7 +28,7 @@ public sealed class VideoFaceDetectorFidelityTests
         Assert.Equal(640, privateProfile.ModelInputWidth);
         Assert.Equal(640, privateProfile.ModelInputHeight);
         Assert.Equal(expectedMode == YuNetDetectorPipelineMode.MultiScale
-            ? expectedTile : null, privateProfile.TileSize);
+            ? (int?)expectedTile : null, privateProfile.TileSize);
     }
 
     [Theory]
@@ -59,7 +59,7 @@ public sealed class VideoFaceDetectorFidelityTests
                 2, 1000, [detection], new ImageSize(1080, 1920));
         Assert.Equal(1080, result.DecodedWidth);
         Assert.Equal(1920, result.DecodedHeight);
-        Assert.Equal(108, result.SmallestFaceWidthPixels);
+        Assert.Equal(108.0, result.SmallestFaceWidthPixels);
         Assert.Equal(153.6, result.SmallestFaceHeightPixels);
         VideoFaceFrameDetectionDiagnostic empty =
             VideoFaceSensitivityDiagnostics.DescribeFrame(
