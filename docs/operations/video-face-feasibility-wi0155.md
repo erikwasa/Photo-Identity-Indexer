@@ -1149,3 +1149,71 @@ safe cleanup and selective retention; (D) decide whether streaming
 or more intelligent sampling is justified by measured results.
 Do not merge the entire WI-0155 feasibility branch into main as
 part of this requirements update.
+
+## Checkpoint 9 — opt-in native-lossless extraction development (2026-11-08)
+
+**Implementation in isolated PR; operator acceptance is deferred.**
+The coverage sampler now supports `-FrameEncoding NativeLosslessPng` while
+preserving `LegacyJpeg` as its default. It extracts one frame at each of the
+existing approved stratified timestamps, with FFmpeg autorotation and **no
+scale filter**, encoding PNG instead of JPEG. It is deliberately limited to
+source coded dimensions at most 3840 pixels per axis; it does not upscale.
+FFmpeg decodes V03's HEVC 10-bit YUV source into **8-bit RGB PNG**; PNG is
+lossless after that conversion, **not** a preservation of source 10-bit
+precision or a recovery of detail lost in HEVC encoding. The existing
+.NET coverage decoder uses a 3840-pixel bound and must be inspected during
+local acceptance for effective detector input resolution.
+
+The extractor now probes stream dimensions, codec, pixel format and
+rotation; writes `extraction-metadata.json` **beside the private frame
+manifest** (not inside the manifest schema); and enforces a configurable
+cumulative workspace budget with `-MaximumWorkspaceMiB` (8–2048,
+default 1024). The existing 8 MiB **per-frame** limit remains in force.
+If a PNG exceeds that cap, or a run exceeds its workspace budget, the
+sampler fails explicitly and **leaves partial files for deliberate local
+cleanup**. Automatic retention, cleanup, streaming and shared downstream
+artifact lifecycle are **not implemented** by this increment.
+
+### Deferred local acceptance: run once the development increment is ready
+
+In the WI-0155 worktree, with `$video3` and the approved `$ffmpegPath`
+already set to **fully local** paths:
+
+```powershell
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+
+$native = & .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video3 `
+    -FfmpegPath $ffmpegPath `
+    -ApprovePrivateLocalVideo `
+    -FrameCount 180 `
+    -FrameEncoding NativeLosslessPng `
+    -MaximumWorkspaceMiB 1024
+
+$native.ManifestPath
+$native.ExtractionMetadataPath
+Get-Content -LiteralPath $native.ExtractionMetadataPath -Raw |
+    ConvertFrom-Json |
+    Select-Object frameEncoding, codedWidth, codedHeight,
+        rotationDegrees, expectedDisplayWidth, expectedDisplayHeight,
+        extractedFrameBytes, maximumWorkspaceMiB
+```
+
+Verify the actual PNG dimensions on several samples (for V03, expected
+portrait **1080 × 1920**), compare the **same timestamps** to legacy
+JPEG extraction, and check distant-face usability rather than merely
+frame size. Then use a **new** private catalogue case file referring
+to the PNG manifest and rerun the approved read-only evaluation;
+do not overwrite baseline manifests/reports or publish biometric data.
+Record peak disk use, runtime, and whether the detector actually sees
+more usable faces. This is a fidelity experiment, not proof of identity
+recognition. If the new frames are no better, investigate the detector's
+effective input size and source face-pixel dimensions before increasing
+sample counts further.
+
+The next substantial increment should implement the separate
+`TEMP-02` safe cleanup/recovery and `ART-01` selective retention
+requirements, without broadening the present standalone prototype into
+production.
