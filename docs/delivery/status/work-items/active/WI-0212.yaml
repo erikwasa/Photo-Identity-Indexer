@@ -3,10 +3,10 @@ title: Expose video metadata, Places and manual person presence
 milestone: M30
 status: in_progress
 owner: ai-agent
+document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
 started_at: 2026-11-08
 last_updated_at: 2026-11-08
 branch: wi-0212-video-details-metadata-people
-document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
 blockers:
 - WI-0151
 - WI-0152
