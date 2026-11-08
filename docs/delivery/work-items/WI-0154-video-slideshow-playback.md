@@ -10,6 +10,15 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, doc
 
 # WI-0154: Integrate video clips into slideshow playback
 
+## Current scope boundary — 2026-11-08
+
+WI-0153 now owns **only** explicit manually curated photo/video
+collection membership, not metadata or manual person presence.
+[WI-0212](WI-0212-video-metadata-place-and-manual-people.md) is an
+independent near-term Video Details item, and does not enable
+mixed-media slideshows by itself. Keep WI-0154 deferred until a
+supported explicit mixed-member selection contract exists.
+
 ## Scheduling decision — 2026-11-02
 
 **Proposed / deferred.** Browser playback (WI-0152) is the next
