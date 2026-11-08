@@ -243,7 +243,6 @@ work_items:
     value: docs/operations/video-onedrive-wi0207-full-local-acceptance.md
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/755
-  
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/759
   - type: maintainer-verification
