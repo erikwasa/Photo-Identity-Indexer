@@ -5,11 +5,19 @@ A file can be catalogued without having a poster, an encoded playable
 proxy or frame evidence for search. “Unsupported” at one stage does
 not imply that the file is absent, excluded or unreadable.
 
+**Current WI-0207 state (2026-11-08):** Opted-in, protected
+managed hydration/release has passed maintained-host acceptance
+for both an already-inspected video and a never-inspected online-only
+video. The first-time path hydrates an eligible placeholder for
+verified inspection before approved proxy processing; it does **not**
+make unsupported formats playable or authorize browsing-triggered
+hydration. Earlier inspection-prerequisite text below is historical.
+
 | Stage | Current delivered behaviour | Main known boundaries | Next owner |
 | --- | --- | --- | --- |
 | **1. Discovered/catalogued** | Opt-in enumeration of MOV/MP4 videos, source/revision identity, known technical metadata and explicit unsupported/unknown inspection results | File attributes/OneDrive placeholders can be inventoried without opening bytes; actual FFprobe inspection requires already-local bytes or a separately approved managed hydration. The explicit ingest operation has a 1 GiB source ceiling; its supported codec inspection limits include H.264 Main/High, HEVC Main/Main 10 and up to 600 seconds. This is not a promise of derivative support. | WI-0210 for new compatibility classes; WI-0207 for online-only availability |
 | **2. Still poster available** | Versioned durable JPEGs for explicitly admitted Rec.709 SDR videos, checked by revision, exclusions, integrity and derivative root | HLG/PQ, missing colour information and several unapproved formats are recorded without silently producing misleading SDR output. A private HLG preview exists but is **not** a production poster profile. Some indexed videos have no poster. | WI-0210 if the archive inventory selects this gap; two existing missing posters remain a separate deferred operator choice |
-| **3. Playable local proxy available** | WI-0189 publishes seekable H.264/AAC MP4 (Standard 720p / Compact 540p). WI-0210 accepted one real full-range Rec.709 `yuvj420p` → limited-range 720p proxy. Under WI-0207, both output qualities select a source-specific conversion for either approved Rec.709 input class; no third input-format quality option is needed. | Approved input admission is independent of output resolution, while source-specific durable conversions retain distinct versions. Existing 256 MiB source, 0.2–600 s, geometry 16–4096, codec/audio/rotation, privacy/exclusion and photo-first bounds remain. Full-range requires actual BT.709 and full-range input evidence and metadata-stripped limited-range output. No HLG/PQ or unknown colour/rotation; online-only hydration is separately opt-in and requires a prior supported inspection. The remaining 11 historical metadata candidates are **not** independently proven. | WI-0210 completed for the first full-range playable-proxy class; WI-0207 separately owns managed hydration/release; WI-0152 completed browser playback |
+| **3. Playable local proxy available** | WI-0189 publishes seekable H.264/AAC MP4 (Standard 720p / Compact 540p). WI-0210 accepted one real full-range Rec.709 `yuvj420p` → limited-range 720p proxy. Under WI-0207, both output qualities select a source-specific conversion for either approved Rec.709 input class; no third input-format quality option is needed. | Approved input admission is independent of output resolution, while source-specific durable conversions retain distinct versions. Existing 256 MiB source, 0.2–600 s, geometry 16–4096, codec/audio/rotation, privacy/exclusion and photo-first bounds remain. Full-range requires actual BT.709 and full-range input evidence and metadata-stripped limited-range output. No HLG/PQ or unknown colour/rotation; online-only hydration is separately opt-in and includes guarded first-time inspection for eligible online-only MOV/MP4 placeholders; processing remains subject to the verified approved input policy. The remaining 11 historical metadata candidates are **not** independently proven. | WI-0210 completed for the first full-range playable-proxy class; WI-0207 separately owns managed hydration/release; WI-0152 completed browser playback |
 | **4. Searchable frame evidence** | WI-0190 stores timestamped caption/embedding samples for selected current eligible local proxies; WI-0191 reads them via opt-in Caption/Visual/Combined Video Search | Evidence is a separate deliberate processing step, not produced by cataloguing or playback. Search reads at most 256 eligible candidate revisions and does not check original/proxy bytes at query time. Frame samples do not establish full motion, sound or unsampled scenes. | WI-0210 if new examples warrant sampling evaluation; further ranking/scale follow-up only after meaningful growth |
 | **5. Face evidence (future)** | Not delivered; photo identities are never inferred from video merely because frames have captions | Bounded prototype and human reviewed identity-governance decision come first; full temporal tracking and production integration require a later approved scope | WI-0155, staged experiment |
 
@@ -47,9 +55,10 @@ source-specific encoding version remains available for existing jobs
 but is no longer an operator quality option; saved legacy selections
 migrate to Standard 720p. The strict staged full-range `pc`/BT.709
 proof remains mandatory. Online-only processing requires independent
-consent and prior source inspection, and the one-video-step throttle
-is optional for both output qualities. Real online-only verification
-belongs to WI-0207 and remains an acceptance gate.
+consent and an approved input policy; since PR #761 it may first hydrate
+an eligible never-inspected placeholder for bounded inspection.
+The one-video-step throttle is optional for both output qualities.
+Real online-only verification was accepted under WI-0207 on 2026-11-08.
 
 ## WI-0210 delivered compatibility expansion (2026-11-04)
 
