@@ -135,17 +135,20 @@ public sealed class VideoFaceExperiment
     private readonly IFaceDetector _detector;
     private readonly IFaceAligner _aligner;
     private readonly IFaceEmbedder _embedder;
+    private readonly VideoFaceDetectorProfile? _detectorProfile;
 
     public VideoFaceExperiment(
         IImageDecoder decoder,
         IFaceDetector detector,
         IFaceAligner aligner,
-        IFaceEmbedder embedder)
+        IFaceEmbedder embedder,
+        VideoFaceDetectorProfile? detectorProfile = null)
     {
         _decoder = decoder;
         _detector = detector;
         _aligner = aligner;
         _embedder = embedder;
+        _detectorProfile = detectorProfile;
     }
 
     public async Task<VideoFaceAggregate> RunAsync(
@@ -307,6 +310,11 @@ public sealed class VideoFaceExperiment
         // Preflight all selected paths before invoking a model.
         string[] files = set.Frames!.Select(frame =>
             VideoFaceFrameSetLoader.ResolveApprovedFrame(manifestDirectory, frame.File)).ToArray();
+        // Validate sampler provenance before any inference; manually supplied
+        // manifests without extraction metadata remain backwards compatible.
+        var expectedNativeSize = coverage
+            ? VideoFaceExtractionFidelity.ExpectedNativeDimensions(manifestDirectory)
+            : null;
 
         long started = Stopwatch.GetTimestamp();
         int framesWithFaces = 0;
@@ -336,6 +344,7 @@ public sealed class VideoFaceExperiment
                 stream,
                 new DecodeOptions(new ImageSize(coverage ? 3840 : 1600, coverage ? 3840 : 1600)),
                 cancellationToken);
+            VideoFaceExtractionFidelity.VerifyDecodedSize(image.Size, expectedNativeSize);
             IReadOnlyList<DetectedFaceCandidate> detections =
                 await _detector.DetectAsync(image, cancellationToken);
             if (detections.Count > 32)
@@ -352,7 +361,7 @@ public sealed class VideoFaceExperiment
             if (diagnostics)
             {
                 frameDetections.Add(VideoFaceSensitivityDiagnostics.DescribeFrame(
-                    index + 1, set.Frames![index].TimestampMs, detections));
+                    index + 1, set.Frames![index].TimestampMs, detections, image.Size));
             }
 
             List<EmbeddingVector> current = [];
@@ -442,6 +451,7 @@ public sealed class VideoFaceExperiment
                 ? new VideoFaceSensitivityDiagnostics(
                     requestedDetectorConfidence, frameDetections, rankedFaces)
                 {
+                    DetectorProfile = _detectorProfile,
                     Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
                         coverageGrouper.Groups.Count,
                         coverageGrouper.Groups,
