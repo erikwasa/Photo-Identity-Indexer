@@ -1,0 +1,14 @@
+id: WI-0212
+title: Expose video metadata, Places and manual person presence
+milestone: M30
+status: ready
+owner: unassigned
+document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
+blockers:
+- WI-0151
+- WI-0152
+- WI-0062
+- WI-0063
+- WI-0064
+blocker_notes: []
+evidence: []

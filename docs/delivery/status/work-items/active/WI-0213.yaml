@@ -1,0 +1,12 @@
+id: WI-0213
+title: Reevaluate video-level descriptions and search after face feasibility
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0213-video-level-description-and-search-review.md
+blockers:
+- WI-0155
+- WI-0190
+- WI-0191
+blocker_notes: []
+evidence: []

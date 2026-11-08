@@ -7,6 +7,36 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**Scope clarification — 2026-11-08 (after merged PR #763):** Split the
+formerly combined metadata/collection WI-0153. [WI-0212](../work-items/WI-0212-video-metadata-place-and-manual-people.md)
+is a new **ready / near-term** video-details item for useful file/capture
+metadata, GPS-to-existing-Place resolution, manual corrections and
+**manual video-level canonical-person presence**. It is independent of
+collection membership and of WI-0155 biometric recognition. Video
+metadata inspection already exists in WI-0151, so WI-0212 begins with
+a current catalogue/UI field audit rather than a second extraction pipeline.
+
+[WI-0153](../work-items/WI-0153-video-collection-membership.md) now means
+**only explicit manual photo/video collection membership**; WI-0154
+remains the separately deferred mixed-media slideshow. Both are
+proposed, not automatically authorized by implementing WI-0212.
+
+[WI-0213](../work-items/WI-0213-video-level-description-and-search-review.md)
+is a **proposed/deferred follow-up** to revisit video-level descriptions,
+captions and Video Search when WI-0155 multi-video face evidence is mature.
+Completed WI-0190/0191 deliver *sampled still-frame evidence*, not
+confirmed whole-video understanding. A future experiment should
+compare temporal/clip summaries against frame captions and evaluate
+more frames, costs, uncertain action claims, scene coverage and
+per-video ranking without changing current photo-search defaults.
+No production 180-frame requirement or new recognition policy is implied.
+
+M30 stays `in_progress` while WI-0155 runs in its isolated
+`wi-0155` branch. WI-0212 may be started separately once selected;
+WI-0213 intentionally waits. Other deferred membership/slideshow
+items will still require a deliberate M30 closeout decision. The
+dated checkpoints below preserve historical decisions.
+
 **Current M30 handoff — 2026-11-08, after merged PR #762:** The basic
 video foundation is accepted: discovery/posters (WI-0150/0151/0211),
 bounded opt-in processing/proxies (WI-0188/0189), caption/embedding
@@ -25,13 +55,13 @@ existing catalogue evidence, unknown-person cases and a late
 integration-versus-separate-component decision. No automatic identity
 assignment is authorized.
 
-**WI-0153 and WI-0154 are intentionally deferred**, not completed:
-metadata/manual collection organization precedes any mixed-media
-slideshow decision, and video Smart Collection queries would need
-separate authorization. M30 remains `in_progress`; whether to implement
-these deferred items under M30 or move them to a later milestone must
-be decided deliberately at closeout. Dated checkpoint notes below are
-historical and do not override this handoff.
+**WI-0153 (explicit mixed-media membership) and WI-0154
+(mixed-media slideshow) remain intentionally deferred**, not completed.
+Their scopes are distinct from new near-term metadata/manual-person
+WI-0212; dynamic video Smart Collection queries still need a
+separate authorization. M30 remains `in_progress`; deferred items
+must be explicitly implemented or rescheduled at a future closeout.
+Dated checkpoint notes below are historical.
 
 **WI-0207 full-local-review candidate — 2026-11-07:** The maintainer
 accepted checkpoint 4 (35 focused integration tests, 1 disposable
@@ -791,9 +821,11 @@ acceptances; refer to the current handoff above for today's status):
 - [WI-0210](../work-items/WI-0210-archive-driven-video-compatibility-expansion.md) — completed one archive-driven input-class expansion.
 - [WI-0207](../work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md) — completed first-time and already-inspected online-only hydration/release acceptance.
 - [WI-0211](../work-items/WI-0211-recognizable-video-posters-and-library-browsing.md) — completed recognizable posters and Videos library improvements.
-- [WI-0153](../work-items/WI-0153-video-metadata-collections.md) — deferred basic metadata/manual collections, no video Smart queries yet.
+- [WI-0153](../work-items/WI-0153-video-collection-membership.md) — deferred explicit photo/video manual collections only; no dynamic video Smart queries.
 - [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) — deferred mixed-media slideshows, depends on WI-0152 and WI-0153.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — in progress on isolated `wi-0155`; bounded feasibility only, with final architecture choice still open.
+- [WI-0212](../work-items/WI-0212-video-metadata-place-and-manual-people.md) — ready near-term video capture metadata, Place and manual person presence.
+- [WI-0213](../work-items/WI-0213-video-level-description-and-search-review.md) — proposed follow-up to evaluate whole-video descriptions and retrieval after WI-0155.
 - [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) — retired without implementation.
 
 ## Completed first video slice — WI-0151 local acceptance (2026-10-19)
@@ -835,18 +867,30 @@ Remaining initial M30 user-value outcomes:
   record a bounded next-production-slice and architecture decision.
   Full tracking or production recognition is not a hidden gate.
 
+Additional independently planned M30 work (not retroactive gates on
+the accepted initial video foundation):
+
+- [ ] **WI-0212 (ready, near-term):** display/explain video capture
+  metadata, GPS-to-Place, catalogue corrections and video-level
+  manual person presence, separate from collections and face evidence.
+- [ ] **WI-0153 / WI-0154 (deferred):** explicit manual mixed-media
+  collection membership, then optional mixed-media slideshows.
+- [ ] **WI-0213 (deferred):** revisit useful whole-video descriptions
+  and search after WI-0155 evidence; initial scoped frame captions
+  and Video Search remain completed.
+
 Explicitly **not required for the above initial outcomes**:
 WI-0153 video collection integration, WI-0154 video slideshow
-integration, video-enabled Smart Collection filters, Live Photo
+integration, and WI-0213's future video-level description evaluation
+are not prerequisites for the accepted *initial* foundation.
+Video-enabled Smart Collection filters, Live Photo
 pairing (WI-0156 retired), universal HDR/codec support, exhaustive
 scene benchmarking, automatic cloud fallback or new security
 infrastructure.
 
-**Registry caveat:** WI-0153 and WI-0154 remain proposed M30
-members because their future value is retained. The milestone
-status generator requires all member workitems to be terminal
-before marking the milestone completed. At the future M30 closeout,
-either deliberately activate them or move their deferred scope
-to an appropriate later milestone with a reviewed status change.
-Do not pretend they were implemented or silently administratively
-complete merely to satisfy milestone arithmetic.
+**Registry caveat:** WI-0153, WI-0154 and WI-0213 remain
+proposed M30 members; WI-0212 is ready. The milestone status
+generator requires all M30 work items to be terminal before marking
+M30 completed. At closeout, deliberately implement the deferred
+scope or move it to a later milestone through a reviewed decision.
+Do not call these items completed simply to satisfy milestone arithmetic.

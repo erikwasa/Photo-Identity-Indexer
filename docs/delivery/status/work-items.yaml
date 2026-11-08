@@ -10,11 +10,11 @@ allowed_statuses:
 - cancelled
 work_items:
 - id: WI-0153
-  title: Integrate video with manual metadata and collection queries
+  title: Integrate videos into explicit manual photo/video collections
   milestone: M30
   status: proposed
   owner: unassigned
-  document: ../work-items/WI-0153-video-metadata-collections.md
+  document: ../work-items/WI-0153-video-collection-membership.md
   blockers:
   - WI-0151
   - WI-0141
@@ -199,3 +199,29 @@ work_items:
   evidence:
   - type: documentation
     value: docs/delivery/work-items/WI-0193-absolute-photo-quality-model-evaluation.md
+- id: WI-0212
+  title: Expose video metadata, Places and manual person presence
+  milestone: M30
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
+  blockers:
+  - WI-0151
+  - WI-0152
+  - WI-0062
+  - WI-0063
+  - WI-0064
+  blocker_notes: []
+  evidence: []
+- id: WI-0213
+  title: Reevaluate video-level descriptions and search after face feasibility
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0213-video-level-description-and-search-review.md
+  blockers:
+  - WI-0155
+  - WI-0190
+  - WI-0191
+  blocker_notes: []
+  evidence: []
