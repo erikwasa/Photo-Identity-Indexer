@@ -48,7 +48,7 @@ public static class VideoSchemaRehearsalCommandRunner
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
-        if (expectedRestoredSchemaVersion is not (32 or 33 or 34 or 37))
+        if (expectedRestoredSchemaVersion is not (32 or 33 or 34 or 37 or 38))
             throw new ArgumentOutOfRangeException(nameof(expectedRestoredSchemaVersion));
 
         string? connectionString = Environment.GetEnvironmentVariable(
@@ -139,6 +139,44 @@ public static class VideoSchemaRehearsalCommandRunner
 
         if (await SchemaVersionAsync(beforeConnection, token) != PostgresCatalogueDatabase.CurrentSchemaVersion)
             throw new InvalidDataException("Rehearsal did not record the current schema version.");
+
+        if (expectedRestoredSchemaVersion == 38)
+        {
+            // A maintained v38 catalogue may already contain frames, jobs,
+            // people and manual photo annotations. Preserve every pre-existing
+            // table count and verify that v39 only introduces empty video
+            // annotation tables and their source-exclusion purge trigger.
+            await using NpgsqlCommand detailsSchema = beforeConnection.CreateCommand();
+            detailsSchema.CommandText = """
+                SELECT
+                    (SELECT COUNT(*) FROM photo_identity_schema_migrations
+                     WHERE version = 39 AND name = 'video-details-manual-annotations'),
+                    (SELECT COUNT(*) FROM video_capture_date_actions),
+                    (SELECT COUNT(*) FROM video_place_actions),
+                    (SELECT COUNT(*) FROM video_person_actions),
+                    (SELECT COUNT(*) FROM pg_trigger
+                     WHERE tgrelid = 'public.source_copy_exclusions'::regclass
+                       AND tgname = 'trg_source_exclusion_purge_video_details'
+                       AND NOT tgisinternal);
+                """;
+            await using NpgsqlDataReader detailRows =
+                await detailsSchema.ExecuteReaderAsync(token);
+            if (!await detailRows.ReadAsync(token) ||
+                detailRows.GetInt64(0) != 1 ||
+                detailRows.GetInt64(1) != 0 ||
+                detailRows.GetInt64(2) != 0 ||
+                detailRows.GetInt64(3) != 0 ||
+                detailRows.GetInt64(4) != 1)
+                throw new InvalidDataException(
+                    "v39 video details annotation migration was not empty, complete and exclusion-guarded.");
+
+            output.WriteLine("Schema v38 -> v39 rehearsal passed on the isolated restored database.");
+            output.WriteLine($"Rehearsal database: {restoredName}");
+            output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
+            output.WriteLine("Video annotation tables empty; exclusion purge trigger installed.");
+            output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
+            return 0;
+        }
 
         if (expectedRestoredSchemaVersion == 37)
         {
