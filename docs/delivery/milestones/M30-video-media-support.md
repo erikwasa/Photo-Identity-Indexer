@@ -795,9 +795,12 @@ Remaining initial M30 user-value outcomes:
   in the existing browser/phone experience, without original recall.
 - [ ] **WI-0210:** select and verify one archive-evidence-driven
   compatibility expansion, not every possible media format.
-- [ ] **WI-0207:** demonstrate bounded online-only video hydration
-  and app-owned local reuse/release with one real authorized example
-  and focused safety tests.
+- [x] **WI-0207:** verified on the maintained Windows PC after
+  PR #761, including an already-inspected SDR original and one
+  previously uninspected online-only source in the newly approved
+  input-format class. Both were safely processed and returned
+  online-only, with successful in-app playback; CI and source
+  ownership/release safety tests passed.
 - [ ] **WI-0155:** after higher-priority media work, record a bounded
   feasibility prototype and a small next-production-slice decision
   for desired video face recognition. Full tracking/recognition

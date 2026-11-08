@@ -1,5 +1,25 @@
 # Build context
 
+**Current handoff — 2026-11-08: WI-0207 COMPLETED and maintainer accepted.**
+
+PR #761 merged (f91df89a9524ff4ace0e51da39e8f3f6ef5fa6a5),
+all six final CI jobs passed. The maintainer verified first-time
+online-only discovery/hydration, inspection/processing of a video
+reported as the newly approved input format, eventual return of the
+original to online-only, and correct app playback including sound,
+pause, seek and colours. The prior already-inspected SDR example
+independently passed safe unpinned release and proxy replay without
+original recall, no collateral video hydration and unchanged user pins.
+WI-0207 completed and moved to the archived status registry.
+The existing 256 MiB, Windows-only, explicitly opted-in,
+photo-first, pinned-original-protecting scope is retained.
+No further local WI-0207 verification is requested. M30 remains
+open because other separate work items remain active/proposed.
+See docs/delivery/status/work-items/archive/WI-0207.yaml and
+docs/operations/video-onedrive-wi0207-full-local-acceptance.md.
+
+**Historical handoffs follow.**
+
 **Current handoff — 2026-11-08: WI-0207 previously-inspected live
 hydration/release PASSED; first-inspection follow-up in draft PR #761.**
 

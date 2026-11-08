@@ -230,3 +230,25 @@ recipes remain unchanged. Format extensions must define an approved
 source conversion and prove output before the shared eligibility
 policy is widened; the UI never acquires a format-specific output
 preset. The real first-inspection OneDrive outcome remains pending.
+
+## WI-0207 completed: online-only first-inspection acceptance (2026-11-08)
+
+The pending references to draft PR #761 above are historical.
+**PR #761 merged** (commit `f91df89a9524ff4ace0e51da39e8f3f6ef5fa6a5`)
+and all six final CI checks passed. On the maintained Windows PC,
+the operator confirmed that a **never-inspected, online-only** original
+using the **newly approved input-format class** was discovered,
+hydrated, inspected and processed by Archive, then returned to
+online-only. The published video played correctly in Photo Identity
+with audio, pause, seek and acceptable colours. The previously
+accepted SDR source test already established the current-revision,
+pin-protected, proxy-after-release path. Together these close
+WI-0207. The exact new input metadata was not included in this
+operator report; no blanket source-format compatibility is claimed.
+
+The shared `VideoApprovedInputPolicy` prevents per-quality selector
+drift. **Standard 720p** and **Compact 540p** remain quality choices,
+not source-format approval toggles. Further formats still require
+an independently validated source-to-output conversion recipe and
+explicit policy admission. HDR is not implicitly authorized.
+
