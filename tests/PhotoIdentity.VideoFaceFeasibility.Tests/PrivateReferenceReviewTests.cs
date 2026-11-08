@@ -421,10 +421,15 @@ public sealed class PrivateReferenceReviewTests
             VideoFaceFrameSet actual = await VideoFaceFrameSetLoader.LoadAsync(
                 manifest, coverage: true);
             Assert.Equal(36, actual.Frames!.Count);
+            VideoFaceFrameSet expanded = new(1,
+                Enumerable.Range(1, 180).Select(i =>
+                    new VideoFaceFrame(i * 1000, $"f{i:000}.png")).ToList());
+            VideoFaceFrameSetLoader.Validate(expanded, coverage: true);
+            Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(expanded));
             Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(
                 new VideoFaceFrameSet(1,
-                    Enumerable.Range(1, 37).Select(i =>
-                        new VideoFaceFrame(i * 1000, $"f{i:00}.png")).ToList()),
+                    Enumerable.Range(1, 181).Select(i =>
+                        new VideoFaceFrame(i * 1000, $"f{i:000}.png")).ToList()),
                 coverage: true));
             Assert.Equal(2, await Program.Main(
                 ["--manifest", "absent.json", "--coverage"]));
