@@ -7,9 +7,21 @@ depends_on: [M19, M22, M24, M27]
 
 # M30: Video media support
 
+**WI-0212 development handoff — 2026-11-08:** The video-only
+metadata, Place and manual canonical-person vertical slice is being
+developed on `wi-0212-video-details-metadata-people`. It adds v39
+revision-bound PostgreSQL action history, guarded video-details APIs
+and a responsive Details editor without original-byte access.
+Configured GeoNames lookup is operator-triggered rather than an
+unreviewed background video GPS worker. Final CI/disposable PostgreSQL
+and maintained-PC UI/online-only acceptance are pending. Verify a
+recoverable backup and rehearsal before running production migration.
+See [WI-0212 acceptance](../../operations/video-details-wi0212-acceptance.md).
+WI-0155 remains isolated and independent.
+
 **Scope clarification — 2026-11-08 (after merged PR #763):** Split the
 formerly combined metadata/collection WI-0153. [WI-0212](../work-items/WI-0212-video-metadata-place-and-manual-people.md)
-is a new **ready / near-term** video-details item for useful file/capture
+is a new **in-progress / near-term** video-details item for useful file/capture
 metadata, GPS-to-existing-Place resolution, manual corrections and
 **manual video-level canonical-person presence**. It is independent of
 collection membership and of WI-0155 biometric recognition. Video
@@ -32,7 +44,7 @@ per-video ranking without changing current photo-search defaults.
 No production 180-frame requirement or new recognition policy is implied.
 
 M30 stays `in_progress` while WI-0155 runs in its isolated
-`wi-0155` branch. WI-0212 may be started separately once selected;
+`wi-0155` branch. WI-0212 is being developed separately;
 WI-0213 intentionally waits. Other deferred membership/slideshow
 items will still require a deliberate M30 closeout decision. The
 dated checkpoints below preserve historical decisions.
@@ -824,7 +836,7 @@ acceptances; refer to the current handoff above for today's status):
 - [WI-0153](../work-items/WI-0153-video-collection-membership.md) — deferred explicit photo/video manual collections only; no dynamic video Smart queries.
 - [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) — deferred mixed-media slideshows, depends on WI-0152 and WI-0153.
 - [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) — in progress on isolated `wi-0155`; bounded feasibility only, with final architecture choice still open.
-- [WI-0212](../work-items/WI-0212-video-metadata-place-and-manual-people.md) — ready near-term video capture metadata, Place and manual person presence.
+- [WI-0212](../work-items/WI-0212-video-metadata-place-and-manual-people.md) — in progress: video capture metadata, Place and manual person presence.
 - [WI-0213](../work-items/WI-0213-video-level-description-and-search-review.md) — proposed follow-up to evaluate whole-video descriptions and retrieval after WI-0155.
 - [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) — retired without implementation.
 
@@ -870,7 +882,7 @@ Remaining initial M30 user-value outcomes:
 Additional independently planned M30 work (not retroactive gates on
 the accepted initial video foundation):
 
-- [ ] **WI-0212 (ready, near-term):** display/explain video capture
+- [ ] **WI-0212 (in progress, near-term):** display/explain video capture
   metadata, GPS-to-Place, catalogue corrections and video-level
   manual person presence, separate from collections and face evidence.
 - [ ] **WI-0153 / WI-0154 (deferred):** explicit manual mixed-media
@@ -889,7 +901,7 @@ scene benchmarking, automatic cloud fallback or new security
 infrastructure.
 
 **Registry caveat:** WI-0153, WI-0154 and WI-0213 remain
-proposed M30 members; WI-0212 is ready. The milestone status
+proposed M30 members; WI-0212 is in progress. The milestone status
 generator requires all M30 work items to be terminal before marking
 M30 completed. At closeout, deliberately implement the deferred
 scope or move it to a later milestone through a reviewed decision.
