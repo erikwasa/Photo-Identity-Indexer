@@ -119,6 +119,17 @@ $folderName = 'coverage-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '-' +
     [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $output = Join-Path $privateRoot $folderName
 New-Item -ItemType Directory -Path $output -ErrorAction Stop | Out-Null
+# Ownership marker is created before the first frame so interrupted runs can be
+# inspected and deliberately cleaned. Never adopt pre-existing unmarked folders.
+$runId = [Guid]::NewGuid().ToString('D')
+$markerPath = Join-Path $output 'wi0155-run.json'
+@{
+    schemaVersion = 1
+    kind = 'PhotoIdentity.WI0155.CoverageWorkspace'
+    runId = $runId
+    state = 'extracting'
+    createdUtc = [DateTime]::UtcNow.ToString('O')
+} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $markerPath -Encoding utf8
 
 $frames = [System.Collections.Generic.List[object]]::new()
 $workspaceBytes = 0L
@@ -184,12 +195,21 @@ for ($index = 0; $index -lt $FrameCount; $index++) {
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $output 'extraction-metadata.json') -Encoding utf8
 
+@{
+    schemaVersion = 1
+    kind = 'PhotoIdentity.WI0155.CoverageWorkspace'
+    runId = $runId
+    state = 'extracted'
+    createdUtc = (Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json).createdUtc
+} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $markerPath -Encoding utf8
+
 Write-Host 'Private WI-0155 coverage samples created.'
 Write-Host ('Frame count: {0}' -f $frames.Count)
 Write-Host ('Window length (seconds): {0:F2}' -f $window)
 Write-Host ('Local output: {0}' -f $output)
 Write-Host 'No person identities have been inferred; short appearances may still be missed.'
 [pscustomobject]@{
+    RunId = $runId
     ManifestPath = Join-Path $output 'frames.json'
     FramesDirectory = $output
     FrameCount = $frames.Count
