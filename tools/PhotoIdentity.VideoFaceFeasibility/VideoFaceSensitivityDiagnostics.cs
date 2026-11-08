@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.VideoFaceFeasibility;
@@ -11,12 +12,30 @@ public sealed record VideoFaceThresholdCheck(
     double SimilarityThreshold,
     string Outcome);
 
+public sealed record VideoFaceDetectorProfile(
+    string PipelineMode,
+    int ModelInputWidth,
+    int ModelInputHeight,
+    int? TileSize);
+
 public sealed record VideoFaceFrameDetectionDiagnostic(
     int FrameNumber,
     long TimestampMs,
     int FacesDetected,
     double? LowestConfidence,
-    double? HighestConfidence);
+    double? HighestConfidence)
+{
+    // Dimensions describe the decoded image BEFORE YuNet preprocessing.
+    // Approximate face widths are in decoded source pixels, never coordinates.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? DecodedWidth { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? DecodedHeight { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? SmallestFaceWidthPixels { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? SmallestFaceHeightPixels { get; init; }
+}
 
 public sealed record VideoFaceRankedDiagnostic(
     int FrameNumber,
@@ -36,6 +55,11 @@ public sealed record VideoFaceSensitivityDiagnostics(
     // Absent in the normal private diagnostic run (only explicit --coverage enables it).
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public VideoFaceCoverageReview? Coverage { get; init; }
+
+    // Model tensor size is *not* the decoded frame resolution. In multi-scale
+    // mode every source region is separately projected onto that tensor.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceDetectorProfile? DetectorProfile { get; init; }
 
     // Values selected for a sensitivity *comparison*, not verified cutoffs.
     public static readonly IReadOnlyList<double> SimilarityThresholds =
@@ -67,7 +91,8 @@ public sealed record VideoFaceSensitivityDiagnostics(
     public static VideoFaceFrameDetectionDiagnostic DescribeFrame(
         int frameNumber,
         long timestampMs,
-        IReadOnlyList<DetectedFaceCandidate> detections)
+        IReadOnlyList<DetectedFaceCandidate> detections,
+        ImageSize? decodedSize = null)
     {
         ArgumentNullException.ThrowIfNull(detections);
         if (frameNumber < 1 || timestampMs < 0)
@@ -75,11 +100,22 @@ public sealed record VideoFaceSensitivityDiagnostics(
             throw new ArgumentOutOfRangeException(nameof(frameNumber));
         }
 
-        return new VideoFaceFrameDetectionDiagnostic(
+        VideoFaceFrameDetectionDiagnostic diagnostic = new(
             frameNumber,
             timestampMs,
             detections.Count,
             detections.Count == 0 ? null : Math.Round(detections.Min(d => d.Confidence), 4),
             detections.Count == 0 ? null : Math.Round(detections.Max(d => d.Confidence), 4));
+        return decodedSize is ImageSize size
+            ? diagnostic with
+            {
+                DecodedWidth = size.Width,
+                DecodedHeight = size.Height,
+                SmallestFaceWidthPixels = detections.Count == 0 ? null : Math.Round(
+                    detections.Min(d => d.BoundingBox.Width) * size.Width, 1),
+                SmallestFaceHeightPixels = detections.Count == 0 ? null : Math.Round(
+                    detections.Min(d => d.BoundingBox.Height) * size.Height, 1),
+            }
+            : diagnostic;
     }
 }
