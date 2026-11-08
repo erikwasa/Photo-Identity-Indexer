@@ -221,4 +221,64 @@ public sealed class VideoSchemaRehearsalCommandTests
     }
 
 
+    [Fact]
+    public async Task V39_rehearsal_rejects_unverified_or_non_v38_restore_without_connecting()
+    {
+        const string variable = "PHOTOIDENTITY_WI0212_V39_TEST_CONN";
+        string? previous = Environment.GetEnvironmentVariable(variable);
+        string reportPath = Path.Combine(Path.GetTempPath(),
+            "photoidentity-v39-restore-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            // The connection string intentionally names production. No network
+            // connection must occur before the restore-report checks pass.
+            Environment.SetEnvironmentVariable(variable,
+                "Host=127.0.0.1;Database=photoidentity_main;Username=fixture;Password=private");
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "photoidentity_main",
+                  "verificationDatabase": "photoidentity_restore_20261108100000_abcdef",
+                  "restoredEvidence": { "schemaVersion": 37 }
+                }
+                """);
+            VideoSchemaRehearsalOptions options = new(variable, reportPath);
+            InvalidOperationException wrongVersion =
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null,
+                        expectedRestoredSchemaVersion: 38));
+            Assert.Contains("schema v38", wrongVersion.Message, StringComparison.Ordinal);
+
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": true,
+                  "sourceDatabase": "photoidentity_main",
+                  "verificationDatabase": "photoidentity_main",
+                  "restoredEvidence": { "schemaVersion": 38 }
+                }
+                """);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null,
+                    expectedRestoredSchemaVersion: 38));
+
+            await File.WriteAllTextAsync(reportPath, """
+                {
+                  "passed": false,
+                  "sourceDatabase": "photoidentity_main",
+                  "verificationDatabase": "photoidentity_restore_20261108100000_abcdef",
+                  "restoredEvidence": { "schemaVersion": 38 }
+                }
+                """);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                VideoSchemaRehearsalCommandRunner.RunAsync(options, TextWriter.Null,
+                    expectedRestoredSchemaVersion: 38));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, previous);
+            if (File.Exists(reportPath)) File.Delete(reportPath);
+        }
+    }
+
+
 }
