@@ -31,10 +31,12 @@ public static class Program
                 "Usage: dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -- " +
                 "--manifest <private-frames.json> [--root <repo>] [--model-dir <installed-model-dir>] " +
                 "[--references <private-references.json> --private-report <new-private-report.json>] " +
-                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>] [--coverage]]\n" +
+                "[--diagnostics [--detector-confidence <0.5|0.7|0.9>] [--coverage] " +
+                "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>]]\n" +
                 "Catalogue: --catalogue-cases <private-2-to-4-clips.json> " +
                 "--private-report <new-private-report.json> [--root <repo>] " +
-                "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>]");
+                "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>] " +
+                "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>]");
             return 0;
         }
 
@@ -65,13 +67,14 @@ public static class Program
             await verifier.VerifyOrThrowAsync(embedderPath, embedderManifest);
 
             using YuNetFaceDetector detector = new(
-                detectorManifest, detectorPath, new YuNetDetectorOptions { ConfidenceThreshold = options.DetectorConfidence });
+                detectorManifest, detectorPath, options.Detection.CreateOptions(options.DetectorConfidence));
             using SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
             VideoFaceExperiment experiment = new(
                 new OpenCvImageDecoder(),
                 detector,
                 new OpenCvFaceAligner(),
-                embedder);
+                embedder,
+                options.Detection.Describe(detector.Descriptor.InputSize));
 
             VideoFaceAggregate result;
             if (referenceSet is null)
@@ -129,7 +132,8 @@ public static class Program
         string? PrivateReport,
         bool Diagnostics,
         double DetectorConfidence,
-        bool Coverage)
+        bool Coverage,
+        VideoFaceDetectorSelection Detection)
     {
         public static Options Parse(string[] args)
         {
@@ -139,6 +143,8 @@ public static class Program
             string? references = null;
             string? privateReport = null;
             string? detectorConfidence = null;
+            string? detectorPipeline = null;
+            string? tileSize = null;
             bool diagnostics = false;
             bool coverage = false;
             for (int i = 0; i < args.Length; i++)
@@ -191,6 +197,12 @@ public static class Program
                     case "--detector-confidence" when detectorConfidence is null:
                         detectorConfidence = value;
                         break;
+                    case "--detector-pipeline" when detectorPipeline is null:
+                        detectorPipeline = value;
+                        break;
+                    case "--tile-size" when tileSize is null:
+                        tileSize = value;
+                        break;
                     default:
                         throw new ArgumentException("Unknown or repeated option.");
                 }
@@ -220,6 +232,14 @@ public static class Program
                     "--coverage requires --diagnostics, --references and --private-report.");
             }
 
+            if ((detectorPipeline is not null || tileSize is not null) && !diagnostics)
+            {
+                throw new ArgumentException(
+                    "Detector pipeline experiments require explicit private diagnostics.");
+            }
+            VideoFaceDetectorSelection selection = VideoFaceDetectorSelection.Parse(
+                detectorPipeline, tileSize);
+
             double threshold = detectorConfidence switch
             {
                 null => 0.9,
@@ -238,7 +258,8 @@ public static class Program
                 privateReport,
                 diagnostics,
                 threshold,
-                coverage);
+                coverage,
+                selection);
         }
     }
 }
