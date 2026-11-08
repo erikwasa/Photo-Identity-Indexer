@@ -628,6 +628,44 @@ public sealed class PrivateReferenceReviewTests
         return path;
     }
 
+    [Fact]
+    public async Task Coverage_refuses_decoded_frames_smaller_than_native_extraction_provenance()
+    {
+        string root = TempDir();
+        try
+        {
+            string frames = Directory.CreateDirectory(Path.Combine(root, "frames")).FullName;
+            string refs = Directory.CreateDirectory(Path.Combine(root, "refs")).FullName;
+            await WritePngStub(frames, "frame-001.png", 1);
+            await WritePngStub(refs, "reference.png", 3);
+            await File.WriteAllTextAsync(Path.Combine(frames, "extraction-metadata.json"),
+                JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    frameEncoding = "NativeLosslessPng",
+                    codedWidth = 1920,
+                    codedHeight = 1080,
+                    rotationDegrees = -90,
+                    expectedDisplayWidth = 1080,
+                    expectedDisplayHeight = 1920,
+                }));
+
+            var experiment = new VideoFaceExperiment(
+                new MarkedDecoder(), new OneFaceDetector(), new PassAligner(), new MarkedEmbedder());
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                experiment.RunWithReferencesAsync(
+                    new VideoFaceFrameSet(1, [new VideoFaceFrame(1000, "frame-001.png")]),
+                    frames,
+                    new VideoFaceReferenceSet(1, [new VideoFaceReference("R01", "reference.png")]),
+                    refs,
+                    diagnostics: true, requestedDetectorConfidence: 0.7, coverage: true));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private sealed class MarkedDecoder : IImageDecoder
     {
         public async Task<ImageFrame> DecodeAsync(

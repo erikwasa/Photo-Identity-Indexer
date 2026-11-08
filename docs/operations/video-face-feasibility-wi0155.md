@@ -1284,3 +1284,95 @@ The broader temporary-data budget across *all* concurrent runs,
 semantic report-to-run binding, streaming frames, automated retry
 or crash recovery and selective compressed poster/clip/caption
 persistence are **not implemented**.
+
+## Checkpoint 11 — detector-input fidelity and isolated multiscale comparison (development; 2026-11-08)
+
+**Implementation ready for CI and future operator acceptance; no real-media
+accuracy assertion.** V03's HEVC 1920 × 1080 10-bit source is already
+below the 3840-pixel extraction cap. Even with correctly oriented native
+1080 × 1920 PNG input, the previously selected default YuNet **single
+pass** processes the *entire* frame through the governed **640 × 640**
+model input. Native PNG storage therefore cannot, by itself, increase
+the face's effective model pixels. A distant face can be only a few
+pixels high after this preprocessing.
+
+The standalone WI-0155 CLI and read-only catalogue evaluation now allow
+the experimental **opt-in**, already-existing governed YuNet
+`MultiScale` pipeline. It runs a whole-frame pass plus spatially
+overlapping tiles of **1024** (default) or **640** source pixels,
+projected separately to the same 640 × 640 model tensor, and merges
+overlapping detections via the existing detector implementation.
+This may improve detection of distant faces but increases inference
+work and may introduce different duplicate/false detections. It **does
+not** change models, similarity thresholds, alignment or any
+production setting. `single-pass` remains the default.
+
+The CLI options are `--detector-pipeline single-pass|multi-scale`
+and (for multi-scale only) `--tile-size 640|1024`. The private
+reference CLI requires existing explicit diagnostics authorization;
+the catalogue runner already requires a private report and a
+read-only PostgreSQL snapshot. The private diagnostic report records
+the detector pipeline, fixed model tensor size, tile size (if used),
+**decoded pre-model frame dimensions**, and smallest detected face
+width/height in source pixels. Face-pixel counts refer to **detections**,
+not manually annotated missed faces; they do not prove that the
+model saw original-resolution face detail.
+
+If the extractor's private `extraction-metadata.json` indicates
+`NativeLosslessPng`, the experiment validates consistent source
+display dimensions and refuses images that the .NET decoder shrinks
+or rotates incorrectly relative to the recorded extraction metadata.
+Operator-supplied manifests **without** metadata retain compatibility.
+These checks are active only in coverage mode; old 12-frame normal
+mode stays unchanged. No original or frame file is modified.
+
+### Deferred combined local procedure
+
+After the code is merged into `wi-0155`, and **after** the
+maintainer approves a fully local V03 and has verified the PNG
+dimensions / no source hydration / local models:
+
+```powershell
+# $newCasesPath: private 2–4-video catalogue case file with V03 pointing
+# to the SAME approved native PNG manifest in BOTH runs.
+# $privateReportSingle and $privateReportTiled: different, new private
+# report paths outside Git and temporary extraction folders.
+# $wiRoot / $modelDir: existing WI-0155 approved installation paths.
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $newCasesPath --private-report $privateReportSingle `
+    --root $wiRoot --model-dir $modelDir --detector-confidence 0.5 `
+    --detector-pipeline single-pass
+if ($LASTEXITCODE -ne 0) { throw 'Single-pass private evaluation failed.' }
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $newCasesPath --private-report $privateReportTiled `
+    --root $wiRoot --model-dir $modelDir --detector-confidence 0.5 `
+    --detector-pipeline multi-scale --tile-size 1024
+if ($LASTEXITCODE -ne 0) { throw 'Tiled private evaluation failed.' }
+```
+
+If the first tiled run shows an insufficient change and its runtime /
+peak resource use is acceptable, a **third new** report can compare
+`--tile-size 640` on the same approved cases; this is more expensive
+and is **not** a required first pass. Check each private report's
+`clips[].review.diagnostics.detectorProfile` and
+`frameDetections[]` for pre-model decoded size, model input size,
+tile size, and small face bounding-box sizes. Review correct/unknown/
+incorrect person candidate rankings against private ground truth,
+not just detection totals. Do not paste scores, identities, file
+paths, timestamps or raw biometric findings into PRs or chats.
+
+Complete focused unit tests, docs validation/check and the explicit
+temporary workspace inspection, selective retention and cleanup
+procedure from checkpoint 10 **after** evaluation and confirmed
+private report persistence. Use the same original selected video,
+sampling timestamps, decoded PNGs and catalogue cohort for both
+detector modes to isolate this new variable.
+
+**Outstanding acceptance:** Real V03 image/model orientation and
+dimension checks; recorded precision/quality of small faces; cost and
+human-confirmed utility of 1024/640 tiles; actual safe cleanup and
+retention; verified private report-to-run association remains
+operator-attested, not enforced cryptographically. No production
+integration is approved.
