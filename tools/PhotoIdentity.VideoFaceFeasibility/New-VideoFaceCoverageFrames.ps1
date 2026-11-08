@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Create a bounded, private set of timeline-spread JPEG stills from ONE explicitly
+Create a bounded, private set of timeline-spread JPEG or lossless PNG stills from ONE explicitly
 approved, already-local video for experimental WI-0155 coverage.
 No OneDrive hydration, DB writes, original modification or background jobs.
 .EXAMPLE
@@ -19,6 +19,12 @@ param(
 
     [ValidateSet(12, 24, 36, 120, 180)]
     [int] $FrameCount = 36,
+
+    [ValidateSet('LegacyJpeg', 'NativeLosslessPng')]
+    [string] $FrameEncoding = 'LegacyJpeg',
+
+    [ValidateRange(8, 2048)]
+    [int] $MaximumWorkspaceMiB = 1024,
 
     [ValidateRange(0, 86400)]
     [double] $WindowStartSeconds = 0,
@@ -54,11 +60,24 @@ foreach ($exe in @($ffmpeg, $ffprobe)) {
 }
 
 # Probe metadata only. This tool never searches directories for videos.
-$probeJson = & $ffprobe -v error -show_entries 'format=duration' -of json -i $video
+$probeJson = & $ffprobe -v error -select_streams 'v:0' -show_entries 'format=duration:stream=width,height,codec_name,pix_fmt:stream_side_data=rotation' -of json -i $video
 if ($LASTEXITCODE -ne 0) { throw 'FFprobe could not read the selected local video.' }
 try {
     $metadata = ($probeJson -join [Environment]::NewLine) | ConvertFrom-Json
     $duration = [double]$metadata.format.duration
+    if (@($metadata.streams).Count -ne 1) { throw 'Missing selected video stream.' }
+    $sourceWidth = [int]$metadata.streams[0].width
+    $sourceHeight = [int]$metadata.streams[0].height
+    if ($sourceWidth -lt 1 -or $sourceHeight -lt 1 -or
+        $sourceWidth -gt 3840 -or $sourceHeight -gt 3840) {
+        throw 'Native-resolution experiment supports sources up to 3840 pixels per axis.'
+    }
+    $rotation = 0
+    foreach ($sideData in @($metadata.streams[0].side_data_list)) {
+        if ($null -ne $sideData -and $null -ne $sideData.rotation) {
+            $rotation = [int]$sideData.rotation
+        }
+    }
 } catch {
     throw 'The video does not expose an unambiguous finite duration.'
 }
@@ -98,6 +117,9 @@ $output = Join-Path $privateRoot $folderName
 New-Item -ItemType Directory -Path $output -ErrorAction Stop | Out-Null
 
 $frames = [System.Collections.Generic.List[object]]::new()
+$workspaceBytes = 0L
+$workspaceLimitBytes = [long]$MaximumWorkspaceMiB * 1MB
+$lossless = $FrameEncoding -eq 'NativeLosslessPng'
 $previousTimestamp = -1L
 for ($index = 0; $index -lt $FrameCount; $index++) {
     # Stratified midpoint samples span the entire selected window, not just
@@ -110,10 +132,17 @@ for ($index = 0; $index -lt $FrameCount; $index++) {
     }
     $previousTimestamp = $timestampMs
 
-    $file = 'frame-{0:D3}.jpg' -f ($index + 1)
+    $extension = if ($lossless) { 'png' } else { 'jpg' }
+    $file = 'frame-{0:D3}.{1}' -f ($index + 1), $extension
     $destination = Join-Path $output $file
     $seek = $absoluteSeconds.ToString('F3', [Globalization.CultureInfo]::InvariantCulture)
-    & $ffmpeg -hide_banner -nostdin -loglevel error -ss $seek -i $video -map '0:v:0' -an -sn -dn -frames:v 1 -threads 1 -vf 'scale=3840:3840:force_original_aspect_ratio=decrease:force_divisible_by=2' -q:v 3 -n $destination
+    if ($lossless) {
+        # FFmpeg autorotation is enabled by default. No scaling or JPEG encoding.
+        # PNG rgb24 is lossless *after* the necessary 10-bit YUV to 8-bit RGB conversion.
+        & $ffmpeg -hide_banner -nostdin -loglevel error -ss $seek -i $video -map '0:v:0' -an -sn -dn -frames:v 1 -threads 1 -pix_fmt rgb24 -c:v png -n $destination
+    } else {
+        & $ffmpeg -hide_banner -nostdin -loglevel error -ss $seek -i $video -map '0:v:0' -an -sn -dn -frames:v 1 -threads 1 -vf 'scale=3840:3840:force_original_aspect_ratio=decrease:force_divisible_by=2' -q:v 3 -n $destination
+    }
     if ($LASTEXITCODE -ne 0) {
         throw 'FFmpeg frame extraction failed. Private partial output remains for local cleanup.'
     }
@@ -121,6 +150,10 @@ for ($index = 0; $index -lt $FrameCount; $index++) {
     $result = Get-Item -LiteralPath $destination -ErrorAction Stop
     if ($result.Length -lt 3 -or $result.Length -gt (8 * 1024 * 1024)) {
         throw 'Extracted sample violates the 8 MiB still-image limit.'
+    }
+    $workspaceBytes += $result.Length
+    if ($workspaceBytes -gt $workspaceLimitBytes) {
+        throw 'Private frame workspace exceeded its configured byte budget. Partial output remains for operator-controlled cleanup.'
     }
     $frames.Add([ordered]@{ timestampMs = $timestampMs; file = $file })
 }
@@ -131,6 +164,22 @@ for ($index = 0; $index -lt $FrameCount; $index++) {
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $output 'frames.json') -Encoding utf8
 
+@{
+    schemaVersion = 1
+    frameEncoding = $FrameEncoding
+    sourceCodec = $metadata.streams[0].codec_name
+    sourcePixelFormat = $metadata.streams[0].pix_fmt
+    codedWidth = $sourceWidth
+    codedHeight = $sourceHeight
+    rotationDegrees = $rotation
+    expectedDisplayWidth = if ([math]::Abs($rotation) % 180 -eq 90) { $sourceHeight } else { $sourceWidth }
+    expectedDisplayHeight = if ([math]::Abs($rotation) % 180 -eq 90) { $sourceWidth } else { $sourceHeight }
+    extractedFrameBytes = $workspaceBytes
+    maximumWorkspaceMiB = $MaximumWorkspaceMiB
+    note = 'NativeLosslessPng uses lossless PNG after decoder RGB24 conversion; original 10-bit precision is not preserved.'
+} | ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath (Join-Path $output 'extraction-metadata.json') -Encoding utf8
+
 Write-Host 'Private WI-0155 coverage samples created.'
 Write-Host ('Frame count: {0}' -f $frames.Count)
 Write-Host ('Window length (seconds): {0:F2}' -f $window)
@@ -140,6 +189,9 @@ Write-Host 'No person identities have been inferred; short appearances may still
     ManifestPath = Join-Path $output 'frames.json'
     FramesDirectory = $output
     FrameCount = $frames.Count
+    FrameEncoding = $FrameEncoding
+    ExtractionMetadataPath = Join-Path $output 'extraction-metadata.json'
+    ExtractedFrameBytes = $workspaceBytes
     WindowStartSeconds = $WindowStartSeconds
     WindowLengthSeconds = $window
 }
