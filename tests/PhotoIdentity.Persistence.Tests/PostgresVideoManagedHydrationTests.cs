@@ -1,4 +1,6 @@
 using Npgsql;
+using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
@@ -190,4 +192,110 @@ public sealed class PostgresVideoManagedHydrationTests
             }
         }
     }
+    [Fact]
+    public async Task Uninspected_online_only_video_claims_source_before_verified_revision()
+    {
+        string? admin = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(admin)) return;
+
+        string name = "photoidentity_wi0207_initial_" +
+            Guid.NewGuid().ToString("N");
+        await using NpgsqlConnection server = new(
+            new NpgsqlConnectionStringBuilder(admin) { Pooling = false }.ConnectionString);
+        await server.OpenAsync();
+        await using (NpgsqlCommand create = server.CreateCommand())
+        {
+            create.CommandText = $"CREATE DATABASE \"{name}\";";
+            await create.ExecuteNonQueryAsync();
+        }
+        try
+        {
+            var options = new NpgsqlConnectionStringBuilder(admin)
+            { Database = name, Pooling = false };
+            await using PostgresCatalogueDatabase db = new(options.ConnectionString);
+            await db.InitializeAsync();
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ArchiveCatalogueSource source =
+                await new PostgresCatalogueSourceRepository(db)
+                    .GetOrCreateLocalFolderSourceAsync(
+                        Path.GetFullPath("wi0207-private-synthetic-root"), now);
+            SourceAsset placeholder = new(
+                new SourceAssetReference(source.SourceId, "camera/first.mov"),
+                "camera/first.mov", "video/quicktime", 4096,
+                now.AddHours(-1), AssetAvailability.OnlineOnly);
+            var provisional = new PostgresVideoProvisionalRepository(db);
+            ArchiveSourceObservationSnapshot observation =
+                await provisional.ObserveAsync(source, placeholder, now);
+            Assert.Equal(ArchiveSourceObservationVerificationState.Unverified,
+                observation.VerificationState);
+            Assert.Null(observation.VerifiedRevisionId);
+            Assert.Null(await new PostgresArchiveSourceObservationRepository(db)
+                .GetNextPendingAsync(source.SourceId)); // Photo verifier must not claim video.
+
+            var sourceLease = new PostgresArchiveSourceHydrationRepository(db);
+            await sourceLease.ClaimAsync(observation.AssetId, now);
+            ProvisionalVideoHydration pending = Assert.Single(
+                await provisional.GetActiveAsync());
+            Assert.Equal(observation.AssetId, pending.Observation.AssetId);
+            Assert.Null(pending.LatestRevisionId);
+            Assert.False(pending.ReleaseRequested);
+            Assert.False((await provisional.GetActiveSourceAsync(
+                source.SourceId, placeholder.Reference.ItemKey))!.ReleaseRequested);
+            ArchiveManagedSourceHydrationLeaseState leased = Assert.Single(
+                await sourceLease.GetActiveLeasesAsync());
+            Assert.True(leased.IsVideo);
+            Assert.Equal(4096, leased.SizeBytes);
+
+            // Existing active source ownership pins the exact observed
+            // size/timestamp; another observation cannot silently retarget it.
+            SourceAsset changed = new(
+                placeholder.Reference, placeholder.RelativePath,
+                placeholder.MediaType, placeholder.SizeBytes + 1,
+                placeholder.LastWriteTimeUtc.AddMinutes(1),
+                AssetAvailability.OnlineOnly);
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                provisional.ObserveAsync(source, changed, now.AddMinutes(1)));
+
+            // Only after independent content verification can the same
+            // video asset obtain a revision and transfer its durable lease.
+            var verified = new VerifiedLocalVideo(source,
+                new SourceAsset(placeholder.Reference, placeholder.RelativePath,
+                    placeholder.MediaType, placeholder.SizeBytes,
+                    placeholder.LastWriteTimeUtc, AssetAvailability.Local),
+                new Sha256Digest(new string('a', 64)), now.AddMinutes(1));
+            RegisteredVideoRevision revision =
+                await new PostgresVideoAssetRepository(db)
+                    .RegisterVerifiedAsync(verified);
+            Assert.Equal(observation.AssetId, revision.AssetId);
+            Assert.True(await sourceLease.TransferToRevisionAsync(
+                observation.AssetId, revision.RevisionId, now.AddMinutes(2)));
+            Assert.Empty(await provisional.GetActiveAsync());
+            Assert.Empty(await sourceLease.GetActiveLeasesAsync());
+            ArchiveManagedHydrationLeaseState owned = Assert.Single(
+                await new PostgresArchiveHydrationRepository(db)
+                    .GetActiveLeasesAsync());
+            Assert.True(owned.IsVideo);
+            Assert.Equal(revision.RevisionId, owned.AssetRevisionId);
+        }
+        finally
+        {
+            await using (NpgsqlCommand terminate = server.CreateCommand())
+            {
+                terminate.CommandText = $"""
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE datname = '{name}' AND pid <> pg_backend_pid();
+                    """;
+                await terminate.ExecuteNonQueryAsync();
+            }
+            await using (NpgsqlCommand drop = server.CreateCommand())
+            {
+                drop.CommandText = $"DROP DATABASE \"{name}\";";
+                await drop.ExecuteNonQueryAsync();
+            }
+        }
+    }
+
 }

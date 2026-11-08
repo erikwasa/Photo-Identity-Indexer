@@ -1,5 +1,47 @@
 # Build context
 
+**Current handoff — 2026-11-08: WI-0207 previously-inspected live
+hydration/release PASSED; first-inspection follow-up in draft PR #761.**
+
+The maintainer verified one explicitly authorized, previously
+inspected, supported SDR original: initially online-only/unpinned,
+successfully hydrated via OneDrive, one Standard 720p published
+proxy (succeeded 31→32, queued/running/failed 0), desktop
+play/pause/seek/colour/audio passed, original returned to
+online-only unpinned, proxy remained playable with no rehydration,
+and existing user pins were unchanged. Maintained Windows
+integration/disposable-PostgreSQL/docs and metadata preflight all
+passed. Record this real acceptance as completed; do not repeat it.
+
+**Newly agreed functional gap:** A folder with five online-only
+MOV/MP4 originals (four within 256 MiB) was skipped with
+`no-eligible-video`; the database-wide metadata preflight had
+nine supported candidates (two local, seven pinned-local), none
+online-only. Previously unknown placeholders cannot be inspected
+by the original local-only discovery path. Follow-up PR #761
+is **draft/development**: provisional VIDEO source-level ownership
+before content hash, shared capacity and nonpinning Cloud Files
+hydration, verified revision promotion, safe release/recovery,
+separated last substantive outcome vs last idle Archive scan,
+targeted tests and documentation. Source-level video leases must
+remain excluded from photo LRU eviction; photo source verification
+must not process provisional video assets. User-specified
+online-only opt-in remains off by default and never bypasses
+approved codecs/FFprobe, exclusions or 256 MiB limit.
+
+**Do not request local media testing until PR #761 is code-complete,
+its CI/tests/docs pass and it is ready for merge.** The next single
+operator approval should select one **never-inspected online-only**
+original and verify first hydration → inspection → supported
+proxy (or durable unsupported result) → safe release. The
+already-accepted previously inspected hydrate/release test is
+not required again. WI-0207 remains `in_progress` until the
+new follow-up passes. See
+docs/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md
+and docs/operations/video-onedrive-wi0207-full-local-acceptance.md.
+
+**Historical handoffs follow.**
+
 **Current handoff — 2026-11-07: WI-0207 one-PR end-to-end
 candidate, awaiting CI and single real local acceptance.**
 PR #754 merged after the maintained operator accepted

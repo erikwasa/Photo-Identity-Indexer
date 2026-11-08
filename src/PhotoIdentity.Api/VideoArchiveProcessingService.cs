@@ -30,9 +30,13 @@ public sealed class VideoArchiveProcessingService(
     private readonly object _activeLock = new();
     private CancellationTokenSource? _active;
     private string _lastResult = "not-run";
+    private string _lastActivityResult = "not-run";
     private string _lastPosterResult = "not-run";
     private VideoAttemptFailureDiagnostic? _lastAttemptFailure;
     public string LastResult => Volatile.Read(ref _lastResult);
+    // Last substantive outcome is not cleared by a later empty Archive scan.
+    // This is in-memory operator feedback; durable job history is PostgreSQL.
+    public string LastActivityResult => Volatile.Read(ref _lastActivityResult);
     public string LastPosterResult => Volatile.Read(ref _lastPosterResult);
 
     public static bool ShouldCreateAutomaticPoster(
@@ -168,6 +172,10 @@ public sealed class VideoArchiveProcessingService(
             await new PostgresVideoProcessingJobRepository(database)
                 .RecoverExpiredAsync(token);
 
+            // A bounded operator-started recovery pass handles source-level
+            // provisional video leases left by cancellation or a crash.
+            await managedHydration.ReconcileUninspectedAsync(token);
+
             // A retryable queued job takes priority. Its original may have
             // become online-only since enqueue/restart; never claim it blindly
             // or hydrate it unless the separate opt-in is active.
@@ -184,12 +192,12 @@ public sealed class VideoArchiveProcessingService(
             // Register one new video per archive cycle only after the existing
             // photo work has drained. The metadata probe is the approved
             // bounded WI-0151 one; unsupported media is recorded, not encoded.
-            bool discovered = false;
+            VideoDiscoveryOutcome discovery = VideoDiscoveryOutcome.None;
             if (candidate is null)
             {
-                discovered = await RegisterNextVideoAsync(
+                discovery = await RegisterNextVideoAsync(
                     coverage, ffprobe, token);
-                if (discovered)
+                if (discovery != VideoDiscoveryOutcome.None)
                     candidate = await FindPendingAsync(
                         coverage, ffmpegHash,
                         preferences.Current.IncludeOnlineOnly,
@@ -203,11 +211,19 @@ public sealed class VideoArchiveProcessingService(
                 // completed-job and interrupted-attempt cleanup gap.
                 int releaseRequests = await managedHydration
                     .ReleaseIdleBatchAsync(4, token);
+                if (discovery != VideoDiscoveryOutcome.None)
+                    Volatile.Write(ref _lastActivityResult,
+                        discovery == VideoDiscoveryOutcome.Unsupported
+                            ? "video-inspected-unsupported" : "video-inspected");
                 Volatile.Write(ref _lastResult,
                     releaseRequests > 0
                         ? "video-managed-release-requested"
-                        : discovered ? "video-inspected" : "no-eligible-video");
-                return discovered || releaseRequests > 0;
+                        : discovery == VideoDiscoveryOutcome.Unsupported
+                            ? "video-inspected-unsupported"
+                        : discovery == VideoDiscoveryOutcome.Supported
+                            ? "video-inspected"
+                        : "no-eligible-video");
+                return discovery != VideoDiscoveryOutcome.None || releaseRequests > 0;
             }
             // Both pending and queued selections bind the same admitted
             // metadata class; the worker independently proves staged bytes.
@@ -309,6 +325,7 @@ public sealed class VideoArchiveProcessingService(
                             selectedJobId: selectedJobId,
                             requireArchiveCoverage: true);
                 Volatile.Write(ref _lastResult, result.ReasonCode);
+                Volatile.Write(ref _lastActivityResult, result.ReasonCode);
                 if (candidate is { } publishedCandidate &&
                     ShouldCreateAutomaticPoster(cyclePreferences, result))
                 {
@@ -354,7 +371,8 @@ public sealed class VideoArchiveProcessingService(
                 if (result.Failure is not null)
                     Volatile.Write(ref _lastAttemptFailure,
                         VideoAttemptFailureDiagnostics.Sanitize(result.Failure));
-                return result.Claimed || candidate is not null || discovered;
+                return result.Claimed || candidate is not null ||
+                    discovery != VideoDiscoveryOutcome.None;
             }
             finally
             {
@@ -415,11 +433,13 @@ public sealed class VideoArchiveProcessingService(
         catch (OperationCanceledException) when (active.IsCancellationRequested)
         {
             Volatile.Write(ref _lastResult, "paused");
+            Volatile.Write(ref _lastActivityResult, "paused");
             return true; // Archive pause or shutdown; lease fencing handles retry.
         }
         catch (OperationCanceledException)
         {
             Volatile.Write(ref _lastResult, "source-timeout");
+            Volatile.Write(ref _lastActivityResult, "source-timeout");
             return false;
         }
         catch (Exception exception)
@@ -428,6 +448,7 @@ public sealed class VideoArchiveProcessingService(
             // native exception messages are returned to clients or logs.
             string code = ClassifyFailure(exception, preflightStage);
             Volatile.Write(ref _lastResult, code);
+            Volatile.Write(ref _lastActivityResult, code);
             logger.LogWarning("Video processing ended with {Code}.", code);
             return false;
         }
@@ -570,7 +591,15 @@ public sealed class VideoArchiveProcessingService(
     /// with a separate explicit opt-in. Never touch photo assets or source
     /// copies outside configured coverage.
     /// </summary>
-    private async Task<bool> RegisterNextVideoAsync(
+    private enum VideoDiscoveryOutcome { None, Supported, Unsupported }
+
+    /// <summary>
+    /// One bounded local-first video inspection. A never-inspected online-only
+    /// video enters the same Archive cycle only with the separate opt-in,
+    /// durable provisional SOURCE ownership, and shared hydration admission.
+    /// Do not create a guessed revision or content hash from metadata alone.
+    /// </summary>
+    private async Task<VideoDiscoveryOutcome> RegisterNextVideoAsync(
         ArchiveCoverageState coverage, string ffprobe, CancellationToken token)
     {
         ArchiveCatalogueSource sourceState =
@@ -601,9 +630,6 @@ public sealed class VideoArchiveProcessingService(
             while (await reader.ReadAsync(token))
                 inspected.Add(reader.GetString(0));
         }
-
-        // Exclusions must be checked before probing or hydrating content,
-        // not only at the final publication fence.
         await using (NpgsqlConnection db = await database.OpenConnectionAsync(token))
         await using (NpgsqlCommand exclusions = db.CreateCommand())
         {
@@ -617,13 +643,8 @@ public sealed class VideoArchiveProcessingService(
                 excluded.Add(reader.GetString(0));
         }
 
-        // Do not hydrate a never-inspected online-only source just to
-        // discover its metadata. Its immutable revision does not yet exist
-        // for durable video managed-lease admission. Only already-catalogued
-        // supported video revisions may use opt-in transient hydration.
         SourceAsset? localCandidate = null;
-        // A bounded discovery scan of metadata only. No content bytes are
-        // opened until a single candidate has been chosen.
+        SourceAsset? onlineCandidate = null;
         foreach (string folder in coverage.IncludedFolders)
         {
             try
@@ -631,64 +652,199 @@ public sealed class VideoArchiveProcessingService(
                 await foreach (SourceAsset video in videos.EnumerateAsync(
                     new SourceScanOptions(folder), token))
                 {
-                    if (video.SizeBytes is < 1 or > MaxSourceBytes ||
-                        inspected.Contains(video.Reference.ItemKey) ||
-                        excluded.Contains(video.Reference.ItemKey))
+                    if (!VideoFirstInspectionAdmission.CanDiscover(
+                            video,
+                            inspected.Contains(video.Reference.ItemKey),
+                            excluded.Contains(video.Reference.ItemKey),
+                            preferences.Current.IncludeOnlineOnly))
                         continue;
                     if (video.Availability == AssetAvailability.Local)
                     {
                         localCandidate ??= video;
                         break;
                     }
-
+                    if (preferences.Current.IncludeOnlineOnly &&
+                        video.Availability == AssetAvailability.OnlineOnly)
+                        onlineCandidate ??= video;
                 }
             }
             catch (DirectoryNotFoundException)
             {
-                // A removed included folder cannot justify opening an
-                // unrelated replacement path.
+                // Missing included folders never authorize unrelated sources.
             }
             if (localCandidate is not null) break;
         }
 
-        SourceAsset? selected = localCandidate;
-        if (selected is null) return false;
+        SourceAsset? selected = localCandidate ?? onlineCandidate;
+        if (selected is null) return VideoDiscoveryOutcome.None;
 
-        // This metadata-inspection lane is strictly local-only; it never
-        // pins or dehydrates a source. Pre-inspected current revisions are
-        // eligible for the separate opt-in managed hydration lane.
-        if (await videos.GetAvailabilityAsync(selected.Reference, token) !=
-            AssetAvailability.Local)
-            return false;
+        string local = ResolveOwnedSourcePath(
+            sourceState.RootLocator, selected.Reference.ItemKey);
+        var provisionalRepository = new PostgresVideoProvisionalRepository(database);
+        ArchiveSourceObservationSnapshot? provisional = null;
+        bool promoted = false;
+        try
+        {
+            AssetAvailability availability =
+                await videos.GetAvailabilityAsync(selected.Reference, token);
+            if (availability == AssetAvailability.OnlineOnly)
+            {
+                if (!preferences.Current.IncludeOnlineOnly)
+                    return VideoDiscoveryOutcome.None;
+                // An active source lease is durable before Cloud Files starts.
+                provisional = await provisionalRepository.ObserveAsync(
+                    sourceState, selected, DateTimeOffset.UtcNow, token);
+                if (oneDrive.GetSyncClientAvailability() ==
+                    OneDriveSyncClientAvailability.Unavailable)
+                    throw new InvalidOperationException(
+                        "OneDrive is unavailable for video inspection.");
+                VideoScratchCapacityGuard.EnsureCapacity(
+                    sourceState.RootLocator, selected.SizeBytes);
+                using CancellationTokenSource timeout =
+                    CancellationTokenSource.CreateLinkedTokenSource(token);
+                timeout.CancelAfter(TimeSpan.FromMinutes(5));
+                Volatile.Write(ref _lastResult, "video-inspection-hydrating");
+                await managedHydration.RequestForUninspectedAsync(
+                    provisional, local, timeout.Token);
+                while (await videos.GetAvailabilityAsync(
+                        selected.Reference, timeout.Token) != AssetAvailability.Local)
+                {
+                    if (!preferences.Current.IncludeOnlineOnly)
+                        throw new OperationCanceledException(timeout.Token);
+                    if ((await new PostgresVideoPhotoPriorityProbe(database)
+                            .GetAsync(timeout.Token)).PhotoWorkActive)
+                        throw new InvalidOperationException(
+                            "Photo work preempted online-only video inspection.");
+                    await Task.Delay(TimeSpan.FromSeconds(2), timeout.Token);
+                }
+            }
+            else if (availability == AssetAvailability.Local)
+            {
+                // A previous authorized hydrate may have completed before a
+                // process restart. Reuse ONLY an exact active owned receipt,
+                // never claim a pre-existing local/user original.
+                ProvisionalVideoHydration? owned =
+                    await provisionalRepository.GetActiveSourceAsync(
+                        sourceState.SourceId, selected.Reference.ItemKey, token);
+                if (owned is { ReleaseRequested: true })
+                    return VideoDiscoveryOutcome.None;
+                provisional = owned?.Observation;
+            }
+            else
+            {
+                return VideoDiscoveryOutcome.None;
+            }
 
-        string local = videos.GetLocalPath(selected.Reference);
-        FileInfo file = new(local);
-        if (!VideoIngestCommandRunner.MatchesObservation(selected, file))
-            return false;
-        var probe = new VideoPilotMediaTools(ffprobe, TimeSpan.FromSeconds(20));
-        VideoPilotMetadata media = await probe.ProbeAsync(local, token);
-        byte[] digest;
-        await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
-            digest = await SHA256.HashDataAsync(original, token);
-        if (!VideoIngestCommandRunner.MatchesObservation(selected, file) ||
-            await videos.GetAvailabilityAsync(selected.Reference, token) !=
-                AssetAvailability.Local)
-            return false;
-        var verified = new VerifiedLocalVideo(sourceState,
-            new SourceAsset(selected.Reference, selected.RelativePath,
-                selected.MediaType, selected.SizeBytes,
-                selected.LastWriteTimeUtc, AssetAvailability.Local),
-            new Sha256Digest(Convert.ToHexString(digest).ToLowerInvariant()),
-            DateTimeOffset.UtcNow);
-        RegisteredVideoRevision revision =
-            await new PostgresVideoAssetRepository(database)
-                .RegisterVerifiedAsync(verified, token);
-        await new PostgresVideoEvidenceRepository(database)
-            .SaveInspectionAsync(VideoIngestCommandRunner.BuildInspection(
-                revision.RevisionId, media, Required("FfprobeSha256"),
-                DateTimeOffset.UtcNow), token);
-        return true;
+            if (await videos.GetAvailabilityAsync(
+                    selected.Reference, token) != AssetAvailability.Local ||
+                !VideoIngestCommandRunner.MatchesObservation(
+                    selected, new FileInfo(local)))
+                return VideoDiscoveryOutcome.None;
+
+            // Hash the local bytes before registering a real revision;
+            // a failed FFprobe can still be durably classified unsupported
+            // without causing the same original to download forever.
+            byte[] digest;
+            await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
+                digest = await SHA256.HashDataAsync(original, token);
+
+            if (!VideoIngestCommandRunner.MatchesObservation(
+                    selected, new FileInfo(local)) ||
+                await videos.GetAvailabilityAsync(
+                    selected.Reference, token) != AssetAvailability.Local)
+                return VideoDiscoveryOutcome.None;
+            var verified = new VerifiedLocalVideo(sourceState,
+                new SourceAsset(selected.Reference, selected.RelativePath,
+                    selected.MediaType, selected.SizeBytes,
+                    selected.LastWriteTimeUtc, AssetAvailability.Local),
+                new Sha256Digest(Convert.ToHexString(digest).ToLowerInvariant()),
+                DateTimeOffset.UtcNow);
+            RegisteredVideoRevision revision =
+                await new PostgresVideoAssetRepository(database)
+                    .RegisterVerifiedAsync(verified, token);
+
+            VideoRevisionInspection inspection;
+            try
+            {
+                var probe = new VideoPilotMediaTools(
+                    ffprobe, TimeSpan.FromSeconds(20));
+                VideoPilotMetadata media = await probe.ProbeAsync(local, token);
+                inspection = VideoIngestCommandRunner.BuildInspection(
+                    revision.RevisionId, media, Required("FfprobeSha256"),
+                    DateTimeOffset.UtcNow);
+            }
+            catch (Exception e) when (e is IOException or InvalidDataException
+                or TimeoutException or System.Text.Json.JsonException)
+            {
+                inspection = new VideoRevisionInspection(
+                    RevisionId: revision.RevisionId,
+                    InspectionStatus: "unsupported",
+                    UnsupportedReasonCode: "probe_failed",
+                    ContainerName: null, VideoCodec: null, VideoProfile: null,
+                    AudioCodec: null, PixelFormat: null, ColorTransfer: null,
+                    CodedWidth: null, CodedHeight: null,
+                    DisplayRotationDegrees: null, DurationSeconds: null,
+                    AverageFrameRate: null, CaptureAtUtc: null,
+                    CaptureTimeProvenance: null, CameraMake: null,
+                    CameraModel: null, GpsLatitude: null, GpsLongitude: null,
+                    InspectedAtUtc: DateTimeOffset.UtcNow,
+                    ToolSha256: Required("FfprobeSha256"),
+                    InspectionProfileId: VideoIngestCommandRunner.InspectionProfile);
+            }
+            await new PostgresVideoEvidenceRepository(database)
+                .SaveInspectionAsync(inspection, token);
+
+            if (provisional is not null)
+            {
+                promoted = await managedHydration.PromoteInspectedSourceAsync(
+                    provisional.AssetId, revision.RevisionId, token);
+                if (!promoted)
+                    throw new InvalidOperationException(
+                        "Provisional video ownership promotion was refused.");
+            }
+
+            bool playable = CanEncodeInspectedVideo(
+                inspection, selected.SizeBytes);
+            if (!playable && promoted)
+            {
+                // Unsupported/HDR media have no derivative worker to trigger
+                // normal cleanup. Release the newly revision-owned bytes now.
+                await managedHydration.ReleaseIfIdleAsync(
+                    new VideoArchiveCandidate(
+                        revision.RevisionId.Value, sourceState.SourceId.Value,
+                        sourceState.RootLocator, selected.Reference.ItemKey,
+                        selected.SizeBytes), local, token);
+            }
+            return playable
+                ? VideoDiscoveryOutcome.Supported
+                : VideoDiscoveryOutcome.Unsupported;
+        }
+        finally
+        {
+            if (provisional is not null && !promoted)
+            {
+                // Cancellation/FFprobe/source-change must retain a durable
+                // receipt; release only if the original is still an exact,
+                // unpinned, pre-revision Photo-Identity-owned source.
+                try
+                {
+                    using CancellationTokenSource cleanup =
+                        new(TimeSpan.FromSeconds(15));
+                    await managedHydration.ReleaseUninspectedAsync(
+                        provisional, local, cleanup.Token);
+                }
+                catch (Exception)
+                {
+                    logger.LogWarning(
+                        "Provisional video source retained for safe Archive recovery.");
+                }
+            }
+        }
     }
+
+    private static bool CanEncodeInspectedVideo(
+        VideoRevisionInspection inspection, long sourceBytes) =>
+        VideoApprovedInputPolicy.IsApproved(inspection, sourceBytes);
 
     /// <summary>
     /// Select an eligible queued job only within the current archive coverage.
@@ -702,7 +858,7 @@ public sealed class VideoArchiveProcessingService(
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
-        query.CommandText = """
+        query.CommandText = $$"""
             SELECT job.id, revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes,
                    (metadata.pixel_format='yuvj420p')
@@ -724,16 +880,7 @@ public sealed class VideoArchiveProcessingService(
               AND source.kind='local-folder'
               AND revision.size_bytes=job.source_bytes
               AND revision.size_bytes BETWEEN 1 AND @max
-              AND metadata.inspection_status='supported'
-              AND metadata.color_transfer='bt709'
-              AND metadata.video_codec IN ('h264','hevc')
-              AND metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')
-              AND (metadata.audio_codec IS NULL OR
-                   metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
-              AND metadata.coded_width BETWEEN 16 AND 4096
-              AND metadata.coded_height BETWEEN 16 AND 4096
-              AND metadata.duration_seconds BETWEEN 0.2 AND 600
-              AND metadata.display_rotation_degrees IN (0,90,-90,180,-180)
+              {{VideoApprovedInputPolicy.MetadataPredicate}}
               AND revision.id=(
                   SELECT latest.id FROM asset_revisions latest
                   WHERE latest.asset_id=asset.id AND latest.media_kind='video'
@@ -768,7 +915,7 @@ public sealed class VideoArchiveProcessingService(
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
-        query.CommandText = """
+        query.CommandText = $$"""
             SELECT revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes,
                    (metadata.pixel_format='yuvj420p')
@@ -778,16 +925,7 @@ public sealed class VideoArchiveProcessingService(
             JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
             WHERE revision.media_kind='video' AND asset.media_kind='video'
               AND asset.deleted_at_utc IS NULL AND source.kind='local-folder'
-              AND metadata.inspection_status='supported'
-              AND metadata.color_transfer='bt709'
-              AND metadata.video_codec IN ('h264','hevc')
-              AND metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')
-              AND (metadata.audio_codec IS NULL OR
-                   metadata.audio_codec IN ('aac','pcm_s16le','pcm_s24le'))
-              AND metadata.coded_width BETWEEN 16 AND 4096
-              AND metadata.coded_height BETWEEN 16 AND 4096
-              AND metadata.duration_seconds BETWEEN 0.2 AND 600
-              AND metadata.display_rotation_degrees IN (0,90,-90,180,-180)
+              {{VideoApprovedInputPolicy.MetadataPredicate}}
               AND revision.size_bytes BETWEEN 1 AND @max
               AND revision.id=(
                   SELECT latest.id FROM asset_revisions latest
@@ -831,6 +969,30 @@ public sealed class VideoArchiveProcessingService(
             SourceId.From(candidate.SourceId), candidate.Root);
         return source.GetAvailabilityAsync(
             new SourceAssetReference(source.SourceId, candidate.Key), token);
+    }
+}
+
+/// <summary>
+/// Source-metadata-only first-inspection admission. No placeholder is opened,
+/// unpinned, hydrated or registered by this eligibility check. Existing
+/// video job/revision selectors apply their independent durable fences.
+/// </summary>
+public static class VideoFirstInspectionAdmission
+{
+    public static bool CanDiscover(
+        SourceAsset source, bool alreadyInspected, bool excluded,
+        bool includeOnlineOnly)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (alreadyInspected || excluded ||
+            source.SizeBytes is < 1 or > 256L * 1024 * 1024 ||
+            source.MediaType is not ("video/mp4" or "video/quicktime") ||
+            Path.GetExtension(source.Reference.ItemKey).ToLowerInvariant()
+                is not (".mov" or ".mp4"))
+            return false;
+        return source.Availability == AssetAvailability.Local ||
+            (includeOnlineOnly &&
+             source.Availability == AssetAvailability.OnlineOnly);
     }
 }
 

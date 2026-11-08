@@ -116,8 +116,13 @@ public sealed class VideoProcessingSettingsLayoutContractTests
         string root = ResolveRepositoryRoot();
         string worker = File.ReadAllText(Path.Combine(root,
             "src", "PhotoIdentity.Api", "VideoArchiveProcessingService.cs"));
-        Assert.Contains("metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')", worker);
+        Assert.Contains("{{VideoApprovedInputPolicy.MetadataPredicate}}", worker);
         Assert.Contains("VideoProxyEncodingProfiles.ResolveForInput(", worker);
+        string inputPolicy = File.ReadAllText(Path.Combine(root,
+            "src", "PhotoIdentity.Api", "VideoApprovedInputPolicy.cs"));
+        Assert.Contains("metadata.pixel_format IN ('yuv420p','yuv420p10le','yuvj420p')",
+            inputPolicy);
+        Assert.Contains("VideoApprovedInputPolicy.IsApproved(", worker);
         Assert.Contains("WHEN metadata.pixel_format='yuvj420p' THEN @fullrange", worker);
     }
 
