@@ -31,14 +31,27 @@ else
         <h2>@Details.FileName</h2>
         <p class="video-details-muted">@(Details.InspectionStatus ?? "Not inspected") · @FormatDuration(Details.DurationSeconds)</p>
         <dl class="video-details-facts">
-            <dt>Recorded</dt>
-            <dd>@(Details.EffectiveCaptureAtUtc?.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture) ?? "Unknown")</dd>
-            <dt>Recording time source</dt>
-            <dd>@Details.CaptureSource @(Details.CaptureTimeProvenance is null ? "" : "· " + Details.CaptureTimeProvenance)</dd>
+            <dt>Recorded (local time)</dt>
+            <dd>@FormatLocalTime(Details.EffectiveCaptureAtUtc)
+                @if (Details.CaptureSource == "manual")
+                {
+                    <small>(manually corrected)</small>
+                }
+            </dd>
+            @if (Details.CaptureSource == "manual")
+            {
+                <dt>Original recording time (local)</dt>
+                <dd>@FormatLocalTime(Details.ExtractedCaptureAtUtc)</dd>
+            }
             <dt>Device make</dt><dd>@(Details.CameraMake ?? "Unknown")</dd>
             <dt>Camera / model</dt><dd>@(Details.CameraModel ?? "Unknown")</dd>
             <dt>Display resolution</dt><dd>@FormatResolution(Details)</dd>
-            <dt>Frame rate</dt><dd>@(Details.AverageFrameRate ?? "Unknown")</dd>
+            <dt>Frame rate</dt><dd>@FormatFrameRate(Details.AverageFrameRate)</dd>
+            <dt>Orientation</dt><dd>@FormatOrientation(Details)</dd>
+            <dt>Video codec</dt><dd>@FormatVideoCodec(Details.VideoCodec)</dd>
+            <dt>Audio codec</dt><dd>@FormatAudioCodec(Details.AudioCodec)</dd>
+            <dt>Bit depth</dt><dd>@FormatBitDepth(Details.PixelFormat)</dd>
+            <dt>HDR / transfer</dt><dd>@FormatTransfer(Details.ColorTransfer)</dd>
             <dt>Embedded GPS</dt>
             <dd>@(Details.Latitude is double lat && Details.Longitude is double lon
                 ? $"{lat.ToString("F6", CultureInfo.InvariantCulture)}, {lon.ToString("F6", CultureInfo.InvariantCulture)}"
@@ -56,11 +69,11 @@ else
     <section class="video-details-editors" aria-label="Video catalogue edits">
         <div class="video-details-panel">
             <h2>Recording date and time</h2>
-            <p>Change the catalogue value without rewriting the video. Enter ISO 8601 with an explicit time-zone offset (for example, 2024-05-06T14:30:00+02:00). Displayed times are normalized to UTC.</p>
+            <p>Change the catalogue value without rewriting the video. Enter the date and time in your browser's local time zone. The original recording time remains visible after an override.</p>
             <label>
                 <span class="field-label">Override recording time</span>
-                <input type="text" maxlength="40" @bind="CaptureInput"
-                       placeholder="2024-05-06T14:30:00+02:00" disabled="@Busy" />
+                <input type="datetime-local" step="60" @bind="CaptureInput"
+                       disabled="@Busy" />
             </label>
             <div class="video-details-actions">
                 <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(CaptureInput))"
@@ -87,14 +100,18 @@ else
             <div class="video-details-actions">
                 <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(PlaceInput))"
                         @onclick="SetPlaceAsync">Save Place</button>
-                <button class="button secondary" disabled="@Busy" @onclick="ClearPlaceAsync">Clear Place</button>
+                <button class="button secondary" disabled="@Busy" @onclick="ClearPlaceAsync">Clear Place (manual)</button>
+                @if (Details.ManualPlaceOverride && Details.LastGpsResolvedPlace is not null)
+                {
+                    <button class="button secondary" disabled="@Busy" @onclick="RestoreGpsPlaceAsync">Restore previous GPS Place</button>
+                }
                 <button class="button secondary"
                         disabled="@(Busy || Details.ManualPlaceOverride || Details.Latitude is null || Details.Longitude is null)"
                         @onclick="ResolvePlaceAsync">Look up Place from GPS</button>
             </div>
             @if (Details.ManualPlaceOverride)
             {
-                <small>The manually saved Place takes precedence; GeoNames will not overwrite it.</small>
+                <small>The manually saved or cleared Place takes precedence. Use Restore previous GPS Place to reinstate the last saved result, if available, without contacting GeoNames.</small>
             }
             <small>GPS lookup is an explicit, configured GeoNames request. Viewing details does not contact GeoNames.</small>
         </div>
@@ -191,8 +208,7 @@ else
         try
         {
             Details = await Http.GetFromJsonAsync<VideoDetailsResponse>(Url + "/details");
-            CaptureInput = Details?.EffectiveCaptureAtUtc?.ToString("yyyy-MM-ddTHH:mm:sszzz",
-                CultureInfo.InvariantCulture) ?? "";
+            CaptureInput = FormatCaptureInput(Details?.EffectiveCaptureAtUtc);
             PlaceInput = Details?.Place?.Value ?? "";
             try
             {
@@ -240,8 +256,7 @@ else
             }
             Details = await response.Content.ReadFromJsonAsync<VideoDetailsResponse>()
                 ?? throw new InvalidDataException("The server returned no updated video details.");
-            CaptureInput = Details.EffectiveCaptureAtUtc?.ToString("yyyy-MM-ddTHH:mm:sszzz",
-                CultureInfo.InvariantCulture) ?? "";
+            CaptureInput = FormatCaptureInput(Details.EffectiveCaptureAtUtc);
             PlaceInput = Details.Place?.Value ?? "";
             Notice = success;
         }
@@ -253,9 +268,26 @@ else
         finally { Busy = false; }
     }
 
-    private Task SetCaptureAsync() => ChangeAsync(
-        () => Http.PutAsJsonAsync(Url + "/capture-time", new VideoDetailsCaptureTimeRequest(CaptureInput.Trim())),
-        "Recording time saved.");
+    private Task SetCaptureAsync()
+    {
+        if (!DateTime.TryParseExact(CaptureInput.Trim(), "yyyy-MM-ddTHH:mm",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime wallClock))
+        {
+            Error = "Enter a valid local recording date and time (YYYY-MM-DD HH:MM).";
+            return Task.CompletedTask;
+        }
+        TimeZoneInfo zone = TimeZoneInfo.Local;
+        if (zone.IsAmbiguousTime(wallClock) || zone.IsInvalidTime(wallClock))
+        {
+            Error = "This local time is ambiguous or does not exist because of daylight-saving time. Choose another time.";
+            return Task.CompletedTask;
+        }
+        DateTimeOffset instant = new(wallClock, zone.GetUtcOffset(wallClock));
+        return ChangeAsync(
+            () => Http.PutAsJsonAsync(Url + "/capture-time",
+                new VideoDetailsCaptureTimeRequest(instant.ToString("O", CultureInfo.InvariantCulture))),
+            "Recording time saved.");
+    }
 
     private Task ClearCaptureAsync() => ChangeAsync(
         () => Http.DeleteAsync(Url + "/capture-time"), "Extracted recording time restored.");
@@ -271,6 +303,10 @@ else
         () => Http.PostAsync(Url + "/resolve-place", null),
         "Place resolved from embedded GPS.");
 
+    private Task RestoreGpsPlaceAsync() => ChangeAsync(
+        () => Http.PostAsync(Url + "/restore-gps-place", null),
+        "Previous GPS-resolved Place restored without a provider request.");
+
     private Task AddPersonAsync(string personId) => ChangeAsync(
         () => Http.PostAsJsonAsync(Url + "/people", new VideoDetailsPersonRequest(personId)),
         "Person tagged in video.");
@@ -278,6 +314,73 @@ else
     private Task RemovePersonAsync(string personId) => ChangeAsync(
         () => Http.DeleteAsync(Url + "/people/" + Uri.EscapeDataString(personId)),
         "Manual person tag removed.");
+
+    private static string FormatLocalTime(DateTimeOffset? instant) =>
+        instant?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "Unknown";
+
+    private static string FormatCaptureInput(DateTimeOffset? instant) =>
+        instant?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? "";
+
+    private static string FormatFrameRate(string? value)
+    {
+        string[] parts = (value ?? "").Split('/');
+        if (parts.Length != 2 ||
+            !double.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out double n) ||
+            !double.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out double d) ||
+            d <= 0 || n <= 0 || !double.IsFinite(n / d))
+            return "Unknown";
+        return (n / d).ToString("0.##", CultureInfo.InvariantCulture) + " fps";
+    }
+
+    private static string FormatOrientation(VideoDetailsResponse details)
+    {
+        if (details.Width is not int w || details.Height is not int h) return "Unknown";
+        if (details.RotationDegrees is int rotation && Math.Abs(rotation % 180) == 90)
+            (w, h) = (h, w);
+        return h > w ? "Portrait" : w > h ? "Landscape" : "Square";
+    }
+
+    private static string FormatVideoCodec(string? codec) => codec?.ToLowerInvariant() switch
+    {
+        "h264" => "H.264",
+        "hevc" => "H.265 / HEVC",
+        "av1" => "AV1",
+        "vp9" => "VP9",
+        "mpeg4" => "MPEG-4",
+        null or "" => "Unknown",
+        _ => codec
+    };
+
+    private static string FormatAudioCodec(string? codec) => codec?.ToLowerInvariant() switch
+    {
+        "aac" => "AAC",
+        "mp3" => "MP3",
+        "opus" => "Opus",
+        "pcm_s16le" => "PCM (16-bit)",
+        null or "" => "Unknown",
+        _ => codec
+    };
+
+    private static string FormatBitDepth(string? pixelFormat)
+    {
+        if (string.IsNullOrWhiteSpace(pixelFormat)) return "Unknown";
+        string fmt = pixelFormat.ToLowerInvariant();
+        foreach (int depth in new[] { 16, 14, 12, 10 })
+            if (fmt.Contains("p" + depth, StringComparison.Ordinal) ||
+                fmt.StartsWith("p0" + depth, StringComparison.Ordinal))
+                return depth + "-bit";
+        return fmt is "yuv420p" or "yuvj420p" or "yuv422p" or "yuv444p" or "nv12"
+            ? "8-bit" : "Unknown";
+    }
+
+    private static string FormatTransfer(string? transfer) => transfer?.ToLowerInvariant() switch
+    {
+        "arib-std-b67" => "HDR (HLG)",
+        "smpte2084" => "HDR (PQ)",
+        "bt709" => "SDR (BT.709)",
+        null or "" => "Unknown",
+        _ => transfer
+    };
 
     private static string FormatResolution(VideoDetailsResponse details)
     {
