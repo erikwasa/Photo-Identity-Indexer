@@ -41,7 +41,8 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
             SELECT latest.id, metadata.inspection_status,
                    metadata.duration_seconds, metadata.coded_width,
                    metadata.coded_height, metadata.display_rotation_degrees,
-                   metadata.capture_at_utc,
+                   CASE WHEN manual_capture.action_kind = 'set' THEN manual_capture.captured_at_utc
+                        ELSE metadata.capture_at_utc END AS capture_at_utc,
                    (poster.asset_revision_id IS NOT NULL) AS has_poster,
                    EXISTS (
                        SELECT 1
@@ -59,7 +60,10 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
                          AND metadata.inspection_status = 'supported'
                          AND metadata.color_transfer = 'bt709'
                    ) AS has_playable_proxy,
-                   COALESCE(metadata.capture_at_utc, latest.observed_at_utc) AS sort_at
+                   COALESCE(CASE WHEN manual_capture.action_kind = 'set'
+                                 THEN manual_capture.captured_at_utc
+                                 ELSE metadata.capture_at_utc END,
+                            latest.observed_at_utc) AS sort_at
             FROM assets asset
             JOIN LATERAL (
                 SELECT revision.id, revision.observed_at_utc
@@ -70,6 +74,12 @@ public sealed class PostgresVideoLibraryRepository(PostgresCatalogueDatabase dat
             ) latest ON TRUE
             LEFT JOIN video_revision_metadata metadata
                 ON metadata.asset_revision_id = latest.id
+            LEFT JOIN LATERAL (
+                SELECT action_kind, captured_at_utc
+                FROM video_capture_date_actions
+                WHERE asset_revision_id = latest.id
+                ORDER BY id DESC LIMIT 1
+            ) manual_capture ON TRUE
             LEFT JOIN LATERAL (
                 SELECT poster.asset_revision_id
                 FROM video_still_posters poster
