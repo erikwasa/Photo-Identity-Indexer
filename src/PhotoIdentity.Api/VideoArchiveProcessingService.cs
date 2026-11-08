@@ -858,7 +858,7 @@ public sealed class VideoArchiveProcessingService(
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
-        query.CommandText = $"""
+        query.CommandText = $$"""
             SELECT job.id, revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes,
                    (metadata.pixel_format='yuvj420p')
@@ -915,7 +915,7 @@ public sealed class VideoArchiveProcessingService(
     {
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlCommand query = connection.CreateCommand();
-        query.CommandText = $"""
+        query.CommandText = $$"""
             SELECT revision.id, source.id, source.root_locator,
                    asset.source_key, revision.size_bytes,
                    (metadata.pixel_format='yuvj420p')
