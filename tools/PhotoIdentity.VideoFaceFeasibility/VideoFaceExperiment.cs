@@ -26,7 +26,7 @@ public sealed record VideoFaceAggregate(
 public static class VideoFaceFrameSetLoader
 {
     public const int MaximumFrames = 12;
-    public const int MaximumCoverageFrames = 36;
+    public const int MaximumCoverageFrames = 180;
     public const long MaximumTimestampMs = 600_000;
     public const int MaximumFrameBytes = 8 * 1024 * 1024;
     private const int MaximumManifestBytes = 16 * 1024;
@@ -285,7 +285,7 @@ public sealed class VideoFaceExperiment
             throw new ArgumentOutOfRangeException(nameof(detectorConfidence));
         }
 
-        // Include up to 36 pre-extracted local frames, without requiring
+        // Include up to 180 pre-extracted local frames, without requiring
         // heuristic groups/tracks to identify a person.
         return await RunCoreAsync(set, manifestDirectory, matcher,
             diagnostics: true, coverage: true,
@@ -334,7 +334,7 @@ public sealed class VideoFaceExperiment
             using MemoryStream stream = new(input, writable: false);
             ImageFrame image = await _decoder.DecodeAsync(
                 stream,
-                new DecodeOptions(new ImageSize(1600, 1600)),
+                new DecodeOptions(new ImageSize(coverage ? 3840 : 1600, coverage ? 3840 : 1600)),
                 cancellationToken);
             IReadOnlyList<DetectedFaceCandidate> detections =
                 await _detector.DetectAsync(image, cancellationToken);

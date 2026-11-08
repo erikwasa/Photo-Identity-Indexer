@@ -998,3 +998,46 @@ separate invocations do not share a database snapshot.
 **Acceptance remains open** until those private real-video observations
 are reviewed by the maintainer. The choice between small in-app integration
 and a separate video-recognition component remains explicitly deferred.
+
+
+## Checkpoint 7 — higher-resolution, denser local coverage (experimental)
+
+The private coverage sampler now accepts `-FrameCount 12|24|36|120|180`.
+It samples stratified midpoints across the explicitly approved window,
+retains the source's aspect ratio, and downscales **only when the longest
+side exceeds 3840 pixels**. This replaces the former 1600-pixel cap.
+The coverage-mode .NET decoder also uses a 3840-pixel limit; the
+non-coverage 12-frame baseline remains at 1600 pixels. No upscaling
+or super-resolution is performed. Higher resolution can help detect
+distant faces, but cannot recover information absent from the source.
+
+The catalogue-backed evaluation and explicit `--coverage` mode now
+accept up to **180** local frames per clip. The ordinary non-coverage
+12-frame mode is unchanged. Each still retains the existing 8 MiB
+file-size limit and each manifest the 16 KiB limit; oversize inputs
+fail closed. A 180-frame run can require substantially more disk,
+CPU and RAM. It processes frames sequentially and does not persist
+embeddings, write to the catalogue or modify original video files.
+
+For a before/after comparison, retain the old 36-frame manifests and
+create a **new** private manifest for the same video:
+
+~~~powershell
+$coverage = & .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video `
+    -FfmpegPath $ffmpegPath `
+    -ApprovePrivateLocalVideo `
+    -FrameCount 180
+
+if (-not (Test-Path -LiteralPath $coverage.ManifestPath -PathType Leaf)) {
+    throw 'High-resolution coverage extraction failed'
+}
+$coverage.ManifestPath
+~~~
+
+Update only the relevant `clips[].manifest` entry in the **private**
+catalogue case file and run the checkpoint-6 read-only evaluation with
+a new private report filename. Compare per-video face counts and
+person-level review findings; a higher detection count alone does not
+prove improved identification. Detector confidence 0.5/0.7/0.9 is
+unchanged. Existing private manifests remain valid.

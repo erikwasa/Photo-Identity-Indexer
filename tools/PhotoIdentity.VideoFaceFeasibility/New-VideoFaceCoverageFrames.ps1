@@ -17,7 +17,7 @@ param(
     [Parameter(Mandatory = $true)]
     [switch] $ApprovePrivateLocalVideo,
 
-    [ValidateSet(12, 24, 36)]
+    [ValidateSet(12, 24, 36, 120, 180)]
     [int] $FrameCount = 36,
 
     [ValidateRange(0, 86400)]
@@ -110,10 +110,10 @@ for ($index = 0; $index -lt $FrameCount; $index++) {
     }
     $previousTimestamp = $timestampMs
 
-    $file = 'frame-{0:D2}.jpg' -f ($index + 1)
+    $file = 'frame-{0:D3}.jpg' -f ($index + 1)
     $destination = Join-Path $output $file
     $seek = $absoluteSeconds.ToString('F3', [Globalization.CultureInfo]::InvariantCulture)
-    & $ffmpeg -hide_banner -nostdin -loglevel error -ss $seek -i $video -map '0:v:0' -an -sn -dn -frames:v 1 -threads 1 -vf 'scale=1600:1600:force_original_aspect_ratio=decrease:force_divisible_by=2' -q:v 3 -n $destination
+    & $ffmpeg -hide_banner -nostdin -loglevel error -ss $seek -i $video -map '0:v:0' -an -sn -dn -frames:v 1 -threads 1 -vf 'scale=3840:3840:force_original_aspect_ratio=decrease:force_divisible_by=2' -q:v 3 -n $destination
     if ($LASTEXITCODE -ne 0) {
         throw 'FFmpeg frame extraction failed. Private partial output remains for local cleanup.'
     }
