@@ -425,6 +425,13 @@ public sealed class PrivateReferenceReviewTests
                 Enumerable.Range(1, 180).Select(i =>
                     new VideoFaceFrame(i * 1000, $"f{i:000}.png")).ToList());
             VideoFaceFrameSetLoader.Validate(expanded, coverage: true);
+            // The new lossless sampler uses PNG names. Coverage validation must
+            // accept all 180 frames without relaxing the ordinary 12-frame budget.
+            VideoFaceFrameSet lossless = new(1,
+                Enumerable.Range(1, 180).Select(i =>
+                    new VideoFaceFrame(i * 1000, $"frame-{i:000}.png")).ToList());
+            VideoFaceFrameSetLoader.Validate(lossless, coverage: true);
+            Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(lossless));
             Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(expanded));
             Assert.Throws<ArgumentException>(() => VideoFaceFrameSetLoader.Validate(
                 new VideoFaceFrameSet(1,
