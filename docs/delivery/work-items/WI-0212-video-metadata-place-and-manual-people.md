@@ -10,17 +10,16 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 # WI-0212: Expose video metadata, Places and manual person presence
 
-**Development started 2026-11-08 on the isolated
-`wi-0212-video-details-metadata-people` branch.** A cohesive
-implementation candidate introduces PostgreSQL v39 video-only audit
-histories, a current/exclusion-guarded database-only Video Details API,
-manual recording-time/Place/person edits and a responsive Video Details
-page linked from Videos. Explicit GeoNames GPS lookup uses the already
-configured provider, with no network lookup from page load. No
-automatic background video geocoding is enabled. Original-media and
-photo/biometric/collection state remain untouched by ordinary edits.
-All work is **in progress**; neither CI nor final maintainer acceptance
-has been claimed. See [the combined acceptance procedure]
+**Development merged in PR #765 on 2026-11-08; CI passed.** The
+PostgreSQL v39 video-only audit histories, guarded Video Details API,
+manual recording-time/Place/person edits and responsive Video Details
+page are present on `main`. GeoNames GPS lookup remains explicitly
+operator-triggered, not an automatic video background worker. Ordinary
+details and edits do not read source video bytes or change biometric,
+photo, or collection records. **WI-0212 remains in progress pending
+maintained-host acceptance.** A follow-up PR adds a guarded v38 -> v39
+restored-catalogue rehearsal gate, required before production startup.
+See [the combined acceptance procedure]
 (../../operations/video-details-wi0212-acceptance.md).
 
 ## Priority and relationship (maintainer 2026-11-08)
@@ -145,7 +144,7 @@ No private GPS/people/video identifiers in Git/CI or reports.
 
 ## Completion notes
 
-- Status: in_progress on the isolated implementation branch.
-- Final local verification is deferred until all development and CI pass; schema v39 requires backup and restored-database rehearsal before production startup.
+- Status: in_progress; implementation PR #765 merged with green CI.
+- Final maintainer acceptance remains pending: run the verified backup, full isolated restore and guarded v38 -> v39 rehearsal first; only then deploy the v39 app and check real video details, people, GPS, online-only and photo regressions.
 - Separate from WI-0153 collection membership and WI-0155 experimental
   face recognition.

@@ -2,9 +2,12 @@
 
 ## Current delivery state
 
-This is a **development candidate**, not accepted production functionality.
-The code is isolated on the WI-0212 branch and must pass CI before a
-maintainer performs real-media checks or starts a production v39 migration.
+PR #765 merged the WI-0212 implementation into `main`, and its final CI
+passed. **Maintained-host acceptance is still pending.** Before starting a
+v39 application against production, take a restorable backup and rehearse
+the v38 -> v39 upgrade on an isolated restored database using the guarded
+`catalogue rehearse-v39` command. That command is supplied by the follow-up
+rehearsal PR and must be merged and green before running these steps.
 
 ## Implemented boundary
 
@@ -51,8 +54,125 @@ The PostgreSQL test **does not actually execute** unless
 PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING is configured.
 Use a disposable PostgreSQL admin connection, never photoidentity_main.
 The fixture creates and deletes its own temporary test database.
-CI build, docs gates, migration and API checks must pass before final
-maintainer verification.
+CI, documentation, and disposable PostgreSQL checks have passed on
+the implementation PR. The restored-database migration and real-video checks
+remain separate mandatory maintainer gates.
+
+## Required v38 -> v39 restore rehearsal (PowerShell 7.6)
+
+**Do not start a newly published v39 Photo Identity app against
+`photoidentity_main` until this gate passes.** The new build automatically
+initializes database schema during startup. Use an updated `main` containing
+the v39 rehearsal command, and keep Photo Identity stopped throughout backup,
+restore and rehearsal. Podman PostgreSQL must remain running. Confirm enough
+Windows and Podman disk space for a full second database; the streaming
+backup avoids staging a dump in Podman but the full restore does not.
+
+```powershell
+$ErrorActionPreference = "Stop"
+Set-Location "C:\\Kod\\codex\\Photo Identity Indexer"
+git status --short
+git switch main
+if ($LASTEXITCODE -ne 0) { throw "Could not switch to main." }
+git pull --ff-only origin main
+if ($LASTEXITCODE -ne 0) { throw "Could not update main." }
+
+# Stop Photo Identity manually before this step; leave Podman PostgreSQL up.
+.\\verify-postgres.ps1 -SkipContainerStart
+if ($LASTEXITCODE -ne 0) { throw "PostgreSQL preflight failed." }
+
+$databaseName = "photoidentity_main"
+$backupPath = Join-Path $env:LOCALAPPDATA (
+    "PhotoIdentity\\backups\\postgresql\\pre-wi0212-v39-" +
+    (Get-Date -Format "yyyyMMdd-HHmmss") + ".dump"
+)
+.\\backup-postgres-catalogue-improved.ps1 `
+    -DatabaseName $databaseName -OutputPath $backupPath
+if ($LASTEXITCODE -ne 0) { throw "Streaming backup failed." }
+
+# A decoded dump is not enough: restore and compare all source table counts.
+.\\verify-postgres-backup-restore.ps1 `
+    -BackupPath $backupPath -ApplicationStopped -RetainRestoredDatabase
+if ($LASTEXITCODE -ne 0) { throw "Isolated restore verification failed." }
+
+$restoreReportPath = "$backupPath.restore-verification.json"
+$restoreReport = Get-Content -LiteralPath $restoreReportPath -Raw |
+    ConvertFrom-Json
+if (-not $restoreReport.passed -or
+    [int]$restoreReport.restoredEvidence.schemaVersion -ne 38 -or
+    $restoreReport.sourceDatabase -ne $databaseName -or
+    $restoreReport.verificationDatabase -eq $databaseName -or
+    $restoreReport.cleanupStatus -ne "retained") {
+    throw "Not a verified retained v38 restore; do not migrate production."
+}
+Write-Host "Verified retained restore:" $restoreReport.verificationDatabase
+
+# Obtain existing localhost credentials from the private launcher without
+# showing or copying them into a file. The rehearsal command replaces the
+# connection string's Database with the verified restore report's target.
+$launcherCandidates = @(
+    $env:PHOTOIDENTITY_LAUNCHER_CONFIG
+    (Join-Path (Get-Location) "PhotoIdentity.launcher.json")
+    (Join-Path $env:LOCALAPPDATA "PhotoIdentity\\launcher.json")
+)
+$launcherPath = @($launcherCandidates | Where-Object {
+    $_ -and (Test-Path -LiteralPath $_ -PathType Leaf)
+} | Select-Object -First 1)[0]
+if (-not $launcherPath) { throw "Private launcher config not found." }
+$launcher = Get-Content -LiteralPath $launcherPath -Raw | ConvertFrom-Json
+$variable = [string]$launcher.postgresConnectionEnvironmentVariable
+if (-not $variable) { throw "PostgreSQL launcher variable name missing." }
+[string]$connection = ""
+foreach ($scope in @(
+    [EnvironmentVariableTarget]::Process,
+    [EnvironmentVariableTarget]::User,
+    [EnvironmentVariableTarget]::Machine
+)) {
+    $candidate = [Environment]::GetEnvironmentVariable($variable, $scope)
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        $connection = $candidate
+        break
+    }
+}
+if (-not $connection) { throw "Configured local PostgreSQL credential missing." }
+try {
+    $env:PHOTOIDENTITY_WI0212_REHEARSAL = $connection
+    dotnet run --project src/PhotoIdentity.Cli -c Release -- catalogue rehearse-v39 `
+        --postgres-connection-env PHOTOIDENTITY_WI0212_REHEARSAL `
+        --restore-report $restoreReportPath
+    if ($LASTEXITCODE -ne 0) { throw "Isolated v38 -> v39 rehearsal failed." }
+}
+finally {
+    Remove-Item Env:PHOTOIDENTITY_WI0212_REHEARSAL -ErrorAction SilentlyContinue
+    $connection = ""
+}
+```
+
+The rehearsal selects **only** the verified
+`photoidentity_restore_YYYYMMDDHHMMSS_xxxxxx` database, rejects a
+non-local server, rejects a source schema other than 38, confirms all
+pre-migration row counts, applies schema initialization twice, and checks
+the v39 migration record, empty capture-time/Place/person action histories,
+and exclusion-purge trigger. It does not change production or read media.
+
+Retain the restored database after the rehearsal until results are reviewed.
+To inspect owned restored copies without modifying any database:
+
+```powershell
+.\\manage-postgres-restores.ps1
+```
+
+If you choose to retire **only this** verified copy, use its exact name and
+ownership marker from `$restoreReport` (never a wildcard):
+
+```powershell
+.\\manage-postgres-restores.ps1 `
+    -RemoveDatabase $restoreReport.verificationDatabase `
+    -ExpectedMarker $restoreReport.restoreOwnershipMarker `
+    -ProductionDatabaseName $databaseName -ConfirmRemoval
+```
+
+Do not run that cleanup when investigating any failure.
 
 ## Final maintained-PC acceptance — after development is complete
 
