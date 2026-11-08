@@ -73,9 +73,13 @@ try {
         throw 'Native-resolution experiment supports sources up to 3840 pixels per axis.'
     }
     $rotation = 0
-    foreach ($sideData in @($metadata.streams[0].side_data_list)) {
-        if ($null -ne $sideData -and $null -ne $sideData.rotation) {
-            $rotation = [int]$sideData.rotation
+    $sideDataProperty = $metadata.streams[0].PSObject.Properties['side_data_list']
+    if ($null -ne $sideDataProperty) {
+        foreach ($sideData in @($sideDataProperty.Value)) {
+            if ($null -ne $sideData -and
+                $null -ne $sideData.PSObject.Properties['rotation']) {
+                $rotation = [int]$sideData.rotation
+            }
         }
     }
 } catch {
