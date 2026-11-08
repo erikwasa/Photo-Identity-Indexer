@@ -100,14 +100,33 @@ public sealed class VideoDetailsPostgresTests
             await repository.SetCaptureDateAsync(revision, corrected, "test");
             await repository.SetPersonAsync(revision, person, true, "test");
             await repository.SetPersonAsync(revision, person, true, "test");
-            await repository.SetPlaceAsync(revision, "Sweden/Stockholm region/Norrtälje", "manual", "test");
-            await repository.SetPlaceAsync(revision, "France/Paris", "automatic", "geonames", "geonames");
+            await repository.SetPlaceAsync(revision, "Sweden/Stockholm region/Norrtälje", "automatic", "geonames-video-lookup", "geonames");
+            await repository.SetPlaceAsync(revision, "France/Paris", "manual", "test");
+            await repository.SetPlaceAsync(revision, "Germany/Berlin", "automatic", "geonames", "geonames");
 
             VideoDetailsRecord changed = Assert.IsType<VideoDetailsRecord>(await repository.GetAsync(revision));
             Assert.Equal(corrected.ToUniversalTime(), changed.EffectiveCaptureAtUtc);
             Assert.Equal("manual", changed.CaptureSource);
-            Assert.Equal("Sweden/Stockholm region/Norrtälje", changed.Place?.Value);
+            Assert.Equal("France/Paris", changed.Place?.Value);
+            Assert.Equal("Sweden/Stockholm region/Norrtälje", changed.LastGpsResolvedPlace);
             Assert.True(changed.ManualPlaceOverride);
+
+            // Explicitly restore the earlier GPS resolution, then clear manually
+            // and restore again. No new provider lookup or source-media read occurs.
+            await repository.RestoreGpsPlaceAsync(revision, "operator");
+            VideoDetailsRecord restoredGps = Assert.IsType<VideoDetailsRecord>(await repository.GetAsync(revision));
+            Assert.Equal("Sweden/Stockholm region/Norrtälje", restoredGps.Place?.Value);
+            Assert.Equal("automatic", restoredGps.Place?.Source);
+            Assert.False(restoredGps.ManualPlaceOverride);
+            await repository.SetPlaceAsync(revision, null, "manual", "operator");
+            VideoDetailsRecord cleared = Assert.IsType<VideoDetailsRecord>(await repository.GetAsync(revision));
+            Assert.Null(cleared.Place);
+            Assert.True(cleared.ManualPlaceOverride);
+            Assert.NotNull(cleared.LastGpsResolvedPlace);
+            await repository.RestoreGpsPlaceAsync(revision, "operator");
+            VideoDetailsRecord recovered = Assert.IsType<VideoDetailsRecord>(await repository.GetAsync(revision));
+            Assert.Equal("Sweden/Stockholm region/Norrtälje", recovered.Place?.Value);
+            Assert.False(recovered.ManualPlaceOverride);
             Assert.Equal("Known Person", Assert.Single(changed.People).DisplayName);
 
             await repository.SetPersonAsync(revision, person, false, "test");
@@ -139,7 +158,7 @@ public sealed class VideoDetailsPostgresTests
                 await using NpgsqlDataReader reader = await check.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
                 Assert.Equal(2L, reader.GetInt64(0)); // one add, one remove; no duplicate
-                Assert.Equal(1L, reader.GetInt64(1)); // manual overrides provider
+                Assert.Equal(5L, reader.GetInt64(1)); // initial GPS, manual, restore, clear, restore
                 Assert.Equal(2L, reader.GetInt64(2));
                 Assert.Equal(0L, reader.GetInt64(3));
                 Assert.Equal(0L, reader.GetInt64(4));
@@ -169,6 +188,8 @@ public sealed class VideoDetailsPostgresTests
 
             AssetRevisionId nextId = AssetRevisionId.From(nextRevision);
             Assert.NotNull(await repository.GetAsync(nextId));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.RestoreGpsPlaceAsync(nextId, "operator"));
             await repository.SetPersonAsync(nextId, person, true, "test");
             await repository.SetPlaceAsync(nextId, "Sweden/Stockholm", "manual", "test");
 
