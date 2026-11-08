@@ -15,7 +15,8 @@ public static class VideoFaceCatalogueRunner
 {
     private sealed record Options(
         string Cases, string PrivateReport, string Root, string ModelDirectory,
-        double DetectorConfidence);
+        double DetectorConfidence,
+        VideoFaceDetectorSelection Detection);
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -54,10 +55,11 @@ public static class VideoFaceCatalogueRunner
 
             using YuNetFaceDetector detector = new(
                 detectorManifest, detectorPath,
-                new YuNetDetectorOptions { ConfidenceThreshold = options.DetectorConfidence });
+                options.Detection.CreateOptions(options.DetectorConfidence));
             using SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
             var experiment = new VideoFaceExperiment(
-                new OpenCvImageDecoder(), detector, new OpenCvFaceAligner(), embedder);
+                new OpenCvImageDecoder(), detector, new OpenCvFaceAligner(), embedder,
+                options.Detection.Describe(detector.Descriptor.InputSize));
 
             // Evidence is materialized once and the transaction is closed before
             // any video-frame inference. All clips see the SAME identity snapshot.
@@ -125,6 +127,8 @@ public static class VideoFaceCatalogueRunner
         string? root = null;
         string? models = null;
         string? detectorConfidence = null;
+        string? detectorPipeline = null;
+        string? tileSize = null;
         for (int i = 0; i < args.Length; i++)
         {
             string name = args[i];
@@ -142,6 +146,10 @@ public static class VideoFaceCatalogueRunner
                 case "--model-dir" when models is null: models = value; break;
                 case "--detector-confidence" when detectorConfidence is null:
                     detectorConfidence = value; break;
+                case "--detector-pipeline" when detectorPipeline is null:
+                    detectorPipeline = value; break;
+                case "--tile-size" when tileSize is null:
+                    tileSize = value; break;
                 default: throw new ArgumentException("Unknown or duplicate catalogue option.");
             }
         }
@@ -161,6 +169,7 @@ public static class VideoFaceCatalogueRunner
             "0.9" => 0.9,
             _ => throw new ArgumentException("Only detector confidence 0.5, 0.7, 0.9 is permitted."),
         };
-        return new Options(cases, report, repo, dir, threshold);
+        return new Options(cases, report, repo, dir, threshold,
+            VideoFaceDetectorSelection.Parse(detectorPipeline, tileSize));
     }
 }
