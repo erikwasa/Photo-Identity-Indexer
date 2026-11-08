@@ -40,9 +40,12 @@ work_items:
 - id: WI-0155
   title: Evaluate face discovery and identity processing inside video
   milestone: M30
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0155-video-face-processing-evaluation.md
+  started_at: 2026-11-05
+  last_updated_at: 2026-11-08
+  branch: wi-0155
   blockers:
   - WI-0151
   - WI-0188
@@ -50,6 +53,12 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/757
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/760
+  - type: implementation
+    value: '2026-11-08: Bounded video-face feasibility work is in progress on the long-lived wi-0155 branch. Read-only catalogue exemplar evaluation and high-resolution coverage development remain isolated from main; multi-video maintainer acceptance and an explicit integration-versus-separate-component decision are still open.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
