@@ -198,6 +198,38 @@ end-to-end metadata workflow is complete. The v40 app must not be
 started against production v39 before the isolated rehearsal is
 accepted.
 
+## Controlled historical metadata completion (development, 2026-11-09)
+
+PR #774 merged with green CI, introducing schema v40 and FFprobe stream-
+specific bitrate, audio channels/layout/sample rate and explicit Samsung
+tag support. Existing v2 evidence remains immutable, and the maintained
+catalogue remains at verified v39 pending the full metadata upgrade.
+
+Draft PR #776 extends this with **v41 append-only refresh provenance** and
+an explicitly selected, read-only-first `video metadata refresh` command.
+It operates on exactly one current, already-local MOV/MP4 revision and
+requires a named registered source root, revision UUID, approved FFprobe
+path and SHA-256, localhost database selection and bounded tool execution.
+Files must remain local and match the immutable size and SHA-256; current
+revision/source exclusion guards are checked again under a source-row lock
+before commit. `--apply --acknowledge-metadata-only` fills only missing
+camera/bitrate/audio fields and transactionally records an audit action.
+It never overwrites existing camera or capture fields, changes manual
+time/Place/people, rescans arbitrary videos, or hydrates online-only files.
+
+Production v39 must not open the new v41 application until
+`catalogue rehearse-v41` passes on a **verified isolated v39 restore**:
+the command applies both v40 and v41 in isolation, checks all preexisting
+table row counts, empty new fields and empty new audit table, and confirms
+idempotent initialization. The earlier v39 host acceptance remains valid.
+
+**Still pending final local review:** full end-to-end refresh on explicitly
+approved real MOV/MP4 files, and confirmation of whether the user's Samsung
+`SamsungModel` metadata is actually exposed by FFprobe or needs an
+explicitly approved vendor-metadata reader. ExifTool-visible alone does
+not prove FFprobe-visible. The user requested one consolidated metadata
+verification cycle when development is complete.
+
 ## Acceptance criteria
 
 - [ ] Maintainer-approved current-video metadata inventory identifies
@@ -237,7 +269,8 @@ No private GPS/people/video identifiers in Git/CI or reports.
 - Maintainer v39 acceptance **passed**: isolated restore and schema rehearsal,
   production startup, real video metadata, manual time/Place/person edits,
   GeoNames lookup, online-only safety and regression checks.
-- Focused no-schema-change follow-up awaiting CI and local UI acceptance;
-  vendor camera tags, audio detail and video bitrate still pending.
+- PR #774 technical metadata fields merged with green CI; PR #776
+  selected-local refresh and v41 provenance awaiting CI and review.
+  Full real-file metadata acceptance is deferred as requested.
 - Separate from WI-0153 collection membership and WI-0155 experimental
   face recognition.
