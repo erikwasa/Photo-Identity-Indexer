@@ -115,6 +115,50 @@ public sealed class VideoFaceExperimentTests
         }
     }
 
+    [Theory]
+    [InlineData(false, "face-count-limit", "frame-face-limit")]
+    [InlineData(true, "face-detection", "invalid-state")]
+    public async Task Tiled_like_frame_failure_reports_only_safe_stage_and_category(
+        bool throwDuringDetection, string expectedStage, string expectedCategory)
+    {
+        string dir = CreateTempDirectory();
+        try
+        {
+            byte[] selectedFrame = [137, 80, 78, 71, 13, 10, 26, 10, 1];
+            await File.WriteAllBytesAsync(Path.Combine(dir, "one.png"), selectedFrame);
+            VideoFaceExperiment experiment = new(
+                new FakeDecoder(),
+                new FakeDetector(faceCount: 33, throwDuringDetection: throwDuringDetection),
+                new FakeAligner(), new FakeEmbedder());
+            InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => experiment.RunAsync(
+                    new VideoFaceFrameSet(1, [new VideoFaceFrame(1000, "one.png")]), dir));
+
+            string diagnostic = VideoFaceFailureDiagnostics.Describe(exception, "clip-analysis");
+            Assert.Contains($"stage: {expectedStage}", diagnostic);
+            Assert.Contains($"category: {expectedCategory}", diagnostic);
+            Assert.DoesNotContain("C:\\Private", diagnostic, StringComparison.Ordinal);
+            Assert.DoesNotContain("secret-person", diagnostic, StringComparison.Ordinal);
+            Assert.Equal(selectedFrame, await File.ReadAllBytesAsync(Path.Combine(dir, "one.png")));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Diagnostic_never_echoes_arbitrary_exception_text_or_untrusted_stage()
+    {
+        Exception exception = new IOException("private path C:\\Private\\secret-person.json");
+        string diagnostic = VideoFaceFailureDiagnostics.Describe(exception, "model-verification");
+        Assert.Contains("stage: model-verification", diagnostic);
+        Assert.Contains("category: file-io", diagnostic);
+        Assert.DoesNotContain("Private", diagnostic, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() =>
+            VideoFaceFailureDiagnostics.Mark(exception, "C:\\Private\\secret-person.json"));
+    }
+
     private static string CreateTempDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"wi0155-{Guid.NewGuid():N}");
@@ -134,6 +178,15 @@ public sealed class VideoFaceExperimentTests
 
     private sealed class FakeDetector : IFaceDetector
     {
+        private readonly int _faceCount;
+        private readonly bool _throwDuringDetection;
+
+        public FakeDetector(int faceCount = 1, bool throwDuringDetection = false)
+        {
+            _faceCount = faceCount;
+            _throwDuringDetection = throwDuringDetection;
+        }
+
         public ModelDescriptor Descriptor { get; } = new(
             new ModelId("fake-detector"),
             ModelRole.FaceDetection,
@@ -145,6 +198,11 @@ public sealed class VideoFaceExperimentTests
         public Task<IReadOnlyList<DetectedFaceCandidate>> DetectAsync(
             ImageFrame image, CancellationToken cancellationToken)
         {
+            if (_throwDuringDetection)
+            {
+                throw new InvalidOperationException("private path C:\\Private\\secret-person.json");
+            }
+
             IReadOnlyList<DetectedFaceCandidate> detections =
             [
                 new DetectedFaceCandidate(
@@ -157,7 +215,8 @@ public sealed class VideoFaceExperimentTests
                         new NormalizedPoint(0.4, 0.6)),
                     0.98),
             ];
-            return Task.FromResult(detections);
+            return Task.FromResult<IReadOnlyList<DetectedFaceCandidate>>(
+                Enumerable.Repeat(detections[0], _faceCount).ToArray());
         }
     }
 
