@@ -2,14 +2,16 @@
 
 ## Current delivery state
 
-PR #765 merged the WI-0212 implementation and PR #766 merged its guarded
-v38 -> v39 rehearsal gate. **Maintained-host v39 acceptance passed on
-2026-11-08.** The maintainer confirmed a current streaming backup, isolated
-full restore, guarded schema rehearsal, production v39 startup and functional
-checks. This document retains the original migration procedure for recovery
-and future reference; do not repeat the v38 rehearsal on an already migrated
-v39 production database. Follow-up user-experience requirements are recorded
-in the work item and need separate CI/local acceptance.
+**Completed, maintainer verified 2026-11-10.** The original v38 →
+v39 rehearsal and functionality were accepted on 2026-11-08.
+The isolated v39 → v41 rehearsal, healthy production schema v41
+startup, real audio/video metadata, Samsung manually selected
+refresh, recording-time reset and regressions subsequently passed.
+PR #782 added the off-by-default persisted Samsung camera option for
+new Archive inspections. **All six PR #782 CI jobs passed**, followed
+by maintained-host acceptance using a previously unindexed Samsung
+video. The commands below are retained as recovery/diagnostic
+runbooks; no additional local WI-0212 acceptance gate remains.
 
 ## Implemented boundary
 
@@ -285,7 +287,7 @@ migrated v39 catalogue (do not repeat the v38 -> v39 restore/rehearsal):
    retention remain unaffected. No source inspection or schema changes.
 
 
-## Planned v39 -> v41 metadata migration and refresh gate (do not run yet)
+## v39 → v41 metadata migration and refresh runbook (accepted 2026-11-09)
 
 PR #774 introduced four **nullable** columns on `video_revision_metadata`
 in schema v40: video bitrate, audio sampling rate, channel count and layout.
@@ -406,19 +408,13 @@ The command never rewrites original media or expands to other videos.
 A version-39 database cannot be migrated by the dry-run command; it fails
 closed until migration is separately authorized.
 
-No local verification is requested for this **development PR**.
-The opt-in Samsung `smta` adapter now exists, but its behavior against the
-maintainer's actual device file must be confirmed on the maintained PC after
-CI and the full metadata workflow are accepted. If ExifTool is not
-independently approved/pinned, skip the vendor option and keep the camera
-model Unknown rather than running an untrusted binary.
-
-Future maintained-host acceptance should include one approved local MOV
-with audio details, one MP4 with a confirmed ExifTool Samsung smta model
-tag (using the optional pinned adapter), one clip without bitrate
-(showing Unknown), and one online-only clip that must not be touched.
-Verify no changes to manual time/Place/people, photo search and video
-playback. Do not import the full archive or rehydrate online-only media.
+The opt-in Samsung `smta` adapter has been verified on the maintained
+PC against real Samsung recordings using SHA-256-pinned ExifTool 13.59.
+The maintainer also accepted video/audio/bitrate/fps and manual
+time/Place/People/photo/video/online-only regressions. Preserve the
+explicit local-only, hash-verified one-revision refresh for historical
+videos. If a binary changes or its hash is not approved, do not invoke
+it; an absent camera value stays Unknown.
 
 ## Follow-up — optional automatic Samsung metadata during new-video inspection
 
@@ -474,30 +470,35 @@ Video Settings preference: it has its own optional
 read-only. This distinction prevents a persistent UI preference from
 quietly widening the scope of an unrelated operator CLI.
 
-### Follow-up maintained-PC acceptance (not yet performed)
+### Follow-up maintained-PC acceptance (passed 2026-11-10)
 
-1. Pause Archive; update the approved private launcher pair and validate
-   with `Start-PhotoIdentity.ps1 -ValidateConfigurationOnly`. Restart
-   the published application to load those two configuration values.
-2. Open Settings → Video processing, select **Extract Samsung camera
-   metadata when FFprobe does not provide it**, and save. Confirm it
-   persists after a browser refresh and application restart.
-3. Enable one-video-step mode; select **one new, never-indexed Samsung
-   video** under already-approved Archive coverage and existing
-   OneDrive permissions. Advance Archive once. Confirm make/model
-   populate on the new Video Details page **without** running the
-   metadata refresh CLI, and check separate vendor audit provenance.
-4. Confirm video codec, bitrate, fps, audio, original byte SHA-256,
-   and online-only preservation are unchanged. Confirm an already
-   indexed video remains untouched. A known Apple/other-make input
-   should skip vendor extraction when FFprobe provides both fields.
-5. Pause Archive, turn the Samsung option off, save and recheck
-   persistence. It must perform no vendor-tool invocation while off.
-   Confirm photo/video search, proxies, Places and people regressions.
+**All checks PASS**, as reported by the maintainer:
 
-This follow-up is an explicit completion gate before merging the held
-WI-0212 closeout PR; all earlier v41 acceptance remains valid. No new
-PostgreSQL schema migration or fresh backup rehearsal is required.
+- PR #782 merged; focused tests and launcher configuration validation
+  passed; approved ExifTool **13.59** executable SHA-256 matched,
+  with PostgreSQL v41 healthy.
+- Samsung metadata checkbox was recognized, saved, and persisted across
+  browser refresh and application restart. The one-video-step setting
+  was enabled and behaved as intended.
+- Archive completed inspection of a **previously unindexed Samsung MP4**,
+  with automatic Samsung make/model, video/audio/fps metadata, and a
+  separate `wi0212-exiftool-samsung-camera-v1` vendor audit action.
+  No manual `video metadata refresh` was needed.
+- Source SHA-256 was unchanged, and no unexpected OneDrive hydration
+  occurred. The Samsung option was turned off successfully and then
+  re-enabled for normal use.
+- Observed new 0:41 video: recorded local **2024-09-04 09:58**,
+  **Samsung / SM-G736B**, **2160 × 3840 portrait**, 30 fps,
+  H.264, **47.98 Mb/s**, AAC stereo 48 kHz, 8-bit,
+  SDR (BT.709). Embedded GPS Not provided; Named Place Unknown.
+
+Previously accepted v39/v41 migration, manually selected metadata,
+idempotency, recording-time correction/restoration and regressions
+remain valid. No extra database schema migration or backup rehearsal
+is needed for PR #782. The setting does **not** backfill historical
+videos, hydrate unapproved originals, or initiate parsing on browsing.
+Use the explicitly bounded single-revision refresh for older missing
+camera fields. This closes WI-0212 acceptance.
 
 ## Deferred
 
