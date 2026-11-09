@@ -1,0 +1,34 @@
+id: WI-0212
+title: Expose video metadata, Places and manual person presence
+milestone: M30
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
+started_at: 2026-11-08
+completed_at: 2026-11-10
+verified_at: 2026-11-10
+verified_by: maintainer
+last_updated_at: 2026-11-10
+branch: wi-0212-auto-samsung-metadata-on-new-inspection
+blockers:
+- WI-0151
+- WI-0152
+- WI-0062
+- WI-0063
+- WI-0064
+blocker_notes: []
+evidence:
+- type: documentation
+  value: docs/operations/video-details-wi0212-acceptance.md
+- type: implementation
+  value: '2026-11-09: Maintainer accepted isolated v39->v41 migration, production v41 startup, real Samsung MP4 opt-in metadata refresh (2 fields, idempotent rerun 0), audio/bitrate/fps, manual recording time restore, People/Place and online-only/photo/video regressions. PRs #774/#776/#777 merged with green CI. Follow-up PR #782 merged with six green CI jobs and automatic Samsung enrichment on an unindexed Archive video passed maintained-host verification, including settings persistence, separate audit, unchanged original hash, no unexpected OneDrive hydration and opt-out/re-enable. WI-0212 accepted 2026-11-10.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/774
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/776
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/777
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/782
+- type: maintainer-acceptance
+  value: '2026-11-10: All automatic Samsung metadata gates PASS. Focused tests, launcher, ExifTool v13.59 and SHA-256 pin, PostgreSQL v41, setting enabled/saved and persisted after refresh/restart, one-video-step, unindexed Samsung MP4 automatically inspected by Archive, make/model and audio/video/fps, separate vendor audit, original SHA-256 unchanged, no unexpected hydration, setting disabled and re-enabled. Video: supported 0:41, recorded local 2024-09-04 09:58, Samsung SM-G736B, portrait 2160x3840, 30 fps, H.264 47.98 Mb/s, AAC stereo 48 kHz, 8-bit SDR BT.709, GPS Not provided and Place Unknown. Prior v39->v41 rehearsal, manual refresh and regression acceptance also passed.'

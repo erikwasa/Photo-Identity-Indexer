@@ -10,16 +10,18 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persiste
 
 # WI-0212: Expose video metadata, Places and manual person presence
 
-**Core implementation merged in PR #765, and the isolated v38 -> v39
-rehearsal gate merged in PR #766.** On 2026-11-08, the maintainer verified
-streaming-backup integrity, isolated restore, v38 -> v39 rehearsal,
-production v39 startup, video details/people/GeoNames, online-only safety,
-photo and video regressions. All reported gates passed. The work item remains
-in progress for follow-up usability observations below rather than because
-schema v39 acceptance is pending. GeoNames is explicitly triggered; browsing
-metadata never reads video originals.
-See [the combined acceptance procedure]
-(../../operations/video-details-wi0212-acceptance.md).
+**WI-0212 completed with maintainer acceptance on 2026-11-10.** Original
+delivery PRs #765 and #766 passed the isolated v38 → v39 rehearsal
+and 2026-11-08 acceptance. Follow-up PRs #774, #776, #777 and #782
+delivered FFprobe bitrate/audio, the guarded v41 metadata refresh,
+Samsung ExifTool fallback and an off-by-default persisted setting for
+automatic Samsung enrichment during an operator-approved Archive
+first inspection. The maintained PostgreSQL catalogue migrated to v41
+only after a successful isolated v39 → v41 rehearsal. The maintainer
+has accepted the new automated path and confirmed original-byte,
+OneDrive, Places, People, playback and photo regression safeguards.
+GeoNames is explicitly triggered, and browsing details never reads
+originals. See the [acceptance runbook](../../operations/video-details-wi0212-acceptance.md).
 
 ## Priority and relationship (maintainer 2026-11-08)
 
@@ -203,7 +205,8 @@ accepted.
 PR #774 merged with green CI, introducing schema v40 and FFprobe stream-
 specific bitrate, audio channels/layout/sample rate and explicit Samsung
 tag support. Existing v2 evidence remains immutable, and the maintained
-catalogue remains at verified v39 pending the full metadata upgrade.
+catalogue subsequently migrated to verified v41 after an isolated
+v39 → v41 rehearsal passed.
 
 Merged PR #776 extends this with **v41 append-only refresh provenance** and
 an explicitly selected, read-only-first `video metadata refresh` command.
@@ -217,76 +220,85 @@ camera/bitrate/audio fields and transactionally records an audit action.
 It never overwrites existing camera or capture fields, changes manual
 time/Place/people, rescans arbitrary videos, or hydrates online-only files.
 
-Production v39 must not open the new v41 application until
-`catalogue rehearse-v41` passes on a **verified isolated v39 restore**:
-the command applies both v40 and v41 in isolation, checks all preexisting
-table row counts, empty new fields and empty new audit table, and confirms
-idempotent initialization. The earlier v39 host acceptance remains valid.
+The production v39 catalogue was **not** opened by the v41
+application until `catalogue rehearse-v41` passed on a verified
+isolated v39 restore. The rehearsal checked row counts, default-null
+new columns, the empty provenance table and idempotent schema
+initialization; the maintainer then verified healthy v41 startup.
 
 **Samsung vendor metadata follow-up (2026-11-09):** ExifTool documents
 `SamsungModel` in Samsung MP4 `smta` metadata and the maintainer observed
-this exact tag on their example. The opt-in Samsung reader in the new
-development PR requires a separately approved and SHA-256-pinned ExifTool,
+this exact tag on their example. The opt-in Samsung reader in merged PR #777 requires a separately approved and SHA-256-pinned ExifTool,
 reads only `Samsung:SamsungModel`, and uses a separate v41 audit action
 for its tool/profile/changed fields. FFprobe-only remains the default.
 The parser never infers missing tags or device identity; past camera
 values remain untouched.
 
-**Still pending final maintained-PC review:** restore a verified v39
-snapshot to an isolated database and rehearse v40/v41 (no production
-migration before the gate), verify a real local MOV's codec/audio/bitrate
-fields, verify the pinned ExifTool fallback on a real Samsung MP4,
-correct local recording-time edit/restore after PR #773, a file with
-unknown metadata, and online-only/photo/video regressions. All metadata
-refreshes remain one selected, current, hash-verified local revision at
-a time. The user requested one consolidated local verification cycle
-when metadata development is complete.
+**Final maintained-PC review passed:** isolated v39 → v41
+rehearsal, healthy v41 startup, real MOV/MP4 audio and video
+metadata, rounded frame rate, manual capture-time correction/reset,
+approved ExifTool Samsung fallback, two-field fill-only apply and
+zero-field idempotent repeat, and photo/video/Places/People/online-only
+regression checks. Historical refreshes remain explicitly scoped to
+one locally verified, current revision.
 
-## Follow-up requirement: automatic Samsung camera fallback (2026-11-09)
+## Follow-up: automatic Samsung camera metadata (accepted 2026-11-10)
 
-The maintainer reports that a substantial portion of their archive comes
-from the Samsung device, so the existing manually selected ExifTool
-refresh is insufficient for **future** Archive imports. A new opt-in
-Video Settings checkbox now persists `ExtractSamsungMetadata` off by
-default and uses independently approved local ExifTool executable
-path/SHA-256 from the private launcher. During a separately authorized
-Archive first inspection (or explicit CLI ingest flags), FFprobe still
-runs first. Only when make/model is missing and no incompatible
-non-Samsung make is present does the bounded Samsung-only adapter run.
-It may complete NULL camera fields via a separate v41 audit action;
-existing make/model, capture, Place, people and original inspection
-values are never overwritten.
+Because many archive videos were recorded with a Samsung device, PR
+#782 adds **Extract Samsung camera metadata when FFprobe does not
+provide it** to Video Processing Settings, off by default and
+persisted across restarts. The private launcher pins the physical
+ExifTool executable by SHA-256. During an independently approved,
+photo-first Archive video inspection, FFprobe runs first. Only
+missing camera make/model values may be filled by the bounded
+Samsung-only ExifTool reader, without overwriting conflicting fields.
+An explicit CLI ingest can opt in separately; ordinary browsing and
+OneDrive file arrival do not trigger extraction.
 
-No auto backfill, automatic OneDrive hydration beyond existing Archive
-approval, or media reads from browsing are introduced. Existing v41
-migration, manual metadata acceptance and photo/video regression evidence
-remain valid. **New acceptance gate:** demonstrate one previously
-unindexed Samsung video is enriched during Archive processing without
-operator CLI refresh, the checkbox persists and can be disabled, and
-source integrity / per-tool provenance / online-only behavior hold.
-After that, update and merge the held documentation-only WI-0212
-closeout PR. See `docs/operations/video-details-wi0212-acceptance.md`.
+**Maintainer acceptance passed:** PR #782 merged with all six CI jobs
+successful. Focused tests, launcher validation, ExifTool version 13.59
+and its approved SHA-256, and healthy v41 app all passed. The new
+setting was recognized, saved, survived browser refresh/restart,
+and the one-video-step Archive option worked. A previously unindexed
+Samsung video was automatically processed by Archive **without
+manual metadata refresh**. Make/model, video/audio/fps, separate
+ExifTool vendor audit, original-source SHA-256 preservation and
+no unexpected OneDrive hydration passed. The option was successfully
+disabled and re-enabled for normal use.
+
+The 41-second clip displayed **Samsung / SM-G736B**, 2160 × 3840
+portrait, 30 fps, H.264, 47.98 Mb/s, AAC stereo 48 kHz, 8-bit,
+SDR (BT.709), recorded local 2024-09-04 09:58, with GPS Not provided
+and Named Place Unknown. These are observed source facts, not a
+general claim that every recording embeds GPS or Samsung model tags.
+
+No background backfill, new database schema, extra OneDrive
+hydration, automatically launched inspection on browsing, or
+archive-wide scan was introduced. Previously indexed videos still
+require the deliberate selected-video refresh for missing fields.
+The acceptance procedure is retained in
+`docs/operations/video-details-wi0212-acceptance.md`.
 
 ## Acceptance criteria
 
-- [ ] Maintainer-approved current-video metadata inventory identifies
+- [x] Maintainer-approved current-video metadata inventory identifies
   existing projected fields, missing fields, extraction precedence and
   explicit unknown states; no unnecessary extraction is duplicated.
-- [ ] Video Details accurately displays available date **and time**,
+- [x] Video Details accurately displays available date **and time**,
   GPS and resolved Place, make/model, orientation-correct resolution and
   duration; unavailable fields remain visibly unknown, not fabricated.
-- [ ] Approved GPS-to-Place enrichment uses existing canonical hierarchy
+- [x] Approved GPS-to-Place enrichment uses existing canonical hierarchy
   and configured provider/privacy/caching rules; a manual Place
   correction takes precedence, and non-GPS clips remain unguessed.
-- [ ] Catalogue-only manual correction/clear for the selected metadata
+- [x] Catalogue-only manual correction/clear for the selected metadata
   fields persists with provenance and leaves the original unchanged.
-- [ ] A canonical person can be manually tagged and untagged as
+- [x] A canonical person can be manually tagged and untagged as
   appearing in a video, including when no video face detection exists;
   merge/revision, duplicate and audit behavior is correct.
-- [ ] The manual person tag creates **no** face observations,
+- [x] The manual person tag creates **no** face observations,
   embeddings, review decisions, automatic identity matches,
   collection memberships or photo Smart Collection changes.
-- [ ] Metadata view, manual edits and person tagging work with a
+- [x] Metadata view, manual edits and person tagging work with a
   retained proxy or online-only original **without hydration**; photo
   features, video playback/search and existing source safeguards
   regressions pass.
@@ -302,14 +314,20 @@ No private GPS/people/video identifiers in Git/CI or reports.
 
 ## Completion notes
 
-- Status: in_progress for the November 8 follow-up usability improvements.
-- Maintainer v39 acceptance **passed**: isolated restore and schema rehearsal,
-  production startup, real video metadata, manual time/Place/person edits,
-  GeoNames lookup, online-only safety and regression checks.
-- PR #774 (nullable bitrate/audio metadata v40) and #776 (targeted,
-  audited v41 refresh) merged with green CI; optional Samsung ExifTool
-  camera fallback in a separate draft PR, not yet locally accepted.
-- Production v39 stays unchanged until the verified v39 -> v41 restore
-  rehearsal and consolidated real-file Video Details acceptance pass.
-- Separate from WI-0153 collection membership and WI-0155 experimental
-  face recognition.
+- **Status: completed; verified by the maintainer on 2026-11-10.**
+- PRs #765/#766 passed original v39 delivery, migration and maintained-host
+  acceptance. PRs #774/#776/#777 passed the v40/v41 metadata extension,
+  backup/restore rehearsal, read-only-first Samsung extraction, idempotency
+  and photo/video regression verification.
+- PR #782 merged with green CI (six jobs). On the maintained PC, the
+  default-off, saved Samsung metadata setting automatically populated
+  camera make/model on a previously unindexed Samsung video during
+  ordinary Archive processing. The separate ExifTool audit, original
+  SHA-256, metadata presentation, source protections and opt-out/re-enable
+  all passed; no per-video refresh CLI was invoked.
+- No new migration is needed; PostgreSQL remains at verified v41. No
+  automatic backfill, additional online-only recall or ordinary browsing
+  media reads are introduced.
+- Collection membership (WI-0153), video slideshow (WI-0154), video
+  face recognition (WI-0155) and video descriptions/search (WI-0213)
+  remain separate future work.

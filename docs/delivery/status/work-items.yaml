@@ -199,27 +199,6 @@ work_items:
   evidence:
   - type: documentation
     value: docs/delivery/work-items/WI-0193-absolute-photo-quality-model-evaluation.md
-- id: WI-0212
-  title: Expose video metadata, Places and manual person presence
-  milestone: M30
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
-  started_at: 2026-11-08
-  last_updated_at: 2026-11-09
-  branch: wi-0212-opt-in-samsung-vendor-camera
-  blockers:
-  - WI-0151
-  - WI-0152
-  - WI-0062
-  - WI-0063
-  - WI-0064
-  blocker_notes: []
-  evidence:
-  - type: documentation
-    value: docs/operations/video-details-wi0212-acceptance.md
-  - type: implementation
-    value: '2026-11-09: Maintainer accepted isolated v39->v41 migration, production v41 startup, real Samsung MP4 opt-in metadata refresh (2 fields, idempotent rerun 0), audio/bitrate/fps, manual recording time restore, People/Place and online-only/photo/video regressions. PRs #774/#776/#777 merged with green CI. Follow-up PR #782 adds default-off persisted automatic ExifTool Samsung fallback for newly inspected Archive videos; this new behavior requires CI and one bounded local first-ingest acceptance before WI-0212 closeout PR #781 can merge.'
 - id: WI-0213
   title: Reevaluate video-level descriptions and search after face feasibility
   milestone: M30
