@@ -205,7 +205,7 @@ specific bitrate, audio channels/layout/sample rate and explicit Samsung
 tag support. Existing v2 evidence remains immutable, and the maintained
 catalogue remains at verified v39 pending the full metadata upgrade.
 
-Draft PR #776 extends this with **v41 append-only refresh provenance** and
+Merged PR #776 extends this with **v41 append-only refresh provenance** and
 an explicitly selected, read-only-first `video metadata refresh` command.
 It operates on exactly one current, already-local MOV/MP4 revision and
 requires a named registered source root, revision UUID, approved FFprobe
@@ -223,12 +223,24 @@ the command applies both v40 and v41 in isolation, checks all preexisting
 table row counts, empty new fields and empty new audit table, and confirms
 idempotent initialization. The earlier v39 host acceptance remains valid.
 
-**Still pending final local review:** full end-to-end refresh on explicitly
-approved real MOV/MP4 files, and confirmation of whether the user's Samsung
-`SamsungModel` metadata is actually exposed by FFprobe or needs an
-explicitly approved vendor-metadata reader. ExifTool-visible alone does
-not prove FFprobe-visible. The user requested one consolidated metadata
-verification cycle when development is complete.
+**Samsung vendor metadata follow-up (2026-11-09):** ExifTool documents
+`SamsungModel` in Samsung MP4 `smta` metadata and the maintainer observed
+this exact tag on their example. The opt-in Samsung reader in the new
+development PR requires a separately approved and SHA-256-pinned ExifTool,
+reads only `Samsung:SamsungModel`, and uses a separate v41 audit action
+for its tool/profile/changed fields. FFprobe-only remains the default.
+The parser never infers missing tags or device identity; past camera
+values remain untouched.
+
+**Still pending final maintained-PC review:** restore a verified v39
+snapshot to an isolated database and rehearse v40/v41 (no production
+migration before the gate), verify a real local MOV's codec/audio/bitrate
+fields, verify the pinned ExifTool fallback on a real Samsung MP4,
+correct local recording-time edit/restore after PR #773, a file with
+unknown metadata, and online-only/photo/video regressions. All metadata
+refreshes remain one selected, current, hash-verified local revision at
+a time. The user requested one consolidated local verification cycle
+when metadata development is complete.
 
 ## Acceptance criteria
 
@@ -269,8 +281,10 @@ No private GPS/people/video identifiers in Git/CI or reports.
 - Maintainer v39 acceptance **passed**: isolated restore and schema rehearsal,
   production startup, real video metadata, manual time/Place/person edits,
   GeoNames lookup, online-only safety and regression checks.
-- PR #774 technical metadata fields merged with green CI; PR #776
-  selected-local refresh and v41 provenance awaiting CI and review.
-  Full real-file metadata acceptance is deferred as requested.
+- PR #774 (nullable bitrate/audio metadata v40) and #776 (targeted,
+  audited v41 refresh) merged with green CI; optional Samsung ExifTool
+  camera fallback in a separate draft PR, not yet locally accepted.
+- Production v39 stays unchanged until the verified v39 -> v41 restore
+  rehearsal and consolidated real-file Video Details acceptance pass.
 - Separate from WI-0153 collection membership and WI-0155 experimental
   face recognition.
