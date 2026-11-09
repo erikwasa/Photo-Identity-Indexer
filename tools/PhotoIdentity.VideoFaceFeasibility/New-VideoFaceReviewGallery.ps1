@@ -356,6 +356,91 @@ foreach ($entry in $entries) {
     $entry.Thumbnail = $thumbnailCache[$key]
 }
 
+# Geometry-bearing galleries show actual detector bounding boxes and a native
+# pixel crop for the exact ordinal selected in the original private report.
+# These are review copies only; no source PNG is rewritten.
+if ($geometryByFrame.Count -gt 0) {
+    foreach ($entry in $entries) {
+        $key = '{0}:{1}' -f $entry.Clip,$entry.Frame
+        $allBoxes = @($geometryByFrame[$key])
+        $selectedBoxes = if ($null -eq $entry.Face) {
+            $allBoxes
+        } else {
+            @($allBoxes | Where-Object { [int]$_.faceNumber -eq [int]$entry.Face })
+        }
+
+        $label = if ($null -eq $entry.Face) {
+            'all'
+        } else {
+            'face-{0:D2}' -f [int]$entry.Face
+        }
+        $base = '{0}-frame-{1:D3}-{2}' -f $entry.Clip,$entry.Frame,$label
+        $overlayName = $base + '.jpg'
+        $overlayPath = Join-Path $overlayFolder $overlayName
+
+        $imagePath = Assert-PrivateFile $entry.OriginalPath (8MB)
+        $image = [Drawing.Image]::FromFile($imagePath)
+        $overlay = $null
+        $graphics = $null
+        $pen = $null
+        try {
+            $ratio = [Math]::Min(1.0,
+                $ThumbnailLongEdge / [double][Math]::Max($image.Width,$image.Height))
+            $overlayWidth = [Math]::Max(1,[int][Math]::Round($image.Width * $ratio))
+            $overlayHeight = [Math]::Max(1,[int][Math]::Round($image.Height * $ratio))
+            $overlay = [Drawing.Bitmap]::new($overlayWidth,$overlayHeight)
+            $graphics = [Drawing.Graphics]::FromImage($overlay)
+            $graphics.DrawImage($image,0,0,$overlayWidth,$overlayHeight)
+            $pen = [Drawing.Pen]::new([Drawing.Color]::FromArgb(255,255,112),3)
+            foreach ($box in $selectedBoxes) {
+                $rx = [int][Math]::Floor([double]$box.x * $overlayWidth)
+                $ry = [int][Math]::Floor([double]$box.y * $overlayHeight)
+                $rw = [Math]::Max(1,[int][Math]::Ceiling([double]$box.width * $overlayWidth))
+                $rh = [Math]::Max(1,[int][Math]::Ceiling([double]$box.height * $overlayHeight))
+                $graphics.DrawRectangle($pen,$rx,$ry,$rw,$rh)
+            }
+            $overlay.Save($overlayPath,[Drawing.Imaging.ImageFormat]::Jpeg)
+            $entry.Overlay = 'overlays/' + $overlayName
+
+            if ($null -ne $entry.Face) {
+                $box = $selectedBoxes[0]
+                $left = [int][Math]::Floor([double]$box.x * $image.Width)
+                $top = [int][Math]::Floor([double]$box.y * $image.Height)
+                $bw = [Math]::Max(1,[int][Math]::Ceiling([double]$box.width * $image.Width))
+                $bh = [Math]::Max(1,[int][Math]::Ceiling([double]$box.height * $image.Height))
+                $marginX = [int][Math]::Ceiling($bw * 0.25)
+                $marginY = [int][Math]::Ceiling($bh * 0.25)
+                $cl = [Math]::Max(0,$left - $marginX)
+                $ct = [Math]::Max(0,$top - $marginY)
+                $cr = [Math]::Min($image.Width,$left + $bw + $marginX)
+                $cb = [Math]::Min($image.Height,$top + $bh + $marginY)
+                $cw = [Math]::Max(1,$cr - $cl)
+                $ch = [Math]::Max(1,$cb - $ct)
+                $cropBitmap = [Drawing.Bitmap]::new($cw,$ch)
+                $cropGraphics = [Drawing.Graphics]::FromImage($cropBitmap)
+                try {
+                    $cropGraphics.DrawImage($image,
+                        [Drawing.Rectangle]::new(0,0,$cw,$ch),
+                        [Drawing.Rectangle]::new($cl,$ct,$cw,$ch),
+                        [Drawing.GraphicsUnit]::Pixel)
+                    $cropFile = $base + '.png'
+                    $cropBitmap.Save((Join-Path $cropFolder $cropFile),
+                        [Drawing.Imaging.ImageFormat]::Png)
+                    $entry.Crop = 'crops/' + $cropFile
+                } finally {
+                    $cropGraphics.Dispose()
+                    $cropBitmap.Dispose()
+                }
+            }
+        } finally {
+            if ($null -ne $pen) { $pen.Dispose() }
+            if ($null -ne $graphics) { $graphics.Dispose() }
+            if ($null -ne $overlay) { $overlay.Dispose() }
+            $image.Dispose()
+        }
+    }
+}
+
 $html = [Collections.Generic.List[string]]::new()
 $html.Add(@'
 <!doctype html>
