@@ -74,6 +74,9 @@ public sealed class VideoIngestCommandTests
         Assert.Null(supported.GpsLatitude);
         Assert.Null(supported.CaptureTimeProvenance);
         Assert.Equal(hash, supported.ToolSha256);
+        Assert.Null(supported.VideoBitrateBps);
+        Assert.Null(supported.AudioChannels);
+        Assert.Null(supported.AudioSampleRateHz);
 
         VideoPilotMetadata unknown = hlg with {
             VideoCodec = "mpeg4", Profile = "Simple",
@@ -115,7 +118,27 @@ public sealed class VideoIngestCommandTests
         Assert.Equal(18.0223, evidence.GpsLongitude);
         Assert.Equal("Apple", evidence.CameraMake);
         Assert.Equal("iPhone", evidence.CameraModel);
-        Assert.Equal("wi0151-ffprobe-metadata-v2", evidence.InspectionProfileId);
+        Assert.Equal("wi0212-ffprobe-metadata-v3", evidence.InspectionProfileId);
+    }
+
+    [Fact]
+    public void Technical_stream_facts_survive_revision_inspection_projection()
+    {
+        VideoPilotMetadata media = new(
+            "mov,mp4", "h264", "High", "yuv420p", "bt709",
+            "aac", 1920, 1080, 0, 5.1, "30/1", true, false)
+        {
+            VideoBitrateBps = 12_500_000,
+            AudioChannels = 1,
+            AudioSampleRateHz = 44100,
+            AudioChannelLayout = "mono"
+        };
+        var evidence = VideoIngestCommandRunner.BuildInspection(
+            AssetRevisionId.New(), media, new string('a', 64), DateTimeOffset.UtcNow);
+        Assert.Equal(12_500_000, evidence.VideoBitrateBps);
+        Assert.Equal(1, evidence.AudioChannels);
+        Assert.Equal(44100, evidence.AudioSampleRateHz);
+        Assert.Equal("mono", evidence.AudioChannelLayout);
     }
 
     [Fact]
