@@ -49,7 +49,8 @@ else
             <dt>Frame rate</dt><dd>@VideoDetailsPresentation.FormatFrameRate(Details.AverageFrameRate)</dd>
             <dt>Orientation</dt><dd>@FormatOrientation(Details)</dd>
             <dt>Video codec</dt><dd>@FormatVideoCodec(Details.VideoCodec)</dd>
-            <dt>Audio codec</dt><dd>@FormatAudioCodec(Details.AudioCodec)</dd>
+            <dt>Video bitrate</dt><dd>@VideoDetailsPresentation.FormatVideoBitrate(Details.VideoBitrateBps)</dd>
+            <dt>Audio</dt><dd>@VideoDetailsPresentation.FormatAudioDetails(Details.AudioCodec, Details.AudioChannels, Details.AudioChannelLayout, Details.AudioSampleRateHz)</dd>
             <dt>Bit depth</dt><dd>@FormatBitDepth(Details.PixelFormat)</dd>
             <dt>HDR / transfer</dt><dd>@FormatTransfer(Details.ColorTransfer)</dd>
             <dt>Embedded GPS</dt>
@@ -327,16 +328,6 @@ else
         "av1" => "AV1",
         "vp9" => "VP9",
         "mpeg4" => "MPEG-4",
-        null or "" => "Unknown",
-        _ => codec ?? "Unknown"
-    };
-
-    private static string FormatAudioCodec(string? codec) => codec?.ToLowerInvariant() switch
-    {
-        "aac" => "AAC",
-        "mp3" => "MP3",
-        "opus" => "Opus",
-        "pcm_s16le" => "PCM (16-bit)",
         null or "" => "Unknown",
         _ => codec ?? "Unknown"
     };

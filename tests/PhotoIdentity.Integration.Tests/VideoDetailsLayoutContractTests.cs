@@ -27,6 +27,11 @@ public sealed class VideoDetailsLayoutContractTests
         Assert.Contains("placeholder=\"YYYY-MM-DD HH:MM\"", details);
         Assert.Contains("VideoDetailsPresentation.TryParseLocalRecordingTime", details);
         Assert.Contains("VideoDetailsPresentation.FormatFrameRate", details);
+        Assert.Contains("VideoDetailsPresentation.FormatVideoBitrate", details);
+        Assert.Contains("VideoDetailsPresentation.FormatAudioDetails", details);
+        Assert.Contains("m.video_bitrate_bps", repository);
+        Assert.Contains("m.audio_sample_rate_hz", repository);
+        Assert.Contains("m.audio_channels", repository);
         Assert.DoesNotContain("type=\"datetime-local\"", details);
         Assert.Contains("TimeZoneInfo.Local", details);
         Assert.Contains("Original recording time (local)", details);

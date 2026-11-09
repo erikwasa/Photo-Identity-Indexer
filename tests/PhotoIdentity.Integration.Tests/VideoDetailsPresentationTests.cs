@@ -70,6 +70,28 @@ public sealed class VideoDetailsPresentationTests
         Assert.Equal(expected, VideoDetailsPresentation.FormatFrameRate(rational));
     }
 
+    [Theory]
+    [InlineData(18_500_000L, "18.5 Mb/s")]
+    [InlineData(12_000_000L, "12 Mb/s")]
+    [InlineData(null, "Unknown")]
+    public void Technical_bitrate_formats_without_claiming_perceptual_quality(
+        long? bitrate, string expected)
+    {
+        Assert.Equal(expected, VideoDetailsPresentation.FormatVideoBitrate(bitrate));
+    }
+
+    [Theory]
+    [InlineData("aac", 1, "mono", 44100, "AAC · Mono · 44.1 kHz")]
+    [InlineData("aac", 2, null, 48000, "AAC · Stereo · 48 kHz")]
+    [InlineData(null, 6, null, null, "6 channels")]
+    [InlineData(null, null, null, null, "Unknown")]
+    public void Audio_display_combines_codec_layout_and_sampling(
+        string? codec, int? channels, string? layout, int? rate, string expected)
+    {
+        Assert.Equal(expected,
+            VideoDetailsPresentation.FormatAudioDetails(codec, channels, layout, rate));
+    }
+
     [Fact]
     public void Recording_time_input_is_formatted_with_a_space_not_a_browser_date_separator()
     {

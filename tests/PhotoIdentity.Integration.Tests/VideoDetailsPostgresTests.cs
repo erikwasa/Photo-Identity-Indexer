@@ -62,10 +62,12 @@ public sealed class VideoDetailsPostgresTests
                          capture_time_provenance, camera_make, camera_model,
                          gps_latitude, gps_longitude, coded_width, coded_height,
                          display_rotation_degrees, duration_seconds, average_frame_rate,
+                         video_bitrate_bps, audio_sample_rate_hz, audio_channels, audio_channel_layout,
                          inspected_at_utc, tool_sha256, inspection_profile_id)
                     VALUES (@revision, 'supported', @capture, 'quicktime-tag',
                             'Camera Co', 'Camera X', 59.3293, 18.0686, 1920, 1080,
-                            90, 12.5, '30/1', @now, @tool_hash, 'wi0151-v1');
+                            90, 12.5, '30/1', 18500000, 44100, 1, 'mono',
+                            @now, @tool_hash, 'wi0212-v40-test');
                     INSERT INTO people
                         (id, display_name, created_at_utc, merged_into_person_id)
                     VALUES (@person, 'Known Person', @now, NULL);
@@ -93,6 +95,10 @@ public sealed class VideoDetailsPostgresTests
             Assert.Equal(59.3293, before.Latitude);
             Assert.Equal(18.0686, before.Longitude);
             Assert.Equal(90, before.RotationDegrees);
+            Assert.Equal(18_500_000L, before.VideoBitrateBps);
+            Assert.Equal(44100, before.AudioSampleRateHz);
+            Assert.Equal(1, before.AudioChannels);
+            Assert.Equal("mono", before.AudioChannelLayout);
             Assert.Null(before.Place);
             Assert.Empty(before.People);
 

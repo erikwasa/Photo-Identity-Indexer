@@ -56,6 +56,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 38),
+                "catalogue" when args.Length > 1 && args[1] == "rehearse-v40" =>
+                    await VideoSchemaRehearsalCommandRunner.RunAsync(
+                        VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken, expectedRestoredSchemaVersion: 39),
                 "catalogue" when args.Length > 1 && args[1] is "rehearse-v35" or "rehearse-v36" or "rehearse-v37" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
@@ -298,6 +302,12 @@ public static class Program
                                      (verified v37 isolated restore only;
                                       apply through the current schema, check
                                       retained counts/empty frame evidence)
+
+              catalogue rehearse-v40 --postgres-connection-env NAME
+                                     --restore-report ABSOLUTE_REPORT_PATH
+                                     (verified v39 isolated restore only;
+                                      apply nullable video metadata v40,
+                                      preserve every existing table row count)
 
               catalogue rehearse-v39 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH

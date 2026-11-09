@@ -77,7 +77,13 @@ public sealed class PostgresVideoEvidenceRepositoryTests
                 "mov,mp4", "h264", "High", "aac", "yuv420p", "bt709",
                 1920, 1080, -90, 41.250000m, "30/1",
                 null, null, null, null, null, null,
-                now, new string('c', 64), "wi0151-inspection-v1");
+                now, new string('c', 64), "wi0212-inspection-v40")
+            {
+                VideoBitrateBps = 18_500_000,
+                AudioSampleRateHz = 44100,
+                AudioChannels = 1,
+                AudioChannelLayout = "mono"
+            };
             await repository.SaveInspectionAsync(inspection);
             Assert.Equal(inspection, await repository.GetInspectionAsync(inspection.RevisionId));
 
@@ -88,6 +94,10 @@ public sealed class PostgresVideoEvidenceRepositoryTests
             Assert.Equal(inspection, await repository.GetInspectionAsync(inspection.RevisionId));
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.SaveInspectionAsync(inspection with { VideoCodec = "hevc" }));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.SaveInspectionAsync(inspection with { VideoBitrateBps = 9_000_000 }));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                repository.SaveInspectionAsync(inspection with { AudioChannels = 33 }));
 
             VideoStillPoster poster = new(
                 inspection.RevisionId, "bt709-poster-v1", new string('d', 64),

@@ -58,7 +58,7 @@ public sealed record VideoIngestOptions(
 public static class VideoIngestCommandRunner
 {
     public const long MaximumSourceBytes = 1024L * 1024 * 1024;
-    public const string InspectionProfile = "wi0151-ffprobe-metadata-v2";
+    public const string InspectionProfile = "wi0212-ffprobe-metadata-v3";
 
     public static VideoRevisionInspection BuildInspection(
         AssetRevisionId revision, VideoPilotMetadata media, string toolHash, DateTimeOffset inspectedAtUtc)
@@ -80,7 +80,13 @@ public static class VideoIngestCommandRunner
             media.CaptureAtUtc, media.CaptureTimeProvenance,
             media.CameraMake, media.CameraModel,
             media.GpsLatitude, media.GpsLongitude,
-            inspectedAtUtc.ToUniversalTime(), toolHash, InspectionProfile);
+            inspectedAtUtc.ToUniversalTime(), toolHash, InspectionProfile)
+        {
+            VideoBitrateBps = media.VideoBitrateBps,
+            AudioSampleRateHz = media.AudioSampleRateHz,
+            AudioChannels = media.AudioChannels,
+            AudioChannelLayout = media.AudioChannelLayout
+        };
     }
 
     public static bool MatchesObservation(SourceAsset asset, FileInfo file)

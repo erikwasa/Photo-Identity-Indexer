@@ -48,7 +48,7 @@ public static class VideoSchemaRehearsalCommandRunner
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
-        if (expectedRestoredSchemaVersion is not (32 or 33 or 34 or 37 or 38))
+        if (expectedRestoredSchemaVersion is not (32 or 33 or 34 or 37 or 38 or 39))
             throw new ArgumentOutOfRangeException(nameof(expectedRestoredSchemaVersion));
 
         string? connectionString = Environment.GetEnvironmentVariable(
@@ -140,6 +140,43 @@ public static class VideoSchemaRehearsalCommandRunner
         if (await SchemaVersionAsync(beforeConnection, token) != PostgresCatalogueDatabase.CurrentSchemaVersion)
             throw new InvalidDataException("Rehearsal did not record the current schema version.");
 
+        if (expectedRestoredSchemaVersion == 39)
+        {
+            // v40 only appends nullable fields on the existing table. The
+            // independent restore report's every-table row count is preserved
+            // by the universal comparison above, including existing manual
+            // date/Place/people actions. Verify the exact additive columns.
+            await using NpgsqlCommand extension = beforeConnection.CreateCommand();
+            extension.CommandText = """
+                SELECT
+                    (SELECT COUNT(*) FROM photo_identity_schema_migrations
+                     WHERE version = 40 AND name = 'video-technical-stream-metadata'),
+                    (SELECT COUNT(*) FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'video_revision_metadata'
+                       AND column_name IN ('video_bitrate_bps', 'audio_sample_rate_hz',
+                                           'audio_channels', 'audio_channel_layout')),
+                    (SELECT COUNT(*) FROM video_revision_metadata
+                     WHERE video_bitrate_bps IS NOT NULL
+                        OR audio_sample_rate_hz IS NOT NULL
+                        OR audio_channels IS NOT NULL
+                        OR audio_channel_layout IS NOT NULL);
+                """;
+            await using NpgsqlDataReader rows = await extension.ExecuteReaderAsync(token);
+            if (!await rows.ReadAsync(token) ||
+                rows.GetInt64(0) != 1 ||
+                rows.GetInt64(1) != 4 ||
+                rows.GetInt64(2) != 0)
+                throw new InvalidDataException(
+                    "v40 video metadata extension was not complete, nullable and empty.");
+
+            output.WriteLine("Schema v39 -> v40 rehearsal passed on the isolated restored database.");
+            output.WriteLine($"Rehearsal database: {restoredName}");
+            output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
+            output.WriteLine("Four nullable technical-stream fields installed; existing values preserved.");
+            output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
+            return 0;
+        }
+
         if (expectedRestoredSchemaVersion == 38)
         {
             // A maintained v38 catalogue may already contain frames, jobs,
@@ -170,7 +207,7 @@ public static class VideoSchemaRehearsalCommandRunner
                 throw new InvalidDataException(
                     "v39 video details annotation migration was not empty, complete and exclusion-guarded.");
 
-            output.WriteLine("Schema v38 -> v39 rehearsal passed on the isolated restored database.");
+            output.WriteLine($"Schema v38 -> v{PostgresCatalogueDatabase.CurrentSchemaVersion} rehearsal passed on the isolated restored database (including v39).");
             output.WriteLine($"Rehearsal database: {restoredName}");
             output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
             output.WriteLine("Video annotation tables empty; exclusion purge trigger installed.");

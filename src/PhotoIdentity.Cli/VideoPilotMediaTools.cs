@@ -41,6 +41,12 @@ public sealed record VideoPilotMetadata(
     [JsonIgnore]
     public string? CameraModel { get; init; }
 
+    // Source stream facts; video bitrate is not a perceptual quality score.
+    public long? VideoBitrateBps { get; init; }
+    public int? AudioSampleRateHz { get; init; }
+    public int? AudioChannels { get; init; }
+    public string? AudioChannelLayout { get; init; }
+
     // Only explicit source stream colour signalling qualifies HLG preview.
     // Never infer BT.2020 from camera, codec or pixel format.
     public string? ColorPrimaries { get; init; }
@@ -110,8 +116,15 @@ public static class VideoPilotMetadataParser
             CaptureTimeProvenance = provenance,
             GpsLatitude = latitude,
             GpsLongitude = longitude,
-            CameraMake = SelectShortTag(tags, streamTags, "com.apple.quicktime.make", "make"),
-            CameraModel = SelectShortTag(tags, streamTags, "com.apple.quicktime.model", "model"),
+            CameraMake = SelectShortTag(tags, streamTags, "com.apple.quicktime.make", "make", "manufacturer") ??
+                         (SelectShortTag(tags, streamTags, "SamsungModel", "com.samsung.model") is null
+                             ? null : "Samsung"),
+            CameraModel = SelectShortTag(tags, streamTags, "com.apple.quicktime.model", "model",
+                "SamsungModel", "com.samsung.model"),
+            VideoBitrateBps = PositiveLong(Text(video, "bit_rate"), 10_000_000_000L),
+            AudioSampleRateHz = PositiveInteger(Text(audio, "sample_rate"), 384000),
+            AudioChannels = PositiveInteger(Integer(audio, "channels"), 32),
+            AudioChannelLayout = SelectAudioLayout(audio),
             ColorPrimaries = Text(video, "color_primaries"),
             ColorSpace = Text(video, "color_space")
         };
@@ -236,19 +249,42 @@ public static class VideoPilotMetadataParser
     }
 
     private static string? SelectShortTag(
-        JsonElement format, JsonElement video, string preferredName, string alternateName)
+        JsonElement format, JsonElement video, params string[] names)
     {
         foreach (JsonElement tags in new[] { format, video })
         {
-            foreach (string name in new[] { preferredName, alternateName })
+            foreach (string name in names)
             {
-                string? value = Tag(tags, name)?.Trim();
-                if (value is { Length: > 0 and <= 128 } &&
-                    !value.Any(char.IsControl))
+                // Reject control characters in the source tag itself. Trimming
+                // first would hide a trailing newline or tab and wrongly
+                // accept a malformed device identity as trustworthy metadata.
+                string? raw = Tag(tags, name);
+                if (raw is null || raw.Any(char.IsControl))
+                    continue;
+                string value = raw.Trim();
+                if (value.Length is > 0 and <= 128)
                     return value;
             }
         }
         return null;
+    }
+
+    private static int? PositiveInteger(int? value, int maximum) =>
+        value is > 0 && value <= maximum ? value : null;
+
+    private static int? PositiveInteger(string? value, int maximum) =>
+        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int result)
+            ? PositiveInteger(result, maximum) : null;
+
+    private static long? PositiveLong(string? value, long maximum) =>
+        long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long result) &&
+        result is > 0 && result <= maximum ? result : null;
+
+    private static string? SelectAudioLayout(JsonElement audio)
+    {
+        string? layout = Text(audio, "channel_layout") ?? Text(Child(audio, "ch_layout"), "layout");
+        return layout is { Length: > 0 and <= 64 } && !layout.Any(char.IsControl)
+            ? layout : null;
     }
 
     private static JsonElement Child(JsonElement item, string name) =>
@@ -314,7 +350,7 @@ public sealed class VideoPilotMediaTools
             "-probesize", "1048576", "-analyzeduration", "1500000",
             "-show_format", "-show_streams",
             "-show_entries",
-            "format=format_name,duration:format_tags=creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream=codec_type,codec_name,profile,width,height,pix_fmt,avg_frame_rate,color_transfer,color_primaries,color_space:stream_tags=rotate,creation_time,location,make,model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream_side_data=rotation",
+            "format=format_name,duration:format_tags=creation_time,location,make,model,manufacturer,SamsungModel,com.samsung.model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream=codec_type,codec_name,profile,width,height,pix_fmt,avg_frame_rate,bit_rate,channels,channel_layout,ch_layout,sample_rate,color_transfer,color_primaries,color_space:stream_tags=rotate,creation_time,location,make,model,manufacturer,SamsungModel,com.samsung.model,com.apple.quicktime.creationdate,com.apple.quicktime.location.ISO6709,com.apple.quicktime.make,com.apple.quicktime.model:stream_side_data=rotation",
             "-of", "json", "-i", sourcePath
         ], cancellationToken);
         if (json.Length > 1024 * 1024)

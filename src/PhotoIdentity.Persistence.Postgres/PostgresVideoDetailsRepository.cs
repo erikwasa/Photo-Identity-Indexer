@@ -37,7 +37,11 @@ public sealed record VideoDetailsRecord(
     string? VideoCodec,
     string? AudioCodec,
     string? PixelFormat,
-    string? ColorTransfer);
+    string? ColorTransfer,
+    long? VideoBitrateBps,
+    int? AudioSampleRateHz,
+    int? AudioChannels,
+    string? AudioChannelLayout);
 
 /// <summary>
 /// Video-only revision-scoped metadata and manual annotation boundary. Reads
@@ -80,7 +84,9 @@ public sealed class PostgresVideoDetailsRepository(
                    d.action_kind, d.captured_at_utc,
                    place.action_kind, place.source_kind, place.actor, place.created_at_utc,
                    tag.display_name, auto_tag.display_name,
-                   m.video_codec, m.audio_codec, m.pixel_format, m.color_transfer
+                   m.video_codec, m.audio_codec, m.pixel_format, m.color_transfer,
+                   m.video_bitrate_bps, m.audio_sample_rate_hz,
+                   m.audio_channels, m.audio_channel_layout
             FROM asset_revisions revision
             JOIN assets asset ON asset.id = revision.asset_id
             LEFT JOIN video_revision_metadata m ON m.asset_revision_id = revision.id
@@ -156,7 +162,11 @@ public sealed class PostgresVideoDetailsRepository(
                     reader.IsDBNull(21) ? null : reader.GetString(21),
                     reader.IsDBNull(22) ? null : reader.GetString(22),
                     reader.IsDBNull(23) ? null : reader.GetString(23),
-                    reader.IsDBNull(24) ? null : reader.GetString(24));
+                    reader.IsDBNull(24) ? null : reader.GetString(24),
+                    reader.IsDBNull(25) ? null : reader.GetInt64(25),
+                    reader.IsDBNull(26) ? null : reader.GetInt32(26),
+                    reader.IsDBNull(27) ? null : reader.GetInt32(27),
+                    reader.IsDBNull(28) ? null : reader.GetString(28));
             }
         }
         if (details is null) return null;

@@ -30,7 +30,13 @@ public sealed record VideoRevisionInspection(
     double? GpsLongitude,
     DateTimeOffset InspectedAtUtc,
     string ToolSha256,
-    string InspectionProfileId);
+    string InspectionProfileId)
+{
+    public long? VideoBitrateBps { get; init; }
+    public int? AudioSampleRateHz { get; init; }
+    public int? AudioChannels { get; init; }
+    public string? AudioChannelLayout { get; init; }
+}
 
 /// <summary>References a bounded durable JPEG poster; no original video bytes are stored here.</summary>
 public sealed record VideoStillPoster(

@@ -34,7 +34,11 @@ public sealed record VideoDetailsResponse(
     string? VideoCodec,
     string? AudioCodec,
     string? PixelFormat,
-    string? ColorTransfer);
+    string? ColorTransfer,
+    long? VideoBitrateBps,
+    int? AudioSampleRateHz,
+    int? AudioChannels,
+    string? AudioChannelLayout);
 
 public sealed record VideoDetailsPersonRequest(string PersonId);
 public sealed record VideoDetailsPlaceRequest(string Value);
