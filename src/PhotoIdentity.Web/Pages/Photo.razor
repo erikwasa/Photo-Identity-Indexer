@@ -284,8 +284,6 @@
         : Original?.CanView == true
             ? OriginalUrl
             : PreviewUrl;
-    private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
-    private string DetailsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/details";
     private string TagsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/tags";
     private string TagCountLabel => Tags.Count == 1 ? "1 manual tag" : $"{Tags.Count} manual tags";
     private string PeopleCountLabel => Details?.People.Count == 1 ? "1 person" : $"{Details?.People.Count ?? 0} people";
