@@ -68,7 +68,7 @@ public static class VideoDetailsPresentation
         string? sampling = sampleRateHz is > 0
             ? (sampleRateHz.Value / 1000d).ToString("0.###", CultureInfo.InvariantCulture) + " kHz"
             : null;
-        string[] known = [friendlyCodec, friendlyLayout, sampling]
+        string[] known = new[] { friendlyCodec, friendlyLayout, sampling }
             .Where(static x => !string.IsNullOrWhiteSpace(x))
             .Select(static x => x!)
             .ToArray();
