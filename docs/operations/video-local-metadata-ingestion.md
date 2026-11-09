@@ -60,6 +60,51 @@ The v40 migration must be independently restore-rehearsed on a verified v39
 copy before launching v40 against production. Do not perform this on the
 maintained host until the complete metadata-refresh work is ready.
 
+## WI-0212 v41 — selected local metadata refresh (development)
+
+An existing, registered video revision is not reinspected by ordinary Video
+Details, Search, ingestion or app startup. Existing v2 evidence is immutable;
+v41 adds a **separate** operator-only, one-revision refresh transaction.
+
+The CLI `video metadata refresh` defaults to a **read-only dry run**. Required
+arguments: `--enable-video`, existing `--revision UUID`,
+`--source-root ABS_REGISTERED_ROOT`, allowlisted `--ffprobe ABS_EXE`,
+`--ffprobe-sha256 APPROVED_SHA256`, `--postgres-connection-env NAME`,
+and explicit `--database DB`. A write requires both `--apply` and
+`--acknowledge-metadata-only`; no implicit fallback or bulk mode exists.
+
+The refresh verifies the catalogue is at v41 without calling the schema
+initializer, then selects exactly the **current** video revision under the
+explicitly named registered local-folder source. The source-copy exclusion
+and deleted-asset guards apply. It reads only an already-local MOV/MP4
+(<= 1 GiB), verifies its size, stable file modification time and complete
+SHA-256 against the immutable revision, checks the physical FFprobe tool
+against the operator-approved digest, and repeats local-availability,
+revision and exclusion checks before committing. Root-relative traversal
+and symbolic link escapes are rejected; online-only originals remain
+online-only. The CLI does not enqueue, play, hydrate, transcode, or analyze
+faces and does not write camera data into the original.
+
+The transaction **fills only NULL** camera make/model and v40 bitrate/audio
+fields, records which fields changed alongside tool SHA, profile and
+inspection time in `video_metadata_refresh_actions`, and leaves original
+`inspected_at_utc`, `tool_sha256`, `inspection_profile_id`, capture time,
+GPS, Place, people and photo/identity records unchanged. A second identical
+refresh writes nothing, and a stale revision or excluded copy fails closed.
+If the new parser supplies no new fields, no audit action is recorded.
+
+**This command never auto-migrates the database**; the separate guarded
+`catalogue rehearse-v41` requires a successful retained v39 restored
+database to rehearse v40/v41 on an isolated database before production
+startup. The precise safe operator script is maintained in
+`video-details-wi0212-acceptance.md`. Until final acceptance, run neither
+the new application against v39 production nor a refresh against it.
+
+ExifTool may decode proprietary Samsung tags that the approved FFprobe
+profile does not expose; do not infer a camera make/model when the
+verified source tag is absent. An additional trusted vendor adapter may
+be needed for real-file acceptance.
+
 ## Commands for the final end-to-end acceptance
 
 The maintainer asked to defer hands-on testing until WI-0151 is developed completely. These commands document the subsequent controlled acceptance path. Do not import the full archive during the intermediate PR review.
