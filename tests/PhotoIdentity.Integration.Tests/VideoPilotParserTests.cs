@@ -207,6 +207,57 @@ public sealed class VideoPilotParserTests
     }
 
     [Fact]
+    public void Samsung_vendor_tag_and_bounded_audio_bitrate_fields_are_read_only_metadata()
+    {
+        const string json = """
+            {
+              "streams": [
+                { "codec_type":"video","codec_name":"h264","bit_rate":"18500000",
+                  "width":1080,"height":1920,
+                  "tags":{"SamsungModel":"SM-G736B"} },
+                { "codec_type":"audio","codec_name":"aac",
+                  "sample_rate":"44100","channels":1,"channel_layout":"mono"}
+              ],
+              "format":{"tags":{"creation_time":"2026-02-05T15:00:04Z"}}
+            }
+            """;
+        VideoPilotMetadata media = VideoPilotMetadataParser.Parse(json);
+        Assert.Equal("Samsung", media.CameraMake);
+        Assert.Equal("SM-G736B", media.CameraModel);
+        Assert.Equal(18_500_000L, media.VideoBitrateBps);
+        Assert.Equal(44100, media.AudioSampleRateHz);
+        Assert.Equal(1, media.AudioChannels);
+        Assert.Equal("mono", media.AudioChannelLayout);
+        Assert.Equal(new DateTimeOffset(2026, 2, 5, 15, 0, 4, TimeSpan.Zero),
+            media.CaptureAtUtc);
+        // Device identity is private catalogue-only data.
+        string diagnostic = System.Text.Json.JsonSerializer.Serialize(media);
+        Assert.DoesNotContain("SM-G736B", diagnostic, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Unknown_or_malformed_audio_bitrate_and_vendor_tags_are_not_guessed()
+    {
+        const string json = """
+            {
+              "streams": [
+                { "codec_type":"video","bit_rate":"-1",
+                  "tags":{"SamsungModel":"bad\\u000a"}},
+                { "codec_type":"audio","sample_rate":"0","channels":500,
+                  "channel_layout":"unknown"}
+              ],
+              "format":{"tags":{}}
+            }
+            """;
+        VideoPilotMetadata media = VideoPilotMetadataParser.Parse(json);
+        Assert.Null(media.VideoBitrateBps);
+        Assert.Null(media.AudioSampleRateHz);
+        Assert.Null(media.AudioChannels);
+        Assert.Null(media.CameraModel);
+        Assert.Null(media.CameraMake);
+    }
+
+    [Fact]
     public void Unsupported_formats_do_not_silently_fall_back_to_photo_behavior()
     {
         Assert.False(VideoPilotCommandRunner.IsSupported(new VideoPilotMetadata(
