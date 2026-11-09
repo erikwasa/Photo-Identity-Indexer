@@ -285,20 +285,21 @@ migrated v39 catalogue (do not repeat the v38 -> v39 restore/rehearsal):
    retention remain unaffected. No source inspection or schema changes.
 
 
-## Planned v39 -> v40 metadata migration gate (do not run yet)
+## Planned v39 -> v41 metadata migration and refresh gate (do not run yet)
 
-The WI-0212 technical-metadata extension adds four **nullable** columns to
-`video_revision_metadata`: `video_bitrate_bps`, `audio_sample_rate_hz`,
-`audio_channels`, and `audio_channel_layout`. It does not change source
-revisions or existing capture/Place/person/face evidence. The parser consumes
-only FFprobe's bounded, explicitly selected local source stream facts; no
-background source access. No historical clip is automatically reinspected.
+PR #774 introduced four **nullable** columns on `video_revision_metadata`
+in schema v40: video bitrate, audio sampling rate, channel count and layout.
+The follow-up PR #776 adds schema v41 with an append-only, revision-bound
+`video_metadata_refresh_actions` provenance table, plus a single-revision
+opt-in metadata-only refresh command. New fields are not fabricated by
+migration, and source capture/GPS, manual Place, person tags, and photo/face
+data are preserved.
 
-Because the current production catalogue is already **schema v39**, the
-new application will migrate it to v40 **on startup**. Hold back production
-installation until the separately guarded metadata-refresh path and full
-local acceptance checklist are complete. The earlier **v38 -> v39**
-rehearsal must not be repeated against v39 production.
+The maintained production catalogue was last verified at **schema v39**.
+Launching the new application will apply **both v40 and v41 automatically**.
+Do not start that build against production until the isolated **v39 -> v41**
+rehearsal has passed and the remaining metadata development has been reviewed.
+Do not rerun the earlier v38 -> v39 rehearsal on a v39 database.
 
 When the entire metadata work is ready for host acceptance, follow the same
 backup+isolated restore procedure above **using a fresh v39 source backup**,
@@ -310,10 +311,10 @@ then validate `restoredEvidence.schemaVersion = 39`, `passed = true`,
 # using the preceding runbook's credential-resolution procedure.
 $env:PHOTOIDENTITY_WI0212_REHEARSAL = $connection
 try {
-    dotnet run --project src/PhotoIdentity.Cli -c Release -- catalogue rehearse-v40 `
+    dotnet run --project src/PhotoIdentity.Cli -c Release -- catalogue rehearse-v41 `
         --postgres-connection-env PHOTOIDENTITY_WI0212_REHEARSAL `
         --restore-report $restoreReportPath
-    if ($LASTEXITCODE -ne 0) { throw "v40 rehearsal failed" }
+    if ($LASTEXITCODE -ne 0) { throw "v41 rehearsal failed" }
 }
 finally {
     Remove-Item Env:PHOTOIDENTITY_WI0212_REHEARSAL -ErrorAction SilentlyContinue
@@ -321,18 +322,70 @@ finally {
 }
 ```
 
-This rehearsal compares row counts for **every existing table**, runs schema
-initialization twice, requires the exact v40 migration receipt, verifies all
-four new nullable columns and that none were silently fabricated for the
-restored historical records. Never point the command to production.
+This rehearsal compares row counts for **every existing table**, runs
+initialization twice, requires the exact v40/v41 receipts, verifies all four
+nullable stream columns and the newly empty audit table. It never opens or
+writes production, original media or cloud files. Never supply a production
+database as the restore-report verification target.
 
-Further host checks, once source-safe refresh exists: one approved local MOV
-with complete audio details, one MP4 with a *confirmed FFprobe-visible*
-Samsung model tag, one source without bitrate (should show Unknown), and one
-online-only clip that must not be touched. Photo/video regressions remain
-required. A proprietary ExifTool-only Samsung tag requires a separate
-approved extraction strategy; it is not silently supported by this FFprobe
-change.
+After the v41 migration is accepted, select a **single previously indexed,
+already local** video revision from its Video Details URL. Use only the
+launcher-approved FFprobe path and SHA-256 digest; the command checks the
+provided digest against the physical binary, but it does not independently
+grant tool approval. Dry-run by default:
+
+```powershell
+$revisionId = 'REPLACE_WITH_VIDEO_REVISION_UUID'
+$sourceRoot = 'C:\\YOUR_REGISTERED_LOCAL_VIDEO_ARCHIVE_ROOT'
+$ffprobePath = 'C:\\YOUR_APPROVED_FFPROBE_PATH\\ffprobe.exe'
+$approvedFfprobeSha256 = 'REPLACE_WITH_APPROVED_64_CHARACTER_SHA256'
+$connectionVariable = 'PHOTOIDENTITY_POSTGRES_CONNECTION_STRING'
+
+$refreshArgs = @(
+    'video', 'metadata', 'refresh', '--enable-video',
+    '--revision', $revisionId,
+    '--source-root', $sourceRoot,
+    '--ffprobe', $ffprobePath,
+    '--ffprobe-sha256', $approvedFfprobeSha256,
+    '--postgres-connection-env', $connectionVariable,
+    '--database', 'photoidentity_main'
+)
+
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @refreshArgs
+if ($LASTEXITCODE -ne 0) { throw 'Read-only metadata refresh verification failed' }
+```
+
+After reviewing the dry run and the rehearsal evidence, only deliberately
+authorize the matching, bounded metadata write:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @refreshArgs `
+    --apply --acknowledge-metadata-only
+if ($LASTEXITCODE -ne 0) { throw 'Explicit metadata refresh failed' }
+```
+
+Each command operates on exactly one current video, checks the registered
+source and exclusion state, verifies local-only availability and original
+SHA-256, and refuses changed or oversized videos (>1 GiB). Apply populates
+**only previously missing** camera/bitrate/audio fields and transactionally
+appends a tool/profile/time/changed-fields provenance action. Existing data
+is not overwritten; repeating apply is idempotent. Output remains aggregate
+and excludes paths, camera models, hashes, capture times and coordinates.
+The command never rewrites original media or expands to other videos.
+A version-39 database cannot be migrated by the dry-run command; it fails
+closed until migration is separately authorized.
+
+No local verification is requested until this and any necessary vendor-
+specific metadata adapter are developed. A Samsung model visible to ExifTool
+but **not** FFprobe will remain Unknown; do not claim the fixture is fixed
+before inspecting the approved FFprobe output.
+
+Future maintained-host acceptance should include one approved local MOV
+with audio details, one MP4 with a *confirmed FFprobe-visible* Samsung model
+tag or a separately approved vendor adapter, one clip without bitrate
+(showing Unknown), and one online-only clip that must not be touched.
+Verify no changes to manual time/Place/people, photo search and video
+playback. Do not import the full archive or rehydrate online-only media.
 
 ## Deferred
 
