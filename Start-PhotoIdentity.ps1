@@ -35,6 +35,8 @@ $SupportedSettings = @(
     "PhotoIdentity__VideoProcessing__FfmpegSha256",
     "PhotoIdentity__VideoProcessing__FfprobePath",
     "PhotoIdentity__VideoProcessing__FfprobeSha256",
+    "PhotoIdentity__VideoProcessing__ExifToolPath",
+    "PhotoIdentity__VideoProcessing__ExifToolSha256",
     "PhotoIdentity__VideoProcessing__CacheRoot",
     "PhotoIdentity__VideoProcessing__MaximumCacheMiB",
     "PhotoIdentity__VideoProcessing__MaximumProxyMiB",
@@ -139,7 +141,8 @@ function Assert-LauncherSettingValue {
 
     if ($Name -in @(
         "PhotoIdentity__VideoProcessing__FfmpegSha256",
-        "PhotoIdentity__VideoProcessing__FfprobeSha256"
+        "PhotoIdentity__VideoProcessing__FfprobeSha256",
+        "PhotoIdentity__VideoProcessing__ExifToolSha256"
     )) {
         if ($Value -cnotmatch '^[0-9a-f]{64}$') {
             throw "$Name must be a lowercase SHA-256 digest (64 hex characters)."
@@ -150,6 +153,7 @@ function Assert-LauncherSettingValue {
     if ($Name -in @(
         "PhotoIdentity__VideoProcessing__FfmpegPath",
         "PhotoIdentity__VideoProcessing__FfprobePath",
+        "PhotoIdentity__VideoProcessing__ExifToolPath",
         "PhotoIdentity__VideoProcessing__CacheRoot"
     )) {
         $isCache = $Name -eq "PhotoIdentity__VideoProcessing__CacheRoot"
@@ -515,6 +519,15 @@ function Read-LauncherConfiguration {
             "PhotoIdentity__VideoProcessing__FfprobePath",
             "PhotoIdentity__VideoProcessing__FfprobeSha256"
         )
+        $samsungToolKeys = @(
+            "PhotoIdentity__VideoProcessing__ExifToolPath",
+            "PhotoIdentity__VideoProcessing__ExifToolSha256"
+        )
+        $samsungToolSpecified = @($samsungToolKeys | Where-Object { $settings.ContainsKey($_) })
+        if ($samsungToolSpecified.Count -eq 1) {
+            throw "Optional Samsung metadata requires ExifToolPath and ExifToolSha256 together."
+        }
+
         $specifiedVideoToolKeys = @($videoToolKeys | Where-Object { $settings.ContainsKey($_) })
         if ($specifiedVideoToolKeys.Count -gt 0 -and
             $specifiedVideoToolKeys.Count -ne $videoToolKeys.Count) {
