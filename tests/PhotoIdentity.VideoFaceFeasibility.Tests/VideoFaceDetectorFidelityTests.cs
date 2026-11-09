@@ -127,4 +127,42 @@ public sealed class VideoFaceDetectorFidelityTests
              "--private-report", "new.json", "--diagnostics",
              "--detector-pipeline", "multi-scale", "--tile-size", "320"]));
     }
+    [Fact]
+    public void Reconstructed_geometry_preserves_post_top32_face_ordinals_and_checks_evidence()
+    {
+        NormalizedFaceLandmarks landmarks = new(
+            new NormalizedPoint(0.22, 0.32),
+            new NormalizedPoint(0.28, 0.32),
+            new NormalizedPoint(0.25, 0.36),
+            new NormalizedPoint(0.22, 0.40),
+            new NormalizedPoint(0.28, 0.40));
+        DetectedFaceCandidate[] candidates = Enumerable.Range(0, 33)
+            .Select(i => new DetectedFaceCandidate(
+                new NormalizedBoundingBox(0.1 + i * 0.001, 0.2, 0.2, 0.3),
+                landmarks,
+                0.5 + i * 0.01))
+            .ToArray();
+
+        VideoFaceFrameDetectionDiagnostic expected = new(1, 1000, 32, 0.51, 0.82)
+        {
+            RawCandidatesDetected = 33,
+            CandidatesDiscarded = 1,
+        };
+
+        IReadOnlyList<VideoFaceReviewBox> result =
+            VideoFaceReviewGeometryConsistency.Reconstruct(candidates, expected);
+
+        Assert.Equal(32, result.Count);
+        Assert.Equal(1, result[0].FaceNumber);
+        Assert.Equal(32, result[^1].FaceNumber);
+        Assert.Equal(0.132, result[0].X, 3);
+        Assert.Equal(0.101, result[^1].X, 3);
+        Assert.Throws<InvalidOperationException>(() =>
+            VideoFaceReviewGeometryConsistency.Reconstruct(
+                candidates, expected with { CandidatesDiscarded = 2 }));
+        Assert.Throws<InvalidOperationException>(() =>
+            VideoFaceReviewGeometryConsistency.Reconstruct(
+                candidates, expected with { LowestConfidence = 0.1 }));
+    }
+
 }
