@@ -242,6 +242,31 @@ refreshes remain one selected, current, hash-verified local revision at
 a time. The user requested one consolidated local verification cycle
 when metadata development is complete.
 
+## Follow-up requirement: automatic Samsung camera fallback (2026-11-09)
+
+The maintainer reports that a substantial portion of their archive comes
+from the Samsung device, so the existing manually selected ExifTool
+refresh is insufficient for **future** Archive imports. A new opt-in
+Video Settings checkbox now persists `ExtractSamsungMetadata` off by
+default and uses independently approved local ExifTool executable
+path/SHA-256 from the private launcher. During a separately authorized
+Archive first inspection (or explicit CLI ingest flags), FFprobe still
+runs first. Only when make/model is missing and no incompatible
+non-Samsung make is present does the bounded Samsung-only adapter run.
+It may complete NULL camera fields via a separate v41 audit action;
+existing make/model, capture, Place, people and original inspection
+values are never overwritten.
+
+No auto backfill, automatic OneDrive hydration beyond existing Archive
+approval, or media reads from browsing are introduced. Existing v41
+migration, manual metadata acceptance and photo/video regression evidence
+remain valid. **New acceptance gate:** demonstrate one previously
+unindexed Samsung video is enriched during Archive processing without
+operator CLI refresh, the checkbox persists and can be disabled, and
+source integrity / per-tool provenance / online-only behavior hold.
+After that, update and merge the held documentation-only WI-0212
+closeout PR. See `docs/operations/video-details-wi0212-acceptance.md`.
+
 ## Acceptance criteria
 
 - [ ] Maintainer-approved current-video metadata inventory identifies
