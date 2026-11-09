@@ -341,6 +341,8 @@ public static class Program
                                      --ffprobe-sha256 APPROVED_SHA256
                                      --postgres-connection-env NAME --database DB
                                      [--timeout-seconds SECONDS (1..120)]
+                                     [--enable-samsung-vendor-camera --exiftool ABS_EXE
+                                      --exiftool-sha256 APPROVED_SHA256]
                                      [--apply --acknowledge-metadata-only]
                                      (dry run by default; one current, SHA-256
                                       verified local revision, fill only NULL
