@@ -18,10 +18,8 @@ public static class VideoFaceReviewGeometryRunner
 {
     private sealed record ReviewFrame(string Clip, int FrameNumber);
     private sealed record ReviewSelection(int SchemaVersion, List<ReviewFrame>? Frames);
-    private sealed record ReviewBox(int FaceNumber, double X, double Y,
-        double Width, double Height);
     private sealed record ReviewGeometryFrame(string Clip, int FrameNumber,
-        IReadOnlyList<ReviewBox> Boxes);
+        IReadOnlyList<VideoFaceReviewBox> Boxes);
     private sealed record ReviewGeometry(int SchemaVersion,
         IReadOnlyList<ReviewGeometryFrame> Frames);
 
@@ -191,34 +189,8 @@ public static class VideoFaceReviewGeometryRunner
                 VideoFaceExtractionFidelity.VerifyDecodedSize(decoded.Size, clip.Expected);
                 IReadOnlyList<PhotoIdentity.Core.Recognition.DetectedFaceCandidate> raw =
                     await detector.DetectAsync(decoded, CancellationToken.None);
-                VideoFaceCandidateSelection retained =
-                    VideoFaceCandidateLimiter.Apply(raw, VideoFaceOverflowPolicy.RetainTop32);
-                int expectedRaw = expected.RawCandidatesDetected ?? expected.FacesDetected;
-                int expectedDiscarded = expected.CandidatesDiscarded ?? 0;
-                if (retained.RawCandidateCount != expectedRaw ||
-                    retained.Candidates.Count != expected.FacesDetected ||
-                    retained.DiscardedCandidates != expectedDiscarded)
-                {
-                    throw new InvalidOperationException(
-                        "Reconstructed face counts disagree with the private report.");
-                }
-
-                // Reject changed candidates even when their total counts match.
-                if (retained.Candidates.Count > 0 &&
-                    (Math.Abs(retained.Candidates.Min(d => d.Confidence) -
-                        (expected.LowestConfidence ?? double.NaN)) > 0.001 ||
-                     Math.Abs(retained.Candidates.Max(d => d.Confidence) -
-                        (expected.HighestConfidence ?? double.NaN)) > 0.001))
-                {
-                    throw new InvalidOperationException(
-                        "Reconstructed detector scores disagree with the private report.");
-                }
-
-                ReviewBox[] boxes = retained.Candidates
-                    .Select((face, index) => new ReviewBox(index + 1,
-                        face.BoundingBox.X, face.BoundingBox.Y,
-                        face.BoundingBox.Width, face.BoundingBox.Height))
-                    .ToArray();
+                IReadOnlyList<VideoFaceReviewBox> boxes =
+                    VideoFaceReviewGeometryConsistency.Reconstruct(raw, expected);
                 outputFrames.Add(new ReviewGeometryFrame(
                     selectedFrame.Clip, selectedFrame.FrameNumber, boxes));
             }
