@@ -681,7 +681,7 @@ DB reads/writes, originals, video decoding, OneDrive hydration
 or production UI changes.
 
 **Requirement WI0155-REVIEW-03:** Make
-\`HumanDecision\`/\`ReviewerNotes\` directly editable in the
+`HumanDecision`/`ReviewerNotes` directly editable in the
 local HTML gallery with explicit CSV save and import. The
 reviewer decision values must distinguish correct suggested
 person, wrong suggested person, visible unknown person,
