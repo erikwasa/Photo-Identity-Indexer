@@ -59,6 +59,7 @@
     private SmartCollectionPhotoNavigationResolution? Resolved { get; set; }
     private readonly Dictionary<int, SmartCollectionPageResponse> CachedPages = new();
     private readonly Dictionary<int, Task<SmartCollectionPageResponse?>> PendingPrefetches = new();
+    private readonly HashSet<int> FailedPrefetchOffsets = new();
     private string? CachedContextKey;
     private int CacheEpoch;
     private long NavigationGeneration;
@@ -228,6 +229,7 @@
         CachedContextKey = null;
         CachedPages.Clear();
         PendingPrefetches.Clear();
+        FailedPrefetchOffsets.Clear();
     }
 
     private void CacheWindow(int offset, SmartCollectionPageResponse page)
@@ -261,7 +263,8 @@
 
     private void QueuePrefetch(SmartCollectionWorkspaceContext context, int offset)
     {
-        if (CachedPages.ContainsKey(offset) || PendingPrefetches.ContainsKey(offset))
+        if (CachedPages.ContainsKey(offset) || PendingPrefetches.ContainsKey(offset) ||
+            FailedPrefetchOffsets.Contains(offset))
         {
             return;
         }
@@ -325,6 +328,12 @@
         {
             CacheWindow(offset, page);
         }
+        else
+        {
+            // Do not retry a failing speculative query on every subsequent photo.
+            // The foreground navigation path still makes its normal attempt.
+            FailedPrefetchOffsets.Add(offset);
+        }
     }
 
     private async Task<SmartCollectionTransientNavigationState?> LoadTransientStateAsync(
@@ -334,7 +343,7 @@
         {
             if (!silent)
             {
-    Notice = "The transient Smart Collection context is incomplete.";
+                Notice = "The transient Smart Collection context is incomplete.";
             }
             return null;
         }
@@ -346,7 +355,7 @@
         {
             if (!silent)
             {
-    Notice = "This unsaved Smart Collection preview is no longer available in this browser tab.";
+                Notice = "This unsaved Smart Collection preview is no longer available in this browser tab.";
             }
             return null;
         }
@@ -357,7 +366,7 @@
         {
             if (!silent)
             {
-    Notice = "This unsaved Smart Collection preview could not be restored.";
+                Notice = "This unsaved Smart Collection preview could not be restored.";
             }
             return null;
         }
