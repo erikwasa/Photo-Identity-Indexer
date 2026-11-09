@@ -159,6 +159,83 @@ public sealed class VideoFaceExperimentTests
             VideoFaceFailureDiagnostics.Mark(exception, "C:\\Private\\secret-person.json"));
     }
 
+    [Fact]
+    public void Candidate_limiter_is_deterministic_and_never_exceeds_32_embeddings()
+    {
+        // Distinct confidences make the retained subset check unambiguous.
+        IReadOnlyList<DetectedFaceCandidate> proposed = Enumerable.Range(0, 40)
+            .Select(i => new DetectedFaceCandidate(
+                new NormalizedBoundingBox(0.2, 0.2, 0.5, 0.5),
+                new NormalizedFaceLandmarks(
+                    new NormalizedPoint(0.6, 0.4),
+                    new NormalizedPoint(0.4, 0.4),
+                    new NormalizedPoint(0.5, 0.5),
+                    new NormalizedPoint(0.6, 0.6),
+                    new NormalizedPoint(0.4, 0.6)),
+                0.6 + (i * 0.01)))
+            .Reverse()
+            .ToArray();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            VideoFaceCandidateLimiter.Apply(proposed, VideoFaceOverflowPolicy.Fail));
+
+        VideoFaceCandidateSelection selected = VideoFaceCandidateLimiter.Apply(
+            proposed, VideoFaceOverflowPolicy.RetainTop32);
+        Assert.Equal(40, selected.RawCandidateCount);
+        Assert.Equal(8, selected.DiscardedCandidates);
+        Assert.Equal(32, selected.Candidates.Count);
+        Assert.Equal(0.99, selected.Candidates[0].Confidence, 8);
+        Assert.Equal(0.68, selected.Candidates[^1].Confidence, 8);
+        Assert.Equal(selected.Candidates.Select(f => f.Confidence),
+            VideoFaceCandidateLimiter.Apply(
+                proposed, VideoFaceOverflowPolicy.RetainTop32)
+                .Candidates.Select(f => f.Confidence));
+    }
+
+    [Fact]
+    public async Task Explicit_overflow_retains_32_and_records_losses_in_private_report()
+    {
+        string dir = CreateTempDirectory();
+        try
+        {
+            byte[] bytes = [137, 80, 78, 71, 13, 10, 26, 10, 1];
+            await File.WriteAllBytesAsync(Path.Combine(dir, "one.png"), bytes);
+
+            var matcher = new VideoFaceCataloguePersonMatcher(
+            [
+                new VideoFaceCatalogueExemplar(
+                    "P01", new string('a', 64),
+                    new EmbeddingVector(new float[] { 1, 0, 0 })),
+            ]);
+            VideoFaceFrameSet frames = new(1,
+                [new VideoFaceFrame(1000, "one.png")]);
+            var experiment = new VideoFaceExperiment(
+                new FakeDecoder(), new FakeDetector(faceCount: 33),
+                new FakeAligner(), new FakeEmbedder(),
+                overflowPolicy: VideoFaceOverflowPolicy.RetainTop32);
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                experiment.RunAsync(frames, dir));
+
+            VideoFacePrivateReview review = await experiment.RunWithPreparedMatcherAsync(
+                frames, dir, matcher, detectorConfidence: 0.5);
+
+            Assert.Equal(32, review.Aggregate.FacesDetected);
+            Assert.Equal(32, review.Aggregate.EmbeddingsCalculated);
+            Assert.Equal(32, review.Findings.Count);
+            VideoFaceFrameDetectionDiagnostic diagnostic =
+                Assert.Single(review.Diagnostics!.FrameDetections);
+            Assert.Equal(33, diagnostic.RawCandidatesDetected);
+            Assert.Equal(1, diagnostic.CandidatesDiscarded);
+            Assert.Equal(32, diagnostic.FacesDetected);
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(Path.Combine(dir, "one.png")));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"wi0155-{Guid.NewGuid():N}");
