@@ -305,8 +305,10 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         command.CommandText = filter.Relationship is not null
             ? filter.People.Count > 0
                 ? BuildPeopleRelationshipPageSql(filter)
-                : BuildRelationshipPageSql(where)
-            : $"""
+                : BuildStagedPageSql(where)
+            : filter.People.Count > 0 && filter.Taken is not null
+                ? BuildStagedPageSql(where)
+                : $"""
             {CommonCtes}
             SELECT
                 asset_revisions.id,
@@ -623,16 +625,18 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             """;
 
         string otherFilters = BuildWhere(filter, omitPeopleRelationship: true);
-        return BuildRelationshipPageSql(
+        return BuildStagedPageSql(
             otherFilters,
             eligibility,
             "INNER JOIN matched_people_revisions AS matched ON matched.revision_id = asset_revisions.id");
     }
 
-    // First pick the exact relationship-filtered page before projecting the
-    // full people array and effective place. This preserves pagination order,
+    // First pick the exact filtered page before projecting the full people array
+    // and effective place. Used for relationship filters and people+date pages,
+    // where enriching every candidate before LIMIT can be especially expensive.
+    // This preserves pagination order,
     // exact counts and photo-only scope, while bounding enrichment to LIMIT.
-    private static string BuildRelationshipPageSql(
+    private static string BuildStagedPageSql(
         string where,
         string eligibilityCtes = "",
         string eligibilityJoin = "") => $"""
