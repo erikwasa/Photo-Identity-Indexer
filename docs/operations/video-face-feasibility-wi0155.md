@@ -1514,3 +1514,88 @@ detection. This increment does not establish face accuracy,
 does not change single-pass behavior, does not bypass the 32
 alignment/embedding cap, and does not alter production,
 originals, OneDrive state, or the database.
+
+## Checkpoint 14 — private visual review instead of enormous JSON (2026-11-09)
+
+**Operator evidence after merged PR #775:** Focused tests PASS; bounded
+multi-scale 1024 PASS with 4,043 raw face candidates, 3,986 retained,
+57 discarded across 17 overflow frames and 207 seconds elapsed.
+**Human usefulness and identification correctness remain unreviewed.**
+The complete private report is approximately 150,000 text lines; asking
+the operator to assess each candidate manually would be unworkable.
+
+**New isolated offline review tool (proposed, no production integration):**
+`tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceReviewGallery.ps1`
+accepts the **existing private catalogue report** and the **existing
+private case file**. It does not run inference, connect to PostgreSQL,
+read original videos, write identity state, modify extracted images or
+change recognition thresholds. It creates a **new local-only** folder
+under `%LOCALAPPDATA%\PhotoIdentity\WI0155\review-galleries` with:
+
+- `review.html` — collapsible per-video summaries, per-person ranking
+  coverage (including people never top-ranked), a few best-ranked
+  frame observations per person, uncertain suggestions and highest
+  candidate-overflow frames; uses **small, newly created JPEG review
+  thumbnails** and links back to the exact approved original frames.
+- `review-worksheet.csv` — a small shortlist of the same observations
+  with blank `HumanDecision` and `ReviewerNotes` columns for private
+  reviewer input.
+- `thumbnails\` — local, explicitly derived *review copies* (not model
+  inputs or claimed recognition artifacts). The script creates these
+  only for shortlisted frames; it does not duplicate the full frame
+  collection or overwrite source material.
+
+**Important limitations:** The existing diagnostic report does not
+retain per-face bounding boxes or face crops. Therefore gallery cards
+show a **full video frame** and its *face ordinal*, not a marked or
+cropped specific face. An ordinal cannot be visually matched to a face
+without further implementation. Highest-ranked person aliases and
+cosine scores are exploratory, not verified identity assignments.
+The `Uncertain suggestions` section is *not* proof of unknown people.
+Top-32 confidence selection may discard genuinely useful low-confidence
+faces, and the review gallery cannot display discarded boxes.
+Human inspection remains required before claiming face discovery or
+identification gains. The HTML/CSV/preview images are private
+biometric-related material: never commit, upload or share them.
+
+### One-time Windows PowerShell 7.6 review commands (no repeated inference)
+
+After the focused PR merges into `wi-0155`, refresh the independent
+worktree. **Use the already successful** bounded 1024 tiled private
+report and exactly the case file used to create it:
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+# Point to EXISTING private local paths; no database connection is needed.
+# $boundedReport = '<previous tiled1024-bounded-...json>'
+# $newCasesPath = '<previous cases-native180-...json>'
+
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceReviewGallery.ps1
+if (-not $?) { throw 'Synthetic gallery verification failed.' }
+
+$gallery = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceReviewGallery.ps1 `
+    -PrivateReportPath $boundedReport `
+    -PrivateCasesPath $newCasesPath `
+    -FramesPerPerson 2 `
+    -UncertainFramesPerClip 3 `
+    -OverflowFramesPerClip 4 `
+    -OpenGallery
+
+$gallery.GalleryPath
+$gallery.WorksheetPath
+```
+
+Review one or two **useful observations per actually visible person**
+rather than every detection. Prioritize wrong matches, missing known
+people, unknown people, duplicates and frames where useful evidence
+might have been discarded. Copy **only non-identifying aggregate
+conclusions** into the work item. Keep extracted V03 PNGs and the
+successful original report intact until the review completes.
+The review tool's `-OpenGallery` option simply opens the generated
+local HTML in the default browser; it does not start a web server.
+
+A synthetic smoke test with local generated PNGs covers bounded frame
+shortlisting, thumbnail creation, private CSV/HTML creation, unchanged
+source hashes and refusal of out-of-manifest frame references.
+CI does **not** necessarily execute this Windows-only PowerShell test;
+run it deliberately on Windows before private review.
