@@ -247,7 +247,43 @@ and is not an objective picture-quality score.
 6. Reconfirm video details, person tagging and an online-only original do
    not read original bytes, and photo/video regressions remain green.
 
-## Deferred
+### PR #771 maintainer follow-up and date-editor correction (2026-11-09)
+
+The maintainer confirmed **PASS** for updated checkout, focused tests,
+documentation, production schema v39, startup, locally displayed recording
+time, whole/decimal fps formatting, orientation, codecs, bit depth, HDR,
+restoring the previous GPS Place after both manual edit and manual clear,
+no unintended GeoNames calls, manual people, online-only preservation,
+photo regressions and video playback/search.
+
+**FAIL**: in a browser configured with a day-first locale, the native
+`datetime-local` control displayed `DD/MM/YYYY HH:MM` while Blazor
+converted the changed value and the handler parsed a strict
+`yyyy-MM-ddTHH:mm` string. Save rejected a legitimate selected date;
+original-versus-overridden display and restore therefore could not be
+verified. The follow-up fix changes the editor to a **plain text input**
+with a stable `YYYY-MM-DD HH:MM` format regardless of browser locale,
+keeps browser-local timezone conversion to an offset-bearing API payload,
+and retains strict daylight-saving overlap/gap rejection. The same fix
+changes frame-rate formatting to the nearest whole fps.
+
+After this fix merges, verify only the focused UI flow on the already
+migrated v39 catalogue (do not repeat the v38 -> v39 restore/rehearsal):
+
+1. Update `main`; run
+   `dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter "FullyQualifiedName~VideoDetailsPresentationTests|FullyQualifiedName~VideoDetailsLayoutContractTests|FullyQualifiedName~VideoDetailsPostgresTests"`.
+2. Build using `./Package-PhotoIdentity.ps1 -Configuration Release` and
+   relaunch the approved publish path with the private launcher.
+3. In the locale where the old picker showed `24/02/2012 00:00`, enter
+   `2012-02-24 00:00` into the plain textbox and save. It must work without
+   a format error; inspect persisted local display after a page refresh.
+4. Confirm both corrected and originally extracted times appear in local
+   time; select **Use extracted time** and confirm the extracted time is
+   restored and the original-only second row disappears.
+5. Verify `496000/16577` is displayed as **30 fps**, not 29.92 fps.
+6. Confirm GPS Place restoration, manual people and online-only original
+   retention remain unaffected. No source inspection or schema changes.
+
 
 Automatic background video geocoding, bulk rescans, collection membership
 (WI-0153), video slideshow (WI-0154), video-face recognition (WI-0155)
