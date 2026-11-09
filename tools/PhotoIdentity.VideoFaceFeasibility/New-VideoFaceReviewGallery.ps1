@@ -177,6 +177,12 @@ foreach ($clip in $reportClips) {
         $findingStatuses[$key] = [string]$finding.reviewStatus
     }
 
+    # A face is uniquely identified by its video, frame and 1-based
+    # face ordinal; never request two human decisions for the same face.
+    # The section is deliberately NOT part of that observation identity.
+    $topRankedFaceKeys = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+
     # Review the strongest *ranked observations* for each selected person.
     # They are NOT verified identifications and can have very low similarity.
     foreach ($person in $personAliases) {
@@ -195,6 +201,7 @@ foreach ($clip in $reportClips) {
             Add-ReviewEntry $alias 'Top-ranked by person' $frameNo (
                 [int]$candidate.faceNumber) $person (
                 [double]$candidate.topSimilarity) $status
+            [void]$topRankedFaceKeys.Add($key)
             if ($used.Count -ge $FramesPerPerson) { break }
         }
     }
@@ -208,7 +215,11 @@ foreach ($clip in $reportClips) {
     $used = [Collections.Generic.HashSet[int]]::new()
     foreach ($item in $uncertain) {
         $frameNo = [int]$item.frameNumber
-        if (-not $used.Add($frameNo)) { continue }
+        $faceKey = '{0}:{1}' -f $frameNo, [int]$item.faceNumber
+        # The same candidate can have a high *rank* but still fail the
+        # recognition threshold. Do not ask the operator to rate it twice.
+        if ($topRankedFaceKeys.Contains($faceKey) -or
+            -not $used.Add($frameNo)) { continue }
         Add-ReviewEntry $alias 'Uncertain suggestions' $frameNo (
             [int]$item.faceNumber) '' ([double]$item.similarity) (
             [string]$item.reviewStatus)
