@@ -114,6 +114,7 @@ public static class VideoMetadataRefreshCommandRunner
         before.Refresh();
         if (!before.Exists || before.Length != target.SizeBytes)
             throw new InvalidOperationException("Selected local file differs in size from its catalogue revision.");
+        DateTime lastWriteBefore = before.LastWriteTimeUtc;
 
         string ffprobePath = VideoPilotMediaTools.ValidateExecutable(options.FfprobePath);
         string verifiedToolHash = await HashFileAsync(ffprobePath, token);
@@ -138,14 +139,15 @@ public static class VideoMetadataRefreshCommandRunner
 
         before.Refresh();
         if (!before.Exists || before.Length != target.SizeBytes ||
+            before.LastWriteTimeUtc != lastWriteBefore ||
             !string.Equals(contentHash, target.ContentSha256, StringComparison.Ordinal) ||
             !string.Equals(verifiedToolHash, await HashFileAsync(ffprobePath, token), StringComparison.Ordinal) ||
             await source.GetAvailabilityAsync(reference, token) != AssetAvailability.Local)
             throw new InvalidOperationException(
                 "Selected source or tool changed during inspection; no refresh was written.");
 
-        // A file might be modified without its size changing. The probe and
-        // SHA-256 must observe the same stable local filesystem snapshot.
+        // Only the newly inspected fields are candidates for completion.
+        // Preserve every pre-existing source inspection and manual action.
         VideoTechnicalMetadataRefreshFacts facts = new(
             media.CameraMake, media.CameraModel, media.VideoBitrateBps,
             media.AudioSampleRateHz, media.AudioChannels, media.AudioChannelLayout,
