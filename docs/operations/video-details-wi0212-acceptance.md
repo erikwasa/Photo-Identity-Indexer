@@ -285,6 +285,57 @@ migrated v39 catalogue (do not repeat the v38 -> v39 restore/rehearsal):
    retention remain unaffected. No source inspection or schema changes.
 
 
+## Planned v39 -> v40 metadata migration gate (do not run yet)
+
+The WI-0212 technical-metadata extension adds four **nullable** columns to
+`video_revision_metadata`: `video_bitrate_bps`, `audio_sample_rate_hz`,
+`audio_channels`, and `audio_channel_layout`. It does not change source
+revisions or existing capture/Place/person/face evidence. The parser consumes
+only FFprobe's bounded, explicitly selected local source stream facts; no
+background source access. No historical clip is automatically reinspected.
+
+Because the current production catalogue is already **schema v39**, the
+new application will migrate it to v40 **on startup**. Hold back production
+installation until the separately guarded metadata-refresh path and full
+local acceptance checklist are complete. The earlier **v38 -> v39**
+rehearsal must not be repeated against v39 production.
+
+When the entire metadata work is ready for host acceptance, follow the same
+backup+isolated restore procedure above **using a fresh v39 source backup**,
+then validate `restoredEvidence.schemaVersion = 39`, `passed = true`,
+`cleanupStatus = retained` and exact production exclusion. Run:
+
+```powershell
+# Configure this short-lived variable from the existing private launcher,
+# using the preceding runbook's credential-resolution procedure.
+$env:PHOTOIDENTITY_WI0212_REHEARSAL = $connection
+try {
+    dotnet run --project src/PhotoIdentity.Cli -c Release -- catalogue rehearse-v40 `
+        --postgres-connection-env PHOTOIDENTITY_WI0212_REHEARSAL `
+        --restore-report $restoreReportPath
+    if ($LASTEXITCODE -ne 0) { throw "v40 rehearsal failed" }
+}
+finally {
+    Remove-Item Env:PHOTOIDENTITY_WI0212_REHEARSAL -ErrorAction SilentlyContinue
+    $connection = ""
+}
+```
+
+This rehearsal compares row counts for **every existing table**, runs schema
+initialization twice, requires the exact v40 migration receipt, verifies all
+four new nullable columns and that none were silently fabricated for the
+restored historical records. Never point the command to production.
+
+Further host checks, once source-safe refresh exists: one approved local MOV
+with complete audio details, one MP4 with a *confirmed FFprobe-visible*
+Samsung model tag, one source without bitrate (should show Unknown), and one
+online-only clip that must not be touched. Photo/video regressions remain
+required. A proprietary ExifTool-only Samsung tag requires a separate
+approved extraction strategy; it is not silently supported by this FFprobe
+change.
+
+## Deferred
+
 Automatic background video geocoding, bulk rescans, collection membership
 (WI-0153), video slideshow (WI-0154), video-face recognition (WI-0155)
 and video-level descriptions/search revision (WI-0213) remain separate
