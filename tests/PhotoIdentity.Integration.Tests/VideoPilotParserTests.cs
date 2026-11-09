@@ -242,7 +242,7 @@ public sealed class VideoPilotParserTests
             {
               "streams": [
                 { "codec_type":"video","bit_rate":"-1",
-                  "tags":{"SamsungModel":"bad\\u000a"}},
+                  "tags":{"SamsungModel":"bad\u000a"}},
                 { "codec_type":"audio","sample_rate":"0","channels":500,
                   "channel_layout":"unknown"}
               ],
