@@ -25,7 +25,13 @@ function New-SyntheticClip {
             @{
                 frameNumber = 1; timestampMs = 1000; faceNumber = $i
                 topReferenceAlias = 'P01'
-                topSimilarity = if ($i -eq 1) { 0.85 } else { 0.41 }
+                # V02: best-ranked face is itself below the review
+                # threshold, triggering the historic cross-section duplicate.
+                # V01: a *different face* in the same frame is uncertain
+                # and must remain independently reviewable.
+                topSimilarity = if ($i -eq 1) {
+                    if ($Alias -eq 'V02') { 0.65 } else { 0.85 }
+                } elseif ($i -eq 2) { 0.74 } else { 0.41 }
             }
         }
         @{
@@ -52,8 +58,8 @@ function New-SyntheticClip {
             @{
                 alias = 'P01'
                 topRankObservations = $ranked.Count
-                bestTopRankSimilarity = 0.85
-                strongReviewCandidates = 1
+                bestTopRankSimilarity = if ($Alias -eq 'V02') { 0.65 } else { 0.85 }
+                strongReviewCandidates = if ($Alias -eq 'V02') { 0 } else { 1 }
             }
         )
         review = @{
@@ -157,6 +163,22 @@ try {
     Assert-True ($html.Contains('class="human-decision"')) 'Interactive review dropdown missing.'
     Assert-True ($html.Contains('class="reviewer-notes"')) 'Reviewer notes editor missing.'
     Assert-True ($html.Contains('review-ui.js')) 'Offline UI script not linked.'
+    Assert-True ($html.Contains('Known person - no reliable match')) 'Missing known person missed by matching option.'
+    Assert-True ($html.Contains('Frame-level diagnostic only')) 'Missing frame-level overflow guidance.'
+
+    $faceRows = @($worksheet | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Face) })
+    $seenFaces = @($faceRows |
+        Group-Object { '{0}:{1}:{2}' -f $_.Clip,$_.Frame,$_.Face } |
+        Where-Object { $_.Count -gt 1 })
+    Assert-True ($seenFaces.Count -eq 0) 'The same face appears in two review sections.'
+    Assert-True (@($worksheet | Where-Object {
+        $_.Clip -eq 'V02' -and $_.Section -eq 'Uncertain suggestions' -and
+        $_.Frame -eq '2' -and $_.Face -eq '1'
+    }).Count -eq 1) 'After suppressing V02 duplicate, the next uncertain frame was not selected.'
+    Assert-True (@($worksheet | Where-Object {
+        $_.Clip -eq 'V01' -and $_.Section -eq 'Uncertain suggestions' -and
+        $_.Frame -eq '1' -and $_.Face -eq '2'
+    }).Count -eq 1) 'A different uncertain face in the same frame was suppressed.'
     Assert-True (@($worksheet | Where-Object Section -eq 'Overflow / omissions').Count -eq 1) 'Missing overflow worksheet entry.'
     foreach ($path in $originalHashes.Keys) {
         Assert-True ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ceq $originalHashes[$path]) 'Source PNG changed.'
