@@ -136,19 +136,26 @@ public sealed class VideoFaceExperiment
     private readonly IFaceAligner _aligner;
     private readonly IFaceEmbedder _embedder;
     private readonly VideoFaceDetectorProfile? _detectorProfile;
+    private readonly VideoFaceOverflowPolicy _overflowPolicy;
 
     public VideoFaceExperiment(
         IImageDecoder decoder,
         IFaceDetector detector,
         IFaceAligner aligner,
         IFaceEmbedder embedder,
-        VideoFaceDetectorProfile? detectorProfile = null)
+        VideoFaceDetectorProfile? detectorProfile = null,
+        VideoFaceOverflowPolicy overflowPolicy = VideoFaceOverflowPolicy.Fail)
     {
+        if (!Enum.IsDefined(overflowPolicy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(overflowPolicy));
+        }
         _decoder = decoder;
         _detector = detector;
         _aligner = aligner;
         _embedder = embedder;
         _detectorProfile = detectorProfile;
+        _overflowPolicy = overflowPolicy;
     }
 
     public async Task<VideoFaceAggregate> RunAsync(
@@ -307,6 +314,11 @@ public sealed class VideoFaceExperiment
     {
         VideoFaceFrameSetLoader.Validate(set, coverage);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
+        if (!coverage && _overflowPolicy != VideoFaceOverflowPolicy.Fail)
+        {
+            throw new ArgumentException(
+                "Bounded overflow retention requires explicit coverage diagnostics.");
+        }
         // Preflight all selected paths before invoking a model.
         string[] files = set.Frames!.Select(frame =>
             VideoFaceFrameSetLoader.ResolveApprovedFrame(manifestDirectory, frame.File)).ToArray();
@@ -352,13 +364,12 @@ public sealed class VideoFaceExperiment
                 stage = "frame-fidelity";
                 VideoFaceExtractionFidelity.VerifyDecodedSize(image.Size, expectedNativeSize);
                 stage = "face-detection";
-                IReadOnlyList<DetectedFaceCandidate> detections =
+                IReadOnlyList<DetectedFaceCandidate> rawDetections =
                     await _detector.DetectAsync(image, cancellationToken);
                 stage = "face-count-limit";
-                if (detections.Count > 32)
-                {
-                    throw new InvalidOperationException("The frame exceeded the 32-face exploratory limit.");
-                }
+                VideoFaceCandidateSelection selected = VideoFaceCandidateLimiter.Apply(
+                    rawDetections, _overflowPolicy);
+                IReadOnlyList<DetectedFaceCandidate> detections = selected.Candidates;
 
                 totalFaces += detections.Count;
                 if (detections.Count > 0)
@@ -369,7 +380,12 @@ public sealed class VideoFaceExperiment
                 if (diagnostics)
                 {
                     frameDetections.Add(VideoFaceSensitivityDiagnostics.DescribeFrame(
-                        index + 1, set.Frames![index].TimestampMs, detections, image.Size));
+                        index + 1, set.Frames![index].TimestampMs, detections, image.Size)
+                        with
+                        {
+                            RawCandidatesDetected = selected.RawCandidateCount,
+                            CandidatesDiscarded = selected.DiscardedCandidates,
+                        });
                 }
 
                 List<EmbeddingVector> current = [];
