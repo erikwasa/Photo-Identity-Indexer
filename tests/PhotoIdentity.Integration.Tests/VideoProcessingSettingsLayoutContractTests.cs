@@ -18,6 +18,7 @@ public sealed class VideoProcessingSettingsLayoutContractTests
         {
             "video-processing-enabled", "video-processing-online",
             "video-processing-one-step", "video-processing-auto-posters",
+            "video-processing-samsung-metadata",
             "video-processing-quota-override",
             "video-retention-confirm"
         })
@@ -90,7 +91,7 @@ public sealed class VideoProcessingSettingsLayoutContractTests
         Assert.Contains("@bind=\"AutomaticPostersForNewProxies\"", page);
         Assert.Contains("AutomaticPostersForNewProxies = Status.AutomaticPostersForNewProxies;", page);
         Assert.Contains("RetentionAgeHours, StopAfterOneVideoStepPerAdvance,", page);
-        Assert.Contains("AutomaticPostersForNewProxies));", page);
+        Assert.Contains("AutomaticPostersForNewProxies, ExtractSamsungMetadata));", page);
         Assert.Contains("not the original video", page);
         Assert.Contains("This does not backfill older videos", page);
 
@@ -103,6 +104,29 @@ public sealed class VideoProcessingSettingsLayoutContractTests
         Assert.Contains("TryCreateForPublishedProxyAsync(", worker);
         Assert.DoesNotContain("TryCreateForPublishedProxyAsync", library);
         Assert.DoesNotContain("VideoProxyPosterCommandRunner", library);
+    }
+
+    [Fact]
+    public void Samsung_metadata_option_is_off_by_default_and_never_triggers_browse_processing()
+    {
+        (string page, _) = Sources();
+        Assert.Contains("Extract Samsung camera metadata when FFprobe does not provide it", page);
+        Assert.Contains("@bind=\"ExtractSamsungMetadata\"", page);
+        Assert.Contains("ExtractSamsungMetadata = Status.ExtractSamsungMetadata;", page);
+        Assert.Contains("AutomaticPostersForNewProxies, ExtractSamsungMetadata));", page);
+        Assert.Contains("No additional downloads, bulk rescans", page);
+        string root = ResolveRepositoryRoot();
+        string archive = File.ReadAllText(Path.Combine(root,
+            "src", "PhotoIdentity.Api", "VideoArchiveProcessingService.cs"));
+        string cli = File.ReadAllText(Path.Combine(root,
+            "src", "PhotoIdentity.Cli", "VideoSamsungAutomaticMetadata.cs"));
+        string library = File.ReadAllText(Path.Combine(root,
+            "src", "PhotoIdentity.Web", "Pages", "Videos.razor"));
+        Assert.Contains("VideoSamsungAutomaticMetadata.ShouldProbe(ffprobeMetadata)", archive);
+        Assert.Contains("approvedVendor.VerifyToolAsync(token)", File.ReadAllText(Path.Combine(
+            root, "src", "PhotoIdentity.Api", "VideoProcessingEndpoints.cs")));
+        Assert.Contains("PostgresVideoTechnicalMetadataRefreshRepository", cli);
+        Assert.DoesNotContain("VideoSamsungAutomaticMetadata", library);
     }
 
     [Fact]
