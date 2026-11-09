@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 
 namespace PhotoIdentity.Cli;
@@ -85,22 +86,49 @@ public sealed class VideoSamsungExifTool(string approvedExe, TimeSpan timeout)
         {
             if (!process.Start())
                 throw new IOException("Approved camera metadata tool did not start.");
-            Task<string> standard = process.StandardOutput.ReadToEndAsync();
-            Task<string> errors = process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync(deadline.Token);
+            // Stream stdout with a strict size bound, while draining stderr
+            // without keeping private filenames or vendor metadata in memory.
+            Task<string> standard = ReadLimitedAsync(
+                process.StandardOutput, 64 * 1024, deadline.Token);
+            Task discardErrors = DiscardAsync(process.StandardError, deadline.Token);
             string data = await standard;
-            _ = await errors; // never expose private paths/tags/tool stderr
+            await process.WaitForExitAsync(deadline.Token);
+            await discardErrors;
             if (process.ExitCode != 0)
                 throw new InvalidDataException("Vendor camera inspection failed.");
             return SamsungVideoCameraMetadataParser.Parse(data);
         }
         catch
         {
-            if (!process.HasExited)
+            try
             {
-                try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
             }
+            catch (InvalidOperationException) { } // process may not have started
+            catch (System.ComponentModel.Win32Exception) { } // already stopped
             throw;
         }
+    }
+
+    private static async Task<string> ReadLimitedAsync(
+        StreamReader reader, int maximumChars, CancellationToken token)
+    {
+        StringBuilder buffer = new();
+        char[] block = new char[2048];
+        int count;
+        while ((count = await reader.ReadAsync(block.AsMemory(), token)) > 0)
+        {
+            if (buffer.Length + count > maximumChars)
+                throw new InvalidDataException("Vendor camera metadata output exceeded the limit.");
+            buffer.Append(block, 0, count);
+        }
+        return buffer.ToString();
+    }
+
+    private static async Task DiscardAsync(StreamReader reader, CancellationToken token)
+    {
+        char[] block = new char[2048];
+        while (await reader.ReadAsync(block.AsMemory(), token) > 0) { }
     }
 }
