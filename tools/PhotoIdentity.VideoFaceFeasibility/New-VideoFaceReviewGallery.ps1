@@ -448,7 +448,7 @@ $html.Add(@'
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
 <title>WI-0155 private face-review shortlist</title>
 <style>
 body{background:#101923;color:#f0f3f7;font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;margin:0}
@@ -466,6 +466,15 @@ code{color:#aad2fa}a{color:#9fd4ff}small{color:#9fb3c5}
 table{width:100%;border-collapse:collapse;margin:16px 0}
 th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #324354}
 .tag{display:inline-block;border-radius:4px;background:#34475a;padding:2px 6px;font-size:12px}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}
+button,select,textarea{font:inherit;color:#f0f3f7;background:#22384b;border:1px solid #607287;border-radius:5px;padding:7px}
+button{cursor:pointer;background:#245b80;font-weight:bold}
+button:focus,select:focus,textarea:focus{outline:2px solid #9fd4ff;outline-offset:1px}
+.review-controls{border-top:1px solid #334656;padding-top:12px;display:grid;gap:6px}
+.review-controls label{font-size:12px;color:#b6cfdf}
+.review-controls textarea{resize:vertical;min-height:62px;width:100%;box-sizing:border-box}
+article img.crop{height:150px;background:#101923;image-rendering:auto}
+article img.box-overlay{height:240px}
 </style>
 </head>
 <body><main>
@@ -473,9 +482,13 @@ th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #324354}
 <p class="note"><strong>Important:</strong> Person aliases are exploratory cosine rankings, NOT identifications.
 Under-threshold suggestions are NOT proof of unknown identity. Preview images are
 downsized and may not show a small face well; use the full original frame for zooming.
-This report cannot show individual face bounding boxes because those are not retained
-in the current diagnostic format. Do not upload this HTML, CSV or its thumbnails.</p>
+Bounded full-frame previews are offered below. Optional reconstructed face bounding
+boxes and native-resolution crops require separate explicit detector-only review geometry.
+Never upload this HTML, review decisions, CSV or thumbnails.</p>
 '@)
+$html.Add('<div class="toolbar"><button type="button" id="save-review">Save review CSV</button><button type="button" id="load-review">Import saved CSV</button><input id="review-import" type="file" accept=".csv,text/csv" hidden><span id="review-status" aria-live="polite"></span></div>')
+$html.Add('<p>Decisions: <strong>Correct person</strong> = the shown face is the suggested catalogue person; <strong>Wrong person</strong> = a different person; <strong>Unknown person</strong> = a real face not among your selected known people; <strong>Not a face</strong> = false detection; <strong>Cannot tell</strong> = insufficient visual evidence; <strong>Review not applicable</strong> = overflow or frame-wide concern without a specific face. Enter short reasoning in Reviewer notes. Edits stay in this browser tab until you explicitly save a local CSV. Import it later to resume. No server/database updates occur.</p>')
+
 
 $html.Add('<h2>Video overview</h2><table><thead><tr><th>Video</th><th>Frames</th><th>Raw candidates</th><th>Retained</th><th>Discarded</th><th>Overflow frames</th></tr></thead><tbody>')
 foreach ($summary in $clipSummaries) {
@@ -519,16 +532,23 @@ foreach ($summary in $clipSummaries) {
             $personLabel = if ([string]::IsNullOrWhiteSpace($entry.Candidate)) {
                 'No verified person'
             } else { 'Ranked: ' + $entry.Candidate }
-            $html.Add(('<article><img loading="lazy" src="{0}" alt="Private full-frame preview"><div class="body"><strong>Frame {1}</strong> <small>· face ordinal {2}</small><p>{3}<br>Similarity: {4}<br><small>{5}</small></p><a href="{6}">Open original full-resolution frame</a></div></article>' -f
-                (To-Html $entry.Thumbnail),$entry.Frame,(To-Html $faceLabel),
-                (To-Html $personLabel),(To-Html $scoreLabel),
-                (To-Html $entry.Note),(To-Html $sourceUri)))
+            $preview = if ($entry.Overlay) { $entry.Overlay } else { $entry.Thumbnail }
+            $cropHtml = if ($entry.Crop) {
+                '<img class="crop" loading="lazy" src="{0}" alt="Face crop at source pixel resolution">' -f
+                    (To-Html $entry.Crop)
+            } else { '' }
+            $html.Add(('<article class="review-card" data-clip="{0}" data-section="{1}" data-frame="{2}" data-face="{3}" data-candidate="{4}" data-score="{5}" data-note="{6}"><img class="box-overlay" loading="lazy" src="{7}" alt="Private reviewed frame with optional detected-face bounding box">{8}<div class="body"><strong>Frame {2}</strong> <small>· face ordinal {3}</small><p>{9}<br>Similarity: {5}<br><small>{6}</small></p><a href="{10}">Open original full-resolution frame</a><div class="review-controls"><label>HumanDecision</label><select class="human-decision"><option value="">Not reviewed</option><option>Correct person</option><option>Wrong person</option><option>Unknown person</option><option>Not a face</option><option>Cannot tell</option><option>Review not applicable</option></select><label>ReviewerNotes</label><textarea class="reviewer-notes" maxlength="1000" placeholder="Why? E.g. too blurry, wrong person, useful face, duplicate."></textarea></div></div></article>' -f
+                (To-Html $entry.Clip),(To-Html $entry.Section),
+                $entry.Frame,(To-Html $(if ($null -eq $entry.Face) { '' } else { [string]$entry.Face })),
+                (To-Html $entry.Candidate),(To-Html $(if ($null -eq $entry.Score) { '' } else { $scoreLabel })),
+                (To-Html $entry.Note),(To-Html $preview),$cropHtml,
+                (To-Html $personLabel),(To-Html $sourceUri)))
         }
         $html.Add('</div>')
     }
     $html.Add('</details>')
 }
-$html.Add('<p class="note">Review one useful face observation per genuinely visible person. Check wrong suggestions, unknown people, repetitive observations, and whether overflow discarded useful evidence. Record your decisions in the accompanying CSV worksheet. No catalogue assignments are made.</p></main></body></html>')
+$html.Add('<p class="note">Review one useful face observation per genuinely visible person. Overflow shows only retained boxes, NOT boxes for discarded detections. Save human decisions explicitly to a private local CSV. No catalogue assignments are made.</p></main><script src="review-ui.js"></script></body></html>')
 
 $galleryPath = Join-Path $outputFolder 'review.html'
 $worksheetPath = Join-Path $outputFolder 'review-worksheet.csv'
@@ -544,9 +564,11 @@ Write-Host 'Only private, local files were created. Existing reports, media and 
 [pscustomobject]@{
     GalleryPath = $galleryPath
     WorksheetPath = $worksheetPath
+    SelectionPath = $selectionFile
     ReviewFolder = $outputFolder
     Observations = $entries.Count
     Previews = $thumbnailCache.Count
+    Crops = @($entries | Where-Object { $_.Crop }).Count
 }
 if ($OpenGallery) {
     Invoke-Item -LiteralPath $galleryPath
