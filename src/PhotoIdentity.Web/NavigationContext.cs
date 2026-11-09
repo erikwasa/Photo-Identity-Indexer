@@ -88,6 +88,16 @@ public static class SmartCollectionNavigation
         return index / pageSize * pageSize;
     }
 
+    // Include one neighboring result on each side of the standard 40-photo page,
+    // so a single bounded query can resolve previous/next even at page edges.
+    public static (int Offset, int Limit) NavigationWindowForOffset(int pageOffset)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(pageOffset);
+        return pageOffset == 0
+            ? (0, ResultPageSize + 1)
+            : (pageOffset - 1, ResultPageSize + 2);
+    }
+
     public static bool TryParsePhotoUrl(
         string url,
         out string? revisionId,

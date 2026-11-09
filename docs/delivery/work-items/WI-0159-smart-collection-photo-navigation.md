@@ -63,3 +63,21 @@ Maintainer verification on desktop and phone: open a Smart Collection with more 
 ## Maintainer acceptance — 2026-09-25
 
 The maintainer reported WI-0159 working as expected after merge. Saved/transient Smart Collection sequence navigation and return-context behavior were accepted, so the item is complete and WI-0160 is unblocked.
+
+## Rapid-navigation regression follow-up — 2026-11-09
+
+During a local review of a roughly 3,000-photo saved Smart Collection, fast Next clicks could advance the position label without updating the displayed photo, followed by the Blazor fatal-error screen. The uploaded API stdout contained no HTTP 500 or server exception for that incident. It showed successful viewer-preview responses (median ~19 ms for 499 requests), while Smart Collection route queries had materially higher latency (median ~606 ms across 725 requests).
+
+The follow-up branch `fix/smart-collection-rapid-photo-navigation` makes the navigator reuse up to four bounded, overlapping 40-photo windows. Each window includes neighboring items across page boundaries, eliminating a second edge query and avoiding fresh database roundtrips for adjacent photos within an already-loaded window. Superseded navigation requests cannot publish stale results. Photo Details now discards or cancels superseded metadata/status/caption/tag loads and original-state polling, so rapid navigation cannot apply earlier photo data to the current revision. Desktop left/right keys activate the same previous/next links, except while using editable controls.
+
+### Follow-up verification (pending maintainer acceptance)
+
+- Run `dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter FullyQualifiedName~NavigationContextTests` from the repository root.
+- Launch the current package and open a saved Smart Collection with enough photos to cross at least two 40-result boundaries.
+- Click Next repeatedly at a fast pace, then Previous; check that every displayed photo matches its position and metadata. Repeat with Left/Right Arrow, including held keys if useful.
+- Verify navigation from photo 39 through 41 and 79 through 81, at the first/last results, and through several rapid direction reversals.
+- Confirm arrow keys still work as text-editing/navigation keys inside photo metadata/tag inputs, and that a direct Photo Details link without Smart Collection context is unchanged.
+- Return to Smart Collections after traversing pages; confirm the expected collection and browsing position.
+- Check browser Console for unhandled Blazor/JavaScript errors, and the API log for failures. The production crash has not yet been reproduced under automated tests.
+
+Acceptance remains **pending** until the focused tests/CI and desktop local checks pass.

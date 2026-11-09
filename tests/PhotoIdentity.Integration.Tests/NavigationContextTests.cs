@@ -181,6 +181,44 @@ public sealed class NavigationContextTests
         Assert.Equal(expectedOffset, SmartCollectionNavigation.PageOffsetForIndex(index));
     }
 
+    [Theory]
+    [InlineData(0, 0, 41)]
+    [InlineData(40, 39, 42)]
+    [InlineData(80, 79, 42)]
+    public void Smart_collection_navigation_window_includes_cross_page_neighbors(
+        int pageOffset,
+        int expectedOffset,
+        int expectedLimit)
+    {
+        (int offset, int limit) = SmartCollectionNavigation.NavigationWindowForOffset(pageOffset);
+        Assert.Equal(expectedOffset, offset);
+        Assert.Equal(expectedLimit, limit);
+        Assert.InRange(limit, 1, 200);
+    }
+
+    [Fact]
+    public void Overlapping_navigation_window_resolves_both_edges_without_another_query()
+    {
+        SmartCollectionPageResponse window = Page(
+            offset: 39,
+            total: 100,
+            Enumerable.Range(39, 42)
+                .Select(index => Photo($"revision-{index}"))
+                .ToArray());
+
+        Assert.True(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            window, "revision-40", 40, out SmartCollectionPhotoNavigationResolution? first));
+        Assert.NotNull(first);
+        Assert.Equal("revision-39", first.PreviousRevisionId);
+        Assert.Equal("revision-41", first.NextRevisionId);
+
+        Assert.True(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            window, "revision-79", 79, out SmartCollectionPhotoNavigationResolution? last));
+        Assert.NotNull(last);
+        Assert.Equal("revision-78", last.PreviousRevisionId);
+        Assert.Equal("revision-80", last.NextRevisionId);
+    }
+
     [Fact]
     public void Photo_navigation_resolves_exact_order_and_first_last_boundaries()
     {

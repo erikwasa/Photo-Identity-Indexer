@@ -41,12 +41,15 @@
     else
     {
         <div class="photo-viewer-frame">
+            @{
+                string renderedRevisionId = RevisionId;
+            }
             <img @key="ViewerUrl"
                  class="photo-viewer-image"
                  src="@ViewerUrl"
                  alt="Selected photo"
                  decoding="async"
-                 @onerror="HandlePreviewError" />
+                 @onerror="() => HandlePreviewError(renderedRevisionId)" />
         </div>
     }
 
@@ -264,6 +267,8 @@
     private string? DetailsError { get; set; }
     private string? TagError { get; set; }
     private CancellationTokenSource? PollCancellation { get; set; }
+    private CancellationTokenSource? PageCancellation { get; set; }
+    private int PageGeneration { get; set; }
 
     private string BackDestination => PhotoReturnContext.NormalizeLocalReturnUrl(ReturnUrl) ?? "/collections";
     private string BackLabel => PhotoReturnContext.IsArchiveReturn(BackDestination)
@@ -279,27 +284,59 @@
         : Original?.CanView == true
             ? OriginalUrl
             : PreviewUrl;
-    private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
-    private string DetailsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/details";
     private string TagsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/tags";
     private string TagCountLabel => Tags.Count == 1 ? "1 manual tag" : $"{Tags.Count} manual tags";
     private string PeopleCountLabel => Details?.People.Count == 1 ? "1 person" : $"{Details?.People.Count ?? 0} people";
 
     protected override async Task OnParametersSetAsync()
     {
+        int generation = ++PageGeneration;
+        PageCancellation?.Cancel();
+        PageCancellation?.Dispose();
+        PageCancellation = new CancellationTokenSource();
+        CancellationToken cancellationToken = PageCancellation.Token;
+        string revisionId = RevisionId;
+
         StopPolling();
-        PreviewUnavailable = false;
-        UseProxyFallback = false;
-        TagInput = string.Empty;
+        Original = null;
         Details = null;
         Caption = null;
         CaptionStatus = null;
-        await Task.WhenAll(LoadStatusAsync(), LoadDetailsAsync(), LoadCaptionAsync(), LoadTagsAsync());
-        StartPollingIfNeeded();
+        Tags = [];
+        Error = null;
+        DetailsError = null;
+        TagError = null;
+        PreviewUnavailable = false;
+        UseProxyFallback = false;
+        TagInput = string.Empty;
+        LoadingStatus = true;
+        LoadingDetails = true;
+        LoadingCaption = true;
+        LoadingTags = true;
+
+        await Task.WhenAll(
+            LoadStatusAsync(revisionId, generation, cancellationToken),
+            LoadDetailsAsync(revisionId, generation, cancellationToken),
+            LoadCaptionAsync(revisionId, generation, cancellationToken),
+            LoadTagsAsync(revisionId, generation, cancellationToken));
+
+        if (IsCurrentPage(revisionId, generation))
+        {
+            StartPollingIfNeeded();
+        }
     }
 
-    private void HandlePreviewError()
+    private bool IsCurrentPage(string revisionId, int generation) =>
+        generation == PageGeneration &&
+        string.Equals(RevisionId, revisionId, StringComparison.Ordinal);
+
+    private void HandlePreviewError(string renderedRevisionId)
     {
+        if (!string.Equals(renderedRevisionId, RevisionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         if (!UseProxyFallback && Original?.CanView == true)
         {
             UseProxyFallback = true;
@@ -310,87 +347,156 @@
         PreviewUnavailable = true;
     }
 
-    private async Task LoadStatusAsync()
+    private Task LoadStatusAsync() =>
+        LoadStatusAsync(RevisionId, PageGeneration, PageCancellation?.Token ?? CancellationToken.None);
+
+    private async Task LoadStatusAsync(string revisionId, int generation, CancellationToken cancellationToken)
     {
-        LoadingStatus = true;
-        Error = null;
+        if (IsCurrentPage(revisionId, generation))
+        {
+            LoadingStatus = true;
+            Error = null;
+        }
+
         try
         {
-            Original = await Http.GetFromJsonAsync<CollectionOriginalAccessResponse>(StatusUrl);
-            PreviewUnavailable = false;
-            UseProxyFallback = false;
+            CollectionOriginalAccessResponse? original = await Http.GetFromJsonAsync<CollectionOriginalAccessResponse>(
+                $"api/collections/photos/{Uri.EscapeDataString(revisionId)}/original/status",
+                cancellationToken);
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Original = original;
+                PreviewUnavailable = false;
+                UseProxyFallback = false;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
-            Error = $"Original status could not be loaded: {exception.Message}";
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Error = $"Original status could not be loaded: {exception.Message}";
+            }
         }
         finally
         {
-            LoadingStatus = false;
+            if (IsCurrentPage(revisionId, generation))
+            {
+                LoadingStatus = false;
+            }
         }
     }
 
-    private async Task LoadDetailsAsync()
+    private async Task LoadDetailsAsync(string revisionId, int generation, CancellationToken cancellationToken)
     {
-        LoadingDetails = true;
-        DetailsError = null;
         try
         {
-            Details = await Http.GetFromJsonAsync<PhotoDetailsResponse>(DetailsUrl);
+            PhotoDetailsResponse? details = await Http.GetFromJsonAsync<PhotoDetailsResponse>(
+                $"api/collections/photos/{Uri.EscapeDataString(revisionId)}/details",
+                cancellationToken);
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Details = details;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
-            Details = null;
-            DetailsError = $"Photo details could not be loaded: {exception.Message}";
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Details = null;
+                DetailsError = $"Photo details could not be loaded: {exception.Message}";
+            }
         }
         finally
         {
-            LoadingDetails = false;
+            if (IsCurrentPage(revisionId, generation))
+            {
+                LoadingDetails = false;
+            }
         }
     }
 
-    private async Task LoadCaptionAsync()
+    private async Task LoadCaptionAsync(string revisionId, int generation, CancellationToken cancellationToken)
     {
-        LoadingCaption = true;
         try
         {
-            CaptionStatus = await Http.GetFromJsonAsync<PhotoCaptionEnrichmentStatusResponse>(
-                "api/caption-enrichment/status");
-            if (CaptionStatus is null)
+            PhotoCaptionEnrichmentStatusResponse? status =
+                await Http.GetFromJsonAsync<PhotoCaptionEnrichmentStatusResponse>(
+                    "api/caption-enrichment/status",
+                    cancellationToken);
+            if (!IsCurrentPage(revisionId, generation) || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            CaptionStatus = status;
+            if (status is null)
             {
                 Caption = null;
                 return;
             }
 
-            Caption = await Http.GetFromJsonAsync<PhotoCaptionResponse>(
-                $"api/photos/{Uri.EscapeDataString(RevisionId)}/caption");
+            PhotoCaptionResponse? caption = await Http.GetFromJsonAsync<PhotoCaptionResponse>(
+                $"api/photos/{Uri.EscapeDataString(revisionId)}/caption",
+                cancellationToken);
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Caption = caption;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch
         {
-            Caption = null;
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Caption = null;
+            }
         }
         finally
         {
-            LoadingCaption = false;
+            if (IsCurrentPage(revisionId, generation))
+            {
+                LoadingCaption = false;
+            }
         }
     }
 
-    private async Task LoadTagsAsync()
+    private async Task LoadTagsAsync(string revisionId, int generation, CancellationToken cancellationToken)
     {
-        LoadingTags = true;
-        TagError = null;
         try
         {
-            Tags = await Http.GetFromJsonAsync<PhotoTagResponse[]>(TagsUrl) ?? [];
+            IReadOnlyList<PhotoTagResponse> tags = await Http.GetFromJsonAsync<PhotoTagResponse[]>(
+                $"api/collections/photos/{Uri.EscapeDataString(revisionId)}/tags",
+                cancellationToken) ?? [];
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Tags = tags;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
-            Tags = [];
-            TagError = $"Tags could not be loaded: {exception.Message}";
+            if (IsCurrentPage(revisionId, generation))
+            {
+                Tags = [];
+                TagError = $"Tags could not be loaded: {exception.Message}";
+            }
         }
         finally
         {
-            LoadingTags = false;
+            if (IsCurrentPage(revisionId, generation))
+            {
+                LoadingTags = false;
+            }
         }
     }
 
@@ -543,21 +649,23 @@
             return;
         }
 
-        PollCancellation = new CancellationTokenSource();
-        _ = PollOriginalStateAsync(PollCancellation.Token);
+        CancellationTokenSource cancellation = new();
+        PollCancellation = cancellation;
+        _ = PollOriginalStateAsync(RevisionId, cancellation);
     }
 
-    private async Task PollOriginalStateAsync(CancellationToken cancellationToken)
+    private async Task PollOriginalStateAsync(string revisionId, CancellationTokenSource cancellation)
     {
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (!cancellation.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation.Token);
                 CollectionOriginalAccessResponse? state = await Http.GetFromJsonAsync<CollectionOriginalAccessResponse>(
-                    StatusUrl,
-                    cancellationToken);
-                if (state is null)
+                    $"api/collections/photos/{Uri.EscapeDataString(revisionId)}/original/status",
+                    cancellation.Token);
+                if (state is null || cancellation.IsCancellationRequested ||
+                    !string.Equals(revisionId, RevisionId, StringComparison.Ordinal))
                 {
                     return;
                 }
@@ -576,24 +684,34 @@
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
-            Error = $"Original status polling stopped: {exception.Message}";
-            await InvokeAsync(StateHasChanged);
+            if (!cancellation.IsCancellationRequested &&
+                string.Equals(revisionId, RevisionId, StringComparison.Ordinal))
+            {
+                Error = $"Original status polling stopped: {exception.Message}";
+                await InvokeAsync(StateHasChanged);
+            }
         }
         finally
         {
-            PollCancellation?.Dispose();
-            PollCancellation = null;
+            if (ReferenceEquals(PollCancellation, cancellation))
+            {
+                PollCancellation = null;
+            }
+
+            cancellation.Dispose();
         }
     }
 
     private void StopPolling()
     {
-        PollCancellation?.Cancel();
+        CancellationTokenSource? previous = PollCancellation;
+        PollCancellation = null;
+        previous?.Cancel();
     }
 
     private static string ConfirmedFaceLabel(int count) =>
@@ -628,6 +746,10 @@
 
     public ValueTask DisposeAsync()
     {
+        ++PageGeneration;
+        PageCancellation?.Cancel();
+        PageCancellation?.Dispose();
+        PageCancellation = null;
         StopPolling();
         return ValueTask.CompletedTask;
     }
