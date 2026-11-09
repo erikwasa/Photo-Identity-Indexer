@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Recognition.Onnx.Models;
 using PhotoIdentity.Recognition.Onnx.YuNet;
@@ -161,7 +162,7 @@ public static class VideoFaceReviewGeometryRunner
                     throw new ArgumentException("Selected private frame is not approved.");
                 }
 
-                VideoFaceSensitivityDiagnostics diagnostics = clip.Review.Diagnostics!;
+                VideoFaceSensitivityDiagnostics diagnostics = clip.Review.Review.Diagnostics!;
                 VideoFaceFrameDetectionDiagnostic expected =
                     diagnostics.FrameDetections[selectedFrame.FrameNumber - 1];
                 if (expected.FrameNumber != selectedFrame.FrameNumber ||
