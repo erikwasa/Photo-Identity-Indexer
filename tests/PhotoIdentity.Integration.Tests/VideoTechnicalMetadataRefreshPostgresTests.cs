@@ -50,6 +50,7 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
             string contentHash = new('a', 64);
             string originalTool = new('b', 64);
             string approvedTool = new('c', 64);
+            string vendorTool = new('e', 64);
 
             await using (NpgsqlConnection open = await database.OpenConnectionAsync())
             await using (NpgsqlCommand seed = open.CreateCommand())
@@ -101,12 +102,19 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
             // The refresh may populate only absent values, preserving existing
             // camera maker and the immutable source/capture metadata.
             VideoTechnicalMetadataRefreshFacts facts = new(
-                "Samsung", "SM-G736B", 18_500_000, 44100, 1, "mono",
+                null, null, 18_500_000, 44100, 1, "mono",
                 approvedTool, "wi0212-ffprobe-metadata-v3", now.AddMinutes(1));
-            Assert.Equal(5, await repository.FillMissingAsync(
+            VideoTechnicalMetadataRefreshFacts vendorFacts = new(
+                "Samsung", "SM-G736B", null, null, null, null,
+                vendorTool, "wi0212-exiftool-samsung-camera-v1", now.AddMinutes(1));
+            Assert.Equal(4, await repository.FillMissingAsync(
                 revision, sourceRoot, contentHash, facts));
+            Assert.Equal(1, await repository.FillMissingAsync(
+                revision, sourceRoot, contentHash, vendorFacts));
             Assert.Equal(0, await repository.FillMissingAsync(
                 revision, sourceRoot, contentHash, facts));
+            Assert.Equal(0, await repository.FillMissingAsync(
+                revision, sourceRoot, contentHash, vendorFacts));
             Assert.Equal(0, await repository.FillMissingAsync(
                 revision, sourceRoot, contentHash, facts with
                 {
@@ -131,7 +139,12 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
                            m.audio_sample_rate_hz, m.audio_channels, m.audio_channel_layout,
                            m.capture_at_utc, m.tool_sha256, m.inspection_profile_id,
                            (SELECT COUNT(*) FROM video_metadata_refresh_actions),
-                           (SELECT changed_fields FROM video_metadata_refresh_actions LIMIT 1),
+                           (SELECT string_agg(changed_fields, '|' ORDER BY id)
+                            FROM video_metadata_refresh_actions),
+                           (SELECT string_agg(tool_sha256, '|' ORDER BY id)
+                            FROM video_metadata_refresh_actions),
+                           (SELECT string_agg(inspection_profile_id, '|' ORDER BY id)
+                            FROM video_metadata_refresh_actions),
                            (SELECT COUNT(*) FROM asset_revisions WHERE media_kind='photo'),
                            (SELECT COUNT(*) FROM video_capture_date_actions)
                     FROM video_revision_metadata m
@@ -149,11 +162,14 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
                 Assert.Equal(captured, rows.GetFieldValue<DateTimeOffset>(6));
                 Assert.Equal(originalTool, rows.GetString(7));
                 Assert.Equal("wi0151-ffprobe-metadata-v2", rows.GetString(8));
-                Assert.Equal(1L, rows.GetInt64(9));
-                Assert.Equal("camera_model,video_bitrate_bps,audio_sample_rate_hz,audio_channels,audio_channel_layout",
+                Assert.Equal(2L, rows.GetInt64(9));
+                Assert.Equal("video_bitrate_bps,audio_sample_rate_hz,audio_channels,audio_channel_layout|camera_model",
                     rows.GetString(10));
-                Assert.Equal(1L, rows.GetInt64(11));
-                Assert.Equal(1L, rows.GetInt64(12));
+                Assert.Equal(approvedTool + "|" + vendorTool, rows.GetString(11));
+                Assert.Equal("wi0212-ffprobe-metadata-v3|wi0212-exiftool-samsung-camera-v1",
+                    rows.GetString(12));
+                Assert.Equal(1L, rows.GetInt64(13));
+                Assert.Equal(1L, rows.GetInt64(14));
             }
 
             Assert.Equal(corrected,

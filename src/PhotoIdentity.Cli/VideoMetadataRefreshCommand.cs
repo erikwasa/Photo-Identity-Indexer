@@ -13,20 +13,26 @@ public sealed record VideoMetadataRefreshOptions(
     string SourceRoot, Guid RevisionId, string FfprobePath, string FfprobeSha256,
     string ConnectionVariable, string DatabaseName, int TimeoutSeconds, bool Apply)
 {
+    public string? VendorExifToolPath { get; init; }
+    public string? VendorExifToolSha256 { get; init; }
+
     public static VideoMetadataRefreshOptions Parse(string[] args)
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
-        bool enabled = false, apply = false, acknowledged = false;
+        bool enabled = false, apply = false, acknowledged = false, vendorEnabled = false;
         for (int i = 0; i < args.Length; i++)
         {
             string arg = args[i];
             if (arg == "--enable-video" && !enabled) { enabled = true; continue; }
             if (arg == "--apply" && !apply) { apply = true; continue; }
+            if (arg == "--enable-samsung-vendor-camera" && !vendorEnabled)
+            { vendorEnabled = true; continue; }
             if (arg == "--acknowledge-metadata-only" && !acknowledged)
             { acknowledged = true; continue; }
             if (arg is not ("--source-root" or "--revision" or "--ffprobe" or
                             "--ffprobe-sha256" or "--postgres-connection-env" or
-                            "--database" or "--timeout-seconds") ||
+                            "--database" or "--timeout-seconds" or
+                            "--exiftool" or "--exiftool-sha256") ||
                 i + 1 == args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(arg, args[++i]))
                 throw new ArgumentException("Unknown, repeated or incomplete metadata refresh argument.");
@@ -57,8 +63,23 @@ public sealed record VideoMetadataRefreshOptions(
             ? int.TryParse(raw, out int n) && n is >= 1 and <= 120
                 ? n : throw new ArgumentException("Timeout must be 1..120 seconds.")
             : 20;
+        bool hasVendorPath = values.TryGetValue("--exiftool", out string? vendorTool);
+        bool hasVendorHash = values.TryGetValue("--exiftool-sha256", out string? vendorHash);
+        if (vendorEnabled != hasVendorPath || vendorEnabled != hasVendorHash)
+            throw new ArgumentException(
+                "Optional Samsung extraction requires --enable-samsung-vendor-camera, --exiftool and --exiftool-sha256 together.");
+        if (vendorEnabled)
+        {
+            if (!Path.IsPathFullyQualified(vendorTool!) ||
+                !Regex.IsMatch(vendorHash!, "^[0-9a-fA-F]{64}$", RegexOptions.CultureInvariant))
+                throw new ArgumentException("Samsung ExifTool requires an absolute executable path and approved SHA-256.");
+        }
         return new(Path.GetFullPath(root), revision, Path.GetFullPath(ffprobe),
-            hash, variable, database, timeout, apply);
+            hash, variable, database, timeout, apply)
+        {
+            VendorExifToolPath = vendorEnabled ? Path.GetFullPath(vendorTool!) : null,
+            VendorExifToolSha256 = vendorEnabled ? vendorHash!.ToLowerInvariant() : null
+        };
     }
 }
 
@@ -117,21 +138,41 @@ public static class VideoMetadataRefreshCommandRunner
         DateTime lastWriteBefore = before.LastWriteTimeUtc;
 
         string ffprobePath = VideoPilotMediaTools.ValidateExecutable(options.FfprobePath);
+        RejectLinkedExecutable(ffprobePath);
         string verifiedToolHash = await HashFileAsync(ffprobePath, token);
         if (!string.Equals(verifiedToolHash, options.FfprobeSha256, StringComparison.Ordinal))
             throw new InvalidOperationException("FFprobe digest is not the operator-approved SHA-256.");
 
+        string? vendorToolPath = null, vendorToolHash = null;
+        if (options.VendorExifToolPath is not null)
+        {
+            if (options.VendorExifToolSha256 is null)
+                throw new ArgumentException("Approved ExifTool SHA-256 is missing.");
+            vendorToolPath = VideoPilotMediaTools.ValidateExecutable(options.VendorExifToolPath);
+            RejectLinkedExecutable(vendorToolPath);
+            vendorToolHash = await HashFileAsync(vendorToolPath, token);
+            if (vendorToolHash != options.VendorExifToolSha256)
+                throw new InvalidOperationException("ExifTool does not match the operator-approved SHA-256.");
+        }
+
         VideoPilotMediaTools tools = new(ffprobePath, TimeSpan.FromSeconds(options.TimeoutSeconds));
         VideoPilotMetadata media;
+        SamsungVideoCameraMetadata? vendorCamera = null;
         string contentHash;
         try
         {
             media = await tools.ProbeAsync(path, token);
+            if (vendorToolPath is not null)
+                vendorCamera = await new VideoSamsungExifTool(
+                    vendorToolPath, TimeSpan.FromSeconds(options.TimeoutSeconds))
+                    .ProbeAsync(path, token);
             contentHash = await HashFileAsync(path, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or
                                  InvalidDataException or TimeoutException or
+                                 OperationCanceledException or
+                                 System.ComponentModel.Win32Exception or
                                  System.Text.Json.JsonException)
         {
             throw new InvalidOperationException("Selected local video metadata inspection failed; no write was attempted.");
@@ -142,6 +183,9 @@ public static class VideoMetadataRefreshCommandRunner
             before.LastWriteTimeUtc != lastWriteBefore ||
             !string.Equals(contentHash, target.ContentSha256, StringComparison.Ordinal) ||
             !string.Equals(verifiedToolHash, await HashFileAsync(ffprobePath, token), StringComparison.Ordinal) ||
+            (vendorToolPath is not null &&
+             !string.Equals(vendorToolHash, await HashFileAsync(vendorToolPath, token),
+                 StringComparison.Ordinal)) ||
             await source.GetAvailabilityAsync(reference, token) != AssetAvailability.Local)
             throw new InvalidOperationException(
                 "Selected source or tool changed during inspection; no refresh was written.");
@@ -165,12 +209,28 @@ public static class VideoMetadataRefreshCommandRunner
         {
             output.WriteLine("Video metadata refresh dry run passed: no database writes.");
             output.WriteLine("One selected current, locally available, SHA-256-verified video.");
+            if (vendorToolPath is not null)
+                output.WriteLine(vendorCamera is null
+                    ? "Approved Samsung vendor tag: not present; no camera identity inferred."
+                    : "Approved Samsung vendor tag: present; only missing camera fields eligible.");
             output.WriteLine("Run with --apply --acknowledge-metadata-only after the approved v41 rehearsal.");
             return 0;
         }
 
+        // Each tool's contribution has its own source-specific audit action:
+        // the v41 schema stores the physical SHA-256 and inspection profile
+        // per action, so never attribute ExifTool camera evidence to FFprobe.
         int changed = await repository.FillMissingAsync(
             revision, options.SourceRoot, contentHash, facts, token);
+        if (vendorCamera is not null && vendorToolHash is not null)
+        {
+            VideoTechnicalMetadataRefreshFacts vendorFacts = new(
+                vendorCamera.CameraMake, vendorCamera.CameraModel,
+                null, null, null, null,
+                vendorToolHash, "wi0212-exiftool-samsung-camera-v1", DateTimeOffset.UtcNow);
+            changed += await repository.FillMissingAsync(
+                revision, options.SourceRoot, contentHash, vendorFacts, token);
+        }
         output.WriteLine("Video metadata refresh completed for exactly one verified local revision.");
         output.WriteLine($"Previously missing technical fields populated: {changed}.");
         output.WriteLine("Existing values and manual metadata were not overwritten.");
@@ -182,6 +242,20 @@ public static class VideoMetadataRefreshCommandRunner
         await using FileStream stream = new(path, FileMode.Open, FileAccess.Read,
             FileShare.Read, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
         return Convert.ToHexString(await SHA256.HashDataAsync(stream, token)).ToLowerInvariant();
+    }
+
+    private static void RejectLinkedExecutable(string executable)
+    {
+        // Approved operator tools must be actual physical pinned files, not
+        // WinGet links, symlinks or junction ancestors that can retarget.
+        if ((File.GetAttributes(executable) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Approved video metadata tool is linked.");
+        for (DirectoryInfo? directory = new(Path.GetDirectoryName(executable)!);
+             directory is not null; directory = directory.Parent)
+        {
+            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Approved video metadata tool is under a linked directory.");
+        }
     }
 
     private static void RejectSymbolicLinks(string root, string selectedPath)

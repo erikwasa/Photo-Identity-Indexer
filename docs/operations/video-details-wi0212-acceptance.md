@@ -355,6 +355,37 @@ dotnet run --project src/PhotoIdentity.Cli -c Release -- @refreshArgs
 if ($LASTEXITCODE -ne 0) { throw 'Read-only metadata refresh verification failed' }
 ```
 
+**Optional Samsung-specific camera metadata**: when FFprobe leaves the camera
+model Unknown but a trusted, separately approved ExifTool build can read a
+`[Samsung] SamsungModel` tag (for example from an MP4 `smta` atom), extend
+`$refreshArgs` only for that selected revision. Use a physical pinned
+ExifTool executable, not a WinGet shim, symlink or junction:
+
+```powershell
+$exiftoolPath = 'C:\\YOUR_APPROVED_EXIFTOOL_PATH\\exiftool.exe'
+# Resolve this digest from the previously approved ExifTool installation,
+# never treat an arbitrary freshly calculated hash as tool approval.
+$approvedExifToolSha256 = 'REPLACE_WITH_APPROVED_64_CHARACTER_SHA256'
+$refreshArgs += @(
+    '--enable-samsung-vendor-camera',
+    '--exiftool', $exiftoolPath,
+    '--exiftool-sha256', $approvedExifToolSha256
+)
+# Repeat the existing read-only dry run with both tools explicitly pinned.
+dotnet run --project src/PhotoIdentity.Cli -c Release -- @refreshArgs
+if ($LASTEXITCODE -ne 0) { throw 'Samsung vendor metadata dry run failed' }
+```
+
+The optional adapter runs ExifTool without a configuration file, requests
+only the `SamsungModel` tag using its `Samsung` tag group, and never reads
+GPS/time/caption/private arbitrary tags. Invalid or absent model evidence is
+Unknown rather than guessed. It does not overwrite an already populated
+camera model. Its changes, if any, are recorded in a **separate v41 audit
+action** containing the physical ExifTool SHA-256 and
+`wi0212-exiftool-samsung-camera-v1` profile. FFprobe and ExifTool actions
+remain distinguishable, with their own hashes. A second tool is optional;
+normal bitrate/audio refresh continues without ExifTool.
+
 After reviewing the dry run and the rehearsal evidence, only deliberately
 authorize the matching, bounded metadata write:
 
@@ -375,14 +406,16 @@ The command never rewrites original media or expands to other videos.
 A version-39 database cannot be migrated by the dry-run command; it fails
 closed until migration is separately authorized.
 
-No local verification is requested until this and any necessary vendor-
-specific metadata adapter are developed. A Samsung model visible to ExifTool
-but **not** FFprobe will remain Unknown; do not claim the fixture is fixed
-before inspecting the approved FFprobe output.
+No local verification is requested for this **development PR**.
+The opt-in Samsung `smta` adapter now exists, but its behavior against the
+maintainer's actual device file must be confirmed on the maintained PC after
+CI and the full metadata workflow are accepted. If ExifTool is not
+independently approved/pinned, skip the vendor option and keep the camera
+model Unknown rather than running an untrusted binary.
 
 Future maintained-host acceptance should include one approved local MOV
-with audio details, one MP4 with a *confirmed FFprobe-visible* Samsung model
-tag or a separately approved vendor adapter, one clip without bitrate
+with audio details, one MP4 with a confirmed ExifTool Samsung smta model
+tag (using the optional pinned adapter), one clip without bitrate
 (showing Unknown), and one online-only clip that must not be touched.
 Verify no changes to manual time/Place/people, photo search and video
 playback. Do not import the full archive or rehydrate online-only media.

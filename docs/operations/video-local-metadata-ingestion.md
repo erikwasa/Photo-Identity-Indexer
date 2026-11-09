@@ -105,6 +105,47 @@ profile does not expose; do not infer a camera make/model when the
 verified source tag is absent. An additional trusted vendor adapter may
 be needed for real-file acceptance.
 
+## Optional Samsung smta tag adapter (WI-0212, development)
+
+Some Samsung MP4 files store a camera model in the `SamsungModel` field of
+the `smta` atom. ExifTool documents that tag within its `Samsung`
+group. The FFprobe metadata projection can omit it, which previously
+left real-device camera make/model Unknown even though ExifTool showed a
+value such as `SM-G736B`.
+
+The selected, **already-local** `video metadata refresh` command now
+accepts an optional independently approved ExifTool executable with
+`--enable-samsung-vendor-camera --exiftool ABS_EXE --exiftool-sha256 SHA256`.
+All three options are required together; omission keeps the existing
+FFprobe-only behavior. ExifTool is a separate operator-provided tool
+and is neither bundled nor downloaded automatically. The CLI checks
+physical executable SHA-256 before and after the scan and rejects linked
+binary files and linked parent directories.
+
+The adapter uses `-config "" -json -G1 -s -SamsungModel` with an absolute
+single video path and no write options. Only the exact
+`Samsung:SamsungModel` tag is accepted, with bounded length, JSON,
+control-character and ambiguity checks. The make is explicitly
+**Samsung** only when that exact tag is present; no device identity is
+inferred from an unrelated field, file name or video codec.
+Output and diagnostics never disclose the private model or file path.
+
+After FFprobe has populated its own previously NULL technical fields,
+the optional ExifTool pass may **only fill still-NULL camera make/model**.
+It records its own v41 `video_metadata_refresh_actions` event with
+`wi0212-exiftool-samsung-camera-v1` and the *ExifTool* SHA-256.
+The FFprobe refresh has its own separate tool hash/profile/action.
+Both use the same current revision, content SHA-256 and source-exclusion
+locks; neither rewrites original inspection provenance, capture dates,
+GPS, Places, people or photo/face records. Retrying with no new fields
+is idempotent; a missing Samsung tag produces no vendor audit action.
+
+The real Samsung example has only been inspected using a separate
+metadata viewer; a final controlled local test with the pinned adapter
+remains required. Do not claim all Samsung camera models are supported.
+See `video-details-wi0212-acceptance.md` for the operator-only
+PowerShell 7.6 steps after the complete local-acceptance gate.
+
 ## Commands for the final end-to-end acceptance
 
 The maintainer asked to defer hands-on testing until WI-0151 is developed completely. These commands document the subsequent controlled acceptance path. Do not import the full archive during the intermediate PR review.
