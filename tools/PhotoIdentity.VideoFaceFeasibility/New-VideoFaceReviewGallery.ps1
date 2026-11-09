@@ -326,6 +326,22 @@ foreach ($summary in $clipSummaries) {
     $clip = $summary.Clip
     $html.Add(('<details open><summary>{0} · {1} frames · {2} retained candidates</summary>' -f
         (To-Html $clip), $summary.Frames, $summary.Retained))
+    $matchingReport = @($reportClips | Where-Object { $_.alias -ceq $clip })[0]
+    $html.Add('<h3>Catalogue ranking coverage (not verified identification)</h3><table><thead><tr><th>Person alias</th><th>Top-ranked observations</th><th>Highest cosine</th><th>Strong review suggestions</th></tr></thead><tbody>')
+    foreach ($person in $personAliases) {
+        $personSummary = @($matchingReport.personRankSummaries |
+            Where-Object { $_.alias -ceq $person })
+        if ($personSummary.Count -eq 0) {
+            $html.Add(('<tr><td>{0}</td><td>0</td><td>–</td><td>0</td></tr>' -f (To-Html $person)))
+        } else {
+            $score = ([double]$personSummary[0].bestTopRankSimilarity).ToString(
+                'F4', [Globalization.CultureInfo]::InvariantCulture)
+            $html.Add(('<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td></tr>' -f
+                (To-Html $person),[int]$personSummary[0].topRankObservations,
+                (To-Html $score),[int]$personSummary[0].strongReviewCandidates))
+        }
+    }
+    $html.Add('</tbody></table>')
     foreach ($section in @('Top-ranked by person','Uncertain suggestions','Overflow / omissions')) {
         $cards = @($entries | Where-Object { $_.Clip -ceq $clip -and $_.Section -ceq $section })
         if ($cards.Count -eq 0) { continue }
