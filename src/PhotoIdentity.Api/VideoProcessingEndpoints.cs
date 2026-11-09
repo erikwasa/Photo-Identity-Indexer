@@ -22,7 +22,8 @@ public sealed record VideoProcessingSettingsUpdate(
     bool? OverrideProxyLimits = null, string? EncodingProfile = null,
     int? RetentionAgeHours = null,
     bool? StopAfterOneVideoStepPerAdvance = null,
-    bool? AutomaticPostersForNewProxies = null)
+    bool? AutomaticPostersForNewProxies = null,
+    bool? ExtractSamsungMetadata = null)
 {
     public VideoProcessingPreferences MergeWith(VideoProcessingPreferences existing)
     {
@@ -33,6 +34,8 @@ public sealed record VideoProcessingSettingsUpdate(
                                existing.StopAfterOneVideoStepPerAdvance;
         bool autoPosters = AutomaticPostersForNewProxies ??
                            existing.AutomaticPostersForNewProxies;
+        bool samsungMetadata = ExtractSamsungMetadata ??
+                               existing.ExtractSamsungMetadata;
         if (OverrideProxyLimits is null)
         {
             if (MaximumCacheMiB.HasValue || MaximumProxyMiB.HasValue)
@@ -45,7 +48,8 @@ public sealed record VideoProcessingSettingsUpdate(
                 EncodingProfile = selectedProfile,
                 RetentionAgeHours = retentionAge,
                 StopAfterOneVideoStepPerAdvance = singleVideoStep,
-                AutomaticPostersForNewProxies = autoPosters
+                AutomaticPostersForNewProxies = autoPosters,
+                ExtractSamsungMetadata = samsungMetadata
             };
         }
         if (OverrideProxyLimits is false)
@@ -57,7 +61,8 @@ public sealed record VideoProcessingSettingsUpdate(
                 EncodingProfile: selectedProfile,
                 RetentionAgeHours: retentionAge,
                 StopAfterOneVideoStepPerAdvance: singleVideoStep,
-                AutomaticPostersForNewProxies: autoPosters);
+                AutomaticPostersForNewProxies: autoPosters,
+                ExtractSamsungMetadata: samsungMetadata);
         }
 
         if (!MaximumCacheMiB.HasValue || !MaximumProxyMiB.HasValue)
@@ -65,7 +70,7 @@ public sealed record VideoProcessingSettingsUpdate(
                 "Both quota limits are required when overriding launcher settings.");
         return new(Enabled, IncludeOnlineOnly,
             MaximumCacheMiB, MaximumProxyMiB, selectedProfile, retentionAge,
-            singleVideoStep, autoPosters);
+            singleVideoStep, autoPosters, samsungMetadata);
     }
 }
 
@@ -75,6 +80,7 @@ public sealed record VideoProcessingSettingsResponse(
     string EncodingProfile, int RetentionAgeHours,
     bool StopAfterOneVideoStepPerAdvance,
     bool AutomaticPostersForNewProxies,
+    bool ExtractSamsungMetadata, bool SamsungMetadataToolConfigured,
     bool Processing, bool ToolsConfigured,
     long Queued, long Running, long Succeeded, long Failed,
     long Cancelled, long ExpiredLeases, string LastResult,
@@ -116,6 +122,7 @@ public static class VideoProcessingEndpoints
         var recent = await inspector.ListRecentAsync(12, token);
         return Results.Ok(ToResponse(preferences.Current, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
+            SamsungToolConfigured(configuration),
             processor.LastResult, processor.LastPosterResult,
             processor.LastActivityResult,
             recent, processor.LastAttemptFailure));
@@ -155,10 +162,11 @@ public static class VideoProcessingEndpoints
             existing.StopAfterOneVideoStepPerAdvance !=
                 requested.StopAfterOneVideoStepPerAdvance ||
             existing.AutomaticPostersForNewProxies !=
-                requested.AutomaticPostersForNewProxies;
+                requested.AutomaticPostersForNewProxies ||
+            existing.ExtractSamsungMetadata != requested.ExtractSamsungMetadata;
         if (quotaOrProfileChanged && processor.IsProcessing)
             return Results.Conflict(new ArchiveErrorResponse(
-                "Pause archive processing before changing video proxy limits, encoding profile, automatic posters or run limit."));
+                "Pause archive processing before changing video proxy limits, encoding profile, automatic posters, Samsung metadata or run limit."));
 
         // Do not enable video work without explicit approved local tool
         // configuration. This also prevents the UI from advertising success
@@ -166,6 +174,25 @@ public static class VideoProcessingEndpoints
         if (value.Enabled && !ToolsConfigured(configuration))
             return Results.BadRequest(new ArchiveErrorResponse(
                 "Configure approved local FFmpeg/FFprobe paths and SHA-256 hashes before enabling video processing."));
+
+        // Tool identity is private launcher configuration. The browser can
+        // toggle a boolean but cannot name executable paths or hashes.
+        if (requested.ExtractSamsungMetadata)
+        {
+            try
+            {
+                VideoSamsungAutomaticMetadata approvedVendor = new(
+                    configuration["PhotoIdentity:VideoProcessing:ExifToolPath"]!,
+                    configuration["PhotoIdentity:VideoProcessing:ExifToolSha256"]!);
+                await approvedVendor.VerifyToolAsync(token);
+            }
+            catch (Exception e) when (e is ArgumentException or
+                InvalidOperationException or IOException or UnauthorizedAccessException)
+            {
+                return Results.BadRequest(new ArchiveErrorResponse(
+                    "Configure a trusted ExifTool executable and approved SHA-256 in the private launcher before enabling Samsung metadata."));
+            }
+        }
 
         var controls = new PostgresVideoProcessingControlRepository(database);
         if (!value.Enabled)
@@ -184,6 +211,7 @@ public static class VideoProcessingEndpoints
         var recent = await inspector.ListRecentAsync(12, token);
         return Results.Ok(ToResponse(saved, overview,
             processor.IsProcessing, ToolsConfigured(configuration),
+            SamsungToolConfigured(configuration),
             processor.LastResult, processor.LastPosterResult,
             processor.LastActivityResult,
             recent, processor.LastAttemptFailure));
@@ -323,10 +351,14 @@ public static class VideoProcessingEndpoints
             .All(key => !string.IsNullOrWhiteSpace(
                 configuration["PhotoIdentity:VideoProcessing:" + key]));
 
+    private static bool SamsungToolConfigured(IConfiguration configuration) =>
+        !string.IsNullOrWhiteSpace(configuration["PhotoIdentity:VideoProcessing:ExifToolPath"]) &&
+        !string.IsNullOrWhiteSpace(configuration["PhotoIdentity:VideoProcessing:ExifToolSha256"]);
+
     private static VideoProcessingSettingsResponse ToResponse(
         VideoProcessingPreferences settings,
         VideoProcessingQueueOverview status,
-        bool processing, bool configured, string lastResult,
+        bool processing, bool configured, bool samsungToolConfigured, string lastResult,
         string lastPosterResult, string lastActivityResult,
         IReadOnlyList<VideoProcessingJobOperatorRow> recent,
         VideoAttemptFailureDiagnostic? lastAttemptFailure) =>
@@ -335,6 +367,7 @@ public static class VideoProcessingEndpoints
             settings.EncodingProfile, settings.RetentionAgeHours,
             settings.StopAfterOneVideoStepPerAdvance,
             settings.AutomaticPostersForNewProxies,
+            settings.ExtractSamsungMetadata, samsungToolConfigured,
             processing, configured, status.Queued, status.Running,
             status.Succeeded, status.Failed, status.Cancelled,
             status.ExpiredLeases, lastResult, lastPosterResult,
