@@ -206,8 +206,8 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0212-video-metadata-place-and-manual-people.md
   started_at: 2026-11-08
-  last_updated_at: 2026-11-08
-  branch: wi-0212-video-details-metadata-people
+  last_updated_at: 2026-11-09
+  branch: wi-0212-opt-in-samsung-vendor-camera
   blockers:
   - WI-0151
   - WI-0152
@@ -219,7 +219,7 @@ work_items:
   - type: documentation
     value: docs/operations/video-details-wi0212-acceptance.md
   - type: implementation
-    value: '2026-11-08: Development candidate on isolated WI-0212 branch: PostgreSQL v39 video-only revision histories, guarded read-only video details, manual capture-time/Place/person changes, opt-in GeoNames lookup and responsive Video Details UI. CI, disposable PostgreSQL and final maintainer Windows/OneDrive acceptance remain pending.'
+    value: '2026-11-09: Core v39 features passed maintained-host acceptance. PRs #774 and #776 merged with green CI: nullable video bitrate/audio fields v40, guarded one-revision local metadata refresh and v41 provenance. Production stays at verified v39 until isolated v39->v41 rehearsal. A separately pinned, optional Samsung ExifTool adapter is in development; final real-file metadata acceptance remains pending.'
 - id: WI-0213
   title: Reevaluate video-level descriptions and search after face feasibility
   milestone: M30
