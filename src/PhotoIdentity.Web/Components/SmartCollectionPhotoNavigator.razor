@@ -198,7 +198,8 @@
                     page,
                     revisionId!,
                     globalIndex,
-                    out SmartCollectionPhotoNavigationResolution? navigation))
+                    out SmartCollectionPhotoNavigationResolution? navigation) &&
+                navigation is not null)
             {
                 Resolved = navigation;
                 QueueNeighborPrefetches(context, navigation);
