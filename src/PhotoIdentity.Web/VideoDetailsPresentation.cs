@@ -40,6 +40,41 @@ public static class VideoDetailsPresentation
         return true;
     }
 
+    /// <summary>Use the encoded video stream bitrate only; it is not a quality score.</summary>
+    public static string FormatVideoBitrate(long? bitsPerSecond) =>
+        bitsPerSecond is > 0
+            ? (bitsPerSecond.Value / 1_000_000d).ToString("0.##", CultureInfo.InvariantCulture) + " Mb/s"
+            : "Unknown";
+
+    public static string FormatAudioDetails(
+        string? codec, int? channels, string? layout, int? sampleRateHz)
+    {
+        string? friendlyCodec = codec?.ToLowerInvariant() switch
+        {
+            "aac" => "AAC",
+            "mp3" => "MP3",
+            "opus" => "Opus",
+            "pcm_s16le" => "PCM (16-bit)",
+            null or "" => null,
+            _ => codec
+        };
+        string? friendlyLayout = layout?.Trim().ToLowerInvariant() switch
+        {
+            "mono" => "Mono",
+            "stereo" => "Stereo",
+            null or "" => channels switch { 1 => "Mono", 2 => "Stereo", > 2 => channels + " channels", _ => null },
+            _ => layout?.Trim()
+        };
+        string? sampling = sampleRateHz is > 0
+            ? (sampleRateHz.Value / 1000d).ToString("0.###", CultureInfo.InvariantCulture) + " kHz"
+            : null;
+        string[] known = [friendlyCodec, friendlyLayout, sampling]
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
+            .Select(static x => x!)
+            .ToArray();
+        return known.Length > 0 ? string.Join(" · ", known) : "Unknown";
+    }
+
     public static string FormatFrameRate(string? rational)
     {
         string[] parts = (rational ?? "").Split('/');
