@@ -122,8 +122,7 @@
                 out SmartCollectionWorkspaceContext? context) ||
             context is null)
         {
-            CachedPages.Clear();
-            CachedContextKey = null;
+            ClearNavigationCache();
             return;
         }
 
