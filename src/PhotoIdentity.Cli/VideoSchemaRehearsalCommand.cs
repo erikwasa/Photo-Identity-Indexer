@@ -159,20 +159,25 @@ public static class VideoSchemaRehearsalCommandRunner
                      WHERE video_bitrate_bps IS NOT NULL
                         OR audio_sample_rate_hz IS NOT NULL
                         OR audio_channels IS NOT NULL
-                        OR audio_channel_layout IS NOT NULL);
+                        OR audio_channel_layout IS NOT NULL),
+                    (SELECT COUNT(*) FROM photo_identity_schema_migrations
+                     WHERE version = 41 AND name = 'explicit-video-metadata-refresh-audit'),
+                    (SELECT COUNT(*) FROM video_metadata_refresh_actions);
                 """;
             await using NpgsqlDataReader rows = await extension.ExecuteReaderAsync(token);
             if (!await rows.ReadAsync(token) ||
                 rows.GetInt64(0) != 1 ||
                 rows.GetInt64(1) != 4 ||
-                rows.GetInt64(2) != 0)
+                rows.GetInt64(2) != 0 ||
+                rows.GetInt64(3) != 1 ||
+                rows.GetInt64(4) != 0)
                 throw new InvalidDataException(
                     "v40 video metadata extension was not complete, nullable and empty.");
 
-            output.WriteLine("Schema v39 -> v40 rehearsal passed on the isolated restored database.");
+            output.WriteLine($"Schema v39 -> v{PostgresCatalogueDatabase.CurrentSchemaVersion} rehearsal passed on the isolated restored database.");
             output.WriteLine($"Rehearsal database: {restoredName}");
             output.WriteLine($"Unchanged catalogue tables verified: {expectedCounts.Count - 1}");
-            output.WriteLine("Four nullable technical-stream fields installed; existing values preserved.");
+            output.WriteLine("Four nullable technical-stream fields and empty append-only refresh audit installed; historical values preserved.");
             output.WriteLine("Repeated schema initialization passed. The maintained catalogue was not opened.");
             return 0;
         }
