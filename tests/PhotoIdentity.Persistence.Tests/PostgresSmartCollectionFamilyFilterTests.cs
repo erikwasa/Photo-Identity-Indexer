@@ -131,6 +131,33 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             Assert.Equal(1, cousinOf.Total);
             Assert.Equal(family2015, Assert.Single(cousinOf.Items).RevisionId);
 
+            // People + Taken previously used a page query that enriched every
+            // candidate before LIMIT. Compare the staged continuation path
+            // against QueryAll's independent ordering, people and date results.
+            SmartCollectionFilter peopleAndTakenFilter = new(
+                people: [alice],
+                taken: SmartCollectionDateRange.Parse("2010-2030"));
+            SmartCollectionPhoto[] peopleAndTakenAll =
+                (await query.QueryAllAsync(peopleAndTakenFilter)).ToArray();
+            Assert.Equal(2, peopleAndTakenAll.Length);
+            for (int offset = 0; offset <= peopleAndTakenAll.Length; offset++)
+            {
+                SmartCollectionPhotoPage page = await query.QueryAsync(
+                    peopleAndTakenFilter, offset: offset, limit: 1);
+                Assert.Equal(peopleAndTakenAll.Length, page.Total);
+                if (offset == peopleAndTakenAll.Length)
+                {
+                    Assert.Empty(page.Items);
+                    continue;
+                }
+
+                SmartCollectionPhoto photo = Assert.Single(page.Items);
+                SmartCollectionPhoto expected = peopleAndTakenAll[offset];
+                Assert.Equal(expected.RevisionId, photo.RevisionId);
+                Assert.Equal(expected.PeopleKeys, photo.PeopleKeys);
+                Assert.Equal(expected.EffectiveCaptureDate, photo.EffectiveCaptureDate);
+            }
+
             // Relationship + people exercises the staged page materialization
             // added for expensive slideshow covers. QueryAll uses the established
             // non-paged SQL and therefore provides an independent result baseline.
