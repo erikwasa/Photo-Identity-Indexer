@@ -36,14 +36,16 @@ public sealed partial class PostgresVideoEvidenceRepository(PostgresCatalogueDat
                     display_rotation_degrees, duration_seconds, average_frame_rate,
                     capture_at_utc, capture_time_provenance, camera_make, camera_model,
                     gps_latitude, gps_longitude, inspected_at_utc, tool_sha256,
-                    inspection_profile_id)
+                    inspection_profile_id, video_bitrate_bps, audio_sample_rate_hz,
+                    audio_channels, audio_channel_layout)
                 VALUES (
                     @revision, @status, @reason,
                     @container, @codec, @profile, @audio,
                     @pixel, @transfer, @width, @height,
                     @rotation, @duration, @frame_rate,
                     @capture, @provenance, @make, @model,
-                    @latitude, @longitude, @inspected, @tool, @inspection_profile)
+                    @latitude, @longitude, @inspected, @tool, @inspection_profile,
+                    @video_bitrate, @audio_sample_rate, @audio_channels, @audio_layout)
                 ON CONFLICT (asset_revision_id) DO NOTHING;
                 """;
             Add(command, "revision", NpgsqlDbType.Uuid, inspection.RevisionId.Value);
@@ -69,6 +71,10 @@ public sealed partial class PostgresVideoEvidenceRepository(PostgresCatalogueDat
             Add(command, "inspected", NpgsqlDbType.TimestampTz, inspection.InspectedAtUtc.ToUniversalTime());
             Add(command, "tool", NpgsqlDbType.Text, inspection.ToolSha256);
             Add(command, "inspection_profile", NpgsqlDbType.Text, inspection.InspectionProfileId);
+            Add(command, "video_bitrate", NpgsqlDbType.Bigint, inspection.VideoBitrateBps);
+            Add(command, "audio_sample_rate", NpgsqlDbType.Integer, inspection.AudioSampleRateHz);
+            Add(command, "audio_channels", NpgsqlDbType.Integer, inspection.AudioChannels);
+            Add(command, "audio_layout", NpgsqlDbType.Text, inspection.AudioChannelLayout);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -216,7 +222,9 @@ public sealed partial class PostgresVideoEvidenceRepository(PostgresCatalogueDat
                    m.duration_seconds, m.average_frame_rate, m.capture_at_utc,
                    m.capture_time_provenance, m.camera_make, m.camera_model,
                    m.gps_latitude, m.gps_longitude, m.inspected_at_utc,
-                   m.tool_sha256, m.inspection_profile_id
+                   m.tool_sha256, m.inspection_profile_id,
+                   m.video_bitrate_bps, m.audio_sample_rate_hz,
+                   m.audio_channels, m.audio_channel_layout
             FROM video_revision_metadata m
             JOIN asset_revisions revision ON revision.id = m.asset_revision_id
             JOIN assets asset ON asset.id = revision.asset_id
@@ -238,7 +246,13 @@ public sealed partial class PostgresVideoEvidenceRepository(PostgresCatalogueDat
             Text(r, 14), Text(r, 15), Text(r, 16),
             r.IsDBNull(17) ? null : r.GetDouble(17),
             r.IsDBNull(18) ? null : r.GetDouble(18),
-            r.GetFieldValue<DateTimeOffset>(19), r.GetString(20), r.GetString(21));
+            r.GetFieldValue<DateTimeOffset>(19), r.GetString(20), r.GetString(21))
+        {
+            VideoBitrateBps = r.IsDBNull(22) ? null : r.GetInt64(22),
+            AudioSampleRateHz = NullableInt(r, 23),
+            AudioChannels = NullableInt(r, 24),
+            AudioChannelLayout = Text(r, 25)
+        };
     }
 
     private static async Task<VideoStillPoster?> ReadPosterAsync(
@@ -288,7 +302,12 @@ public sealed partial class PostgresVideoEvidenceRepository(PostgresCatalogueDat
             (m.CaptureAtUtc is null) != (m.CaptureTimeProvenance is null) ||
             (m.GpsLatitude is null) != (m.GpsLongitude is null) ||
             m.DurationSeconds is < 0 ||
-            m.CodedWidth is <= 0 || m.CodedHeight is <= 0)
+            m.CodedWidth is <= 0 || m.CodedHeight is <= 0 ||
+            m.VideoBitrateBps is <= 0 or > 10_000_000_000 ||
+            m.AudioSampleRateHz is <= 0 or > 384000 ||
+            m.AudioChannels is <= 0 or > 32 ||
+            (m.AudioChannelLayout is { } layout &&
+             (layout.Length is < 1 or > 64 || layout.Any(char.IsControl))))
             throw new ArgumentException("Invalid revision-bound video inspection evidence.");
     }
 
