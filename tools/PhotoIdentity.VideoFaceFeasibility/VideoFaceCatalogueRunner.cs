@@ -16,7 +16,8 @@ public static class VideoFaceCatalogueRunner
     private sealed record Options(
         string Cases, string PrivateReport, string Root, string ModelDirectory,
         double DetectorConfidence,
-        VideoFaceDetectorSelection Detection);
+        VideoFaceDetectorSelection Detection,
+        VideoFaceOverflowPolicy OverflowPolicy);
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -61,7 +62,8 @@ public static class VideoFaceCatalogueRunner
             using SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
             var experiment = new VideoFaceExperiment(
                 new OpenCvImageDecoder(), detector, new OpenCvFaceAligner(), embedder,
-                options.Detection.Describe(detector.Descriptor.InputSize));
+                options.Detection.Describe(detector.Descriptor.InputSize),
+                options.OverflowPolicy);
 
             // Evidence is materialized once and the transaction is closed before
             // any video-frame inference. All clips see the SAME identity snapshot.
@@ -109,6 +111,12 @@ public static class VideoFaceCatalogueRunner
                 framesWithFaces = reviews.Sum(r => r.Review.Aggregate.FramesWithFaces),
                 facesDetected = reviews.Sum(r => r.Review.Aggregate.FacesDetected),
                 embeddingsCalculated = reviews.Sum(r => r.Review.Aggregate.EmbeddingsCalculated),
+                framesWithCandidateOverflow = reviews.Sum(r =>
+                    r.Review.Diagnostics!.FrameDetections.Count(f =>
+                        f.CandidatesDiscarded is > 0)),
+                candidatesDiscarded = reviews.Sum(r =>
+                    r.Review.Diagnostics!.FrameDetections.Sum(f =>
+                        f.CandidatesDiscarded ?? 0)),
                 elapsedMilliseconds = Math.Round(reviews.Sum(
                     r => r.Review.Aggregate.ElapsedMilliseconds), 3),
                 privateReportWritten = true,
@@ -134,6 +142,7 @@ public static class VideoFaceCatalogueRunner
         string? detectorConfidence = null;
         string? detectorPipeline = null;
         string? tileSize = null;
+        string? overflowPolicy = null;
         for (int i = 0; i < args.Length; i++)
         {
             string name = args[i];
@@ -155,6 +164,8 @@ public static class VideoFaceCatalogueRunner
                     detectorPipeline = value; break;
                 case "--tile-size" when tileSize is null:
                     tileSize = value; break;
+                case "--face-overflow-policy" when overflowPolicy is null:
+                    overflowPolicy = value; break;
                 default: throw new ArgumentException("Unknown or duplicate catalogue option.");
             }
         }
@@ -174,7 +185,21 @@ public static class VideoFaceCatalogueRunner
             "0.9" => 0.9,
             _ => throw new ArgumentException("Only detector confidence 0.5, 0.7, 0.9 is permitted."),
         };
-        return new Options(cases, report, repo, dir, threshold,
-            VideoFaceDetectorSelection.Parse(detectorPipeline, tileSize));
+        VideoFaceDetectorSelection selected = VideoFaceDetectorSelection.Parse(
+            detectorPipeline, tileSize);
+        VideoFaceOverflowPolicy policy = overflowPolicy switch
+        {
+            null or "fail" => VideoFaceOverflowPolicy.Fail,
+            "retain-top-32" => VideoFaceOverflowPolicy.RetainTop32,
+            _ => throw new ArgumentException(
+                "Face overflow policy must be fail or retain-top-32."),
+        };
+        if (policy != VideoFaceOverflowPolicy.Fail &&
+            selected.PipelineMode != YuNetDetectorPipelineMode.MultiScale)
+        {
+            throw new ArgumentException(
+                "Candidate overflow retention requires explicit multiscale detection.");
+        }
+        return new Options(cases, report, repo, dir, threshold, selected, policy);
     }
 }

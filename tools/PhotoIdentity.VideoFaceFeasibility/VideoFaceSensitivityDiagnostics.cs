@@ -35,6 +35,13 @@ public sealed record VideoFaceFrameDetectionDiagnostic(
     public double? SmallestFaceWidthPixels { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? SmallestFaceHeightPixels { get; init; }
+
+    // Raw means post-YuNet merge/NMS, before the opt-in 32-face selection.
+    // Discarded candidates may be real faces: these are not false-positive counts.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RawCandidatesDetected { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? CandidatesDiscarded { get; init; }
 }
 
 public sealed record VideoFaceRankedDiagnostic(

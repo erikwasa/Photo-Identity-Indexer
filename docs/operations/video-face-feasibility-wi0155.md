@@ -1438,3 +1438,79 @@ or remove the bounded 32-face safety gate. If the stage is
 source-to-tensor path through focused synthetic tests before retrying
 full private clips. Other stages require different fixes.
 No root-cause claim can be made until the retry identifies the stage.
+
+## Checkpoint 13 — controlled multiscale candidate overflow (2026-11-09)
+
+**Observed:** After PR #772 the maintainer's 1024-pixel tiled
+catalogue trial failed at **stage `face-count-limit`,
+category `frame-face-limit`**, exit code 1 after 35.6 s.
+That proves at least one frame returned more than 32 post-NMS
+candidate faces; it does **not** prove that they were real people
+or identify the affected frame/video. Successful single-pass
+results remain 3 clips / 252 frames / 74 frames with faces /
+101 face observations / 101 embeddings in 46.2 s.
+
+**New opt-in experimental behavior:** The catalogue runner now
+accepts `--face-overflow-policy retain-top-32` **only with**
+`--detector-pipeline multi-scale`. Default `fail` retains
+the existing fail-closed 32-face limit for all experiments.
+An opted-in frame with more than 32 post-merge detections keeps
+only the 32 highest YuNet-confidence candidates, with
+deterministic position/index tie-breaking, *before* alignment,
+embedding and catalogue ranking. This does **not** raise the
+number of faces processed per frame, alter YuNet thresholds
+or its existing NMS, or affect the app's normal recognition.
+
+This is an evaluation workaround, **not evidence of
+identification quality**. High-confidence false positives can
+displace real smaller faces, especially distant people.
+The private per-frame diagnostic report records
+`rawCandidatesDetected`, `candidatesDiscarded`,
+and `facesDetected` (retained candidates), with safe
+cross-video aggregate counts `framesWithCandidateOverflow`
+and `candidatesDiscarded` in CLI stdout. These are candidate
+counts, **not** numbers of distinct people, confirmed faces,
+or known identities. Human review must explicitly assess
+whether this ranking discards useful people.
+
+### Deferred local trial, using existing private PNGs and case file
+
+Do **not** rerun the successful single-pass evaluation or re-extract V03.
+After focused synthetic CI succeeds and the PR merges into
+`wi-0155`, retry the existing 1024-pixel tiled evaluation
+with a **new** report name, the existing approved
+`$newCasesPath` / `$modelDir` / `$wiRoot`, and the
+approved read-only PostgreSQL credential:
+
+```powershell
+$boundedReport = Join-Path $reportsDir (
+    'tiled1024-bounded-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '.json'
+)
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $newCasesPath `
+    --private-report $boundedReport `
+    --root $wiRoot --model-dir $modelDir `
+    --detector-confidence 0.5 `
+    --detector-pipeline multi-scale --tile-size 1024 `
+    --face-overflow-policy retain-top-32
+if ($LASTEXITCODE -ne 0) { throw 'Bounded multiscale evaluation failed.' }
+```
+
+Keep the report outside repository/source frames, use a
+fresh name, and do not print private ranking or frame metadata
+to chat/PRs. Review the raw/retained/discarded counts within
+`clips[].review.diagnostics.frameDetections`, using the
+operator's private ground truth to compare known people,
+unknown people, false detections, and whether dropped candidates
+might contain someone useful. If this fails again, the safe
+stage/category from checkpoint 12 still applies. Preserve the
+temporary PNGs until the evaluation and explicit retention /
+cleanup procedure have been verified.
+
+**Not accepted yet:** No actual positive/negative human
+classification or performance result is available for tiled
+detection. This increment does not establish face accuracy,
+does not change single-pass behavior, does not bypass the 32
+alignment/embedding cap, and does not alter production,
+originals, OneDrive state, or the database.

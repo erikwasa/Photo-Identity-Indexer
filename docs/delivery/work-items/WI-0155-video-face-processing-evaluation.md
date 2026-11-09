@@ -582,3 +582,36 @@ automatic temporary-frame cleanup until the full evaluation and
 selected retention have been verified. Integration versus
 separation remains undecided; no production writes or app
 registration are authorized.
+
+## Experimental checkpoint 13 — bounded face candidates for tiled evaluation (2026-11-09)
+
+The subsequent Windows tiled-1024 retry returned a **confirmed
+`face-count-limit` / `frame-face-limit`** after 35.6 seconds.
+At least one frame exceeded the **32 candidate faces per frame**
+post-merger safety limit. The actual number of valid people among
+those candidates is unknown, and this failure does not constitute
+an identification-quality assessment.
+
+To enable bounded, **review-only** experimentation without
+simply raising the limit, the isolated catalogue CLI adds a
+multiscale-only, explicit `--face-overflow-policy retain-top-32`.
+The original default is `fail` and the existing limit of
+32 aligned/embedded/ranked candidates per frame stays in force.
+This experimental policy deterministically ranks post-NMS
+candidates by detector confidence, then keeps at most 32.
+It privately records raw candidate counts and discarded
+candidate counts; stdout contains only aggregate suppression
+totals. It does not claim discarded candidates are false
+detections or that confidence ranking preserves every useful
+person. Local human review must compare person-discovery yield,
+false detections, right/unknown suggestions and omitted candidates.
+
+**Acceptance remains outstanding.** Preserve the 180 PNG V03
+extraction, already successful single-pass report and the
+read-only database cohort. After this child-branch PR merges
+into `wi-0155`, rerun only the tiled-1024 experiment using
+a new private report and opt-in policy. CI synthetic tests
+check strict default, bounded retention, deterministic
+selection and diagnostic accounting; they cannot establish
+real image accuracy. No main-branch production integration,
+database mutation or original-file change is authorized.
