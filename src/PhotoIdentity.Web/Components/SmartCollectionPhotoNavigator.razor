@@ -234,6 +234,7 @@
 
     private void CacheWindow(int offset, SmartCollectionPageResponse page)
     {
+        FailedPrefetchOffsets.Remove(offset);
         if (!CachedPages.ContainsKey(offset) && CachedPages.Count >= 4)
         {
             CachedPages.Remove(CachedPages.Keys.First());
