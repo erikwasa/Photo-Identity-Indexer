@@ -332,101 +332,122 @@ public sealed class VideoFaceExperiment
         List<EmbeddingVector>? previous = null;
         long previousTimestamp = -1;
 
-        for (int index = 0; index < files.Length; index++)
+        string stage = "frame-read";
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            string file = files[index];
-            byte[] input = await ReadApprovedStillAsync(file, cancellationToken);
-
-            byte[] before = SHA256.HashData(input);
-            using MemoryStream stream = new(input, writable: false);
-            ImageFrame image = await _decoder.DecodeAsync(
-                stream,
-                new DecodeOptions(new ImageSize(coverage ? 3840 : 1600, coverage ? 3840 : 1600)),
-                cancellationToken);
-            VideoFaceExtractionFidelity.VerifyDecodedSize(image.Size, expectedNativeSize);
-            IReadOnlyList<DetectedFaceCandidate> detections =
-                await _detector.DetectAsync(image, cancellationToken);
-            if (detections.Count > 32)
-            {
-                throw new InvalidOperationException("The frame exceeded the 32-face exploratory limit.");
-            }
-
-            totalFaces += detections.Count;
-            if (detections.Count > 0)
-            {
-                framesWithFaces++;
-            }
-
-            if (diagnostics)
-            {
-                frameDetections.Add(VideoFaceSensitivityDiagnostics.DescribeFrame(
-                    index + 1, set.Frames![index].TimestampMs, detections, image.Size));
-            }
-
-            List<EmbeddingVector> current = [];
-            foreach (DetectedFaceCandidate face in detections)
+            for (int index = 0; index < files.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var protocol = _embedder.Descriptor.AlignmentProtocol
-                    ?? throw new InvalidOperationException("The embedding model has no alignment protocol.");
-                AlignedFace aligned = await _aligner.AlignAsync(
-                    image, face, protocol, cancellationToken);
-                EmbeddingVector embedding = await _embedder.EmbedAsync(
-                    aligned, cancellationToken);
-                current.Add(embedding);
-                totalEmbeddings++;
-            }
+                string file = files[index];
+                stage = "frame-read";
+                byte[] input = await ReadApprovedStillAsync(file, cancellationToken);
 
-            long timestamp = set.Frames![index].TimestampMs;
-            if (coverageGrouper is not null && current.Count > 1)
-            {
-                sameFramePairs.AddRange(VideoFaceCoverageSensitivity.DescribeSameFrame(
-                    index + 1, detections, current));
-            }
-
-            if (matcher is not null)
-            {
-                for (int faceIndex = 0; faceIndex < current.Count; faceIndex++)
+                byte[] before = SHA256.HashData(input);
+                using MemoryStream stream = new(input, writable: false);
+                stage = "frame-decode";
+                ImageFrame image = await _decoder.DecodeAsync(
+                    stream,
+                    new DecodeOptions(new ImageSize(coverage ? 3840 : 1600, coverage ? 3840 : 1600)),
+                    cancellationToken);
+                stage = "frame-fidelity";
+                VideoFaceExtractionFidelity.VerifyDecodedSize(image.Size, expectedNativeSize);
+                stage = "face-detection";
+                IReadOnlyList<DetectedFaceCandidate> detections =
+                    await _detector.DetectAsync(image, cancellationToken);
+                stage = "face-count-limit";
+                if (detections.Count > 32)
                 {
-                    findings.Add(matcher.FindCandidate(
-                        index + 1, timestamp, faceIndex + 1, current[faceIndex]));
-                    if (diagnostics)
-                    {
-                        rankedFaces.Add(matcher.Diagnose(
-                            index + 1, timestamp, faceIndex + 1, current[faceIndex]));
-                    }
-                    if (coverageGrouper is not null)
-                    {
-                        if (coverageSamples.Count >= 256)
-                        {
-                            throw new InvalidOperationException(
-                                "Private grouping sensitivity is limited to 256 face observations.");
-                        }
+                    throw new InvalidOperationException("The frame exceeded the 32-face exploratory limit.");
+                }
 
-                        coverageSamples.Add(new VideoFaceCoverageObservation(
+                totalFaces += detections.Count;
+                if (detections.Count > 0)
+                {
+                    framesWithFaces++;
+                }
+
+                if (diagnostics)
+                {
+                    frameDetections.Add(VideoFaceSensitivityDiagnostics.DescribeFrame(
+                        index + 1, set.Frames![index].TimestampMs, detections, image.Size));
+                }
+
+                List<EmbeddingVector> current = [];
+                stage = "face-alignment";
+                foreach (DetectedFaceCandidate face in detections)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var protocol = _embedder.Descriptor.AlignmentProtocol
+                        ?? throw new InvalidOperationException("The embedding model has no alignment protocol.");
+                    AlignedFace aligned = await _aligner.AlignAsync(
+                        image, face, protocol, cancellationToken);
+                    stage = "face-embedding";
+                    EmbeddingVector embedding = await _embedder.EmbedAsync(
+                        aligned, cancellationToken);
+                    current.Add(embedding);
+                    totalEmbeddings++;
+                }
+
+                long timestamp = set.Frames![index].TimestampMs;
+                if (coverageGrouper is not null && current.Count > 1)
+                {
+                    sameFramePairs.AddRange(VideoFaceCoverageSensitivity.DescribeSameFrame(
+                        index + 1, detections, current));
+                }
+
+                stage = "candidate-ranking";
+                if (matcher is not null)
+                {
+                    for (int faceIndex = 0; faceIndex < current.Count; faceIndex++)
+                    {
+                        findings.Add(matcher.FindCandidate(
                             index + 1, timestamp, faceIndex + 1, current[faceIndex]));
-                        coverageGrouper.Observe(
-                            index + 1, timestamp, faceIndex + 1, current[faceIndex]);
+                        if (diagnostics)
+                        {
+                            rankedFaces.Add(matcher.Diagnose(
+                                index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                        }
+                        if (coverageGrouper is not null)
+                        {
+                            if (coverageSamples.Count >= 256)
+                            {
+                                throw new InvalidOperationException(
+                                    "Private grouping sensitivity is limited to 256 face observations.");
+                            }
+
+                            coverageSamples.Add(new VideoFaceCoverageObservation(
+                                index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                            coverageGrouper.Observe(
+                                index + 1, timestamp, faceIndex + 1, current[faceIndex]);
+                        }
                     }
                 }
+
+                if (previous is not null &&
+                    timestamp - previousTimestamp <= MaximumAdjacentGapMs)
+                {
+                    adjacentPairs += CountPossibleRepeatPairs(previous, current);
+                }
+
+                // Verify the selected file was not modified during the model run.
+                stage = "frame-integrity";
+                byte[] after = await File.ReadAllBytesAsync(file, cancellationToken);
+                if (!SHA256.HashData(after).AsSpan().SequenceEqual(before))
+                {
+                    throw new InvalidOperationException("A frame was modified during the experiment.");
+                }
+
+                previous = current;
+                previousTimestamp = timestamp;
             }
 
-            if (previous is not null &&
-                timestamp - previousTimestamp <= MaximumAdjacentGapMs)
-            {
-                adjacentPairs += CountPossibleRepeatPairs(previous, current);
-            }
-
-            // Verify the selected file was not modified during the model run.
-            byte[] after = await File.ReadAllBytesAsync(file, cancellationToken);
-            if (!SHA256.HashData(after).AsSpan().SequenceEqual(before))
-            {
-                throw new InvalidOperationException("A frame was modified during the experiment.");
-            }
-
-            previous = current;
-            previousTimestamp = timestamp;
+        }
+        catch (Exception exception)
+        {
+            // Preserve the exception type and stack for existing tests, but
+            // disclose only a fixed, non-identifying stage at the CLI boundary.
+            VideoFaceFailureDiagnostics.Mark(exception, stage);
+            throw;
         }
 
         VideoFaceAggregate aggregate = new(
