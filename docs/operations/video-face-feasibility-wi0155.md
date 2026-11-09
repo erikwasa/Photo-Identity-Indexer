@@ -1376,3 +1376,65 @@ human-confirmed utility of 1024/640 tiles; actual safe cleanup and
 retention; verified private report-to-run association remains
 operator-attested, not enforced cryptographically. No production
 integration is approved.
+
+## Checkpoint 12 — masked tiled-catalogue failure in combined local verification (2026-11-09)
+
+**Observed operator evidence:** The single-pass read-only evaluation
+completed successfully for three selected videos / 252 frames:
+74 frames with faces, 101 face detections and 101 embeddings;
+46,222.713 ms aggregate analysis time, private report successfully
+persisted. The same-cases 1024-pixel multi-scale evaluation terminated
+with the runner's previous generic `private read-only catalogue
+evaluation failed` message. **The underlying cause is unknown**;
+do not mark multiscale acceptance passed or assume the 32-face-per-frame
+limit was hit.
+
+**Diagnostic correction:** The catalogue CLI now emits a fixed,
+non-identifying `stage` and `category` when it fails. Categories
+cover the explicit 32-face safety limit, memory, file I/O/access,
+invalid JSON/input/state, cancellation and other runtime failures.
+Stage tags can isolate input selection, model integrity, read-only
+catalogue snapshot, frame read/decode/fidelity, face detection/limit,
+alignment, embedding, candidate ranking, frame integrity and report
+persistence. The original exception type, stack and failure behavior
+are left intact internally. **No exception message, frame number,
+timestamp, clip/person alias, image path, score, embedding, database
+connection or other private evidence appears on stdout/stderr.**
+The tool does not add database writes, automatic retry or a new
+error report.
+
+### Focused retry after this diagnostic PR is merged
+
+**Do not re-extract V03 or rerun the successful single-pass pass.**
+Keep the existing approved PNG workspace, private case file and
+single-pass private report. Re-run **only** tiled detection using a new
+report path, with the same approved least-privilege PostgreSQL login:
+
+```powershell
+$retryReport = Join-Path $reportsDir (
+    'tiled1024-retry-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '.json'
+)
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $newCasesPath `
+    --private-report $retryReport `
+    --root $wiRoot --model-dir $modelDir `
+    --detector-confidence 0.5 `
+    --detector-pipeline multi-scale --tile-size 1024
+```
+
+The pre-existing `PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING`
+variable must already point to the approved local SELECT-only account;
+never use application write credentials. Only share the **sanitized
+stage/category**, exit status and anonymous aggregate outcome.
+Do not share exception details, person rankings or report contents.
+A failed run is *not* evidence for detector quality; preserve frames
+until failure classification and actual successful comparison.
+
+If the category is `frame-face-limit`, investigate unexpected
+candidate volume and false positives first; do **not** silently raise
+or remove the bounded 32-face safety gate. If the stage is
+`face-detection`, examine the existing governed YuNet tiling and
+source-to-tensor path through focused synthetic tests before retrying
+full private clips. Other stages require different fixes.
+No root-cause claim can be made until the retry identifies the stage.
