@@ -20,6 +20,13 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // Geometry reconstruction is opt-in and must be routed BEFORE the
+        // catalogue runner; it never loads the PostgreSQL catalogue.
+        if (args.Contains("--review-geometry-selection", StringComparer.Ordinal))
+        {
+            return await VideoFaceReviewGeometryRunner.RunAsync(args);
+        }
+
         if (args.Contains("--catalogue-cases", StringComparer.Ordinal))
         {
             return await VideoFaceCatalogueRunner.RunAsync(args);
@@ -37,7 +44,11 @@ public static class Program
                 "--private-report <new-private-report.json> [--root <repo>] " +
                 "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>] " +
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
-                "[--face-overflow-policy <fail|retain-top-32>]");
+                "[--face-overflow-policy <fail|retain-top-32>]\n" +
+                "Visual review geometry (NO database): --review-geometry-selection <existing-selection.json> " +
+                "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +
+                "--review-geometry-output <new-private-geometry.json> [--root <repo>] " +
+                "[--model-dir <approved-models>]");
             return 0;
         }
 
