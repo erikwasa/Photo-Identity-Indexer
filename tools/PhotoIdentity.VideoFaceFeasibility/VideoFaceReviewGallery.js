@@ -16,8 +16,8 @@
   const load = document.getElementById("load-review");
   const chooser = document.getElementById("review-import");
   const choices = new Set([
-    "", "Correct person", "Wrong person", "Unknown person",
-    "Not a face", "Cannot tell", "Review not applicable"
+    "", "Correct person", "Wrong person", "Known person - no reliable match",
+    "Unknown person", "Not a face", "Cannot tell", "Review not applicable"
   ]);
   let dirty = false;
   let fileHandle = null;
@@ -37,11 +37,17 @@
     };
   };
 
+  // A frame-wide overflow warning is contextual evidence, not a face
+  // identity decision. Exclude these optional rows from completion progress.
+  const candidateCards = cards.filter(card => card.dataset.face !== "");
+
   const refresh = () => {
-    const completed = cards.filter(card => {
+    const completed = candidateCards.filter(card => {
       return card.querySelector(".human-decision").value !== "";
     }).length;
-    status.textContent = completed + " of " + cards.length + " reviewed" +
+    status.textContent = completed + " of " + candidateCards.length +
+      " face observations reviewed (" +
+      (cards.length - candidateCards.length) + " optional overflow entries)" +
       (dirty ? " · unsaved edits" : " · save explicitly to keep changes");
   };
 

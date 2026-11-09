@@ -1721,3 +1721,86 @@ The actual usefulness and accuracy of catalogue suggestions remain
 **unverified** until the operator marks correct/wrong/unknown/not-a-face
 and cannot-tell observations. No automatic identity assignment or
 production integration is approved.
+
+## Checkpoint 16 — eliminate duplicate reviews and clarify uncertain/overflow (2026-11-09)
+
+**Operator verification for merged PR #780:** C# and PowerShell synthetic
+tests PASS; detector-only geometry reconstruction PASS; box overlays
+PASS; face crops PASS; direct HTML decisions/notes PASS; CSV save/import
+PASS. Human usefulness is **partially useful**. The operator has
+reviewed the person-ranked examples but has not yet reviewed
+`Uncertain suggestions` or `Overflow / omissions`. They reported
+that some face observations appear in **both** the top-ranked and
+uncertain lists.
+
+**Cause:** The gallery originally picked person-ranked evidence and
+below-threshold/ambiguous evidence independently. The same retained
+face (same `clip`, `frameNumber`, `faceNumber`) could therefore
+be selected and graded twice. A single frame showing *different*
+face ordinals may appear in more than one section, correctly, because
+those are independent detections.
+
+**Proposed fix:** The isolated gallery now suppresses exact
+face-observation duplicates across `Top-ranked by person` and
+`Uncertain suggestions`, always retaining the top-ranked
+instance and choosing the next qualifying uncertain example
+if possible. A different face ordinal in the same frame remains
+eligible. The gallery's **completion indicator counts only
+face-specific observations**, not optional frame-level overflow
+warnings. Neither the detector output, private report, inference,
+face ordinals, bounding boxes, top-32 ranking nor app/DB is changed.
+
+### How to classify the remaining sections
+
+For `Uncertain suggestions`, examine the **specific face crop**:
+- `Not a face`: false-positive detector candidate.
+- `Unknown person`: a clearly visible real face not among the
+  selected known catalogue people. This is not a verified new
+  identity assignment.
+- `Cannot tell`: image quality, occlusion or angle prevents
+  a reliable human judgment.
+- `Known person - no reliable match`: the reviewer recognizes
+  a **selected known catalogue person**, but the match was
+  below-threshold or ambiguous. In private `ReviewerNotes`,
+  record the selected person pseudonym (e.g. `P02`) and why
+  matching was unreliable. This category is an observed *possible
+  false negative*, not automatic correction of the matcher.
+- `Correct person` or `Wrong person`: for cases where a
+  reliable catalogue person suggestion actually exists, not
+  simply the top-ranking alias in a below-threshold case.
+
+For `Overflow / omissions`, **no retained face is being
+evaluated**: it is a frame-level warning that raw post-NMS
+candidates exceeded the limit of 32. The gallery can draw
+retained boxes/crops only; the discarded candidates were not
+persisted in the historical report. Human reviewers may leave
+these entries untouched or mark `Review not applicable` and
+write a note such as `57 candidates discarded in 17 frames
+overall; unavailable for face-level judgment`. If a full
+frame visibly shows an unboxed human face, add `possible
+missed face` in notes, **without asserting** it was one of
+the discarded candidate boxes. No false-positive rate or
+number of useful discarded people can be inferred from this
+section alone.
+
+### Preserve already completed private reviews
+
+**Before changing galleries, save the current HTML decisions to a
+private CSV using `Save review CSV`**, outside OneDrive and Git.
+The existing CSV columns and row identity (`Clip`, `Section`,
+`Frame`, `Face`, `Candidate`) remain unchanged. After the
+follow-up PR merges, regenerate a new shortlist and (if needed)
+its matching detector geometry, then use the gallery's
+`Import saved CSV`. The import restores matching old rows;
+new uncertain selections may be blank and need review. Because
+a shortlist may change, **do not assume all previous rows
+are imported**: check the reported number of matched rows
+and inspect the regenerated gallery. Keep the old CSV; never
+delete or overwrite it automatically.
+
+The focused Windows PowerShell synthetic test now exercises
+both a previously duplicated below-threshold top-ranked face
+and a separate uncertain face in the same frame. Review
+outcomes and notes remain private, do not update the
+canonical identity index, and are not proof of automatic
+identification quality.

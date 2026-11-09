@@ -177,6 +177,12 @@ foreach ($clip in $reportClips) {
         $findingStatuses[$key] = [string]$finding.reviewStatus
     }
 
+    # A face is uniquely identified by its video, frame and 1-based
+    # face ordinal; never request two human decisions for the same face.
+    # The section is deliberately NOT part of that observation identity.
+    $topRankedFaceKeys = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+
     # Review the strongest *ranked observations* for each selected person.
     # They are NOT verified identifications and can have very low similarity.
     foreach ($person in $personAliases) {
@@ -195,6 +201,7 @@ foreach ($clip in $reportClips) {
             Add-ReviewEntry $alias 'Top-ranked by person' $frameNo (
                 [int]$candidate.faceNumber) $person (
                 [double]$candidate.topSimilarity) $status
+            [void]$topRankedFaceKeys.Add($key)
             if ($used.Count -ge $FramesPerPerson) { break }
         }
     }
@@ -208,7 +215,11 @@ foreach ($clip in $reportClips) {
     $used = [Collections.Generic.HashSet[int]]::new()
     foreach ($item in $uncertain) {
         $frameNo = [int]$item.frameNumber
-        if (-not $used.Add($frameNo)) { continue }
+        $faceKey = '{0}:{1}' -f $frameNo, [int]$item.faceNumber
+        # The same candidate can have a high *rank* but still fail the
+        # recognition threshold. Do not ask the operator to rate it twice.
+        if ($topRankedFaceKeys.Contains($faceKey) -or
+            -not $used.Add($frameNo)) { continue }
         Add-ReviewEntry $alias 'Uncertain suggestions' $frameNo (
             [int]$item.faceNumber) '' ([double]$item.similarity) (
             [string]$item.reviewStatus)
@@ -487,7 +498,7 @@ boxes and native-resolution crops require separate explicit detector-only review
 Never upload this HTML, review decisions, CSV or thumbnails.</p>
 '@)
 $html.Add('<div class="toolbar"><button type="button" id="save-review">Save review CSV</button><button type="button" id="load-review">Import saved CSV</button><input id="review-import" type="file" accept=".csv,text/csv" hidden><span id="review-status" aria-live="polite"></span></div>')
-$html.Add('<p>Decisions: <strong>Correct person</strong> = the shown face is the suggested catalogue person; <strong>Wrong person</strong> = a different person; <strong>Unknown person</strong> = a real face not among your selected known people; <strong>Not a face</strong> = false detection; <strong>Cannot tell</strong> = insufficient visual evidence; <strong>Review not applicable</strong> = overflow or frame-wide concern without a specific face. Enter short reasoning in Reviewer notes. Edits stay in this browser tab until you explicitly save a local CSV. Import it later to resume. No server/database updates occur.</p>')
+$html.Add('<p>Decisions: <strong>Correct person</strong> = the face matches a reliable suggested catalogue person; <strong>Wrong person</strong> = a reliable suggestion names another person; <strong>Known person - no reliable match</strong> = you recognize a selected catalogue person but the model supplied no reliable match (put the pseudonym in ReviewerNotes); <strong>Unknown person</strong> = a real face not among the selected known people; <strong>Not a face</strong> = false detection; <strong>Cannot tell</strong> = insufficient visual evidence; <strong>Review not applicable</strong> = a frame-wide overflow warning. Enter reasoning in ReviewerNotes. Save explicitly to a local CSV and import later to resume. No server/database updates occur.</p>')
 
 
 $html.Add('<h2>Video overview</h2><table><thead><tr><th>Video</th><th>Frames</th><th>Raw candidates</th><th>Retained</th><th>Discarded</th><th>Overflow frames</th></tr></thead><tbody>')
@@ -521,8 +532,19 @@ foreach ($summary in $clipSummaries) {
     foreach ($section in @('Top-ranked by person','Uncertain suggestions','Overflow / omissions')) {
         $cards = @($entries | Where-Object { $_.Clip -ceq $clip -and $_.Section -ceq $section })
         if ($cards.Count -eq 0) { continue }
-        $html.Add(('<h3>{0} ({1} observations)</h3><div class="grid">' -f
-            (To-Html $section),$cards.Count))
+        $explanation = switch ($section) {
+            'Top-ranked by person' {
+                'A small selection of highest cosine rankings for each catalogue person. Rankings alone do not establish reliable identification.'
+            }
+            'Uncertain suggestions' {
+                'These real or false detections had no reliable catalogue suggestion. Decide whether each crop is a known person missed by matching, an unknown person, a non-face, or too unclear. Each selected face appears only once across the ranked and uncertain sections.'
+            }
+            'Overflow / omissions' {
+                'Frame-level diagnostic only: more than 32 candidates were found, but only the retained 32 have boxes and crops. The discarded candidates are NOT visible. Review is optional; use Review not applicable and note any visibly unboxed faces, but do not infer which discarded candidate was real.'
+            }
+        }
+        $html.Add(('<h3>{0} ({1} observations)</h3><p>{2}</p><div class="grid">' -f
+            (To-Html $section),$cards.Count,(To-Html $explanation)))
         foreach ($entry in $cards) {
             $sourceUri = ([Uri]::new([IO.Path]::GetFullPath($entry.OriginalPath))).AbsoluteUri
             $scoreLabel = if ($null -eq $entry.Score) { '–' } else {
@@ -537,7 +559,7 @@ foreach ($summary in $clipSummaries) {
                 '<img class="crop" loading="lazy" src="{0}" alt="Face crop at source pixel resolution">' -f
                     (To-Html $entry.Crop)
             } else { '' }
-            $html.Add(('<article class="review-card" data-clip="{0}" data-section="{1}" data-frame="{2}" data-face="{3}" data-candidate="{4}" data-score="{5}" data-note="{6}"><img class="box-overlay" loading="lazy" src="{7}" alt="Private reviewed frame with optional detected-face bounding box">{8}<div class="body"><strong>Frame {2}</strong> <small>· face ordinal {3}</small><p>{9}<br>Similarity: {5}<br><small>{6}</small></p><a href="{10}">Open original full-resolution frame</a><div class="review-controls"><label>HumanDecision</label><select class="human-decision"><option value="">Not reviewed</option><option>Correct person</option><option>Wrong person</option><option>Unknown person</option><option>Not a face</option><option>Cannot tell</option><option>Review not applicable</option></select><label>ReviewerNotes</label><textarea class="reviewer-notes" maxlength="1000" placeholder="Why? E.g. too blurry, wrong person, useful face, duplicate."></textarea></div></div></article>' -f
+            $html.Add(('<article class="review-card" data-clip="{0}" data-section="{1}" data-frame="{2}" data-face="{3}" data-candidate="{4}" data-score="{5}" data-note="{6}"><img class="box-overlay" loading="lazy" src="{7}" alt="Private reviewed frame with optional detected-face bounding box">{8}<div class="body"><strong>Frame {2}</strong> <small>· face ordinal {3}</small><p>{9}<br>Similarity: {5}<br><small>{6}</small></p><a href="{10}">Open original full-resolution frame</a><div class="review-controls"><label>HumanDecision</label><select class="human-decision"><option value="">Not reviewed</option><option>Correct person</option><option>Wrong person</option><option>Known person - no reliable match</option><option>Unknown person</option><option>Not a face</option><option>Cannot tell</option><option>Review not applicable</option></select><label>ReviewerNotes</label><textarea class="reviewer-notes" maxlength="1000" placeholder="Why? E.g. too blurry, wrong person, useful face, duplicate."></textarea></div></div></article>' -f
                 (To-Html $entry.Clip),(To-Html $entry.Section),
                 $entry.Frame,(To-Html $(if ($null -eq $entry.Face) { '' } else { [string]$entry.Face })),
                 (To-Html $entry.Candidate),(To-Html $(if ($null -eq $entry.Score) { '' } else { $scoreLabel })),
@@ -548,7 +570,7 @@ foreach ($summary in $clipSummaries) {
     }
     $html.Add('</details>')
 }
-$html.Add('<p class="note">Review one useful face observation per genuinely visible person. Overflow shows only retained boxes, NOT boxes for discarded detections. Save human decisions explicitly to a private local CSV. No catalogue assignments are made.</p></main><script src="review-ui.js"></script></body></html>')
+$html.Add('<p class="note">Only actual face observations require HumanDecision. Overflow entries are optional, frame-wide warnings. Face candidates must not be double-counted; different face ordinals in one frame remain distinct. Boxes show retained candidates only, never discarded ones. Save your decisions explicitly to a private local CSV. No catalogue assignments are made.</p></main><script src="review-ui.js"></script></body></html>')
 
 $galleryPath = Join-Path $outputFolder 'review.html'
 $worksheetPath = Join-Path $outputFolder 'review-worksheet.csv'
