@@ -196,9 +196,17 @@ public static class VideoIngestCommandRunner
                     string path = videos.GetLocalPath(asset.Reference);
                     if (!MatchesObservation(asset, new FileInfo(path))) { changed++; continue; }
                     VideoPilotMetadata media = await tools.ProbeAsync(path, token);
-                    SamsungVideoCameraMetadata? samsungCamera = samsungTool is null
-                        ? null : await samsungTool.ProbeIfMissingAsync(media, path,
-                            TimeSpan.FromSeconds(options.TimeoutSeconds), token);
+                    SamsungVideoCameraMetadata? samsungCamera = null;
+                    if (samsungTool is not null &&
+                        VideoSamsungAutomaticMetadata.ShouldProbe(media))
+                    {
+                        if (await videos.GetAvailabilityAsync(
+                                asset.Reference, token) != AssetAvailability.Local ||
+                            !MatchesObservation(asset, new FileInfo(path)))
+                        { changed++; continue; }
+                        samsungCamera = await samsungTool.ProbeIfMissingAsync(
+                            media, path, TimeSpan.FromSeconds(options.TimeoutSeconds), token);
+                    }
                     byte[] hash;
                     await using (Stream content = await videos.OpenContentAsync(asset.Reference, token))
                         hash = await SHA256.HashDataAsync(content, token);
