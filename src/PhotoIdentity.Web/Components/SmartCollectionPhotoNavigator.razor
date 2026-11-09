@@ -1,5 +1,5 @@
 @using System.Text.Json
-@implements IDisposable
+@implements IAsyncDisposable
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -58,11 +58,34 @@
     private string? Notice { get; set; }
     private SmartCollectionWorkspaceContext? WorkspaceContext { get; set; }
     private SmartCollectionPhotoNavigationResolution? Resolved { get; set; }
+    private readonly Dictionary<int, SmartCollectionPageResponse> CachedPages = new();
+    private string? CachedContextKey;
+    private long NavigationGeneration;
+    private IJSObjectReference? KeyboardModule;
 
     protected override async Task OnInitializedAsync()
     {
         Navigation.LocationChanged += HandleLocationChanged;
         await ReloadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            KeyboardModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/smart-photo-navigation.js");
+            await KeyboardModule.InvokeVoidAsync("installSmartCollectionArrows");
+        }
+        catch (JSException)
+        {
+            // Navigation buttons remain usable when browser shortcut support is unavailable.
+        }
     }
 
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
@@ -76,6 +99,7 @@
 
     private async Task ReloadAsync()
     {
+        long generation = ++NavigationGeneration;
         Visible = false;
         Loading = false;
         Notice = null;
@@ -87,6 +111,8 @@
                 out string? revisionId,
                 out string? returnUrl))
         {
+            CachedPages.Clear();
+            CachedContextKey = null;
             return;
         }
 
@@ -96,7 +122,16 @@
                 out SmartCollectionWorkspaceContext? context) ||
             context is null)
         {
+            CachedPages.Clear();
+            CachedContextKey = null;
             return;
+        }
+
+        string contextKey = $"{context.Mode}:{context.CollectionId}:{context.PreviewKey}";
+        if (!string.Equals(CachedContextKey, contextKey, StringComparison.Ordinal))
+        {
+            CachedPages.Clear();
+            CachedContextKey = contextKey;
         }
 
         Visible = true;
@@ -105,22 +140,36 @@
 
         try
         {
-            SmartCollectionTransientNavigationState? transientState = null;
-            if (string.Equals(context.Mode, "transient", StringComparison.Ordinal))
+            SmartCollectionPageResponse? page;
+            if (!CachedPages.TryGetValue(context.Offset, out page))
             {
-                transientState = await LoadTransientStateAsync(context);
-                if (transientState is null)
+                SmartCollectionTransientNavigationState? transientState = null;
+                if (string.Equals(context.Mode, "transient", StringComparison.Ordinal))
+                {
+                    transientState = await LoadTransientStateAsync(context);
+                    if (generation != NavigationGeneration || transientState is null)
+                    {
+                        return;
+                    }
+                }
+
+                (int offset, int limit) = SmartCollectionNavigation.NavigationWindowForOffset(context.Offset);
+                page = await QueryPageAsync(context, transientState, offset, limit, generation);
+                if (generation != NavigationGeneration || page is null)
                 {
                     return;
                 }
+
+                // Retain only a few bounded windows for rapid back-and-forth browsing.
+                if (CachedPages.Count >= 4)
+                {
+                    CachedPages.Remove(CachedPages.Keys.First());
+                }
+
+                CachedPages[context.Offset] = page;
             }
 
-            SmartCollectionPageResponse? page = await QueryPageAsync(
-                context,
-                transientState,
-                context.Offset,
-                SmartCollectionNavigation.ResultPageSize);
-            if (page is null)
+            if (generation != NavigationGeneration)
             {
                 return;
             }
@@ -128,13 +177,15 @@
             int localIndex = Array.FindIndex(
                 page.Items,
                 item => string.Equals(item.RevisionId, revisionId, StringComparison.Ordinal));
-            if (localIndex < 0)
+            int globalIndex = page.Offset + localIndex;
+            if (localIndex < 0 ||
+                globalIndex < context.Offset ||
+                globalIndex >= context.Offset + SmartCollectionNavigation.ResultPageSize)
             {
                 Notice = "Smart Collection results changed or this photo is no longer in the active result set. Return to Smart Collections to refresh the results.";
                 return;
             }
 
-            int globalIndex = page.Offset + localIndex;
             if (SmartCollectionNavigation.TryResolvePhotoNavigation(
                     page,
                     revisionId!,
@@ -145,36 +196,21 @@
                 return;
             }
 
-            int neighborOffset = Math.Max(0, globalIndex - 1);
-            SmartCollectionPageResponse? neighbors = await QueryPageAsync(
-                context,
-                transientState,
-                neighborOffset,
-                3);
-            if (neighbors is not null &&
-                SmartCollectionNavigation.TryResolvePhotoNavigation(
-                    neighbors,
-                    revisionId!,
-                    globalIndex,
-                    out navigation))
-            {
-                Resolved = navigation;
-                return;
-            }
-
             Notice = "Smart Collection results changed while this photo was open. Previous/next navigation is disabled until the collection is refreshed.";
-        }
-        catch (Exception exception) when (exception is JSException or JsonException)
-        {
-            Notice = $"Smart Collection navigation could not be restored: {exception.Message}";
         }
         catch (Exception exception)
         {
-            Notice = $"Smart Collection navigation could not be loaded: {exception.Message}";
+            if (generation == NavigationGeneration)
+            {
+                Notice = $"Smart Collection navigation could not be loaded: {exception.Message}";
+            }
         }
         finally
         {
-            Loading = false;
+            if (generation == NavigationGeneration)
+            {
+                Loading = false;
+            }
         }
     }
 
@@ -211,12 +247,18 @@
         SmartCollectionWorkspaceContext context,
         SmartCollectionTransientNavigationState? transientState,
         int offset,
-        int limit)
+        int limit,
+        long generation)
     {
         using HttpResponseMessage response = string.Equals(context.Mode, "saved", StringComparison.Ordinal)
             ? await Http.GetAsync(
                 $"api/smart-collections/{Uri.EscapeDataString(context.CollectionId!)}/query?offset={offset}&limit={limit}")
             : await QueryTransientAsync(transientState, offset, limit);
+
+        if (generation != NavigationGeneration)
+        {
+            return null;
+        }
 
         if (!response.IsSuccessStatusCode)
         {
@@ -259,8 +301,21 @@
         return SmartCollectionNavigation.BuildPhotoUrl(revisionId, returnUrl);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Navigation.LocationChanged -= HandleLocationChanged;
+        ++NavigationGeneration;
+        if (KeyboardModule is not null)
+        {
+            try
+            {
+                await KeyboardModule.InvokeVoidAsync("uninstallSmartCollectionArrows");
+                await KeyboardModule.DisposeAsync();
+            }
+            catch (JSException)
+            {
+                // The browser may already be gone during teardown.
+            }
+        }
     }
 }
