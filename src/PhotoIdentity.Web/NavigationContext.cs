@@ -98,6 +98,32 @@ public static class SmartCollectionNavigation
             : (pageOffset - 1, ResultPageSize + 2);
     }
 
+    public const int NavigationPrefetchDistance = 15;
+
+    // Schedule only the neighboring result windows, and only when the current
+    // photo is close enough to a 40-result boundary to make prefetching useful.
+    public static (int? PreviousOffset, int? NextOffset) PrefetchOffsetsForIndex(
+        int pageOffset,
+        int currentIndex,
+        int total)
+    {
+        if (pageOffset < 0 || currentIndex < pageOffset ||
+            currentIndex - pageOffset >= ResultPageSize || currentIndex >= total)
+        {
+            return (null, null);
+        }
+
+        int? previousOffset = pageOffset > 0 &&
+            currentIndex - pageOffset < NavigationPrefetchDistance
+                ? pageOffset - ResultPageSize
+                : null;
+        int? nextOffset = (long)pageOffset + ResultPageSize < total &&
+            currentIndex - pageOffset >= ResultPageSize - NavigationPrefetchDistance
+                ? pageOffset + ResultPageSize
+                : null;
+        return (previousOffset, nextOffset);
+    }
+
     public static bool TryParsePhotoUrl(
         string url,
         out string? revisionId,
