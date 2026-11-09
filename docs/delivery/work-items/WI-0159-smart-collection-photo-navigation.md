@@ -81,3 +81,11 @@ The follow-up branch `fix/smart-collection-rapid-photo-navigation` makes the nav
 - Check browser Console for unhandled Blazor/JavaScript errors, and the API log for failures. The production crash has not yet been reproduced under automated tests.
 
 Acceptance remains **pending** until the focused tests/CI and desktop local checks pass.
+
+## Boundary prefetch improvement — 2026-11-10
+
+After PR #783 was merged, the maintainer confirmed rapid photo navigation works well within each 40-photo window. A roughly 2.5-second pause remains at boundaries around photos 40–41, 80–81 and 120–121. This is consistent with a fresh Smart Collection query being required on first entry to the next result window.
+
+A small follow-up keeps the existing bounded 40-result query and up-to-four-window cache, but starts loading the next window once the current photo is within 15 positions of the next boundary (and likewise prefetches the previous window when browsing backward). Crossing a boundary reuses a completed cached window or awaits its existing in-flight request rather than querying it twice. Speculative failures remain silent, are attempted at most once per offset/context, and fall back to the normal visible navigation query. Context changes invalidate old prefetches; no image originals are hydrated or modified.
+
+**Local verification pending:** after CI passes, rebuild the normal Windows package and navigate quickly across photo positions 25–41, 65–81, and 105–121. Confirm the old boundary pauses are reduced or eliminated at ordinary browsing speed, the photo/counter/details remain aligned, first/last photo navigation and arrow keys still work, saved/transient Smart Collection context is retained, and no extra load occurs when leaving the photo viewer. A very fast advance can still overtake an in-flight prefetch; this change is not a guarantee of zero delay.
