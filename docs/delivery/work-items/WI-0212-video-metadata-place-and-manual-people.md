@@ -141,7 +141,23 @@ A focused follow-up branch implements the UI/local-time, formatting and
 reversible GPS-Place changes using existing v39 tables. The metadata-field
 extension and Samsung inspection remain pending separate approval/testing.
 
-## Out of scope
+### PR #771 local verification defect and focused fix (2026-11-09)
+
+The maintainer verified all PR #771 follow-up checks **except local manual
+recording-time edit**. The browser localized a native `datetime-local`
+input to a day-first display and the event value no longer matched the
+string parser expecting `yyyy-MM-ddTHH:mm`, so saving a legitimate time
+failed. The two-time metadata display and restoring the extracted value
+could not be confirmed. The maintainer also requests the **nearest integer**
+frame rate rather than fractional fps.
+
+A focused no-schema-change follow-up replaces the native date picker with
+an explicit `YYYY-MM-DD HH:MM` plain text field, converts a valid local
+clock time to an offset-bearing timestamp, keeps DST ambiguity rejection,
+rounds fps to the nearest integer and adds regression tests. Run targeted
+local acceptance once merged; the production v39 migration was previously
+accepted and must not be rerun for this UI-only fix.
+
 
 - WI-0153 manual photo/video collection membership and WI-0154 slideshow.
 - Automatic recognition, face tracks, generated video-person suggestions
