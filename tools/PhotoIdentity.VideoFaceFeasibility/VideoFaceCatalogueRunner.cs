@@ -20,6 +20,7 @@ public static class VideoFaceCatalogueRunner
 
     public static async Task<int> RunAsync(string[] args)
     {
+        string stage = "input-selection";
         try
         {
             Options options = Parse(args);
@@ -39,6 +40,7 @@ public static class VideoFaceCatalogueRunner
                 selected.Add((clip, frames));
             }
 
+            stage = "model-verification";
             ModelManifestLoader loader = new();
             string manifests = Path.Combine(options.Root, "models", "manifests");
             ModelManifest detectorManifest = await loader.LoadAsync(
@@ -63,11 +65,13 @@ public static class VideoFaceCatalogueRunner
 
             // Evidence is materialized once and the transaction is closed before
             // any video-frame inference. All clips see the SAME identity snapshot.
+            stage = "catalogue-snapshot";
             var (provenance, matcher) = await VideoFaceCatalogueEvidenceReader.LoadAsync(
                 cases, embedder.Descriptor);
             List<VideoFaceCatalogueClipReview> reviews = [];
             foreach (var (clip, frames) in selected)
             {
+                stage = "clip-analysis";
                 string folder = Path.GetDirectoryName(Path.GetFullPath(clip.Manifest))!;
                 VideoFacePrivateReview review = await experiment.RunWithPreparedMatcherAsync(
                     frames, folder, matcher, options.DetectorConfidence);
@@ -89,6 +93,7 @@ public static class VideoFaceCatalogueRunner
                 });
             }
 
+            stage = "report-persistence";
             await VideoFaceCatalogueReportWriter.WriteAsync(
                 options.PrivateReport, options.Root, options.Cases,
                 selected.Select(s => s.Clip.Manifest).ToArray(),
@@ -110,12 +115,12 @@ public static class VideoFaceCatalogueRunner
             }, new JsonSerializerOptions { WriteIndented = true }));
             return 0;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // Deliberately never print private paths, credentials, UUIDs or model errors
-            // that could contain user-controlled data. The report is never overwritten.
-            Console.Error.WriteLine(
-                "error: private read-only catalogue evaluation failed; no identity data was logged.");
+            // A known, constant stage is safe to share. Never forward arbitrary
+            // exception messages, source paths, timestamps, or identity evidence.
+            // The report remains create-new and is never overwritten.
+            Console.Error.WriteLine(VideoFaceFailureDiagnostics.Describe(exception, stage));
             return 1;
         }
     }

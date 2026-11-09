@@ -551,3 +551,34 @@ until the combined Windows operator trial described in the
 The already-merged temporary frame lifecycle should be tested in
 that same acceptance session, after preservation of the original
 and confirmed report persistence.
+
+## Experimental checkpoint 12 — initial Windows results and diagnostic follow-up (2026-11-09)
+
+The maintainer's first combined Windows catalogue trial completed
+**single-pass** inference for 3 videos and 252 sampled frames:
+74 frames contained detections, 101 total faces/embeddings, and
+46.223 seconds aggregate processing time. The private output
+was persisted. **This verifies processing, not correct identity
+assignments or additional unique-person discovery.**
+
+The same-cases **multi-scale 1024** run failed with the original
+all-purpose, privacy-preserving error. The exact stage and reason
+cannot be inferred from that error alone; it is **not** legitimate
+to claim model/tiling failure or exceedance of the face-count gate.
+The isolated diagnostic follow-up adds stable, non-identifying
+failure stage/category reporting, with synthetic regression tests
+for detector exceptions and the bounded >32-face condition. It
+does not weaken safety caps or change detection thresholds.
+
+**Acceptance plan:** keep the existing private 180-frame PNG
+extraction, V01/V02 inputs, catalogue case snapshot selection, and
+successful single-pass report. After merging the diagnostic fix,
+rerun *only* the tiled configuration with a fresh private report
+destination and the existing dedicated read-only PostgreSQL role.
+A safe error category, if still failing, determines the next
+targeted correction; successful detection must still undergo
+private human review of true known/unknown matches. Delay
+automatic temporary-frame cleanup until the full evaluation and
+selected retention have been verified. Integration versus
+separation remains undecided; no production writes or app
+registration are authorized.
