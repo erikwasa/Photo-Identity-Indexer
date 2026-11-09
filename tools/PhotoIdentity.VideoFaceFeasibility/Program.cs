@@ -36,7 +36,8 @@ public static class Program
                 "Catalogue: --catalogue-cases <private-2-to-4-clips.json> " +
                 "--private-report <new-private-report.json> [--root <repo>] " +
                 "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>] " +
-                "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>]");
+                "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
+                "[--face-overflow-policy <fail|retain-top-32>]");
             return 0;
         }
 
