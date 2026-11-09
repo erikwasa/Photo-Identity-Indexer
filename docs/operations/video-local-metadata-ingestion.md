@@ -27,6 +27,39 @@ Only already-local video input is probed. FFprobe `format.tags` and video `strea
 - Existing revision metadata is immutable. If a video revision already has v1 inspection evidence, a v2 re-inspection that changes fields **fails closed** rather than silently overwriting the row. Explicit administrative invalidation/re-inspection is a later controlled step. This checkpoint does not backfill old rows automatically.
 - Full end-to-end verification still requires representative QuickTime files with correct timezone, device tag variants and missing/ambiguous fields. These parser tests are deterministic synthetic evidence, not a claim of validated camera-wide coverage.
 
+## WI-0212 v40 technical-stream metadata extension (development)
+
+The opt-in FFprobe parser now also extracts **video-stream bit rate** (bps),
+**audio channel count/layout**, and **audio sample rate** (Hz). The new
+`video_revision_metadata` fields are nullable, revision-bound and range
+validated. Video Details shows video bitrate in Mb/s, plus audio codec,
+channels and sample rate (e.g. `AAC · Mono · 44.1 kHz`). Bitrate is only
+one compression characteristic and **not** an objective image-quality score.
+Missing stream facts stay Unknown; no value is inferred from file size,
+resolution or duration. FFprobe's container-level format bitrate is *not*
+used as a substitute for video-stream bitrate (it includes other streams).
+
+Camera-tag support is extended for explicit FFprobe `SamsungModel` and
+`com.samsung.model` tags, plus `manufacturer`. Samsung is assigned as make
+only when a Samsung-specific model tag is actually present. ExifTool may
+recognize proprietary device metadata that the approved FFprobe inspection
+does not expose; there is **no claim** that every Samsung file will now have
+make/model. If the input yields no approved model tag, camera model remains
+Unknown. The metadata profile is `wi0212-ffprobe-metadata-v3`.
+
+**Existing inspections remain immutable.** Running the new application and
+migrating schema v39 -> v40 will not fill these four new fields for clips
+previously inspected with v2, and retrying a v3 ingestion against the same
+revision fails closed if newly extracted evidence differs. A separately
+authorized, bounded, revision- and exclusion-guarded refresh workflow is
+required before the maintainer's existing samples can show the new stream
+facts. That workflow must leave original capture/GPS, manual annotations,
+photo and face evidence unchanged, and must not hydrate online-only video.
+
+The v40 migration must be independently restore-rehearsed on a verified v39
+copy before launching v40 against production. Do not perform this on the
+maintained host until the complete metadata-refresh work is ready.
+
 ## Commands for the final end-to-end acceptance
 
 The maintainer asked to defer hands-on testing until WI-0151 is developed completely. These commands document the subsequent controlled acceptance path. Do not import the full archive during the intermediate PR review.
