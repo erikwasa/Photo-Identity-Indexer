@@ -168,6 +168,36 @@ accepted and must not be rerun for this UI-only fix.
   patterns as factual place/capture time, or requiring every video to
   contain full camera/GPS metadata.
 
+## v40 technical metadata development (2026-11-09)
+
+The next video-only metadata projection includes source **video-stream
+bitrate (Mb/s)**, audio stream **channel count/layout and sample rate**
+(e.g. `AAC · Mono · 44.1 kHz`). FFprobe's `bit_rate` is not an
+objective picture-quality score; absent measurements remain Unknown and
+are never inferred from container size or resolution.
+
+Samsung make/model is accepted only from an explicit **FFprobe-visible**
+`SamsungModel` or `com.samsung.model` tag. ExifTool's proprietary
+Samsung metadata is not guaranteed to be exposed by FFprobe; the cited
+Samsung sample may therefore still lack an approved value. No device
+identity is inferred from codec, name or file modification time.
+
+PostgreSQL v40 adds four **nullable** columns to
+`video_revision_metadata` with bounded checks. The change does not
+rewrite old metadata, original GPS/capture, manual video annotations,
+frame evidence, photo data or face recognition. A guarded
+`catalogue rehearse-v40` command requires a verified retained v39
+restore and confirms every existing table row count, correct new
+columns and idempotent migration.
+
+**Outstanding dependency:** existing v2 inspections are immutable. A
+separately authorized, selected-local-only revision/hash-verified
+metadata refresh path must be implemented before old catalogue clips
+show these values. The maintainer defers local review until the
+end-to-end metadata workflow is complete. The v40 app must not be
+started against production v39 before the isolated rehearsal is
+accepted.
+
 ## Acceptance criteria
 
 - [ ] Maintainer-approved current-video metadata inventory identifies
