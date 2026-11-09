@@ -31,10 +31,11 @@ public static class VideoFaceReviewGeometryConsistency
         }
 
         if (selected.Candidates.Count > 0 &&
-            (Math.Abs(selected.Candidates.Min(d => d.Confidence) -
-                (expected.LowestConfidence ?? double.NaN)) > 0.001 ||
-             Math.Abs(selected.Candidates.Max(d => d.Confidence) -
-                (expected.HighestConfidence ?? double.NaN)) > 0.001))
+            (expected.LowestConfidence is not double minimum ||
+             expected.HighestConfidence is not double maximum ||
+             !double.IsFinite(minimum) || !double.IsFinite(maximum) ||
+             Math.Abs(selected.Candidates.Min(d => d.Confidence) - minimum) > 0.001 ||
+             Math.Abs(selected.Candidates.Max(d => d.Confidence) - maximum) > 0.001))
         {
             throw new InvalidOperationException(
                 "Reconstructed detector confidence disagrees with the private report.");
