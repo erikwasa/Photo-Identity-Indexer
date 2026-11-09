@@ -87,6 +87,9 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
             }
 
             AssetRevisionId revision = AssetRevisionId.From(revisionGuid);
+            PostgresVideoDetailsRepository annotations = new(database, TimeProvider.System);
+            DateTimeOffset corrected = captured.AddDays(1);
+            await annotations.SetCaptureDateAsync(revision, corrected, "test");
             PostgresVideoTechnicalMetadataRefreshRepository repository = new(database);
             VideoTechnicalMetadataRefreshTarget target = Assert.IsType<VideoTechnicalMetadataRefreshTarget>(
                 await repository.GetCurrentTargetAsync(revision, sourceRoot));
@@ -129,7 +132,8 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
                            m.capture_at_utc, m.tool_sha256, m.inspection_profile_id,
                            (SELECT COUNT(*) FROM video_metadata_refresh_actions),
                            (SELECT changed_fields FROM video_metadata_refresh_actions LIMIT 1),
-                           (SELECT COUNT(*) FROM asset_revisions WHERE media_kind='photo')
+                           (SELECT COUNT(*) FROM asset_revisions WHERE media_kind='photo'),
+                           (SELECT COUNT(*) FROM video_capture_date_actions)
                     FROM video_revision_metadata m
                     WHERE m.asset_revision_id = @revision;
                     """;
@@ -149,7 +153,11 @@ public sealed class VideoTechnicalMetadataRefreshPostgresTests
                 Assert.Equal("camera_model,video_bitrate_bps,audio_sample_rate_hz,audio_channels,audio_channel_layout",
                     rows.GetString(10));
                 Assert.Equal(1L, rows.GetInt64(11));
+                Assert.Equal(1L, rows.GetInt64(12));
             }
+
+            Assert.Equal(corrected,
+                (await annotations.GetAsync(revision))?.EffectiveCaptureAtUtc);
 
             // A new revision or explicit exclusion must invalidate any further
             // technical refresh of the historical or deleted source.
