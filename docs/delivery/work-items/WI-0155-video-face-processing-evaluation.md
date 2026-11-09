@@ -615,3 +615,45 @@ check strict default, bounded retention, deterministic
 selection and diagnostic accounting; they cannot establish
 real image accuracy. No main-branch production integration,
 database mutation or original-file change is authorized.
+
+## Experimental checkpoint 14 — human review of a large private result (2026-11-09)
+
+The maintainer reports **PASS** for focused tests and the bounded
+tiled-1024 trial: **4,043 raw candidates; 3,986 retained;
+57 discarded in 17 overflowing frames; 207 seconds**.
+Technical bounded processing is now locally verified; none of
+these counts establish how many distinct people were detected or
+whether known/unknown suggestions were correct. The private
+evaluation report is about **150,000 lines**, which is not an
+acceptable human-review interface.
+
+**New requirement WI0155-REVIEW-01:** Review should focus on one/few
+useful face observations per actually visible person, not every
+frame-level candidate. Supply a small, offline, local, private
+review shortlist with:
+
+- per-video candidate, overflow and ranking-coverage summaries,
+  explicitly showing catalogue people with **zero** top-ranked
+  observations;
+- a bounded number of highest-ranked frame observations per person,
+  plus uncertain outcomes and overflow risk, with full-frame
+  visual access and a small CSV worksheet for human decisions;
+- no private evidence uploaded, no production app or database writes,
+  no automatic identification and no silent assertion that
+  higher cosine scores imply truth;
+- no modifications to original videos or intermediate decoded frames,
+  no additional inference or unnecessary OneDrive hydration;
+- clear limitations until face bounding boxes/crops and stable
+  review decisions can be captured by a separately approved design.
+
+A standalone PowerShell 7.6 review-gallery generator and synthetic
+smoke test are proposed on an isolated WI-0155 feature branch.
+The HTML/CSV and thumbnail files remain entirely in
+`%LOCALAPPDATA%\PhotoIdentity\WI0155\review-galleries`.
+**Local operator review is still pending**; use the already
+successful private report and approved case manifests, not another
+252-frame inference run. Frame thumbnails are for review only
+and are not evidence of image-model fidelity. The absence of
+face-specific bounding boxes prevents direct visual localization
+of individual candidate ordinals; consider this a next design
+requirement after first human-review feedback.
