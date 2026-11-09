@@ -56,6 +56,10 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 38),
+                "catalogue" when args.Length > 1 && args[1] == "rehearse-v41" =>
+                    await VideoSchemaRehearsalCommandRunner.RunAsync(
+                        VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken, expectedRestoredSchemaVersion: 39),
                 "catalogue" when args.Length > 1 && args[1] == "rehearse-v40" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
@@ -64,6 +68,11 @@ public static class Program
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
                         output, cancellationToken, expectedRestoredSchemaVersion: 34),
+                "video" when args.Length > 2 &&
+                    args[1] == "metadata" && args[2] == "refresh" =>
+                    await VideoMetadataRefreshCommandRunner.RunAsync(
+                        VideoMetadataRefreshOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
                 "video" when args.Length > 2 &&
                     args[1] == "one-shot" && args[2] == "assess-photo-load" =>
                     await VideoPhotoLoadEvidenceCommandRunner.RunAsync(
@@ -303,6 +312,11 @@ public static class Program
                                       apply through the current schema, check
                                       retained counts/empty frame evidence)
 
+              catalogue rehearse-v41 --postgres-connection-env NAME
+                                     --restore-report ABSOLUTE_REPORT_PATH
+                                     (verified v39 restore only; apply both
+                                      v40 and v41, preserve table counts
+                                      and audit-table initialization)
               catalogue rehearse-v40 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (verified v39 isolated restore only;
@@ -322,6 +336,15 @@ public static class Program
               catalogue rehearse-v35 / rehearse-v36
                                      (legacy aliases; also apply through v37)
 
+              video metadata refresh --enable-video --revision UUID
+                                     --source-root ABS_LOCAL_ROOT --ffprobe ABS_EXE
+                                     --ffprobe-sha256 APPROVED_SHA256
+                                     --postgres-connection-env NAME --database DB
+                                     [--timeout-seconds SECONDS (1..120)]
+                                     [--apply --acknowledge-metadata-only]
+                                     (dry run by default; one current, SHA-256
+                                      verified local revision, fill only NULL
+                                      stream/device fields, append provenance)
               video one-shot assess-photo-load --baseline-file ABS_JSON
                                                --mixed-file ABS_JSON
                                                --limits-file ABS_JSON
