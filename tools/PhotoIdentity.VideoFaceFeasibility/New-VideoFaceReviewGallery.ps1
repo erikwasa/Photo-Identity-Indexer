@@ -14,6 +14,7 @@ param(
     [ValidateRange(1, 6)][int] $UncertainFramesPerClip = 3,
     [ValidateRange(1, 6)][int] $OverflowFramesPerClip = 4,
     [ValidateRange(240, 960)][int] $ThumbnailLongEdge = 600,
+    [string] $GeometryPath,
     [switch] $OpenGallery
 )
 
@@ -96,6 +97,8 @@ function Add-ReviewEntry {
         Note = $Description
         OriginalPath = $selectedFrames[$Frame - 1].fullPath
         Thumbnail = ''
+        Crop = ''
+        Overlay = ''
     })
 }
 
@@ -231,6 +234,58 @@ if ($entries.Count -eq 0) {
     throw 'No reviewable observations found. Preserve the underlying private report.'
 }
 
+$selectedKeys = @($entries |
+    ForEach-Object { '{0}:{1}' -f $_.Clip, $_.Frame } |
+    Sort-Object -Unique)
+if ($selectedKeys.Count -gt 128) {
+    throw 'Review shortlist exceeds the bounded reconstruction budget.'
+}
+
+# Optional geometry comes from explicitly re-running only these selected frames,
+# with the same detector settings. Never trust box coordinates or face ordinals
+# blindly when loading a separate local geometry file.
+$geometryByFrame = @{}
+if (-not [string]::IsNullOrWhiteSpace($GeometryPath)) {
+    $geometryFile = Assert-PrivateFile $GeometryPath (1MB)
+    $geometry = Get-Content -LiteralPath $geometryFile -Raw -Encoding utf8 |
+        ConvertFrom-Json
+    if ($geometry.schemaVersion -ne 1 -or
+        @($geometry.frames).Count -ne $selectedKeys.Count) {
+        throw 'Geometry does not match the selected frames.'
+    }
+    foreach ($item in @($geometry.frames)) {
+        $key = '{0}:{1}' -f $item.clip,[int]$item.frameNumber
+        if ($key -cnotin $selectedKeys -or $geometryByFrame.ContainsKey($key) -or
+            @($item.boxes).Count -gt 32) {
+            throw 'Geometry contains an unexpected or repeated frame.'
+        }
+        $faceNumbers = [Collections.Generic.HashSet[int]]::new()
+        foreach ($box in @($item.boxes)) {
+            $x = [double]$box.x
+            $y = [double]$box.y
+            $w = [double]$box.width
+            $h = [double]$box.height
+            if (-not $faceNumbers.Add([int]$box.faceNumber) -or
+                [int]$box.faceNumber -lt 1 -or
+                [int]$box.faceNumber -gt 32 -or
+                -not ([double]::IsFinite($x) -and [double]::IsFinite($y) -and
+                    [double]::IsFinite($w) -and [double]::IsFinite($h)) -or
+                $x -lt 0 -or $y -lt 0 -or $w -le 0 -or $h -le 0 -or
+                $x + $w -gt 1.000001 -or $y + $h -gt 1.000001) {
+                throw 'Invalid normalized private face geometry.'
+            }
+        }
+        $geometryByFrame[$key] = @($item.boxes)
+    }
+    foreach ($entry in $entries) {
+        if ($null -ne $entry.Face -and
+            @($geometryByFrame[('{0}:{1}' -f $entry.Clip,$entry.Frame)] |
+                Where-Object { $_.faceNumber -eq [int]$entry.Face }).Count -ne 1) {
+            throw 'A shortlisted face ordinal has no matching reconstructed box.'
+        }
+    }
+}
+
 # New private output. Deliberately outside the repository and extraction folders.
 $outputRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\review-galleries'
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
@@ -244,6 +299,29 @@ $outputFolder = Join-Path $outputRoot (
 New-Item -ItemType Directory -Path $outputFolder -ErrorAction Stop | Out-Null
 $thumbFolder = Join-Path $outputFolder 'thumbnails'
 New-Item -ItemType Directory -Path $thumbFolder -ErrorAction Stop | Out-Null
+
+$selectionFile = Join-Path $outputFolder 'review-selection.json'
+$selectedFrames = @(
+    foreach ($key in $selectedKeys) {
+        $parts = $key.Split(':')
+        [ordered]@{ clip = $parts[0]; frameNumber = [int]$parts[1] }
+    }
+)
+@{ schemaVersion = 1; frames = $selectedFrames } |
+    ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath $selectionFile -Encoding utf8
+
+$scriptAsset = Join-Path $PSScriptRoot 'VideoFaceReviewGallery.js'
+[void](Assert-PrivateFile $scriptAsset (64KB))
+Copy-Item -LiteralPath $scriptAsset -Destination (
+    Join-Path $outputFolder 'review-ui.js') -ErrorAction Stop
+
+if ($geometryByFrame.Count -gt 0) {
+    $cropFolder = Join-Path $outputFolder 'crops'
+    $overlayFolder = Join-Path $outputFolder 'overlays'
+    New-Item -ItemType Directory -Path $cropFolder,$overlayFolder -ErrorAction Stop |
+        Out-Null
+}
 
 # These are intentionally lossy, reduced-size PRIVATE review thumbnails;
 # source frames and the experiment's image input remain untouched.
