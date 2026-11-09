@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 40;
+    public const int CurrentSchemaVersion = 41;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
