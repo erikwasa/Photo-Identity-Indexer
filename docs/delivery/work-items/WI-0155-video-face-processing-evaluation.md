@@ -702,3 +702,42 @@ unverified until the maintainer reviews candidate crops.
 The isolated WI-0155 branch remains separate from main,
 and no write to the canonical identity catalogue is
 authorized.
+
+## Experimental checkpoint 16 — human review workflow clarity (2026-11-09)
+
+PR #780 passed local operator verification: synthetic tests,
+selected-frame re-detection, visible bounding boxes, crop
+generation, in-HTML review editing and CSV save/import. The
+maintainer reported **partially useful** and completed all
+top-ranked-person reviews, leaving uncertain and overflow sections
+pending. This is human-interface acceptance, **not verified
+identification correctness**.
+
+**Defect WI0155-REVIEW-04:** The same retained candidate
+(`clip/frame/face ordinal`) was shown in both the top-ranked
+person section and uncertain suggestions, because those samples
+were selected independently. Avoid asking for two independent
+human decisions for the same exact face. A shared image frame
+may still show different face ordinals and must allow separate
+face decisions. Preserve existing reviewed CSV imports and
+detector geometries where applicable; no modification to source
+media, index state, face models or ranked report.
+
+**Clarified requirement WI0155-REVIEW-05:** Distinguish
+`Known person - no reliable match` (selected known person
+visually recognized even though catalogue ranking is below
+threshold/ambiguous) from `Unknown person` (real face outside
+the selected known identities) and `Cannot tell` (poor
+evidence). Treat `Overflow / omissions` as an **optional
+frame-level diagnostic**, not an individual face identity
+judgment. Previous reports expose no discarded boxes; an
+unboxed face observed by the operator does not prove that it
+was one of the discarded detections. Track face-specific
+review progress separately from frame-wide overflow warnings.
+
+**Acceptance status:** Gallery improvements proposed on an
+isolated WI-0155 child branch; Windows local test and
+re-import of previously completed reviews remain pending.
+Do not delete the existing CSV, gallery, cases, original
+bounded JSON or extracted PNGs. No production integration
+or catalogue mutations authorized.
