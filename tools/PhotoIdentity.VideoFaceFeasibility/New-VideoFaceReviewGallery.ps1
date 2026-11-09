@@ -14,6 +14,7 @@ param(
     [ValidateRange(1, 6)][int] $UncertainFramesPerClip = 3,
     [ValidateRange(1, 6)][int] $OverflowFramesPerClip = 4,
     [ValidateRange(240, 960)][int] $ThumbnailLongEdge = 600,
+    [string] $GeometryPath,
     [switch] $OpenGallery
 )
 
@@ -96,6 +97,8 @@ function Add-ReviewEntry {
         Note = $Description
         OriginalPath = $selectedFrames[$Frame - 1].fullPath
         Thumbnail = ''
+        Crop = ''
+        Overlay = ''
     })
 }
 
@@ -231,6 +234,58 @@ if ($entries.Count -eq 0) {
     throw 'No reviewable observations found. Preserve the underlying private report.'
 }
 
+$selectedKeys = @($entries |
+    ForEach-Object { '{0}:{1}' -f $_.Clip, $_.Frame } |
+    Sort-Object -Unique)
+if ($selectedKeys.Count -gt 128) {
+    throw 'Review shortlist exceeds the bounded reconstruction budget.'
+}
+
+# Optional geometry comes from explicitly re-running only these selected frames,
+# with the same detector settings. Never trust box coordinates or face ordinals
+# blindly when loading a separate local geometry file.
+$geometryByFrame = @{}
+if (-not [string]::IsNullOrWhiteSpace($GeometryPath)) {
+    $geometryFile = Assert-PrivateFile $GeometryPath (1MB)
+    $geometry = Get-Content -LiteralPath $geometryFile -Raw -Encoding utf8 |
+        ConvertFrom-Json
+    if ($geometry.schemaVersion -ne 1 -or
+        @($geometry.frames).Count -ne $selectedKeys.Count) {
+        throw 'Geometry does not match the selected frames.'
+    }
+    foreach ($item in @($geometry.frames)) {
+        $key = '{0}:{1}' -f $item.clip,[int]$item.frameNumber
+        if ($key -cnotin $selectedKeys -or $geometryByFrame.ContainsKey($key) -or
+            @($item.boxes).Count -gt 32) {
+            throw 'Geometry contains an unexpected or repeated frame.'
+        }
+        $faceNumbers = [Collections.Generic.HashSet[int]]::new()
+        foreach ($box in @($item.boxes)) {
+            $x = [double]$box.x
+            $y = [double]$box.y
+            $w = [double]$box.width
+            $h = [double]$box.height
+            if (-not $faceNumbers.Add([int]$box.faceNumber) -or
+                [int]$box.faceNumber -lt 1 -or
+                [int]$box.faceNumber -gt 32 -or
+                -not ([double]::IsFinite($x) -and [double]::IsFinite($y) -and
+                    [double]::IsFinite($w) -and [double]::IsFinite($h)) -or
+                $x -lt 0 -or $y -lt 0 -or $w -le 0 -or $h -le 0 -or
+                $x + $w -gt 1.000001 -or $y + $h -gt 1.000001) {
+                throw 'Invalid normalized private face geometry.'
+            }
+        }
+        $geometryByFrame[$key] = @($item.boxes)
+    }
+    foreach ($entry in $entries) {
+        if ($null -ne $entry.Face -and
+            @($geometryByFrame[('{0}:{1}' -f $entry.Clip,$entry.Frame)] |
+                Where-Object { $_.faceNumber -eq [int]$entry.Face }).Count -ne 1) {
+            throw 'A shortlisted face ordinal has no matching reconstructed box.'
+        }
+    }
+}
+
 # New private output. Deliberately outside the repository and extraction folders.
 $outputRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\review-galleries'
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
@@ -244,6 +299,29 @@ $outputFolder = Join-Path $outputRoot (
 New-Item -ItemType Directory -Path $outputFolder -ErrorAction Stop | Out-Null
 $thumbFolder = Join-Path $outputFolder 'thumbnails'
 New-Item -ItemType Directory -Path $thumbFolder -ErrorAction Stop | Out-Null
+
+$selectionFile = Join-Path $outputFolder 'review-selection.json'
+$selectedFrames = @(
+    foreach ($key in $selectedKeys) {
+        $parts = $key.Split(':')
+        [ordered]@{ clip = $parts[0]; frameNumber = [int]$parts[1] }
+    }
+)
+@{ schemaVersion = 1; frames = $selectedFrames } |
+    ConvertTo-Json -Depth 5 |
+    Set-Content -LiteralPath $selectionFile -Encoding utf8
+
+$scriptAsset = Join-Path $PSScriptRoot 'VideoFaceReviewGallery.js'
+[void](Assert-PrivateFile $scriptAsset (64KB))
+Copy-Item -LiteralPath $scriptAsset -Destination (
+    Join-Path $outputFolder 'review-ui.js') -ErrorAction Stop
+
+if ($geometryByFrame.Count -gt 0) {
+    $cropFolder = Join-Path $outputFolder 'crops'
+    $overlayFolder = Join-Path $outputFolder 'overlays'
+    New-Item -ItemType Directory -Path $cropFolder,$overlayFolder -ErrorAction Stop |
+        Out-Null
+}
 
 # These are intentionally lossy, reduced-size PRIVATE review thumbnails;
 # source frames and the experiment's image input remain untouched.
@@ -278,6 +356,91 @@ foreach ($entry in $entries) {
     $entry.Thumbnail = $thumbnailCache[$key]
 }
 
+# Geometry-bearing galleries show actual detector bounding boxes and a native
+# pixel crop for the exact ordinal selected in the original private report.
+# These are review copies only; no source PNG is rewritten.
+if ($geometryByFrame.Count -gt 0) {
+    foreach ($entry in $entries) {
+        $key = '{0}:{1}' -f $entry.Clip,$entry.Frame
+        $allBoxes = @($geometryByFrame[$key])
+        $selectedBoxes = if ($null -eq $entry.Face) {
+            $allBoxes
+        } else {
+            @($allBoxes | Where-Object { [int]$_.faceNumber -eq [int]$entry.Face })
+        }
+
+        $label = if ($null -eq $entry.Face) {
+            'all'
+        } else {
+            'face-{0:D2}' -f [int]$entry.Face
+        }
+        $base = '{0}-frame-{1:D3}-{2}' -f $entry.Clip,$entry.Frame,$label
+        $overlayName = $base + '.jpg'
+        $overlayPath = Join-Path $overlayFolder $overlayName
+
+        $imagePath = Assert-PrivateFile $entry.OriginalPath (8MB)
+        $image = [Drawing.Image]::FromFile($imagePath)
+        $overlay = $null
+        $graphics = $null
+        $pen = $null
+        try {
+            $ratio = [Math]::Min(1.0,
+                $ThumbnailLongEdge / [double][Math]::Max($image.Width,$image.Height))
+            $overlayWidth = [Math]::Max(1,[int][Math]::Round($image.Width * $ratio))
+            $overlayHeight = [Math]::Max(1,[int][Math]::Round($image.Height * $ratio))
+            $overlay = [Drawing.Bitmap]::new($overlayWidth,$overlayHeight)
+            $graphics = [Drawing.Graphics]::FromImage($overlay)
+            $graphics.DrawImage($image,0,0,$overlayWidth,$overlayHeight)
+            $pen = [Drawing.Pen]::new([Drawing.Color]::FromArgb(255,255,112),3)
+            foreach ($box in $selectedBoxes) {
+                $rx = [int][Math]::Floor([double]$box.x * $overlayWidth)
+                $ry = [int][Math]::Floor([double]$box.y * $overlayHeight)
+                $rw = [Math]::Max(1,[int][Math]::Ceiling([double]$box.width * $overlayWidth))
+                $rh = [Math]::Max(1,[int][Math]::Ceiling([double]$box.height * $overlayHeight))
+                $graphics.DrawRectangle($pen,$rx,$ry,$rw,$rh)
+            }
+            $overlay.Save($overlayPath,[Drawing.Imaging.ImageFormat]::Jpeg)
+            $entry.Overlay = 'overlays/' + $overlayName
+
+            if ($null -ne $entry.Face) {
+                $box = $selectedBoxes[0]
+                $left = [int][Math]::Floor([double]$box.x * $image.Width)
+                $top = [int][Math]::Floor([double]$box.y * $image.Height)
+                $bw = [Math]::Max(1,[int][Math]::Ceiling([double]$box.width * $image.Width))
+                $bh = [Math]::Max(1,[int][Math]::Ceiling([double]$box.height * $image.Height))
+                $marginX = [int][Math]::Ceiling($bw * 0.25)
+                $marginY = [int][Math]::Ceiling($bh * 0.25)
+                $cl = [Math]::Max(0,$left - $marginX)
+                $ct = [Math]::Max(0,$top - $marginY)
+                $cr = [Math]::Min($image.Width,$left + $bw + $marginX)
+                $cb = [Math]::Min($image.Height,$top + $bh + $marginY)
+                $cw = [Math]::Max(1,$cr - $cl)
+                $ch = [Math]::Max(1,$cb - $ct)
+                $cropBitmap = [Drawing.Bitmap]::new($cw,$ch)
+                $cropGraphics = [Drawing.Graphics]::FromImage($cropBitmap)
+                try {
+                    $cropGraphics.DrawImage($image,
+                        [Drawing.Rectangle]::new(0,0,$cw,$ch),
+                        [Drawing.Rectangle]::new($cl,$ct,$cw,$ch),
+                        [Drawing.GraphicsUnit]::Pixel)
+                    $cropFile = $base + '.png'
+                    $cropBitmap.Save((Join-Path $cropFolder $cropFile),
+                        [Drawing.Imaging.ImageFormat]::Png)
+                    $entry.Crop = 'crops/' + $cropFile
+                } finally {
+                    $cropGraphics.Dispose()
+                    $cropBitmap.Dispose()
+                }
+            }
+        } finally {
+            if ($null -ne $pen) { $pen.Dispose() }
+            if ($null -ne $graphics) { $graphics.Dispose() }
+            if ($null -ne $overlay) { $overlay.Dispose() }
+            $image.Dispose()
+        }
+    }
+}
+
 $html = [Collections.Generic.List[string]]::new()
 $html.Add(@'
 <!doctype html>
@@ -285,7 +448,7 @@ $html.Add(@'
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
 <title>WI-0155 private face-review shortlist</title>
 <style>
 body{background:#101923;color:#f0f3f7;font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;margin:0}
@@ -303,6 +466,15 @@ code{color:#aad2fa}a{color:#9fd4ff}small{color:#9fb3c5}
 table{width:100%;border-collapse:collapse;margin:16px 0}
 th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #324354}
 .tag{display:inline-block;border-radius:4px;background:#34475a;padding:2px 6px;font-size:12px}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}
+button,select,textarea{font:inherit;color:#f0f3f7;background:#22384b;border:1px solid #607287;border-radius:5px;padding:7px}
+button{cursor:pointer;background:#245b80;font-weight:bold}
+button:focus,select:focus,textarea:focus{outline:2px solid #9fd4ff;outline-offset:1px}
+.review-controls{border-top:1px solid #334656;padding-top:12px;display:grid;gap:6px}
+.review-controls label{font-size:12px;color:#b6cfdf}
+.review-controls textarea{resize:vertical;min-height:62px;width:100%;box-sizing:border-box}
+article img.crop{height:150px;background:#101923;image-rendering:auto}
+article img.box-overlay{height:240px}
 </style>
 </head>
 <body><main>
@@ -310,9 +482,13 @@ th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #324354}
 <p class="note"><strong>Important:</strong> Person aliases are exploratory cosine rankings, NOT identifications.
 Under-threshold suggestions are NOT proof of unknown identity. Preview images are
 downsized and may not show a small face well; use the full original frame for zooming.
-This report cannot show individual face bounding boxes because those are not retained
-in the current diagnostic format. Do not upload this HTML, CSV or its thumbnails.</p>
+Bounded full-frame previews are offered below. Optional reconstructed face bounding
+boxes and native-resolution crops require separate explicit detector-only review geometry.
+Never upload this HTML, review decisions, CSV or thumbnails.</p>
 '@)
+$html.Add('<div class="toolbar"><button type="button" id="save-review">Save review CSV</button><button type="button" id="load-review">Import saved CSV</button><input id="review-import" type="file" accept=".csv,text/csv" hidden><span id="review-status" aria-live="polite"></span></div>')
+$html.Add('<p>Decisions: <strong>Correct person</strong> = the shown face is the suggested catalogue person; <strong>Wrong person</strong> = a different person; <strong>Unknown person</strong> = a real face not among your selected known people; <strong>Not a face</strong> = false detection; <strong>Cannot tell</strong> = insufficient visual evidence; <strong>Review not applicable</strong> = overflow or frame-wide concern without a specific face. Enter short reasoning in Reviewer notes. Edits stay in this browser tab until you explicitly save a local CSV. Import it later to resume. No server/database updates occur.</p>')
+
 
 $html.Add('<h2>Video overview</h2><table><thead><tr><th>Video</th><th>Frames</th><th>Raw candidates</th><th>Retained</th><th>Discarded</th><th>Overflow frames</th></tr></thead><tbody>')
 foreach ($summary in $clipSummaries) {
@@ -356,16 +532,23 @@ foreach ($summary in $clipSummaries) {
             $personLabel = if ([string]::IsNullOrWhiteSpace($entry.Candidate)) {
                 'No verified person'
             } else { 'Ranked: ' + $entry.Candidate }
-            $html.Add(('<article><img loading="lazy" src="{0}" alt="Private full-frame preview"><div class="body"><strong>Frame {1}</strong> <small>· face ordinal {2}</small><p>{3}<br>Similarity: {4}<br><small>{5}</small></p><a href="{6}">Open original full-resolution frame</a></div></article>' -f
-                (To-Html $entry.Thumbnail),$entry.Frame,(To-Html $faceLabel),
-                (To-Html $personLabel),(To-Html $scoreLabel),
-                (To-Html $entry.Note),(To-Html $sourceUri)))
+            $preview = if ($entry.Overlay) { $entry.Overlay } else { $entry.Thumbnail }
+            $cropHtml = if ($entry.Crop) {
+                '<img class="crop" loading="lazy" src="{0}" alt="Face crop at source pixel resolution">' -f
+                    (To-Html $entry.Crop)
+            } else { '' }
+            $html.Add(('<article class="review-card" data-clip="{0}" data-section="{1}" data-frame="{2}" data-face="{3}" data-candidate="{4}" data-score="{5}" data-note="{6}"><img class="box-overlay" loading="lazy" src="{7}" alt="Private reviewed frame with optional detected-face bounding box">{8}<div class="body"><strong>Frame {2}</strong> <small>· face ordinal {3}</small><p>{9}<br>Similarity: {5}<br><small>{6}</small></p><a href="{10}">Open original full-resolution frame</a><div class="review-controls"><label>HumanDecision</label><select class="human-decision"><option value="">Not reviewed</option><option>Correct person</option><option>Wrong person</option><option>Unknown person</option><option>Not a face</option><option>Cannot tell</option><option>Review not applicable</option></select><label>ReviewerNotes</label><textarea class="reviewer-notes" maxlength="1000" placeholder="Why? E.g. too blurry, wrong person, useful face, duplicate."></textarea></div></div></article>' -f
+                (To-Html $entry.Clip),(To-Html $entry.Section),
+                $entry.Frame,(To-Html $(if ($null -eq $entry.Face) { '' } else { [string]$entry.Face })),
+                (To-Html $entry.Candidate),(To-Html $(if ($null -eq $entry.Score) { '' } else { $scoreLabel })),
+                (To-Html $entry.Note),(To-Html $preview),$cropHtml,
+                (To-Html $personLabel),(To-Html $sourceUri)))
         }
         $html.Add('</div>')
     }
     $html.Add('</details>')
 }
-$html.Add('<p class="note">Review one useful face observation per genuinely visible person. Check wrong suggestions, unknown people, repetitive observations, and whether overflow discarded useful evidence. Record your decisions in the accompanying CSV worksheet. No catalogue assignments are made.</p></main></body></html>')
+$html.Add('<p class="note">Review one useful face observation per genuinely visible person. Overflow shows only retained boxes, NOT boxes for discarded detections. Save human decisions explicitly to a private local CSV. No catalogue assignments are made.</p></main><script src="review-ui.js"></script></body></html>')
 
 $galleryPath = Join-Path $outputFolder 'review.html'
 $worksheetPath = Join-Path $outputFolder 'review-worksheet.csv'
@@ -381,9 +564,11 @@ Write-Host 'Only private, local files were created. Existing reports, media and 
 [pscustomobject]@{
     GalleryPath = $galleryPath
     WorksheetPath = $worksheetPath
+    SelectionPath = $selectionFile
     ReviewFolder = $outputFolder
     Observations = $entries.Count
     Previews = $thumbnailCache.Count
+    Crops = @($entries | Where-Object { $_.Crop }).Count
 }
 if ($OpenGallery) {
     Invoke-Item -LiteralPath $galleryPath

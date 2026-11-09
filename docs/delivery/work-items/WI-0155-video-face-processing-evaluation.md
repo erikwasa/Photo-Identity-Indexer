@@ -657,3 +657,48 @@ and are not evidence of image-model fidelity. The absence of
 face-specific bounding boxes prevents direct visual localization
 of individual candidate ordinals; consider this a next design
 requirement after first human-review feedback.
+
+## Experimental checkpoint 15 — editable private review with face-specific geometry (2026-11-09)
+
+The maintainer verified that the offline PR #778 gallery, thumbnail
+links and worksheet all work, but human-review usefulness is
+**not yet assessed**. Reviewing uncertain face ordinals in
+unmarked full frames is impractical.
+
+**Requirement WI0155-REVIEW-02:** Provide face-specific boxes/crops
+without changing production face detection or repeating the
+full 252-frame catalogue matching run. Reconstruct shortlisted
+face ordinals from existing approved local frames using the
+same governed YuNet model, multiscale tile size and confidence.
+Validate raw/retained/discarded counts and confidence extrema
+against the existing private diagnostic report, fail closed
+if they disagree, and persist normalized candidate geometry
+only in a new private local file. Apply the same maximum 32
+retained faces per frame; do not silently recover discarded
+candidates or claim these to be false positives. This targeted
+local re-detection is model inference but involves no embeddings,
+DB reads/writes, originals, video decoding, OneDrive hydration
+or production UI changes.
+
+**Requirement WI0155-REVIEW-03:** Make
+`HumanDecision`/`ReviewerNotes` directly editable in the
+local HTML gallery with explicit CSV save and import. The
+reviewer decision values must distinguish correct suggested
+person, wrong suggested person, visible unknown person,
+non-face detection, insufficient evidence and frame-level
+not applicable. A browser must not silently persist names
+or identity labels to an account, remote service or database.
+Saving is explicitly user-initiated to a private local file,
+with a fallback for browsers lacking direct save support.
+Box previews and cropped images are review-only and must
+not alter the original frame or detector input.
+
+**Limitations/acceptance:** Old report data lacks individual
+coordinates; reconstructed boxes are best-effort tied to
+consistent re-detection, not a cryptographic match of all
+candidate coordinates. Human usefulness/identity accuracy,
+multi-person ambiguity and overflow omission remain
+unverified until the maintainer reviews candidate crops.
+The isolated WI-0155 branch remains separate from main,
+and no write to the canonical identity catalogue is
+authorized.

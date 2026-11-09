@@ -152,10 +152,57 @@ try {
 
     $worksheet = @(Import-Csv -LiteralPath $output.WorksheetPath)
     Assert-True ($worksheet.Count -ge 3 -and $worksheet.Count -le 8) 'Worksheet is not bounded.'
+    Assert-True (Test-Path -LiteralPath $output.SelectionPath -PathType Leaf) 'Review frame selection missing.'
+    Assert-True (Test-Path -LiteralPath (Join-Path $output.ReviewFolder 'review-ui.js') -PathType Leaf) 'Offline UI script missing.'
+    Assert-True ($html.Contains('class="human-decision"')) 'Interactive review dropdown missing.'
+    Assert-True ($html.Contains('class="reviewer-notes"')) 'Reviewer notes editor missing.'
+    Assert-True ($html.Contains('review-ui.js')) 'Offline UI script not linked.'
     Assert-True (@($worksheet | Where-Object Section -eq 'Overflow / omissions').Count -eq 1) 'Missing overflow worksheet entry.'
     foreach ($path in $originalHashes.Keys) {
         Assert-True ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ceq $originalHashes[$path]) 'Source PNG changed.'
     }
+
+
+    # Simulate detector-only geometry for the *same selected frames*.
+    $geometryFrames = @(
+        foreach ($chosen in @((Get-Content -LiteralPath $output.SelectionPath -Raw | ConvertFrom-Json).frames)) {
+            $faceCount = if ($chosen.clip -eq 'V01' -and $chosen.frameNumber -eq 1) { 32 } else { 1 }
+            $boxes = @(
+                for ($face = 1; $face -le $faceCount; $face++) {
+                    @{ faceNumber = $face; x = 0.1; y = 0.15; width = 0.2; height = 0.3 }
+                }
+            )
+            @{ clip = $chosen.clip; frameNumber = $chosen.frameNumber; boxes = $boxes }
+        }
+    )
+    $geometryPath = Join-Path $casesDir 'synthetic-geometry.json'
+    @{ schemaVersion = 1; frames = $geometryFrames } |
+        ConvertTo-Json -Depth 8 |
+        Set-Content -LiteralPath $geometryPath -Encoding utf8
+
+    $withGeometry = & $scriptPath -PrivateCasesPath $casesPath -PrivateReportPath $reportPath -FramesPerPerson 1 -UncertainFramesPerClip 1 -OverflowFramesPerClip 1 -GeometryPath $geometryPath
+    Assert-True ($withGeometry.Crops -gt 0) 'Expected face-crop images.'
+    $htmlBoxes = Get-Content -LiteralPath $withGeometry.GalleryPath -Raw
+    Assert-True ($htmlBoxes.Contains('crops/')) 'Face crop links missing.'
+    Assert-True ($htmlBoxes.Contains('overlays/')) 'Bounding-box previews missing.'
+    Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $withGeometry.ReviewFolder 'crops') -Filter '*.png').Count -gt 0) 'Face crops missing.'
+    foreach ($path in $originalHashes.Keys) {
+        Assert-True ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ceq $originalHashes[$path]) 'Source frame changed during cropping.'
+    }
+
+    # Reject out-of-bounds geometry, not just missing face ordinals.
+    $geometryFrames[0].boxes[0].x = 1.2
+    $invalidGeometryPath = Join-Path $casesDir 'invalid-geometry.json'
+    @{ schemaVersion = 1; frames = $geometryFrames } |
+        ConvertTo-Json -Depth 8 |
+        Set-Content -LiteralPath $invalidGeometryPath -Encoding utf8
+    $invalidGeometryRefused = $false
+    try {
+        & $scriptPath -PrivateCasesPath $casesPath -PrivateReportPath $reportPath -FramesPerPerson 1 -UncertainFramesPerClip 1 -OverflowFramesPerClip 1 -GeometryPath $invalidGeometryPath | Out-Null
+    } catch {
+        $invalidGeometryRefused = $true
+    }
+    Assert-True $invalidGeometryRefused 'Invalid geometry was not rejected.'
 
     $report.clips[0].review.diagnostics.rankedFaces[0].frameNumber = 99
     $invalidPath = Join-Path $casesDir 'invalid-report.json'
