@@ -138,6 +138,7 @@ public static class VideoMetadataRefreshCommandRunner
         DateTime lastWriteBefore = before.LastWriteTimeUtc;
 
         string ffprobePath = VideoPilotMediaTools.ValidateExecutable(options.FfprobePath);
+        RejectLinkedExecutable(ffprobePath);
         string verifiedToolHash = await HashFileAsync(ffprobePath, token);
         if (!string.Equals(verifiedToolHash, options.FfprobeSha256, StringComparison.Ordinal))
             throw new InvalidOperationException("FFprobe digest is not the operator-approved SHA-256.");
@@ -148,6 +149,7 @@ public static class VideoMetadataRefreshCommandRunner
             if (options.VendorExifToolSha256 is null)
                 throw new ArgumentException("Approved ExifTool SHA-256 is missing.");
             vendorToolPath = VideoPilotMediaTools.ValidateExecutable(options.VendorExifToolPath);
+            RejectLinkedExecutable(vendorToolPath);
             vendorToolHash = await HashFileAsync(vendorToolPath, token);
             if (vendorToolHash != options.VendorExifToolSha256)
                 throw new InvalidOperationException("ExifTool does not match the operator-approved SHA-256.");
@@ -240,6 +242,20 @@ public static class VideoMetadataRefreshCommandRunner
         await using FileStream stream = new(path, FileMode.Open, FileAccess.Read,
             FileShare.Read, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
         return Convert.ToHexString(await SHA256.HashDataAsync(stream, token)).ToLowerInvariant();
+    }
+
+    private static void RejectLinkedExecutable(string executable)
+    {
+        // Approved operator tools must be actual physical pinned files, not
+        // WinGet links, symlinks or junction ancestors that can retarget.
+        if ((File.GetAttributes(executable) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Approved video metadata tool is linked.");
+        for (DirectoryInfo? directory = new(Path.GetDirectoryName(executable)!);
+             directory is not null; directory = directory.Parent)
+        {
+            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Approved video metadata tool is under a linked directory.");
+        }
     }
 
     private static void RejectSymbolicLinks(string root, string selectedPath)
