@@ -23,7 +23,11 @@ public sealed class VideoDetailsLayoutContractTests
         Assert.Contains("Manual presence means", details);
         Assert.Contains("Look up Place from GPS", details);
         Assert.Contains("Restore previous GPS Place", details);
-        Assert.Contains("datetime-local", details);
+        Assert.Contains("type=\"text\" inputmode=\"numeric\" maxlength=\"16\"", details);
+        Assert.Contains("placeholder=\"YYYY-MM-DD HH:MM\"", details);
+        Assert.Contains("VideoDetailsPresentation.TryParseLocalRecordingTime", details);
+        Assert.Contains("VideoDetailsPresentation.FormatFrameRate", details);
+        Assert.DoesNotContain("type=\"datetime-local\"", details);
         Assert.Contains("TimeZoneInfo.Local", details);
         Assert.Contains("Original recording time (local)", details);
         Assert.Contains("FormatFrameRate", details);
