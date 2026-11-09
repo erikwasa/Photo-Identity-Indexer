@@ -813,6 +813,12 @@ public sealed class VideoArchiveProcessingService(
             {
                 try
                 {
+                    if (await videos.GetAvailabilityAsync(
+                            selected.Reference, token) != AssetAvailability.Local ||
+                        !VideoIngestCommandRunner.MatchesObservation(
+                            selected, new FileInfo(local)))
+                        throw new InvalidDataException(
+                            "Selected video is no longer local and stable.");
                     SamsungVideoCameraMetadata? camera =
                         await samsungTool.ProbeIfMissingAsync(
                             ffprobeMetadata, local, TimeSpan.FromSeconds(20), token);
