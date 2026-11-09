@@ -303,6 +303,12 @@ public static class Program
                                       apply through the current schema, check
                                       retained counts/empty frame evidence)
 
+              catalogue rehearse-v40 --postgres-connection-env NAME
+                                     --restore-report ABSOLUTE_REPORT_PATH
+                                     (verified v39 isolated restore only;
+                                      apply nullable video metadata v40,
+                                      preserve every existing table row count)
+
               catalogue rehearse-v39 --postgres-connection-env NAME
                                      --restore-report ABSOLUTE_REPORT_PATH
                                      (verified v38 isolated restore only;
