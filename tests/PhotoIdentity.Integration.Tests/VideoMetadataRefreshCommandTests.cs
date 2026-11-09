@@ -48,6 +48,39 @@ public sealed class VideoMetadataRefreshCommandTests
     }
 
     [Fact]
+    public void Optional_Samsung_adapter_requires_explicit_opt_in_and_pinned_tool()
+    {
+        string tool = Path.GetFullPath(
+            Path.Combine(Path.GetTempPath(), "pinned-exiftool.exe"));
+        string hash = new('b', 64);
+        Assert.Throws<ArgumentException>(() =>
+            VideoMetadataRefreshOptions.Parse([.. Required(), "--enable-samsung-vendor-camera"]));
+        Assert.Throws<ArgumentException>(() =>
+            VideoMetadataRefreshOptions.Parse([.. Required(), "--exiftool", tool]));
+        Assert.Throws<ArgumentException>(() =>
+            VideoMetadataRefreshOptions.Parse([.. Required(),
+                "--enable-samsung-vendor-camera", "--exiftool", tool]));
+        Assert.Throws<ArgumentException>(() =>
+            VideoMetadataRefreshOptions.Parse([.. Required(),
+                "--enable-samsung-vendor-camera", "--exiftool", tool,
+                "--exiftool-sha256", "123"]));
+
+        VideoMetadataRefreshOptions options = VideoMetadataRefreshOptions.Parse(
+            [.. Required(), "--enable-samsung-vendor-camera",
+             "--exiftool", tool, "--exiftool-sha256", hash]);
+        Assert.False(options.Apply);
+        Assert.Equal(tool, options.VendorExifToolPath);
+        Assert.Equal(hash, options.VendorExifToolSha256);
+
+        VideoMetadataRefreshOptions apply = VideoMetadataRefreshOptions.Parse(
+            [.. Required(), "--enable-samsung-vendor-camera",
+             "--exiftool", tool, "--exiftool-sha256", hash,
+             "--apply", "--acknowledge-metadata-only"]);
+        Assert.True(apply.Apply);
+        Assert.Equal(hash, apply.VendorExifToolSha256);
+    }
+
+    [Fact]
     public void Wrong_scope_paths_credentials_and_bounds_are_rejected()
     {
         Assert.Throws<ArgumentException>(() =>
