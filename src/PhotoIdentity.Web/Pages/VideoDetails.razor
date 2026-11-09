@@ -46,7 +46,7 @@ else
             <dt>Device make</dt><dd>@(Details.CameraMake ?? "Unknown")</dd>
             <dt>Camera / model</dt><dd>@(Details.CameraModel ?? "Unknown")</dd>
             <dt>Display resolution</dt><dd>@FormatResolution(Details)</dd>
-            <dt>Frame rate</dt><dd>@FormatFrameRate(Details.AverageFrameRate)</dd>
+            <dt>Frame rate</dt><dd>@VideoDetailsPresentation.FormatFrameRate(Details.AverageFrameRate)</dd>
             <dt>Orientation</dt><dd>@FormatOrientation(Details)</dd>
             <dt>Video codec</dt><dd>@FormatVideoCodec(Details.VideoCodec)</dd>
             <dt>Audio codec</dt><dd>@FormatAudioCodec(Details.AudioCodec)</dd>
@@ -69,11 +69,12 @@ else
     <section class="video-details-editors" aria-label="Video catalogue edits">
         <div class="video-details-panel">
             <h2>Recording date and time</h2>
-            <p>Change the catalogue value without rewriting the video. Enter the date and time in your browser's local time zone. The original recording time remains visible after an override.</p>
+            <p>Change the catalogue value without rewriting the video. Enter YYYY-MM-DD HH:MM in your browser's local time zone. The original recording time remains visible after an override.</p>
             <label>
                 <span class="field-label">Override recording time</span>
-                <input type="datetime-local" step="60" value="@CaptureInput"
-                       @onchange="UpdateCaptureInput" disabled="@Busy" />
+                <input type="text" inputmode="numeric" maxlength="16"
+                       placeholder="YYYY-MM-DD HH:MM" autocomplete="off"
+                       @bind="CaptureInput" @bind:event="oninput" disabled="@Busy" />
             </label>
             <div class="video-details-actions">
                 <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(CaptureInput))"
@@ -208,7 +209,7 @@ else
         try
         {
             Details = await Http.GetFromJsonAsync<VideoDetailsResponse>(Url + "/details");
-            CaptureInput = FormatCaptureInput(Details?.EffectiveCaptureAtUtc);
+            CaptureInput = VideoDetailsPresentation.FormatLocalRecordingTimeInput(Details?.EffectiveCaptureAtUtc);
             PlaceInput = Details?.Place?.Value ?? "";
             try
             {
@@ -256,7 +257,7 @@ else
             }
             Details = await response.Content.ReadFromJsonAsync<VideoDetailsResponse>()
                 ?? throw new InvalidDataException("The server returned no updated video details.");
-            CaptureInput = FormatCaptureInput(Details.EffectiveCaptureAtUtc);
+            CaptureInput = VideoDetailsPresentation.FormatLocalRecordingTimeInput(Details.EffectiveCaptureAtUtc);
             PlaceInput = Details.Place?.Value ?? "";
             Notice = success;
         }
@@ -268,24 +269,14 @@ else
         finally { Busy = false; }
     }
 
-    private void UpdateCaptureInput(ChangeEventArgs change) =>
-        CaptureInput = change.Value?.ToString() ?? "";
-
     private Task SetCaptureAsync()
     {
-        if (!DateTime.TryParseExact(CaptureInput.Trim(), "yyyy-MM-ddTHH:mm",
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime wallClock))
+        if (!VideoDetailsPresentation.TryParseLocalRecordingTime(
+                CaptureInput, TimeZoneInfo.Local, out DateTimeOffset instant, out string? error))
         {
-            Error = "Enter a valid local recording date and time (YYYY-MM-DD HH:MM).";
+            Error = error;
             return Task.CompletedTask;
         }
-        TimeZoneInfo zone = TimeZoneInfo.Local;
-        if (zone.IsAmbiguousTime(wallClock) || zone.IsInvalidTime(wallClock))
-        {
-            Error = "This local time is ambiguous or does not exist because of daylight-saving time. Choose another time.";
-            return Task.CompletedTask;
-        }
-        DateTimeOffset instant = new(wallClock, zone.GetUtcOffset(wallClock));
         return ChangeAsync(
             () => Http.PutAsJsonAsync(Url + "/capture-time",
                 new VideoDetailsCaptureTimeRequest(instant.ToString("O", CultureInfo.InvariantCulture))),
@@ -320,20 +311,6 @@ else
 
     private static string FormatLocalTime(DateTimeOffset? instant) =>
         instant?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "Unknown";
-
-    private static string FormatCaptureInput(DateTimeOffset? instant) =>
-        instant?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? "";
-
-    private static string FormatFrameRate(string? value)
-    {
-        string[] parts = (value ?? "").Split('/');
-        if (parts.Length != 2 ||
-            !double.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out double n) ||
-            !double.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out double d) ||
-            d <= 0 || n <= 0 || !double.IsFinite(n / d))
-            return "Unknown";
-        return (n / d).ToString("0.##", CultureInfo.InvariantCulture) + " fps";
-    }
 
     private static string FormatOrientation(VideoDetailsResponse details)
     {
