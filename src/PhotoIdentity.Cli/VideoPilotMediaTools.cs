@@ -255,9 +255,14 @@ public static class VideoPilotMetadataParser
         {
             foreach (string name in names)
             {
-                string? value = Tag(tags, name)?.Trim();
-                if (value is { Length: > 0 and <= 128 } &&
-                    !value.Any(char.IsControl))
+                // Reject control characters in the source tag itself. Trimming
+                // first would hide a trailing newline or tab and wrongly
+                // accept a malformed device identity as trustworthy metadata.
+                string? raw = Tag(tags, name);
+                if (raw is null || raw.Any(char.IsControl))
+                    continue;
+                string value = raw.Trim();
+                if (value.Length is > 0 and <= 128)
                     return value;
             }
         }
