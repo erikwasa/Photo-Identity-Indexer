@@ -58,7 +58,9 @@
     private SmartCollectionWorkspaceContext? WorkspaceContext { get; set; }
     private SmartCollectionPhotoNavigationResolution? Resolved { get; set; }
     private readonly Dictionary<int, SmartCollectionPageResponse> CachedPages = new();
+    private readonly Dictionary<int, Task<SmartCollectionPageResponse?>> PendingPrefetches = new();
     private string? CachedContextKey;
+    private int CacheEpoch;
     private long NavigationGeneration;
     private IJSObjectReference? KeyboardModule;
 
@@ -110,8 +112,7 @@
                 out string? revisionId,
                 out string? returnUrl))
         {
-            CachedPages.Clear();
-            CachedContextKey = null;
+            ClearNavigationCache();
             return;
         }
 
@@ -129,7 +130,7 @@
         string contextKey = $"{context.Mode}:{context.CollectionId}:{context.PreviewKey}";
         if (!string.Equals(CachedContextKey, contextKey, StringComparison.Ordinal))
         {
-            CachedPages.Clear();
+            ClearNavigationCache();
             CachedContextKey = contextKey;
         }
 
@@ -142,30 +143,38 @@
             SmartCollectionPageResponse? page;
             if (!CachedPages.TryGetValue(context.Offset, out page))
             {
-                SmartCollectionTransientNavigationState? transientState = null;
-                if (string.Equals(context.Mode, "transient", StringComparison.Ordinal))
+                // A boundary crossing can await an in-flight prefetch instead of
+                // issuing another identical database query.
+                if (PendingPrefetches.TryGetValue(context.Offset, out Task<SmartCollectionPageResponse?>? pending))
                 {
-                    transientState = await LoadTransientStateAsync(context);
-                    if (generation != NavigationGeneration || transientState is null)
+                    page = await pending;
+                    if (generation != NavigationGeneration)
                     {
                         return;
                     }
                 }
 
-                (int offset, int limit) = SmartCollectionNavigation.NavigationWindowForOffset(context.Offset);
-                page = await QueryPageAsync(context, transientState, offset, limit, generation);
-                if (generation != NavigationGeneration || page is null)
+                if (page is null)
                 {
-                    return;
+                    SmartCollectionTransientNavigationState? transientState = null;
+                    if (string.Equals(context.Mode, "transient", StringComparison.Ordinal))
+                    {
+                        transientState = await LoadTransientStateAsync(context);
+                        if (generation != NavigationGeneration || transientState is null)
+                        {
+                            return;
+                        }
+                    }
+
+                    (int offset, int limit) = SmartCollectionNavigation.NavigationWindowForOffset(context.Offset);
+                    page = await QueryPageAsync(context, transientState, offset, limit, generation);
+                    if (generation != NavigationGeneration || page is null)
+                    {
+                        return;
+                    }
                 }
 
-                // Retain only a few bounded windows for rapid back-and-forth browsing.
-                if (CachedPages.Count >= 4)
-                {
-                    CachedPages.Remove(CachedPages.Keys.First());
-                }
-
-                CachedPages[context.Offset] = page;
+                CacheWindow(context.Offset, page);
             }
 
             if (generation != NavigationGeneration)
@@ -192,6 +201,7 @@
                     out SmartCollectionPhotoNavigationResolution? navigation))
             {
                 Resolved = navigation;
+                QueueNeighborPrefetches(context, navigation);
                 return;
             }
 
@@ -213,12 +223,120 @@
         }
     }
 
+    private void ClearNavigationCache()
+    {
+        ++CacheEpoch;
+        CachedContextKey = null;
+        CachedPages.Clear();
+        PendingPrefetches.Clear();
+    }
+
+    private void CacheWindow(int offset, SmartCollectionPageResponse page)
+    {
+        if (!CachedPages.ContainsKey(offset) && CachedPages.Count >= 4)
+        {
+            CachedPages.Remove(CachedPages.Keys.First());
+        }
+
+        CachedPages[offset] = page;
+    }
+
+    private void QueueNeighborPrefetches(
+        SmartCollectionWorkspaceContext context,
+        SmartCollectionPhotoNavigationResolution navigation)
+    {
+        (int? previousOffset, int? nextOffset) =
+            SmartCollectionNavigation.PrefetchOffsetsForIndex(
+                context.Offset, navigation.Index, navigation.Total);
+
+        if (previousOffset is int previous)
+        {
+            QueuePrefetch(context, previous);
+        }
+
+        if (nextOffset is int next)
+        {
+            QueuePrefetch(context, next);
+        }
+    }
+
+    private void QueuePrefetch(SmartCollectionWorkspaceContext context, int offset)
+    {
+        if (CachedPages.ContainsKey(offset) || PendingPrefetches.ContainsKey(offset))
+        {
+            return;
+        }
+
+        int epoch = CacheEpoch;
+        Task<SmartCollectionPageResponse?> pending = PrefetchWindowAsync(context, offset, epoch);
+        PendingPrefetches[offset] = pending;
+        _ = CompletePrefetchAsync(offset, epoch, pending);
+    }
+
+    private async Task<SmartCollectionPageResponse?> PrefetchWindowAsync(
+        SmartCollectionWorkspaceContext context,
+        int pageOffset,
+        int epoch)
+    {
+        try
+        {
+            SmartCollectionTransientNavigationState? transientState = null;
+            if (string.Equals(context.Mode, "transient", StringComparison.Ordinal))
+            {
+                transientState = await LoadTransientStateAsync(context, silent: true);
+                if (transientState is null)
+                {
+                    return null;
+                }
+            }
+
+            if (epoch != CacheEpoch)
+            {
+                return null;
+            }
+
+            (int offset, int limit) = SmartCollectionNavigation.NavigationWindowForOffset(pageOffset);
+            SmartCollectionPageResponse? page = await QueryPageAsync(
+                context, transientState, offset, limit, NavigationGeneration, silent: true);
+            return epoch == CacheEpoch ? page : null;
+        }
+        catch (Exception)
+        {
+            // Speculative reads must never interrupt normal navigation.
+            // A failed prefetch is retried by the normal foreground query.
+            return null;
+        }
+    }
+
+    private async Task CompletePrefetchAsync(
+        int offset,
+        int epoch,
+        Task<SmartCollectionPageResponse?> pending)
+    {
+        SmartCollectionPageResponse? page = await pending;
+        if (epoch != CacheEpoch ||
+            !PendingPrefetches.TryGetValue(offset, out Task<SmartCollectionPageResponse?>? current) ||
+            !ReferenceEquals(current, pending))
+        {
+            return;
+        }
+
+        PendingPrefetches.Remove(offset);
+        if (page is not null)
+        {
+            CacheWindow(offset, page);
+        }
+    }
+
     private async Task<SmartCollectionTransientNavigationState?> LoadTransientStateAsync(
-        SmartCollectionWorkspaceContext context)
+        SmartCollectionWorkspaceContext context, bool silent = false)
     {
         if (string.IsNullOrWhiteSpace(context.PreviewKey))
         {
-            Notice = "The transient Smart Collection context is incomplete.";
+            if (!silent)
+            {
+    Notice = "The transient Smart Collection context is incomplete.";
+            }
             return null;
         }
 
@@ -227,7 +345,10 @@
             SmartCollectionNavigation.PreviewStorageKey(context.PreviewKey));
         if (string.IsNullOrWhiteSpace(json))
         {
-            Notice = "This unsaved Smart Collection preview is no longer available in this browser tab.";
+            if (!silent)
+            {
+    Notice = "This unsaved Smart Collection preview is no longer available in this browser tab.";
+            }
             return null;
         }
 
@@ -235,7 +356,10 @@
             SmartCollectionNavigation.DeserializeTransientState(json);
         if (state is null)
         {
-            Notice = "This unsaved Smart Collection preview could not be restored.";
+            if (!silent)
+            {
+    Notice = "This unsaved Smart Collection preview could not be restored.";
+            }
             return null;
         }
 
@@ -247,23 +371,28 @@
         SmartCollectionTransientNavigationState? transientState,
         int offset,
         int limit,
-        long generation)
+        long generation,
+        bool silent = false)
     {
         using HttpResponseMessage response = string.Equals(context.Mode, "saved", StringComparison.Ordinal)
             ? await Http.GetAsync(
                 $"api/smart-collections/{Uri.EscapeDataString(context.CollectionId!)}/query?offset={offset}&limit={limit}")
-            : await QueryTransientAsync(transientState, offset, limit);
+            : await QueryTransientAsync(transientState, offset, limit, silent);
 
-        if (generation != NavigationGeneration)
+        if (!silent && generation != NavigationGeneration)
         {
             return null;
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            Notice = response.StatusCode == System.Net.HttpStatusCode.NotFound
-                ? "The saved Smart Collection is no longer available."
-                : $"Smart Collection navigation query failed with HTTP {(int)response.StatusCode}.";
+            if (!silent)
+            {
+                Notice = response.StatusCode == System.Net.HttpStatusCode.NotFound
+                    ? "The saved Smart Collection is no longer available."
+                    : $"Smart Collection navigation query failed with HTTP {(int)response.StatusCode}.";
+            }
+
             return null;
         }
 
@@ -273,7 +402,8 @@
     private async Task<HttpResponseMessage> QueryTransientAsync(
         SmartCollectionTransientNavigationState? state,
         int offset,
-        int limit)
+        int limit,
+        bool silent)
     {
         if (state is null ||
             !SmartCollectionNavigation.TryBuildTransientQuery(
@@ -283,7 +413,11 @@
                 out SmartCollectionQueryRequest? request) ||
             request is null)
         {
-            Notice = "The unsaved Smart Collection filter could not be reconstructed for photo navigation.";
+            if (!silent)
+            {
+                Notice = "The unsaved Smart Collection filter could not be reconstructed for photo navigation.";
+            }
+
             return new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
         }
 
@@ -304,6 +438,7 @@
     {
         Navigation.LocationChanged -= HandleLocationChanged;
         ++NavigationGeneration;
+        ClearNavigationCache();
         if (KeyboardModule is not null)
         {
             try
