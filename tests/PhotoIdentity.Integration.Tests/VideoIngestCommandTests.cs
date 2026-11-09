@@ -54,6 +54,28 @@ public sealed class VideoIngestCommandTests
     }
 
     [Fact]
+    public void Explicit_ingest_requires_paired_approved_Samsung_tool_for_vendor_fallback()
+    {
+        string[] baseline = ["--enable-video", "--source", @"C:\\Archive",
+            "--ffprobe", @"C:\\Tools\\ffprobe.exe"];
+        string digest = new('a', 64);
+        Assert.Null(VideoIngestOptions.Parse(baseline).ExifToolPath);
+        Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
+            [.. baseline, "--enable-samsung-vendor-camera"]));
+        Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
+            [.. baseline, "--exiftool", @"C:\\Tools\\exiftool.exe"]));
+        Assert.Throws<ArgumentException>(() => VideoIngestOptions.Parse(
+            [.. baseline, "--enable-samsung-vendor-camera", "--exiftool", @"C:\\Tools\\exiftool.exe",
+             "--exiftool-sha256", "not-a-hash"]));
+        VideoIngestOptions optIn = VideoIngestOptions.Parse(
+            [.. baseline, "--enable-samsung-vendor-camera",
+             "--exiftool", @"C:\\Tools\\exiftool.exe", "--exiftool-sha256", digest]);
+        Assert.False(optIn.Apply);
+        Assert.Equal(@"C:\\Tools\\exiftool.exe", optIn.ExifToolPath);
+        Assert.Equal(digest, optIn.ExifToolSha256);
+    }
+
+    [Fact]
     public void Metadata_projection_distinguishes_supported_unknown_and_unsupported_without_inventing_capture()
     {
         var revision = AssetRevisionId.New();

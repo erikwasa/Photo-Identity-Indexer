@@ -575,6 +575,8 @@ public static class Program
                                  does not start video workers)
 
               video ingest --enable-video --source DIR --ffprobe ABSOLUTE_EXE
+                           [--enable-samsung-vendor-camera --exiftool ABS_EXE
+                            --exiftool-sha256 APPROVED_SHA256]
                            [--max-videos COUNT (1..25)] [--timeout-seconds SECONDS (1..120)]
                            [--postgres-connection-env NAME --database DB --apply]
                            (dry-run by default; --apply writes only bounded local video

@@ -135,6 +135,16 @@ public sealed class VideoArchiveProcessingService(
             await VideoDerivativeCacheGuard.ValidateAsync(database, cache, token);
             preflightStage = "quota-configuration";
             VideoProcessingPreferences cyclePreferences = preferences.Current;
+            VideoSamsungAutomaticMetadata? samsungTool = null;
+            if (cyclePreferences.ExtractSamsungMetadata)
+            {
+                // Verify the private executable pin before selecting or
+                // hydrating any original. This setting does not grant admission.
+                preflightStage = "samsung-approval";
+                samsungTool = new(
+                    Required("ExifToolPath"), Required("ExifToolSha256"));
+                await samsungTool.VerifyToolAsync(token);
+            }
             VideoProxyRetentionLimits? publicationQuota =
                 cyclePreferences.ResolvePublicationQuota(configuration);
             VideoProxyEncodingProfile quality =
@@ -196,7 +206,7 @@ public sealed class VideoArchiveProcessingService(
             if (candidate is null)
             {
                 discovery = await RegisterNextVideoAsync(
-                    coverage, ffprobe, token);
+                    coverage, ffprobe, samsungTool, token);
                 if (discovery != VideoDiscoveryOutcome.None)
                     candidate = await FindPendingAsync(
                         coverage, ffmpegHash,
@@ -468,7 +478,7 @@ public sealed class VideoArchiveProcessingService(
     internal static string ClassifyFailure(Exception exception, string preflightStage)
     {
         if ((preflightStage is "tool-configuration" or "ffmpeg-approval"
-                or "ffprobe-approval" or "cache-validation"
+                or "ffprobe-approval" or "samsung-approval" or "cache-validation"
                 or "quota-configuration") &&
             (exception is InvalidOperationException or ArgumentException
                 or IOException or UnauthorizedAccessException))
@@ -478,6 +488,7 @@ public sealed class VideoArchiveProcessingService(
                 "tool-configuration" => "video-tool-configuration-rejected",
                 "ffmpeg-approval" => "video-ffmpeg-approval-rejected",
                 "ffprobe-approval" => "video-ffprobe-approval-rejected",
+                "samsung-approval" => "video-samsung-tool-approval-rejected",
                 "cache-validation" => "video-cache-validation-rejected",
                 "quota-configuration" => "video-proxy-quota-config-rejected",
                 _ => "video-safety-or-configuration-rejected"
@@ -600,7 +611,8 @@ public sealed class VideoArchiveProcessingService(
     /// Do not create a guessed revision or content hash from metadata alone.
     /// </summary>
     private async Task<VideoDiscoveryOutcome> RegisterNextVideoAsync(
-        ArchiveCoverageState coverage, string ffprobe, CancellationToken token)
+        ArchiveCoverageState coverage, string ffprobe,
+        VideoSamsungAutomaticMetadata? samsungTool, CancellationToken token)
     {
         ArchiveCatalogueSource sourceState =
             await new PostgresCatalogueSourceRepository(database)
@@ -764,11 +776,13 @@ public sealed class VideoArchiveProcessingService(
                     .RegisterVerifiedAsync(verified, token);
 
             VideoRevisionInspection inspection;
+            VideoPilotMetadata? ffprobeMetadata = null;
             try
             {
                 var probe = new VideoPilotMediaTools(
                     ffprobe, TimeSpan.FromSeconds(20));
                 VideoPilotMetadata media = await probe.ProbeAsync(local, token);
+                ffprobeMetadata = media;
                 inspection = VideoIngestCommandRunner.BuildInspection(
                     revision.RevisionId, media, Required("FfprobeSha256"),
                     DateTimeOffset.UtcNow);
@@ -793,6 +807,55 @@ public sealed class VideoArchiveProcessingService(
             }
             await new PostgresVideoEvidenceRepository(database)
                 .SaveInspectionAsync(inspection, token);
+
+            if (samsungTool is not null && ffprobeMetadata is not null &&
+                VideoSamsungAutomaticMetadata.ShouldProbe(ffprobeMetadata))
+            {
+                try
+                {
+                    if (await videos.GetAvailabilityAsync(
+                            selected.Reference, token) != AssetAvailability.Local ||
+                        !VideoIngestCommandRunner.MatchesObservation(
+                            selected, new FileInfo(local)))
+                        throw new InvalidDataException(
+                            "Selected video is no longer local and stable.");
+                    SamsungVideoCameraMetadata? camera =
+                        await samsungTool.ProbeIfMissingAsync(
+                            ffprobeMetadata, local, TimeSpan.FromSeconds(20), token);
+                    if (camera is not null)
+                    {
+                        // A second complete no-recall SHA-256 check binds the
+                        // vendor data to exactly the locally verified revision.
+                        if (await videos.GetAvailabilityAsync(
+                                selected.Reference, token) != AssetAvailability.Local ||
+                            !VideoIngestCommandRunner.MatchesObservation(
+                                selected, new FileInfo(local)))
+                            throw new InvalidDataException(
+                                "Selected video changed before vendor metadata commit.");
+                        byte[] currentHash;
+                        await using (Stream original = OneDriveVideoNoRecallReader.OpenRead(local))
+                            currentHash = await SHA256.HashDataAsync(original, token);
+                        if (!digest.AsSpan().SequenceEqual(currentHash))
+                            throw new InvalidDataException(
+                                "Selected video content changed before vendor metadata commit.");
+                        await samsungTool.FillMissingAsync(database,
+                            revision.RevisionId, sourceState.RootLocator,
+                            Convert.ToHexString(digest).ToLowerInvariant(), camera, token);
+                    }
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+                catch (Exception error) when (error is IOException or
+                    InvalidDataException or InvalidOperationException or
+                    ArgumentException or UnauthorizedAccessException or
+                    System.ComponentModel.Win32Exception or
+                    System.Text.Json.JsonException or OperationCanceledException)
+                {
+                    // Optional vendor failure never invalidates valid FFprobe
+                    // metadata; do not log private model/source/tool details.
+                    logger.LogWarning(
+                        "Optional Samsung metadata inspection failed; FFprobe evidence retained.");
+                }
+            }
 
             if (provisional is not null)
             {

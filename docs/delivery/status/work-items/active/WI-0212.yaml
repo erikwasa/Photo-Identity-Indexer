@@ -18,4 +18,4 @@ evidence:
 - type: documentation
   value: docs/operations/video-details-wi0212-acceptance.md
 - type: implementation
-  value: '2026-11-09: Core v39 features passed maintained-host acceptance. PRs #774 and #776 merged with green CI: nullable video bitrate/audio fields v40, guarded one-revision local metadata refresh and v41 provenance. Production stays at verified v39 until isolated v39->v41 rehearsal. A separately pinned, optional Samsung ExifTool adapter is in development; final real-file metadata acceptance remains pending.'
+  value: '2026-11-09: Maintainer accepted isolated v39->v41 migration, production v41 startup, real Samsung MP4 opt-in metadata refresh (2 fields, idempotent rerun 0), audio/bitrate/fps, manual recording time restore, People/Place and online-only/photo/video regressions. PRs #774/#776/#777 merged with green CI. Follow-up PR #782 adds default-off persisted automatic ExifTool Samsung fallback for newly inspected Archive videos; this new behavior requires CI and one bounded local first-ingest acceptance before WI-0212 closeout PR #781 can merge.'

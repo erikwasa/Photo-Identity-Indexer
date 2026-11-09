@@ -420,6 +420,85 @@ tag (using the optional pinned adapter), one clip without bitrate
 Verify no changes to manual time/Place/people, photo search and video
 playback. Do not import the full archive or rehydrate online-only media.
 
+## Follow-up — optional automatic Samsung metadata during new-video inspection
+
+WI-0212 now offers an **off-by-default** Video Settings checkbox:
+**Extract Samsung camera metadata when FFprobe does not provide it**.
+This setting is persisted in the local video-processing preferences file;
+it is not a global source scanner or a background task.
+
+Before enabling, explicitly approve your existing trusted ExifTool
+installation and add **both** private launcher settings under `settings`:
+
+```text
+PhotoIdentity__VideoProcessing__ExifToolPath = C:\\absolute\\physical\\path\\exiftool.exe
+PhotoIdentity__VideoProcessing__ExifToolSha256 = lowercase-64-character-approved-hash
+```
+
+Keep these in `%LOCALAPPDATA%\\PhotoIdentity\\launcher.json`, not the
+repository. The executable must be a physical local file outside OneDrive,
+without linked/symlink/junction ancestors. The launcher validates the
+paired values and path; the Settings API checks the physical SHA-256
+before accepting an enabled checkbox. The Archive run verifies the tool
+again before source admission, and before and after a selected vendor
+inspection. No tool executable is bundled, downloaded or installed.
+
+**Operation:** During a separately enabled, operator-started Archive
+advance, the usual photo-first, inclusion, online-only and source
+guards select at most one eligible new video per video-inspection step.
+FFprobe inspects the original first using the existing approved profile.
+If it already reports both make and model, the vendor executable is
+**not called**. If either is missing and FFprobe has not already
+identified a non-Samsung make, the selected, already-local video is
+inspected by the bounded Samsung-tag-only ExifTool reader. A verified
+`Samsung:SamsungModel` may fill only absent camera fields, never
+overwrite conflicting non-Samsung or model values. The separate v41
+`video_metadata_refresh_actions` event records ExifTool's SHA-256,
+profile and changed fields. A second source hash check and the existing
+revision/source-exclusion transaction guard precede this write.
+
+This uses the same source bytes already selected or explicitly hydrated
+for approved video inspection. It does **not** enlarge Archive coverage,
+hydrate any other original, run on ordinary browsing, or revisit
+previously inspected clips. If ExifTool is absent, modified or
+unapproved, the Archive preflight rejects the enabled vendor option
+without source reads. An individual vendor parse/inspection failure
+leaves the valid FFprobe record intact and logs a sanitized warning.
+Operators may use the existing one-revision `video metadata refresh`
+workflow for older videos.
+
+An independent `video ingest --enable-video` CLI does not read the
+Video Settings preference: it has its own optional
+`--enable-samsung-vendor-camera --exiftool ABS_EXE
+--exiftool-sha256 APPROVED_SHA256` triple. CLI dry-run remains
+read-only. This distinction prevents a persistent UI preference from
+quietly widening the scope of an unrelated operator CLI.
+
+### Follow-up maintained-PC acceptance (not yet performed)
+
+1. Pause Archive; update the approved private launcher pair and validate
+   with `Start-PhotoIdentity.ps1 -ValidateConfigurationOnly`. Restart
+   the published application to load those two configuration values.
+2. Open Settings → Video processing, select **Extract Samsung camera
+   metadata when FFprobe does not provide it**, and save. Confirm it
+   persists after a browser refresh and application restart.
+3. Enable one-video-step mode; select **one new, never-indexed Samsung
+   video** under already-approved Archive coverage and existing
+   OneDrive permissions. Advance Archive once. Confirm make/model
+   populate on the new Video Details page **without** running the
+   metadata refresh CLI, and check separate vendor audit provenance.
+4. Confirm video codec, bitrate, fps, audio, original byte SHA-256,
+   and online-only preservation are unchanged. Confirm an already
+   indexed video remains untouched. A known Apple/other-make input
+   should skip vendor extraction when FFprobe provides both fields.
+5. Pause Archive, turn the Samsung option off, save and recheck
+   persistence. It must perform no vendor-tool invocation while off.
+   Confirm photo/video search, proxies, Places and people regressions.
+
+This follow-up is an explicit completion gate before merging the held
+WI-0212 closeout PR; all earlier v41 acceptance remains valid. No new
+PostgreSQL schema migration or fresh backup rehearsal is required.
+
 ## Deferred
 
 Automatic background video geocoding, bulk rescans, collection membership

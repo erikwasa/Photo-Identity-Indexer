@@ -17,7 +17,8 @@ public sealed record VideoProcessingPreferences(
     string EncodingProfile = VideoProxyEncodingProfiles.StandardKey,
     int RetentionAgeHours = 48,
     bool StopAfterOneVideoStepPerAdvance = false,
-    bool AutomaticPostersForNewProxies = false)
+    bool AutomaticPostersForNewProxies = false,
+    bool ExtractSamsungMetadata = false)
 {
     public void Validate()
     {

@@ -156,6 +156,29 @@
                 </p>
             </fieldset>
             <fieldset class="review-filter-panel">
+                <legend class="field-label">Video camera metadata</legend>
+                <label class="field-label video-settings-check-row" for="video-processing-samsung-metadata">
+                    <input id="video-processing-samsung-metadata" type="checkbox"
+                           @bind="ExtractSamsungMetadata" disabled="@Saving" />
+                    Extract Samsung camera metadata when FFprobe does not provide it
+                </label>
+                <p class="field-help">
+                    Off by default. During an approved Archive video inspection,
+                    use the separately pinned ExifTool only if FFprobe left
+                    the camera make or model unknown. Preserve existing camera
+                    values and keep Samsung provenance separate from FFprobe.
+                    No additional downloads, bulk rescans, or processing when
+                    merely browsing videos. Older videos still require a
+                    deliberately selected metadata refresh.
+                </p>
+                @if (!Status.SamsungMetadataToolConfigured)
+                {
+                    <p class="field-help">Set ExifToolPath and ExifToolSha256
+                        in the private launcher configuration before enabling.
+                        Save verifies the physical executable and its SHA-256.</p>
+                }
+            </fieldset>
+            <fieldset class="review-filter-panel">
                 <legend class="field-label">Video proxy encoding</legend>
                 <label class="field-label" for="video-processing-encoding-profile">
                     Output quality and size
@@ -338,6 +361,7 @@
         string EncodingProfile, int RetentionAgeHours,
         bool StopAfterOneVideoStepPerAdvance,
         bool AutomaticPostersForNewProxies,
+        bool ExtractSamsungMetadata, bool SamsungMetadataToolConfigured,
         bool Processing, bool ToolsConfigured,
         long Queued, long Running, long Succeeded,
         long Failed, long Cancelled, long ExpiredLeases,
@@ -356,7 +380,7 @@
         int? MaximumCacheMiB, int? MaximumProxyMiB,
         bool OverrideProxyLimits, string EncodingProfile,
         int RetentionAgeHours, bool StopAfterOneVideoStepPerAdvance,
-        bool AutomaticPostersForNewProxies);
+        bool AutomaticPostersForNewProxies, bool ExtractSamsungMetadata);
     private sealed record ErrorResponse(string Error);
 
     private VideoSettingsResponse? Status;
@@ -370,6 +394,7 @@
     private int RetentionAgeHours = 48;
     private bool StopAfterOneVideoStepPerAdvance;
     private bool AutomaticPostersForNewProxies;
+    private bool ExtractSamsungMetadata;
     private int? MaximumCacheMiB = 1024;
     private int? MaximumProxyMiB = 256;
     private bool Loading = true;
@@ -412,6 +437,7 @@
                 StopAfterOneVideoStepPerAdvance =
                     Status.StopAfterOneVideoStepPerAdvance;
                 AutomaticPostersForNewProxies = Status.AutomaticPostersForNewProxies;
+                ExtractSamsungMetadata = Status.ExtractSamsungMetadata;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;
@@ -542,7 +568,7 @@
                     OverrideProxyLimits ? MaximumProxyMiB : null,
                     OverrideProxyLimits, EncodingProfile,
                     RetentionAgeHours, StopAfterOneVideoStepPerAdvance,
-                    AutomaticPostersForNewProxies));
+                    AutomaticPostersForNewProxies, ExtractSamsungMetadata));
             if (!response.IsSuccessStatusCode)
             {
                 ErrorResponse? failure = null;
@@ -561,6 +587,7 @@
                 StopAfterOneVideoStepPerAdvance =
                     Status.StopAfterOneVideoStepPerAdvance;
                 AutomaticPostersForNewProxies = Status.AutomaticPostersForNewProxies;
+                ExtractSamsungMetadata = Status.ExtractSamsungMetadata;
                 OverrideProxyLimits = Status.MaximumCacheMiB.HasValue &&
                                       Status.MaximumProxyMiB.HasValue;
                 MaximumCacheMiB = Status.MaximumCacheMiB ?? 1024;

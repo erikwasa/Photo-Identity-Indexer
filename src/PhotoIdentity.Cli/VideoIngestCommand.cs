@@ -15,17 +15,22 @@ public sealed record VideoIngestOptions(
     string SourceRoot, string FfprobePath, int MaximumVideos, int TimeoutSeconds,
     string? ConnectionEnvironmentVariable, string? DatabaseName, bool Apply)
 {
+    public string? ExifToolPath { get; init; }
+    public string? ExifToolSha256 { get; init; }
     public static VideoIngestOptions Parse(string[] arguments)
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
-        bool enabled = false, apply = false;
+        bool enabled = false, apply = false, samsungEnabled = false;
         for (int i = 0; i < arguments.Length; i++)
         {
             string key = arguments[i];
             if (key == "--enable-video" && !enabled) { enabled = true; continue; }
             if (key == "--apply" && !apply) { apply = true; continue; }
+            if (key == "--enable-samsung-vendor-camera" && !samsungEnabled)
+            { samsungEnabled = true; continue; }
             if (key is not ("--source" or "--ffprobe" or "--max-videos" or
-                           "--timeout-seconds" or "--postgres-connection-env" or "--database") ||
+                           "--timeout-seconds" or "--postgres-connection-env" or "--database" or
+                           "--exiftool" or "--exiftool-sha256") ||
                 i + 1 == arguments.Length || arguments[i + 1].StartsWith("--", StringComparison.Ordinal) ||
                 !values.TryAdd(key, arguments[++i]))
                 throw new ArgumentException("Unknown, repeated or incomplete video ingest option.");
@@ -49,9 +54,23 @@ public sealed record VideoIngestOptions(
             throw new ArgumentException("Database must be a simple, explicit PostgreSQL database name.");
         if (env is not null && !Regex.IsMatch(env, @"^[A-Za-z_][A-Za-z0-9_]*$"))
             throw new ArgumentException("Provide an environment variable NAME, not a connection string.");
+        string? exiftool = values.GetValueOrDefault("--exiftool");
+        string? exiftoolSha = values.GetValueOrDefault("--exiftool-sha256");
+        if (samsungEnabled != (exiftool is not null) ||
+            samsungEnabled != (exiftoolSha is not null))
+            throw new ArgumentException(
+                "Samsung ingest requires --enable-samsung-vendor-camera, --exiftool and --exiftool-sha256 together.");
+        if (samsungEnabled &&
+            (!Path.IsPathFullyQualified(exiftool!) ||
+             !Regex.IsMatch(exiftoolSha!, "^[0-9a-f]{64}$", RegexOptions.CultureInvariant)))
+            throw new ArgumentException("Samsung tool requires an absolute path and approved lowercase SHA-256.");
         return new(Required("--source"), Required("--ffprobe"),
             Bounded("--max-videos", 8, 25), Bounded("--timeout-seconds", 20, 120),
-            env, databaseName, apply);
+            env, databaseName, apply)
+        {
+            ExifToolPath = samsungEnabled ? exiftool : null,
+            ExifToolSha256 = samsungEnabled ? exiftoolSha : null
+        };
     }
 }
 
@@ -106,6 +125,12 @@ public static class VideoIngestCommandRunner
         VideoPilotMediaTools tools = new(options.FfprobePath,
             TimeSpan.FromSeconds(options.TimeoutSeconds));
         string ffprobe = VideoPilotMediaTools.ValidateExecutable(options.FfprobePath);
+        VideoSamsungAutomaticMetadata? samsungTool = null;
+        if (options.ExifToolPath is not null)
+        {
+            samsungTool = new(options.ExifToolPath, options.ExifToolSha256!);
+            await samsungTool.VerifyToolAsync(token);
+        }
 
         PostgresCatalogueDatabase? db = null;
         if (options.Apply)
@@ -171,6 +196,17 @@ public static class VideoIngestCommandRunner
                     string path = videos.GetLocalPath(asset.Reference);
                     if (!MatchesObservation(asset, new FileInfo(path))) { changed++; continue; }
                     VideoPilotMetadata media = await tools.ProbeAsync(path, token);
+                    SamsungVideoCameraMetadata? samsungCamera = null;
+                    if (samsungTool is not null &&
+                        VideoSamsungAutomaticMetadata.ShouldProbe(media))
+                    {
+                        if (await videos.GetAvailabilityAsync(
+                                asset.Reference, token) != AssetAvailability.Local ||
+                            !MatchesObservation(asset, new FileInfo(path)))
+                        { changed++; continue; }
+                        samsungCamera = await samsungTool.ProbeIfMissingAsync(
+                            media, path, TimeSpan.FromSeconds(options.TimeoutSeconds), token);
+                    }
                     byte[] hash;
                     await using (Stream content = await videos.OpenContentAsync(asset.Reference, token))
                         hash = await SHA256.HashDataAsync(content, token);
@@ -189,6 +225,14 @@ public static class VideoIngestCommandRunner
                             await assetRepository.RegisterVerifiedAsync(verified, token);
                         await evidenceRepository.SaveInspectionAsync(
                             BuildInspection(saved.RevisionId, media, toolHash, DateTimeOffset.UtcNow), token);
+                        if (samsungCamera is not null && samsungTool is not null)
+                        {
+                            // ExifTool contributes only missing camera columns
+                            // in its own transaction and separate v41 tool audit.
+                            await samsungTool.FillMissingAsync(db!, saved.RevisionId,
+                                root, Convert.ToHexString(hash).ToLowerInvariant(),
+                                samsungCamera, token);
+                        }
                         inserted++;
                         if (saved.NewAsset) newAssets++;
                         if (saved.NewRevision) newRevisions++;
@@ -196,7 +240,8 @@ public static class VideoIngestCommandRunner
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
                 catch (Exception error) when (error is IOException or InvalidDataException or
-                    TimeoutException or UnauthorizedAccessException or System.Text.Json.JsonException)
+                    TimeoutException or UnauthorizedAccessException or System.Text.Json.JsonException or
+                    InvalidOperationException or System.ComponentModel.Win32Exception)
                 {
                     // Never print private paths, metadata, diagnostics or original content.
                     failures++;
