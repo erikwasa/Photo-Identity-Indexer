@@ -177,7 +177,10 @@ public static class VideoProcessingEndpoints
 
         // Tool identity is private launcher configuration. The browser can
         // toggle a boolean but cannot name executable paths or hashes.
-        if (requested.ExtractSamsungMetadata)
+        // A disabled video lane must remain disable-able even if a pinned
+        // vendor binary was subsequently deleted or replaced.
+        if (requested.ExtractSamsungMetadata &&
+            (requested.Enabled || !existing.ExtractSamsungMetadata))
         {
             try
             {
