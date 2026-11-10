@@ -10,6 +10,23 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+**Current identification workflow clarification (maintainer, 2026-11-10):**
+Video face identification must follow the **same three-tier human workflow
+as still-image identification**: (1) auto-assign only when the existing
+configured score cutoff **and** sufficiently large top-vs-runner-up margin
+both pass; (2) otherwise provide **two or three ranked existing-person
+suggestions** for user confirmation/correction; (3) for genuinely
+unsuggested or unknown faces, allow manual identification, including
+creating people and enriching future catalogue evidence through the
+normal reviewed workflow. The maintainer informally expects **under
+25% auto-assignment, roughly 50–60% suggestion-assisted review, and
+roughly 20% fully manual**. These are illustrative expectations, not
+measured rates or strict acceptance quotas. In difficult oblique or
+distant video (especially V03), **a correct person anywhere among
+2–3 human-review suggestions is a useful success**; a high absolute
+score and large margin are not necessary for that outcome. Do not
+spend disproportionate time optimizing V03 for auto-assignment.
+
 **Current direction (maintainer, 2026-11-07):** Judge the experiment by whether a
 video yields **at least one useful, human-reviewable face observation per
 visible person** and, when an eligible known-person reference exists, a
@@ -856,3 +873,121 @@ and discarded-box examples before changing detector model/threshold,
 raising limits or integrating video identification into `main`.
 This checkpoint records evidence and requirements only; no model,
 database, code path or production behavior changes are approved.
+
+## Experimental checkpoint 18 — image-equivalent three-tier user workflow (2026-11-10)
+
+**Maintainer clarification (supersedes any reading of checkpoints
+17/earlier that would require high-confidence auto-assignments):**
+The target video-identification **review experience** is the same
+as the still-photo one, with three outcomes:
+
+1. **Automatic** only if both the configured identity similarity
+   threshold and the configured top-vs-runner-up margin pass,
+   with safeguards against wrong-person auto-assignment.
+   The maintainer anticipates **fewer than ~25%** of cases
+   being eligible. Do not invent or hard-code new threshold
+   values from the experimental score distributions.
+2. **Semi-automatic** otherwise, when the matcher can provide
+   **2 or 3 ranked existing-person candidates** that the
+   reviewer can accept or correct. The maintainer anticipates
+   **~50–60%** of cases. A correct identity within the **top
+   three** is meaningful even if top score/margin would not
+   allow automatic assignment. Present rank, score, and
+   ambiguous evidence as suggestions, not verified identities.
+3. **Manual** when useful suggestions are absent, an unknown
+   person is shown, or visual evidence needs direct human
+   handling. The reviewer may select or create a person
+   and add approved identity evidence through the **existing
+   governed still-image workflow**, which may improve future
+   suggestions. The maintainer anticipates **~20%** of cases.
+
+These proportions are rough planning expectations, **not
+per-clip quotas or measured model performance**. The categories
+should be mutually exclusive in the UI for each *human-reviewable
+person instance/observation group*, and repeated detections of
+the same recurring person across adjacent frames must **not**
+inflate the denominator or generate thousands of review tasks.
+The precise association/grouping and definition of a review
+unit remain design questions, so do not claim existing code
+already satisfies this end-to-end workflow. Automatic decisions
+must prioritize precision/safety over hitting any quota.
+
+**V03 interpretation:** Three known people are present from
+an elevated camera about 10 m away with oblique, nonfrontal
+faces and limited detail. The operator would consider a
+**correct suggested person** successful here and does not
+expect score/margin suitable for auto-assignment. Stop
+describing absence of strong auto-suggestions as, by itself,
+a failure of the target workflow. **Separate** (a) whether
+a person yields at least one reviewable detected face,
+(b) whether the correct known identity reaches top-1/top-2/
+top-3 suggestions, and (c) whether score+margin support a
+safe auto-assignment. One of the three people is absent from
+the reviewed HTML *shortlist*, not necessarily from all
+processed frames; this coverage question remains open.
+
+**Confirmed evidence/schema gap:** The existing catalogue
+report's `review.diagnostics.rankedFaces` contains
+`topReferenceAlias`, `topSimilarity`,
+`runnerUpSimilarity` and `scoreGap`. It does **not**
+retain the alias of the second-ranked person or the
+third-ranked alias/score. Thus an aggregate `personRankSummaries`
+table (or the current human review CSV) is insufficient
+to calculate **top-2/top-3 hit rates**. Do not infer a
+third candidate from per-person maximum scores or rankings
+across different frames. Implement a small governed, strictly
+private, per-observation top-3 evidence/selection capability
+only after reviewing the existing operator reports and
+ground truth. Preserve immutable ranks and allow reviewer
+confirmation; do not weaken auto-assignment safeguards.
+
+**New acceptance criteria:**
+- **WI0155-WORKFLOW-01:** Mirror still-image human interaction
+  and approval semantics across auto/suggestions/manual,
+  including an explicit user correction and new-person path.
+  Experimental video work remains isolated from main.
+- **WI0155-WORKFLOW-02:** Evaluate *top-1/top-2/top-3
+  candidate recall* for human-confirmed known-person
+  observations; report no-suggestion, unknown, false-positive,
+  and insufficient-evidence cases separately. Distinguish
+  score calibration / gap precision for auto candidates from
+  useful lower-confidence ranked review suggestions.
+- **WI0155-WORKFLOW-03:** Measure operator workload by
+  **person/episode review units**, deduplicated across
+  repeated frames, rather than by frame detections,
+  candidate score comparisons or raw model embeddings.
+  Require at least one useful observation per visible
+  person where face evidence actually exists; avoid
+  assuming body visibility guarantees recoverable facial
+  evidence.
+- **WI0155-WORKFLOW-04:** Correctness of automatic
+  assignments is a stricter safety criterion than
+  top-3 suggestion usefulness. No threshold relaxation,
+  arbitrary rank-based automatic action or person
+  creation from unreviewed model output.
+- **WI0155-WORKFLOW-05:** **Optional operator-provided
+  evidence** may be reviewed in this conversation:
+  previously saved **human-reviewed CSV** and the
+  existing **bounded private catalogue JSON report**,
+  optionally a prior single-pass report or a few
+  specifically approved frame crops for ambiguous
+  observations. The maintainer explicitly offered to
+  provide these reports. Sharing is voluntary, and
+  files may contain private paths, clip/person aliases,
+  scores, timestamps and biometric-related information;
+  review them only for this analysis, do not publish
+  them to GitHub or include private payloads in PRs.
+  No credentials, database dumps, original videos or
+  whole extracted-frame directories are necessary.
+  Earlier blanket `never upload` guidance should
+  be read as **never automatically publish or upload**:
+  voluntary user-authorized report sharing is permitted.
+
+**Next gate:** Analyze the operator's existing private
+human-review CSV and catalogue report, *then* decide whether
+a focused top-3 diagnostic enhancement is needed. Do not
+rerun full 252-frame inference merely to chase stronger
+V03 scores. Treat face discovery, safe auto-assignment,
+human-assisted ranking, and manual evidence enrichment
+as separate acceptance outcomes. Do not merge the
+experimental code into production main yet.

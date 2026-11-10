@@ -8,6 +8,21 @@ No video recognition is added to the normal production API, worker,
 UI or media processing flow merely by merging a prototype PR.
 PRs #740, #741, #745, #748 and #751 are merged into wi-0155.
 
+**Maintainer workflow clarification — 2026-11-10:** The video-identification
+user flow is the **same as for still images**. Auto-assignment requires
+both the governed similarity cutoff and meaningful runner-up margin,
+and is expected to apply to only a minority (likely under 25%).
+Most known-person observations should instead offer two or three
+ranked suggestions for human confirmation (anticipated 50–60%),
+with the remaining ~20% manually identified or newly created using
+existing approved review/evidence paths. These percentages are rough
+forecasts, not observed rates. For difficult oblique/distant V03,
+**correctly suggesting a person in the top 2–3 is useful success**;
+large confidence margins or automatic matches are *not* required.
+Do not repeatedly process the full 252-frame cohort to force automatic
+matches. This operational direction takes precedence over earlier
+checkpoint text referring to zero strong review suggestions.
+
 **Current direction — 2026-11-07:** Identify at least one useful
 face observation per visible person, test existing-catalogue
 known-person suggestions and unknown handling, and examine a small
@@ -1860,3 +1875,58 @@ recognition/thresholds based on these observations alone.
 For full requirements and the next evaluation gate, see
 `docs/delivery/work-items/WI-0155-video-face-processing-evaluation.md`,
 experimental checkpoint 17.
+
+## Checkpoint 18 — actionable three-tier evaluation and voluntary report sharing (2026-11-10)
+
+**Clarification:** The operator does not require a high-confidence
+automatic identification for V03. Their intended **video review
+flow matches image review**: (1) auto-assign only with satisfactory
+similarity **and** margin; (2) otherwise show **2–3 ranked
+existing-person suggestions** that a reviewer may confirm/correct;
+(3) manually identify or create new people when needed, so reviewed
+catalogue evidence can improve future recognition. The tentative
+expected distribution is **less than 25% auto, 50–60%
+semi-automatic, about 20% manual**; these are not measurements
+or per-video quotas, and should not influence model thresholds.
+When persons recur across many video frames, require a manageable
+number of distinct human review tasks, not one per raw detection.
+
+**Current private data limitation:** `rankedFaces` records the
+top alias and cosine score, runner-up score, and gap but **not**
+the second alias or third-ranked alias/score. Consequently
+the existing local reports cannot establish whether correct
+known people reach the top **two or three** suggestions.
+A top-1 count or zero strong auto-suggestion count does not
+answer that question, and strong auto confidence is not the
+appropriate success requirement for oblique V03. A separate,
+approved follow-up will need to retain private top-3 ranked
+candidates and group repeated faces for review rather than
+changing acceptance thresholds.
+
+**Operator-authorized data sharing:** The maintainer has
+volunteered to provide their existing local reports to improve
+understanding of the human review. Prefer the already **saved,
+reviewed CSV** and the matching **bounded private catalogue
+JSON**; the prior single-pass report or a few explicitly
+approved local face crops can be supplied if they materially
+clarify observations. Never upload without the maintainer's
+specific action. These files may include private clip/person
+aliases, frame identifiers, metadata and biometric-related
+scores; do not copy their contents into GitHub, CI logs, PRs,
+or public documentation. No PostgreSQL password, database dump,
+original video, or entire extraction folder is required. The
+previous general `never upload` precaution remains applicable
+to unsolicited/automatic publication, not to a user choosing
+to attach their own private reports for analysis.
+
+**Next steps:** Await the selected operator files; compare
+human decisions with the actual available rankings and report
+schema, identify which additional top-3 candidate information
+is required, and then propose a narrow, isolated experimental
+change. Reuse the same approved local frames, immutable
+report and review CSV. Do not rerun 252-frame inference
+or merge any recognition behavior into main yet.
+
+The detailed formal acceptance criteria are recorded in
+`docs/delivery/work-items/WI-0155-video-face-processing-evaluation.md`,
+checkpoint 18.
