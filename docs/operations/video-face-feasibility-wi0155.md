@@ -2180,3 +2180,79 @@ automatic identity assignment, executed group merges,
 and video/person DB associations are explicitly **not**
 part of this checkpoint. More requirements and open
 issues are in work-item checkpoint 20.
+
+## Checkpoint 21 — useful V03 coverage, but background groups dominate (2026-11-11)
+
+**Verified by maintainer (PR #789):** C# tests PASS,
+Windows synthetic PowerShell gallery PASS,
+real grouping PASS, HTML crops PASS, CSV save/import
+PASS. All three people in V03 appear in at least
+one group. Grouping usefulness **partially useful**:
+**most groups are unrelated background objects**.
+Exact group counts/unassigned totals were not reported.
+Do not classify 64 groups or any observation count
+as 64 persons, nor claim detection precision is good.
+
+**Follow-up triage workflow (new optional gallery UI):**
+- Generate group HTML from the **same prior private
+  grouped report and case file**; no new inference
+  is needed merely to test revised HTML review controls.
+- Click **Dismiss obvious background** on any
+  obviously non-face group. The card is hidden when
+  **Hide dismissed** is checked; uncheck to inspect
+  or correct a dismissal. The **Show groups with
+  3+ observations only** checkbox is a reversible
+  *navigation filter*, NOT a face classifier.
+  Real faces may have only one observation,
+  while background features may recur many times.
+- The group export always includes **all groups,
+  including hidden/dismissed**. Save CSV explicitly
+  and verify reimport. The input CSV columns remain
+  identical to PR #789, permitting import into a
+  newly generated gallery **only when group IDs and
+  per-group observation counts match**.
+- The new grouper retains up to **five diverse
+  representative crops**, instead of three.
+  Older grouped reports containing one to three
+  crops remain valid and immediately usable with
+  the revised HTML gallery. A new model evaluation
+  is needed only to obtain **new** fourth/fifth
+  samples from the original unpersisted embeddings.
+
+### Verify locally (PowerShell 7.6; after follow-up PR merge)
+
+```powershell
+$wiRoot = "C:\Kod\codex\Photo Identity Indexer-WI0155"
+Set-Location $wiRoot
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw "C# tests failed." }
+
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupReview.ps1
+if (-not $?) { throw "Group gallery synthetic tests failed." }
+
+# Use the successful PR #789 private file and existing cases.
+$gallery = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceGroupReview.ps1 `
+  -PrivateReportPath $newGroupReport `
+  -PrivateCasesPath $newCasesPath `
+  -ClipAlias V03 -OpenGallery
+$gallery | Format-List
+```
+
+Check one-click dismissal, hide/show correction,
+the optional repeated-observation view filter,
+**CSV preservation of hidden groups**, and
+save/import. A fresh V01–V03 ONNX run is **not**
+needed for this triage acceptance. The previous
+3-crop gallery remains valid. To independently
+inspect the 5-crop selection on real faces,
+an additional approved opt-in run would be
+required; **do not rerun it just to prove the
+interface controls work**.
+
+The next improvement to actual false-positive
+filtering must be measured against labelled
+true/false reviewed groups and safeguard detection
+of the three actual V03 people. Do not equate
+repeated detections, cosine score or group size
+with verified face evidence.
