@@ -76,7 +76,7 @@ foreach ($group in $groups) {
   $crops = @($group.representativeCrops)
   if ($alias -cnotmatch '^G(?!000)[0-9]{3}$' -or -not $seen.Add($alias) -or
       [int]$group.observations -lt 1 -or $crops.Count -lt 1 -or
-      $crops.Count -gt 3 -or $crops.Count -gt [int]$group.observations) {
+      $crops.Count -gt 5 -or $crops.Count -gt [int]$group.observations) {
     throw 'Invalid or duplicate provisional group.'
   }
   $rows.Add([pscustomobject][ordered]@{
@@ -185,11 +185,14 @@ textarea{min-height:62px;resize:vertical}.grid{display:grid;grid-template-column
 .photos img{max-height:160px;max-width:100%;object-fit:contain;background:#08101a;border-radius:3px}
 .group-card label{display:block;color:#c3d5e2;font-size:12px;margin:8px 0 3px}
 .group-card small{color:#aebfcf}.warning{border-left:3px solid #f1bb61;padding-left:12px;margin:16px 0}
+.group-card[hidden]{display:none}.toolbar label{display:inline-flex;align-items:center;gap:6px;color:#d7e5f0}
+.toolbar input[type=checkbox]{width:auto}.quick-dismiss{background:#60434c;margin-top:8px}
 </style></head><body><main><h1>WI-0155 · Provisional groups</h1>
 <p class="note">Each card contains a few representative detected-face crops from one provisional group. Groups are not confirmed people: multiple people can be incorrectly merged, one person can appear in several groups, and a group may contain no real face. Video face crops and embeddings are NEVER enrolled as future references.</p>
-<p class="note">Review locally: Keep group, Merge group (enter the other G-number), Split required, Dismiss false detection, or Cannot tell. SelectedPerson is optional private text. These controls only annotate a local CSV: they DO NOT merge, identify or modify anything in the database.</p>
+<p class="note">Review locally: Keep group, Merge group (enter the other G-number), Split required, Dismiss false detection, or Cannot tell. Use the one-click dismiss control for obvious background objects. SelectedPerson is optional private text. These controls only annotate a local CSV: they DO NOT merge, identify or modify anything in the database.</p>
+<p class="note">Background objects can receive many detector hits, so observation count alone does NOT measure face-likeness. Optional view filters only hide cards temporarily, never drop evidence or remove rows from your saved CSV. Inspect lower-support groups too before declaring that a person is absent. Newer group reports contain up to five representative crops; older three-crop reports remain valid.</p>
 <p class="note">Full-catalogue top-3 identity suggestions are not yet implemented; the legacy experiment ranks against only five selected people. No video timestamps are displayed.</p>
-<div class="toolbar"><button id="save-groups" type="button">Save group-review CSV</button><button id="import-groups" type="button">Import saved CSV</button><input id="groups-file" type="file" accept=".csv,text/csv" hidden><span id="group-status" aria-live="polite"></span></div>
+<div class="toolbar"><button id="save-groups" type="button">Save group-review CSV</button><button id="import-groups" type="button">Import saved CSV</button><label><input id="hide-dismissed" type="checkbox" checked> Hide dismissed</label><label><input id="repeat-only" type="checkbox"> Show groups with 3+ observations only</label><input id="groups-file" type="file" accept=".csv,text/csv" hidden><span id="group-status" aria-live="polite"></span></div>
 '@)
 if ([int]$groupReview.observationsUnassigned -gt 0) {
   $html.Add(('<p class="warning">Group capacity reached: {0} candidate observations remain unassigned and may include real faces. This is not a complete person inventory.</p>' -f
@@ -201,7 +204,7 @@ foreach ($row in $rows) {
   $pictures=($imgs | ForEach-Object {
     '<img loading="lazy" src="{0}" alt="Representative review crop">' -f (Esc $_.Relative)
   }) -join ''
-  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div><label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="G002"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea></article>' -f
+  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div><label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="G002"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
     (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures))
 }
 $html.Add('</div><p class="note">The intended outcome is one manageable group per real person, not hundreds of face observations. Export your review CSV before leaving.</p></main><script src="group-review.js"></script></body></html>')
