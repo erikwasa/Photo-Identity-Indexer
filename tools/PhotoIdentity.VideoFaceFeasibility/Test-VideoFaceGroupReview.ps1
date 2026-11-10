@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Path $private,$framesDir | Out-Null
 try {
   $frameRecords=[Collections.Generic.List[object]]::new()
   $hashes=@{}
-  for ($i=1; $i -le 2; $i++) {
+  for ($i=1; $i -le 5; $i++) {
     $filename=('frame-{0:D2}.png' -f $i)
     $path=Join-Path $framesDir $filename
     $bitmap=[Drawing.Bitmap]::new(160,100)
@@ -43,15 +43,20 @@ try {
     x=.2;y=.15;width=.3;height=.5;detectorConfidence=.9;quality=.8}
   $sample2=@{frameNumber=2;timestampMs=2000;faceNumber=1;
     x=.25;y=.2;width=.35;height=.4;detectorConfidence=.8;quality=.7}
-  $group=@{alias='G001';observations=2;representativeCrops=@($sample1,$sample2)}
-  $groups=@{schemaVersion=1;observationsConsidered=3;
-    observationsAssigned=2;observationsUnassigned=1;
+  $samples=@($sample1,$sample2)
+  foreach ($n in 3..5) {
+    $samples+=@{frameNumber=$n;timestampMs=($n*1000);faceNumber=1;
+      x=.2;y=.15;width=.3;height=.5;detectorConfidence=.9;quality=.8}
+  }
+  $group=@{alias='G001';observations=5;representativeCrops=$samples}
+  $groups=@{schemaVersion=1;observationsConsidered=6;
+    observationsAssigned=5;observationsUnassigned=1;
     maximumGroups=64;minimumWithinGroupCosine=.82;groups=@($group)}
   $reportPath=Join-Path $private 'report.json'
   @{schemaVersion=1;clips=@(
-      @{alias='V03';review=@{aggregate=@{framesExamined=2;facesDetected=3};
+      @{alias='V03';review=@{aggregate=@{framesExamined=5;facesDetected=6};
         diagnostics=@{provisionalGroups=$groups}}},
-      @{alias='V01';review=@{aggregate=@{framesExamined=2;facesDetected=0};
+      @{alias='V01';review=@{aggregate=@{framesExamined=5;facesDetected=0};
         diagnostics=@{provisionalGroups=$null}}}
     )} | ConvertTo-Json -Depth 12 |
     Set-Content -LiteralPath $reportPath -Encoding utf8
@@ -60,23 +65,40 @@ try {
   $gallery = & $script -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias V03
   Check (Test-Path -LiteralPath $gallery.GalleryPath -PathType Leaf) 'HTML not generated.'
   Check (Test-Path -LiteralPath $gallery.WorksheetPath -PathType Leaf) 'CSV not generated.'
-  Check ($gallery.Groups -eq 1 -and $gallery.Crops -eq 2 -and
+  Check ($gallery.Groups -eq 1 -and $gallery.Crops -eq 5 -and
     $gallery.UnassignedObservations -eq 1) 'Group/crop/unassigned totals differ.'
   $html=Get-Content -LiteralPath $gallery.GalleryPath -Raw
-  Check ($html.Contains('G001') -and $html.Contains('crops/V03-G001-01.png') -and
-    $html.Contains('Split required') -and $html.Contains('Save group-review CSV')) 'Expected HTML review controls are missing.'
+  Check ($html.Contains('G001') -and $html.Contains('crops/V03-G001-05.png') -and
+    $html.Contains('Split required') -and $html.Contains('Save group-review CSV') -and
+    $html.Contains('hide-dismissed') -and $html.Contains('repeat-only') -and
+    $html.Contains('quick-dismiss')) 'Expected five-crop review and triage controls are missing.'
   $rows=@(Import-Csv -LiteralPath $gallery.WorksheetPath)
   Check ($rows.Count -eq 1 -and $rows[0].Group -eq 'G001') 'Incorrect group worksheet.'
   foreach ($path in $hashes.Keys) {
     Check ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ceq
       $hashes[$path]) 'Source PNG was modified.'
   }
+  # Legacy three-crop reports remain valid so previously generated
+  # private group evidence does not require another ONNX evaluation.
+  $group.representativeCrops=@($samples | Select-Object -First 3)
+  $legacyPath=Join-Path $private 'legacy-three-crop.json'
+  @{schemaVersion=1;clips=@(
+      @{alias='V03';review=@{aggregate=@{framesExamined=5;facesDetected=6};
+        diagnostics=@{provisionalGroups=$groups}}},
+      @{alias='V01';review=@{aggregate=@{framesExamined=5;facesDetected=0};
+        diagnostics=@{provisionalGroups=$null}}}
+    )} | ConvertTo-Json -Depth 12 |
+    Set-Content -LiteralPath $legacyPath -Encoding utf8
+  $legacy = & $script -PrivateReportPath $legacyPath -PrivateCasesPath $casesPath -ClipAlias V03
+  Check ($legacy.Crops -eq 3) 'Legacy three-crop group reports no longer work.'
+  $group.representativeCrops=$samples
+
   $sample2.x=.9
   $badPath=Join-Path $private 'invalid-report.json'
   @{schemaVersion=1;clips=@(
-      @{alias='V03';review=@{aggregate=@{framesExamined=2;facesDetected=3};
+      @{alias='V03';review=@{aggregate=@{framesExamined=5;facesDetected=6};
         diagnostics=@{provisionalGroups=$groups}}},
-      @{alias='V01';review=@{aggregate=@{framesExamined=2;facesDetected=0};
+      @{alias='V01';review=@{aggregate=@{framesExamined=5;facesDetected=0};
         diagnostics=@{provisionalGroups=$null}}}
     )} | ConvertTo-Json -Depth 12 |
     Set-Content -LiteralPath $badPath -Encoding utf8
