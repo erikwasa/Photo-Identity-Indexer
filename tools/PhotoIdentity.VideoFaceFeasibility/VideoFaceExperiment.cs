@@ -287,7 +287,8 @@ public sealed class VideoFaceExperiment
         string manifestDirectory,
         IVideoFaceCandidateMatcher matcher,
         double detectorConfidence,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool provisionalGroups = false)
     {
         ArgumentNullException.ThrowIfNull(matcher);
         if (detectorConfidence is not (0.5 or 0.7 or 0.9))
@@ -300,7 +301,8 @@ public sealed class VideoFaceExperiment
         return await RunCoreAsync(set, manifestDirectory, matcher,
             diagnostics: true, coverage: true,
             requestedDetectorConfidence: detectorConfidence,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            provisionalGroups: provisionalGroups);
     }
 
     private async Task<VideoFacePrivateReview> RunCoreAsync(
@@ -310,7 +312,8 @@ public sealed class VideoFaceExperiment
         bool diagnostics,
         bool coverage,
         double requestedDetectorConfidence,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool provisionalGroups = false)
     {
         VideoFaceFrameSetLoader.Validate(set, coverage);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
@@ -333,6 +336,11 @@ public sealed class VideoFaceExperiment
         int totalFaces = 0;
         int totalEmbeddings = 0;
         int adjacentPairs = 0;
+        // Allocated only on an explicit operator-requested catalogue run.
+        // No group vectors or cross-frame reference templates are serialized.
+        VideoFaceProvisionalGrouper? provisional = provisionalGroups
+            ? new VideoFaceProvisionalGrouper()
+            : null;
         List<VideoFaceReferenceFinding> findings = [];
         List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
         List<VideoFaceRankedDiagnostic> rankedFaces = [];
@@ -416,6 +424,11 @@ public sealed class VideoFaceExperiment
                 {
                     for (int faceIndex = 0; faceIndex < current.Count; faceIndex++)
                     {
+                        if (provisional is not null)
+                        {
+                            provisional.Observe(index + 1, timestamp, faceIndex + 1,
+                                current[faceIndex], detections[faceIndex], image.Size);
+                        }
                         findings.Add(matcher.FindCandidate(
                             index + 1, timestamp, faceIndex + 1, current[faceIndex]));
                         if (diagnostics)
@@ -489,6 +502,7 @@ public sealed class VideoFaceExperiment
                     requestedDetectorConfidence, frameDetections, rankedFaces)
                 {
                     DetectorProfile = _detectorProfile,
+                    ProvisionalGroups = provisional?.CreateReview(),
                     Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
                         coverageGrouper.Groups.Count,
                         coverageGrouper.Groups,
