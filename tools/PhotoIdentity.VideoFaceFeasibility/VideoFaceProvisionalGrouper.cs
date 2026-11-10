@@ -6,7 +6,7 @@ namespace PhotoIdentity.VideoFaceFeasibility;
 /// <summary>
 /// PRIVATE, opt-in, conservative provisional within-video grouping.
 /// Groups are NOT people, tracks, or verified identity assignments.
-/// Only up to three face boxes per group leave memory; no vectors are serialized.
+/// Only up to five representative face boxes per group leave memory; no vectors are serialized.
 /// </summary>
 public sealed record VideoFaceGroupCrop(
     int FrameNumber,
@@ -42,7 +42,7 @@ public sealed record VideoFaceProvisionalGroupReview(
 public sealed class VideoFaceProvisionalGrouper
 {
     public const int MaximumGroups = 64;
-    public const int MaximumCropsPerGroup = 3;
+    public const int MaximumCropsPerGroup = 5;
     public const double MinimumCosine = 0.82;
     public const double MinimumWinnerMargin = 0.04;
     public const int MinimumRepresentativeFrameSeparation = 3;
