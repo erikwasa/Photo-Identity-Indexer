@@ -8,6 +8,18 @@ No video recognition is added to the normal production API, worker,
 UI or media processing flow merely by merging a prototype PR.
 PRs #740, #741, #745, #748 and #751 are merged into wi-0155.
 
+**Updated product boundary — 2026-11-10:** For a video, review
+**provisional person groups**, not individual frame occurrences.
+Each group should contain the best few crops and top-2/top-3
+suggestions from **all eligible people** in the production
+catalogue (the maintainer reports 100+ people). A V03 review
+ideally has three groups, but extra groups must support explicit
+merge, split and dismiss. Reviewed identity is an association
+that a person **appears in the video**; no occurrence time
+display is required. **Video crops and video-derived embeddings
+must never enrich permanent still-image face references.**
+See checkpoint 19 for the measured experimental limitations.
+
 **Maintainer workflow clarification — 2026-11-10:** The video-identification
 user flow is the **same as for still images**. Auto-assignment requires
 both the governed similarity cutoff and meaningful runner-up margin,
@@ -1930,3 +1942,104 @@ or merge any recognition behavior into main yet.
 The detailed formal acceptance criteria are recorded in
 `docs/delivery/work-items/WI-0155-video-face-processing-evaluation.md`,
 checkpoint 18.
+
+## Checkpoint 19 — group-based video review: scope and data findings (2026-11-10)
+
+The maintainer confirmed PR #787 merged and clarified the
+**intended finished user experience**:
+- Present **a small set of person groups per video** rather than
+  every detection. A V03 review ideally shows three groups for
+  its three people; more groups may be created by viewpoint
+  variation, difficult faces or false positives.
+- Each provisional group shows a few best, **visually diverse
+  face crops** plus **2 or 3 ranked identity suggestions**.
+  The reviewer can accept a suggestion, choose another,
+  create a new person via the normal person workflow,
+  dismiss false positives, or merge/split incorrect groups.
+  Groups must not be defined simply by the model's
+  top-ranked known-person alias.
+- The final identity result is **person present in video**.
+  Individual frame and timestamp positions can be internal
+  transient processing aids, but the reviewer need not know
+  when in the video the person appears.
+- Video-derived crops and embeddings are **not permanent
+  reference data** and must not train/improve future
+  identifications. Ephemeral embeddings for *within-video*
+  clustering and ranking remain permitted, with explicit
+  cleanup, retention and no canonical DB writes.
+
+### Observations from the three voluntarily supplied reports
+
+The user supplied the existing bounded tiled-1024 catalogue JSON,
+single-pass catalogue JSON and the completed review CSV for
+private evaluation. Their contents must not be committed,
+uploaded to CI, logged or reprinted in the repository. Safe
+aggregate outcomes:
+
+| Clip | Single-pass retained candidates | Tiled-1024 retained candidates |
+|---|---:|---:|
+| V01 | 30 | 36 |
+| V02 | 36 | 38 |
+| V03 | 35 | 3,912 |
+
+Both runs compared **only 5 manually selected known people**
+using **15 total still-photo exemplars**. The actual
+production catalogue has 100+ people according to the
+operator, so these results **do not evaluate** realistic
+full-catalogue top-3 suggestions. Current
+`VideoFaceCatalogueCasesLoader.MaximumPeople = 32`;
+this existing experimental limit prevents a simple
+100+ person trial. Matchers also rank per person, with
+at most three reference exemplars per person. The
+`rankedFaces` diagnostics omit runner-up and third
+**identity labels**: only top-ranked alias and runner-up
+score are available.
+
+The human-review CSV has 36 face-specific review observations
+and four optional overflow entries. It contains examples of
+correct suggestions, wrong suggestions, known people without
+a reliable match, poor-angle faces and non-face candidates.
+This is **biased reviewer-selected evidence**; it is not
+a representative model accuracy estimate. In V03 the
+tiled detector generated very many detections, despite
+only three recurring real people being visible. Reject the
+idea that maximizing model candidate counts is the same
+as finding additional unique people.
+
+### Design, performance and safety checkpoints
+
+1. Use a read-only frozen catalogue snapshot of **all
+   eligible** reference people, with governed resource
+   budgets. Do **not** interpret the existing 5/32 limits
+   as the required finished maximum; separately plan
+   and test a safe, bounded enlargement. Exclude people
+   with no eligible reference vectors from automatic/
+   semi-automatic matching, but allow manual identification.
+2. Select representative high-quality crops, cluster
+   conservatively within each video, prefer extra
+   reviewable fragments to unsafe merges, and allow
+   explicit manual merge/split/dismiss. A group can be
+   unidentified/unknown; do not require a selected
+   catalogue identity to form a group.
+3. Evaluate full-catalogue ranked top-1/top-2/top-3
+   **per human-reviewed person group**, not per-candidate
+   hit rate. Auto-assign only under the existing
+   governed similarity **and** runner-up margin rules;
+   otherwise present suggestions or manual controls.
+4. Attach person to video with a unique reviewed
+   **video/person presence** record and correction path.
+   Do not expose/require appearance timestamps. Do not
+   persist video-derived embeddings as canonical
+   person reference exemplars, even after the reviewer
+   confirms an identity.
+5. Preserve the existing reviewed CSV and reports
+   outside Git; no repeated full-model run, production
+   schema changes or write access in this documentation
+   checkpoint. Future grouping/full-catalogue development
+   remains in a separate isolated WI-0155 feature branch.
+
+The main work item describes acceptance contracts
+`WI0155-GROUP-01` through `WI0155-GROUP-06`.
+This checkpoint only establishes requirements and records
+anonymous aggregates. It does not implement grouping
+or 100+ identity matching.

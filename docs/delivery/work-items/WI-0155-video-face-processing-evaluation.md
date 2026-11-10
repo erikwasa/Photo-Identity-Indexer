@@ -10,6 +10,22 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+**Current video-level review requirement (maintainer, 2026-11-10):**
+The review output is a small set of **provisional face/person groups per
+video**, each showing several of its best crops plus top 2–3
+suggested identities from **all eligible people in the production
+catalogue**, not a preselected five-person shortlist. V03 ideally
+produces three groups (one for each actual person), but additional
+groups due to angle, uncertain merges or false detections are expected
+and must be manageable. Human identification produces a unique
+**video ↔ person association** without an exposed appearance
+timestamp. Video-derived crops and embeddings may be used temporarily
+to detect, group and review faces but **must never be inserted into
+the still-image reference embedding collection or used to improve
+future identity matching**. An authorized user may still create a
+person through the regular workflow, without using video frames as
+reference exemplars.
+
 **Current identification workflow clarification (maintainer, 2026-11-10):**
 Video face identification must follow the **same three-tier human workflow
 as still-image identification**: (1) auto-assign only when the existing
@@ -991,3 +1007,141 @@ V03 scores. Treat face discovery, safe auto-assignment,
 human-assisted ranking, and manual evidence enrichment
 as separate acceptance outcomes. Do not merge the
 experimental code into production main yet.
+
+## Experimental checkpoint 19 — per-video person grouping and full-catalogue suggestions (2026-11-10)
+
+**Maintainer accepted PR #787** and clarified the intended production
+result: **one group per actual person in a video**, each containing
+the best few face crops and two or three ranked existing-catalogue
+suggestions. V03's realistic ideal is **three groups**, but a
+modestly larger number is acceptable when the same person appears
+different across angles or detection quality, and when false
+detections cause extra provisional groups. The user must be able
+to **merge, split, dismiss and identify** groups without assigning
+every frame. After identification, the only lasting intended
+semantic result is that the person **appears in that video**,
+with no user-facing requirement to retain or display the position,
+time interval, or per-frame occurrence. Internal time/frame references
+may assist temporary grouping, traceability, and review, but are not
+the core persisted person-in-video relationship.
+
+**Explicit non-learning boundary:** Video frames, extracted crops
+and their face embeddings must **not** be enrolled as reference
+exemplars, persisted to enrich the canonical still-face identity
+index, or used for future matching. Temporary derived vectors are
+permitted for inference, deduplication and grouping within the video,
+subject to explicit retention/cleanup policy. Manual review may
+identify an existing person or create a new person, but video crops
+must never become reference training material; a newly created
+person may lack a still-image reference embedding until the ordinary
+image review workflow supplies one. Do not conflate creating a person
+record with updating their recognition template.
+
+**Full-catalogue requirement:** Video suggestions must rank against
+the **entire eligible known-person population** available in the
+governed read-only production catalogue snapshot, currently reported
+by the maintainer to contain **100+ people**, not only the five
+hand-selected identities used in this experiment. The existing
+private experimental catalogue reports confirm `selectedPeople=5`,
+`eligiblePeople=5` and `exemplarsLoaded=15`. The current
+`VideoFaceCatalogueCasesLoader.MaximumPeople=32` and per-person
+exemplar-bounded matcher mean the present experiment cannot simply
+select or evaluate 100+ persons without a separately approved
+scalable, read-only candidate retrieval/ranking change. Design it
+so all eligible people can compete, bounded by governed reference
+eligibility and resource controls; do not silently change the
+production DB or ingest video embeddings. Maintain a consistent
+read-only snapshot for evaluation and preserve privacy/OneDrive
+guardrails.
+
+**Evidence actually supplied:** The maintainer voluntarily
+provided an existing single-pass report, bounded tiled-1024
+report, and completed human-review CSV. Those raw private files,
+individual comments and person/clip mappings remain **out of
+GitHub, PRs and CI**. Safe aggregate interpretation:
+- Both reports used five selected people and fifteen reference
+  exemplars; **neither measures ranking among 100+ people**.
+- With identical evaluated frame counts per clip, the
+  single-pass report has V01=30, V02=36 and V03=35 retained
+  detections, whereas tiled-1024 has V01=36, V02=38 and
+  V03=3,912. Tiled V03 flags every frame as containing at
+  least one candidate, but dramatic raw growth is **not
+  independent evidence of additional real people**.
+- The completed CSV contains **40 rows**, including **four
+  optional frame-level overflow entries** and **36 face
+  observations** with human decisions. It captures both useful
+  correct suggestions and misses/false positives. As the
+  shortlist was deliberately selected, these decisions must
+  not be used as an unbiased overall detection accuracy estimate.
+- Existing diagnostic `rankedFaces` data retains only the
+  top alias, top score, runner-up **score** and margin: no
+  runner-up identity, no third identity/score, no per-person
+  group membership and no reference to the full catalogue.
+  Neither report can support a measured full-catalogue
+  top-3 hit rate, let alone accurate group count.
+
+### Required review contract and evaluation gates
+
+- **WI0155-GROUP-01 — Provisional grouping:** Given one
+  video, emit a bounded manageable number of provisional
+  candidate-person groups. Within each group select several
+  high-quality **diverse** crops (different moments/angles
+  where useful), not merely the highest detector confidence,
+  highest identity cosine, or thousands of near-duplicates.
+  Keep face grouping **independent of which known-person
+  alias ranked first**: top-ranked aliases can be wrong,
+  and an individual can rank differently across frames.
+- **WI0155-GROUP-02 — Reviewer controls:** Allow one
+  reviewed identity or unknown/dismissed status per group,
+  with explicit **merge**, **split/reassign crop** and
+  **dismiss false detection** to correct over-/under-grouping.
+  Identifying a group must not automatically propagate to
+  other weakly-associated groups or silently create identities.
+  The reviewer can reassign groups later.
+- **WI0155-GROUP-03 — Ranked suggestions:** Against a
+  frozen read-only snapshot of **all eligible people**,
+  provide two/three named ranked person options per
+  *group*, with score and uncertainty clearly indicated.
+  Preserve enough provenance to evaluate full-catalogue
+  top-1/top-2/top-3 reach for operator-verified groups.
+  A low-confidence correct third-place suggestion counts
+  as useful semi-automatic review; **automatic assignment
+  still requires the existing score and runner-up margin
+  safeguards**. Never turn group voting or raw observation
+  counts into an unchecked auto-assignment.
+- **WI0155-GROUP-04 — Video-person association:** After
+  review persist at most one active video-to-person presence
+  link for an individual (unique by video/person) and allow
+  correction/removal. The end-user feature is **presence,
+  not an occurrence timeline**. No video-derived reference
+  image/embedding may enter permanent still-face identity
+  training/evidence tables. Define the relation and
+  transactional review audit before integration.
+- **WI0155-GROUP-05 — Group-level metrics:** Evaluate
+  operator-labelled *true people found*, missing people,
+  extra or fragmented groups, falsely merged people,
+  false-positive groups, average/median groups shown per
+  actual video person, useful top-3 suggestion presence,
+  and human decisions needed to finish a video. Do not
+  measure success by raw candidate volume or per-frame
+  highest score. Compare single-pass vs tiled candidate
+  discovery without asserting V03's 3,912 candidates
+  are 3,912 faces or 3,912 review tasks.
+- **WI0155-GROUP-06 — Isolation and performance:** Keep
+  all experimentation off `main`, preserve existing
+  accepted frame inputs and prior private reports. Use
+  read-only `photoidentity_main` snapshot access, no
+  unexpected OneDrive hydration, bounded memory/model
+  time and no production writes before a separate
+  integration decision. Capture temporary processing
+  geometry/embeddings privately with explicit cleanup.
+  Recheck speed and memory at 100+ eligible identities.
+
+**Decision:** Treat grouping + full-catalogue top-3 suggestions as
+the next experiment's acceptance targets. First design and verify
+a small, safe prototype using the already extracted V01–V03
+frames; do not launch another unrestricted tiled-1024 full
+catalogue evaluation or tune thresholds to reach arbitrary
+automatic percentages. The present PR is **requirements/docs
+only**; grouped inference and production association logic
+are **not implemented**.
