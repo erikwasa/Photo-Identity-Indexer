@@ -1804,3 +1804,59 @@ and a separate uncertain face in the same frame. Review
 outcomes and notes remain private, do not update the
 canonical identity index, and are not proof of automatic
 identification quality.
+
+## Checkpoint 17 — PR #784 acceptance and qualitative V03 limits (2026-11-10)
+
+**Operator local verification:** Windows synthetic tests **PASS**;
+deduplication **PASS**; re-created face geometry and visual gallery
+**PASS**; existing CSV decision import **PASS**; uncertain suggestions
+reviewed **PASS**. HTML human-review usefulness: **useful**.
+
+**Private-cohort observations:** V01 is stated to include P02 and
+P03, V02 P01 and P02, V03 P01, P04 and P05. The operator notes
+an incorrect P04 identification/ranking for V03. Summary of
+per-clip top-ranked candidate observations:
+
+| Clip | Top-ranked counts (P01 / P02 / P03 / P04 / P05) | Best cosine per alias (P01 / P02 / P03 / P04 / P05) | Strong suggestions |
+|---|---|---|---:|
+| V01 | 1 / 18 / 5 / 4 / 8 | 0.1352 / 0.4962 / 0.5565 / 0.2618 / 0.3878 | 0 |
+| V02 | 16 / 11 / 0 / 4 / 7 | 0.4897 / 0.5123 / — / 0.3081 / 0.3791 | 0 |
+| V03 | 44 / 115 / 40 / 198 / 3515 | 0.4895 / 0.3682 / 0.3322 / 0.4088 / 0.4903 | 0 |
+
+**Interpretation guardrails:**
+- These are nearest-neighbour *top-ranked observations*, not
+  counts of recognized people, verified matches or unique faces.
+  No clip has any strong review suggestion; all reported maximum
+  similarities are far below the existing exploratory 0.80
+  review-candidate cutoff. Do not present the leading aliases
+  as automatically identified.
+- V03's 3,515 P05 top-rank observations do not imply 3,515
+  distinct P05 faces or independent observations of P05.
+- The operator knows three people appear repeatedly in V03's
+  180-frame video, filmed from a one-storey elevated window
+  approximately 10 m away. People do not face the lens and
+  complete frontal faces are absent; image quality is limited.
+  **One of the three people never appears as a face detection
+  in the *HTML review shortlist***. This does not yet prove
+  all 180 sampled frames lack a valid detector box.
+- The operator suspects some of the previously discarded
+  57 candidates are real useful faces. The current report
+  persisted only retained boxes, so this is unconfirmed:
+  counts/relative cosine scores cannot adjudicate discarded
+  quality.
+
+**Do not redo** the successful full 252-frame catalogue
+run or delete the approved extracted frames, private report,
+geometry or reviewed CSV. The next development proposal
+should be a distinct opt-in **person-coverage audit**
+with a few operator-chosen representative frames, explicitly
+including the person absent from the shortlist; separately,
+capture a bounded private comparison of *raw post-NMS* and
+top-32-retained box coordinates at overflow frames. Keep
+review-by-person ground truth local, no identity data in
+logs/PRs, no database writes, and do not change production
+recognition/thresholds based on these observations alone.
+
+For full requirements and the next evaluation gate, see
+`docs/delivery/work-items/WI-0155-video-face-processing-evaluation.md`,
+experimental checkpoint 17.
