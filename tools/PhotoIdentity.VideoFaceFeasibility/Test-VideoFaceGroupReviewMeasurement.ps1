@@ -95,8 +95,9 @@ try {
     $rows[0].MergeInto = ''
     $rows | Export-Csv -LiteralPath $csv -NoTypeInformation -Encoding utf8
     $mismatched = Join-Path $folder 'inconsistent-report.json'
-    $jsonText = Get-Content -LiteralPath $json -Raw
-    $jsonText.Replace('"observationsAssigned": 59', '"observationsAssigned": 60') |
+    $changedReport = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
+    $changedReport.clips[0].review.diagnostics.provisionalGroups.observationsAssigned = 60
+    $changedReport | ConvertTo-Json -Depth 12 |
         Set-Content -LiteralPath $mismatched -Encoding utf8
     $refused = $false
     try {
