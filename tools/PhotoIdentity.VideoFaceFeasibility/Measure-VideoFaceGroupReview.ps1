@@ -165,7 +165,7 @@ try {
         SplitRequiredGroups = $split.Count
         CannotTellGroups = $uncertain.Count
         UnreviewedGroups = $pending.Count
-        ProposedFinalGroups = if ($unresolved -eq 0) { $kept.Count } else { $null }
+        ProposedFinalGroups = $(if ($unresolved -eq 0) { $kept.Count } else { $null })
         AssignedGroupObservations = $observations
         KeptOrMergeObservations = $activeObservations
         DismissedGroupObservations = $dismissedObservations
