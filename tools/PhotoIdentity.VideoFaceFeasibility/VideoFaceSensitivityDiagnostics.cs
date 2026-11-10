@@ -63,6 +63,12 @@ public sealed record VideoFaceSensitivityDiagnostics(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public VideoFaceCoverageReview? Coverage { get; init; }
 
+    // Only present for explicit --provisional-groups catalogue experiments.
+    // Each group contains a few private source-frame boxes, NOT a canonical person.
+    // Never retain embeddings or treat a group alias as a recognized identity.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceProvisionalGroupReview? ProvisionalGroups { get; init; }
+
     // Model tensor size is *not* the decoded frame resolution. In multi-scale
     // mode every source region is separately projected onto that tensor.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
