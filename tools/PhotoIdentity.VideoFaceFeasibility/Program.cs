@@ -44,7 +44,7 @@ public static class Program
                 "--private-report <new-private-report.json> [--root <repo>] " +
                 "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>] " +
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
-                "[--face-overflow-policy <fail|retain-top-32>]\n" +
+                "[--face-overflow-policy <fail|retain-top-32>] [--provisional-groups]\n" +
                 "Visual review geometry (NO database): --review-geometry-selection <existing-selection.json> " +
                 "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +
                 "--review-geometry-output <new-private-geometry.json> [--root <repo>] " +
