@@ -2256,3 +2256,74 @@ true/false reviewed groups and safeguard detection
 of the three actual V03 people. Do not equate
 repeated detections, cosine score or group size
 with verified face evidence.
+
+## Checkpoint 22 — audited V03 grouping baseline and private metrics (2026-11-11)
+
+**PR #790 local operator feedback:** one-click dismiss,
+hide/reveal and review CSV save/import all **PASS**.
+The voluntarily attached V03 group CSV has **64
+complete group decisions**: 55 dismissed (326 assigned
+observations), six proposed merges (six assigned),
+and three kept (three assigned). The six merges
+terminate at kept groups without cycles. Proposed
+outcome: **three groups**, but no merge is executed
+by the HTML and no production database is updated.
+Every retained/merged group had exactly **one**
+face observation; several dismissed background groups
+were detected repeatedly. This confirms substantial
+false-positive workload and genuine-face fragmentation
+despite the previously reported presence of all
+three real people in V03's group gallery.
+
+### After the measurement PR merges: local quantitative audit
+
+Use the *operator-saved completed group-review CSV*,
+not the initial blank worksheet. The standalone
+analyzer reads private inputs, but emits **only
+aggregate numbers**; no per-group identifiers,
+notes, names, paths, frames or embeddings. It
+never connects to PostgreSQL, re-runs ONNX or
+edits frames/reports.
+
+```powershell
+$wiRoot = "C:\Kod\codex\Photo Identity Indexer-WI0155"
+Set-Location $wiRoot
+
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupReviewMeasurement.ps1
+if (-not $?) { throw "Group metric synthetic test failed." }
+
+# Set to the actual saved private review CSV:
+$reviewCsv = "C:\Path\To\wi0155-private-group-review-....csv"
+
+$metrics = .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceGroupReview.ps1 `
+    -ReviewedCsvPath $reviewCsv -ClipAlias V03
+$metrics | Format-List
+```
+
+For the submitted CSV the expected counts are:
+`TotalGroups=64`, `GroupsReviewed=64`,
+`KeptGroups=3`, `MergeGroups=6`,
+`DismissedGroups=55`,
+`ProposedFinalGroups=3`,
+`AssignedGroupObservations=335`,
+`KeptOrMergeObservations=9`,
+`DismissedGroupObservations=326`.
+`ObservationsUnassigned` and `GroupCapacityReached`
+remain **null** unless the matching private
+grouped JSON report is provided.
+
+For the exact same evaluation, optionally pass
+`-PrivateGroupReportPath $newGroupReport`
+as well as `-ReviewedCsvPath $reviewCsv` to
+reconcile every group ID/observation count and
+return the actual unassigned candidate total.
+Use the saved PR #789 group report that produced
+the review, **not** a new report with different
+embeddings/group selection.
+
+This quantitative baseline will distinguish
+review workload, true-person coverage and
+false-positive candidate grouping in subsequent
+independent WI-0155 experiments. A full rerun,
+new extraction or production DB access is not
+needed to measure the existing report.
