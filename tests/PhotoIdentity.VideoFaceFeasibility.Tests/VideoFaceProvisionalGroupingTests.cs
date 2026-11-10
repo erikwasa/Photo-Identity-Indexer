@@ -29,7 +29,7 @@ public sealed class VideoFaceProvisionalGroupingTests
     }
 
     [Fact]
-    public void Repeated_face_is_one_provisional_group_with_diverse_best_three_crops()
+    public void Repeated_face_is_one_provisional_group_with_diverse_best_five_crops()
     {
         var grouper = new VideoFaceProvisionalGrouper();
         EmbeddingVector a = Vector(0);
@@ -38,17 +38,19 @@ public sealed class VideoFaceProvisionalGroupingTests
         grouper.Observe(6, 6000, 1, a, Face(.9), Native);
         grouper.Observe(11, 11000, 1, a, Face(.95), Native);
         grouper.Observe(17, 17000, 1, a, Face(.99), Native);
+        grouper.Observe(23, 23000, 1, a, Face(.85), Native);
+        grouper.Observe(29, 29000, 1, a, Face(.96), Native);
 
         VideoFaceProvisionalGroupReview review = grouper.CreateReview();
-        Assert.Equal(5, review.ObservationsConsidered);
-        Assert.Equal(5, review.ObservationsAssigned);
+        Assert.Equal(7, review.ObservationsConsidered);
+        Assert.Equal(7, review.ObservationsAssigned);
         Assert.Equal(0, review.ObservationsUnassigned);
         VideoFaceProvisionalGroup group = Assert.Single(review.Groups);
         Assert.Equal("G001", group.Alias);
-        Assert.Equal(5, group.Observations);
-        Assert.Equal(3, group.RepresentativeCrops.Count);
-        Assert.DoesNotContain(group.RepresentativeCrops, c => c.FrameNumber == 1);
-        Assert.Equal(new[] { 17, 2, 11 },
+        Assert.Equal(7, group.Observations);
+        Assert.Equal(5, group.RepresentativeCrops.Count);
+        Assert.DoesNotContain(group.RepresentativeCrops, c => c.FrameNumber is 1 or 23);
+        Assert.Equal(new[] { 17, 2, 29, 11, 6 },
             group.RepresentativeCrops.Select(c => c.FrameNumber).ToArray());
         Assert.All(group.RepresentativeCrops, crop =>
         {
