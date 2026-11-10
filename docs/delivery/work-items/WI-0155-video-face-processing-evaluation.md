@@ -1270,3 +1270,97 @@ previous JSON reports contain **neither cross-frame
 SFace embeddings nor group membership**. Reuse
 existing frames and the same read-only database
 connection, do not extract videos again.
+
+## Experimental checkpoint 21 — V03 local acceptance exposes background-group workload (2026-11-11)
+
+**Operator local acceptance of PR #789:** C# tests **PASS**,
+Windows PowerShell synthetic gallery **PASS**, real bounded
+V01–V03 group inference **PASS**, HTML group gallery **PASS**,
+and explicit CSV save/import **PASS**. The maintainer reports
+that **all three known V03 people have at least one provisional
+group**, so the prototype reached a meaningful *gallery person
+coverage* milestone. Overall grouping usefulness remains
+**partially useful**. The operator did **not** supply per-clip
+group counts or unassigned totals; do not infer them.
+
+**Main remaining defect WI0155-GROUP-07 — background objects:**
+A **majority of provisional groups are obviously non-face
+background objects** according to the human review, despite
+the detector assigning them face candidates and the grouping
+model finding sufficient vector similarities. This is a
+meaningful precision/reviewer-workload failure, separate from
+the successful coverage of the three actual people.
+Group size, detector confidence, similarity and repeated
+observations alone **do not prove face-likeness**, and applying
+a hard group-size threshold risks excluding real small,
+oblique or poorly-lit faces. Keep all groups reviewable and
+do not suppress them or auto-assign identities based on
+proxy quality alone.
+
+**Operator request WI0155-GROUP-08 — more crop evidence:**
+Allow **up to five quality-ranked, temporally diverse crops**
+per provisional group rather than a hard three. The
+limit remains bounded; groups with fewer samples remain
+valid. The older three-crop report format and existing
+CSV keys/columns remain supported.
+
+### Focused proposed follow-up
+
+An isolated gallery usability improvement provides a
+**single-click dismiss for obvious non-face background
+groups**, plus **optional reversible filters** to hide
+dismissed groups and view only groups with at least three
+observations. Filtering is purely client-side:
+the saved CSV still includes **every** provisional group,
+its original identifier and exact review decision.
+The repeated-observation filter is clearly marked
+as a *review navigation aid*, **not a validated
+face/background classifier**. Dismissal is a reviewer
+annotation, not detector learning or a database write.
+No automatic false-positive filtering is claimed.
+
+Increase `VideoFaceProvisionalGrouper.MaximumCropsPerGroup`
+from 3 to **5**, retain all prior constraints
+(conservative within-video grouping, same-frame
+separation, max 64 groups, no reference enrollment).
+The offline Windows gallery accepts **1–5** crops,
+including historical 1–3 crop reports. The grouping
+algorithm is otherwise unchanged so that comparisons
+remain interpretable. New reports with five candidates
+require a fresh opt-in inference run; **the already
+successful PR #789 report can immediately test gallery
+triage with no new ONNX or DB work**.
+
+**Acceptance goals:**
+- All original V03 groups and representative crops
+  remain accessible even when a filter is enabled.
+- One-click background dismissal and reversible
+  filters work in the browser. The saved CSV preserves
+  dismissed and hidden groups and can be imported.
+- C# tests verify bounded five-crop diversity and
+  replacement. Synthetic Windows gallery tests
+  verify five crops, legacy three-crop reports,
+  source immutability and invalid geometry rejection.
+- Do not call this an accuracy improvement. A later
+  separately evaluated **face-candidate precision**
+  change needs labelled true/false candidate examples
+  (preferably the already user-reviewed CSV plus
+  false-positive group feedback), explicit measured
+  true-face recall, and a person-coverage regression
+  before touching detector thresholds/box selection.
+  This is especially important for V03's oblique
+  ~10 m faces.
+- Group counts and unassigned candidates per clip
+  remain essential acceptance information before
+  considering grouping production-ready.
+- Continue to treat `GROUP-03` full eligible
+  100+ person top-3 suggestions, `GROUP-04`
+  reviewed video-person association and executable
+  merge/split controls as pending. Keep WI-0155
+  isolated and do not enrich the still-image reference
+  catalogue with video crops or vectors.
+
+**Scope:** focused review-efficiency and representative
+evidence PR only, no production processing,
+PostgreSQL writes, model replacement or automatic
+person identifications.

@@ -11,6 +11,8 @@
   const importButton = document.getElementById("import-groups");
   const fileInput = document.getElementById("groups-file");
   const status = document.getElementById("group-status");
+  const hideDismissed = document.getElementById("hide-dismissed");
+  const repeatedOnly = document.getElementById("repeat-only");
   const valid = new Set(["", "Keep group", "Merge group",
     "Dismiss false detection", "Split required", "Cannot tell"]);
   let dirty = false;
@@ -25,14 +27,32 @@
     ReviewerNotes: card.querySelector(".notes").value
   });
   const review = () => {
-    const complete = cards.filter(card => fields(card).Decision !== "").length;
-    status.textContent = complete + " / " + cards.length + " provisional groups reviewed" +
-      (dirty ? " · UNSAVED edits" : " · save to preserve decisions");
+    let complete = 0, dismissed = 0, visible = 0;
+    for (const card of cards) {
+      const decision = fields(card).Decision;
+      if (decision !== "") complete++;
+      if (decision === "Dismiss false detection") dismissed++;
+      const isHidden = (hideDismissed.checked &&
+          decision === "Dismiss false detection") ||
+        (repeatedOnly.checked && Number(card.dataset.observations) < 3);
+      card.hidden = isHidden;
+      if (!isHidden) visible++;
+    }
+    status.textContent = complete + " / " + cards.length + " reviewed; " +
+      dismissed + " dismissed; " + visible + " visible" +
+      (dirty ? " · UNSAVED edits" : " · save explicitly to preserve decisions");
   };
+  hideDismissed.addEventListener("change", review);
+  repeatedOnly.addEventListener("change", review);
   for (const card of cards) {
     for (const input of card.querySelectorAll("input, textarea, select")) {
       input.addEventListener("input", () => {dirty = true; review();});
     }
+    card.querySelector(".quick-dismiss").addEventListener("click", () => {
+      card.querySelector(".decision").value = "Dismiss false detection";
+      dirty = true;
+      review();
+    });
   }
 
   const escape = v => '"' + String(v ?? "").replaceAll('"', '""') + '"';
