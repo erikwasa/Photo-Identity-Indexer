@@ -741,3 +741,118 @@ re-import of previously completed reviews remain pending.
 Do not delete the existing CSV, gallery, cases, original
 bounded JSON or extracted PNGs. No production integration
 or catalogue mutations authorized.
+
+## Experimental checkpoint 17 — actual human review and coverage gap (2026-11-10)
+
+**PR #784 local acceptance: PASS** for synthetic gallery tests,
+deduplicated face observations, regenerated face geometry/gallery,
+restored decisions from the previous CSV, and review of uncertain
+suggestions. The operator now rates the HTML review **useful**.
+This is tool usability acceptance, **not recognition acceptance**.
+
+The operator supplied the following **pseudonymous** report aggregates.
+These are counts of **top-ranked face observations**, not unique faces,
+tracked people, verified recognitions, or independently confirmed
+identity matches. `Strong review suggestions` is **zero in every
+row**; maximum cosine values are below the exploratory strong-review
+threshold in every clip.
+
+| Clip / operator-stated presence | Alias | Top-ranked observations | Maximum cosine | Strong review suggestions |
+|---|---|---:|---:|---:|
+| V01 (P02, P03) | P01 | 1 | 0.1352 | 0 |
+| V01 | P02 | 18 | 0.4962 | 0 |
+| V01 | P03 | 5 | 0.5565 | 0 |
+| V01 | P04 | 4 | 0.2618 | 0 |
+| V01 | P05 | 8 | 0.3878 | 0 |
+| V02 (P01, P02) | P01 | 16 | 0.4897 | 0 |
+| V02 | P02 | 11 | 0.5123 | 0 |
+| V02 | P03 | 0 | — | 0 |
+| V02 | P04 | 4 | 0.3081 | 0 |
+| V02 | P05 | 7 | 0.3791 | 0 |
+| V03 (P01, P04, P05) | P01 | 44 | 0.4895 | 0 |
+| V03 | P02 | 115 | 0.3682 | 0 |
+| V03 | P03 | 40 | 0.3322 | 0 |
+| V03 | P04 | 198 | 0.4088 | 0 |
+| V03 | P05 | 3515 | 0.4903 | 0 |
+
+The top-rank counts sum to 36 observations in V01, 38 in V02
+and 3,912 in V03: **3,986 retained observations** overall,
+consistent with the successful bounded catalogue run.
+V03 is heavily dominated by P05 ranking (3,515 of 3,912
+observations), which is **not proof** that P05 is correctly
+recognized or even the most frequently visible person. The
+operator also reports an **incorrect P04 identification/ranking
+in V03**. Preserve that as a human-review finding without
+turning the aggregate table into a claimed per-face ground truth.
+
+**Crucial qualitative evidence about V03:** the same three
+people recur across approximately 180 selected frames, shot
+from an elevated one-storey window roughly 10 m away; no
+person directly faces the camera and no frame presents an easy
+complete frontal face. Image quality could be better. The
+operator reports **one of those three people has no detection
+in any frame shown in the HTML review shortlist**, even though
+the person appears repeatedly in the underlying footage.
+Do **not** infer that all 180 frames lack a detector box for
+that person: the gallery samples a small subset, biased toward
+the highest cosine rankings. The operator observes that the
+correct people's aliases often score highest, but absolute
+similarities remain weak and **no strong review candidate**
+was produced. Relative nearest-neighbour ranking alone does
+not constitute reliable automatic recognition.
+
+**Bounded-discard limitations:** prior run saw 4,043 raw,
+3,986 retained, and 57 discarded post-NMS candidate faces
+across 17 overflowing frames. The operator believes some
+discarded candidates were useful genuine faces, a plausible
+hypothesis **not demonstrated** by the saved report: it lacks
+their geometry and individual evidence. Multiple detections
+across frames can belong to one person and false positives
+can be ranked above true smaller/oblique faces. Do not call
+discarded candidates 57 distinct people or 57 true faces.
+
+### Explicit next acceptance requirements (experimental scope only)
+
+- **WI0155-QUALITY-01 — Human-anchored person coverage.** Use the
+  existing local V01–V03 frames and private review observations
+  to create a *small operator-selected* ground-truth set of
+  frames/people actually visible (including the V03 person
+  missing from the shortlist). Distinguish visible body,
+  visible face, detected box and face evidence usable for
+  recognition. Maintain private aliases and do not upload
+  frames or person mappings. The denominator is real,
+  operator-verified person appearances, not top-rank counts.
+- **WI0155-QUALITY-02 — Candidate-selection fairness.** Evaluate
+  time-diverse, person-diverse and low-quality examples, not
+  exclusively the highest cosine observation per known alias.
+  Include at least one deliberate negative/missed-person case.
+  A person absent from the *gallery* must not be counted absent
+  from all detections until directly verified across sampled
+  source frames.
+- **WI0155-QUALITY-03 — Raw vs retained face-box comparison.**
+  When explicitly approved, inspect bounded subsets of the
+  **pre-top32** YuNet candidates, including *discarded* boxes
+  and their confidence, strictly privately and without
+  embeddings or person assignments. Test whether high-confidence
+  false positives displace actual small or oblique faces.
+  Reconstructing only retained boxes cannot answer this question.
+- **WI0155-QUALITY-04 — Separate discovery from recognition.**
+  Assess whether the actual visible people have at least one
+  useful detected face, independently of whether SFace produces
+  a confident known-person suggestion. Evaluate human
+  inspectability and relative rankings separately from
+  calibrated identification accuracy. Keep exploratory score
+  thresholds and production identity decisions unchanged
+  until sufficient labeled evidence supports any change.
+- **WI0155-QUALITY-05 — No automatic production integration.**
+  Treat the full bounded experiment as technically successful,
+  the gallery as locally accepted, and **reliable identification
+  from this difficult oblique/distant cohort as not demonstrated**.
+  Preserve existing approved source frames, case file, private
+  reports and CSV reviews until the next focused assessment.
+
+**Decision gate:** obtain the local ground-truth/coverage evidence
+and discarded-box examples before changing detector model/threshold,
+raising limits or integrating video identification into `main`.
+This checkpoint records evidence and requirements only; no model,
+database, code path or production behavior changes are approved.
