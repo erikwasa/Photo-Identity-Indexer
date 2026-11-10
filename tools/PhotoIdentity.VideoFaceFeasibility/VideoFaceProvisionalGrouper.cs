@@ -131,10 +131,12 @@ public sealed class VideoFaceProvisionalGrouper
         var crop = new VideoFaceGroupCrop(frameNumber, timestampMs, faceNumber,
             b.X, b.Y, b.Width, b.Height, Math.Round(detection.Confidence, 4), quality);
 
-        winner.Observations++;
-        winner.LastObservedFrame = frameNumber;
+        Group assigned = winner ?? throw new InvalidOperationException(
+            "Provisional grouping failed to assign the selected candidate.");
+        assigned.Observations++;
+        assigned.LastObservedFrame = frameNumber;
         _assigned++;
-        RetainDiverseRepresentative(winner, embedding, crop);
+        RetainDiverseRepresentative(assigned, embedding, crop);
     }
 
     public VideoFaceProvisionalGroupReview CreateReview() =>
