@@ -1364,3 +1364,114 @@ triage with no new ONNX or DB work**.
 evidence PR only, no production processing,
 PostgreSQL writes, model replacement or automatic
 person identifications.
+
+## Experimental checkpoint 22 — completed V03 group-review baseline (2026-11-11)
+
+**Operator acceptance of merged PR #790:** One-click
+background-group dismissal **PASS**, hide/reveal **PASS**,
+and HTML CSV save/import **PASS**. Prior PR #789 C#,
+Windows synthetic, real inference and group gallery had
+also passed. The operator voluntarily attached their
+completed **V03** offline group-review CSV for private
+analysis. Its individual rows, notes, private paths and
+person mappings are not committed. A derived,
+non-identifying aggregate is recorded here:
+
+| Human disposition | Provisional groups | Assigned face-candidate observations |
+|---|---:|---:|
+| Dismiss false detection | 55 | 326 |
+| Merge group | 6 | 6 |
+| Keep group | 3 | 3 |
+| **Total** | **64** | **335** |
+
+- All **64/64 groups have review decisions** and no
+  unknown/split/pending dispositions in this supplied CSV.
+  **55/64 (85.9%)** are dismissed as background/non-face.
+  **326/335 (97.3%)** of *assigned-to-group*
+  candidate observations belong to dismissed groups.
+  This percentage describes only the reviewable group
+  evidence, **not the entire source video or its raw
+  post-NMS candidate population**.
+- All six proposed merge targets are valid,
+  terminate at kept groups and are noncyclic.
+  Three kept groups remain if the manual merges
+  were applied; these are the reviewer's
+  **proposed outcome**, NOT merges already executed
+  by the system.
+- Critically **all nine nondismissed groups contain
+  exactly one face observation**. In contrast,
+  a background group may represent dozens of repeated
+  detections (maximum **54** in this review).
+  This is strong evidence that the current within-video
+  cosine-based grouping **fails to join many of the
+  visible genuine observations** while readily
+  grouping background features. The problem is
+  NOT simply lack of fourth/fifth crop representatives:
+  the true-face groups are singletons. Increasing
+  representatives to five improves evidence where
+  available, but **does not fix grouping precision**.
+- The grouper has a hard maximum of 64 groups,
+  which the CSV demonstrates was reached. This
+  CSV sums the **335 candidates assigned to
+  groups**; it does **not** contain the original
+  total observed or the number **unassigned**.
+  The matching private `groups-tiled1024-*.json`
+  is required to establish missing/unassigned
+  observation counts. Do not infer them from a
+  different historical run without verifying
+  exact input/provenance.
+- The operator already reported that all three
+  actual V03 people appeared among these
+  provisional groups. No clip-wide person recall
+  or candidate-level precision has been proven,
+  as the gallery can omit additional examples
+  after the group cap is hit.
+
+### New acceptance and evidence requirements
+
+**WI0155-GROUP-09 — Repeatable private group-quality baseline:**
+Add an **offline read-only PowerShell 7.6 measurement
+tool** which validates the exact saved group CSV
+and optionally a matching private grouped JSON report,
+checks merge targets and cycles, reconciles candidate
+totals, and prints only aggregate review statistics
+(no groups, persons, notes, coordinates, paths or
+embeddings). Establish this 64/55/6/3 result as the
+first **reviewed benchmark** for any next grouping
+proposal. If the matching JSON is absent, mark
+unassigned counts **unknown** rather than assuming
+zero. No database interaction or inference required
+to calculate the baseline.
+
+**WI0155-GROUP-10 — Separate face candidate precision
+from identity grouping:** The next algorithm
+experiment must address obviously non-face
+candidates **before** they exhaust the 64-group
+capacity, or otherwise provide a robust candidate
+prioritization that does not hide low-confidence
+genuine oblique/distant faces. Evaluate it against
+reviewed background **and** all three V03 actual
+people, with explicit true-face retention,
+false-positive-group workload, grouping fragmentation,
+group-cap saturation and unassigned evidence.
+Never adopt a hard minimum occurrence-count
+filter as a face validator: many background
+groups recur and all retained true-face groups
+were singleton observations in this review.
+Keep a reviewable fallback for uncertain face
+candidates rather than silent destructive exclusion.
+No video-derived embeddings or crops may be
+enrolled into permanent still-person references.
+
+**Decision gate:** WI-0155 remains experimental.
+The current grouping prototype demonstrates
+operator-visible people but fails the intended
+low-workload, per-person grouping requirement.
+Do not proceed to full 100+ person suggestions
+as though these groups were already clean;
+it would waste retrieval work and burden the
+reviewer. A following separate supervised
+candidate-quality/grouping design may use
+privately operator-reviewed examples as
+**evaluation labels**, but must not turn
+video crops into future identity reference data.
