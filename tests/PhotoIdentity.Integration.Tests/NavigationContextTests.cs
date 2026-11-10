@@ -196,6 +196,31 @@ public sealed class NavigationContextTests
         Assert.InRange(limit, 1, 200);
     }
 
+    [Theory]
+    [InlineData(0, 24, 100, null, null)]
+    [InlineData(0, 25, 100, null, 40)]
+    [InlineData(0, 39, 40, null, null)]
+    [InlineData(40, 40, 120, 0, null)]
+    [InlineData(40, 54, 120, 0, null)]
+    [InlineData(40, 55, 120, null, null)]
+    [InlineData(40, 64, 120, null, null)]
+    [InlineData(40, 65, 120, null, 80)]
+    [InlineData(40, 79, 81, null, 80)]
+    [InlineData(80, 80, 81, 40, null)]
+    [InlineData(80, 85, 81, null, null)]
+    public void Smart_collection_prefetch_starts_15_photos_before_page_boundaries(
+        int pageOffset,
+        int index,
+        int total,
+        int? expectedPrevious,
+        int? expectedNext)
+    {
+        (int? previous, int? next) =
+            SmartCollectionNavigation.PrefetchOffsetsForIndex(pageOffset, index, total);
+        Assert.Equal(expectedPrevious, previous);
+        Assert.Equal(expectedNext, next);
+    }
+
     [Fact]
     public void Overlapping_navigation_window_resolves_both_edges_without_another_query()
     {
