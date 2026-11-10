@@ -17,7 +17,8 @@ public static class VideoFaceCatalogueRunner
         string Cases, string PrivateReport, string Root, string ModelDirectory,
         double DetectorConfidence,
         VideoFaceDetectorSelection Detection,
-        VideoFaceOverflowPolicy OverflowPolicy);
+        VideoFaceOverflowPolicy OverflowPolicy,
+        bool ProvisionalGroups);
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -76,7 +77,8 @@ public static class VideoFaceCatalogueRunner
                 stage = "clip-analysis";
                 string folder = Path.GetDirectoryName(Path.GetFullPath(clip.Manifest))!;
                 VideoFacePrivateReview review = await experiment.RunWithPreparedMatcherAsync(
-                    frames, folder, matcher, options.DetectorConfidence);
+                    frames, folder, matcher, options.DetectorConfidence,
+                    provisionalGroups: options.ProvisionalGroups);
                 var personRanks = review.Diagnostics!.RankedFaces
                     .GroupBy(face => face.TopReferenceAlias, StringComparer.Ordinal)
                     .Select(group => new VideoFaceCataloguePersonRankSummary(
@@ -117,6 +119,13 @@ public static class VideoFaceCatalogueRunner
                 candidatesDiscarded = reviews.Sum(r =>
                     r.Review.Diagnostics!.FrameDetections.Sum(f =>
                         f.CandidatesDiscarded ?? 0)),
+                groupReviewRequested = options.ProvisionalGroups,
+                provisionalGroups = options.ProvisionalGroups
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.Groups.Count)
+                    : 0,
+                groupObservationsUnassigned = options.ProvisionalGroups
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.ObservationsUnassigned)
+                    : 0,
                 elapsedMilliseconds = Math.Round(reviews.Sum(
                     r => r.Review.Aggregate.ElapsedMilliseconds), 3),
                 privateReportWritten = true,
@@ -143,9 +152,19 @@ public static class VideoFaceCatalogueRunner
         string? detectorPipeline = null;
         string? tileSize = null;
         string? overflowPolicy = null;
+        bool provisionalGroups = false;
         for (int i = 0; i < args.Length; i++)
         {
             string name = args[i];
+            if (name == "--provisional-groups")
+            {
+                if (provisionalGroups)
+                {
+                    throw new ArgumentException("Duplicate provisional-groups option.");
+                }
+                provisionalGroups = true;
+                continue;
+            }
             if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
             {
                 throw new ArgumentException("Each option requires a value.");
@@ -200,6 +219,7 @@ public static class VideoFaceCatalogueRunner
             throw new ArgumentException(
                 "Candidate overflow retention requires explicit multiscale detection.");
         }
-        return new Options(cases, report, repo, dir, threshold, selected, policy);
+        return new Options(cases, report, repo, dir, threshold, selected, policy,
+            provisionalGroups);
     }
 }

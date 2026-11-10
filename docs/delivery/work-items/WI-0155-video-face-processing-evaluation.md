@@ -1145,3 +1145,128 @@ catalogue evaluation or tune thresholds to reach arbitrary
 automatic percentages. The present PR is **requirements/docs
 only**; grouped inference and production association logic
 are **not implemented**.
+
+## Experimental checkpoint 20 — opt-in streaming provisional group prototype (2026-11-10)
+
+**Implementation proposed on isolated WI-0155 child branch:** first
+substantial video-level grouping experiment, deliberately NOT
+production integration. Based on the same approved local frame
+manifests, detector, aligner and SFace embeddings, an optional
+`--provisional-groups` flag adds temporary **within-video**
+comparison during the already authorized experimental catalogue
+run. This does **not** identify persons, infer their timeline
+in the UI, write to PostgreSQL, add reference embeddings,
+or modify original videos/extracted PNGs.
+
+### In-memory grouping rule
+
+- Compare face embeddings against up to three diverse
+  representative vectors within each previously formed
+  provisional group. Similarity is for **within-video
+  group association**, never for automatic catalogue
+  identity assignment. Initial explicit experimental
+  minimum cosine = **0.82** and winner-vs-next-group
+  gap = **0.04**. These are **untuned prototype constants**,
+  not production-grade model calibrations or per-person
+  identity thresholds.
+- Two separate detections in one frame cannot join the
+  same group. Ambiguous assignments are conservatively
+  split into extra groups rather than silently merging
+  people. Catalogue top-ranked aliases are **not used**
+  to determine group membership.
+- Keep up to three representative faces per group, from
+  nonadjacent frames where possible, preferring larger
+  and higher detector-confidence crops (a crude quality
+  proxy, **not** certified face recognition suitability).
+  Group IDs are private, ephemeral, local to the clip
+  and are **not** person IDs.
+- Bound to **64 provisional groups per video** and
+  **3 representative crops per group**. Once capacity
+  is exceeded, increment an explicit **unassigned
+  observations** count rather than silently claiming
+  detected persons; neither assigned nor unassigned
+  counts are verified unique faces.
+- Report only group aliases, observation counts and
+  the coordinates of up to three selected crops;
+  SFace vectors and per-observation group membership
+  stay in memory and are **not persisted**. The private
+  `diagnostics.provisionalGroups` field is absent
+  unless the flag is explicitly used. Existing reports
+  and production behavior remain unchanged.
+
+### Operator preview and correction boundary
+
+A new Windows PowerShell 7.6
+`New-VideoFaceGroupReview.ps1` script turns a
+new **private grouped catalogue report** into
+an offline HTML gallery showing per-group best crops,
+without requiring another coordinate reconstruction
+run. Reviewers can **annotate** provisional keep,
+merge-into, split-needed, dismiss and cannot-tell
+decisions, plus optional selected-person pseudonyms
+and notes, then explicitly save/import a local CSV.
+These annotations do **not** yet execute merges,
+splits, video/person associations or identity writes.
+No appearance times are displayed. The private
+gallery requires user-initiated saving to an
+unsynced local destination and may not be
+published to GitHub or CI.
+
+Synthetic C# unit tests cover repeated observations,
+diverse samples, same-frame exclusion, conservative
+splits, bounded capacity/unassigned accounting and
+absence of vectors in the group-report schema.
+The separate Windows synthetic PowerShell smoke test
+covers group images/CSV/HTML, invalid boxes and
+source-frame hash integrity. Existing Windows
+gallery acceptance stays valid; this branch
+does not alter the previous review CSV schema.
+
+### Progress and explicit limitations
+
+- **GROUP-01 — partial:** actual opt-in
+  within-video clustering and best sample selection
+  are implemented, but their grouping accuracy
+  on V01/V02/V03 is **not yet measured**. A fixed
+  64-group budget may saturate badly with V03's
+  noisy tiled detections. If so, the prototype is
+  **not** an acceptable video person inventory.
+  No higher-confidence claim is appropriate.
+- **GROUP-02 — partial:** HTML annotations for
+  group merge/split/dismiss are captured in a
+  private CSV. There is no executable validated
+  regroup/identity workflow yet.
+- **GROUP-03 — pending:** full eligible 100+ person
+  catalogue, actual named top-2/top-3 group suggestions
+  and top-k accuracy are **not implemented**.
+  The existing experiment still compares only
+  the operator-selected five people. Do NOT label
+  nearest five-person ranks as full-catalogue
+  suggestions.
+- **GROUP-04 — pending:** no production
+  video/person presence table or identity writes.
+- **GROUP-05 — partial:** group count, assigned,
+  unassigned and samples are measurable; person
+  coverage and correct merges/false positives
+  require the maintainer's new human review.
+- **GROUP-06 — partial:** model/code remains on
+  the isolated branch, the new mode is strictly
+  opt-in, exports no reference vectors, and
+  has group/sample caps. Model-run performance
+  and source integrity still need local acceptance.
+- **WORKFLOW-01..05 — pending:** no production
+  automatic/semi-automatic/manual group workflow,
+  no video frame learning, and no change to
+  normal still-image identity assignment.
+
+**Decision gate:** Focused C# tests and CI plus
+Windows synthetic gallery test are required;
+operator inspection of group count, missing
+people and false groups on a new private grouped
+V03 run is needed before this prototype can
+inform grouping architecture. The new mode
+requires a fresh explicit inference run because
+previous JSON reports contain **neither cross-frame
+SFace embeddings nor group membership**. Reuse
+existing frames and the same read-only database
+connection, do not extract videos again.

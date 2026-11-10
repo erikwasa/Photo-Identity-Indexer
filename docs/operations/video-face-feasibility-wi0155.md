@@ -2043,3 +2043,140 @@ The main work item describes acceptance contracts
 This checkpoint only establishes requirements and records
 anonymous aggregates. It does not implement grouping
 or 100+ identity matching.
+
+## Checkpoint 20 — experimental provisional group preview (PR pending; 2026-11-10)
+
+This checkpoint **does not** change any application behavior.
+It adds an explicitly opt-in private *group* diagnostic to
+the existing isolated catalogue runner, and a new offline
+PowerShell group review gallery. Do not run the new full
+252-frame experiment unless the maintainer wants the
+grouping evidence and the earlier tests are green.
+
+### Focused verification (PowerShell 7.6, after this PR merges)
+
+Start in the already approved isolated WI-0155 worktree
+after fetching `origin/wi-0155`. Do not discard local
+uncommitted work. Existing approved model files,
+private `$newCasesPath` and validated least-privilege
+PostgreSQL read-only account are reused:
+
+```powershell
+$wiRoot = "C:\Kod\codex\Photo Identity Indexer-WI0155"
+Set-Location $wiRoot
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw "C# group tests failed" }
+
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupReview.ps1
+if (-not $?) { throw "Synthetic gallery tests failed" }
+```
+
+These tests require no real media, ONNX models or database.
+The synthetic group review is temporary; it checks
+source-image hashes, crop export, HTML controls,
+CSV worksheet and refusal of invalid boxes.
+
+### Optional V03 real grouping evaluation
+
+Use the same existing approved `$newCasesPath` (the
+two-to-four-clip file with V01/V02/V03) and `$modelDir`
+you used for PR #780. The old catalogue report is
+insufficient to reconstruct groups because it does not
+persist the per-face SFace vectors needed to compare
+faces across frames. A new inference evaluation is
+therefore required, **but not any new video extraction**.
+
+```powershell
+if (-not (Test-Path -LiteralPath $newCasesPath -PathType Leaf)) {
+    throw "Private case file missing."
+}
+if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) {
+    throw "Approved model directory missing."
+}
+if (-not $env:PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING) {
+    throw "The preapproved PostgreSQL SELECT-only connection is not set."
+}
+
+$reportsDir = Join-Path $env:LOCALAPPDATA "PhotoIdentity\WI0155\reports"
+New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null
+$newGroupReport = Join-Path $reportsDir (
+    "groups-tiled1024-" + (Get-Date -Format "yyyyMMdd-HHmmssfff") + ".json"
+)
+
+$argsForGroupRun = @(
+    "run", "--project", "tools/PhotoIdentity.VideoFaceFeasibility",
+    "-c", "Release", "--",
+    "--catalogue-cases", $newCasesPath,
+    "--private-report", $newGroupReport,
+    "--root", $wiRoot,
+    "--model-dir", $modelDir,
+    "--detector-confidence", "0.5",
+    "--detector-pipeline", "multi-scale",
+    "--tile-size", "1024",
+    "--face-overflow-policy", "retain-top-32",
+    "--provisional-groups"
+)
+& dotnet @argsForGroupRun
+if ($LASTEXITCODE -ne 0) {
+    throw "Isolated private provisional-group run failed."
+}
+
+$groupReport = Get-Content -LiteralPath $newGroupReport -Raw | ConvertFrom-Json
+$groupReport.clips | ForEach-Object {
+    $g = $_.review.diagnostics.provisionalGroups
+    [pscustomobject]@{
+        Video = $_.alias
+        Frames = $_.review.aggregate.framesExamined
+        Candidates = $g.observationsConsidered
+        ProvisionalGroups = @($g.groups).Count
+        Assigned = $g.observationsAssigned
+        Unassigned = $g.observationsUnassigned
+    }
+} | Format-Table -AutoSize
+```
+
+A capped count of 64 and large `Unassigned` is
+**not a successful result**; it means the cap has been
+reached and potentially useful candidates were not
+assigned. The resulting aliases `G001` and so on
+refer to tentative groups, NOT actual persons.
+V03 is challenging and may produce many extra groups;
+quantify this before choosing thresholds or another
+grouping strategy.
+
+### Build the private group review HTML (no inference)
+
+```powershell
+$gallery = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceGroupReview.ps1 -PrivateReportPath $newGroupReport -PrivateCasesPath $newCasesPath -ClipAlias V03 -OpenGallery
+$gallery | Format-List
+```
+
+The gallery selects up to three local crops per
+provisional group and shows **no appearance timeline**.
+Use `Keep group`, `Merge group` with another G alias,
+`Split required`, `Dismiss false detection` or
+`Cannot tell` and the private notes field; click
+`Save group-review CSV` to keep decisions locally.
+The buttons record decisions **only in the private
+CSV**, not in the database and not in grouped inference.
+The next step must implement validated and reversible
+review actions before any production integration.
+No person identities or video frames are copied into
+permanent reference embeddings.
+
+Local acceptance should report:
+**C# tests**, **PowerShell synthetic PASS/FAIL**,
+**group count per video**, **V03 unassigned count**,
+number of actual real people represented by at least
+one group, false-positive groups, necessary merges/splits,
+group usefulness and any unusual crop quality.
+Keep the new JSON/CSV and all original frames
+private and intact; do not include them in the PR.
+
+The previous 5-person scope remains unchanged in this
+prototype. Full 100+ person top-2/top-3 catalogue ranking,
+automatic identity assignment, executed group merges,
+and video/person DB associations are explicitly **not**
+part of this checkpoint. More requirements and open
+issues are in work-item checkpoint 20.
