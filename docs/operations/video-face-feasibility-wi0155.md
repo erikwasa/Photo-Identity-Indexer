@@ -2593,3 +2593,86 @@ detections were background. Even if these diagnostics look promising,
 a later targeted local inference comparison must still prove true-face
 retention, reduced review effort and useful person-level top three.
 Full-duration adaptive video sampling remains a separate gate.
+
+## Checkpoint 26 — zero-inference review-priority comparison (PR #795)
+
+PR #794's **local private human-label verification** is complete. The
+snapshot included 241 canonical people, 240 eligible people and 596
+eligible SFace still-photo exemplars. All nine genuine V03 singleton
+groups were privately labelled: correct top-one in one group, correct
+top-three in one group and correct person represented in one of three
+distinct known people. The other two known people were absent from
+top-three suggestions. The V03 detector generated 3,912 candidate
+observations, of which only 407 entered 64 groups and 3,505 remained
+unassigned. The reviewer dismissed 55 groups as background.
+
+The median detector confidence, quality proxy and top catalogue cosine
+were respectively **0.5954 / 0.1080 / 0.3208** for dismissed non-faces,
+versus **0.6531 / 0.1949 / 0.4137** for retained true-face groups.
+Although these medians differ, there are only nine positive groups
+and no evidence that any single threshold can distinguish every true
+face. In particular, the exploratory catalogue 0.80 cosine threshold
+is above all reviewed group scores, including real people. These
+scores are **not** calibrated face probabilities.
+
+### Compare existing reviewed V03 groups without model inference
+
+**Do not rerun** the 180-frame catalogue inference, video extraction or
+PostgreSQL snapshot for this step. Use the same private, fully-local
+JSON/CSV/map from the successfully accepted PR #794 run. All three
+input paths must be outside Git and from the same saved cohort.
+
+```powershell
+$wiRoot = 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+Set-Location $wiRoot
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+
+# Zero-personal-media deterministic regression.
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceReviewPriority.ps1
+if (-not $?) { throw 'Review priority synthetic comparison failed' }
+
+# Replace these placeholders with the EXISTING matching private files.
+$csv = 'C:\Private\WI0155\review\annotated-v03.csv'
+$report = 'C:\Private\WI0155\reports\full-catalogue-report.json'
+$map = 'C:\Private\WI0155\reports\people-map.json'
+
+$comparison = @(.\tools\PhotoIdentity.VideoFaceFeasibility\Compare-VideoFaceReviewPriority.ps1 `
+    -ReviewedCsvPath $csv `
+    -PrivateGroupReportPath $report `
+    -PrivatePeopleMapPath $map `
+    -ClipAlias V03)
+
+$comparison |
+    Select-Object Policy,ReviewBudgetGroups,TrueFaceGroupsShown,
+        TrueFaceGroupsNotShown,BackgroundGroupsShown,
+        DistinctKnownPeopleShown,DistinctKnownPeopleWithCorrectTop3Shown |
+    Format-Table -AutoSize
+```
+
+The command produces **only aggregate scenario metrics**; it never
+displays group aliases, person pseudonyms, names, source paths,
+individual similarities, image data or embeddings. The comparator
+requires a completely reviewed keep/merge/dismiss worksheet;
+unresolved or cross-snapshot evidence is rejected rather than
+silently counted as background. If human identity labels are
+incomplete, known-person counts are `null`, not invented zeroes.
+
+Six fixed experimental priorities are compared at review budgets of
+8, 16, 32, 48 and 64 groups (plus the available full group count).
+`Time-spread + quality` round-robins between four temporal buckets
+based on representative frame positions. This is a **review order**,
+not a face-rejection rule or true adaptive sampling.
+
+**Interpretation:** a smaller review budget is useful only if
+it reduces background-group review work while retaining all
+three known visible people and the reviewed singleton groups.
+The upper bound is still the **64 already assigned groups**:
+3,505 unassigned candidate observations have no group labels
+and cannot be credited as background or included in a full-video
+person-recall denominator. Even a zero-miss scenario here cannot
+prove a safe global face filter. A future deliberately controlled
+local inference test is needed to validate any new group selection
+or grouping-cap strategy against those unassigned observations,
+other videos and the missing two people.
