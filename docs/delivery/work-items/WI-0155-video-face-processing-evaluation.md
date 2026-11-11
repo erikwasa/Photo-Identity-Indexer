@@ -57,6 +57,133 @@ whether to integrate into Photo Identity or retain video recognition as a
 separate component. Neither integration nor independence has been selected.
 The historical checkpoints below remain as evidence, not current priorities.
 
+## Revised pre-merge proof and explicit post-merge boundary (maintainer, 2026-11-11)
+
+This section is the **current merge gate** and supersedes earlier
+feasibility-only stopping rules wherever they conflict. The earlier
+checklists, experiments and GROUP/WORKFLOW numbers remain historical
+evidence and/or follow-on design requirements; do not treat every
+historical production requirement as a condition for merging
+`wi-0155` into `main`.
+
+**Product proof before merge:** Demonstrate that an explicitly approved
+video can yield **as few reviewable candidate-person groups as practical
+while representing every person whose face is human-identifiable in
+the chosen evaluation footage**, and that eligible existing people can
+be retrieved as useful **top-three suggestions from the entire
+eligible production people catalogue**, not a hand-selected five-person
+cohort. Unknown/unidentifiable outcomes must remain possible. A correct
+top-three suggestion on a difficult distant face is valuable even if
+automatic assignment would be unsafe. Do not infer universal recall
+from a small reviewed test suite.
+
+### Required development/evaluation gates before `main`
+
+- [ ] **FACE-QUALITY-01 — Reduce false-face workload without losing people.**
+  Establish the reviewed V03 baseline (64 groups; 55 background
+  dismissals, six proposed merges, three retained; reconcile true
+  unassigned candidates with matching grouped JSON when available).
+  Compare improved candidate validation/prioritization against labelled
+  true-face and background examples. Distinguish detector candidate
+  precision from within-person grouping quality. Repeated observations,
+  group cardinality and cosine similarity are NOT face validators;
+  every true, even singleton or oblique, identifiable face must have
+  a reviewable path. Report dismissed/background groups, true people
+  covered, false merges, over-splits, group-cap saturation and
+  unassigned candidates. Meaningfully lower the false-group burden
+  versus baseline without losing any of V03's three actual people.
+- [ ] **GROUP-QUALITY-01 — Reuse proven still-photo grouping ideas.**
+  Evaluate `ProvisionalFaceDbscanClusterer`, the not-same/noise
+  semantics, and `ProvisionalFaceClusterKnownPersonAdvisory` from
+  M25/WI-0113–0116 against the current video streaming grouper,
+  with the SAME private reviewed cases and model-compatible vectors.
+  Adapt rather than copy photo DBSCAN thresholds, minimum-sample
+  rules or independent-photo vote counts; a single video frame may
+  be the only valid appearance and adjacent video frames are
+  correlated evidence. Never merge reliably simultaneous different
+  faces. Keep genuine uncertain/ungrouped evidence visible instead of
+  silently discarding it at a fixed 64-group ceiling. Prefer fewer
+  review groups but prioritize person coverage and zero known
+  wrong-person merges over perfect compression.
+- [ ] **SAMPLING-01 — Content- and duration-adaptive frames.**
+  The count of **frames sampled per video** (not frames per image)
+  is decided from the duration and observed content, rather than
+  fixed 12/24/36/120/180 choices. Make an initial whole-video
+  coverage pass; selectively increase temporal density at scene
+  changes, movement, possible entrances/exits, newly seen or
+  poorly observed people, and uncertain detections, including
+  background people. Avoid spending hundreds of frames on
+  unchanged scenes where additional frames add no information,
+  but NEVER stop evaluating the remainder of a video merely
+  because a known face was found early. Define a bounded,
+  deterministic/replayable plan, maximum unsampled temporal
+  gaps, CPU/time/frame/disk limits, safe chunking or explicit
+  continuation for longer videos, and an honest report when
+  coverage remains incomplete. Reuse existing WI-0155 extraction
+  safety and WI-0190's source-free planning concepts where
+  suitable; its current 24-frame limit and manually supplied
+  scene boundaries do not solve adaptive face discovery.
+- [ ] **CATALOGUE-TOP3-01 — Real full-archive recognition proof.**
+  Replace the selected-person (currently max 32, typically five)
+  experimental scope with a frozen, bounded, read-only view of
+  **every eligible canonical person** and compatible current SFace
+  still-photo exemplars. Implement actual per-person top-1/top-2/
+  top-3 identity+score ranking for reviewable groups using
+  uncorrelated/diverse evidence, not just the present runner-up
+  score. Evaluate operator-confirmed correct identity within top
+  1/2/3, wrong top-1 proposals, ambiguity, no-suggestion, unknown
+  and negatives across the *entire* catalogue. Preserve exact
+  model/hash/alignment, eligible assignment filtering, stable
+  snapshot provenance, privacy and separate read-only access.
+  An initial proof may rank human-confirmed true-face crops independently
+  of noisy groups; final acceptance requires group-level suggestions.
+  Do not auto-assign, create canonical tags or enrich photo
+  identity references with video crops/embeddings.
+- [ ] **DIVERSE-VIDEOS-01 — Expand the evaluation corpus.**
+  Retain V01–V03 as historical/regression cases (V03 especially
+  for hard distant-face/background grouping) and add **several
+  explicitly approved, already-local videos**, preferably four
+  to six if practical, spanning lighting, strong colour changes,
+  camera/subject motion, people entering/leaving or crossing,
+  identifiable people in the foreground and background,
+  short appearances, multiple known people, unknown people and
+  no-face/background negatives. Annotate by a human who is
+  actually visually identifiable and which intervals/persons
+  may be missed; an image of a person's body is not necessarily
+  a recognisable face. Measure per-video actual-person coverage,
+  false/fragmented/merged group burden, top-3 success, reviewed
+  workload, sample count and time. Avoid tuning solely to V03.
+- [ ] **MERGE-01 — Safety, integration and operator sign-off.**
+  Reconcile `wi-0155` with current `main`; verify focused
+  and repository tests, Windows PowerShell 7.6 synthetic tools,
+  bounded full-catalogue performance, frame hash/source integrity,
+  no PostgreSQL writes or unintended OneDrive hydration, private
+  report retention/cleanup, and absence of automatic processing.
+  Produce an aggregate per-video acceptance comparison and
+  document the chosen in-repository experimental boundary versus
+  a separate component, plus operational and rollback plan.
+  The maintainer explicitly accepts the evidence and integration
+  scope before a PR targets `main`.
+
+**Post-merge implementation, not pre-merge proof:** Production
+video/person presence persistence with transactional audit/correction,
+production review UI and executable merge/split/person association,
+automatic canonical assignment or still-photo three-tier workflow
+integration, scheduled/background processing, mass archive processing,
+cross-video person tracks and time-range identity history remain
+separately scoped. The isolated gallery can record manual decisions
+for evaluation; no production writes should be introduced to
+fulfil this proof.
+
+**Acceptance principle:** A video is not a success merely because
+the output has few groups: suppressing hard real faces would make
+the number look better. Equally, all three V03 people appearing
+somewhere among 64 noisy groups is not yet acceptable usability.
+Compare *person coverage + false merges + review burden + correct
+full-catalogue suggestions* together. Exact numerical quality gates
+can be set using the diversified, labelled evaluation corpus rather
+than by guessing thresholds from one difficult clip.
+
 ## Product direction (maintainer 2026-11-02)
 
 **Face recognition in videos is wanted**, but the architecture,

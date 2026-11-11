@@ -2327,3 +2327,95 @@ false-positive candidate grouping in subsequent
 independent WI-0155 experiments. A full rerun,
 new extraction or production DB access is not
 needed to measure the existing report.
+
+## Checkpoint 23 — revised merge target: adaptive all-person coverage (2026-11-11)
+
+This checkpoint records the **new pre-merge evaluation goal**, not
+a claim that the implementation has passed it. The authoritative gate
+is in the [WI-0155 work item](../delivery/work-items/WI-0155-video-face-processing-evaluation.md).
+Keep experimental changes on `wi-0155` or branches targeting it.
+
+### Reuse photo discovery evidence without copying its thresholds
+
+Review the existing photo paths in
+`src/PhotoIdentity.Core/Clustering/ProvisionalFaceDbscanClusterer.cs`,
+`ProvisionalFaceClusterKnownPersonAdvisory.cs`, and
+`docs/architecture/provisional-face-clustering.md`. Evaluate
+noise/uncertain grouping, exact-model distances, disagreement and
+explicit not-same evidence against the **same reviewed V03 inputs**.
+M25's independent still-photo votes do not correspond to adjacent
+correlated video samples; photo density parameters should not be
+adopted without a labelled video comparison. Separate face-candidate
+quality from clustering. In the V03 baseline, **55/64 groups were
+dismissed as background**, while **all nine nondismissed groups
+were singletons**. A minimum group-size or repeated-detection
+filter could discard all accepted true-face evidence.
+
+### Adaptive frame sampling requirements
+
+The current `New-VideoFaceCoverageFrames.ps1` samples one approved
+local window using a **manually selected fixed** 12, 24, 36, 120 or
+180 evenly spaced frames. Its ten-minute window, 180-frame loader,
+8 MiB per-frame bound and owned-workspace lifecycle are current
+safety contracts, **not an adaptive quality policy**. WI-0190's
+`VideoFrameSamplingPlanner` is a source-free general frame-evidence
+planner capped at 24 samples and needs *externally provided* scene
+boundaries; do not mistake it for an adaptive video-face sampler.
+
+Implement a versioned private sampling plan with an initial sweep
+of the whole approved video, measured or explicitly annotated
+motion/scene/entrance/exit signals and selective bounded refinement
+of sparse or uncertain areas. Frame counts must vary across videos,
+and the report should show duration, segments examined, selected
+timestamp distribution, largest uncovered temporal gap, total frames,
+processing time, budget exhaustion and skipped/deferred intervals.
+Do not stop sampling later intervals because a known person has been
+found. Long videos may be processed by separately approved contiguous
+windows under bounded resource budgets; never silently imply the
+unvisited portion was checked. Preserve original hashes, media
+exclusions, local-only/OneDrive safeguards, provenance and cleanup
+semantics. Use existing extracted images in regression tests first
+where possible, but a genuinely new adaptive sampling test will
+need approved source clips and extraction.
+
+### Expanded private comparison and evidence reporting
+
+Keep the already reviewed V03 group CSV + matching grouped JSON
+together for the same-run baseline. The existing measurement tool
+can reconcile `ObservationsUnassigned` if that JSON is supplied.
+For each new approved clip, record human-observed *identifiable*
+people, face candidates with an actual visible face, representation
+in at least one review group, missing people, false/non-face groups,
+split and incorrect-merge groups, distinct review actions needed,
+total/temporal coverage and processing time. Include new clips with
+motion, strong lighting/colour variations, foreground and background
+people, arrivals/departures, known and intentionally unknown people
+and no-face negatives.
+
+For full-catalogue matching, never present the current selected
+five-people/15-exemplar reports as evidence of correct recognition
+against the 100+ person archive. Existing
+`VideoFaceCatalogueCasesLoader.MaximumPeople=32` and
+`VideoFaceCataloguePersonMatcher.Rank` returning only top alias,
+top score and runner-up *score* must change before acceptance.
+First prove full-catalogue retrieval on human-verified true-face
+crops, independently of group quality; then integrate ranking into
+groups. Rank every eligible current person, return the actual top 3
+identities/scores per group, and record human-reviewed top-1/2/3
+coverage and wrong/unknown outcomes. Review evidence privately;
+only aggregate measures may enter GitHub.
+
+### Post-merge scope
+
+A successful evaluation plus explicit maintainer sign-off can
+support a controlled merge of the isolated capability. Production
+video/person presence writeback, review UI, executable person
+association, three-tier canonical auto/suggest/manual workflow,
+background scheduling, broad archive scanning and cross-video
+tracks are deliberately deferred to later work items. No video
+embedding or crop is enrolled into still-photo reference evidence.
+
+No new CLI flags or scripts are implied by this checkpoint;
+previous local procedures remain valid only for their **fixed**
+frame and **selected-catalogue** evaluations.
+
