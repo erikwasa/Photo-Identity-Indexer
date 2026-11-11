@@ -72,6 +72,60 @@ public sealed class CatalogueEvidenceTests
     }
 
     [Fact]
+    public void Full_archive_top_three_returns_distinct_people_not_three_photos()
+    {
+        // More than the old 32-person selected-scope ceiling; no DB or models.
+        VideoFaceCatalogueExemplar[] examples = Enumerable.Range(1, 256)
+            .Select(i => new VideoFaceCatalogueExemplar(
+                $"P{i:D4}", i.ToString("x64"),
+                i == 255 ? Vector(1, 0, 0) : Vector(0, 1, 0)))
+            .ToArray();
+        var matcher = new VideoFaceCataloguePersonMatcher(examples);
+        Assert.Equal(256, matcher.ReferenceCount);
+
+        var ranks = matcher.RankTopPeople(Vector(1, 0, 0));
+        Assert.Equal(new[] { "P0255", "P0001", "P0002" },
+            ranks.Select(r => r.Alias).ToArray());
+        Assert.Equal(3, ranks.Select(r => r.Alias).Distinct().Count());
+        Assert.Equal(1, ranks[0].Score);
+        Assert.Equal(0, ranks[1].Score);
+
+        var diagnostic = matcher.Diagnose(1, 100, 1, Vector(1, 0, 0));
+        Assert.Equal(3, diagnostic.TopCandidates!.Count);
+        Assert.Equal(ranks, diagnostic.TopCandidates);
+
+        var onePass = matcher.Evaluate(1, 100, 1, Vector(1, 0, 0));
+        Assert.Equal("P0255", onePass.Finding.CandidateAlias);
+        Assert.Equal("P0255", onePass.Diagnostic.TopCandidates![0].Alias);
+        Assert.DoesNotContain("PersonId", JsonSerializer.Serialize(onePass),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Group_ranking_combines_two_representatives_and_preserves_singletons()
+    {
+        var matcher = new VideoFaceCataloguePersonMatcher(
+        [
+            new("P01", new string('a', 64), Vector(1, 0, 0)),
+            new("P01", new string('b', 64), Vector(.99f, .14f, 0)),
+            new("P02", new string('c', 64), Vector(0, 1, 0)),
+            new("P03", new string('d', 64), Vector(0, 0, 1)),
+        ]);
+        var singleton = matcher.RankRepresentatives([Vector(1, 0, 0)]);
+        Assert.Equal(new[] { "P01", "P02", "P03" },
+            singleton.Select(r => r.Alias).ToArray());
+
+        var multi = matcher.RankRepresentatives(
+            [Vector(1, 0, 0), Vector(.95f, .31f, 0)]);
+        Assert.Equal("P01", multi[0].Alias);
+        Assert.Equal(3, multi.Count);
+        Assert.Throws<ArgumentException>(() =>
+            matcher.RankRepresentatives([]));
+        Assert.Throws<ArgumentException>(() =>
+            matcher.RankRepresentatives(Enumerable.Repeat(Vector(1, 0, 0), 6).ToArray()));
+    }
+
+    [Fact]
     public async Task Explicit_case_scope_requires_several_unique_local_clips_and_pseudonyms()
     {
         string root = Path.Combine(Path.GetTempPath(), "wi0155-catalogue-tests-" + Guid.NewGuid().ToString("N"));
@@ -92,6 +146,28 @@ public sealed class CatalogueEvidenceTests
                  new VideoFaceCatalogueCase("V02", second)]);
 
             VideoFaceCatalogueCasesLoader.Validate(selection, repo, casesDir);
+            VideoFaceCatalogueCases all = selection with
+            {
+                People = null,
+                CatalogueScope = "all-eligible"
+            };
+            VideoFaceCatalogueCasesLoader.Validate(all, repo, casesDir);
+            Assert.Throws<ArgumentException>(() =>
+                VideoFaceCatalogueCasesLoader.Validate(all with
+                {
+                    People = selection.People
+                }, repo, casesDir));
+            Assert.Throws<ArgumentException>(() =>
+                VideoFaceCatalogueCasesLoader.Validate(selection with
+                {
+                    CatalogueScope = "all-eligible"
+                }, repo, casesDir));
+            Assert.Throws<ArgumentException>(() =>
+                VideoFaceCatalogueCasesLoader.Validate(all with
+                {
+                    CatalogueScope = "typo"
+                }, repo, casesDir));
+
             Assert.Throws<ArgumentException>(() =>
                 VideoFaceCatalogueCasesLoader.Validate(selection with
                 {
@@ -125,6 +201,29 @@ public sealed class CatalogueEvidenceTests
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 VideoFaceCatalogueReportWriter.WriteAsync(reportPath, repo,
                     Path.Combine(casesDir, "cases.json"), [first, second], report));
+            string mapPath = Path.Combine(reportDirectory, "people-map.json");
+            Guid personId = selection.People![0].PersonId;
+            var map = new VideoFaceCataloguePrivatePersonMap(1, "1:1:",
+            [
+                new VideoFaceCataloguePrivatePersonMapEntry(
+                    "P0001", personId, "Private display name")
+            ]);
+            await VideoFaceCataloguePrivatePeopleMapWriter.WriteAsync(
+                mapPath, repo, Path.Combine(casesDir, "cases.json"),
+                [first, second], reportPath, map);
+            string mapJson = File.ReadAllText(mapPath);
+            Assert.Contains(personId.ToString(), mapJson, StringComparison.Ordinal);
+            Assert.Contains("Private display name", mapJson, StringComparison.Ordinal);
+            Assert.DoesNotContain(personId.ToString(), json, StringComparison.Ordinal);
+            Assert.Throws<ArgumentException>(() =>
+                VideoFaceCataloguePrivatePeopleMapWriter.ValidateTarget(
+                    mapPath, repo, Path.Combine(casesDir, "cases.json"),
+                    [first, second], reportPath));
+            Assert.Throws<ArgumentException>(() =>
+                VideoFaceCataloguePrivatePeopleMapWriter.ValidateTarget(
+                    reportPath, repo, Path.Combine(casesDir, "cases.json"),
+                    [first, second], reportPath));
+
         }
         finally
         {
