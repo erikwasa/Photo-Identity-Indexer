@@ -52,7 +52,13 @@ public sealed record VideoFaceRankedDiagnostic(
     double TopSimilarity,
     double? RunnerUpSimilarity,
     double? ScoreGap,
-    IReadOnlyList<VideoFaceThresholdCheck> ThresholdChecks);
+    IReadOnlyList<VideoFaceThresholdCheck> ThresholdChecks)
+{
+    // The actual top-three catalogue aliases/scores. Only present when the
+    // opt-in catalogue matcher is used; not a verified identity or assignment.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<VideoFaceCatalogueRank>? TopCandidates { get; init; }
+}
 
 public sealed record VideoFaceSensitivityDiagnostics(
     double RequestedDetectorConfidenceThreshold,
@@ -68,6 +74,9 @@ public sealed record VideoFaceSensitivityDiagnostics(
     // Never retain embeddings or treat a group alias as a recognized identity.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public VideoFaceProvisionalGroupReview? ProvisionalGroups { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<VideoFaceCatalogueGroupSuggestion>? GroupSuggestions { get; init; }
 
     // Model tensor size is *not* the decoded frame resolution. In multi-scale
     // mode every source region is separately projected onto that tensor.
