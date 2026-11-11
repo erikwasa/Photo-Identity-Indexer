@@ -79,14 +79,14 @@ try {
     }
     $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $json -Encoding utf8
 
-    $args = @{
+    $trial = @{
         ReviewedCsvPath=$csv
         PrivateGroupReportPath=$json
         PrivatePeopleMapPath=$mapFile
         ClipAlias='V03'
         ReviewBudgets=@(1,2,3,5)
     }
-    $result = @(& $script @args)
+    $result = @(& $script @trial)
     Check ($result.Count -eq 24) 'Expected six policies and four review budgets.'
     Check (@($result | Where-Object { $_.ReviewBudgetGroups -eq 5 }).Count -eq 6) 'Missing all-group comparisons.'
     foreach ($row in $result) {
@@ -117,7 +117,7 @@ try {
     # A missing human label means person-level recall is unknown, not zero.
     $rows[0].SelectedPerson = ''
     $rows | Export-Csv -LiteralPath $csv -NoTypeInformation -Encoding utf8
-    $partial = @(& $script @args)
+    $partial = @(& $script @trial)
     Check ($partial.Count -eq 24 -and
         $partial[0].HumanPersonLabelsComplete -eq $false -and
         $null -eq $partial[0].DistinctKnownPeopleShown -and
@@ -128,13 +128,13 @@ try {
     # Ambiguous/unreviewed groups must not be assumed to be background.
     $rows[4].Decision = ''
     $rows | Export-Csv -LiteralPath $csv -NoTypeInformation -Encoding utf8
-    Check (Rejects { & $script @args }) 'Unreviewed real-face group accepted.'
+    Check (Rejects { & $script @trial }) 'Unreviewed real-face group accepted.'
     $rows[4].Decision = 'Keep group'
     $rows | Export-Csv -LiteralPath $csv -NoTypeInformation -Encoding utf8
 
     $map.pgSnapshot='wrong'
     $map | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $mapFile -Encoding utf8
-    Check (Rejects { & $script @args }) 'Cross-snapshot map was accepted.'
+    Check (Rejects { & $script @trial }) 'Cross-snapshot map was accepted.'
 
     $raw = $result | ConvertTo-Json -Depth 6
     foreach ($private in @('G001','P0001','Private one','00000000-0000','review.csv','V03')) {
