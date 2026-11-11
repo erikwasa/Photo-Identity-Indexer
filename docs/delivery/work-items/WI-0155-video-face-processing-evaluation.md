@@ -1602,3 +1602,89 @@ candidate-quality/grouping design may use
 privately operator-reviewed examples as
 **evaluation labels**, but must not turn
 video crops into future identity reference data.
+
+## Experimental checkpoint 25 — full-catalogue V03 acceptance and private rank triage (2026-11-11)
+
+**PR #793 merged to \`wi-0155\`**, and its maintainer's focused C#,
+documentation, synthetic gallery, read-only snapshot, top-three structure,
+source-image hash, OneDrive exclusion and no-production-write checks passed.
+The separate canonical people archive contained **241 current people**,
+**240 eligible exact-SFace people**, and **596 current still-photo exemplars**
+(up to three independently sourced photos per eligible person).
+This confirms catalogue coverage/technical loading, **not face identification accuracy**.
+
+For the latest complete **180-frame V03** cohort, the report and review CSV
+agree on **3,912 post-retention detections = 407 assigned + 3,505 unassigned**;
+the **64-group cap** is exhausted. The 64 reviewed groups comprise
+**55 dismissed non-face/background groups (398 assigned observations)**,
+six proposed merges and three kept groups (nine single-observation
+true-face groups). The reviewer confirmed **three distinct identifiable
+people**, no wrong-person merge in the reviewed groups, but only **one**
+correct top-three match among **nine** genuine-face groups; **two of the three**
+known people never received a correct top-three suggestion in the reviewed
+groups. Both top-one and top-three success were reported for one group.
+**V01/V02 human accuracy is not yet reviewed**. The separate 2026-11-10
+baseline that had **335 assigned** observations was a **different** run;
+do not combine its counts with this 407-assigned report.
+
+**Interpretation:** This is a technical success of full-catalogue snapshot and
+top-three data shape, but an explicit **quality failure** of both
+review burden and meaningful full-archive recognition. Although 89.6% of
+candidate detections are unassigned, they are not proven non-faces;
+the first 64 groups are not a complete person inventory.
+The 55 dismissed groups contain 398/407 assigned observations (97.8%).
+An uncalibrated high cosine, high detector confidence, or multiple hits on
+background objects cannot justify a destructive face filter.
+Conversely, every operator-retained face group had only a singleton
+observation; a minimum group-support threshold could remove every
+reviewed true-face group. The fact that 240 of 241 people are eligible
+does not establish that the **specific** three visible people each have
+suitable/representative photo exemplars.
+
+### PR #794 — private, zero-inference diagnostic increment (in review)
+
+This increment remains isolated from \`main\` and changes **neither**
+YuNet, SFace, candidate retention, grouping cosine thresholds nor frame
+sampling. It closes a major observability gap before algorithm calibration:
+
+- The existing private group gallery now shows each group’s actual,
+  verified top-three catalogue **pseudonyms and cosine scores**, with
+  an uncertainty warning; no real person names/IDs, image embeddings or
+  automatic assignments are exposed. Older unranked reports remain valid.
+- \`Measure-VideoFaceGroupRankAccuracy.ps1\` uses an existing same-run
+  group CSV + full-catalogue evaluation JSON + private alias map,
+  checks group/snapshot/mapping consistency, and emits only aggregate
+  known-person top-one/top-three recall, missed/unlabelled/unknown groups,
+  64-group overflow counts, and separate human-dismissed vs retained
+  detector-confidence, crop-quality-proxy and catalogue-score medians.
+  Even a high score for a human-dismissed **non-face** stays a false
+  detection, not a person match. No inference, database or video reads.
+- Accuracy metrics are **null/not evaluated** when the group CSV's
+  optional \`SelectedPerson\` fields are empty. The V03 CSV currently has
+  no such labels, so its previously reported one-of-three result is
+  operator testimony, not a derived script claim. \`P0001\`-style labels
+  must be supplied privately from the separate map and \`UNKNOWN\` is
+  reserved for a genuine face absent from the eligible catalogue.
+- Synthetic Windows CI fixtures prove top-one/top-three accounting
+  by **distinct person** and by group, verify a high-scoring background
+  negative and a missed real person, reject corrupt ranks or map snapshots,
+  and ensure private names/aliases/paths never enter aggregate output.
+
+**Decision gate:** Run the synthetic checks in CI first. A **small local
+offline review only** of the existing V03 report/map and CSV is useful
+after PR #794 merges; no fresh PostgreSQL snapshot, full 180-frame YuNet/
+SFace pass or new video extraction is required. Continue towards
+candidate-quality filtering and non-saturating group review **only after**
+diagnostics show whether confidence/quality/rank signals actually separate
+the operator-labelled real faces from the 55 dismissed groups. Dedicated
+full-video adaptive frame sampling and multi-clip generalization remain
+open. Production video/person writes and UI remain deferred.
+
+**Acceptance progress:** \`WI0155-GROUP-03\` (actual full-archive top-three
+retrieval) implemented but **real accuracy not accepted**;
+\`WI0155-GROUP-05/09\` aggregate review and same-run reconciliation
+implemented, with new labelled top-k and negative-class diagnostics pending
+local review; \`WI0155-GROUP-01/10\` precision/saturation **not accepted**;
+adaptive coverage **not implemented**; \`WI0155-GROUP-06\` experimental
+isolation and read-only safeguards passed local checks but performance
+and diverse-videos acceptance remain pending.
