@@ -1688,3 +1688,77 @@ local review; `WI0155-GROUP-01/10` precision/saturation **not accepted**;
 adaptive coverage **not implemented**; `WI0155-GROUP-06` experimental
 isolation and read-only safeguards passed local checks but performance
 and diverse-videos acceptance remain pending.
+
+## Experimental checkpoint 26 — V03 labelled feature separation and review-budget counterfactual (2026-11-12)
+
+**PR #794 merged** into the isolated `wi-0155` experiment. The maintainer ran its
+private same-snapshot rank audit with **241 canonical people, 240 eligible,
+596 SFace reference exemplars, 3,912 retained V03 detections, 407 assigned,
+3,505 unassigned, all 64 groups reviewed**. Of the 64 reviewed groups, 55
+were dismissed non-faces and nine retained real-face singletons representing
+three known people; all nine groups received explicit private ground-truth
+person pseudonyms and zero wrong-person group merges were observed.
+Actual full-catalogue retrieval accuracy was **1/9 correct top-one groups,
+1/9 correct top-three groups, and 1/3 distinct people represented in the
+top three**. Two distinct people were missed. No group, real-face or
+dismissed background, reached exploratory catalogue cosine 0.80.
+
+The **median** feature separation was:
+
+| Reviewed class (group-level) | Detector confidence | Crop quality proxy | Top catalogue cosine |
+|---|---:|---:|---:|
+| 55 dismissed background/non-face groups | 0.5954 | 0.1080 | 0.3208 |
+| 9 retained genuine-face singleton groups | 0.6531 | 0.1949 | 0.4137 |
+
+This establishes **directional group-level differences**, not nonoverlapping
+classes or calibrated cutoffs. The existing 0.80 candidate-suggestion
+threshold offers no useful separation for the reviewed V03 groups, while a
+lower threshold may incorrectly assign background detections to real people.
+Do **not** reinterpret these similarity scores as face probabilities or
+assume any of the 3,505 unassigned detections are background.
+
+### PR #795 — deterministic, non-destructive counterfactual (development)
+
+A new strictly private `Compare-VideoFaceReviewPriority.ps1` analyzes the
+already annotated same-run CSV, report JSON and person alias map, first
+using the existing cross-snapshot/merge/rank validator. It compares six
+**label-independent** review orders (original group arrival, detector
+confidence, crop quality, top catalogue similarity, confidence+quality,
+and temporal-spread+quality) at small review budgets (8/16/32/48/64,
+and all available groups). No ground-truth label enters policy ranking.
+Results are *aggregate only*: true-face groups retained/omitted among
+the reviewed 64, dismissed non-face groups shown, distinct labelled
+people represented and people with a correct top-three candidate
+within the selected group subset. All policies leave the 3,505
+unassigned observations **unknown/unreviewed** and counted separately.
+No deletion/rejection or write occurs; the current grouping
+algorithm, detector, matcher, read-only PostgreSQL access, private
+video inputs and video sampling remain unchanged.
+
+- A candidate ordering is an **experiment** for reducing the first-pass
+  human-review workload, not a validated face filter or a new production
+  identification policy. Singleton preservation must be measured at every
+  proposed budget; never require repeat observations.
+- The temporal-spread heuristic uses frame positions of retained
+  representative crops, not validated scene boundaries or proven complete
+  sampling, and it is not adaptive extraction.
+- Synthetic Windows tests require zero private data, cover a high-score,
+  high-confidence *background object* outranking actual people, known
+  people absent from top-three, genuine unknown faces, missing identity
+  labels, invalid snapshots, aggregate privacy and conservation of all
+  labelled groups at the full review budget.
+- **Local acceptance:** run once on previously retained matching V03
+  evidence after CI passes. Compare policies and decide whether any
+  priority actually lowers background review work **without hiding any
+  of the three labelled people** at a smaller budget. No renewed ONNX
+  inference, SQL snapshots or video extraction needed for this checkpoint.
+
+**Status toward requirements:** `WI0155-GROUP-03` structural top-three
+and full-archive matching are complete but real accuracy **fails**;
+`GROUP-05/09` baseline and labelled diagnostics accepted;
+`GROUP-10` now has an offline candidate-ordering comparison
+but no deployed background rejection; `GROUP-01` capacity and
+person-level grouping still **fail** (64/64 groups, 3,505 unknown
+unassigned observations), and adaptive whole-video sampling and
+V01/V02 human verification remain open. Do not merge the experimental
+`wi-0155` branch into main until quality and safety gates pass.
