@@ -135,6 +135,8 @@ from a small reviewed test suite.
   and negatives across the *entire* catalogue. Preserve exact
   model/hash/alignment, eligible assignment filtering, stable
   snapshot provenance, privacy and separate read-only access.
+  An initial proof may rank human-confirmed true-face crops independently
+  of noisy groups; final acceptance requires group-level suggestions.
   Do not auto-assign, create canonical tags or enrich photo
   identity references with video crops/embeddings.
 - [ ] **DIVERSE-VIDEOS-01 — Expand the evaluation corpus.**
