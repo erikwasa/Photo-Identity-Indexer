@@ -2398,7 +2398,9 @@ against the 100+ person archive. Existing
 `VideoFaceCatalogueCasesLoader.MaximumPeople=32` and
 `VideoFaceCataloguePersonMatcher.Rank` returning only top alias,
 top score and runner-up *score* must change before acceptance.
-Rank every eligible current person, return the actual top 3
+First prove full-catalogue retrieval on human-verified true-face
+crops, independently of group quality; then integrate ranking into
+groups. Rank every eligible current person, return the actual top 3
 identities/scores per group, and record human-reviewed top-1/2/3
 coverage and wrong/unknown outcomes. Review evidence privately;
 only aggregate measures may enter GitHub.
