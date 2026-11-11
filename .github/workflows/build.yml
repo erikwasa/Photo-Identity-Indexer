@@ -197,6 +197,12 @@ jobs:
           }
           Write-Host 'Offline and manual-review runners parse and expose expected parameters.'
 
+      - name: Verify WI-0155 private ranked-group review (synthetic only)
+        shell: pwsh
+        run: |
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupReview.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupRankAccuracy.ps1
+
       - name: Verify WI-0208 restore-copy ownership guards
         shell: pwsh
         run: |
