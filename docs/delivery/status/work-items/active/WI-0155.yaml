@@ -5,39 +5,7 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0155-video-face-processing-evaluation.md
 started_at: 2026-11-05
-last_updated_at: 2026-11-07
-branch: wi-0155
-blockers:
-- WI-0151
-- WI-0188
-blocker_notes: []
-evidence:
-- type: pull_request
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/719
-- type: pull_request
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/740
-- type: pull_request
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/741
-- type: maintainer_verification
-  value: 2026-11-05 private two-frame one-clip pilot completed with 8 of 8 local verification checks passed, one detector hit, no known-person suggestion, source file hashes unchanged and human review of a few seconds; further diagnostics needed
-- type: pull_request
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/748
-- type: pull_request
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/751
-- type: maintainer_verification
-  value: 2026-11-07 private 36-frame one-clip pilot found both operator-observed people, 19 frames with faces and 21 face detections; a second sensitivity experiment compared baseline 14 groups with 12/11/9 multi-observation groups at 0.80/0.70/0.60; grouping remains exploratory and source hashes unchanged
-- type: maintainer_verification
-  value: 2026-11-07 maintainer redirected feasibility toward one useful observation per person across more approved local videos, read-only recognition from eligible existing identified-person catalogue evidence, and explicit deferred integrate-versus-separate decision; work stays on wi-0155
-- type: documentation
-  value: docs/operations/video-face-feasibility-wi0155.md
-id: WI-0155
-title: Evaluate face discovery and identity processing inside video
-milestone: M30
-status: in_progress
-owner: ai-agent
-document: ../work-items/WI-0155-video-face-processing-evaluation.md
-started_at: 2026-11-05
-last_updated_at: 2026-11-07
+last_updated_at: 2026-11-11
 branch: wi-0155
 blockers:
 - WI-0151
@@ -64,3 +32,13 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/757
 - type: documentation
   value: docs/operations/video-face-feasibility-wi0155.md
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/789
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/790
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/791
+- type: maintainer_verification
+  value: '2026-11-11: V03 human review found 64 provisional groups, 55 dismissed background groups, six proposed merges and three kept groups; all actual people represented, but review burden too high and full-catalogue top-three still pending.'
+- type: documentation
+  value: '2026-11-11: Pre-merge scope revised to reduced false groups, adaptive whole-video sampling, top-three against entire eligible catalogue and diverse local-video acceptance; production persistence and UI explicitly deferred.'
