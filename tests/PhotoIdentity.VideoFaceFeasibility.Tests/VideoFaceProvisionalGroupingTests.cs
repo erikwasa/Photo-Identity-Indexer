@@ -109,6 +109,36 @@ public sealed class VideoFaceProvisionalGroupingTests
     }
 
     [Fact]
+    public void Provisional_groups_get_three_private_person_candidates_without_vectors()
+    {
+        var grouper = new VideoFaceProvisionalGrouper();
+        grouper.Observe(1, 1000, 1, Vector(0), Face(), Native);
+        grouper.Observe(5, 5000, 1, Vector(0), Face(), Native);
+        grouper.Observe(7, 7000, 1, Vector(1), Face(), Native);
+        var matcher = new VideoFaceCataloguePersonMatcher(
+        [
+            new("P01", new string('a', 64), Vector(0)),
+            new("P02", new string('b', 64), Vector(1)),
+            new("P03", new string('c', 64), Vector(2)),
+        ]);
+
+        var suggestions = grouper.RankGroups(matcher);
+        Assert.Equal(2, suggestions.Count);
+        Assert.Equal("G001", suggestions[0].GroupAlias);
+        Assert.Equal(2, suggestions[0].GroupObservations);
+        Assert.Equal(2, suggestions[0].RepresentativeCount);
+        Assert.Equal("P01", suggestions[0].TopCandidates[0].Alias);
+        Assert.Equal("G002", suggestions[1].GroupAlias);
+        Assert.Equal(1, suggestions[1].RepresentativeCount);
+        Assert.Equal("P02", suggestions[1].TopCandidates[0].Alias);
+
+        string json = JsonSerializer.Serialize(suggestions);
+        Assert.DoesNotContain("Embedding", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Vector", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("PersonId", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Near_duplicate_with_lower_quality_does_not_replace_evidence()
     {
         var grouper = new VideoFaceProvisionalGrouper();
