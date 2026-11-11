@@ -18,7 +18,8 @@ public static class VideoFaceCatalogueRunner
         double DetectorConfidence,
         VideoFaceDetectorSelection Detection,
         VideoFaceOverflowPolicy OverflowPolicy,
-        bool ProvisionalGroups);
+        bool ProvisionalGroups,
+        string? PrivatePeopleMap);
 
     public static async Task<int> RunAsync(string[] args)
     {
@@ -28,6 +29,12 @@ public static class VideoFaceCatalogueRunner
             Options options = Parse(args);
             VideoFaceCatalogueCases cases = await VideoFaceCatalogueCasesLoader.LoadAsync(
                 options.Cases, options.Root);
+            bool allPeople = cases.CatalogueScope == "all-eligible";
+            if (allPeople != (options.PrivatePeopleMap is not null))
+            {
+                throw new ArgumentException(
+                    "all-eligible scope requires --private-people-map; selected scope forbids it.");
+            }
             var selected = new List<(VideoFaceCatalogueCase Clip, VideoFaceFrameSet Frames)>();
             foreach (VideoFaceCatalogueCase clip in cases.Clips!)
             {
@@ -40,6 +47,13 @@ public static class VideoFaceCatalogueRunner
                     _ = VideoFaceFrameSetLoader.ResolveApprovedFrame(folder, frame.File);
                 }
                 selected.Add((clip, frames));
+            }
+
+            if (options.PrivatePeopleMap is not null)
+            {
+                VideoFaceCataloguePrivatePeopleMapWriter.ValidateTarget(
+                    options.PrivatePeopleMap, options.Root, options.Cases,
+                    selected.Select(s => s.Clip.Manifest).ToArray(), options.PrivateReport);
             }
 
             stage = "model-verification";
@@ -69,8 +83,8 @@ public static class VideoFaceCatalogueRunner
             // Evidence is materialized once and the transaction is closed before
             // any video-frame inference. All clips see the SAME identity snapshot.
             stage = "catalogue-snapshot";
-            var (provenance, matcher) = await VideoFaceCatalogueEvidenceReader.LoadAsync(
-                cases, embedder.Descriptor);
+            var (provenance, matcher, privatePeopleMap) =
+                await VideoFaceCatalogueEvidenceReader.LoadAsync(cases, embedder.Descriptor);
             List<VideoFaceCatalogueClipReview> reviews = [];
             foreach (var (clip, frames) in selected)
             {
@@ -102,6 +116,14 @@ public static class VideoFaceCatalogueRunner
                 options.PrivateReport, options.Root, options.Cases,
                 selected.Select(s => s.Clip.Manifest).ToArray(),
                 new VideoFaceCatalogueEvaluationReport(1, provenance, reviews));
+            if (options.PrivatePeopleMap is not null)
+            {
+                await VideoFaceCataloguePrivatePeopleMapWriter.WriteAsync(
+                    options.PrivatePeopleMap, options.Root, options.Cases,
+                    selected.Select(s => s.Clip.Manifest).ToArray(), options.PrivateReport,
+                    new VideoFaceCataloguePrivatePersonMap(
+                        1, provenance.PgSnapshot, privatePeopleMap));
+            }
 
             // stdout is aggregate ONLY: no paths, catalogue IDs, names, aliases,
             // frames/timestamps, scores, ranks, vectors or private case mappings.
@@ -109,6 +131,9 @@ public static class VideoFaceCatalogueRunner
             {
                 schemaVersion = 1,
                 clipsEvaluated = reviews.Count,
+                fullEligibleCatalogue = allPeople,
+                canonicalPeople = provenance.SelectedPeople,
+                eligiblePeople = provenance.EligiblePeople,
                 framesExamined = reviews.Sum(r => r.Review.Aggregate.FramesExamined),
                 framesWithFaces = reviews.Sum(r => r.Review.Aggregate.FramesWithFaces),
                 facesDetected = reviews.Sum(r => r.Review.Aggregate.FacesDetected),
@@ -122,6 +147,9 @@ public static class VideoFaceCatalogueRunner
                 groupReviewRequested = options.ProvisionalGroups,
                 provisionalGroups = options.ProvisionalGroups
                     ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.Groups.Count)
+                    : 0,
+                groupsWithTopThree = options.ProvisionalGroups
+                    ? reviews.Sum(r => r.Review.Diagnostics!.GroupSuggestions!.Count)
                     : 0,
                 groupObservationsUnassigned = options.ProvisionalGroups
                     ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.ObservationsUnassigned)
@@ -146,6 +174,7 @@ public static class VideoFaceCatalogueRunner
     {
         string? cases = null;
         string? report = null;
+        string? peopleMap = null;
         string? root = null;
         string? models = null;
         string? detectorConfidence = null;
@@ -175,6 +204,7 @@ public static class VideoFaceCatalogueRunner
             {
                 case "--catalogue-cases" when cases is null: cases = value; break;
                 case "--private-report" when report is null: report = value; break;
+                case "--private-people-map" when peopleMap is null: peopleMap = value; break;
                 case "--root" when root is null: root = value; break;
                 case "--model-dir" when models is null: models = value; break;
                 case "--detector-confidence" when detectorConfidence is null:
@@ -219,7 +249,11 @@ public static class VideoFaceCatalogueRunner
             throw new ArgumentException(
                 "Candidate overflow retention requires explicit multiscale detection.");
         }
+        if (peopleMap is not null && !Path.IsPathFullyQualified(peopleMap))
+        {
+            throw new ArgumentException("Private people map requires a fully qualified path.");
+        }
         return new Options(cases, report, repo, dir, threshold, selected, policy,
-            provisionalGroups);
+            provisionalGroups, peopleMap);
     }
 }
