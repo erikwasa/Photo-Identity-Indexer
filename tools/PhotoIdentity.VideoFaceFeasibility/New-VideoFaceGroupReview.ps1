@@ -52,7 +52,8 @@ $groups = @($groupReview.groups)
 # For new catalogue reports, require rank evidence for exactly these groups.
 # Older reports without group suggestions remain valid and reviewable.
 $rankings = @{}
-$hasRankings = $null -ne $clip.review.diagnostics.groupSuggestions
+$hasRankings = $null -ne $clip.review.diagnostics.PSObject.Properties['groupSuggestions'] -and
+  $null -ne $clip.review.diagnostics.groupSuggestions
 if ($hasRankings) {
   $provided = @($clip.review.diagnostics.groupSuggestions)
   if ($provided.Count -ne $groups.Count) {
