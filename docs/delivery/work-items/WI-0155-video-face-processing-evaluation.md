@@ -1605,7 +1605,7 @@ video crops into future identity reference data.
 
 ## Experimental checkpoint 25 — full-catalogue V03 acceptance and private rank triage (2026-11-11)
 
-**PR #793 merged to \`wi-0155\`**, and its maintainer's focused C#,
+**PR #793 merged to `wi-0155`**, and its maintainer's focused C#,
 documentation, synthetic gallery, read-only snapshot, top-three structure,
 source-image hash, OneDrive exclusion and no-production-write checks passed.
 The separate canonical people archive contained **241 current people**,
@@ -1643,7 +1643,7 @@ suitable/representative photo exemplars.
 
 ### PR #794 — private, zero-inference diagnostic increment (in review)
 
-This increment remains isolated from \`main\` and changes **neither**
+This increment remains isolated from `main` and changes **neither**
 YuNet, SFace, candidate retention, grouping cosine thresholds nor frame
 sampling. It closes a major observability gap before algorithm calibration:
 
@@ -1651,7 +1651,7 @@ sampling. It closes a major observability gap before algorithm calibration:
   verified top-three catalogue **pseudonyms and cosine scores**, with
   an uncertainty warning; no real person names/IDs, image embeddings or
   automatic assignments are exposed. Older unranked reports remain valid.
-- \`Measure-VideoFaceGroupRankAccuracy.ps1\` uses an existing same-run
+- `Measure-VideoFaceGroupRankAccuracy.ps1` uses an existing same-run
   group CSV + full-catalogue evaluation JSON + private alias map,
   checks group/snapshot/mapping consistency, and emits only aggregate
   known-person top-one/top-three recall, missed/unlabelled/unknown groups,
@@ -1660,10 +1660,10 @@ sampling. It closes a major observability gap before algorithm calibration:
   Even a high score for a human-dismissed **non-face** stays a false
   detection, not a person match. No inference, database or video reads.
 - Accuracy metrics are **null/not evaluated** when the group CSV's
-  optional \`SelectedPerson\` fields are empty. The V03 CSV currently has
+  optional `SelectedPerson` fields are empty. The V03 CSV currently has
   no such labels, so its previously reported one-of-three result is
-  operator testimony, not a derived script claim. \`P0001\`-style labels
-  must be supplied privately from the separate map and \`UNKNOWN\` is
+  operator testimony, not a derived script claim. `P0001`-style labels
+  must be supplied privately from the separate map and `UNKNOWN` is
   reserved for a genuine face absent from the eligible catalogue.
 - Synthetic Windows CI fixtures prove top-one/top-three accounting
   by **distinct person** and by group, verify a high-scoring background
@@ -1680,11 +1680,11 @@ the operator-labelled real faces from the 55 dismissed groups. Dedicated
 full-video adaptive frame sampling and multi-clip generalization remain
 open. Production video/person writes and UI remain deferred.
 
-**Acceptance progress:** \`WI0155-GROUP-03\` (actual full-archive top-three
+**Acceptance progress:** `WI0155-GROUP-03` (actual full-archive top-three
 retrieval) implemented but **real accuracy not accepted**;
-\`WI0155-GROUP-05/09\` aggregate review and same-run reconciliation
+`WI0155-GROUP-05/09` aggregate review and same-run reconciliation
 implemented, with new labelled top-k and negative-class diagnostics pending
-local review; \`WI0155-GROUP-01/10\` precision/saturation **not accepted**;
-adaptive coverage **not implemented**; \`WI0155-GROUP-06\` experimental
+local review; `WI0155-GROUP-01/10` precision/saturation **not accepted**;
+adaptive coverage **not implemented**; `WI0155-GROUP-06` experimental
 isolation and read-only safeguards passed local checks but performance
 and diverse-videos acceptance remain pending.
