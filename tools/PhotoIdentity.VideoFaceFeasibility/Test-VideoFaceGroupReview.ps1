@@ -55,7 +55,18 @@ try {
   $reportPath=Join-Path $private 'report.json'
   @{schemaVersion=1;clips=@(
       @{alias='V03';review=@{aggregate=@{framesExamined=5;facesDetected=6};
-        diagnostics=@{provisionalGroups=$groups}}},
+        diagnostics=@{
+          provisionalGroups=$groups
+          groupSuggestions=@(
+            @{
+              groupAlias='G001';groupObservations=5;representativeCount=5
+              topCandidates=@(
+                @{alias='P0001';score=.9234},
+                @{alias='P0002';score=.8123}
+              )
+            }
+          )
+        }}},
       @{alias='V01';review=@{aggregate=@{framesExamined=5;facesDetected=0};
         diagnostics=@{provisionalGroups=$null}}}
     )} | ConvertTo-Json -Depth 12 |
@@ -69,6 +80,8 @@ try {
     $gallery.UnassignedObservations -eq 1) 'Group/crop/unassigned totals differ.'
   $html=Get-Content -LiteralPath $gallery.GalleryPath -Raw
   Check ($html.Contains('G001') -and $html.Contains('crops/V03-G001-05.png') -and
+    $html.Contains('Top-2 catalogue suggestions') -and
+    $html.Contains('P0001') -and $html.Contains('0.9234') -and
     $html.Contains('Split required') -and $html.Contains('Save group-review CSV') -and
     $html.Contains('hide-dismissed') -and $html.Contains('repeat-only') -and
     $html.Contains('quick-dismiss')) 'Expected five-crop review and triage controls are missing.'
@@ -91,7 +104,22 @@ try {
     Set-Content -LiteralPath $legacyPath -Encoding utf8
   $legacy = & $script -PrivateReportPath $legacyPath -PrivateCasesPath $casesPath -ClipAlias V03
   Check ($legacy.Crops -eq 3) 'Legacy three-crop group reports no longer work.'
+  $legacyHtml = Get-Content -LiteralPath $legacy.GalleryPath -Raw
+  Check ($legacyHtml.Contains('Top-three catalogue suggestions not available') -and
+    -not $legacyHtml.Contains('0.9234')) 'Older unranked gallery incorrectly claimed ranked evidence.'
   $group.representativeCrops=$samples
+
+  # Reject incomplete or contradictory group-ranking diagnostics.
+  $badRanks = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+  $badRanks.clips[0].review.diagnostics.groupSuggestions[0].topCandidates[1].alias='P0001'
+  $badRanksPath=Join-Path $private 'invalid-ranking-report.json'
+  $badRanks | ConvertTo-Json -Depth 20 |
+    Set-Content -LiteralPath $badRanksPath -Encoding utf8
+  $rankRefused=$false
+  try {
+    & $script -PrivateReportPath $badRanksPath -PrivateCasesPath $casesPath -ClipAlias V03 | Out-Null
+  } catch { $rankRefused=$true }
+  Check $rankRefused 'Duplicated top-three catalogue aliases were accepted.'
 
   $sample2.x=.9
   $badPath=Join-Path $private 'invalid-report.json'

@@ -42,3 +42,9 @@ evidence:
   value: '2026-11-11: V03 human review found 64 provisional groups, 55 dismissed background groups, six proposed merges and three kept groups; all actual people represented, but review burden too high and full-catalogue top-three still pending.'
 - type: documentation
   value: '2026-11-11: Pre-merge scope revised to reduced false groups, adaptive whole-video sampling, top-three against entire eligible catalogue and diverse local-video acceptance; production persistence and UI explicitly deferred.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/793
+- type: maintainer_verification
+  value: '2026-11-11 PR793 local acceptance: 241 canonical people, 240 eligible, 596 exemplars; V03 180 frames, 3912 retained detections, 64 groups, 407 assigned and 3505 unassigned; 55 dismissed background groups (398 observations); 9 retained singleton face groups for 3 people, only 1 correct top-three person, 2 distinct known people missed; no wrong merges observed; V01/V02 human accuracy pending.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/794

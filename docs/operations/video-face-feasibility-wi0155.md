@@ -2504,3 +2504,92 @@ feature has passed CI and before declaring `CATALOGUE-TOP3-01`
 accepted; additional detector/grouping/sampler development may proceed
 independently before that local acceptance.
 
+## Checkpoint 25 — PR #794: offline top-three group inspection and reviewed accuracy
+
+This checkpoint follows the **merged PR #793** full-catalogue run and the
+maintainer's 2026-11-11 V03 review: 241 canonical people, 240 eligible people,
+**596** current still-photo exemplars; 180 V03 frames; 3,912 retained
+detector candidates, **407 assigned** to 64 groups and **3,505 unassigned**.
+The matching 64-row review CSV identified **55 background/non-face groups**
+containing **398** assigned detections; three kept and six proposed merges
+are nine single-observation genuine-face groups, corresponding to three
+identifiable people. Only one genuine group/person received the correct
+top-three candidate. V01/V02 human accuracy is still not reviewed.
+This is a *failed precision and recognition acceptance result*, not a
+database/CLI or JSON-structure regression.
+
+PR #794 provides **no new detector, face-crop, grouping or identity
+algorithm**, only more reliable human diagnostic access. It does not use
+PostgreSQL, approved ONNX models, FFmpeg, OneDrive or source media to
+calculate reviewed accuracy. The group gallery now displays the actual
+up-to-three **private pseudonyms** and scores from a PR #793 report;
+a score is not a face-validity or identity probability. Old rankless
+reports remain inspectable. The revised offline measure validates
+that a CSV, its group JSON and private person alias map describe the
+same experiment/snapshot, and produces **aggregate-only** top-one/top-three
+human-review accuracy and group-level score/quality signal comparisons.
+
+### Windows PowerShell 7.6: no-inference verification after merge
+
+Use your existing separate `wi-0155` worktree and previously generated
+**matching** V03 full-catalogue JSON, case JSON, private person map and saved
+group CSV. Do **not** rerun 180-frame inference just for this step.
+
+```powershell
+$wiRoot = 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+Set-Location $wiRoot
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+
+# Synthetic fixtures: no personal media, SFace, DB or network.
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupReview.ps1
+if (-not $?) { throw 'Ranked gallery synthetic test failed' }
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupRankAccuracy.ps1
+if (-not $?) { throw 'Private rank audit synthetic test failed' }
+
+# Replace these four values with your EXISTING matching local files.
+$casesPath = 'C:\Private\WI0155\cases\cases.json'
+$reportPath = 'C:\Private\WI0155\reports\evaluation.json'
+$mapPath = 'C:\Private\WI0155\reports\people-map.json'
+$csvPath = 'C:\Private\WI0155\reports\saved-group-review.csv'
+
+$gallery = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceGroupReview.ps1 -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias V03 -OpenGallery
+$gallery.Groups
+$gallery.UnassignedObservations
+
+# Safe even before identity labels are populated: missing recall is null.
+$comparison = .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceGroupRankAccuracy.ps1 -ReviewedCsvPath $csvPath -PrivateGroupReportPath $reportPath -PrivatePeopleMapPath $mapPath -ClipAlias V03
+$comparison | Format-List
+```
+
+If you want measured human top-three accuracy, **import the saved CSV**
+into the new group gallery. For the nine reviewed genuine-face groups,
+fill `SelectedPerson` with the **correct private P0001/P0002... alias**
+from the separate people map (repeat the same alias across groups
+representing the same person), or `UNKNOWN` only for a genuine face
+with no eligible catalogue identity. Do not type real names/UUIDs.
+Keep false-positive groups dismissed and without a person alias.
+Save a **new** CSV under your private local folder, set `$csvPath`
+to that new file and rerun the aggregate measurement (not inference).
+Unlabelled genuine groups remain unmeasured; the tool deliberately
+reports **null**, not zero, when no known-person labels exist.
+
+Report back only `InputEvidenceValidated`, `KnownPeople...` counts,
+`CorrectTop1Groups`, `CorrectTop3Groups`, false-group exploratory
+lead counts, group/class medians and the assigned/unassigned totals.
+Keep the private JSON, person map, individual rankings and any
+annotated group CSV **outside Git, CI, chats and public issue comments**.
+A review CSV must come from **the same exact inference report**:
+the 2026-11-10 335-assigned baseline must not be paired with
+2026-11-11 407-assigned diagnostics.
+
+The purpose of the class-level aggregate medians is to decide whether
+the reviewed true-face and background groups have any separable
+confidence, geometry-quality or similarity signals before attempting
+a non-destructive face-validation rule. Do not tune fixed cutoffs from
+the nine genuine singleton groups or infer that the **3,505 unassigned**
+detections were background. Even if these diagnostics look promising,
+a later targeted local inference comparison must still prove true-face
+retention, reduced review effort and useful person-level top three.
+Full-duration adaptive video sampling remains a separate gate.

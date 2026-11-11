@@ -49,6 +49,45 @@ if ($null -eq $groupReview -or $groupReview.schemaVersion -ne 1 -or
   throw 'The report lacks validated opt-in provisional groups.'
 }
 $groups = @($groupReview.groups)
+# For new catalogue reports, require rank evidence for exactly these groups.
+# Older reports without group suggestions remain valid and reviewable.
+$rankings = @{}
+$hasRankings = $null -ne $clip.review.diagnostics.PSObject.Properties['groupSuggestions'] -and
+  $null -ne $clip.review.diagnostics.groupSuggestions
+if ($hasRankings) {
+  $provided = @($clip.review.diagnostics.groupSuggestions)
+  if ($provided.Count -ne $groups.Count) {
+    throw 'Group rank suggestions do not match group count.'
+  }
+  foreach ($item in $provided) {
+    $id = [string]$item.groupAlias
+    if ($id -cnotmatch '^G(?!000)[0-9]{3}$' -or
+        $rankings.ContainsKey($id) -or
+        [int]$item.representativeCount -lt 1 -or
+        [int]$item.representativeCount -gt 5 -or
+        [int]$item.groupObservations -lt 1) {
+      throw 'Invalid or duplicate private group ranks.'
+    }
+    $candidates = @($item.topCandidates)
+    if ($candidates.Count -lt 1 -or $candidates.Count -gt 3) {
+      throw 'Unexpected private group rank count.'
+    }
+    $aliases = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $previous = [double]::PositiveInfinity
+    foreach ($candidate in $candidates) {
+      $alias = [string]$candidate.alias
+      $score = [double]$candidate.score
+      if ($alias -cnotmatch '^P([0-9]{2}|[0-9]{4})$' -or
+          -not $aliases.Add($alias) -or
+          -not [double]::IsFinite($score) -or
+          $score -lt -1 -or $score -gt 1 -or $score -gt $previous) {
+        throw 'Invalid or unsorted private top-three scores.'
+      }
+      $previous = $score
+    }
+    $rankings[$id] = $item
+  }
+}
 if ($groups.Count -lt 1 -or $groups.Count -gt 64) {
   throw 'Expected 1 to 64 provisional groups.'
 }
@@ -74,6 +113,13 @@ $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($group in $groups) {
   $alias = [string]$group.alias
   $crops = @($group.representativeCrops)
+  if ($hasRankings) {
+    if (-not $rankings.ContainsKey($alias) -or
+        [int]$rankings[$alias].groupObservations -ne [int]$group.observations -or
+        [int]$rankings[$alias].representativeCount -ne $crops.Count) {
+      throw 'Private ranked group does not match its review crops.'
+    }
+  }
   if ($alias -cnotmatch '^G(?!000)[0-9]{3}$' -or -not $seen.Add($alias) -or
       [int]$group.observations -lt 1 -or $crops.Count -lt 1 -or
       $crops.Count -gt 5 -or $crops.Count -gt [int]$group.observations) {
@@ -185,13 +231,13 @@ textarea{min-height:62px;resize:vertical}.grid{display:grid;grid-template-column
 .photos img{max-height:160px;max-width:100%;object-fit:contain;background:#08101a;border-radius:3px}
 .group-card label{display:block;color:#c3d5e2;font-size:12px;margin:8px 0 3px}
 .group-card small{color:#aebfcf}.warning{border-left:3px solid #f1bb61;padding-left:12px;margin:16px 0}
-.group-card[hidden]{display:none}.toolbar label{display:inline-flex;align-items:center;gap:6px;color:#d7e5f0}
+.group-card[hidden]{display:none}.ranked{background:#122536;border:1px solid #4b6479;padding:8px;border-radius:5px;margin-top:8px;font-size:13px}.ranked ol{margin:4px 0 0;padding-left:23px}.ranked li{margin:3px 0}.ranked small{font-weight:normal}.toolbar label{display:inline-flex;align-items:center;gap:6px;color:#d7e5f0}
 .toolbar input[type=checkbox]{width:auto}.quick-dismiss{background:#60434c;margin-top:8px}
 </style></head><body><main><h1>WI-0155 · Provisional groups</h1>
 <p class="note">Each card contains a few representative detected-face crops from one provisional group. Groups are not confirmed people: multiple people can be incorrectly merged, one person can appear in several groups, and a group may contain no real face. Video face crops and embeddings are NEVER enrolled as future references.</p>
-<p class="note">Review locally: Keep group, Merge group (enter the other G-number), Split required, Dismiss false detection, or Cannot tell. Use the one-click dismiss control for obvious background objects. SelectedPerson is optional private text. These controls only annotate a local CSV: they DO NOT merge, identify or modify anything in the database.</p>
+<p class="note">Review locally: Keep group, Merge group (enter the other G-number), Split required, Dismiss false detection, or Cannot tell. Use the one-click dismiss control for obvious background objects. SelectedPerson should be a private P01/P0001 alias (or UNKNOWN for a visible person without an eligible catalogue entry), never a real name. These controls only annotate a local CSV: they DO NOT merge, identify or modify anything in the database.</p>
 <p class="note">Background objects can receive many detector hits, so observation count alone does NOT measure face-likeness. Optional view filters only hide cards temporarily, never drop evidence or remove rows from your saved CSV. Inspect lower-support groups too before declaring that a person is absent. Newer group reports contain up to five representative crops; older three-crop reports remain valid.</p>
-<p class="note">Full-catalogue top-3 identity suggestions are not yet implemented; the legacy experiment ranks against only five selected people. No video timestamps are displayed.</p>
+<p class="note">Newer reports show top-three <b>pseudonym aliases</b> and exploratory cosine scores for each group, not names or verified identities. Low scores and small score gaps are uncertain; scores cannot tell whether a crop is a real face. Resolve aliases only with the separate local private people map. Older reports show no group ranks. No video timestamps are displayed.</p>
 <div class="toolbar"><button id="save-groups" type="button">Save group-review CSV</button><button id="import-groups" type="button">Import saved CSV</button><label><input id="hide-dismissed" type="checkbox" checked> Hide dismissed</label><label><input id="repeat-only" type="checkbox"> Show groups with 3+ observations only</label><input id="groups-file" type="file" accept=".csv,text/csv" hidden><span id="group-status" aria-live="polite"></span></div>
 '@)
 if ([int]$groupReview.observationsUnassigned -gt 0) {
@@ -204,8 +250,30 @@ foreach ($row in $rows) {
   $pictures=($imgs | ForEach-Object {
     '<img loading="lazy" src="{0}" alt="Representative review crop">' -f (Esc $_.Relative)
   }) -join ''
-  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div><label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="G002"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
-    (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures))
+  $rankHtml='<div class="ranked">Top-three catalogue suggestions not available in this report.</div>'
+  if ($hasRankings) {
+    $ranked=@($rankings[$row.Group].topCandidates)
+    $list=($ranked | ForEach-Object {
+      '<li>{0} — {1:F4}</li>' -f (Esc $_.alias),([double]$_.score)
+    }) -join ''
+    $best=[double]$ranked[0].score
+    $margin=if ($ranked.Count -gt 1) {
+      $best-[double]$ranked[1].score
+    } else { $null }
+    $status=if ($best -lt 0.8) {
+      'Below exploratory review threshold'
+    } elseif ($null -eq $margin) {
+      'Single reference: uncertain'
+    } elseif ($margin -lt 0.05) {
+      'Ambiguous between top people'
+    } else {
+      'Potential review lead, NOT an identification'
+    }
+    $rankHtml='<div class="ranked"><strong>Top-{0} catalogue suggestions</strong><small> · {1}</small><ol>{2}</ol></div>' -f
+      $ranked.Count,(Esc $status),$list
+  }
+  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="G002"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
+    (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures,$rankHtml))
 }
 $html.Add('</div><p class="note">The intended outcome is one manageable group per real person, not hundreds of face observations. Export your review CSV before leaving.</p></main><script src="group-review.js"></script></body></html>')
 $page=Join-Path $folder 'group-review.html'
