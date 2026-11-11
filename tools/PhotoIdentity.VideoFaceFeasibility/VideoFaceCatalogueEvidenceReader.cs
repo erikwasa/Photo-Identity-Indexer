@@ -56,7 +56,7 @@ public static class VideoFaceCatalogueEvidenceReader
             JOIN public.assets AS asset ON asset.id = revision.asset_id
             JOIN public.face_crops AS crop ON crop.face_occurrence_id = face.id
             JOIN public.embeddings AS embedding ON embedding.face_crop_id = crop.id
-            WHERE confirmed.person_id = ANY(@people)
+            WHERE (@all_people OR confirmed.person_id = ANY(@people))
               AND asset.deleted_at_utc IS NULL
               AND asset.media_kind = 'photo'
               AND revision.media_kind = 'photo'
@@ -85,7 +85,8 @@ public static class VideoFaceCatalogueEvidenceReader
 
     public static async Task<(
         VideoFaceCatalogueProvenance Provenance,
-        VideoFaceCataloguePersonMatcher Matcher)> LoadAsync(
+        VideoFaceCataloguePersonMatcher Matcher,
+        IReadOnlyList<VideoFaceCataloguePrivatePersonMapEntry> PeopleMap)> LoadAsync(
         VideoFaceCatalogueCases cases, ModelDescriptor model,
         CancellationToken cancellationToken = default)
     {
@@ -105,9 +106,11 @@ public static class VideoFaceCatalogueEvidenceReader
             throw new ArgumentException("Only the approved exact SFace identity and alignment may be queried.");
         }
 
-        if (cases.People is not { Count: >= 1 and <= VideoFaceCatalogueCasesLoader.MaximumPeople })
+        bool all = cases.CatalogueScope == "all-eligible" && cases.People is null;
+        if (!all && (cases.CatalogueScope is not null ||
+            cases.People is not { Count: >= 1 and <= VideoFaceCatalogueCasesLoader.MaximumPeople }))
         {
-            throw new ArgumentException("No bounded, explicit catalogue person selection was supplied.");
+            throw new ArgumentException("No valid selected or all-eligible catalogue scope was supplied.");
         }
 
         string connectionString = Environment.GetEnvironmentVariable(ConnectionEnvironmentVariable)
@@ -193,11 +196,52 @@ public static class VideoFaceCatalogueEvidenceReader
             lastEmbedding = reader.GetInt64(3);
         }
 
-        Dictionary<Guid, string> aliases = cases.People.ToDictionary(p => p.PersonId, p => p.Alias);
+        Dictionary<Guid, string> aliases;
+        List<VideoFaceCataloguePrivatePersonMapEntry> peopleMap = [];
+        if (all)
+        {
+            // All current canonical people, including those without eligible
+            // matching SFace evidence, are counted. Only eligible people can
+            // appear in rankings. The private map is operator-only.
+            await using var people = new NpgsqlCommand("""
+                SELECT id, display_name
+                FROM public.people
+                WHERE merged_into_person_id IS NULL
+                ORDER BY id
+                LIMIT @maximum_plus_one;
+                """, connection, transaction);
+            people.Parameters.AddWithValue("maximum_plus_one",
+                VideoFaceCatalogueCasesLoader.MaximumAllPeople + 1);
+            await using var reader = await people.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                int count = peopleMap.Count + 1;
+                if (count > VideoFaceCatalogueCasesLoader.MaximumAllPeople)
+                {
+                    throw new InvalidOperationException(
+                        "Entire canonical people archive exceeds the explicit evaluation safety bound.");
+                }
+
+                peopleMap.Add(new VideoFaceCataloguePrivatePersonMapEntry(
+                    $"P{count:D4}", reader.GetGuid(0),
+                    reader.IsDBNull(1) ? null : reader.GetString(1)));
+            }
+            if (peopleMap.Count == 0)
+            {
+                throw new InvalidOperationException("No canonical people were available in the snapshot.");
+            }
+            aliases = peopleMap.ToDictionary(p => p.PersonId, p => p.Alias);
+        }
+        else
+        {
+            aliases = cases.People!.ToDictionary(p => p.PersonId, p => p.Alias);
+        }
+
         var exemplars = new List<VideoFaceCatalogueExemplar>();
         await using (var command = new NpgsqlCommand(EvidenceQuery, connection, transaction))
         {
-            command.Parameters.AddWithValue("people", aliases.Keys.ToArray());
+            command.Parameters.AddWithValue("all_people", all);
+            command.Parameters.AddWithValue("people", all ? Array.Empty<Guid>() : aliases.Keys.ToArray());
             command.Parameters.AddWithValue("model_id", modelId);
             command.Parameters.AddWithValue("model_hash", modelHash);
             command.Parameters.AddWithValue("alignment", alignment);
@@ -240,15 +284,16 @@ public static class VideoFaceCatalogueEvidenceReader
         await transaction.RollbackAsync(cancellationToken);
 
         if (exemplars.Count == 0 ||
-            aliases.Values.Except(exemplars.Select(e => e.PersonAlias), StringComparer.Ordinal).Any())
+            (!all && aliases.Values.Except(
+                exemplars.Select(e => e.PersonAlias), StringComparer.Ordinal).Any()))
         {
-            throw new InvalidOperationException("At least one selected person has no eligible exact-model exemplar.");
+            throw new InvalidOperationException("No eligible exact-model exemplars for the requested catalogue scope.");
         }
 
         var provenance = new VideoFaceCatalogueProvenance(
             captured, snapshot, modelId, modelHash, alignment,
-            cases.People.Count, exemplars.Select(e => e.PersonAlias).Distinct().Count(),
+            aliases.Count, exemplars.Select(e => e.PersonAlias).Distinct().Count(),
             exemplars.Count, lastReview, lastEmbedding);
-        return (provenance, new VideoFaceCataloguePersonMatcher(exemplars));
+        return (provenance, new VideoFaceCataloguePersonMatcher(exemplars), peopleMap);
     }
 }

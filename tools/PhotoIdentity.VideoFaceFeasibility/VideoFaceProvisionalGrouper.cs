@@ -154,6 +154,27 @@ public sealed class VideoFaceProvisionalGrouper
                 .ThenBy(g => g.Alias, StringComparer.Ordinal)
                 .ToArray());
 
+    /// <summary>
+    /// Read-only advisory ranks for the retained in-memory group representatives.
+    /// Must be called before the grouper is discarded; no embeddings are serialized.
+    /// Unassigned observations are never misrepresented as ranked groups.
+    /// </summary>
+    public IReadOnlyList<VideoFaceCatalogueGroupSuggestion> RankGroups(
+        VideoFaceCataloguePersonMatcher matcher)
+    {
+        ArgumentNullException.ThrowIfNull(matcher);
+        return _groups
+            .OrderByDescending(g => g.Observations)
+            .ThenBy(g => g.Alias, StringComparer.Ordinal)
+            .Select(group => new VideoFaceCatalogueGroupSuggestion(
+                group.Alias,
+                group.Representatives.Count,
+                group.Observations,
+                matcher.RankRepresentatives(
+                    group.Representatives.Select(r => r.Vector).ToArray())))
+            .ToArray();
+    }
+
     private static void RetainDiverseRepresentative(Group group,
         EmbeddingVector embedding, VideoFaceGroupCrop crop)
     {

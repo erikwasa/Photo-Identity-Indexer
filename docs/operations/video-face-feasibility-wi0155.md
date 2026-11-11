@@ -2419,3 +2419,88 @@ No new CLI flags or scripts are implied by this checkpoint;
 previous local procedures remain valid only for their **fixed**
 frame and **selected-catalogue** evaluations.
 
+## Checkpoint 24 — full-eligible-catalogue top-three code (PR #793, pending local acceptance)
+
+**Development only; not proof that the correct identity is retrieved on real footage.**
+The isolated experiment now supports either (a) historical named/pseudonymized
+1–32 selected-person cases or (b) explicitly requested **all-eligible**
+catalogue cases against a read-only PostgreSQL snapshot of **all current,
+unmerged canonical people**, up to an explicit 4,096-person safety ceiling.
+For each canonical person, only current eligible photo-origin exact SFace
+exemplars participate, at most three distinct-content photo samples.
+A person without any eligible exact-model exemplar cannot be recognized by
+this experiment and is counted in the canonical-versus-eligible provenance.
+Never equate `eligiblePeople` with the full canonical roster.
+
+### Input and private-map contract
+
+For an all-eligible case manifest, omit the `people` property and use
+`catalogueScope: "all-eligible"` at the top level, along with two to eight
+operator-selected clip manifests in approved local directories. Example
+structure (replace paths with actual **private absolute** paths; never
+commit populated case manifests):
+
+```json
+{
+  "schemaVersion": 1,
+  "catalogueScope": "all-eligible",
+  "clips": [
+    {"alias": "V01", "manifest": "C:\\Private\\WI0155\\V01\\frames.json"},
+    {"alias": "V02", "manifest": "C:\\Private\\WI0155\\V02\\frames.json"}
+  ]
+}
+```
+
+The command requires `--private-people-map` **only for all-eligible
+mode**, in addition to existing `--catalogue-cases` and
+`--private-report`. This map is a create-new private JSON containing
+`P0001`-style aliases, canonical person UUIDs and optional display names
+from the same snapshot. Keep it **outside the repository, the case directory
+and all clip folders**. The separate evaluation report contains aliases,
+never canonical UUIDs or display names. Neither report nor alias map may
+be overwritten, and stdout still contains aggregates only. Handle the
+map as personally identifying information: never paste it into PRs, CI
+logs or public issue comments.
+
+The evaluator's `rankedFaces[].topCandidates` privately contains up to
+three distinct **people**, with scores even below exploratory suggestion
+thresholds; this supports measuring recognition opportunities that the
+rank-one threshold would otherwise hide. With `--provisional-groups`,
+`groupSuggestions` adds up to three person candidates per group based
+on its retained representative vectors, using the average of the two
+strongest representative-to-person scores when more than one representative
+exists. This is a ranking heuristic, NOT a calibrated probability, identity
+assignment, confidence guarantee or proof that the candidate is a real face.
+One authentic singleton remains rankable. Provisional group false-positive
+suppression and full-video adaptive sampling are **still pending**.
+
+### Example PowerShell 7.6 command (run only during explicit local acceptance)
+
+```powershell
+$repo = 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$cases = 'C:\Private\WI0155\all-eligible-cases.json'
+$report = 'C:\Private\WI0155\all-eligible-evaluation.json'
+$map = 'C:\Private\WI0155\all-eligible-people-map.json'
+$models = 'C:\Private\ApprovedModels'  # Replace with your verified model directory
+
+Set-Location $repo
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -- `
+    --catalogue-cases $cases `
+    --private-report $report `
+    --private-people-map $map `
+    --model-dir $models `
+    --provisional-groups
+```
+
+The existing `PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING` must
+identify a **separate loopback PostgreSQL SELECT-only account**; the
+reader verifies least privilege and a READ ONLY repeatable-read
+transaction. Inputs must be approved fully-local frames and approved
+exact model files. To compare group-level top-three recall, the operator
+must map aliases to ground truth only in the private environment.
+A current code-only PR can pass synthetic tests without establishing
+real full-archive accuracy. Run the local snapshot once after this
+feature has passed CI and before declaring `CATALOGUE-TOP3-01`
+accepted; additional detector/grouping/sampler development may proceed
+independently before that local acceptance.
+

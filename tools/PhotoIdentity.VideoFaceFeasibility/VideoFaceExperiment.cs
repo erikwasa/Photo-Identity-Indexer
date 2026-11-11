@@ -429,12 +429,24 @@ public sealed class VideoFaceExperiment
                             provisional.Observe(index + 1, timestamp, faceIndex + 1,
                                 current[faceIndex], detections[faceIndex], image.Size);
                         }
-                        findings.Add(matcher.FindCandidate(
-                            index + 1, timestamp, faceIndex + 1, current[faceIndex]));
-                        if (diagnostics)
+                        if (diagnostics && matcher is VideoFaceCataloguePersonMatcher catalogue)
                         {
-                            rankedFaces.Add(matcher.Diagnose(
+                            // Full-archive ranking only once per face, preserving all
+                            // top-three aliases for the private diagnostic report.
+                            var result = catalogue.Evaluate(
+                                index + 1, timestamp, faceIndex + 1, current[faceIndex]);
+                            findings.Add(result.Finding);
+                            rankedFaces.Add(result.Diagnostic);
+                        }
+                        else
+                        {
+                            findings.Add(matcher.FindCandidate(
                                 index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                            if (diagnostics)
+                            {
+                                rankedFaces.Add(matcher.Diagnose(
+                                    index + 1, timestamp, faceIndex + 1, current[faceIndex]));
+                            }
                         }
                         if (coverageGrouper is not null)
                         {
@@ -503,6 +515,10 @@ public sealed class VideoFaceExperiment
                 {
                     DetectorProfile = _detectorProfile,
                     ProvisionalGroups = provisional?.CreateReview(),
+                    GroupSuggestions = provisional is not null &&
+                        matcher is VideoFaceCataloguePersonMatcher catalogueMatcher
+                        ? provisional.RankGroups(catalogueMatcher)
+                        : null,
                     Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
                         coverageGrouper.Groups.Count,
                         coverageGrouper.Groups,

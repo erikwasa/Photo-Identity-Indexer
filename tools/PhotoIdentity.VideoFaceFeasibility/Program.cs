@@ -40,11 +40,12 @@ public static class Program
                 "[--references <private-references.json> --private-report <new-private-report.json>] " +
                 "[--diagnostics [--detector-confidence <0.5|0.7|0.9>] [--coverage] " +
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>]]\n" +
-                "Catalogue: --catalogue-cases <private-2-to-4-clips.json> " +
+                "Catalogue: --catalogue-cases <private-2-to-8-clips.json> " +
                 "--private-report <new-private-report.json> [--root <repo>] " +
                 "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>] " +
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
-                "[--face-overflow-policy <fail|retain-top-32>] [--provisional-groups]\n" +
+                "[--face-overflow-policy <fail|retain-top-32>] [--provisional-groups] " +
+                "[--private-people-map <new-private-map.json> for catalogueScope=all-eligible]\n" +
                 "Visual review geometry (NO database): --review-geometry-selection <existing-selection.json> " +
                 "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +
                 "--review-geometry-output <new-private-geometry.json> [--root <repo>] " +
