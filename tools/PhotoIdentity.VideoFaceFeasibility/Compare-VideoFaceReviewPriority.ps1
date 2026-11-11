@@ -44,29 +44,29 @@ function OrderedGroups([object[]]$Groups,[string]$Policy) {
     # Each score is independent of human labels; there is no target leakage.
     switch ($Policy) {
         'Arrival order' {
-            return ,@($Groups | Sort-Object -Property @{Expression='Sequence';Ascending=$true})
+            return @($Groups | Sort-Object -Property @{Expression='Sequence';Ascending=$true})
         }
         'Detector confidence' {
-            return ,@($Groups | Sort-Object -Property @{Expression='Confidence';Descending=$true}, @{Expression='Sequence';Ascending=$true})
+            return @($Groups | Sort-Object -Property @{Expression='Confidence';Descending=$true}, @{Expression='Sequence';Ascending=$true})
         }
         'Crop quality proxy' {
-            return ,@($Groups | Sort-Object -Property @{Expression='Quality';Descending=$true}, @{Expression='Sequence';Ascending=$true})
+            return @($Groups | Sort-Object -Property @{Expression='Quality';Descending=$true}, @{Expression='Sequence';Ascending=$true})
         }
         'Catalogue similarity' {
-            return ,@($Groups | Sort-Object -Property @{Expression='CatalogueScore';Descending=$true}, @{Expression='Sequence';Ascending=$true})
+            return @($Groups | Sort-Object -Property @{Expression='CatalogueScore';Descending=$true}, @{Expression='Sequence';Ascending=$true})
         }
         'Confidence + quality' {
-            return ,@($Groups | Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
+            return @($Groups | Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
         }
         'Time-spread + quality' {
             # Round-robin among four equally spaced temporal segments; no
             # distinct-person or ground-truth labels enter selection.
-            $buckets = @(
-                ,@($Groups | Where-Object Quarter -EQ 0 | Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
-                ,@($Groups | Where-Object Quarter -EQ 1 | Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
-                ,@($Groups | Where-Object Quarter -EQ 2 | Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
-                ,@($Groups | Where-Object Quarter -EQ 3 | Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
-            )
+            $buckets = [object[]]::new(4)
+            for ($quarter = 0; $quarter -lt 4; $quarter++) {
+                $q = $quarter
+                $buckets[$quarter] = @($Groups | Where-Object { $_.Quarter -eq $q } |
+                    Sort-Object -Property @{Expression='Combined';Descending=$true}, @{Expression='Sequence';Ascending=$true})
+            }
             $ordered = [Collections.Generic.List[object]]::new()
             $index = 0
             do {
@@ -79,7 +79,7 @@ function OrderedGroups([object[]]$Groups,[string]$Policy) {
                 }
                 $index++
             } while ($added)
-            return ,@($ordered.ToArray())
+            return $ordered.ToArray()
         }
         default { throw 'Unrecognized review priority policy.' }
     }
@@ -134,7 +134,7 @@ try {
         }
         $confidence = [double](($samples | Measure-Object -Property detectorConfidence -Average).Average)
         $quality = [double](($samples | Measure-Object -Property quality -Average).Average)
-        $score = [double]@($rank.topCandidates)[0].score
+        $score = [double](@($rank.topCandidates)[0].score)
         $person = [string]$row.SelectedPerson
         $isHumanFace = $row.Decision -cin @('Keep group','Merge group')
         if ($isHumanFace -and $person -eq '') { $unlabelled++ }
