@@ -233,6 +233,11 @@ public static class VideoFaceAdaptiveCueCommand
         {
             if (frames.Frames[i].TimestampMs != coarse.FrameTimestampsMs[i] - start)
                 throw new ArgumentException("Frame manifest does not match the coarse window.");
+            // A complete coarse run must still own its actual local frame
+            // inputs. Do not follow online-only, offline or linked files.
+            string frameFile = VideoFaceFrameSetLoader.ResolveApprovedFrame(
+                folder, frames.Frames[i].File);
+            _ = RequireLocalFile(frameFile, VideoFaceFrameSetLoader.MaximumFrameBytes);
         }
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllBytesAsync(report));
@@ -305,7 +310,7 @@ public static class VideoFaceAdaptiveCueCommand
                 observedFrameTimestampMs = c.ObservedFrameTimestampMs,
                 kind = c.Kind.ToString(),
             }),
-        }, new JsonSerializerOptions { WriteIndented = true });
+        });
         if (bytes.Length > 16 * 1024)
             throw new ArgumentException("The new private cue JSON exceeds the input budget.");
 
