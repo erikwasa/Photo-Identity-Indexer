@@ -1762,3 +1762,39 @@ person-level grouping still **fail** (64/64 groups, 3,505 unknown
 unassigned observations), and adaptive whole-video sampling and
 V01/V02 human verification remain open. Do not merge the experimental
 `wi-0155` branch into main until quality and safety gates pass.
+
+## Experimental checkpoint 27 — independent adaptive sampling plan, no source execution (2026-11-12)
+
+While PR #795's six-policy *offline group-priority* comparison awaits
+the maintainer's already-approved local evidence, a separate
+**SAMPLING-01 implementation increment** can proceed without those
+results. A new, pure `VideoFaceAdaptiveSamplingPlanner` and synthetic
+tests plan up to ten-minute windows of an approved clip, with
+deterministic whole-window timestamps no more than eight seconds
+apart and an independent bounded stage for denser samples around
+observed motion/scene/uncertain-face/possible-entrance or new-face
+cues. Each window stays at or below 180 requested frames; longer
+clips require explicit continuation, and optional refinement reports
+when the per-window budget is exhausted. The code does not consult
+human identity labels or catalogue similarity for frame ordering.
+
+**Strict implementation boundary:** These are timestamps, not actual
+examined frames, an automatic content-event detector, a frame
+extraction runner, or proof of detecting every person. No change to
+the currently working fixed manifests, full-catalogue runner,
+64-group cap, matching, scoring or production data is included.
+No video, models, people, PostgreSQL or other private inputs are
+required for CI. The synthetic tests prove deterministic/bounded
+planning, not face recall, runtime, or acceptable review workload.
+The current 1/3 V03 correct known-person top-three result and the
+3,505 unassigned detections remain open failures.
+
+**Deferred host verification:** run the focused test and docs command
+in `docs/operations/video-face-feasibility-wi0155.md` after merging
+this PR into `wi-0155` along with the still-pending PR #795
+offline comparison. Before satisfying SAMPLING-01, explicitly opt in
+to a new, separately reviewed extraction-and-detection integration
+and human-annotated varied-video comparisons (including short
+appearances between coarse frames and incomplete long videos).
+Do not merge the feature branch into `main` on the strength of
+this planner.
