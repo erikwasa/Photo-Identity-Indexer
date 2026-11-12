@@ -191,6 +191,8 @@ public static class VideoFaceAdaptiveCueCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
         string manifest = RequireLocalFile(manifestPath, VideoFaceFrameSetLoader.MaximumCoverageFrames * 128);
         string report = RequireLocalFile(reportPath, MaximumDiagnosticsBytes);
+        if (IsWithin(repositoryRoot, manifest) || IsWithin(repositoryRoot, report))
+            throw new ArgumentException("Biometric diagnostics and frame manifests must stay outside the repository.");
         string folder = Path.GetDirectoryName(manifest)!;
         string metadataPath = RequireLocalFile(
             Path.Combine(folder, "extraction-metadata.json"), MaximumMetadataBytes);
