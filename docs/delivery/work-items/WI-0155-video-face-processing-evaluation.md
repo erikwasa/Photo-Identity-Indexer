@@ -1869,3 +1869,38 @@ acceptance remains open** until approved videos demonstrate that
 the operator-selected, detector-responsive samples actually preserve
 more human-identifiable people without excessive review burden.
 See operations checkpoint 29 for the consolidated Windows procedure.
+
+
+## Experimental checkpoint 30 — unassigned-candidate visibility without changing groups (2026-11-12)
+
+After checkpoint 29, a separate, isolated opt-in `--unassigned-audit`
+increment addresses part of the **GROUP-QUALITY-01** observability
+gap: the 64-group cap historically left **3,505 V03 observations
+counted but inaccessible as review crops**. The new mode does not
+replace the streaming grouper, loosen its threshold, merge faces or
+declare any observations to be background. It samples up to 96
+otherwise unassigned private crop references across 12 temporal
+sections (at most eight per section, two per frame), while keeping
+the full unassigned count, all existing groups, person suggestions,
+and the separate 180-frame/32-per-frame inference safety budgets.
+
+The supplemental audit lives only in the existing explicitly
+requested private catalogue report under
+`diagnostics.provisionalGroups.unassignedAudit`. It contains **no
+extra embedding vectors or canonical identities**. CLI stdout
+contains only aggregate audit counts. Existing reports and normal
+runs are unchanged. No database writes, source-video scanning,
+automatic labelling, face suppression or production integration
+are introduced. Synthetic tests exercise strata, deterministic
+bounded selection, complete count reconciliation, unchanged normal
+grouping, no overflow, JSON privacy and invalid input rejection.
+
+**Acceptance is NOT passed:** sampled overflow may be mostly
+background or miss unique true faces; it is not an accurate group,
+a track, or a 96-item unbiased representation of the 3,505 cases.
+It does not improve the 55 false groups or top-three recall on V03.
+A dedicated sampled-crop gallery, labelled unassigned audit, and
+comparable still-photo DBSCAN/noise/not-same experiment remain future
+work. Human verification of new private V03 and diverse-video
+evidence is postponed for the consolidated local acceptance session.
+Operations checkpoint 30 contains the later opt-in commands.
