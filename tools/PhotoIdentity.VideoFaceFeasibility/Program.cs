@@ -20,6 +20,12 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // Explicit detector-derived cues are private, read-only, no identity decisions.
+        if (args.Contains("--derive-adaptive-cues", StringComparer.Ordinal))
+        {
+            return await VideoFaceAdaptiveCueCommand.RunAsync(args);
+        }
+
         // Explicit source-free timestamp planning does not open video or databases.
         if (args.Contains("--adaptive-sampling-plan", StringComparer.Ordinal))
         {
@@ -55,7 +61,10 @@ public static class Program
                 "Visual review geometry (NO database): --review-geometry-selection <existing-selection.json> " +
                 "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +
                 "--review-geometry-output <new-private-geometry.json> [--root <repo>] " +
-                "[--model-dir <approved-models>]");
+                "[--model-dir <approved-models>]\n" +
+                "Private adaptive cues: --derive-adaptive-cues --manifest <owned-coarse-frames.json> " +
+                "--private-diagnostics <same-window-report.json> " +
+                "--private-cues-output <new-private-cues.json> [--root <repo>]");
             return 0;
         }
 
