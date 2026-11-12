@@ -2676,3 +2676,66 @@ prove a safe global face filter. A future deliberately controlled
 local inference test is needed to validate any new group selection
 or grouping-cap strategy against those unassigned observations,
 other videos and the missing two people.
+
+
+## Checkpoint 27 — deterministic, staged adaptive frame planner (experimental)
+
+A **planning-only** component, `VideoFaceAdaptiveSamplingPlanner`, advances
+SAMPLING-01 without relying on private V03 analysis or waiting for the
+counterfactual PR #795 review. It is deliberately **not wired to the
+production application, the video extractor or the catalogue runner**.
+Existing fixed-frame manifests and all prior grouping/identity baselines
+remain untouched.
+
+- Stage one selects deterministic timestamps throughout the entire current
+  window, with consecutive sample gaps at most eight seconds. It does not
+  stop when a known person appears. A window is at most ten minutes and
+  requests no more than 180 frames.
+- For a longer video, `HasMoreWindows` remains true and the caller must
+  explicitly plan the next window starting at `WindowEndMs`. Finishing
+  the first window does not imply complete video coverage.
+- A separately supplied, bounded second-stage cue list can request more
+  sampling near already-planned frames showing possible new/poorly
+  observed faces, entrance/exit, uncertain detections, scene changes or
+  motion. Refinement is deterministic, prioritizes diverse cue anchors,
+  never removes the coarse pass, never exceeds 180 frames per window,
+  and reports `RefinementBudgetReached` if there is more proposed work.
+- Cues are constrained to frames already in the plan, not an arbitrary
+  guessed timestamp. No actual scene detector, face-event classifier,
+  frame extraction or continuation executor exists yet. There is
+  **no guarantee of detecting short appearances between samples**;
+  subsequent local evaluations must quantify such misses.
+- The plan contains timestamps only. No real source paths, photo/video
+  bytes, embeddings, people, model access, PostgreSQL, identity writes,
+  OneDrive hydration or automatic processing are involved.
+
+### Synthetic verification now; private validation later
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release --filter 'FullyQualifiedName~VideoFaceAdaptiveSamplingPlannerTests'
+if ($LASTEXITCODE -ne 0) { throw 'Adaptive sampling planner tests failed.' }
+
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw 'Docs validation failed.' }
+```
+
+These tests cover full-window temporal bounds, explicit multi-window
+continuation, deterministic priority under permuted cue input,
+preservation of all coarse timestamps, the frame cap and rejection of
+invalid/unobserved cues. **No private files are needed** for these tests.
+Do not run adaptive video-face inference with these timestamps yet:
+the CLI has no adaptive extraction/continuation integration.
+
+**Acceptance still open:** wire the planner to an explicitly approved
+local source extractor behind a separate opt-in switch, analyze
+observed content (including possible short appearances), compare
+duration/frame/runtime/review costs to V01–V03 and several diverse
+new clips, preserve all human-identifiable people and private
+identity boundaries, and explicitly handle incomplete long-video
+coverage. Keep the 64-group overflow problem and top-three recall
+quality failure separate; this planner does not fix either.
