@@ -178,7 +178,7 @@ jobs:
             }
           }
           $coverageRunner = Get-Command './tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
-          foreach ($required in @('VideoPath','FfmpegPath','ApprovePrivateLocalVideo','FrameCount','WindowStartSeconds','WindowLengthSeconds')) {
+          foreach ($required in @('VideoPath','FfmpegPath','ApprovePrivateLocalVideo','FrameCount','WindowStartSeconds','WindowLengthSeconds','AdaptiveSampling','AdaptiveCuesPath')) {
             if (-not $coverageRunner.Parameters.ContainsKey($required)) {
               throw "WI-0155 coverage sampler is missing -$required"
             }
@@ -196,6 +196,30 @@ jobs:
             }
           }
           Write-Host 'Offline and manual-review runners parse and expose expected parameters.'
+
+      - name: Verify WI-0155 adaptive timestamp CLI (no private media)
+        shell: pwsh
+        run: |
+          $project = 'tools/PhotoIdentity.VideoFaceFeasibility/PhotoIdentity.VideoFaceFeasibility.csproj'
+          $raw = & dotnet run --project $project -c Release --no-build -- --adaptive-sampling-plan --duration-ms 1350000 --window-start-ms 600000
+          if ($LASTEXITCODE -ne 0) { throw 'Adaptive timestamp CLI failed.' }
+          $plan = ($raw -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($plan.schemaVersion -ne 1 -or $plan.windowStartMs -ne 600000 -or
+              $plan.windowEndMs -ne 1200000 -or -not $plan.hasMoreWindows -or
+              @($plan.frameTimestampsMs).Count -gt 180 -or
+              @($plan.frameTimestampsMs).Count -lt 1) {
+            throw 'Adaptive continuation plan violates the bounded contract.'
+          }
+          $script = './tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
+          $rejected = $false
+          try {
+            & $script -VideoPath 'Z:\absent.mp4' -FfmpegPath 'Z:\absent.exe' -ApprovePrivateLocalVideo -AdaptiveSampling -FrameCount 36 | Out-Null
+          } catch {
+            $rejected = $_.Exception.Message -like '*Adaptive mode selects its own frame count*'
+          }
+          if (-not $rejected) {
+            throw 'Adaptive mode accepted the legacy explicit frame count.'
+          }
 
       - name: Verify WI-0155 private ranked-group review (synthetic only)
         shell: pwsh
