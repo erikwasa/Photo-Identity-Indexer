@@ -48,3 +48,7 @@ evidence:
   value: '2026-11-11 PR793 local acceptance: 241 canonical people, 240 eligible, 596 exemplars; V03 180 frames, 3912 retained detections, 64 groups, 407 assigned and 3505 unassigned; 55 dismissed background groups (398 observations); 9 retained singleton face groups for 3 people, only 1 correct top-three person, 2 distinct known people missed; no wrong merges observed; V01/V02 human accuracy pending.'
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/794
+- type: maintainer_verification
+  value: '2026-11-12 PR794 private ranked-group audit: 241 canonical, 240 eligible, 596 exemplars; V03 3912 detections, 407 assigned, 3505 unassigned, all 64 groups reviewed, 55 background dismissed, nine genuine singleton groups labelled across three people; top-one 1/9, top-three 1/9, only one of three distinct people top-three; feature medians show weak directionality but no proven safe threshold.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/795
