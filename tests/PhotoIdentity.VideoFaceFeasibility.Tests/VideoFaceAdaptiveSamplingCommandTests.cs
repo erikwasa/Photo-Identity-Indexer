@@ -65,7 +65,9 @@ public sealed class VideoFaceAdaptiveSamplingCommandTests
             else
             {
                 await Assert.ThrowsAnyAsync<Exception>(async () =>
-                    await VideoFaceAdaptiveSamplingCommand.LoadCuesAsync(file));
+                {
+                    _ = await VideoFaceAdaptiveSamplingCommand.LoadCuesAsync(file);
+                });
             }
         }
         finally
