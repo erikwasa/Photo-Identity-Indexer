@@ -1798,3 +1798,39 @@ and human-annotated varied-video comparisons (including short
 appearances between coarse frames and incomplete long videos).
 Do not merge the feature branch into `main` on the strength of
 this planner.
+
+
+## Experimental checkpoint 28 — approved local adaptive extraction bridge (2026-11-12)
+
+The separate PR after #796 adds an explicitly requested `-AdaptiveSampling`
+mode to the existing native-lossless/legacy coverage extractor. After
+the operator approves a **specific already-local video**, the guarded
+FFprobe step supplies its duration to the source-free .NET planning
+command, which emits bounded timestamps for at most one ten-minute
+window. The extractor then uses the unchanged FFmpeg path, output
+manifest schema, per-frame size limit and owned-workspace lifecycle.
+Each window gets a new private run; any remaining video is flagged for
+**explicit** continuation, not automatically scanned. Cues may be
+supplied only from *previously sampled* frames using strict private
+bounded JSON, in which case nearby temporal samples are added without
+identity labels. The historic fixed 12/24/36/120/180 controls remain
+the default.
+
+**Acceptance boundary:** This is the first executable link from planner
+to actual source extraction but remains opt-in, isolated from `main`,
+and requires Windows PowerShell 7.6 source-fidelity/continuation
+verification later. Without independent motion/scene/appearance cue
+generation it performs **duration-adaptive coarse sampling**, not a
+self-calibrating content-adaptive pipeline. Re-extracting a refined
+window currently duplicates its coarse frames. It does not invoke
+YuNet/SFace automatically, perform a new full-archive identity snapshot
+or auto-create catalogue tags. Recorded face-crop quality and
+reviewed person coverage on diverse clips are still necessary before
+SAMPLING-01 can be accepted.
+
+CI runs C# synthetic tests for planning, cue schema, rejection and
+continued window bounds, plus a PowerShell parse/option smoke test
+without access to a private video. The consolidated operator procedure
+is checkpoint 28 in the WI-0155 operations document. The pending #795
+offline review-priority comparison, 64-group saturation and V03
+full-catalogue known-person top-three failures remain separate gates.

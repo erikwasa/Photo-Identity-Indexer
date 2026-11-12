@@ -2739,3 +2739,116 @@ new clips, preserve all human-identifiable people and private
 identity boundaries, and explicitly handle incomplete long-video
 coverage. Keep the 64-group overflow problem and top-three recall
 quality failure separate; this planner does not fix either.
+
+
+## Checkpoint 28 — opt-in adaptive timestamp extraction (experimental development)
+
+This step connects checkpoint 27's **source-free** C# adaptive planner to
+the **existing, explicitly approved local** `New-VideoFaceCoverageFrames.ps1`
+extractor. It is a new `-AdaptiveSampling` switch; without it, the
+historical fixed 12/24/36/120/180 midpoint timestamps and existing
+manifest format are unchanged. There is still **no automatic content
+analysis, person tracking, database write, production API/worker integration,
+OneDrive hydration or scheduled archive scan**.
+
+- The extractor first requires `-ApprovePrivateLocalVideo`, rejects
+  offline/reparse/on-demand files, and uses only the exact supplied local
+  FFmpeg/FFprobe installation. FFprobe supplies the approved clip duration.
+- In adaptive mode, it asks the isolated .NET
+  `--adaptive-sampling-plan` command to plan the **next complete window**
+  (up to ten minutes). The planner requests 1–180 temporal frames,
+  initially no more than eight seconds apart; a clip at most one hour
+  may require multiple separately approved windows.
+- `-WindowStartSeconds` selects a window explicitly. Returned
+  `HasMoreWindows` and `NextWindowStartSeconds` tell the operator
+  whether the remainder is **not yet processed**. No automatic
+  continuation or success claim for unvisited windows is made.
+- Optional `-AdaptiveCuesPath` supplies observed movement, scene
+  change, uncertain-face, possible entrance/exit or poorly observed
+  face cues from previously sampled frames. The source-free CLI
+  accepts only strict schema-version-1 JSON, bounded to 256 entries
+  and 16 KiB. Every cue **must** anchor to a timestamp in the
+  planner's initial window pass. It cannot contain person IDs,
+  name fields, invented frame positions or identity labels.
+  A second extraction at these refined timestamps currently creates
+  a **new** owned run and re-extracts coarse frames; do not assume
+  same-run reuse or automatic event detection.
+- The same existing `frames.json` schema is written with **window-relative**
+  timestamps for the unchanged 180-frame recognition loader.
+  Metadata now also records sampling mode, coarse count,
+  refinement-budget exhaustion and long-video continuation.
+- The 8 MiB per frame, at-most-180 frames per run, 8–2048 MiB
+  user-selected workspace budget, source-dimension limit and
+  existing opt-in `Complete-VideoFaceCoverageRun.ps1` ownership/cleanup
+  behavior are preserved. Partial failures remain for deliberate review;
+  no automatic cleanup is introduced.
+
+### Consolidated local review (later; not performed by this PR)
+
+In PowerShell 7.6 within the isolated worktree:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release --filter 'FullyQualifiedName~VideoFaceAdaptiveSampling'
+if ($LASTEXITCODE -ne 0) { throw 'Adaptive sampler tests failed.' }
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw 'Documentation validation failed.' }
+
+# Reuse the previously authorized already-local source and approved FFmpeg.
+# Set these paths LOCALLY; no actual path or private output belongs in Git.
+# $video = 'D:\Private\approved-local-video.mp4'
+# $ffmpeg = 'C:\ApprovedFFmpeg\ffmpeg.exe'
+$first = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video -FfmpegPath $ffmpeg `
+    -ApprovePrivateLocalVideo -AdaptiveSampling `
+    -FrameEncoding NativeLosslessPng -MaximumWorkspaceMiB 1024
+
+# Inspect only aggregates; the new run still requires human face review.
+$first | Select-Object FrameCount,CoarseFrameCount,HasMoreWindows,
+    RefinementBudgetReached,WindowLengthSeconds
+
+# If HasMoreWindows is true, the NEXT window is still unexamined:
+# $second = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+#     -VideoPath $video -FfmpegPath $ffmpeg `
+#     -ApprovePrivateLocalVideo -AdaptiveSampling `
+#     -FrameEncoding NativeLosslessPng `
+#     -WindowStartSeconds $first.NextWindowStartSeconds
+~~~
+
+A private cue JSON file, **only after** reviewing its matching initial
+window's timestamped frames, has this shape (the timestamp must equal
+one of that window's actual initial planned **absolute** timestamps):
+
+~~~json
+{
+  "schemaVersion": 1,
+  "cues": [
+    {
+      "observedFrameTimestampMs": 100,
+      "kind": "PossibleNewOrPoorlyObservedFace"
+    }
+  ]
+}
+~~~
+
+The `100` above is merely a schema example and may not be a valid cue
+for the selected window. The accepted kinds are `Motion`, `SceneChange`,
+`UncertainFace`, `PossibleEntranceOrExit` and
+`PossibleNewOrPoorlyObservedFace`. Cues are local private evidence.
+No person labels, source images, frame-specific scores, reference
+mapping, precise private timestamps or cue files should be uploaded
+or pasted into public discussions.
+
+**Real acceptance remains pending:** Verify approved source hashes,
+orientation/colour, manifest loading, per-window time coverage,
+detector runtime/crop quality, any short appearances missed between
+samples, workspace byte budget and explicit cleanup. Compare adaptive
+runs against the same source fixed-frame V01–V03 baselines and several
+diverse additional videos. Without content cues, this increment is
+duration-adaptive **coarse coverage only**; it has not solved V03's
+55 false groups, 3,505 unassigned observations or its poor full-catalogue
+top-three rank accuracy.
