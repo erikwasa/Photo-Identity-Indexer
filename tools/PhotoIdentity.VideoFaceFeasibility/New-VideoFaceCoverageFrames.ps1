@@ -311,6 +311,7 @@ for ($index = 0; $index -lt $frameTotal; $index++) {
     samplingRefinementBudgetReached = $refinementBudgetReached
     samplingHasMoreWindows = $hasMoreWindows
     samplingClipDurationMs = $clipDurationMs
+    samplingWindowStartMs = if ($AdaptiveSampling) { $startMs } else { $null }
     samplingWindowEndMs = $windowEndMs
     note = 'NativeLosslessPng uses lossless PNG after decoder RGB24 conversion; original 10-bit precision is not preserved.'
 } | ConvertTo-Json -Depth 5 |
