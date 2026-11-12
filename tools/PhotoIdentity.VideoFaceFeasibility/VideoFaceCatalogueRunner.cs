@@ -19,6 +19,7 @@ public static class VideoFaceCatalogueRunner
         VideoFaceDetectorSelection Detection,
         VideoFaceOverflowPolicy OverflowPolicy,
         bool ProvisionalGroups,
+        bool UnassignedAudit,
         string? PrivatePeopleMap);
 
     public static async Task<int> RunAsync(string[] args)
@@ -92,7 +93,8 @@ public static class VideoFaceCatalogueRunner
                 string folder = Path.GetDirectoryName(Path.GetFullPath(clip.Manifest))!;
                 VideoFacePrivateReview review = await experiment.RunWithPreparedMatcherAsync(
                     frames, folder, matcher, options.DetectorConfidence,
-                    provisionalGroups: options.ProvisionalGroups);
+                    provisionalGroups: options.ProvisionalGroups,
+                    unassignedAudit: options.UnassignedAudit);
                 var personRanks = review.Diagnostics!.RankedFaces
                     .GroupBy(face => face.TopReferenceAlias, StringComparer.Ordinal)
                     .Select(group => new VideoFaceCataloguePersonRankSummary(
@@ -145,6 +147,13 @@ public static class VideoFaceCatalogueRunner
                     r.Review.Diagnostics!.FrameDetections.Sum(f =>
                         f.CandidatesDiscarded ?? 0)),
                 groupReviewRequested = options.ProvisionalGroups,
+                unassignedAuditRequested = options.UnassignedAudit,
+                unassignedAuditSamples = options.UnassignedAudit
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.UnassignedAudit!.SampledObservations)
+                    : 0,
+                unassignedAuditStrataRepresented = options.UnassignedAudit
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.UnassignedAudit!.StrataRepresented)
+                    : 0,
                 provisionalGroups = options.ProvisionalGroups
                     ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.Groups.Count)
                     : 0,
@@ -182,6 +191,7 @@ public static class VideoFaceCatalogueRunner
         string? tileSize = null;
         string? overflowPolicy = null;
         bool provisionalGroups = false;
+        bool unassignedAudit = false;
         for (int i = 0; i < args.Length; i++)
         {
             string name = args[i];
@@ -192,6 +202,15 @@ public static class VideoFaceCatalogueRunner
                     throw new ArgumentException("Duplicate provisional-groups option.");
                 }
                 provisionalGroups = true;
+                continue;
+            }
+            if (name == "--unassigned-audit")
+            {
+                if (unassignedAudit)
+                {
+                    throw new ArgumentException("Duplicate unassigned-audit option.");
+                }
+                unassignedAudit = true;
                 continue;
             }
             if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
@@ -217,6 +236,11 @@ public static class VideoFaceCatalogueRunner
                     overflowPolicy = value; break;
                 default: throw new ArgumentException("Unknown or duplicate catalogue option.");
             }
+        }
+
+        if (unassignedAudit && !provisionalGroups)
+        {
+            throw new ArgumentException("The unassigned audit requires --provisional-groups.");
         }
 
         string repo = Path.GetFullPath(root ?? Directory.GetCurrentDirectory());
@@ -254,6 +278,6 @@ public static class VideoFaceCatalogueRunner
             throw new ArgumentException("Private people map requires a fully qualified path.");
         }
         return new Options(cases, report, repo, dir, threshold, selected, policy,
-            provisionalGroups, peopleMap);
+            provisionalGroups, unassignedAudit, peopleMap);
     }
 }
