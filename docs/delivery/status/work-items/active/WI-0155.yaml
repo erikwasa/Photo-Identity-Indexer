@@ -57,7 +57,7 @@ evidence:
 - type: implementation
   value: '2026-11-12: Planning-only adaptive video-frame sampling foundation with bounded whole-window coverage, cue-driven refinement and explicit long-clip continuation; CLI integration and real person-coverage verification pending.'
 
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/797
-  - type: implementation
-    value: '2026-11-12: Opt-in approved-local adaptive extraction now uses the bounded C# timestamp planner, preserves legacy fixed-frame manifests/workspaces, requires explicit continuation, and defers real-video acceptance.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/797
+- type: implementation
+  value: '2026-11-12: Opt-in approved-local adaptive extraction now uses the bounded C# timestamp planner, preserves legacy fixed-frame manifests/workspaces, requires explicit continuation, and defers real-video acceptance.'
