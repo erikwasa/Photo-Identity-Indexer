@@ -136,8 +136,8 @@ public sealed class VideoFaceUnassignedAuditSampler
 
         public int Compare(VideoFaceGroupCrop? left, VideoFaceGroupCrop? right)
         {
-            if (left is null || right is null)
-                return Comparer<VideoFaceGroupCrop>.Default.Compare(left!, right!);
+            if (left is null) return right is null ? 0 : -1;
+            if (right is null) return 1;
 
             int priority = left.Quality.CompareTo(right.Quality);
             if (priority != 0) return priority;
