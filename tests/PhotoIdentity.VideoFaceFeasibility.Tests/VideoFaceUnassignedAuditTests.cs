@@ -39,7 +39,7 @@ public sealed class VideoFaceUnassignedAuditTests
         for (int i = 0; i < total; i++)
         {
             long time = 600_000L * i / (total - 1);
-            sampler.Observe(Crop(i / 3 + 1, time, i % 3 + 1, .2 + (i % 7) * .1));
+            sampler.Observe(Crop(i + 1, time, 1, .2 + (i % 7) * .1));
         }
 
         var result = sampler.CreateReview(total);
@@ -55,6 +55,20 @@ public sealed class VideoFaceUnassignedAuditTests
         Assert.True(result.SampledCrops.SequenceEqual(
             result.SampledCrops.OrderBy(c => c.TimestampMs)
                 .ThenBy(c => c.FrameNumber).ThenBy(c => c.FaceNumber)));
+    }
+
+    [Fact]
+    public void One_crowded_frame_cannot_fill_a_whole_temporal_stratum()
+    {
+        var sampler = new VideoFaceUnassignedAuditSampler(0, 600_000);
+        for (int face = 1; face <= 20; face++)
+            sampler.Observe(Crop(1, 1_000, face, face / 20.0));
+
+        var result = sampler.CreateReview(20);
+        Assert.Equal(2, result.SampledObservations);
+        Assert.Equal(new[] { 19, 20 },
+            result.SampledCrops.Select(c => c.FaceNumber).ToArray());
+        Assert.Equal(18, result.UnrepresentedObservations);
     }
 
     [Fact]
