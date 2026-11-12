@@ -44,7 +44,7 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0155-video-face-processing-evaluation.md
   started_at: 2026-11-05
-  last_updated_at: 2026-11-11
+  last_updated_at: 2026-11-12
   branch: wi-0155
   blockers:
   - WI-0151
@@ -91,6 +91,10 @@ work_items:
     value: '2026-11-12 PR794 private ranked-group audit: 241 canonical, 240 eligible, 596 exemplars; V03 3912 detections, 407 assigned, 3505 unassigned, all 64 groups reviewed, 55 background dismissed, nine genuine singleton groups labelled across three people; top-one 1/9, top-three 1/9, only one of three distinct people top-three; feature medians show weak directionality but no proven safe threshold.'
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/795
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/796
+  - type: implementation
+    value: '2026-11-12: Planning-only adaptive video-frame sampling foundation with bounded whole-window coverage, cue-driven refinement and explicit long-clip continuation; CLI integration and real person-coverage verification pending.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
