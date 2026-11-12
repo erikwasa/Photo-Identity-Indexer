@@ -155,7 +155,14 @@ public sealed class VideoFaceAdaptiveCueDerivationTests
                 manifest, report, repo);
             Assert.NotEmpty(cues);
             Assert.All(cues, c => Assert.InRange(c.ObservedFrameTimestampMs, start, plan.WindowEndMs - 1));
-            await VideoFaceAdaptiveCueCommand.WriteCuesAsync(output, repo, workspace, cues);
+            int exit = await Program.Main([
+                "--derive-adaptive-cues",
+                "--manifest", manifest,
+                "--private-diagnostics", report,
+                "--private-cues-output", output,
+                "--root", repo,
+            ]);
+            Assert.Equal(0, exit);
             var outputText = await File.ReadAllTextAsync(output);
             Assert.DoesNotContain("secretTopReferenceAlias", outputText);
             Assert.DoesNotContain("must-not-be-in-output", outputText);
