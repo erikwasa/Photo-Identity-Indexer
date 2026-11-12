@@ -103,6 +103,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/798
   - type: implementation
     value: '2026-11-12: Offline adaptive cue derivation from exact validated coarse frames and per-frame detector diagnostics; opt-in second pass remains private and human acceptance pending.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/799
+  - type: implementation
+    value: '2026-11-12: Opt-in 96-sample temporal overflow audit reveals bounded private crop evidence from the 64-group saturation while preserving assignments, full unassigned counts and ranking; real validation pending.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
