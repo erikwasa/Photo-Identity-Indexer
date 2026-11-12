@@ -10,7 +10,7 @@ public sealed class VideoFaceAdaptiveCueDerivationTests
     public void Detector_boundaries_and_weak_samples_request_nearby_frames_without_identity_labels()
     {
         var plan = VideoFaceAdaptiveSamplingPlanner.PlanCoverage(60_000);
-        int[] counts = [0, 1, 1, 0, 1, 1, 1, 0, 0];
+        int[] counts = [0, 1, 1, 0, 1, 1, 1, 1, 0];
         Assert.Equal(counts.Length, plan.CoarseFrameCount);
         var observed = plan.FrameTimestampsMs.Select((t, i) =>
             new VideoFaceObservedCoarseFrame(
