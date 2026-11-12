@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Recognition;
 
@@ -31,7 +32,12 @@ public sealed record VideoFaceProvisionalGroupReview(
     int ObservationsUnassigned,
     int MaximumGroups,
     double MinimumWithinGroupCosine,
-    IReadOnlyList<VideoFaceProvisionalGroup> Groups);
+    IReadOnlyList<VideoFaceProvisionalGroup> Groups)
+{
+    // Only when explicitly opted in; never present in legacy reports.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceUnassignedAudit? UnassignedAudit { get; init; }
+}
 
 /// <summary>
 /// Bounded single-pass grouping on SFace vectors already calculated by the
@@ -56,9 +62,20 @@ public sealed class VideoFaceProvisionalGrouper
     }
 
     private readonly List<Group> _groups = [];
+    private readonly VideoFaceUnassignedAuditSampler? _unassignedAudit;
     private int _seen;
     private int _assigned;
     private int _unassigned;
+
+    public VideoFaceProvisionalGrouper(
+        bool captureUnassignedAudit = false,
+        long firstTimestampMs = 0,
+        long lastTimestampMs = VideoFaceFrameSetLoader.MaximumTimestampMs)
+    {
+        _unassignedAudit = captureUnassignedAudit
+            ? new VideoFaceUnassignedAuditSampler(firstTimestampMs, lastTimestampMs)
+            : null;
+    }
 
     /// <summary>
     /// Observe the actual face ordinal in the same frame, before any catalogue
@@ -102,6 +119,15 @@ public sealed class VideoFaceProvisionalGrouper
             }
         }
 
+        var b = detection.BoundingBox;
+        double minPixels = Math.Min(b.Width * imageSize.Width,
+            b.Height * imageSize.Height);
+        // A ranking proxy for the best crops, not a face-quality probability.
+        double quality = Math.Round(detection.Confidence *
+            Math.Min(1, Math.Max(0, minPixels) / 160), 4);
+        var crop = new VideoFaceGroupCrop(frameNumber, timestampMs, faceNumber,
+            b.X, b.Y, b.Width, b.Height, Math.Round(detection.Confidence, 4), quality);
+
         // No decision is inferred from catalogue nearest neighbours.
         // Ambiguity creates an extra group if there is capacity: false splits
         // are more reviewable than mistakenly merging two distinct people.
@@ -112,6 +138,7 @@ public sealed class VideoFaceProvisionalGrouper
             if (_groups.Count >= MaximumGroups)
             {
                 _unassigned++;
+                _unassignedAudit?.Observe(crop);
                 return;
             }
 
@@ -121,15 +148,6 @@ public sealed class VideoFaceProvisionalGrouper
             };
             _groups.Add(winner);
         }
-
-        var b = detection.BoundingBox;
-        double minPixels = Math.Min(b.Width * imageSize.Width,
-            b.Height * imageSize.Height);
-        // A ranking proxy for the best crops, not a face-quality probability.
-        double quality = Math.Round(detection.Confidence *
-            Math.Min(1, Math.Max(0, minPixels) / 160), 4);
-        var crop = new VideoFaceGroupCrop(frameNumber, timestampMs, faceNumber,
-            b.X, b.Y, b.Width, b.Height, Math.Round(detection.Confidence, 4), quality);
 
         Group assigned = winner ?? throw new InvalidOperationException(
             "Provisional grouping failed to assign the selected candidate.");
@@ -152,7 +170,10 @@ public sealed class VideoFaceProvisionalGrouper
                     .ToArray()))
                 .OrderByDescending(g => g.Observations)
                 .ThenBy(g => g.Alias, StringComparer.Ordinal)
-                .ToArray());
+                .ToArray())
+        {
+            UnassignedAudit = _unassignedAudit?.CreateReview(_unassigned),
+        };
 
     /// <summary>
     /// Read-only advisory ranks for the retained in-memory group representatives.
