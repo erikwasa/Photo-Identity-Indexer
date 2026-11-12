@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace PhotoIdentity.VideoFaceFeasibility;
 
 /// <summary>
@@ -67,8 +65,7 @@ public sealed class VideoFaceUnassignedAuditSampler
             crop.DetectorConfidence is < 0 or > 1 ||
             !double.IsFinite(crop.X) || !double.IsFinite(crop.Y) ||
             !double.IsFinite(crop.Width) || !double.IsFinite(crop.Height) ||
-            crop.X < 0 || crop.Y < 0 || crop.Width <= 0 || crop.Height <= 0 ||
-            crop.X + crop.Width > 1.000001 || crop.Y + crop.Height > 1.000001)
+            crop.Width <= 0 || crop.Height <= 0)
         {
             throw new ArgumentException("Invalid unassigned private diagnostic crop.");
         }
