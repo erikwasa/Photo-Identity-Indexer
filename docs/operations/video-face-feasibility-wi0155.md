@@ -2852,3 +2852,123 @@ diverse additional videos. Without content cues, this increment is
 duration-adaptive **coarse coverage only**; it has not solved V03's
 55 false groups, 3,505 unassigned observations or its poor full-catalogue
 top-three rank accuracy.
+
+
+## Checkpoint 29 — derive bounded refinement cues from previous detector evidence (experimental)
+
+An additional **optional offline stage** turns the *existing* per-frame
+detector diagnostics of one completed **adaptive coarse-only** window
+into a strict, small, private cue JSON compatible with checkpoint 28.
+This is a separate `--derive-adaptive-cues` command; it neither reads
+the source video nor runs models or opens PostgreSQL. The command
+reads only the per-frame detection counts, minimum detector confidence,
+smallest face width, and discarded-candidate count from the previously
+saved one-clip diagnostics report. It does **not** interpret any person
+alias, similarity, top-three ranking, embedding or reviewed identity.
+
+### Exploratory selection rule
+
+- A change in detected face count between consecutive coarse frames
+  triggers `PossibleEntranceOrExit` for **both** sides. Face visibility
+  at the first frame may also merit a boundary cue. Detector jitter
+  and background false positives can cause these signals; **no actual
+  entrance, distinct person or correct face is implied**.
+- A detector candidate below 64 decoded pixels in width gives a
+  `PossibleNewOrPoorlyObservedFace` cue. Otherwise discarded candidates
+  or minimum detection confidence below 0.70 give `UncertainFace`.
+  These are exploratory *review allocation* thresholds, **not**
+  validated probabilities or rules for rejecting detections.
+- A clip with no detected faces yields no cue, and a face that appears
+  entirely between two coarse samples may still be missed. Neither
+  condition proves that the original video contains no people.
+- A continuously stable visible detection does not consume all
+  refinement slots: the first coarse sample is the only such boundary
+  cue. Candidate/face identities do not affect selection.
+- Input is accepted only from a **complete, marked, already extracted**
+  window using the original coarse planner timestamps. The extractor
+  records the absolute `samplingWindowStartMs` in its private metadata,
+  while the original frame manifest and private detector report use
+  window-relative timestamps. The command verifies them against each
+  other and the deterministic coarse plan, requires the actual local
+  frame files to remain safely available, and rejects partial, wrong
+  window, modified or refined plans. This is structural provenance,
+  **not a cryptographic binding** of the report to particular image
+  bytes; the maintainer must still preserve evidence/source hashes.
+- The new cue output is created without overwriting an existing file,
+  outside the repository and temporary frame workspace. Only
+  `schemaVersion`, `observedFrameTimestampMs` and the cue kind are
+  emitted; no people, aliases, vectors, coordinates or confidence
+  values appear in the output or CLI logs. The original diagnostics
+  report remains private and unchanged.
+
+### Deferred consolidated PowerShell 7.6 acceptance
+
+Update `wi-0155` and run the synthetic tests and documentation
+validator first:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release --filter 'FullyQualifiedName~VideoFaceAdaptiveCueDerivationTests|FullyQualifiedName~VideoFaceAdaptiveSampling'
+if ($LASTEXITCODE -ne 0) { throw 'Adaptive cue tests failed' }
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 docs validation failed' }
+~~~
+
+After selecting a **specific already-local, approved** video, approved
+FFmpeg/models, and previously approved local reference manifest, run
+the following private sequence. Do not paste the paths, individual
+timestamps, person labels or diagnostics contents into GitHub.
+
+~~~powershell
+# Requires previously set LOCAL $video, $ffmpeg, $referenceManifest,
+# $modelDirectory, plus a separate private $reportFolder outside the
+# repository and extracted frame folder. Use NEW output names each time.
+$coarse = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video -FfmpegPath $ffmpeg -ApprovePrivateLocalVideo `
+    -AdaptiveSampling -FrameEncoding NativeLosslessPng
+if ($coarse.CoarseFrameCount -ne $coarse.FrameCount) {
+    throw 'Expected an unrefined coarse-only run'
+}
+
+$report = Join-Path $reportFolder ('wi0155-coarse-' + [guid]::NewGuid().ToString('N') + '.json')
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --manifest $coarse.ManifestPath --root (Get-Location).Path `
+    --model-dir $modelDirectory --references $referenceManifest `
+    --private-report $report --diagnostics --coverage
+if ($LASTEXITCODE -ne 0) { throw 'Coarse offline diagnostics failed' }
+
+$cues = Join-Path $reportFolder ('wi0155-cues-' + [guid]::NewGuid().ToString('N') + '.json')
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --derive-adaptive-cues --manifest $coarse.ManifestPath `
+    --private-diagnostics $report --private-cues-output $cues `
+    --root (Get-Location).Path
+if ($LASTEXITCODE -ne 0) { throw 'Private cue derivation failed' }
+
+# Second extraction of the same approved window. It makes a NEW owned run
+# and currently duplicates the coarse frames rather than reusing them.
+$refined = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video -FfmpegPath $ffmpeg -ApprovePrivateLocalVideo `
+    -AdaptiveSampling -AdaptiveCuesPath $cues `
+    -WindowStartSeconds $coarse.WindowStartSeconds `
+    -FrameEncoding NativeLosslessPng
+
+$coarse | Select-Object FrameCount,CoarseFrameCount,HasMoreWindows
+$refined | Select-Object FrameCount,CoarseFrameCount,RefinementBudgetReached,HasMoreWindows
+~~~
+
+The **original coarse run and private report must remain intact** until
+verification and any desired refined comparison are complete. Do not
+auto-delete either extraction. Use the existing explicit run-completion
+tool from checkpoint 10 only after separately verifying reports,
+retained evidence and hashes.
+
+This step enables a first two-pass **detector-responsive** workflow,
+but is not self-running, not a scene-change or motion estimator, and
+is not proof of missing-person recall. New videos and all windows
+need separate human review. Existing V03 failures—55 dismissed
+background groups out of 64, 3,505 unassigned observations and only
+one of three distinct known people correctly ranked top-three—are
+unchanged. Do not integrate `wi-0155` into `main` on this evidence.
