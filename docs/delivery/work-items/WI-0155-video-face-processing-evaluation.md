@@ -1717,7 +1717,7 @@ lower threshold may incorrectly assign background detections to real people.
 Do **not** reinterpret these similarity scores as face probabilities or
 assume any of the 3,505 unassigned detections are background.
 
-### PR #795 — deterministic, non-destructive counterfactual (development)
+### PR #795 — deterministic, non-destructive counterfactual (merged; local verification pending)
 
 A new strictly private `Compare-VideoFaceReviewPriority.ps1` analyzes the
 already annotated same-run CSV, report JSON and person alias map, first
@@ -1791,8 +1791,8 @@ The current 1/3 V03 correct known-person top-three result and the
 
 **Deferred host verification:** run the focused test and docs command
 in `docs/operations/video-face-feasibility-wi0155.md` after merging
-this PR into `wi-0155` along with the still-pending PR #795
-offline comparison. Before satisfying SAMPLING-01, explicitly opt in
+this PR into `wi-0155`. PR #795 is already merged, but its
+private offline comparison still awaits local verification. Before satisfying SAMPLING-01, explicitly opt in
 to a new, separately reviewed extraction-and-detection integration
 and human-annotated varied-video comparisons (including short
 appearances between coarse frames and incomplete long videos).
