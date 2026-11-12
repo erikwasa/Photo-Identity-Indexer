@@ -1834,3 +1834,38 @@ without access to a private video. The consolidated operator procedure
 is checkpoint 28 in the WI-0155 operations document. The pending #795
 offline review-priority comparison, 64-group saturation and V03
 full-catalogue known-person top-three failures remain separate gates.
+
+
+## Experimental checkpoint 29 — detector-responsive two-pass sampling, offline only (2026-11-12)
+
+A separate child PR after #797 adds an **explicit** `--derive-adaptive-cues`
+command and stores the absolute adaptive-window start in new extraction
+metadata. From a completed, owned **coarse-only** extraction and its
+matching one-clip private detector report, the command derives bounded
+refinement cues using face-count transitions, small face width and
+weak/overflowed detector observations. It validates the exact planned
+coarse timestamps against the frame manifest, metadata and the report;
+it requires the actual frames to remain available. The output is a
+**create-new private JSON file** that the existing opt-in
+`-AdaptiveCuesPath` extraction switch can consume to produce a second,
+denser temporary run.
+
+Neither ranking nor known-person labels are input to the cue decision.
+The original frames, detector report, database and video are unchanged.
+The second pass remains **operator initiated**; no automatic scene or
+motion detector, multi-window executor, duplicate-frame reuse or
+recognition-on-extraction is introduced. Face-count fluctuations can
+be background false positives; this work explicitly **does not**
+declare a candidate a real face, merge video groups or improve
+top-three recognition. The 64-group ceiling, false-face workload and
+3,505 V03 unassigned detections are still unresolved.
+
+The synthetic tests cover bounded cue kinds, exact provenance,
+complete-window/real-file checks, no-face evidence, expected
+transitions, safe private output, and refusal to overwrite or publish
+inside the repo. No maintainer video verification is required to
+merge this isolated development increment into `wi-0155`. **SAMPLING-01
+acceptance remains open** until approved videos demonstrate that
+the operator-selected, detector-responsive samples actually preserve
+more human-identifiable people without excessive review burden.
+See operations checkpoint 29 for the consolidated Windows procedure.
