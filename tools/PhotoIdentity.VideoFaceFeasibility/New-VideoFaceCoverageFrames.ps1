@@ -126,9 +126,22 @@ if ($AdaptiveSampling) {
     if ($clipDurationMs -lt 200 -or $startMs -ge $clipDurationMs) {
         throw 'Adaptive clip duration or window start is out of bounds.'
     }
-    if (-not [string]::IsNullOrWhiteSpace($AdaptiveCuesPath) -and
-        -not [IO.Path]::IsPathFullyQualified($AdaptiveCuesPath)) {
-        throw 'Adaptive cue input must be an absolute, private local path.'
+    if (-not [string]::IsNullOrWhiteSpace($AdaptiveCuesPath)) {
+        if (-not [IO.Path]::IsPathFullyQualified($AdaptiveCuesPath)) {
+            throw 'Adaptive cue input must be an absolute, private local path.'
+        }
+        $cueFull = [IO.Path]::GetFullPath($AdaptiveCuesPath)
+        $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+        $relative = [IO.Path]::GetRelativePath($repoRoot, $cueFull)
+        if ($relative -eq '.' -or
+            (-not [IO.Path]::IsPathRooted($relative) -and
+                $relative -ne '..' -and
+                -not $relative.StartsWith('..' + [IO.Path]::DirectorySeparatorChar,
+                    [StringComparison]::Ordinal) -and
+                -not $relative.StartsWith('..' + [IO.Path]::AltDirectorySeparatorChar,
+                    [StringComparison]::Ordinal))) {
+            throw 'Private adaptive cue evidence must be stored outside the repository.'
+        }
     }
 
     $plannerArguments = @(
@@ -139,7 +152,7 @@ if ($AdaptiveSampling) {
         '--window-start-ms', $startMs.ToString([Globalization.CultureInfo]::InvariantCulture)
     )
     if (-not [string]::IsNullOrWhiteSpace($AdaptiveCuesPath)) {
-        $plannerArguments += @('--private-cues', $AdaptiveCuesPath)
+        $plannerArguments += @('--private-cues', $cueFull)
     }
     $planJson = & dotnet @plannerArguments
     if ($LASTEXITCODE -ne 0) {
