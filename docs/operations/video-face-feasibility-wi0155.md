@@ -2972,3 +2972,102 @@ need separate human review. Existing V03 failures—55 dismissed
 background groups out of 64, 3,505 unassigned observations and only
 one of three distinct known people correctly ranked top-three—are
 unchanged. Do not integrate `wi-0155` into `main` on this evidence.
+
+
+## Checkpoint 30 — bounded visibility into 64-group overflow (experimental; 2026-11-12)
+
+An opt-in `--unassigned-audit` flag has been added to the **existing,
+read-only full-catalogue experiment**, and is permitted **only with**
+`--provisional-groups`. The legacy 64-group algorithm, score thresholds,
+ranking, face detection, detector overflow policy, 180-frame manifest
+and report structure remain unchanged unless the new flag is used.
+
+### What is collected
+
+When the grouper reaches 64 groups and a candidate cannot be assigned,
+it still increments `observationsUnassigned`. If the explicit audit is
+enabled, it *also* considers that candidate's **existing private
+source-frame crop metadata** for a fixed-memory sample:
+
+- The current clip's frame timestamp range is divided into 12
+  deterministic strata. Each retains at most eight candidate crops
+  with the strongest current **review-quality proxy**, at most two
+  from one frame, giving at most **96 sampled observations** per clip.
+- Neither the other unassigned candidates nor their counts are
+  discarded. The private `provisionalGroups.unassignedAudit` shows
+  `totalUnassignedObservations`, `sampledObservations`,
+  `unrepresentedObservations`, `strataRepresented` and the bounded
+  `sampledCrops`. These are candidates, **not person groups** or
+  assigned face observations.
+- Sampling the overflow does not retain extra embedding vectors,
+  use catalogue person rankings, change any existing group or
+  identity suggestion, reject any supposed background face, write
+  to PostgreSQL, or scan additional media. The new per-candidate
+  frame numbers, bounding boxes, timestamps and quality values are
+  **private diagnostic evidence** and never appear in stdout.
+  The CLI prints only the sample total and represented-strata count.
+- The cap is **not removed**: a sample of 96 cannot prove that
+  the remaining thousands of unassigned detections contain no
+  useful people. In particular, a high-quality background false
+  positive can displace a small authentic face. The audit allows
+  a bounded *human look* at overflow rather than hiding all of it.
+- The existing gallery still focuses on 64 provisional groups.
+  It does **not yet** provide a dedicated overflow-crop annotation UI,
+  automatically promote sampled overflow to face groups, or implement
+  the still-photo DBSCAN comparison. Those belong to later increments.
+
+### Deferred consolidated Windows 11 / PowerShell 7.6 verification
+
+After this PR is merged into `wi-0155`, the following needs **no
+private media or PostgreSQL** and can be batched with previous synthetic
+verification:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release --filter 'FullyQualifiedName~VideoFaceUnassignedAuditTests|FullyQualifiedName~VideoFaceProvisionalGroupingTests'
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 audit tests failed' }
+
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 docs validation failed' }
+~~~
+
+For the later **real V03 comparison**, use the previously approved
+fully-local V03 extracted manifest and existing read-only case
+definitions. **Do not replace** baseline JSON/CSV or user-reviewed
+group labels. Use **new private filenames** for report and person map,
+and the same approved face model settings, detector pipeline,
+model hashes, catalogue snapshot selection and other parameters as
+the baseline:
+
+~~~powershell
+# Set these locally from your existing approved environment/cases.
+# $cases, $models, $newPrivateReport, $newPrivatePeopleMap
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $cases --private-report $newPrivateReport `
+    --private-people-map $newPrivatePeopleMap --model-dir $models `
+    --provisional-groups --unassigned-audit
+if ($LASTEXITCODE -ne 0) { throw 'Private overflow audit failed' }
+
+# stdout contains only aggregate totals, not faces, timestamps or people.
+# Inspect the new report ONLY locally; it contains private face crop geometry.
+~~~
+
+For selected-catalogue cases, omit `--private-people-map`; if the
+baseline used `--detector-pipeline multi-scale` or
+`--face-overflow-policy retain-top-32`, also repeat those exact
+existing flags. A fresh read-only snapshot may differ from the
+historical baseline: compare source hashes, eligible catalogue
+snapshot and real group counts before attributing differences
+to this audit. **No extra inference run is necessary before the
+maintainer is ready for the consolidated local review.**
+
+**Human acceptance is still open.** Record whether useful genuine
+singletons or any additional identifiable people are visible among
+the bounded overflow crop samples, whether the sampling proxy
+overrepresents background false positives, and how many original
+groups still need dismissal. Do not claim `FACE-QUALITY-01`,
+`GROUP-QUALITY-01` or full person coverage based on the audit alone.
