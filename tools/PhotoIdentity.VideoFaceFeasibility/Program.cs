@@ -20,6 +20,12 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // Explicit source-free timestamp planning does not open video or databases.
+        if (args.Contains("--adaptive-sampling-plan", StringComparer.Ordinal))
+        {
+            return await VideoFaceAdaptiveSamplingCommand.RunAsync(args);
+        }
+
         // Geometry reconstruction is opt-in and must be routed BEFORE the
         // catalogue runner; it never loads the PostgreSQL catalogue.
         if (args.Contains("--review-geometry-selection", StringComparer.Ordinal))
