@@ -78,3 +78,7 @@ evidence:
 
 - type: maintainer_verification
   value: '2026-11-13: PR800 merged; automatic tests PASS. Real V03 22-frame YuNet-only detector pass: all 22 frames had candidates, 486 raw/473 retained/13 discarded in 12.1s; 22 detector-derived cues; refined to 180 frames (+158), 569296333 bytes, frame budget reached, no remaining window, coarse timestamps preserved, original video and coarse still SHA-256 unchanged during refinement; visual colour/orientation PASS; uniquely unobstructed face interval observed only in refined frames. Sampling mechanics verified on V03, recognition benefit and efficiency still unverified.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/802
+- type: implementation
+  value: '2026-11-13: Offline bounded 96-sample review gallery for PR799 unassigned V03 candidates with context crops, human face/non-face labels, private CSV save/import and aggregate quality measurement; human sample review pending; no candidate suppression, grouping mutation or database writes.'

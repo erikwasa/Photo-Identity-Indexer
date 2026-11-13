@@ -2000,3 +2000,47 @@ the detector still returns large numbers of background candidates.
 `CATALOGUE-TOP3-01` and multi-video human acceptance remain
 unfulfilled. No production integration or identity enrollment
 should follow these observations alone. See operations checkpoint 32.
+
+
+## Experimental checkpoint 33 — measure real faces missed by V03 group saturation (2026-11-13)
+
+The V03 baseline still stands: 64 groups, 407 grouped observations,
+3,505 unassigned observations, 55 of the 64 groups dismissed by a
+human as background, and **only one** of three visually identifiable
+known people retrieved with a correct top-three suggestion. The
+separate 96-example PR #799 temporally stratified unassigned audit
+was structurally verified, but we have not human-labelled its
+crops. This is a critical unknown: candidate detector errors and
+lost real-face observations are different failure modes.
+
+PR #802 adds an opt-in **Windows/PowerShell 7.6, fully local
+unassigned-candidate review** of the previous audit, requiring no
+model inference, database connection, original video or new frame
+extraction. It validates the original private multi-clip catalogue
+report, cases, frame manifest, grouping accounting, 64-group
+saturation, 12-stratum/8-sample capacity, maximum two samples per
+frame and image geometry. The standalone gallery creates private
+bounded crop and source-context image copies, simple manual
+face/non-face/uncertain labels, optional private known-person
+aliases for real faces, and strict CSV save/import. A separate
+read-only script reconciles the saved CSV against the same
+report, returning only anonymous counts (including real-face
+samples among unassigned, distinct known people observed and
+exploratory confidence/quality threshold retention counts).
+
+**This is quality observability, not quality improvement yet.**
+Samples favor higher crop-quality proxies in each temporal stratum,
+so the human-labelled sample ratio cannot be extrapolated to the
+3,409 not sampled; a real face in the sample is nevertheless
+important proof of missed visible evidence. It provides evidence
+for later comparison of candidate quality filtering and M25 DBSCAN
+grouping, while avoiding premature automatic suppression or
+unsafe merging. `FACE-QUALITY-01`, `GROUP-QUALITY-01`, top-three
+accuracy and diverse-video acceptance remain open.
+
+Post-merge local verification: run the synthetic Windows gallery
+test and then use the **existing** PR #799 private report and
+matching cases manifest to open and annotate the 96-sample V03
+gallery. Import/save CSV, run aggregate measurement and report only
+counts. See operations checkpoint 33. No archive write or
+production integration is authorized by this PR.

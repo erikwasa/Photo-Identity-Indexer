@@ -227,6 +227,7 @@ jobs:
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupReview.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupRankAccuracy.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceReviewPriority.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceUnassignedReview.ps1
 
       - name: Verify WI-0208 restore-copy ownership guards
         shell: pwsh

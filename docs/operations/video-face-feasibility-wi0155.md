@@ -3265,3 +3265,93 @@ Evaluate other approved videos with transient appearances before
 tuning cue priority/number of refinement samples. Retain private
 artifacts outside Git and do not integrate `wi-0155` into `main`
 without separate production acceptance.
+
+
+## Checkpoint 33 — PR #802: human-review bridge for the 96 unassigned candidates (2026-11-13)
+
+The prior read-only PR #799 V03 run preserved **3,505 unassigned
+observations** after the 64-group ceiling and sampled **96 candidate
+crops in 12 temporal strata**, but until this PR the sampler's metadata
+had no human-review interface. Do not assume those unmatched detections
+are genuine people or that all are background. The 96 are
+**quality-prioritized, temporally stratified examples**, not an
+unbiased random sample. Their observed face/background percentages
+CANNOT be multiplied by 3,505.
+
+The new, separate offline PowerShell gallery renders the **existing**
+samples as a small face crop and a bounded source-context thumbnail
+with a rectangle. It accepts the *same* approved private full-catalogue
+report and cases JSON produced for PR #799; it checks report and manifest
+consistency, per-frame and temporal sample bounds, geometry and fully
+local inputs. It never runs YuNet/SFace, opens videos/OneDrive,
+loads the people database, modifies source images, or creates identity
+assignments. Only review copies and an initially empty local CSV are
+created under LOCALAPPDATA.
+
+The controls let the maintainer review each sample as **Real face,
+Not a face, Cannot tell** or leave it unreviewed. For a clearly
+recognized real face, a private P-alias can optionally be added; if
+the person is confidently not in the eligible catalogue, use
+`UNKNOWN`. Do not use real names. Review CSV save/import is
+operator-initiated and local only; the measurement script checks
+all sample IDs, frame and face ordinals and classifications against
+the original report before reporting aggregate counts.
+
+### Local verification (after PR #802 merges to wi-0155)
+
+From your already updated PowerShell 7.6 WI-0155 worktree:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+if ($LASTEXITCODE -ne 0) { throw 'Docs invalid' }
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+if ($LASTEXITCODE -ne 0) { throw 'Generated docs stale' }
+
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceUnassignedReview.ps1
+if (-not $?) { throw 'Synthetic private audit review failed' }
+
+# Reuse the approved V03-containing PR #799 private files.
+# No models, credentials, people map or video are required.
+# $auditReport = actual full-eligible report produced with --unassigned-audit
+# $casesPath   = its exact matching existing private catalogue-cases JSON
+foreach ($file in @($auditReport, $casesPath)) {
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        throw 'Approved private WI-0155 audit input is unavailable'
+    }
+}
+
+$review = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceUnassignedReview.ps1 `
+    -PrivateReportPath $auditReport -PrivateCasesPath $casesPath `
+    -ClipAlias V03 -OpenGallery
+$review | Select-Object SampledCrops,TotalUnassignedObservations,
+    UnrepresentedObservations,TemporalStrataRepresented | Format-List
+
+# Label the 96 samples in the private browser gallery, save the reviewed
+# CSV locally, and use its actual absolute file path here.
+$reviewCsv = 'C:\replace-with-actual-private-reviewed-audit.csv'
+$stats = .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceUnassignedReview.ps1 `
+    -ReviewedCsvPath $reviewCsv -PrivateGroupReportPath $auditReport -ClipAlias V03
+$stats | Format-List
+~~~
+
+Expected V03 gallery accounting from the existing PR #799 report:
+`SampledCrops=96`,
+`TotalUnassignedObservations=3505`,
+`UnrepresentedObservations=3409`,
+`TemporalStrataRepresented=12`. After review, report only the
+measurement command's **aggregate** output. Never share the HTML,
+crops, original private JSON, CSV contents, names or P-aliases.
+
+The quality-retention counters at detector confidence 0.70 and crop
+quality proxy 0.50 are **retrospective comparisons of labelled
+sample observations only**; neither is a validated face threshold.
+Even if most sampled items are background, the unrepresented
+3,409 observations remain unknown. This increment improves visibility
+and provides a labelled cohort for evaluating better detector
+validation and DBSCAN/other grouping policies; it does NOT lower the
+false-group burden or establish a safe suppression policy.
+
+**Local acceptance pending** until the operator has verified the
+gallery, manual labels, matching CSV import/export, source-frame
+integrity and aggregate report against actual V03 evidence.
