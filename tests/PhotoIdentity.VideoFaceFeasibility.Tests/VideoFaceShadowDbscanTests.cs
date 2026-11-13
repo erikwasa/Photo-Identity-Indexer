@@ -58,7 +58,7 @@ public sealed class VideoFaceShadowDbscanTests
         Assert.All(report.Groups, group =>
         {
             Assert.Equal(2, group.Observations);
-            Assert.Single(group.RepresentativeCrops);
+            Assert.Equal(2, group.RepresentativeCrops.Count);
             Assert.Equal("P0001", group.TopCandidates[0].Alias);
         });
 
