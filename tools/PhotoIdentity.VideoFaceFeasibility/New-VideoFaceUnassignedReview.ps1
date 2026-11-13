@@ -133,8 +133,10 @@ for ($i=0; $i -lt $samples.Count; $i++) {
         throw 'Invalid, duplicated or mismatched unassigned detection geometry.'
     }
     $priorTime = $time
-    $stratum = [int][Math]::Min(11,
-        (($time - $minTime) * 12) / ($maxTime - $minTime + 1))
+    # C# audit sampling uses integer division (floor for nonnegative time).
+    # PowerShell [int] casts ROUND, so use Floor explicitly to match it.
+    $stratum = [int][Math]::Min(11, [Math]::Floor(
+        (($time - $minTime) * 12.0) / ($maxTime - $minTime + 1)))
     $stratumKey = [string]$stratum
     $frameKey = '{0}:{1}' -f $stratum,$frame
     if (-not $strata.ContainsKey($stratumKey)) { $strata[$stratumKey]=0 }
