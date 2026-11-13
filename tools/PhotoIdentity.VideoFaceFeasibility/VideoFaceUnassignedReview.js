@@ -128,9 +128,7 @@
     link.href = url;
     link.download = 'wi0155-' + clip + '-unassigned-review.csv';
     link.click();
-    // Browser-owned download finishes asynchronously; this revocation
-    // occurs on an actual later user action, not a timer or background task.
-    link.addEventListener('click', () => URL.revokeObjectURL(url), { once: true });
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
     status.textContent = 'CSV save requested; no source or database changes';
   });
 
