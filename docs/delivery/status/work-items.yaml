@@ -107,6 +107,12 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/799
   - type: implementation
     value: '2026-11-12: Opt-in 96-sample temporal overflow audit reveals bounded private crop evidence from the 64-group saturation while preserving assignments, full unassigned counts and ranking; real validation pending.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/800
+  - type: maintainer_verification
+    value: '2026-11-13: PR795 offline V03 review-priority comparison completed; PR799 all-eligible 3-video overflow audit succeeded (V03 original 64 groups / 407 assigned / 3505 unassigned unchanged, 96 samples across 12 strata); V03 adaptive coarse extraction produced 22 frames across 166.68s, 7928ms maximum gap and no continuation; hash/visual/refined review pending.'
+  - type: implementation
+    value: '2026-11-13: Reference-free YuNet-only private coarse detector report for existing cue deriver; no curated still references, SFace, PostgreSQL, original video or production writes in this stage; post-PR800 local verification pending.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
