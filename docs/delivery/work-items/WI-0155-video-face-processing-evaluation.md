@@ -2044,3 +2044,61 @@ matching cases manifest to open and annotate the 96-sample V03
 gallery. Import/save CSV, run aggregate measurement and report only
 counts. See operations checkpoint 33. No archive write or
 production integration is authorized by this PR.
+
+
+## Experimental checkpoint 34 — corrected face audit and isolated M25 shadow grouping (2026-11-13)
+
+The completed PR #802 V03 review initially reported 48 Real face,
+46 Cannot tell and 2 Not a face out of the 96 quality-biased
+unassigned candidates. The maintainer clarified that **all 46
+Cannot tell entries represented real human faces whose person's
+identity was not visually determinable**. With a separate
+corrected face-validity CSV (the original identity-conservative
+review preserved), the true classification is **94 real faces,
+2 non-faces, 0 uncertain face-validity cases**. Of the 94 real
+faces, only **82** were at or above detector confidence 0.70,
+and **none** exceeded crop-quality proxy 0.50; 12 would be
+excluded by a 0.70 detector cutoff and all 94 by a 0.50
+quality cutoff. These are biased-sample counts, NOT population
+precision estimates; the 3,409 other unassigned observations
+remain unreviewed. No known/unknown identity aliases were
+recorded, so no person-level inference can be drawn.
+
+**Impact on requirements:** `FACE-QUALITY-01` cannot safely
+be addressed by naive high-confidence/quality filtering.
+`GROUP-QUALITY-01` needs a method that retains singletons
+and does not silently discard real faces after hitting 64
+streaming groups. The existing 64-group review found substantial
+background burden; the separate unassigned audit is a quality
+*biased* slice and cannot contradict its group-label results.
+
+PR #803 introduces an **opt-in shadow-only use of the existing
+M25 DBSCAN clustering engine** on the exact SFace vectors
+already computed inside the all-eligible read-only video
+catalogue experiment. It adapts M25 with a clearly experimental
+video policy (cosine distance 0.18, min two members) and explicit
+same-frame not-same constraints; unlike the still-photo
+known-person advisory it does not treat adjacent frames as
+independent identity votes. It keeps singleton and otherwise
+ungrouped evidence as **explicit noise observations**, not
+deleted or rejected faces, with up to 96 temporally stratified
+private noise-crop examples for future human review. Any noise
+not sampled remains counted and is not assumed to be background. The bounded shadow review stores
+up to 64 groups' source-frame boxes plus full-eligible-catalogue
+top-three pseudonymous suggestions, and reports all remaining
+clusters and members as *unrepresented*, not lost. The original
+streaming grouping, all V03 baseline assignment counts,
+all other catalogue ranks and the private human-labelled audit
+are left unchanged.
+
+This is **algorithm-comparison infrastructure, not demonstrated
+quality improvement**. The run cannot yet assert fewer false
+groups, no wrong-person merges, known-person recall or improved
+top-three identification. Real V01–V03 read-only comparison and
+human adjudication are pending; further diverse-video cases
+are required before any cutoff or grouping substitution.
+See operations checkpoint 34. All `GROUP-QUALITY-01`,
+`FACE-QUALITY-01`, `CATALOGUE-TOP3-01`,
+`DIVERSE-VIDEOS-01` and `MERGE-01` acceptance gates
+remain open; `SAMPLING-01` two-pass mechanics remain
+verified only for V03.

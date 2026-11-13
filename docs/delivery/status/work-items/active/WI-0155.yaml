@@ -82,3 +82,9 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/802
 - type: implementation
   value: '2026-11-13: Offline bounded 96-sample review gallery for PR799 unassigned V03 candidates with context crops, human face/non-face labels, private CSV save/import and aggregate quality measurement; human sample review pending; no candidate suppression, grouping mutation or database writes.'
+- type: maintainer_verification
+  value: '2026-11-13: PR802 full V03 unassigned review corrected after face-vs-identity clarification: all 96 sampled, 94 confirmed real human face detections and 2 backgrounds; former 46 Cannot tell all real faces but identities not visually identifiable. Corrected private audit 82/94 real faces at detector confidence >=0.70, 0/94 at crop-quality proxy >=0.50; 0 known-person aliases. Sample quality-biased; no claim about 3409 other unassigned candidates or any suppression threshold.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/803
+- type: implementation
+  value: '2026-11-13: Experimental all-eligible read-only M25 DBSCAN shadow comparison at cosine distance 0.18/min2 with same-frame not-same constraints, bounded in-memory vectors, explicit singleton noise and private 96-sample noise audit; baseline groups, ranks and source files unchanged. Real comparative run and human validation pending.'

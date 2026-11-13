@@ -20,6 +20,7 @@ public static class VideoFaceCatalogueRunner
         VideoFaceOverflowPolicy OverflowPolicy,
         bool ProvisionalGroups,
         bool UnassignedAudit,
+        bool ShadowDbscan,
         string? PrivatePeopleMap);
 
     public static async Task<int> RunAsync(string[] args)
@@ -31,6 +32,10 @@ public static class VideoFaceCatalogueRunner
             VideoFaceCatalogueCases cases = await VideoFaceCatalogueCasesLoader.LoadAsync(
                 options.Cases, options.Root);
             bool allPeople = cases.CatalogueScope == "all-eligible";
+            if (options.ShadowDbscan && !allPeople)
+            {
+                throw new ArgumentException("Video shadow DBSCAN requires the all-eligible catalogue, not selected references.");
+            }
             if (allPeople != (options.PrivatePeopleMap is not null))
             {
                 throw new ArgumentException(
@@ -94,7 +99,8 @@ public static class VideoFaceCatalogueRunner
                 VideoFacePrivateReview review = await experiment.RunWithPreparedMatcherAsync(
                     frames, folder, matcher, options.DetectorConfidence,
                     provisionalGroups: options.ProvisionalGroups,
-                    unassignedAudit: options.UnassignedAudit);
+                    unassignedAudit: options.UnassignedAudit,
+                    shadowDbscan: options.ShadowDbscan);
                 var personRanks = review.Diagnostics!.RankedFaces
                     .GroupBy(face => face.TopReferenceAlias, StringComparer.Ordinal)
                     .Select(group => new VideoFaceCataloguePersonRankSummary(
@@ -163,6 +169,17 @@ public static class VideoFaceCatalogueRunner
                 groupObservationsUnassigned = options.ProvisionalGroups
                     ? reviews.Sum(r => r.Review.Diagnostics!.ProvisionalGroups!.ObservationsUnassigned)
                     : 0,
+                shadowDbscanRequested = options.ShadowDbscan,
+                shadowDbscanClusterCount = options.ShadowDbscan
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.ClusterCount) : 0,
+                shadowDbscanNoiseObservations = options.ShadowDbscan
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.NoiseObservations) : 0,
+                shadowDbscanClusterMembers = options.ShadowDbscan
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.ClusterMembers) : 0,
+                shadowDbscanGroupsNotRepresented = options.ShadowDbscan
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.GroupsNotRepresentedForReview) : 0,
+                shadowDbscanSameFrameCollisions = options.ShadowDbscan
+                    ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.SameFrameCollisions) : 0,
                 elapsedMilliseconds = Math.Round(reviews.Sum(
                     r => r.Review.Aggregate.ElapsedMilliseconds), 3),
                 privateReportWritten = true,
@@ -192,6 +209,7 @@ public static class VideoFaceCatalogueRunner
         string? overflowPolicy = null;
         bool provisionalGroups = false;
         bool unassignedAudit = false;
+        bool shadowDbscan = false;
         for (int i = 0; i < args.Length; i++)
         {
             string name = args[i];
@@ -211,6 +229,13 @@ public static class VideoFaceCatalogueRunner
                     throw new ArgumentException("Duplicate unassigned-audit option.");
                 }
                 unassignedAudit = true;
+                continue;
+            }
+            if (name == "--shadow-dbscan")
+            {
+                if (shadowDbscan)
+                    throw new ArgumentException("Duplicate shadow-dbscan option.");
+                shadowDbscan = true;
                 continue;
             }
             if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
@@ -241,6 +266,10 @@ public static class VideoFaceCatalogueRunner
         if (unassignedAudit && !provisionalGroups)
         {
             throw new ArgumentException("The unassigned audit requires --provisional-groups.");
+        }
+        if (shadowDbscan && (!provisionalGroups || !unassignedAudit))
+        {
+            throw new ArgumentException("Shadow DBSCAN requires both --provisional-groups and --unassigned-audit.");
         }
 
         string repo = Path.GetFullPath(root ?? Directory.GetCurrentDirectory());
@@ -278,6 +307,6 @@ public static class VideoFaceCatalogueRunner
             throw new ArgumentException("Private people map requires a fully qualified path.");
         }
         return new Options(cases, report, repo, dir, threshold, selected, policy,
-            provisionalGroups, unassignedAudit, peopleMap);
+            provisionalGroups, unassignedAudit, shadowDbscan, peopleMap);
     }
 }

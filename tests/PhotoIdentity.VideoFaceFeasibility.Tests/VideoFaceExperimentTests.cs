@@ -236,6 +236,71 @@ public sealed class VideoFaceExperimentTests
         }
     }
 
+    [Fact]
+    public async Task Opt_in_shadow_dbscan_preserves_original_grouping_and_source_integrity()
+    {
+        string dir = CreateTempDirectory();
+        try
+        {
+            byte[] first = [137, 80, 78, 71, 13, 10, 26, 10, 1];
+            byte[] second = [137, 80, 78, 71, 13, 10, 26, 10, 2];
+            await File.WriteAllBytesAsync(Path.Combine(dir, "one.png"), first);
+            await File.WriteAllBytesAsync(Path.Combine(dir, "two.png"), second);
+
+            var matcher = new VideoFaceCataloguePersonMatcher(
+            [
+                new("P01", new string('a', 64),
+                    new EmbeddingVector(new float[] { 1, 0, 0 })),
+            ]);
+            var manifest = new VideoFaceFrameSet(1,
+            [
+                new VideoFaceFrame(1000, "one.png"),
+                new VideoFaceFrame(2000, "two.png"),
+            ]);
+            var experiment = new VideoFaceExperiment(
+                new FakeDecoder(), new FakeDetector(), new FakeAligner(),
+                new FakeEmbedder());
+
+            VideoFacePrivateReview baseline = await experiment.RunWithPreparedMatcherAsync(
+                manifest, dir, matcher, detectorConfidence: 0.5,
+                provisionalGroups: true, unassignedAudit: true);
+            VideoFacePrivateReview shadow = await experiment.RunWithPreparedMatcherAsync(
+                manifest, dir, matcher, detectorConfidence: 0.5,
+                provisionalGroups: true, unassignedAudit: true,
+                shadowDbscan: true);
+
+            Assert.Null(baseline.Diagnostics!.ShadowDbscan);
+            Assert.Equal(
+                JsonSerializer.Serialize(baseline.Diagnostics.ProvisionalGroups),
+                JsonSerializer.Serialize(shadow.Diagnostics!.ProvisionalGroups));
+            Assert.Equal(
+                JsonSerializer.Serialize(baseline.Diagnostics.GroupSuggestions),
+                JsonSerializer.Serialize(shadow.Diagnostics.GroupSuggestions));
+            Assert.Equal(
+                JsonSerializer.Serialize(baseline.Findings),
+                JsonSerializer.Serialize(shadow.Findings));
+            Assert.Equal(1, shadow.Diagnostics.ShadowDbscan!.ClusterCount);
+            Assert.Equal(2, shadow.Diagnostics.ShadowDbscan.ClusterMembers);
+            Assert.Equal(0, shadow.Diagnostics.ShadowDbscan.NoiseObservations);
+            Assert.True(shadow.Diagnostics.ShadowDbscan.AllObservationsAccountedFor);
+            Assert.Equal("P01", Assert.Single(
+                shadow.Diagnostics.ShadowDbscan.Groups).TopCandidates[0].Alias);
+            Assert.Equal(first, await File.ReadAllBytesAsync(Path.Combine(dir, "one.png")));
+            Assert.Equal(second, await File.ReadAllBytesAsync(Path.Combine(dir, "two.png")));
+
+            // The comparator is *not* a fallback for obsolete still-reference
+            // experiments and it cannot hide missing baseline/audit evidence.
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                experiment.RunWithPreparedMatcherAsync(
+                    manifest, dir, matcher, detectorConfidence: 0.5,
+                    shadowDbscan: true));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"wi0155-{Guid.NewGuid():N}");

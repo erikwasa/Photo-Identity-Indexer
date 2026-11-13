@@ -63,6 +63,7 @@ public static class Program
                 "[--model-dir <installed-model-dir>] [--detector-confidence <0.5|0.7|0.9>] " +
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
                 "[--face-overflow-policy <fail|retain-top-32>] [--provisional-groups] " +
+                "[--unassigned-audit] [--shadow-dbscan (requires both flags)] " +
                 "[--private-people-map <new-private-map.json> for catalogueScope=all-eligible]\n" +
                 "Visual review geometry (NO database): --review-geometry-selection <existing-selection.json> " +
                 "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +

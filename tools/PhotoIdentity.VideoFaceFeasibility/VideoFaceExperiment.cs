@@ -289,7 +289,8 @@ public sealed class VideoFaceExperiment
         double detectorConfidence,
         CancellationToken cancellationToken = default,
         bool provisionalGroups = false,
-        bool unassignedAudit = false)
+        bool unassignedAudit = false,
+        bool shadowDbscan = false)
     {
         ArgumentNullException.ThrowIfNull(matcher);
         if (detectorConfidence is not (0.5 or 0.7 or 0.9))
@@ -301,6 +302,11 @@ public sealed class VideoFaceExperiment
         {
             throw new ArgumentException("Unassigned audit requires explicit provisional grouping.");
         }
+        if (shadowDbscan && (!provisionalGroups || !unassignedAudit ||
+            matcher is not VideoFaceCataloguePersonMatcher))
+        {
+            throw new ArgumentException("Shadow DBSCAN requires full-catalogue provisional groups and unassigned audit.");
+        }
 
         // Include up to 180 pre-extracted local frames, without requiring
         // heuristic groups/tracks to identify a person.
@@ -309,7 +315,8 @@ public sealed class VideoFaceExperiment
             requestedDetectorConfidence: detectorConfidence,
             cancellationToken: cancellationToken,
             provisionalGroups: provisionalGroups,
-            unassignedAudit: unassignedAudit);
+            unassignedAudit: unassignedAudit,
+            shadowDbscan: shadowDbscan);
     }
 
     private async Task<VideoFacePrivateReview> RunCoreAsync(
@@ -321,7 +328,8 @@ public sealed class VideoFaceExperiment
         double requestedDetectorConfidence,
         CancellationToken cancellationToken,
         bool provisionalGroups = false,
-        bool unassignedAudit = false)
+        bool unassignedAudit = false,
+        bool shadowDbscan = false)
     {
         VideoFaceFrameSetLoader.Validate(set, coverage);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
@@ -351,6 +359,9 @@ public sealed class VideoFaceExperiment
                 captureUnassignedAudit: unassignedAudit,
                 firstTimestampMs: set.Frames![0].TimestampMs,
                 lastTimestampMs: set.Frames[^1].TimestampMs)
+            : null;
+        VideoFaceShadowDbscan? shadow = shadowDbscan
+            ? new VideoFaceShadowDbscan()
             : null;
         List<VideoFaceReferenceFinding> findings = [];
         List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
@@ -440,6 +451,8 @@ public sealed class VideoFaceExperiment
                             provisional.Observe(index + 1, timestamp, faceIndex + 1,
                                 current[faceIndex], detections[faceIndex], image.Size);
                         }
+                        shadow?.Observe(index + 1, timestamp, faceIndex + 1,
+                            current[faceIndex], detections[faceIndex], image.Size);
                         if (diagnostics && matcher is VideoFaceCataloguePersonMatcher catalogue)
                         {
                             // Full-archive ranking only once per face, preserving all
@@ -502,6 +515,11 @@ public sealed class VideoFaceExperiment
             throw;
         }
 
+        VideoFaceShadowDbscanReview? shadowReview = shadow is not null
+            ? await shadow.EvaluateAsync((VideoFaceCataloguePersonMatcher)matcher!,
+                cancellationToken)
+            : null;
+
         VideoFaceAggregate aggregate = new(
             1,
             files.Length,
@@ -530,6 +548,7 @@ public sealed class VideoFaceExperiment
                         matcher is VideoFaceCataloguePersonMatcher catalogueMatcher
                         ? provisional.RankGroups(catalogueMatcher)
                         : null,
+                    ShadowDbscan = shadowReview,
                     Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
                         coverageGrouper.Groups.Count,
                         coverageGrouper.Groups,
