@@ -32,6 +32,10 @@ public static class VideoFaceCatalogueRunner
             VideoFaceCatalogueCases cases = await VideoFaceCatalogueCasesLoader.LoadAsync(
                 options.Cases, options.Root);
             bool allPeople = cases.CatalogueScope == "all-eligible";
+            if (options.ShadowDbscan && !allPeople)
+            {
+                throw new ArgumentException("Video shadow DBSCAN requires the all-eligible catalogue, not selected references.");
+            }
             if (allPeople != (options.PrivatePeopleMap is not null))
             {
                 throw new ArgumentException(
