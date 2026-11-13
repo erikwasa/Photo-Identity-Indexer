@@ -1961,3 +1961,42 @@ extraction on the already-approved V03 video, human inspection,
 original-video hash check and eventually diverse approved videos.
 See operations checkpoint 31. `SAMPLING-01` and all other
 pre-merge quality gates remain open until human-reviewed proof.
+
+
+## Experimental checkpoint 32 — first real V03 adaptive two-pass acceptance (2026-11-13)
+
+PR #800 merged into the isolated `wi-0155` branch. The maintainer
+reported **all automatic tests passing** and completed the previously
+blocked reference-free detector/cue and refined-extraction workflow.
+
+On 22 approved V03 coarse frames (166.68-second window), the YuNet-only
+diagnostic run examined **22/22 frames with detector candidates**,
+reported **486 raw / 473 retained / 13 discarded candidates**,
+and took 12,110.831 ms. The cue adapter wrote **22 private cues**
+successfully; no reference-image manifest or database identity
+consultation was required for sampling. The subsequent opt-in
+refinement extracted **180 frames**, including the original 22
+coarse timestamps and **158 additional samples**; it reached the
+bounded per-window frame budget, had **no additional window**, and
+wrote **569,296,333 bytes** of private frame data (within the
+configured 1,024 MiB limit).
+
+The maintainer confirmed **zero missing coarse timestamps**,
+source-video SHA-256 unchanged during refined extraction, coarse
+still SHA-256 hashes unchanged, and visually acceptable frame
+orientation, colour and quality. The three visible people mostly
+remained in view; crucially, **one person became fully visible only
+briefly when leaving the frame and that unobstructed-face interval
+appears in refined samples only**. This supports a real,
+human-observed *face visibility* benefit, but not increased
+known-person top-three accuracy or a justified 158-frame workload.
+
+**Acceptance distinctions:** `SAMPLING-01` two-pass *mechanics*
+have passed a real approved Windows V03 test. Wider sampling
+**effectiveness/efficiency remains open**, because every coarse frame
+generated a cue, the refinement exhausted the 180-frame budget and
+the detector still returns large numbers of background candidates.
+`FACE-QUALITY-01`, `GROUP-QUALITY-01`,
+`CATALOGUE-TOP3-01` and multi-video human acceptance remain
+unfulfilled. No production integration or identity enrollment
+should follow these observations alone. See operations checkpoint 32.
