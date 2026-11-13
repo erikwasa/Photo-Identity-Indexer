@@ -2081,7 +2081,9 @@ same-frame not-same constraints; unlike the still-photo
 known-person advisory it does not treat adjacent frames as
 independent identity votes. It keeps singleton and otherwise
 ungrouped evidence as **explicit noise observations**, not
-deleted or rejected faces. The bounded shadow review stores
+deleted or rejected faces, with up to 96 temporally stratified
+private noise-crop examples for future human review. Any noise
+not sampled remains counted and is not assumed to be background. The bounded shadow review stores
 up to 64 groups' source-frame boxes plus full-eligible-catalogue
 top-three pseudonymous suggestions, and reports all remaining
 clusters and members as *unrepresented*, not lost. The original
