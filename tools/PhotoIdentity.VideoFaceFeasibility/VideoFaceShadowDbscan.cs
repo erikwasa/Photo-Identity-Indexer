@@ -60,7 +60,7 @@ public sealed class VideoFaceShadowDbscan
     public const double ExperimentalCosineDistance = 0.18;
     public const string ExperimentalPolicyVersion = "wi0155-video-shadow-dbscan-e018-min2-v1";
 
-    private static readonly ProvisionalFaceClusterPolicy Policy = new(
+    private static readonly ProvisionalFaceClusterPolicy Policy = new ProvisionalFaceClusterPolicy(
         Version: ExperimentalPolicyVersion,
         Algorithm: "dbscan-cosine",
         MinimumClusterSize: 2,
