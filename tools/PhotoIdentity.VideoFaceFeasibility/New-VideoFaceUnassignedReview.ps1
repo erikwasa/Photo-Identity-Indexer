@@ -74,6 +74,10 @@ if ($samples.Count -lt 1 -or $samples.Count -gt 96 -or
     [int]$audit.strataRepresented -gt 12) {
     throw 'Invalid private audit sample count.'
 }
+if (@($review.groups).Count -ne 64 -or
+    [int]$review.observationsUnassigned -lt 1) {
+    throw 'An unassigned capacity audit requires all 64 provisional groups.'
+}
 $assigned = 0
 foreach ($group in @($review.groups)) {
     $assigned += [int]$group.observations
@@ -198,7 +202,7 @@ article h2{margin:0 0 5px;font-size:17px}.sample-meta{font-size:12px;color:#b6ca
 article label{display:block;font-size:13px;margin-top:8px}
 article select,article input{width:100%;box-sizing:border-box}
 article[hidden]{display:none}
-</style></head><body><main>
+</style></head><body><main data-clip="CLIP_ALIAS_TOKEN">
 <h1>WI-0155 · Unassigned detections</h1>
 <p class="note">PRIVATE, read-only human review of the bounded audit samples that did not join a provisional group after capacity was reached. These are NOT all unassigned detections, not independent random samples, not identified people and not a detection precision estimate. The temporal sampler deliberately favors higher quality-proxy examples. A real face here is evidence for missed reviewable material, not an automatic identity.</p>
 <p class="note">Classify each crop as Real face, Not a face, or Cannot tell. If you recognize a real face, optionally enter its existing PRIVATE P0001-style alias or UNKNOWN. No real names, notes, raw frames, scores, or identity decisions leave this folder. CSV files remain local, and importing them never changes the database. Use the enlarged crop and context image to check tiny and oblique faces.</p>
@@ -273,6 +277,7 @@ try {
             $rows[[int]($task.Id.Substring(1))-1].Face,$task.Stratum,
             $task.Confidence,$task.Quality))
     }
+    $gallery[0] = $gallery[0].Replace('CLIP_ALIAS_TOKEN', (Esc $ClipAlias))
     $gallery.Add('</div><script src="unassigned-review.js"></script></main></body></html>')
 
     $worksheet = Join-Path $output 'unassigned-review.csv'
