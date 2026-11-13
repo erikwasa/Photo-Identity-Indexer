@@ -3355,3 +3355,143 @@ false-group burden or establish a safe suppression policy.
 **Local acceptance pending** until the operator has verified the
 gallery, manual labels, matching CSV import/export, source-frame
 integrity and aggregate report against actual V03 evidence.
+
+
+## Checkpoint 34 — real unassigned-face labels; M25 DBSCAN shadow comparator (2026-11-13)
+
+**Confirmed operator evidence after PR #802 (full 96-sample V03 audit):**
+96/96 reviewed; **94 genuinely human face crops, 2 background crops,
+0 uncertain whether a face exists**. The original 46 “Cannot tell”
+labels meant **real faces whose owners could not be identified**,
+NOT uncertain face validity. The maintainer therefore preserved an
+original identity-conservative CSV and separately corrected the
+face-validity CSV (94/2/0). Both measurement runs validated against
+the original private audit report; the corrected aggregate included
+**82/94 real faces with detector confidence >= 0.70** (12 below),
+**0/94 with crop-quality proxy >= 0.50**, no known-person aliases
+and no unknown-person aliases. Zero aliases is **missing identity
+annotation**, not evidence that the faces were unknown to the catalogue.
+An actual face must not be described as “unknown identity” solely
+because it was unclear.
+
+The 96 samples are **not random**: the PR #799 sampler favors its
+crop-quality proxy within 12 temporal strata. Consequently, these
+observed percentages are NOT detector precision and **cannot be
+extrapolated** to the other 3,409 unassigned observations.
+Nevertheless, the corrected evidence proves that valid face
+observations exist beyond the chronological 64-group ceiling. The
+sample offers no validated confidence/quality rejection threshold.
+
+### New experimental comparison: `--shadow-dbscan`
+
+M25's `ProvisionalFaceDbscanClusterer` implements bounded exact
+cosine-distance DBSCAN with explicit noise and “not the same person”
+constraints. This PR reuses that computation ONLY as a **separate,
+offline, opt-in shadow comparison** while the existing all-eligible
+video experiment already has the SFace vectors in memory. It does
+not copy M25's three-independent-photo known-person voting or its
+still-image policy values. The exploratory video policy has
+cosine distance **0.18** (similarity ~0.82), min-neighbors **2**,
+min-cluster-size **2**, chosen for a controlled structural
+comparison against the original group cosine threshold—not
+calibrated for people recognition or safe face rejection.
+
+- Captures at most 180 frames x 32 candidates = **5,760** volatile
+  embeddings per clip. Every detector-retained observation enters
+  the shadow comparison; no prefilter based on confidence/size.
+  The production M25 sparse-neighbor edge cap **2 million** remains
+  fail-closed.
+- All simultaneous detections from one frame get pairwise **not-same**
+  constraints (bounded <=100,000). The replay checks that no resulting
+  cluster contains two faces from the same frame; it fails rather
+  than silently merging them.
+- **Single-observation faces are allowed as noise**; noise is counted
+  and NEVER treated as discarded/background/unknown persons.
+  The number of formed clusters, their members, noise, co-presence
+  violations, and the number of clusters not represented in the
+  bounded 64-group review shortlist are all explicitly accounted.
+- Private JSON may include up to **64 shadow group records** with
+  source-frame crop geometry and up to three *catalogue-derived*
+  candidate aliases/scores per group for **human review only**.
+  The extra groups and their members are counted even when the
+  shortlist cannot display them. Neither SFace embeddings,
+  canonical IDs, names, original paths, nor M25's suggestion
+  voting are serialized.
+- Baseline `provisionalGroups`, `unassignedAudit`, original individual
+  top-three ranks and existing private review workflows **remain
+  unchanged**. The shadow results are separately stored in
+  `clips[].review.diagnostics.shadowDbscan` ONLY with explicit
+  `--shadow-dbscan`. No archive writes, video identity enrollments,
+  worker scheduling, or main-branch changes are authorized.
+
+### Optional read-only local acceptance (after PR merge)
+
+This run computes the new comparison from local approved V01–V03
+frame manifests and one read-only eligible production people
+snapshot. It **does repeat** the old ONNX experiment, because the
+prior private JSON appropriately contains no SFace vectors to
+replay. The existing approved `$casesPath`, `$modelDir` and
+`PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING` must be available.
+Do not run without a restored explicit, SELECT-only DB connection
+and approved fully-local frames. Use the existing original V01–V03
+case manifest (not V03-only; two or more cases required).
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Focused experimental tests failed' }
+
+if (-not $env:PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING) {
+    throw 'Existing approved SELECT-only WI-0155 PostgreSQL connection required'
+}
+foreach ($path in @($casesPath, $modelDir)) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw 'Missing previously approved private cases or verified models'
+    }
+}
+$shadowRoot = Join-Path $env:LOCALAPPDATA (
+    'PhotoIdentity\WI0155\shadow-dbscan-' +
+    (Get-Date -Format 'yyyyMMdd-HHmmssfff')
+)
+New-Item -ItemType Directory -Path $shadowRoot -Force | Out-Null
+$shadowReport = Join-Path $shadowRoot 'full-catalogue-shadow.json'
+$shadowMap = Join-Path $shadowRoot 'private-people-map.json'
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $casesPath --private-report $shadowReport `
+    --private-people-map $shadowMap `
+    --root (Get-Location).Path --model-dir $modelDir `
+    --detector-confidence 0.5 --detector-pipeline multi-scale `
+    --tile-size 1024 --face-overflow-policy retain-top-32 `
+    --provisional-groups --unassigned-audit --shadow-dbscan
+if ($LASTEXITCODE -ne 0) { throw 'Private shadow DBSCAN experiment failed' }
+
+$private = Get-Content -LiteralPath $shadowReport -Raw | ConvertFrom-Json
+$private.clips | ForEach-Object {
+    $group = $_.review.diagnostics.provisionalGroups
+    $shadow = $_.review.diagnostics.shadowDbscan
+    [pscustomobject]@{
+        BaselineGroups = @($group.groups).Count
+        BaselineAssigned = $group.observationsAssigned
+        BaselineUnassigned = $group.observationsUnassigned
+        ShadowClusters = $shadow.clusterCount
+        ShadowClusterMembers = $shadow.clusterMembers
+        ShadowNoise = $shadow.noiseObservations
+        ShadowGroupsNotShown = $shadow.groupsNotRepresentedForReview
+        ShadowHiddenGroupMembers = $shadow.membersInUnrepresentedGroups
+        SameFrameCollisions = $shadow.sameFrameCollisions
+        AllAccounted = ($shadow.clusterMembers + $shadow.noiseObservations) -eq
+            $shadow.observationsEvaluated
+    }
+} | Format-Table -AutoSize
+~~~
+
+**Acceptance:** baseline V03 group counts remain 64/407/3505;
+all shadow observations are accounted for, same-frame collisions
+remain zero, private outputs stay outside Git, source files are
+unchanged, and the shadow run reports explicit noise/omissions.
+No requirement is accepted solely because shadow group count is
+smaller. Review representative crops and person coverage with
+known human labels before deciding to substitute an algorithm.
+This increment does not yet solve the false-background burden or
+the 1/3 known-person top-three failure.
