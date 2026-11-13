@@ -51,6 +51,9 @@ public sealed class VideoFaceShadowDbscanTests
         Assert.Equal(2, report.ClusterCount);
         Assert.Equal(4, report.ClusterMembers);
         Assert.Equal(1, report.NoiseObservations);
+        Assert.Single(report.NoiseAudit!.SampledCrops);
+        Assert.Equal(1, report.NoiseAudit.TotalUnassignedObservations);
+        Assert.Equal(9, report.NoiseAudit.SampledCrops[0].FrameNumber);
         Assert.Equal(2, report.NotSameFrameConstraints);
         Assert.Equal(0, report.SameFrameCollisions);
         Assert.True(report.AllObservationsAccountedFor);
@@ -111,6 +114,7 @@ public sealed class VideoFaceShadowDbscanTests
 
         VideoFaceShadowDbscanReview report = await shadow.EvaluateAsync(Matcher());
         Assert.Equal(3, report.NoiseObservations);
+        Assert.Equal(3, report.NoiseAudit!.SampledObservations);
         Assert.Empty(report.Groups);
         Assert.Equal(0, report.ClusterCount);
         Assert.Equal(0, report.ClusterMembers);
@@ -124,6 +128,7 @@ public sealed class VideoFaceShadowDbscanTests
         Assert.Equal(0, report.ObservationsEvaluated);
         Assert.Equal(0, report.NoiseObservations);
         Assert.Empty(report.Groups);
+        Assert.Null(report.NoiseAudit);
         Assert.True(report.AllObservationsAccountedFor);
     }
 
