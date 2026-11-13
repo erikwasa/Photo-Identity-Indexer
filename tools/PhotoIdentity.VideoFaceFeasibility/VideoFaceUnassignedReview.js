@@ -5,7 +5,7 @@
 (() => {
   'use strict';
 
-  const columns = ['Clip', 'Sample', 'Frame', 'Face', 'Label', 'PersonAlias'];
+  const columns = ['Clip', 'AuditReportSha256', 'Sample', 'Frame', 'Face', 'Label', 'PersonAlias'];
   const cards = Array.from(document.querySelectorAll('article[data-sample]'));
   const status = document.getElementById('audit-status');
   const importFile = document.getElementById('audit-file');
@@ -26,6 +26,7 @@
       const person = card.querySelector('.audit-person').value.trim().toUpperCase();
       return {
         Clip: 'V03', // overridden by the gallery's own clip below
+        AuditReportSha256: reportSha256,
         Sample: card.dataset.sample,
         Frame: card.dataset.frame,
         Face: card.dataset.face,
@@ -37,7 +38,8 @@
 
   // The HTML element's own clip source is inserted as an immutable data field.
   const clip = document.querySelector('main').dataset.clip;
-  if (!/^V(?!00)\d{2}$/.test(clip)) return;
+  const reportSha256 = document.querySelector('main').dataset.reportSha256;
+  if (!/^V(?!00)\d{2}$/.test(clip) || !/^[0-9a-f]{64}$/.test(reportSha256)) return;
   function gather() {
     const rows = sampleRows();
     rows.forEach(row => { row.Clip = clip; });
@@ -152,6 +154,7 @@
         if (source.length !== columns.length) throw new Error('Wrong CSV columns');
         const item = Object.fromEntries(columns.map((col, j) => [col, source[j]]));
         if (item.Clip !== expected[i].Clip ||
+          item.AuditReportSha256 !== expected[i].AuditReportSha256 ||
           item.Sample !== expected[i].Sample ||
           item.Frame !== expected[i].Frame ||
           item.Face !== expected[i].Face ||
