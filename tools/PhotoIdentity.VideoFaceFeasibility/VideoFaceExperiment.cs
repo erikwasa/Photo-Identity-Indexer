@@ -288,12 +288,18 @@ public sealed class VideoFaceExperiment
         IVideoFaceCandidateMatcher matcher,
         double detectorConfidence,
         CancellationToken cancellationToken = default,
-        bool provisionalGroups = false)
+        bool provisionalGroups = false,
+        bool unassignedAudit = false)
     {
         ArgumentNullException.ThrowIfNull(matcher);
         if (detectorConfidence is not (0.5 or 0.7 or 0.9))
         {
             throw new ArgumentOutOfRangeException(nameof(detectorConfidence));
+        }
+
+        if (unassignedAudit && !provisionalGroups)
+        {
+            throw new ArgumentException("Unassigned audit requires explicit provisional grouping.");
         }
 
         // Include up to 180 pre-extracted local frames, without requiring
@@ -302,7 +308,8 @@ public sealed class VideoFaceExperiment
             diagnostics: true, coverage: true,
             requestedDetectorConfidence: detectorConfidence,
             cancellationToken: cancellationToken,
-            provisionalGroups: provisionalGroups);
+            provisionalGroups: provisionalGroups,
+            unassignedAudit: unassignedAudit);
     }
 
     private async Task<VideoFacePrivateReview> RunCoreAsync(
@@ -313,7 +320,8 @@ public sealed class VideoFaceExperiment
         bool coverage,
         double requestedDetectorConfidence,
         CancellationToken cancellationToken,
-        bool provisionalGroups = false)
+        bool provisionalGroups = false,
+        bool unassignedAudit = false)
     {
         VideoFaceFrameSetLoader.Validate(set, coverage);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
@@ -339,7 +347,10 @@ public sealed class VideoFaceExperiment
         // Allocated only on an explicit operator-requested catalogue run.
         // No group vectors or cross-frame reference templates are serialized.
         VideoFaceProvisionalGrouper? provisional = provisionalGroups
-            ? new VideoFaceProvisionalGrouper()
+            ? new VideoFaceProvisionalGrouper(
+                captureUnassignedAudit: unassignedAudit,
+                firstTimestampMs: set.Frames![0].TimestampMs,
+                lastTimestampMs: set.Frames[^1].TimestampMs)
             : null;
         List<VideoFaceReferenceFinding> findings = [];
         List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
