@@ -168,7 +168,7 @@ public static class VideoFaceDetectorOnlyRunner
             if (selected.Candidates.Count > 0) framesWithFaces++;
 
             observations.Add(VideoFaceSensitivityDiagnostics.DescribeFrame(
-                i + 1, frames.Frames[i].TimestampMs, selected.Candidates, image.Size)
+                i + 1, frames.Frames![i].TimestampMs, selected.Candidates, image.Size)
                 with
                 {
                     RawCandidatesDetected = selected.RawCandidateCount,
