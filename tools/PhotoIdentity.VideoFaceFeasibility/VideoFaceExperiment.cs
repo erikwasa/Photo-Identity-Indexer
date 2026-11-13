@@ -544,7 +544,7 @@ public sealed class VideoFaceExperiment
         };
     }
 
-    private static async Task<byte[]> ReadApprovedStillAsync(
+    internal static async Task<byte[]> ReadApprovedStillAsync(
         string file,
         CancellationToken cancellationToken)
     {
