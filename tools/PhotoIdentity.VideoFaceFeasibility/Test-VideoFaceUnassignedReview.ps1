@@ -94,6 +94,7 @@ try {
 
     $html = Get-Content -LiteralPath $gallery.GalleryPath -Raw
     Check ($html.Contains('data-clip="V03"') -and
+        $html.Contains('data-report-sha256="') -and
         $html.Contains('crops/S001.png') -and
         $html.Contains('context/S012.jpg') -and
         $html.Contains('Save reviewed CSV') -and
@@ -154,6 +155,11 @@ try {
     $worksheet[1].Label='Not a face'; $worksheet[1].PersonAlias='P0001'
     $worksheet | Export-Csv -LiteralPath $tamperPath -NoTypeInformation -Encoding utf8
     MustReject { & $measurer -ReviewedCsvPath $tamperPath -PrivateGroupReportPath $reportPath } 'Background was assigned a person alias.'
+
+    $worksheet[1].PersonAlias=''
+    $worksheet[0].AuditReportSha256 = ('a' * 64)
+    $worksheet | Export-Csv -LiteralPath $tamperPath -NoTypeInformation -Encoding utf8
+    MustReject { & $measurer -ReviewedCsvPath $tamperPath -PrivateGroupReportPath $reportPath } 'Review from a different report fingerprint was accepted.'
 
     $audit.sampledCrops[0].x=.95
     $badReport = Join-Path $private 'out-of-bounds.json'
