@@ -3410,6 +3410,9 @@ calibrated for people recognition or safe face rejection.
   The number of formed clusters, their members, noise, co-presence
   violations, and the number of clusters not represented in the
   bounded 64-group review shortlist are all explicitly accounted.
+  Noise also has a bounded, temporally stratified private crop audit
+  (up to 96 samples); any unsampled noise remains explicitly counted.
+  This is biased review evidence and is never a face-rejection rule.
 - Private JSON may include up to **64 shadow group records** with
   source-frame crop geometry and up to three *catalogue-derived*
   candidate aliases/scores per group for **human review only**.
@@ -3477,6 +3480,7 @@ $private.clips | ForEach-Object {
         ShadowClusters = $shadow.clusterCount
         ShadowClusterMembers = $shadow.clusterMembers
         ShadowNoise = $shadow.noiseObservations
+        ShadowNoiseSamples = @($shadow.noiseAudit.sampledCrops).Count
         ShadowGroupsNotShown = $shadow.groupsNotRepresentedForReview
         ShadowHiddenGroupMembers = $shadow.membersInUnrepresentedGroups
         SameFrameCollisions = $shadow.sameFrameCollisions
