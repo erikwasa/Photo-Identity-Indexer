@@ -35,12 +35,13 @@ try {
     $csvPath = LocalFile $ReviewedCsvPath (64KB)
     $reportPath = LocalFile $PrivateGroupReportPath (64MB)
     $rows = @(Import-Csv -LiteralPath $csvPath -Encoding utf8)
-    $header = @('Clip','Sample','Frame','Face','Label','PersonAlias')
+    $header = @('Clip','AuditReportSha256','Sample','Frame','Face','Label','PersonAlias')
     if ($rows.Count -lt 1 -or $rows.Count -gt 96 -or
         (@($rows[0].PSObject.Properties.Name) -join '|') -cne
         ($header -join '|')) {
         throw 'Audit review CSV has unexpected columns or row count.'
     }
+    $reportHash = (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
     $clips = @($report.clips | Where-Object { $_.alias -ceq $ClipAlias })
     if ($report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
@@ -88,6 +89,7 @@ try {
         $label = [string]$row.Label
         $key = '{0}:{1}' -f $row.Frame,$row.Face
         if ($row.Clip -cne $ClipAlias -or
+            [string]$row.AuditReportSha256 -cne $reportHash -or
             $row.Sample -cne ('S{0:D3}' -f ($i+1)) -or
             [string]$row.Frame -cne [string]$sample.frameNumber -or
             [string]$row.Face -cne [string]$sample.faceNumber -or
