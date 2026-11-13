@@ -3071,3 +3071,139 @@ the bounded overflow crop samples, whether the sampling proxy
 overrepresents background false positives, and how many original
 groups still need dismissal. Do not claim `FACE-QUALITY-01`,
 `GROUP-QUALITY-01` or full person coverage based on the audit alone.
+
+
+## Checkpoint 31 — reference-free adaptive detector diagnostics, verified V03 audit (2026-11-13)
+
+**Maintainer verification received after merged PR #799:**
+
+- Updated experimental branch `wi-0155` at merge commit `a43db2bb`.
+  Focused release C# test assembly: **84 passed, 0 failed**; docs
+  `validate` and `generate --check` passed.
+- The separately reviewed V03 six-policy group-priority comparison
+  (PR #795) completed with the same approved private group evidence.
+  At eight reviewed groups, quality-first reveals six of nine genuine
+  groups but only two of three people; catalogue-similarity-first
+  reveals all three people but only five of nine genuine groups and
+  zero correct top-three person suggestions in that review budget.
+  At 32 groups, arrival and catalogue-similarity each show nine of
+  nine genuine groups and 23 background groups. **No safe candidate
+  suppression or person-recall rule has been established.**
+- Full eligible catalogue opt-in overflow audit (PR #799): three
+  cases, 252 frames, 241 canonical/240 eligible people, 3,986
+  detections and embeddings, 17 frames with overflow and 57 detector
+  candidates discarded. V03 exactly reproduces the existing baseline:
+  **180 frames, 3,912 candidates, 64 groups, 407 assigned, 3,505
+  unassigned**. The new sampler retained **96 private examples across
+  all 12 strata**, with 3,409 unrepresented; original group count,
+  assigned/unassigned counts and exact group details all matched.
+  **PR #799 real-run behavior accepted, not grouping quality.**
+- First expressly approved V03 adaptive coarse-only extraction: **22
+  frames** over a **166.68-second** video window, largest observed
+  inter-frame sample gap **7,928 ms**, no remaining window. The
+  maintainer has not yet supplied original-video hash comparison,
+  crop orientation/colour review, detector cues, or a refined
+  extraction result. These remain **pending**.
+- Prior script for `--diagnostics --coverage` required manually
+  selected `references.json` and consequently could not execute
+  the intended detector-only adaptive pass without the obsolete
+  selected-reference experiment. This was an **interface gap**;
+  historical references are not intended as the reference source
+  for current WI-0155 recognition. Reuse the full eligible people
+  catalogue (read-only) for final identity evaluation.
+
+### New explicitly requested detector-only bridge
+
+The new `--detector-only` CLI examines only operator-approved,
+already-extracted **local frames** using the verified YuNet model.
+It does **not** load SFace, still-image reference manifests, person
+identities, PostgreSQL, OneDrive or an original video. Its private
+create-new report contains detector counts, candidate overflow and
+minimal per-frame diagnostics in the `aggregate.framesExamined` /
+`diagnostics.frameDetections` shape required by the existing
+`--derive-adaptive-cues` command. Source frames are preflighted,
+fidelity checked and checked for modifications during inference.
+It preserves the existing governed 32-candidate overflow behavior;
+opt-in multiscale retention is available explicitly.
+There is no ranking, tracking, person assignment, face rejection
+or source modification. The two-pass adaptive workflow is still
+**operator initiated**, not a background workflow.
+
+### Consolidated PowerShell 7.6 continuation — replace earlier Step 5C
+
+Use the **existing** approved coarse adaptive extraction in
+`$coarse.ManifestPath`. You do NOT need `$referenceManifest`.
+Reuse your verified `$wiRoot`, `$modelDir`, `$video` and `$ffmpeg`.
+All generated reports and cues must be in a **new private folder
+outside Git and the frame workspace**. Run after merging this PR
+into `wi-0155` and completing its CI checks.
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 detector-only regression tests failed' }
+
+# $coarse must still be the preserved successful coarse-only run object
+# with its actual frames/metadata and completed ownership marker.
+# $modelDir must be your already-verified YuNet model directory.
+$privateDir = Join-Path $env:LOCALAPPDATA (
+    'PhotoIdentity\WI0155\adaptive-detector-' +
+    (Get-Date -Format 'yyyyMMdd-HHmmssfff')
+)
+New-Item -ItemType Directory -Path $privateDir -Force | Out-Null
+$coarseReport = Join-Path $privateDir 'coarse-detector-only.json'
+$cuePath = Join-Path $privateDir 'derived-adaptive-cues.json'
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --detector-only --manifest $coarse.ManifestPath `
+    --private-report $coarseReport --root (Get-Location).Path `
+    --model-dir $modelDir --detector-confidence 0.5 `
+    --detector-pipeline multi-scale --tile-size 1024 `
+    --face-overflow-policy retain-top-32
+if ($LASTEXITCODE -ne 0) { throw 'Approved YuNet coarse diagnostics failed' }
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --derive-adaptive-cues --manifest $coarse.ManifestPath `
+    --private-diagnostics $coarseReport `
+    --private-cues-output $cuePath --root (Get-Location).Path
+if ($LASTEXITCODE -ne 0) { throw 'Private adaptive cue derivation failed' }
+
+$refined = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video -FfmpegPath $ffmpeg `
+    -ApprovePrivateLocalVideo -AdaptiveSampling `
+    -AdaptiveCuesPath $cuePath `
+    -WindowStartSeconds $coarse.WindowStartSeconds `
+    -FrameEncoding NativeLosslessPng -MaximumWorkspaceMiB 1024
+
+[pscustomobject]@{
+    CoarseFrames = $coarse.FrameCount
+    RefinedFrames = $refined.FrameCount
+    AddedFrames = $refined.FrameCount - $coarse.FrameCount
+    CueCount = @((Get-Content -LiteralPath $cuePath -Raw |
+        ConvertFrom-Json).cues).Count
+    RefinementBudgetHit = $refined.RefinementBudgetReached
+    HasMoreWindows = $refined.HasMoreWindows
+} | Format-List
+~~~
+
+The multiscale settings above match the historical V03 exploratory
+detector configuration; they are *not* a recommended or calibrated
+face-detection cutoff. Running this isolated detector command does
+not require the environment variable
+`PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING`. For later
+**identity recognition** on additional sampled frames, use the
+**existing full-eligible-catalogue read-only experiment** and create
+a separate, operator-approved case/manifest/report. Do not enrol
+video frame crops as photo exemplars.
+
+**Pending acceptance:** Compare original video's SHA-256 before/after;
+inspect orientation, colour and a human-visible face sampling
+difference on coarse versus refined frames; confirm bounded counts,
+privacy and source integrity. Refinement cannot claim person coverage
+or make an unknown person known without human-reviewed evidence from
+several diverse approved videos. Do not integrate `wi-0155` into
+`main` based only on structural evidence.
