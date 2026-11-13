@@ -20,6 +20,12 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // Detector-only diagnostics require neither references nor catalogue access.
+        if (args.Contains("--detector-only", StringComparer.Ordinal))
+        {
+            return await VideoFaceDetectorOnlyRunner.RunAsync(args);
+        }
+
         // Explicit detector-derived cues are private, read-only, no identity decisions.
         if (args.Contains("--derive-adaptive-cues", StringComparer.Ordinal))
         {
@@ -62,6 +68,11 @@ public static class Program
                 "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +
                 "--review-geometry-output <new-private-geometry.json> [--root <repo>] " +
                 "[--model-dir <approved-models>]\n" +
+                "Detector-only: --detector-only --manifest <approved-frames.json> " +
+                "--private-report <new-private-diagnostics.json> [--root <repo>] " +
+                "[--model-dir <approved-models>] [--detector-confidence <0.5|0.7|0.9>] " +
+                "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
+                "[--face-overflow-policy <fail|retain-top-32>]\n" +
                 "Private adaptive cues: --derive-adaptive-cues --manifest <owned-coarse-frames.json> " +
                 "--private-diagnostics <same-window-report.json> " +
                 "--private-cues-output <new-private-cues.json> [--root <repo>]");

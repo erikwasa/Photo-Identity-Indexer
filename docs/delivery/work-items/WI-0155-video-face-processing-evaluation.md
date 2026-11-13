@@ -1904,3 +1904,60 @@ comparable still-photo DBSCAN/noise/not-same experiment remain future
 work. Human verification of new private V03 and diverse-video
 evidence is postponed for the consolidated local acceptance session.
 Operations checkpoint 30 contains the later opt-in commands.
+
+
+## Experimental checkpoint 31 — first consolidated local results and reference-free adaptive bridge (2026-11-13)
+
+The maintainer confirmed the experimental `wi-0155` branch at
+PR #799's merge commit `a43db2bb`, 84/84 release C# tests passed,
+and documentation `validate` and `generate --check` passed.
+The six-policy **offline V03** review-priority experiment also ran
+using previously reviewed private ground truth: reviewing eight
+quality-first groups finds six of nine authentic groups, but only
+two of three actual people. Reviewing eight catalogue-similarity-first
+groups sees all three people but only five of nine genuine groups;
+its correct top-three people count is zero at that budget. Both
+arrival-order and catalogue-similarity priority need **32 reviewed
+groups** to show all nine genuine groups (23 background groups
+remain). This is evidence that *ordering can help*, not a safe
+threshold or improved full-catalogue top-three ranking.
+
+The real PR #799 read-only **all-eligible** evaluation completed for
+three clips, 252 frames, 241 canonical/240 eligible people, 3,986
+ranked detections, and 17 frames with overflows/57 discarded raw
+candidates. V03 reproduced the existing 180-frame,
+3,912-candidate, 64-group, 407-assigned, 3,505-unassigned
+baseline **exactly**; new audit samples: 96 from all 12 temporal
+strata, 3,409 not sampled. Original group counts, assignments
+and exact group details were unchanged. This accepts the
+**observability/invariance implementation**, not FACE-QUALITY-01
+or GROUP-QUALITY-01: neither real-face validity nor person recall
+in the sampled overflow has been reviewed.
+
+The first specifically approved V03 adaptive coarse-only extraction
+completed with **22 frames spanning a 166.68-second window**,
+largest consecutive sample gap **7,928 ms**, no continuation
+required. Source hash invariance, visual quality, actual cue
+derivation and refined extraction remain unverified.
+
+During the acceptance run, the previous Step 5C instruction to
+supply a manually curated `references.json` was identified as a
+regression to an **obsolete prototype reference source**, contrary
+to the current existing-catalogue direction. The new isolated
+`--detector-only` command processes *only* previously extracted
+local frames with YuNet, emits the minimal private diagnostics
+needed by the existing validated `--derive-adaptive-cues` adapter,
+and requires **no reference stills, SFace, person identities,
+PostgreSQL or original video access**. The separate **full
+eligible PostgreSQL catalogue** remains the only intended
+identity reference source for final video-face recognition.
+Original media and retained still-photo embeddings are unchanged;
+the command never automatically scans a collection or writes to
+the production database.
+
+Remaining acceptance: Windows-host rerun of new focused detector
+tests; detector-only diagnostics → validated cues → refined
+extraction on the already-approved V03 video, human inspection,
+original-video hash check and eventually diverse approved videos.
+See operations checkpoint 31. `SAMPLING-01` and all other
+pre-merge quality gates remain open until human-reviewed proof.
