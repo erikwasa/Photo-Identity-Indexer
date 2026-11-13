@@ -41,8 +41,9 @@ function LocalFile([string]$Path, [long]$Limit) {
 
 function Esc([object]$Value) { return [Net.WebUtility]::HtmlEncode([string]$Value) }
 
-$report = Get-Content -LiteralPath (LocalFile $PrivateReportPath (64MB)) -Raw |
-    ConvertFrom-Json
+$reportFile = LocalFile $PrivateReportPath (64MB)
+$reportHash = (Get-FileHash -LiteralPath $reportFile -Algorithm SHA256).Hash.ToLowerInvariant()
+$report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
 $cases = Get-Content -LiteralPath (LocalFile $PrivateCasesPath (16KB)) -Raw |
     ConvertFrom-Json
 $clips = @($report.clips | Where-Object { $_.alias -ceq $ClipAlias })
@@ -152,6 +153,7 @@ for ($i=0; $i -lt $samples.Count; $i++) {
     $id = 'S{0:D3}' -f ($i + 1)
     $rows.Add([pscustomobject][ordered]@{
         Clip=$ClipAlias
+        AuditReportSha256=$reportHash
         Sample=$id
         Frame=$frame
         Face=$face
@@ -202,7 +204,7 @@ article h2{margin:0 0 5px;font-size:17px}.sample-meta{font-size:12px;color:#b6ca
 article label{display:block;font-size:13px;margin-top:8px}
 article select,article input{width:100%;box-sizing:border-box}
 article[hidden]{display:none}
-</style></head><body><main data-clip="CLIP_ALIAS_TOKEN">
+</style></head><body><main data-clip="CLIP_ALIAS_TOKEN" data-report-sha256="REPORT_HASH_TOKEN">
 <h1>WI-0155 · Unassigned detections</h1>
 <p class="note">PRIVATE, read-only human review of the bounded audit samples that did not join a provisional group after capacity was reached. These are NOT all unassigned detections, not independent random samples, not identified people and not a detection precision estimate. The temporal sampler deliberately favors higher quality-proxy examples. A real face here is evidence for missed reviewable material, not an automatic identity.</p>
 <p class="note">Classify each crop as Real face, Not a face, or Cannot tell. If you recognize a real face, optionally enter its existing PRIVATE P0001-style alias or UNKNOWN. No real names, notes, raw frames, scores, or identity decisions leave this folder. CSV files remain local, and importing them never changes the database. Use the enlarged crop and context image to check tiny and oblique faces.</p>
@@ -277,7 +279,7 @@ try {
             $rows[[int]($task.Id.Substring(1))-1].Face,$task.Stratum,
             $task.Confidence,$task.Quality))
     }
-    $gallery[0] = $gallery[0].Replace('CLIP_ALIAS_TOKEN', (Esc $ClipAlias))
+    $gallery[0] = $gallery[0].Replace('CLIP_ALIAS_TOKEN', (Esc $ClipAlias)).Replace('REPORT_HASH_TOKEN', $reportHash)
     $gallery.Add('</div><script src="unassigned-review.js"></script></main></body></html>')
 
     $worksheet = Join-Path $output 'unassigned-review.csv'
