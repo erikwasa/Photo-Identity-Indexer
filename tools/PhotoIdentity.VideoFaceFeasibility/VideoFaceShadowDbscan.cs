@@ -2,6 +2,7 @@ using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using System.Text.Json.Serialization;
 
 namespace PhotoIdentity.VideoFaceFeasibility;
 
@@ -38,6 +39,11 @@ public sealed record VideoFaceShadowDbscanReview(
     // members is explicit. Noise is not deleted and may contain real faces.
     public bool AllObservationsAccountedFor =>
         ClusterMembers + NoiseObservations == ObservationsEvaluated;
+
+    // Quality-biased, temporally stratified review examples, not all noise
+    // and not a representative estimate of shadow singleton face precision.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceUnassignedAudit? NoiseAudit { get; init; }
 }
 
 /// <summary>
@@ -242,11 +248,22 @@ public sealed class VideoFaceShadowDbscan
             }).ToArray();
 
         int selectedMembers = clusters.Take(MaximumReviewGroups).Sum(g => g.Length);
+        var noiseSampler = new VideoFaceUnassignedAuditSampler(
+            _observations[0].Crop.TimestampMs, _observations[^1].Crop.TimestampMs);
+        foreach (Observation candidate in _observations)
+        {
+            if (memberships[candidate.Id].Role == ProvisionalFaceClusterMemberRole.Noise)
+                noiseSampler.Observe(candidate.Crop);
+        }
+
         return new VideoFaceShadowDbscanReview(
             1, ExperimentalPolicyVersion, ExperimentalCosineDistance,
             Policy.MinimumSamples, Policy.MinimumClusterSize,
             _observations.Count, clusters.Length, members, noise,
             constraints.Count, chosen.Length, clusters.Length - chosen.Length,
-            members - selectedMembers, collisions, chosen);
+            members - selectedMembers, collisions, chosen)
+        {
+            NoiseAudit = noiseSampler.CreateReview(noise),
+        };
     }
 }
