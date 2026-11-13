@@ -2072,7 +2072,7 @@ streaming groups. The existing 64-group review found substantial
 background burden; the separate unassigned audit is a quality
 *biased* slice and cannot contradict its group-label results.
 
-the next isolated PR introduces an **opt-in shadow-only use of the existing
+PR #803 introduces an **opt-in shadow-only use of the existing
 M25 DBSCAN clustering engine** on the exact SFace vectors
 already computed inside the all-eligible read-only video
 catalogue experiment. It adapts M25 with a clearly experimental
