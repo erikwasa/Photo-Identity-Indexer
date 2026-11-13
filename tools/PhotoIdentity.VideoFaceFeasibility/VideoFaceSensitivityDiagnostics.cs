@@ -78,6 +78,11 @@ public sealed record VideoFaceSensitivityDiagnostics(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<VideoFaceCatalogueGroupSuggestion>? GroupSuggestions { get; init; }
 
+    // Experimental M25 DBSCAN replay against the same in-memory video vectors.
+    // Never overwrites or reinterprets the chronological provisional groups.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceShadowDbscanReview? ShadowDbscan { get; init; }
+
     // Model tensor size is *not* the decoded frame resolution. In multi-scale
     // mode every source region is separately projected onto that tensor.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
