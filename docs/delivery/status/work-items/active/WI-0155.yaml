@@ -75,3 +75,6 @@ evidence:
   value: '2026-11-13: PR795 offline V03 review-priority comparison completed; PR799 all-eligible 3-video overflow audit succeeded (V03 original 64 groups / 407 assigned / 3505 unassigned unchanged, 96 samples across 12 strata); V03 adaptive coarse extraction produced 22 frames across 166.68s, 7928ms maximum gap and no continuation; hash/visual/refined review pending.'
 - type: implementation
   value: '2026-11-13: Reference-free YuNet-only private coarse detector report for existing cue deriver; no curated still references, SFace, PostgreSQL, original video or production writes in this stage; post-PR800 local verification pending.'
+
+- type: maintainer_verification
+  value: '2026-11-13: PR800 merged; automatic tests PASS. Real V03 22-frame YuNet-only detector pass: all 22 frames had candidates, 486 raw/473 retained/13 discarded in 12.1s; 22 detector-derived cues; refined to 180 frames (+158), 569296333 bytes, frame budget reached, no remaining window, coarse timestamps preserved, original video and coarse still SHA-256 unchanged during refinement; visual colour/orientation PASS; uniquely unobstructed face interval observed only in refined frames. Sampling mechanics verified on V03, recognition benefit and efficiency still unverified.'

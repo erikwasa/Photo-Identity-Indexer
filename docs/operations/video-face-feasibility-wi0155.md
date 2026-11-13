@@ -3207,3 +3207,61 @@ privacy and source integrity. Refinement cannot claim person coverage
 or make an unknown person known without human-reviewed evidence from
 several diverse approved videos. Do not integrate `wi-0155` into
 `main` based only on structural evidence.
+
+
+## Checkpoint 32 — PR #800 real V03 adaptive refinement verified (2026-11-13)
+
+**Maintainer local verification after PR #800 merged into `wi-0155`:**
+
+- Automatic tests: **PASS** (the maintainer did not report individual test totals).
+- The approved, already-local V03 video yielded **22 adaptive coarse
+  frames** over **166.68 seconds**, maximum coarse sample gap **7,928 ms**,
+  with **no second window**. The same coarse frames were preserved.
+- New reference-free YuNet `--detector-only` mode examined all 22
+  frames, with detector candidates on all 22; **486 raw candidates**,
+  **473 retained**, **13 discarded** under explicit multiscale
+  `retain-top-32`, elapsed **12,110.831 ms**. Private diagnostics
+  were written and the existing `--derive-adaptive-cues` command
+  successfully produced **22 cues**, without a manually curated
+  `references.json` or PostgreSQL catalogue connection.
+- Explicit refined extraction completed: **180 total frames**
+  (**22 coarse + 158 new**), over the same 166.68-second window.
+  `RefinementBudgetReached=True` and `HasMoreWindows=False`.
+  **180/180-frame bound PASS**. Private extracted frame bytes:
+  **569,296,333** (~543 MiB), within the configured 1,024 MiB
+  workspace limit. All 22 original coarse **timestamps remained**
+  and their **SHA-256 hashes were unchanged**.
+- The original video **SHA-256 matched before and after the refined
+  extraction**. Note: this verification measures the refined step
+  only unless a separately retained hash from *before* initial
+  coarse extraction is compared.
+- Human inspection: no apparent differences in colour, orientation,
+  or image quality; all sampled frames looked visually correct.
+  Three people appear in frame for virtually the entire video,
+  so coarse temporal coverage alone likely would already capture
+  each. **One person was seen with their entire face visible
+  only at a brief moment while leaving the frame; those
+  unobstructed-face frames were in the *refined* set, not the coarse
+  set.** This establishes at least one useful sampling difference,
+  not a proven increase in correctly recognized people or ranking
+  quality.
+
+**Outcome:** real Windows-host end-to-end **SAMPLING-01 mechanics PASS
+for this V03 clip** (approved local extraction, reference-free
+detection and cue generation, bounded refinement, source integrity,
+private outputs, human visual inspection). **General quality and
+efficiency acceptance remains OPEN.** The 22/22 cue saturation
+exhausted the 180-frame window budget and consumed 569 MB despite
+heavy background false-positive detections. Additional frames were
+human-useful at one important moment, but neither recognition
+improvement nor the necessity of all 158 added samples is established.
+Do **not** infer a suitable cutoff or auto-dismissal rule.
+
+**Suggested next measurement:** Compare human-reviewed, full-face
+observations and correct known-person top-three retrieval for the
+coarse and refined windows, keeping catalogue reference evidence
+solely in the existing read-only PostgreSQL photo catalogue.
+Evaluate other approved videos with transient appearances before
+tuning cue priority/number of refinement samples. Retain private
+artifacts outside Git and do not integrate `wi-0155` into `main`
+without separate production acceptance.
