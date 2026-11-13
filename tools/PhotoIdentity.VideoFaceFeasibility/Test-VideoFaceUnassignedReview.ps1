@@ -93,13 +93,17 @@ try {
         $gallery.TemporalStrataRepresented -eq 12) 'Audit accounting wrong.'
 
     $html = Get-Content -LiteralPath $gallery.GalleryPath -Raw
-    Check ($html.Contains('data-clip="V03"') -and
-        $html.Contains('data-report-sha256="') -and
-        $html.Contains('crops/S001.png') -and
-        $html.Contains('context/S012.jpg') -and
-        $html.Contains('Save reviewed CSV') -and
-        $html.Contains('Not a face') -and
-        $html.Contains('These are NOT all unassigned detections')) 'Offline review controls missing.'
+    foreach ($required in @(
+        'data-clip="V03"',
+        'data-report-sha256="',
+        'crops/S001.png',
+        'context/S012.jpg',
+        'Save reviewed CSV',
+        'Not a face',
+        'These are NOT all unassigned detections'
+    )) {
+        Check ($html.Contains($required)) ('Offline gallery element missing: ' + $required)
+    }
     Check ((@(Get-ChildItem -LiteralPath (Join-Path $galleryFolder 'crops') -File).Count) -eq 12) 'Incorrect crop count.'
     Check ((@(Get-ChildItem -LiteralPath (Join-Path $galleryFolder 'context') -File).Count) -eq 12) 'Missing context images.'
     foreach ($file in $hashes.Keys) {
