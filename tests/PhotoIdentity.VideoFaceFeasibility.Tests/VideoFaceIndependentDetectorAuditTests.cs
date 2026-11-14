@@ -50,7 +50,7 @@ public sealed class VideoFaceIndependentDetectorAuditTests
             Shadow(), Frames(), 20, 24);
         Assert.Equal(3, selected.Count);
         Assert.Equal(2, selected.Count(s => s.Source == "group"));
-        Assert.Single(selected.Where(s => s.Source == "noise"));
+        Assert.Single(selected, s => s.Source == "noise");
         Assert.Equal("D001", selected[0].GroupAlias);
         Assert.Equal(1, selected[0].Crop.FrameNumber);
         Assert.Null(selected[^1].GroupAlias);
