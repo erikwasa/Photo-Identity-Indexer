@@ -3640,3 +3640,100 @@ level (known people recovered at top three, wrongful person merges,
 noise genuine-face retention, review burden), never by smaller total
 cluster count alone. Grouping, identity accuracy and diverse-video
 quality acceptance are still **OPEN**. No production integration.
+
+## Checkpoint 37 — independent YuNet / CenterFace agreement (PR #806, 2026-11-14)
+
+The private V03 gallery screenshots explicitly show **the same cracked-stone
+paving pattern** inside the representative crops of D001–D020 (all
+visually reviewed as non-faces), while the 24 sampled DBSCAN noise
+crops contain human faces. The SFace embedding is not a guarantee
+that an input is a face: passing background proposals through an
+embedding model can yield highly repeatable vectors for a fixed
+background texture. YuNet is ALREADY the upstream face detector,
+so blindly adding another pass of the same YuNet model or using
+DBSCAN cluster size is not independent face confirmation.
+
+PR #806 adds a **separate, explicit, read-only CenterFace agreement
+audit** for the same existing, already-approved V03 data:
+`--cross-check-centerface`. CenterFace is an existing governed,
+pinned model in `models/manifests/centerface-2019-fp32.json`;
+its OpenCV DNN adapter already exists. It must be installed and
+integrity-verified locally with no automatic download. The model
+manifest records unresolved weight/training-data licensing;
+**this experimental comparison grants no additional rights**.
+
+The command reads the **existing** full-catalogue shadow JSON and
+matching approved multi-clip case manifest; it uses the selected
+**first 20 D-groups and first 24 shadow noise crops** by default
+to match the actual screenshots and human notes. It does NOT
+load PostgreSQL, SFace, original video, the video extractor or
+the full-catalogue vectors. On each unique selected frame it
+runs independent CenterFace once at confidence >=0.30, then
+measures spatial agreement with each existing YuNet box via
+intersection-over-union >=0.25. Results include both confidence
+>=0.30 and >=0.50, reporting *group representative* and *noise*
+agreement separately. This is an **exploratory correspondence
+test**, not a calibrated face-validity classifier. No matching
+CenterFace box may simply mean the face is tiny, oblique,
+partially hidden or below CenterFace resolution. CenterFace
+agreement can also be wrong.
+
+The report is a brand-new, private JSON outside the repository
+and selected frame directories with input source-report SHA-256,
+the second detector's model identity/hash, bounded crop
+ordinals and match results; the public console receives
+**aggregate agreement counts only**. No changed face detection,
+DBSCAN membership, exemplar ranking, archive writes, identity
+assignments or production UI integration.
+
+### Optional local check (after PR #806 merges)
+
+Do **not** rerun the original all-eligible catalogue experiment.
+Reuse the same `$shadowReport` and `$casesPath` used in
+checkpoint 36. Windows PowerShell 7.6:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 tests failed' }
+
+$modelDir = Join-Path (Get-Location).Path 'models\files'
+$centerFace = Join-Path $modelDir 'centerface.onnx'
+if (-not (Test-Path -LiteralPath $centerFace -PathType Leaf)) {
+    throw 'Approved CenterFace model is not locally installed; review its manifest/licensing and install separately only if approved.'
+}
+foreach ($p in @($shadowReport, $casesPath)) {
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) {
+        throw 'Existing approved shadow report/cases required'
+    }
+}
+
+$folder = Join-Path $env:LOCALAPPDATA (
+    'PhotoIdentity\WI0155\centerface-crosscheck-' +
+    (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
+New-Item -ItemType Directory -Path $folder -Force | Out-Null
+$agreementReport = Join-Path $folder 'centerface-agreement.json'
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --cross-check-centerface `
+    --catalogue-cases $casesPath `
+    --source-shadow-report $shadowReport `
+    --private-report $agreementReport `
+    --clip V03 --max-groups 20 --max-noise 24 `
+    --root (Get-Location).Path --model-dir $modelDir
+if ($LASTEXITCODE -ne 0) { throw 'Independent CenterFace agreement audit failed' }
+~~~
+
+**Review requirement:** Compare the reported `groupCropsAt030` /
+`groupCropsAt050` among the already human-rejected D01–D20
+representatives and `noiseCropsAt030` / `noiseCropsAt050`
+among the already human-confirmed 24 noise samples. These are
+different sampled units and may not correspond to every
+observation in a cluster. A useful *candidate* corroboration
+signal should reject the obvious paving examples **without
+losing most genuine noise faces**. Until the real comparison
+and broader diverse-video validation are complete, all
+`FACE-QUALITY-01`, `GROUP-QUALITY-01` and
+`CATALOGUE-TOP3-01` gates remain open and **no automatic
+suppression is permitted**.
