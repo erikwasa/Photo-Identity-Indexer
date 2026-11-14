@@ -169,6 +169,13 @@ public static class VideoFaceIndependentDetectorAudit
             g => g.Key,
             g => VideoFaceFrameSetLoader.ResolveApprovedFrame(frameDirectory,
                 frames.Frames![g.Key - 1].File));
+        const long unavailableFlags = (long)FileAttributes.Offline | 0x00040000L | 0x00400000L;
+        foreach (string frame in localFrames.Values)
+        {
+            FileInfo local = new(frame);
+            if (((long)local.Attributes & unavailableFlags) != 0)
+                throw new ArgumentException("Selected evidence frame must already be fully local.");
+        }
         var results = new List<VideoFaceIndependentAgreement>(selected.Count);
         foreach (var group in groups)
         {
