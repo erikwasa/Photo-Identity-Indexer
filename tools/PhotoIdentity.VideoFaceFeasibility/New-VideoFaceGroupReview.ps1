@@ -289,12 +289,11 @@ textarea{min-height:62px;resize:vertical}.grid{display:grid;grid-template-column
 <div class="toolbar"><button id="save-groups" type="button">Save group-review CSV</button><button id="import-groups" type="button">Import saved CSV</button><label><input id="hide-dismissed" type="checkbox" checked> Hide dismissed</label><label><input id="repeat-only" type="checkbox"> Show groups with 3+ observations only</label><input id="groups-file" type="file" accept=".csv,text/csv" hidden><span id="group-status" aria-live="polite"></span></div>
 '@
 if ($isShadow) {
-  $intro = $intro.Replace('Private provisional groups','Private shadow DBSCAN groups').
-    Replace('Provisional groups','Shadow DBSCAN groups').
-    Replace('provisional group','shadow DBSCAN cluster').
-    Replace('G-number','D-number').
-    Replace('G002','D002').
-    Replace('Grouped','Clustered')
+  $intro = $intro.Replace('Private provisional groups','Private shadow DBSCAN groups')
+  $intro = $intro.Replace('Provisional groups','Shadow DBSCAN groups')
+  $intro = $intro.Replace('provisional group','shadow DBSCAN cluster')
+  $intro = $intro.Replace('G-number','D-number')
+  $intro = $intro.Replace('G002','D002')
 }
 $html.Add($intro)
 if ($isShadow) {
