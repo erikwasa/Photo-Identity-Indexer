@@ -3499,3 +3499,84 @@ smaller. Review representative crops and person coverage with
 known human labels before deciding to substitute an algorithm.
 This increment does not yet solve the false-background burden or
 the 1/3 known-person top-three failure.
+
+## Checkpoint 35 — offline shadow-cluster review bridge (2026-11-14)
+
+PR #803 is merged into the **isolated** wi-0155 branch. The maintainer
+cannot perform new private local verification now, so the next
+development step is source-free with a consolidated review later.
+
+The already reported **three-clip aggregate** from a real read-only
+evaluation: 252 frames, 3,986 retained detections, 267 DBSCAN clusters
+containing 2,663 observations, 1,323 noise observations,
+195 shadow clusters omitted from the bounded per-clip review
+shortlists and zero same-frame collisions. These are NOT V03-only
+counts; V03's streaming baseline is still 64 groups / 407 assigned /
+3,505 unassigned. No human review of the shadow groups has occurred,
+so neither fewer false groups nor improved person coverage is proven.
+
+The offline review bridge adds an explicit -GroupSource choice to the
+existing private gallery, aggregate measurement and rank measurement:
+- Provisional remains the default with G-prefixed group decisions,
+  unchanged baseline computations and compatible CSVs.
+- ShadowDbscan uses only the stored D-prefixed representative boxes and
+  full-catalogue top-three pseudonym suggestions. It warns about
+  unseen cluster members and DBSCAN noise separately. Neither is
+  discarded or assumed to be a false face.
+- The aggregate scripts validate per-clip accounting, same-frame
+  collision count, full-catalogue snapshot/aliases and correct ranked
+  ordering. G and D worksheets cannot be interchanged.
+- No models, SQL, original videos, automatic assignments, source
+  modifications or production writeback. Reports, galleries and
+  human decisions remain private and locally stored.
+
+### Deferred consolidated Windows / PowerShell 7.6 review
+
+Use the already approved local shadow report, people map and case
+manifest from checkpoint 34; this needs no further ONNX or PostgreSQL
+run. If those paths are missing, the real comparison must wait; do
+not attempt to reconstruct private vectors from published counts.
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+
+# Source-free tests; no video, database or model access.
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupReview.ps1
+if (-not $?) { throw 'Baseline gallery test failed' }
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceGroupRankAccuracy.ps1
+if (-not $?) { throw 'Baseline ranks test failed' }
+.\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceShadowGroupReview.ps1
+if (-not $?) { throw 'Shadow review test failed' }
+
+foreach ($path in @($shadowReport,$shadowMap,$casesPath)) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw 'Approved private shadow evidence is unavailable'
+    }
+}
+
+$shadowGallery = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceGroupReview.ps1 -PrivateReportPath $shadowReport -PrivateCasesPath $casesPath -ClipAlias V03 -GroupSource ShadowDbscan -OpenGallery
+$shadowGallery | Format-List
+
+# Human-review D-groups, save private CSV, then supply its actual path.
+$shadowCsv = 'C:\replace-with-private-shadow-reviewed.csv'
+$shadowCounts = .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceGroupReview.ps1 -ReviewedCsvPath $shadowCsv -PrivateGroupReportPath $shadowReport -ClipAlias V03 -GroupSource ShadowDbscan
+$shadowRanks = .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceGroupRankAccuracy.ps1 -ReviewedCsvPath $shadowCsv -PrivateGroupReportPath $shadowReport -PrivatePeopleMapPath $shadowMap -ClipAlias V03 -GroupSource ShadowDbscan
+$shadowCounts | Format-List
+$shadowRanks | Format-List
+
+# Compare with the separately saved G-group V03 review CSV.
+$baselineCsv = 'C:\replace-with-private-baseline-reviewed.csv'
+$baseline = .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceGroupRankAccuracy.ps1 -ReviewedCsvPath $baselineCsv -PrivateGroupReportPath $shadowReport -PrivatePeopleMapPath $shadowMap -ClipAlias V03
+$baseline | Format-List
+~~~
+
+Share only anonymous aggregate measurements, human observations
+about whether all three visually identifiable V03 people are in
+reviewable clusters, false merges/over-splits and qualitative review
+burden. Never post private maps, raw reports, CSVs, frames, paths or
+identities. The shadow shortlist omits some clusters and noise:
+absence from displayed D-groups is NOT proof that a person was absent.
+
+This does not close FACE-QUALITY-01, GROUP-QUALITY-01, CATALOGUE-TOP3-01,
+DIVERSE-VIDEOS-01, SAMPLING-01 or MERGE-01. No production integration
+or automatic video/person identity assignment is authorized.
