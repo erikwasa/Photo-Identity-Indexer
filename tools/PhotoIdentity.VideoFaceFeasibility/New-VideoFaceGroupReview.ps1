@@ -8,6 +8,7 @@ param(
   [Parameter(Mandatory)][string]$PrivateReportPath,
   [Parameter(Mandatory)][string]$PrivateCasesPath,
   [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
+  [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional',
   [ValidateRange(240,640)][int]$CropLongEdge = 512,
   [switch]$OpenGallery
 )
@@ -41,8 +42,32 @@ if ($report.schemaVersion -ne 1 -or $cases.schemaVersion -ne 1 -or
   throw 'Private report and cases must contain the requested video once.'
 }
 $clip = $matches[0]
-$groupReview = $clip.review.diagnostics.provisionalGroups
-if ($null -eq $groupReview -or $groupReview.schemaVersion -ne 1 -or
+$isShadow = $GroupSource -ceq 'ShadowDbscan'
+$aliasPattern = if ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
+$groupReview = if ($isShadow) {
+  $clip.review.diagnostics.shadowDbscan
+} else {
+  $clip.review.diagnostics.provisionalGroups
+}
+if ($isShadow) {
+  if ($null -eq $groupReview -or [int]$groupReview.schemaVersion -ne 1 -or
+      [string]$groupReview.policyVersion -cne 'wi0155-video-shadow-dbscan-e018-min2-v1' -or
+      [int]$groupReview.observationsEvaluated -ne [int]$clip.review.aggregate.facesDetected -or
+      [int]$groupReview.observationsEvaluated -gt 5760 -or
+      [int]$groupReview.clusterCount -lt 1 -or
+      [int]$groupReview.clusterMembers -lt 1 -or
+      [int]$groupReview.noiseObservations -lt 0 -or
+      [int]$groupReview.clusterMembers + [int]$groupReview.noiseObservations -ne
+        [int]$groupReview.observationsEvaluated -or
+      [int]$groupReview.sameFrameCollisions -ne 0 -or
+      [int]$groupReview.groupsRepresentedForReview -ne @($groupReview.groups).Count -or
+      [int]$groupReview.groupsNotRepresentedForReview -ne
+        [int]$groupReview.clusterCount - @($groupReview.groups).Count -or
+      [int]$groupReview.membersInUnrepresentedGroups -lt 0 -or
+      [int]$groupReview.membersInUnrepresentedGroups -gt [int]$groupReview.clusterMembers) {
+    throw 'Shadow DBSCAN counts, constraints or policy are invalid.'
+  }
+} elseif ($null -eq $groupReview -or $groupReview.schemaVersion -ne 1 -or
     [int]$groupReview.maximumGroups -ne 64 -or
     [int]$groupReview.observationsConsidered -ne
       [int]$clip.review.aggregate.facesDetected) {
@@ -52,16 +77,28 @@ $groups = @($groupReview.groups)
 # For new catalogue reports, require rank evidence for exactly these groups.
 # Older reports without group suggestions remain valid and reviewable.
 $rankings = @{}
-$hasRankings = $null -ne $clip.review.diagnostics.PSObject.Properties['groupSuggestions'] -and
-  $null -ne $clip.review.diagnostics.groupSuggestions
+$hasRankings = $isShadow -or (
+  $null -ne $clip.review.diagnostics.PSObject.Properties['groupSuggestions'] -and
+  $null -ne $clip.review.diagnostics.groupSuggestions)
 if ($hasRankings) {
-  $provided = @($clip.review.diagnostics.groupSuggestions)
+  $provided = if ($isShadow) {
+    @($groups | ForEach-Object {
+      [pscustomobject]@{
+        groupAlias = $_.alias
+        groupObservations = $_.observations
+        representativeCount = @($_.representativeCrops).Count
+        topCandidates = $_.topCandidates
+      }
+    })
+  } else {
+    @($clip.review.diagnostics.groupSuggestions)
+  }
   if ($provided.Count -ne $groups.Count) {
     throw 'Group rank suggestions do not match group count.'
   }
   foreach ($item in $provided) {
     $id = [string]$item.groupAlias
-    if ($id -cnotmatch '^G(?!000)[0-9]{3}$' -or
+    if ($id -cnotmatch $aliasPattern -or
         $rankings.ContainsKey($id) -or
         [int]$item.representativeCount -lt 1 -or
         [int]$item.representativeCount -gt 5 -or
@@ -92,8 +129,18 @@ if ($groups.Count -lt 1 -or $groups.Count -gt 64) {
   throw 'Expected 1 to 64 provisional groups.'
 }
 $total = ($groups | Measure-Object -Property observations -Sum).Sum
-if ([int]$total -ne [int]$groupReview.observationsAssigned -or
-    [int]$total + [int]$groupReview.observationsUnassigned -ne
+$hiddenObservations = if ($isShadow) {
+  [int]$groupReview.noiseObservations + [int]$groupReview.membersInUnrepresentedGroups
+} else { [int]$groupReview.observationsUnassigned }
+if ($isShadow) {
+  if ([int]$total -ne ([int]$groupReview.clusterMembers -
+        [int]$groupReview.membersInUnrepresentedGroups) -or
+      [int]$total + $hiddenObservations -ne
+        [int]$groupReview.observationsEvaluated) {
+    throw 'The shadow shortlist does not reconcile with all candidates.'
+  }
+} elseif ([int]$total -ne [int]$groupReview.observationsAssigned -or
+    [int]$total + $hiddenObservations -ne
       [int]$groupReview.observationsConsidered) {
   throw 'Ungrouped observations are not correctly accounted for.'
 }
@@ -120,7 +167,7 @@ foreach ($group in $groups) {
       throw 'Private ranked group does not match its review crops.'
     }
   }
-  if ($alias -cnotmatch '^G(?!000)[0-9]{3}$' -or -not $seen.Add($alias) -or
+  if ($alias -cnotmatch $aliasPattern -or -not $seen.Add($alias) -or
       [int]$group.observations -lt 1 -or $crops.Count -lt 1 -or
       $crops.Count -gt 5 -or $crops.Count -gt [int]$group.observations) {
     throw 'Invalid or duplicate provisional group.'
@@ -167,7 +214,8 @@ if (((Get-Item -LiteralPath $outputRoot).Attributes -band
   throw 'Group review output directory must not be linked.'
 }
 $folder=Join-Path $outputRoot (
-  'groups-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') +
+  $(if ($isShadow) { 'shadow-groups-' } else { 'groups-' }) +
+  (Get-Date -Format 'yyyyMMdd-HHmmssfff') +
   '-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $folder | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $folder 'crops') | Out-Null
@@ -215,7 +263,7 @@ $worksheet=Join-Path $folder 'group-review-worksheet.csv'
 $rows | Export-Csv -LiteralPath $worksheet -NoTypeInformation -Encoding utf8
 
 $html=[Collections.Generic.List[string]]::new()
-$html.Add(@'
+$intro = @'
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -239,10 +287,24 @@ textarea{min-height:62px;resize:vertical}.grid{display:grid;grid-template-column
 <p class="note">Background objects can receive many detector hits, so observation count alone does NOT measure face-likeness. Optional view filters only hide cards temporarily, never drop evidence or remove rows from your saved CSV. Inspect lower-support groups too before declaring that a person is absent. Newer group reports contain up to five representative crops; older three-crop reports remain valid.</p>
 <p class="note">Newer reports show top-three <b>pseudonym aliases</b> and exploratory cosine scores for each group, not names or verified identities. Low scores and small score gaps are uncertain; scores cannot tell whether a crop is a real face. Resolve aliases only with the separate local private people map. Older reports show no group ranks. No video timestamps are displayed.</p>
 <div class="toolbar"><button id="save-groups" type="button">Save group-review CSV</button><button id="import-groups" type="button">Import saved CSV</button><label><input id="hide-dismissed" type="checkbox" checked> Hide dismissed</label><label><input id="repeat-only" type="checkbox"> Show groups with 3+ observations only</label><input id="groups-file" type="file" accept=".csv,text/csv" hidden><span id="group-status" aria-live="polite"></span></div>
-'@)
-if ([int]$groupReview.observationsUnassigned -gt 0) {
+'@
+if ($isShadow) {
+  $intro = $intro.Replace('Private provisional groups','Private shadow DBSCAN groups')
+  $intro = $intro.Replace('Provisional groups','Shadow DBSCAN groups')
+  $intro = $intro.Replace('provisional group','shadow DBSCAN cluster')
+  $intro = $intro.Replace('G-number','D-number')
+  $intro = $intro.Replace('G002','D002')
+}
+$html.Add($intro)
+if ($isShadow) {
+  $html.Add(('<p class="warning">Shadow comparison only: {0} clusters total, {1} displayed, {2} clusters ({3} observations) outside this shortlist, plus {4} noise observations. Noise may contain genuine singleton faces. The displayed groups are NOT full person coverage; the baseline grouping is unchanged. Never import shadow decisions as baseline review.</p>' -f
+    [int]$groupReview.clusterCount,$groups.Count,
+    [int]$groupReview.groupsNotRepresentedForReview,
+    [int]$groupReview.membersInUnrepresentedGroups,
+    [int]$groupReview.noiseObservations))
+} elseif ($hiddenObservations -gt 0) {
   $html.Add(('<p class="warning">Group capacity reached: {0} candidate observations remain unassigned and may include real faces. This is not a complete person inventory.</p>' -f
-    [int]$groupReview.observationsUnassigned))
+    $hiddenObservations))
 }
 $html.Add('<div class="grid">')
 foreach ($row in $rows) {
@@ -272,10 +334,11 @@ foreach ($row in $rows) {
     $rankHtml='<div class="ranked"><strong>Top-{0} catalogue suggestions</strong><small> · {1}</small><ol>{2}</ol></div>' -f
       $ranked.Count,(Esc $status),$list
   }
-  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="G002"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
-    (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures,$rankHtml))
+  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="{6}"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
+    (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures,$rankHtml,
+    $(if ($isShadow) { 'D002' } else { 'G002' })))
 }
-$html.Add('</div><p class="note">The intended outcome is one manageable group per real person, not hundreds of face observations. Export your review CSV before leaving.</p></main><script src="group-review.js"></script></body></html>')
+$html.Add('</div><p class="note">These are experimental candidate groups, not confirmed people. Export your review CSV before leaving; do not mix G-prefixed baseline and D-prefixed shadow worksheets.</p></main><script src="group-review.js"></script></body></html>')
 $page=Join-Path $folder 'group-review.html'
 $html -join [Environment]::NewLine |
   Set-Content -LiteralPath $page -Encoding utf8
@@ -286,5 +349,8 @@ if ($OpenGallery) { Invoke-Item -LiteralPath $page }
   ReviewFolder=$folder
   Groups=$rows.Count
   Crops=$cropList.Count
-  UnassignedObservations=[int]$groupReview.observationsUnassigned
+  UnassignedObservations=$hiddenObservations
+  GroupSource=$GroupSource
+  NoiseObservations=$(if ($isShadow) { [int]$groupReview.noiseObservations } else { $null })
+  GroupsNotRepresented=$(if ($isShadow) { [int]$groupReview.groupsNotRepresentedForReview } else { $null })
 }

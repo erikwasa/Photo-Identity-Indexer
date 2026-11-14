@@ -13,7 +13,8 @@ Does not connect to PostgreSQL or modify inputs.
 param(
     [Parameter(Mandatory)][string]$ReviewedCsvPath,
     [string]$PrivateGroupReportPath,
-    [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias
+    [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias,
+    [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -68,8 +69,10 @@ try {
     $byAlias = [Collections.Generic.Dictionary[string,object]]::new(
         [StringComparer]::Ordinal)
     $observations = 0
+    $isShadow = $GroupSource -ceq 'ShadowDbscan'
+    $aliasPattern = if ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
     foreach ($row in $rows) {
-        if ([string]$row.Group -cnotmatch '^G(?!000)[0-9]{3}$' -or
+        if ([string]$row.Group -cnotmatch $aliasPattern -or
             -not $byAlias.TryAdd([string]$row.Group, $row) -or
             -not $allowedDecisions.Contains([string]$row.Decision) -or
             [string]$row.Observations -cnotmatch '^[1-9][0-9]{0,6}$') {
@@ -113,6 +116,9 @@ try {
 
     $unassigned = $null
     $atCapacity = $null
+    $noise = $null
+    $hiddenClusterMembers = $null
+    $totalClusters = $null
     if (-not [string]::IsNullOrWhiteSpace($PrivateGroupReportPath)) {
         $jsonPath = Test-LocalRegularFile $PrivateGroupReportPath (64MB)
         $report = Get-Content -LiteralPath $jsonPath -Raw -Encoding utf8 |
@@ -120,23 +126,55 @@ try {
         $clips = @($report.clips | Where-Object {
             $_.alias -ceq $videoAliases[0]
         })
-        if ([int]$report.schemaVersion -ne 1 -or
-            $clips.Count -ne 1 -or
-            $null -eq $clips[0].review.diagnostics.provisionalGroups) {
+        if ([int]$report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
             throw 'Expected corresponding private grouped report.'
         }
-        $review = $clips[0].review.diagnostics.provisionalGroups
+        $review = if ($isShadow) {
+            $clips[0].review.diagnostics.shadowDbscan
+        } else { $clips[0].review.diagnostics.provisionalGroups }
+        if ($null -eq $review) {
+            throw 'The requested group source is absent.'
+        }
         $reportGroups = @($review.groups)
-        if ([int]$review.schemaVersion -ne 1 -or
-            [int]$review.maximumGroups -ne 64 -or
-            $reportGroups.Count -ne $rows.Count -or
-            [int]$review.observationsAssigned -ne $observations -or
-            [int]$review.observationsConsidered -ne
-                ([int]$review.observationsAssigned +
-                 [int]$review.observationsUnassigned) -or
-            [int]$review.observationsConsidered -ne
-                [int]$clips[0].review.aggregate.facesDetected) {
-            throw 'Group report totals do not match the reviewed CSV.'
+        if ($isShadow) {
+            if ([int]$review.schemaVersion -ne 1 -or
+                [string]$review.policyVersion -cne 'wi0155-video-shadow-dbscan-e018-min2-v1' -or
+                $reportGroups.Count -ne $rows.Count -or
+                $reportGroups.Count -ne [int]$review.groupsRepresentedForReview -or
+                $reportGroups.Count -gt 64 -or
+                [int]$review.clusterCount -lt $reportGroups.Count -or
+                [int]$review.groupsNotRepresentedForReview -ne
+                    ([int]$review.clusterCount - $reportGroups.Count) -or
+                [int]$review.clusterMembers -lt $observations -or
+                [int]$review.clusterMembers - $observations -ne
+                    [int]$review.membersInUnrepresentedGroups -or
+                [int]$review.noiseObservations -lt 0 -or
+                [int]$review.clusterMembers + [int]$review.noiseObservations -ne
+                    [int]$review.observationsEvaluated -or
+                [int]$review.observationsEvaluated -ne
+                    [int]$clips[0].review.aggregate.facesDetected -or
+                [int]$review.sameFrameCollisions -ne 0) {
+                throw 'Shadow group accounting is inconsistent.'
+            }
+            $noise = [int]$review.noiseObservations
+            $hiddenClusterMembers = [int]$review.membersInUnrepresentedGroups
+            $totalClusters = [int]$review.clusterCount
+            $unassigned = $noise + $hiddenClusterMembers
+            $atCapacity = [int]$review.groupsNotRepresentedForReview -gt 0
+        } else {
+            if ([int]$review.schemaVersion -ne 1 -or
+                [int]$review.maximumGroups -ne 64 -or
+                $reportGroups.Count -ne $rows.Count -or
+                [int]$review.observationsAssigned -ne $observations -or
+                [int]$review.observationsConsidered -ne
+                    ([int]$review.observationsAssigned +
+                     [int]$review.observationsUnassigned) -or
+                [int]$review.observationsConsidered -ne
+                    [int]$clips[0].review.aggregate.facesDetected) {
+                throw 'Group report totals do not match the reviewed CSV.'
+            }
+            $unassigned = [int]$review.observationsUnassigned
+            $atCapacity = $reportGroups.Count -eq [int]$review.maximumGroups
         }
         $expected = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
@@ -149,14 +187,13 @@ try {
                 throw 'Group report and CSV identities or counts differ.'
             }
         }
-        $unassigned = [int]$review.observationsUnassigned
-        $atCapacity = $reportGroups.Count -eq [int]$review.maximumGroups
     }
 
     # Output deliberately excludes group aliases, notes, identities,
     # timestamp positions, private paths and any source image data.
     [pscustomobject][ordered]@{
         SchemaVersion = 1
+        GroupSource = $GroupSource
         GroupsReviewed = $rows.Count - $pending.Count
         TotalGroups = $rows.Count
         KeptGroups = $kept.Count
@@ -170,6 +207,9 @@ try {
         KeptOrMergeObservations = $activeObservations
         DismissedGroupObservations = $dismissedObservations
         ObservationsUnassigned = $unassigned
+        ShadowNoiseObservations = $noise
+        ShadowMembersOutsideReview = $hiddenClusterMembers
+        ShadowTotalClusters = $totalClusters
         GroupCapacityReached = $atCapacity
         DismissedGroupPercentage = [Math]::Round(
             100.0 * $dismissed.Count / $rows.Count, 1)

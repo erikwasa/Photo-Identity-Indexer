@@ -2102,3 +2102,32 @@ See operations checkpoint 34. All `GROUP-QUALITY-01`,
 `DIVERSE-VIDEOS-01` and `MERGE-01` acceptance gates
 remain open; `SAMPLING-01` two-pass mechanics remain
 verified only for V03.
+
+## Experimental checkpoint 35 — source-free shadow review preparation (2026-11-14)
+
+PR #803 was merged into wi-0155. Further local/private review is
+deferred at the maintainer's request. The previously reported **three
+clip aggregate** counted 267 clusters, 2,663 clustered observations,
+1,323 noise observations and 195 clusters not represented among
+bounded shadow review shortlists, with zero same-frame collisions.
+These are NOT V03-only, and are not human-review quality results.
+V03 streaming baseline remains 64 groups, 407 assigned and 3,505
+unassigned observations.
+
+The next isolated increment adds **D-prefixed private DBSCAN cluster
+review, rank adjudication and aggregate measurements**, reusing the
+existing PowerShell 7.6 gallery/worksheet with an explicit group
+source selector. Existing G-prefixed provisional review remains the
+default, with no altered detection, clustering or identity score.
+The offline tools reuse an existing matching private PR #803 report,
+case manifests, and people map; no fresh inference or SQL is needed.
+Unshown clusters and noise remain accounted for and cannot be
+interpreted as false or missing faces. Source-free synthetic tests
+exercise a withheld 65th cluster, identity rank mismatch, baseline
+isolation and failure on invalid accounting/co-presence.
+
+The combined human verification procedure is in operations checkpoint
+35. This is review infrastructure only, not proof of meeting
+FACE-QUALITY-01, GROUP-QUALITY-01, CATALOGUE-TOP3-01 or
+DIVERSE-VIDEOS-01. No automatic identity writeback or main-branch
+integration is authorized.
