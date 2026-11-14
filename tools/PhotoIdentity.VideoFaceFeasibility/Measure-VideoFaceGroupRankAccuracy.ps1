@@ -17,7 +17,8 @@ param(
     [Parameter(Mandatory)][string]$ReviewedCsvPath,
     [Parameter(Mandatory)][string]$PrivateGroupReportPath,
     [Parameter(Mandatory)][string]$PrivatePeopleMapPath,
-    [Parameter(Mandatory)][ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias
+    [Parameter(Mandatory)][ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias,
+    [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -55,7 +56,7 @@ try {
     $mapFile = Assert-PrivateFile $PrivatePeopleMapPath (1MB)
 
     # Reuse the established CSV decision/merge-cycle/count validator.
-    $baseline = & (Join-Path $PSScriptRoot 'Measure-VideoFaceGroupReview.ps1') -ReviewedCsvPath $csv -PrivateGroupReportPath $json -ClipAlias $ClipAlias
+    $baseline = & (Join-Path $PSScriptRoot 'Measure-VideoFaceGroupReview.ps1') -ReviewedCsvPath $csv -PrivateGroupReportPath $json -ClipAlias $ClipAlias -GroupSource $GroupSource
     $rows = @(Import-Csv -LiteralPath $csv -Encoding utf8)
     $report = Get-Content -LiteralPath $json -Raw -Encoding utf8 | ConvertFrom-Json
     $privateMap = Get-Content -LiteralPath $mapFile -Raw -Encoding utf8 | ConvertFrom-Json
@@ -84,9 +85,26 @@ try {
     }
 
     $clip = $clips[0]
-    $groupReview = $clip.review.diagnostics.provisionalGroups
+    $isShadow = $GroupSource -ceq 'ShadowDbscan'
+    $groupReview = if ($isShadow) {
+        $clip.review.diagnostics.shadowDbscan
+    } else {
+        $clip.review.diagnostics.provisionalGroups
+    }
+    if ($null -eq $groupReview) {
+        throw 'Missing the selected group evidence.'
+    }
     $groups = @($groupReview.groups)
-    $ranked = @($clip.review.diagnostics.groupSuggestions)
+    $ranked = if ($isShadow) {
+        @($groups | ForEach-Object {
+            [pscustomobject]@{
+                groupAlias = $_.alias
+                groupObservations = $_.observations
+                representativeCount = @($_.representativeCrops).Count
+                topCandidates = $_.topCandidates
+            }
+        })
+    } else { @($clip.review.diagnostics.groupSuggestions) }
     if ($groups.Count -ne $ranked.Count -or $ranked.Count -ne $rows.Count) {
         throw 'The report does not contain complete group rankings.'
     }
@@ -227,6 +245,10 @@ try {
     # intentionally do not include unreviewed, unknown or unassigned faces.
     [pscustomobject][ordered]@{
         SchemaVersion = 1
+        GroupSource = $GroupSource
+        ShadowTotalClusters = $baseline.ShadowTotalClusters
+        ShadowNoiseObservations = $baseline.ShadowNoiseObservations
+        ShadowMembersOutsideReview = $baseline.ShadowMembersOutsideReview
         InputEvidenceValidated = $true
         CanonicalPeople = [int]$report.catalogue.selectedPeople
         EligiblePeople = [int]$report.catalogue.eligiblePeople
