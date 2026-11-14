@@ -3580,3 +3580,63 @@ absence from displayed D-groups is NOT proof that a person was absent.
 This does not close FACE-QUALITY-01, GROUP-QUALITY-01, CATALOGUE-TOP3-01,
 DIVERSE-VIDEOS-01, SAMPLING-01 or MERGE-01. No production integration
 or automatic video/person identity assignment is authorized.
+
+## Checkpoint 36 — V03 shadow DBSCAN human review: negative grouping-quality result (2026-11-14)
+
+**Local acceptance findings after PR #803 was merged:** The maintainer ran the
+existing approved V01–V03 three-clip all-eligible, read-only shadow comparison
+and verified its private report against the approved frame manifests.
+Automated accounting and source-manifest verification **PASS** for all three
+clips, including exact previous streaming-group baselines and **zero
+same-frame collisions**.
+
+The V03 baseline remained **180 frames, 3,912 detections, 64 streaming
+groups, 407 assigned and 3,505 unassigned**. The separate DBSCAN shadow
+result was **259 clusters / 2,636 cluster members / 1,276 noise
+observations**, with **64 review shortlist groups**, **195 hidden
+clusters containing 483 members**, and **96 total sampled noise crops**.
+The three-clip aggregate was **267 DBSCAN clusters, 2,663 members, 1,323
+noise observations**, evaluated over **252 frames / 3,986 retained
+detections**. These are counts of observations and derived clusters,
+**not real-face classification or identity accuracy**.
+
+A manually run private offline gallery (first 20 largest D-groups and
+24 sampled V03 noise crops) opened correctly after fixing a formatting
+error in the separately supplied local gallery helper. The maintainer
+reported **D01–D20: all 20 groups contained background objects, no
+faces**; **24/24 displayed DBSCAN noise crops: human faces**. These
+noise crops really are DBSCAN unclustered observations, not a display
+section for erroneous detections. Identity identifiability was not
+assessed for those 24 crops.
+
+**Human grouping-quality acceptance: FAIL for the tested shadow
+policy and group-size-prioritized V03 shortlist.** It concentrated the
+largest review groups on repeated background structure while the sampled
+noise contained genuine faces. It is **not** a validated alternative
+for video grouping or known-person top-three ranking. Passing structural
+accounting and the lack of same-frame collisions do not imply useful
+groups, real-face recall, or correct identities. Do not adopt its
+experimental distance 0.18/minimum-two policy in production; do not
+filter away, auto-reject, or auto-enrol its noise observations.
+
+**Sampling limitations:** D01–D20 are the 20 largest of 259 clusters;
+we have **not** established that all 259 are background. The 24 noise
+crops were a quality-prioritized review subset of 1,276 noise
+observations; **24/24 is not population noise-face precision**. The
+previous separate 96-crop streaming-unassigned audit found 94 real
+human faces and 2 background objects, also with a biased sample.
+These two findings together justify **protecting singleton and
+uncertain faces**, not weakening thresholds without evidence.
+
+**Next engineering decision:** Retain PR #803 as an opt-in, isolated,
+read-only failed comparator for traceability; keep the existing
+chronological grouping and the original observation accounting
+unchanged. Avoid spending additional manual review time on the same
+20 obviously invalid largest groups. Investigate a **face-validity
+and review-priority signal independent of embedding-cluster density**
+with explicit human-labeled positive/negative examples, and separate
+that from cross-frame identity similarity. Evaluate at the person
+level (known people recovered at top three, wrongful person merges,
+noise genuine-face retention, review burden), never by smaller total
+cluster count alone. Grouping, identity accuracy and diverse-video
+quality acceptance are still **OPEN**. No production integration.

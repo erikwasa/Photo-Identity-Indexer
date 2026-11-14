@@ -2131,3 +2131,41 @@ The combined human verification procedure is in operations checkpoint
 FACE-QUALITY-01, GROUP-QUALITY-01, CATALOGUE-TOP3-01 or
 DIVERSE-VIDEOS-01. No automatic identity writeback or main-branch
 integration is authorized.
+
+## Experimental checkpoint 36 — verified shadow DBSCAN failure on V03 human quality (2026-11-14)
+
+Following PR #803 merge, the maintainer reran the all-eligible,
+read-only three-video catalogue experiment and performed private
+source-manifest validation. **Structural acceptance PASS**: the old
+V03 baseline remained 64 groups / 407 assigned / 3,505 unassigned;
+V03 shadow DBSCAN accounted for all 3,912 detections with **259
+clusters, 2,636 cluster members and 1,276 noise observations**,
+**zero same-frame collisions**, 195 clusters / 483 members omitted
+from the bounded 64-group shortlist, and 96 sampled noise crop
+references. V01 and V02 also passed all accounting and original
+baseline checks. The three-clip total is 267 shadow clusters,
+2,663 cluster members, 1,323 noise observations.
+
+**Human quality acceptance FAIL for this candidate policy and
+largest-cluster review order:** the separately rendered V03 local
+gallery showed **20/20 largest shadow groups (D01–D20) consisting
+of background objects rather than faces**, while **24/24 displayed
+noise samples visibly contained human faces**. This is a selected,
+not random comparison: it does NOT establish that the remaining
+239 shadow clusters are background nor that all 1,276 noise
+observations are real faces. Person identifiability of the 24
+noise samples was not established. Nevertheless, this exposes
+unacceptable review prioritization and important genuine-face
+loss from clusters at the chosen experimental cosine distance.
+
+The shadow algorithm's passing accounting and co-presence checks
+are distinct from face-detection, grouping and recognition quality.
+**Do not replace the original video grouping with this DBSCAN
+configuration, discard the counted noise, or infer identities
+from its background-dominated groups.** Retain the comparator only
+as isolated diagnostic evidence. The next development stage must
+separate face validity, face/person identifiability, and temporal
+identity grouping, with explicit human-reviewed ground truth.
+`FACE-QUALITY-01`, `GROUP-QUALITY-01`, `CATALOGUE-TOP3-01`,
+`DIVERSE-VIDEOS-01` and `MERGE-01` remain open; the already
+verified V03 two-pass sampling mechanics remain intact.
