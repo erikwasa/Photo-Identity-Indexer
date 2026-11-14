@@ -88,3 +88,7 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/803
 - type: implementation
   value: '2026-11-13: Experimental all-eligible read-only M25 DBSCAN shadow comparison at cosine distance 0.18/min2 with same-frame not-same constraints, bounded in-memory vectors, explicit singleton noise and private 96-sample noise audit; baseline groups, ranks and source files unchanged. Real comparative run and human validation pending.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/805
+- type: maintainer_verification
+  value: '2026-11-14: PR803 shadow DBSCAN local report accounting and original V01/V02/V03 baselines PASS; V03 259 shadow clusters, 2636 members, 1276 noise, zero simultaneous-face collisions, 195 hidden clusters/483 members. Human V03 gallery review: all first 20 largest D-groups were background objects, all 24 sampled shadow-noise crops were real human faces; selected samples, not population estimates. Human grouping-quality FAIL for experimental DBSCAN policy. Do not promote grouping, discard noise or infer identity.'
