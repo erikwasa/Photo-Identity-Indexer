@@ -286,7 +286,7 @@ public static class VideoFaceIndependentDetectorCommand
             VideoFaceCatalogueClipReview[] matchingReports = report.Clips
                 .Where(c => c.Alias == alias).ToArray();
             if (report.SchemaVersion != 1 || matchingCases.Length != 1 ||
-                matchingReports.Length != 1 || report.Clips.Count != cases.Clips.Count)
+                matchingReports.Length != 1 || report.Clips.Count != cases.Clips!.Count)
                 throw new ArgumentException();
             var clip = matchingReports[0];
             VideoFaceShadowDbscanReview shadow = clip.Review.Diagnostics?.ShadowDbscan
