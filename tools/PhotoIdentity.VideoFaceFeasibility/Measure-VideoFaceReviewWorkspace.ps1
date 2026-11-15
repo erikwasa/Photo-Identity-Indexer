@@ -88,7 +88,6 @@ foreach ($row in $rows) {
         })
     } else {
         $prefix = if ($next -eq 1) { 'N' } else { 'U' }
-        $target = if ($next -eq 1) { $noise } else { $uncorroborated }
         if ([string]$row.Sample -cnotmatch ('^' + $prefix + '(?!000)[0-9]{3}$') -or
             [string]$row.Frame -cnotmatch '^[1-9][0-9]*$' -or
             [string]$row.Face -cnotmatch '^[1-9][0-9]*$' -or
@@ -98,11 +97,13 @@ foreach ($row in $rows) {
             -not $seen.Add($prefix + ':' + [string]$row.Sample)) {
             throw 'Invalid or duplicated private audit evidence.'
         }
-        $target.Add([pscustomobject][ordered]@{
+        $audited = [pscustomobject][ordered]@{
             Clip=$ClipAlias;AuditReportSha256=$hash;Sample=$row.Sample
             Frame=$row.Frame;Face=$row.Face;Label=$row.Label
             PersonAlias=$row.PersonAlias
-        })
+        }
+        if ($next -eq 1) { $noise.Add($audited) }
+        else { $uncorroborated.Add($audited) }
     }
 }
 if ($groups.Count -lt 1 -or $groups.Count -gt 64 -or
