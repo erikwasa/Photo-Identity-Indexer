@@ -170,6 +170,18 @@ $css = @'
 .ws-audit-card{border:1px solid #4c6378;border-radius:8px;background:#1a2c3d;padding:10px;min-width:0}
 .ws-audit-card label{display:block;font-size:12px;margin-top:7px;color:#d2e5f3}
 .ws-audit-card select,.ws-audit-card input{width:100%;box-sizing:border-box;margin-top:3px}
+.ws-merge-assist{padding:12px 15px;border:1px solid #5a7590;border-radius:8px;margin:12px 0;background:#15293a}
+.ws-merge-assist summary{cursor:pointer;font-size:17px;font-weight:600}
+.ws-merge-assist p{color:#d5e3f0}
+.ws-merge-pair{border:1px solid #4a6176;padding:10px;margin:9px 0;border-radius:8px;background:#192b3e}
+.ws-merge-pictures{display:flex;gap:14px;flex-wrap:wrap}
+.ws-merge-preview{flex:1 1 240px;min-width:0}
+.ws-merge-images{display:flex;gap:5px;overflow-x:auto;margin:8px 0}
+.ws-merge-images img{max-width:100px;max-height:110px;object-fit:contain}
+.ws-merge-checkbox{display:block;margin:8px 0}
+.ws-merge-checkbox input{width:auto}
+.ws-merge-pair button:disabled,#ws-merge-batch-apply:disabled{opacity:.5;cursor:not-allowed}
+.ws-merge-batch{border-top:1px solid #5a7590;padding-top:10px;margin-top:12px}
 .ws-audit-card[hidden]{display:none}
 .evidence-lane{margin-top:22px;border:1px solid #526c82;border-radius:8px;padding:12px;background:#172a3b}
 .evidence-lane summary{cursor:pointer;padding:8px;font-size:15px;color:#e9f5ff}
@@ -182,18 +194,42 @@ $css = @'
 '@
 $intro = ('<div id="ws-toolbar" class="ws-toolbar" data-clip="{0}" data-report="{1}"><button type="button" id="ws-save">Save all C/N/U decisions (one CSV)</button><button type="button" id="ws-import">Import combined CSV</button><input type="file" id="ws-file" accept=".csv,text/csv" hidden><span id="ws-status" aria-live="polite">No decisions saved yet</span></div><p class="note"><strong>Private group-first review · {0}.</strong> Review the {2} C-groups first. Expand N and U below, classify their crops in this same page, then save everything using the single button above. Earlier individual galleries remain available for context, but their separate Save buttons are not needed. This is a private worksheet, not a production identity update.</p><p><a href="#lane-noise">Ungrouped corroborated evidence</a> · <a href="#lane-uncorroborated">Detector disagreements</a></p>' -f
     (Html $ClipAlias),(Html $reportHash),[int]$groups.Groups)
+$mergePanel = @'
+<section id="ws-merge-assist" class="ws-merge-assist">
+  <details>
+    <summary>Review possible same-person group fragments (human confirmation)</summary>
+    <p class="note">This optional shortlist only uses shared top-three catalogue aliases and explicitly reviewed person aliases, NOT reliable pairwise video-face similarity. Shared ranks can be wrong. Compare crops before any merge; crop-frame overlap blocks a lead but absence of overlap among representative crops does not prove a merge is safe. No cross-person or automatic identity assignment.</p>
+    <p id="ws-merge-summary" aria-live="polite"></p>
+    <div id="ws-merge-proposals"></div>
+    <div class="ws-merge-batch">
+      <h3>Batch merge groups you already labelled as the same known person</h3>
+      <p id="ws-merge-batch-count" aria-live="polite"></p>
+      <label><input type="checkbox" id="ws-merge-batch-confirm"> I have checked every relevant group and confirmed each repeated person alias represents one person, with no conflicting simultaneous faces</label>
+      <p><button type="button" id="ws-merge-batch-apply" disabled>Apply my reviewed same-person merges</button></p>
+      <p class="note">A batch changes only local C-group decision controls. It never changes a selected identity, the N/U lanes or a database. Inspect and save once using the original combined CSV button.</p>
+    </div>
+  </details>
+</section>
+'@
 $page = $page.Replace($styleAnchor,($css + $styleAnchor))
-$page = $page.Replace($gridAnchor,($intro + $gridAnchor))
+$page = $page.Replace($gridAnchor,($intro + $mergePanel + $gridAnchor))
 $page = $page.Replace($endAnchor,(
     $noiseLane + [Environment]::NewLine + $uncorroboratedLane +
     [Environment]::NewLine + $endAnchor +
-    '<script src="review-workspace.js"></script>'))
+    '<script src="review-workspace.js"></script>' +
+    '<script src="merge-assist.js"></script>'))
 $workspaceJs = Join-Path $PSScriptRoot 'VideoFaceReviewWorkspace.js'
 if (-not (Test-Path -LiteralPath $workspaceJs -PathType Leaf)) {
     throw 'Private combined review script is missing.'
 }
 Copy-Item -LiteralPath $workspaceJs -Destination (
     Join-Path $groups.ReviewFolder 'review-workspace.js')
+$mergeAssistJs = Join-Path $PSScriptRoot 'VideoFaceGroupMergeAssist.js'
+if (-not (Test-Path -LiteralPath $mergeAssistJs -PathType Leaf)) {
+    throw 'Private group-merge assistant script is missing.'
+}
+Copy-Item -LiteralPath $mergeAssistJs -Destination (
+    Join-Path $groups.ReviewFolder 'merge-assist.js')
 $page | Set-Content -LiteralPath $groups.GalleryPath -Encoding utf8
 
 if ($OpenGallery) { Invoke-Item -LiteralPath $groups.GalleryPath }
