@@ -395,6 +395,13 @@ try {
             Remove-Item -LiteralPath $privateDraft -Force
         }
     }
+    # A syntactically valid N/U pseudonym absent from the frozen catalogue
+    # may pass sample-label validation, but MUST NOT create known presence.
+    $unified[1].PersonAlias = 'P9999'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $presenceCmd @combinedArgs }) 'Presence accepted person absent from snapshot.'
+    $unified[1].PersonAlias = ''
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
     Write-Host 'Synthetic reviewed person presence proposal: PASS'
     $unified[1].AuditReportSha256 = ('f' * 64)
     $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
