@@ -159,6 +159,12 @@ work_items:
     value: '2026-11-15: Opt-in private group-first review workspace combines existing CenterFace C-groups with collapsed, temporally spread N-noise and U-disagreement sample lanes, links to exact audit sample for labeling and preserves three independent CSV readers. No new inference, PostgreSQL/source writes, automatic suppression or merging. Synthetic regression extended; Windows local human UI acceptance pending; empty-source clips and full >96 noise navigation remain deferred.'
   - type: implementation
     value: '2026-11-15: PR812 browser review received usability FAIL despite synthetic PASS: C/N/U required three saves, duplicate default audit filenames and manual renaming/moving. Follow-up changes group-first page to edit N/U labels inline and save/import ONE source-bound combined CSV; a new read-only measurement wrapper reuses original strict C/N/U readers with temporary cleanup. Windows synthetic and real-browser acceptance pending; source/model/database safety unchanged.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/813
+  - type: maintainer_verification
+    value: '2026-11-15: PR813 merged; final Windows CI PASS; maintainer V01 browser acceptance PASS all six checks (C-group crops/ranks/controls; N and U in-page face classification; ONE combined CSV save with distinct name and no manual file rearrangement; one-file import restores all three sections after page reload). Saved CSV measured by combined source readers: SchemaVersion=1, ClipAlias=V01, CombinedEvidenceValidated=True. Three-save PR812 usability failure resolved; no further PR813 local verification needed.'
+  - type: documentation
+    value: '2026-11-15: Prioritize one bounded report-only assisted person-group consolidation improvement if it materially reduces manual merging (V02 six initial C-groups for two people; four human merges), without wrong cross-person merges or losing genuine N/U singleton evidence. Continue preserving isolated wi-0155, no production identities/reference enrichment, and defer no-face/empty-source, full unsampled coverage and integration/licensing decisions.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
