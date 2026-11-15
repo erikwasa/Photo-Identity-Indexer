@@ -2614,3 +2614,53 @@ automatic person-group consolidation, unrepresented evidence
 outside the capped 96 samples, no-face inputs, CenterFace model
 rights or future integration scope. Keep all changes isolated
 from `main` pending explicit maintainer approval.
+
+## Experimental checkpoint 45 — PR #813 single-save human acceptance (2026-11-15)
+
+**Maintainer local acceptance: PASS.** PR #813 was merged into the
+isolated \`wi-0155\` integration branch after its final Windows CI
+checks passed. The operator verified the combined V01 private
+review workspace in the local browser:
+
+- Both C-groups rendered representative crops, existing catalogue
+  suggestions and human decision controls: **PASS**.
+- Corroborated DBSCAN-noise N lane expanded and allowed in-page
+  human face classification: **PASS**.
+- YuNet/CenterFace disagreement U lane expanded and allowed
+  in-page human face classification: **PASS**.
+- A single **Save all C/N/U** action produced one combined CSV:
+  **PASS**. The distinct filename required no manual rename,
+  download consolidation or file relocation.
+- After page reload, **Import combined CSV** restored all
+  three sets of decisions: **PASS**.
+
+The read-only \`Measure-VideoFaceReviewWorkspace.ps1\`
+returned \`SchemaVersion=1\`, \`ClipAlias=V01\` and
+\`CombinedEvidenceValidated=True\` for the saved worksheet.
+This confirms the combined worksheet matched its report and
+source-specific validators. The operator reported that the
+corrected workflow looked good. The prior PR #812
+three-save browser usability rejection is therefore
+**resolved** for the accepted V01 case; older separate
+C/N/U CSVs remain usable.
+
+This acceptance verifies *review usability and evidence
+integrity*, not a new face-detection accuracy, model
+ranking or automatic grouping result. Do not repeat
+V01/V02 human labelling or full inference merely to
+recheck the one-save behavior.
+
+**Next product-quality gap:** V02 still had six
+algorithmic C-groups representing two manually labelled
+people, requiring four manual merges. The desired outcome
+is few groups per person without wrong cross-person merges,
+plus safe discoverability of genuine N/U faces and
+singletons. Consider one bounded, *report-only* assisted
+consolidation/review prototype against existing private
+evidence; gate any additional experiment on a meaningful
+reduction in operator effort without person-coverage loss.
+No all-N/U suppression, persistent identity writes,
+catalogue exemplar enrichment or \`main\` integration
+is authorized. No-face/empty-source handling, capped
+N/U sampling coverage, licensing/packaging and production
+integration boundary remain open.
