@@ -44,7 +44,7 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0155-video-face-processing-evaluation.md
   started_at: 2026-11-05
-  last_updated_at: 2026-11-12
+  last_updated_at: 2026-11-15
   branch: wi-0155
   blockers:
   - WI-0151
@@ -147,6 +147,10 @@ work_items:
     value: '2026-11-15: PR808 V01-V03 full-candidate all-eligible read-only CenterFace shadow: 103/103 tests, models, run, accounting, unchanged original baseline PASS. 252 frames/3986 retained YuNet; 337 corroborated at confidence 0.30 (276 at 0.50), 3649 explicitly retained uncorroborated. V03 3912 retained, 288 corroborated, 3624 not corroborated, 18 corroborated-only DBSCAN clusters (54 members/234 noise), zero same-frame collisions; original V03 64 G groups/259 D clusters unchanged. Human content quality still unverified.'
   - type: implementation
     value: '2026-11-15: Add private offline human review modes CenterFaceShadow (C-prefixed distinct groups), CenterFaceNoise (N sample audit), CenterFaceUncorroborated (U sample audit) to existing PowerShell gallery and aggregate group/person-rank measurement. Existing G/D modes preserved; selected samples biased, no automatic filtering or database/source writes; local human acceptance pending.'
+  - type: maintainer_verification
+    value: '2026-11-15: PR809 Windows synthetic C/N/U tests and offline galleries PASS; all four local aggregate readers validated matching V03 source evidence. CenterFace C groups 18 initially, 3 kept plus 15 human merges, 0 background dismissals, 54 clustered members; 234 corroborated noise. Biased N sample 96: 69 real faces across 3 known people, 27 cannot tell, 0 background. Biased U sample 96: 15 real faces across 2 known people, 67 background, 14 cannot tell. Script top-three 0/3 on labelled kept C groups is not maintainer-reviewed suggestion acceptance; V03 unsuitable as deciding rank benchmark.'
+  - type: documentation
+    value: '2026-11-15: Maintainer prioritizes low production review burden (few background groups, near one group/person, preserved true singletons); V03 for hard face/group stress only; V01/V02 first for qualitative top-three utility, then only a few approved clearer clips if needed. No compulsory top-three success rate, no extended marginal-gain evaluation loops, no CenterFace hard suppression; keep integration decision deferred.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
