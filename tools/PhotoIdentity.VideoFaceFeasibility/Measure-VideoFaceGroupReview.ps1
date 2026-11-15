@@ -111,10 +111,14 @@ try {
     $active = @($rows | Where-Object {
         $_.Decision -in @('Keep group','Merge group')
     })
-    $dismissedObservations = [int](($dismissed |
-        Measure-Object -Property Observations -Sum).Sum)
-    $activeObservations = [int](($active |
-        Measure-Object -Property Observations -Sum).Sum)
+    # A valid review can have zero dismissed (or zero retained) groups.
+    # Measure-Object returns no result for an empty pipeline under StrictMode.
+    $dismissedObservations = if ($dismissed.Count -eq 0) { 0 } else {
+        [int](($dismissed | Measure-Object -Property Observations -Sum).Sum)
+    }
+    $activeObservations = if ($active.Count -eq 0) { 0 } else {
+        [int](($active | Measure-Object -Property Observations -Sum).Sum)
+    }
     $unresolved = $uncertain.Count + $split.Count + $pending.Count
 
     $unassigned = $null
@@ -122,6 +126,7 @@ try {
     $noise = $null
     $hiddenClusterMembers = $null
     $totalClusters = $null
+    $safeStage = 'private-report'
     if (-not [string]::IsNullOrWhiteSpace($PrivateGroupReportPath)) {
         $jsonPath = Test-LocalRegularFile $PrivateGroupReportPath (64MB)
         $report = Get-Content -LiteralPath $jsonPath -Raw -Encoding utf8 |
