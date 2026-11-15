@@ -1,5 +1,6 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Geometry;
+using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.VideoFaceFeasibility;
 using Xunit;
