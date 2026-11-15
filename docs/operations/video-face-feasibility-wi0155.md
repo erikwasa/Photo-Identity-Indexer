@@ -4039,3 +4039,87 @@ genuine-face recall and singleton retention, original versus C-group
 review burden, per-person distinct known-person top-three accuracy,
 diverse videos and runtime overhead. Also review the CenterFace
 manifest's provisional model-weight and training-data rights.
+
+## Checkpoint 41 — PR #809 human-reviewed result and short next decision (2026-11-15)
+
+**Verified:** Windows PowerShell synthetic shadow-gallery/rank test PASS;
+C/N/U V03 private gallery generation PASS; all four matching aggregate
+measurement readers PASS. These are verified local operator outcomes,
+not a release acceptance of video recognition.
+
+| V03 reviewed source | Human result | Limitation |
+| --- | --- | --- |
+| CenterFace C-groups | 18 initial, 3 kept + 15 merges, 0 dismissed; 3 proposed final groups | Only 54 clustered members from 288 corroborated candidates; 15 human merges are still review work |
+| CenterFace N-noise | 96 sampled of 234; 69 real faces (three known people), 27 cannot tell, 0 background | Genuine singletons/noise remain outside clusters |
+| Uncorroborated U candidates | 96 sampled of 3,624; 15 real faces (two known people), 67 background, 14 cannot tell | Do not reject all CenterFace nonmatches |
+| Full-catalogue rank on three labelled C-groups | Automated 0 top-1 / 0 top-3 for those three labels | Operator did **not** review suggestion usefulness; V03 is low-quality and not a sensible deciding benchmark |
+
+The biased N/U samples are **not population precision/recall
+estimates**. The rank tool's `RetainedGroups=18` counts all
+15 merge rows as active; the reviewed **proposed final count is 3**.
+No false-person merges were reported in the selected review; that
+does not establish correctness of automatic merges. No suppression
+rule is validated. Preserve the private reviews and matched
+report; do not upload crops, people aliases, report paths or CSVs
+to repository issues.
+
+### Updated product-oriented next step
+
+1. **Use V03 only as the hard face-discovery/background/grouping
+   stress case.** Do not conduct another V03 top-three cutoff
+   sweep, infer a general matcher failure from 0/3, or try to
+   force the top three on distant unrecognizable faces.
+2. **Review the existing V01 and V02 evidence first, without
+   inference or PostgreSQL access.** Check whether each *human-
+   identifiable* person is discoverable in a small number of
+   groups **or** a reviewable singleton/noise path. Count
+   background dismissals and manual merges, not only cluster
+   totals. Inspect top-three suggestions on the clearest human-
+   confirmed real faces; log success as useful, not mandatory.
+3. **One bounded stop/go decision.** If V01/V02 already demonstrate
+   manageable burden and usable suggestions on reasonable
+   footage, move to the smallest production-oriented proposal
+   and maintain isolated safety boundaries. If evidence misses
+   a material case, add one or a few expressly approved local
+   clips, not a fixed corpus quota. Only attempt further model/
+   grouping development when a concrete, high-impact improvement
+   is likely; compare once and stop if the gain is marginal.
+   Any resulting production integration still requires separate
+   explicit maintainer approval and review of CenterFace rights.
+
+With the same already existing local `$allReport` (PR #808
+full-candidate report), `$casesPath`, and optional `$allMap`,
+run this **zero-inference** gallery-only review in PowerShell 7.6
+on the isolated `wi-0155` worktree. The expected V01/V02 C
+cluster counts are 2/6; corroborated noise 7/15; and
+uncorroborated observations 19/6, respectively.
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$tools = 'tools\PhotoIdentity.VideoFaceFeasibility'
+foreach ($clip in @('V01','V02')) {
+    $base = @{
+        PrivateReportPath = $allReport
+        PrivateCasesPath = $casesPath
+        ClipAlias = $clip
+        OpenGallery = $true
+    }
+    & "$tools\New-VideoFaceGroupReview.ps1" @base -GroupSource CenterFaceShadow |
+        Format-List
+    & "$tools\New-VideoFaceUnassignedReview.ps1" @base -AuditSource CenterFaceNoise |
+        Format-List
+    & "$tools\New-VideoFaceUnassignedReview.ps1" @base -AuditSource CenterFaceUncorroborated |
+        Format-List
+}
+~~~
+
+Save any human-reviewed private C/N/U CSVs explicitly from their
+HTML gallery. Reuse the checkpoint 40 measurement commands with
+the **corresponding clip alias/source**; prefer PowerShell
+hashtable splatting to prevent multiline-paste mistakes. Do not
+treat blank `SelectedPerson` values as verified wrong suggestions.
+Record only aggregate results and qualitative reviewer feedback.
+If a gallery lacks human-identifiable faces, it is **not** a
+top-three validation case. No extra synthetic tests or model
+runs are necessary merely to repeat already passed PR #809
+verification.
