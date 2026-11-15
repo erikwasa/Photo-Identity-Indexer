@@ -316,7 +316,7 @@ try {
             $image.Dispose()
         }
 
-        $gallery.Add((('<article data-sample="{0}" data-frame="{1}" data-face="{2}"><h2>{0}</h2>' +
+        $gallery.Add((('<article id="sample-{0}" data-sample="{0}" data-frame="{1}" data-face="{2}"><h2>{0}</h2>' +
             '<div class="sample-meta">Temporal section {3}/12 · detector confidence {4:F3} · crop-quality proxy {5:F3} (not face probabilities)</div>' +
             '<div class="images"><a href="crops/{0}.png" target="_blank"><img alt="Cropped candidate" src="crops/{0}.png"></a>' +
             '<a href="context/{0}.jpg" target="_blank"><img alt="Source context with candidate box" src="context/{0}.jpg"></a></div>' +

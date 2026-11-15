@@ -2509,3 +2509,60 @@ of integration boundary. Original media and production
 catalogue/embeddings remain untouched. No PR should target
 `main` without separate maintainer approval; the smallest
 production slice remains a later explicit decision.
+
+## Experimental checkpoint 43 — compact group-first private workspace (implementation; local acceptance pending)
+
+A new **opt-in, read-only** `New-VideoFaceReviewWorkspace.ps1`
+reuses the previously tested CenterFace C-group, N-noise and
+U-uncorroborated offline gallery builders. The default browser entry
+is a C-group review editor with existing top-three suggestions,
+manual keep/merge/dismiss/split decisions and source-specific CSV
+save/import. Below it are two **collapsed evidence lanes**, each
+showing up to eight temporally distributed thumbnails first, with
+the rest of the maximum 96 sampled audit crops accessible in a
+second expandable section. Every thumbnail links to its exact
+N/U audit-card anchor for classification and separate source CSV
+save/import. The workspace shows the full source counts and how
+many observations were not sampled, without calling them background
+or inventing identities.
+
+This is a substantial **review-workflow improvement**, **not**
+an automatic grouping improvement: it does not merge V02's four
+remaining fragments, choose identities, suppress YuNet candidates,
+reduce the actual count of observations or establish production
+quality. It deliberately avoids presenting every noise crop as
+a new face group. CenterFace nonmatches and DBSCAN noise remain
+accessible, and the viewer can fall back to manual identification.
+Both existing C and N/U CSV formats remain unchanged. Windows
+7.6 synthetic coverage checks C/N/U source isolation, matching
+report SHA in audit worksheets, count reconciliation, deep links,
+bounded preview display and unmodified source frames. Existing
+validators own source manifest, frame geometry and report checks;
+no extra inference, PostgreSQL reads/writes or new model is used.
+
+**Local acceptance remains pending.** Reuse V01/V02 approved
+private reports, cases and source frames to verify: compact
+C-groups first, N/U initially collapsed, first eight audit
+thumbnails spread across the samples, additional sample
+expansion, open-to-label anchor navigation, all three independent
+CSV save/import paths, and no source-frame changes. Review the
+human effort qualitatively against the accepted checkpoint 42
+baseline (V01: two groups/zero merges; V02: six groups/four
+manual merges), not as a new model accuracy test. This workspace
+currently requires at least one C-group and at least one
+sampled candidate in **each** N/U source because it composes
+the existing nonempty gallery builders; no-face/empty-source
+production handling is deferred. Sampling up to 96 leaves
+additional unrepresented observations explicitly counted,
+not made individually navigable. Do not claim complete person
+coverage from the sampled view.
+
+`FACE-QUALITY-01`, `GROUP-QUALITY-01`,
+`DIVERSE-VIDEOS-01`, `CATALOGUE-TOP3-01` and
+`MERGE-01` remain not fully accepted. Especially before
+integration: more automatic within-person consolidation,
+a bounded but comprehensive path for genuine singleton/noise
+faces, representative corpus, Windows runtime,
+CenterFace licensing/training rights, and explicit choice of
+video-component versus in-app boundary still require decisions.
+No changes may target `main` without maintainer sign-off.

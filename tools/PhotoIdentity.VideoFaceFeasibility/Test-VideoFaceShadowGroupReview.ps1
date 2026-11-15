@@ -266,6 +266,41 @@ try {
             -PrivateGroupReportPath $reportPath -ClipAlias V03 -AuditSource $wrongSource }) 'Wrong independent sample class was accepted.'
     }
 
+    Write-Host 'Synthetic group-first review workspace: START'
+    $workspaceCmd = Join-Path $PSScriptRoot 'New-VideoFaceReviewWorkspace.ps1'
+    $workspace = & $workspaceCmd -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias V03 -SpotlightPerLane 2
+    $folders.Add((Split-Path -Parent $workspace.GalleryPath))
+    $folders.Add((Split-Path -Parent $workspace.NoiseGalleryPath))
+    $folders.Add((Split-Path -Parent $workspace.UncorroboratedGalleryPath))
+    Check ($workspace.SchemaVersion -eq 1 -and
+        $workspace.ClipAlias -ceq 'V03' -and
+        $workspace.GroupSource -ceq 'CenterFaceShadow' -and
+        $workspace.Groups -eq 1 -and
+        $workspace.NoiseSamples -eq 3 -and
+        $workspace.NoiseNotRepresented -eq 0 -and
+        $workspace.UncorroboratedSamples -eq 2 -and
+        $workspace.UncorroboratedNotRepresented -eq 126 -and
+        $workspace.SpotlightPerLane -eq 2) 'Group-first source totals do not reconcile.'
+    $hub = Get-Content -LiteralPath $workspace.GalleryPath -Raw
+    Check ($hub.Contains('id="lane-noise"') -and
+        $hub.Contains('id="lane-uncorroborated"') -and
+        $hub.Contains('Show 1 more sampled crops') -and
+        $hub.Contains('#sample-N003') -and
+        $hub.Contains('#sample-U002') -and
+        $hub.Contains('128') -and
+        $hub.Contains('Save group-review CSV') -and
+        $hub.Contains('group-review.js') -and
+        $hub.Contains('not represented') -and
+        $hub.Contains('Top-3 catalogue suggestions')) 'Incomplete group-first workspace.'
+    Check ((Get-Content -LiteralPath $workspace.NoiseGalleryPath -Raw).Contains(
+        'id="sample-N003"') -and
+        (Get-Content -LiteralPath $workspace.UncorroboratedGalleryPath -Raw).Contains(
+        'id="sample-U002"')) 'Private audit sample anchors are missing.'
+    Check (@(Import-Csv -LiteralPath $workspace.GroupWorksheetPath).Count -eq 1 -and
+        @(Import-Csv -LiteralPath $workspace.NoiseWorksheetPath).Count -eq 3 -and
+        @(Import-Csv -LiteralPath $workspace.UncorroboratedWorksheetPath).Count -eq 2) 'Group-first source workbooks were changed.'
+    Write-Host 'Synthetic group-first review workspace: PASS'
+
     foreach ($file in $hashes.Keys) {
         Check ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ceq
             $hashes[$file]) 'Independent gallery modified a source frame.'
@@ -281,6 +316,7 @@ try {
     Check (Refused { & $measureCmd -ReviewedCsvPath $cfCsv `
         -PrivateGroupReportPath $badCfPath -ClipAlias V03 `
         -GroupSource CenterFaceShadow }) 'Malformed corroboration accepted by measurement.'
+    Check (Refused { & $workspaceCmd -PrivateReportPath $badCfPath -PrivateCasesPath $casesPath -ClipAlias V03 }) 'Malformed corroboration accepted by group-first workspace.'
     $report.clips[0].review.diagnostics.centerFaceCounterfactual=$counterfactual
 
     # One known face has correct rank two. Another is absent from top three.
