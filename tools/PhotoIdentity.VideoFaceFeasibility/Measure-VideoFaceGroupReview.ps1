@@ -38,6 +38,7 @@ function Test-LocalRegularFile {
     return $item.FullName
 }
 
+$safeStage = 'review-csv'
 try {
     $csv = Test-LocalRegularFile $ReviewedCsvPath (256KB)
     $rows = @(Import-Csv -LiteralPath $csv -Encoding utf8)
@@ -82,6 +83,7 @@ try {
         $observations += [int]$row.Observations
     }
 
+    $safeStage = 'review-decisions'
     foreach ($row in $rows) {
         if ([string]$row.Decision -ne 'Merge group') { continue }
         $visited = [Collections.Generic.HashSet[string]]::new(
@@ -130,6 +132,7 @@ try {
         if ([int]$report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
             throw 'Expected corresponding private grouped report.'
         }
+        $safeStage = 'counterfactual-contract'
         $cf = if ($isCenterFace) {
             $clips[0].review.diagnostics.centerFaceCounterfactual
         } else { $null }
@@ -152,6 +155,7 @@ try {
         if ($null -eq $review) {
             throw 'The requested group source is absent.'
         }
+        $safeStage = 'group-evidence'
         $reportGroups = if ($isCenterFace) {
             @($review.groups | ForEach-Object {
                 if ([string]$_.alias -cnotmatch '^D(?!000)[0-9]{3}$') {
@@ -203,6 +207,7 @@ try {
             $unassigned = [int]$review.observationsUnassigned
             $atCapacity = $reportGroups.Count -eq [int]$review.maximumGroups
         }
+        $safeStage = 'group-row-consistency'
         $expected = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
         foreach ($group in $reportGroups) {
@@ -216,6 +221,7 @@ try {
         }
     }
 
+    $safeStage = 'aggregate-output'
     # Output deliberately excludes group aliases, notes, identities,
     # timestamp positions, private paths and any source image data.
     [pscustomobject][ordered]@{
@@ -248,5 +254,5 @@ try {
 catch {
     # Do not disclose private file paths, clip aliases, group IDs or
     # review annotations in terminal output/CI logs.
-    throw 'WI-0155 private group measurement rejected inconsistent or unsafe inputs.'
+    throw ('WI-0155 private group measurement rejected inconsistent or unsafe inputs (stage: ' + $safeStage + ').')
 }
