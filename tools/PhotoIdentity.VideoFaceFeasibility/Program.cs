@@ -20,6 +20,13 @@ public static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // Independent CenterFace agreement is read-only, already-extracted-frame
+        // evidence only. It cannot change any YuNet/DBSCAN or catalogue result.
+        if (args.Contains("--cross-check-centerface", StringComparer.Ordinal))
+        {
+            return await VideoFaceIndependentDetectorCommand.RunAsync(args);
+        }
+
         // Detector-only diagnostics require neither references nor catalogue access.
         if (args.Contains("--detector-only", StringComparer.Ordinal))
         {
@@ -74,6 +81,11 @@ public static class Program
                 "[--model-dir <approved-models>] [--detector-confidence <0.5|0.7|0.9>] " +
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
                 "[--face-overflow-policy <fail|retain-top-32>]\n" +
+                "Independent detector audit (no DB, no SFace): --cross-check-centerface " +
+                "--catalogue-cases <private-all-eligible-cases.json> " +
+                "--source-shadow-report <existing-private-shadow.json> " +
+                "--private-report <new-private-audit.json> --clip V03 " +
+                "[--max-groups 20] [--max-noise 24] [--root <repo>] [--model-dir <approved-models>]\\n" +
                 "Private adaptive cues: --derive-adaptive-cues --manifest <owned-coarse-frames.json> " +
                 "--private-diagnostics <same-window-report.json> " +
                 "--private-cues-output <new-private-cues.json> [--root <repo>]");

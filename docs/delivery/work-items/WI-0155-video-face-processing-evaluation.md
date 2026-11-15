@@ -2169,3 +2169,43 @@ identity grouping, with explicit human-reviewed ground truth.
 `FACE-QUALITY-01`, `GROUP-QUALITY-01`, `CATALOGUE-TOP3-01`,
 `DIVERSE-VIDEOS-01` and `MERGE-01` remain open; the already
 verified V03 two-pass sampling mechanics remain intact.
+
+## Experimental checkpoint 37 — independent detector agreement before grouping (2026-11-14)
+
+The V03 private screenshots confirm that the large false
+DBSCAN clusters D001–D020 repeatedly represent the **same
+cracked-stone paving**, even when real people are visible
+elsewhere in the original frame. A consistent SFace embedding
+for a non-face crop is not evidence of a person; DBSCAN density
+reinforces repeating background patterns. Conversely, all 24
+reviewed DBSCAN noise samples were genuine faces. The missing
+signal is *independent face validity*, not a less restrictive
+embedding-similarity threshold.
+
+PR #806 adds a strictly separate experimental **CenterFace
+corroboration audit** using the already governed independent
+CenterFace adapter and pinned model. It reads the exact existing
+private full-catalogue PR #803 report and approved local frames,
+selecting the same first 20 D-groups / 24 noise samples reviewed
+by the maintainer. It measures spatial YuNet–CenterFace
+agreement at two confidence levels without changing candidate
+retention, SFace embeddings, DBSCAN membership, ranks, identity
+assignments or originals. No PostgreSQL access and no fresh
+video-frame extraction are required. The model must already
+be installed and verified; weight/training-data rights remain
+provisional in the existing manifest.
+
+This produces measurable positive-versus-negative agreement
+evidence, **not a trained or validated automatic rejection
+rule**. CenterFace may fail on genuine small and obscured faces,
+so absent corroboration is uncertainty rather than a definitive
+non-face. A subsequent decision to change gating would require
+false-negative/false-positive assessment on human-labelled
+examples and varied videos, preserving real singleton faces
+and catalogue top-three person coverage.
+
+**Local model-integrity verification and the real V03 agreement
+experiment are pending.** Structural confidence and group
+counts from the existing DBSCAN run remain separate from
+human quality acceptance. All real quality acceptance gates
+remain open; isolated `wi-0155` remains the only target.

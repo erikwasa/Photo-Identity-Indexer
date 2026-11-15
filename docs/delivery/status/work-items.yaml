@@ -129,6 +129,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/805
   - type: maintainer_verification
     value: '2026-11-14: PR803 shadow DBSCAN local report accounting and original V01/V02/V03 baselines PASS; V03 259 shadow clusters, 2636 members, 1276 noise, zero simultaneous-face collisions, 195 hidden clusters/483 members. Human V03 gallery review: all first 20 largest D-groups were background objects, all 24 sampled shadow-noise crops were real human faces; selected samples, not population estimates. Human grouping-quality FAIL for experimental DBSCAN policy. Do not promote grouping, discard noise or infer identity.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/806
+  - type: implementation
+    value: '2026-11-14: Opt-in independent CenterFace second-detector spatial agreement audit against the exact D01-D20 false paving groups and first 24 confirmed-human-face DBSCAN noise samples in existing V03 read-only report, using source frame boxes and governed CenterFace model. Reports model agreement at confidence 0.30/0.50 and overlap >=0.25; source hash verification; no suppression, PostgreSQL access, DBSCAN change, SFace inference or source-video extraction; real acceptance pending.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
