@@ -4254,3 +4254,74 @@ background dismissals and manual merges. If it does not,
 avoid further UI iterations without a clear high-impact
 human-usability gain. Keep `wi-0155` isolated until
 maintainer-approved integration or separate-component decision.
+
+## Checkpoint 44 — single-file C/N/U review and measurement (2026-11-15)
+
+After PR #812 merged, the operator passed the synthetic suite
+but found that **three independent saves still made the review
+workspace inconvenient**. This follow-up retains the same C/N/U
+evidence and old gallery/CSV validators while offering a
+single-file human-review workflow.
+
+On the combined page:
+- Review C-groups and existing top-three aliases in the main
+  cards as before.
+- Expand the N and U lanes; classify each sample directly
+  below its crop and optionally supply a private P0001-style
+  alias. Click the crop to inspect the original context.
+- Use **Save all C/N/U decisions (one CSV)** and select a
+  single private destination. If the browser does not offer
+  the picker, only **one** timestamped combined CSV downloads.
+  Re-import it using **Import combined CSV**. Existing per-
+  source gallery HTML and measurements are still supported,
+  but their three separate Save actions are no longer needed.
+
+### Minimal local verification, Windows PowerShell 7.6
+
+With the isolated `wi-0155` worktree updated, and the same
+private `$allReport`, `$casesPath`, `$allMap` used in the
+prior all-catalogue evaluation:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$ErrorActionPreference = 'Stop'
+$tools = 'tools\PhotoIdentity.VideoFaceFeasibility'
+& "$tools\Test-VideoFaceShadowGroupReview.ps1"
+if (-not $?) { throw 'WI-0155 combined workspace synthetic test failed' }
+
+$workspace = & "$tools\New-VideoFaceReviewWorkspace.ps1" -PrivateReportPath $allReport -PrivateCasesPath $casesPath -ClipAlias V01 -OpenGallery
+$workspace | Format-List
+~~~
+
+Expected V01 counts remain 2 C-groups, 7 N-samples,
+19 U-samples, zero N/U samples outside the gallery.
+Review or restore labels across all three sections,
+save **once**, reopen the page, import that single CSV,
+and confirm that C decisions, N/U classifications and
+private aliases survive. Avoid checking real person names
+into any repository log or PR.
+
+To measure the saved combined review in one command
+(replace the prompted path with the actual downloaded
+or selected location):
+
+~~~powershell
+$combinedCsv = (Read-Host 'Full path to the single combined review CSV').Trim('"')
+$combined = & "$tools\Measure-VideoFaceReviewWorkspace.ps1" -ReviewedCsvPath $combinedCsv -PrivateGroupReportPath $allReport -PrivatePeopleMapPath $allMap -ClipAlias V01
+$combined.GroupMetrics | Format-List
+$combined.RankMetrics | Format-List
+$combined.NoiseMetrics | Format-List
+$combined.UncorroboratedMetrics | Format-List
+~~~
+
+Expected `CombinedEvidenceValidated=True`. The aggregate
+figures depend on the operator's saved labels. The same
+commands may be run with V02 if V01 works; do not repeat
+the full all-eligible video inference.
+
+**Prior V01 separate CSVs remain valid evidence.** The old
+measure scripts can still read them; do not relabel the
+footage merely to create a combined file. The combined
+page does not migrate these older CSVs automatically.
+No production DB writes, source media changes or
+identity auto-assignment are introduced.
