@@ -2209,3 +2209,39 @@ experiment are pending.** Structural confidence and group
 counts from the existing DBSCAN run remain separate from
 human quality acceptance. All real quality acceptance gates
 remain open; isolated `wi-0155` remains the only target.
+
+## Experimental checkpoint 38 — independent-detector V03 host acceptance PASS (2026-11-15)
+
+The maintainer completed PR #806 local verification: focused tests,
+CenterFace pinned model verification and standalone read-only
+independent-detector execution **PASS**. The approved V03 evidence
+involved **77 distinct frames, 100 representative crops** from
+human-dismissed D001–D020 repeated-paving DBSCAN groups, and **24
+human-confirmed real-face crops** from the first 24 selected DBSCAN
+noise samples. At YuNet/CenterFace IoU >= 0.25, CenterFace agreed
+with **0/100 paving crops** at either confidence 0.30 or 0.50;
+for human-confirmed noise faces it agreed with **24/24 at 0.30**
+and **23/24 at 0.50**. The private report was written; automatic
+suppression remained disabled.
+
+**This succeeds as a bounded diagnostic separation test**, not as
+population face-detection accuracy or a proven grouping improvement.
+These positive/negative observations were selected from a single
+V03 scene and were repeatedly correlated with one dominant paving
+texture; independent representative clips and all-candidate review
+are still required. At the more conservative 0.50 cutoff the
+candidate corroboration would already lose one known real face
+within this selected cohort. Preserve every unsupported candidate
+as reviewable evidence in any future experimental gate; do NOT
+silently discard detector-negative real singleton faces.
+
+**Next direction:** Add a separate, explicitly opt-in, source-safe
+shadow agreement stage over all retained candidate boxes to compare
+counterfactual filtering/review ordering before DBSCAN, preserving
+baseline results and negative cases. Evaluate all-candidate face
+recall, person representation, per-person top-three accuracy,
+wrong-person merges, background review cost, short-exposure face
+retention, multi-video generalization and model rights. No revised
+production detector threshold or grouping adoption is authorized.
+FACE-QUALITY-01, GROUP-QUALITY-01, CATALOGUE-TOP3-01,
+DIVERSE-VIDEOS-01 and MERGE-01 still OPEN.
