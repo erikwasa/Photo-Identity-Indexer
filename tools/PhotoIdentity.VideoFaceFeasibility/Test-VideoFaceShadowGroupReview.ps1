@@ -291,7 +291,12 @@ try {
         $hub.Contains('Save group-review CSV') -and
         $hub.Contains('group-review.js') -and
         $hub.Contains('not represented') -and
-        $hub.Contains('Top-3 catalogue suggestions')) 'Incomplete group-first workspace.'
+        $hub.Contains('Top-3 catalogue suggestions') -and
+        $hub.Contains('id="ws-save"') -and
+        $hub.Contains('id="ws-import"') -and
+        $hub.Contains('review-workspace.js') -and
+        $hub.Contains('class="ws-audit-card"') -and
+        $hub.Contains('Face classification')) 'Incomplete group-first workspace.'
     Check ((Get-Content -LiteralPath $workspace.NoiseGalleryPath -Raw).Contains(
         'id="sample-N003"') -and
         (Get-Content -LiteralPath $workspace.UncorroboratedGalleryPath -Raw).Contains(
@@ -299,6 +304,156 @@ try {
     Check (@(Import-Csv -LiteralPath $workspace.GroupWorksheetPath).Count -eq 1 -and
         @(Import-Csv -LiteralPath $workspace.NoiseWorksheetPath).Count -eq 3 -and
         @(Import-Csv -LiteralPath $workspace.UncorroboratedWorksheetPath).Count -eq 2) 'Group-first source workbooks were changed.'
+    Write-Host 'Synthetic combined one-save review measurement: START'
+    $unified = [Collections.Generic.List[object]]::new()
+    $sourceHash = (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    foreach ($row in @(Import-Csv -LiteralPath $workspace.GroupWorksheetPath)) {
+        $decision = if ($row.Group -ceq 'C001') { 'Keep group' } else { '' }
+        $person = if ($row.Group -ceq 'C001') { 'P0002' } else { '' }
+        $unified.Add([pscustomobject][ordered]@{
+            Source='CenterFaceShadow';Clip=$row.Clip;AuditReportSha256=$sourceHash
+            Group=$row.Group;Observations=$row.Observations;Decision=$decision
+            MergeInto='';SelectedPerson=$person;ReviewerNotes=''
+            Sample='';Frame='';Face='';Label='';PersonAlias=''
+        })
+    }
+    foreach ($type in @(
+        @{ Source='CenterFaceNoise'; Path=$workspace.NoiseWorksheetPath },
+        @{ Source='CenterFaceUncorroborated'; Path=$workspace.UncorroboratedWorksheetPath }
+    )) {
+        foreach ($row in @(Import-Csv -LiteralPath $type.Path)) {
+            $label = if ($row.Sample -match '001
+
+    foreach ($file in $hashes.Keys) {
+        Check ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ceq
+            $hashes[$file]) 'Independent gallery modified a source frame.'
+    }
+    $cfBad = $counterfactual.Clone()
+    $cfBad.corroboratedAt030 = 6
+    $report.clips[0].review.diagnostics.centerFaceCounterfactual=$cfBad
+    $badCfPath = Join-Path $private 'bad-corroboration.json'
+    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $badCfPath -Encoding utf8
+    Check (Refused { & $galleryCmd -PrivateReportPath $badCfPath `
+        -PrivateCasesPath $casesPath -ClipAlias V03 `
+        -GroupSource CenterFaceShadow }) 'Malformed corroboration accepted.'
+    Check (Refused { & $measureCmd -ReviewedCsvPath $cfCsv `
+        -PrivateGroupReportPath $badCfPath -ClipAlias V03 `
+        -GroupSource CenterFaceShadow }) 'Malformed corroboration accepted by measurement.'
+    Check (Refused { & $workspaceCmd -PrivateReportPath $badCfPath -PrivateCasesPath $casesPath -ClipAlias V03 }) 'Malformed corroboration accepted by group-first workspace.'
+    $report.clips[0].review.diagnostics.centerFaceCounterfactual=$counterfactual
+
+    # One known face has correct rank two. Another is absent from top three.
+    # One group is unknown-to-the-catalogue and the other 61 are dismissed.
+    $rows[0].Decision='Keep group'; $rows[0].SelectedPerson='P0002'
+    $rows[1].Decision='Dismiss false detection'
+    $rows[2].Decision='Keep group'; $rows[2].SelectedPerson='P0004'
+    $rows[3].Decision='Keep group'; $rows[3].SelectedPerson='UNKNOWN'
+    for ($i=4; $i -lt $rows.Count; $i++) {
+        $rows[$i].Decision='Dismiss false detection'
+    }
+    $csv = Join-Path $private 'shadow-reviewed.csv'
+    $rows | Export-Csv -LiteralPath $csv -NoTypeInformation -Encoding utf8
+    $argsForMeasure = @{
+        ReviewedCsvPath=$csv;PrivateGroupReportPath=$reportPath
+        ClipAlias='V03';GroupSource='ShadowDbscan'
+    }
+    Write-Host 'Synthetic original D-group aggregate: START'
+    $counts = & $measureCmd @argsForMeasure
+    Write-Host 'Synthetic original D-group aggregate: PASS'
+    Check ($counts.TotalGroups -eq 64 -and $counts.GroupsReviewed -eq 64 -and
+        $counts.AssignedGroupObservations -eq 128 -and
+        $counts.ObservationsUnassigned -eq 5 -and
+        $counts.ShadowNoiseObservations -eq 3 -and
+        $counts.ShadowMembersOutsideReview -eq 2 -and
+        $counts.ShadowTotalClusters -eq 65 -and
+        $counts.DismissedGroups -eq 61 -and $counts.GroupCapacityReached) 'Wrong shadow group metrics.'
+
+    $rank = & $rankCmd @argsForMeasure -PrivatePeopleMapPath $mapPath
+    Check ($rank.InputEvidenceValidated -and
+        $rank.LabelledKnownGroups -eq 2 -and $rank.LabelledUnknownGroups -eq 1 -and
+        $rank.CorrectTop1Groups -eq 0 -and $rank.CorrectTop3Groups -eq 1 -and
+        $rank.MissedTop3Groups -eq 1 -and
+        $rank.DistinctKnownPeopleTop3 -eq 1 -and
+        $rank.ShadowMembersOutsideReview -eq 2) 'Wrong shadow top-three metrics.'
+    Check (Refused { & $measureCmd -ReviewedCsvPath $csv -PrivateGroupReportPath $reportPath -ClipAlias V03 }) 'D-groups accepted as G-groups.'
+    $shadow.sameFrameCollisions = 1
+    $badReport = Join-Path $private 'colliding.json'
+    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $badReport -Encoding utf8
+    $invalidGalleryArgs = $galleryArgs.Clone()
+    $invalidGalleryArgs.PrivateReportPath=$badReport
+    $invalidCountArgs = $argsForMeasure.Clone()
+    $invalidCountArgs.PrivateGroupReportPath=$badReport
+    Check (Refused { & $galleryCmd @invalidGalleryArgs }) 'Co-present collision accepted.'
+    Check (Refused { & $measureCmd @invalidCountArgs }) 'Co-present collision ignored in metrics.'
+    $shadow.sameFrameCollisions = 0
+
+    $shadow.membersInUnrepresentedGroups = 1
+    $badReport = Join-Path $private 'missing-observation.json'
+    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $badReport -Encoding utf8
+    $invalidGalleryArgs.PrivateReportPath=$badReport
+    Check (Refused { & $galleryCmd @invalidGalleryArgs }) 'Unaccounted candidate was accepted.'
+    $shadow.membersInUnrepresentedGroups = 2
+
+    $groups[0].topCandidates[1].alias = 'P0001'
+    $badReport = Join-Path $private 'duplicate-suggestion.json'
+    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $badReport -Encoding utf8
+    $invalidGalleryArgs.PrivateReportPath=$badReport
+    $invalidCountArgs.PrivateGroupReportPath=$badReport
+    Check (Refused { & $galleryCmd @invalidGalleryArgs }) 'Duplicate catalogue alias was accepted.'
+    Check (Refused { & $rankCmd @invalidCountArgs -PrivatePeopleMapPath $mapPath }) 'Duplicate rank was accepted.'
+
+    Write-Host 'WI-0155 shadow DBSCAN gallery/rank synthetic tests: PASS'
+}
+finally {
+    foreach ($folder in $folders) {
+        if (Test-Path -LiteralPath $folder) {
+            Remove-Item -LiteralPath $folder -Recurse -Force
+        }
+    }
+    if (Test-Path -LiteralPath $root) {
+        Remove-Item -LiteralPath $root -Recurse -Force
+    }
+}
+) { 'Real face' } else { '' }
+            $unified.Add([pscustomobject][ordered]@{
+                Source=$type.Source;Clip=$row.Clip;AuditReportSha256=$row.AuditReportSha256
+                Group='';Observations='';Decision='';MergeInto=''
+                SelectedPerson='';ReviewerNotes='';Sample=$row.Sample
+                Frame=$row.Frame;Face=$row.Face;Label=$label;PersonAlias=''
+            })
+        }
+    }
+    $unifiedCsv = Join-Path $private 'one-save-reviewed.csv'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    $unifiedCmd = Join-Path $PSScriptRoot 'Measure-VideoFaceReviewWorkspace.ps1'
+    $combinedArgs = @{
+        ReviewedCsvPath=$unifiedCsv
+        PrivateGroupReportPath=$reportPath
+        PrivatePeopleMapPath=$mapPath
+        ClipAlias='V03'
+    }
+    $measured = & $unifiedCmd @combinedArgs
+    Check ($measured.CombinedEvidenceValidated -and
+        $measured.ClipAlias -ceq 'V03' -and
+        $measured.GroupMetrics.TotalGroups -eq 1 -and
+        $measured.RankMetrics.CorrectTop3Groups -eq 1 -and
+        $measured.NoiseMetrics.SampledObservations -eq 3 -and
+        $measured.NoiseMetrics.RealFaceSamples -eq 1 -and
+        $measured.UncorroboratedMetrics.SampledObservations -eq 2 -and
+        $measured.UncorroboratedMetrics.RealFaceSamples -eq 1) 'Combined worksheet measurement changed source evidence.'
+    $unified[1].AuditReportSha256 = ('f' * 64)
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted wrong source report hash.'
+    $unified[1].AuditReportSha256 = $sourceHash
+    $unified[1].Source = 'CenterFaceUncorroborated'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted cross-source noise.'
+    $unified[1].Source = 'CenterFaceNoise'
+    $unified[1].Sample = 'N003'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted repeated sample.'
+    Write-Host 'Synthetic combined one-save review measurement: PASS'
+
     Write-Host 'Synthetic group-first review workspace: PASS'
 
     foreach ($file in $hashes.Keys) {
