@@ -31,24 +31,27 @@ PR #809 V03 human review, and does not consider V03 suitable as the deciding
 top-three benchmark. The audit script's 0/3 top-three result on three
 labelled C-groups is a valid computational comparison *for those selected
 groups*, but it is **not a human-reviewed judgement of suggestion utility
-or a general recognition failure**. Use V01 and V02 first for top-three
-suggestion usefulness, if their real crops are sufficiently identifiable;
-add only a few specifically approved, already-local representative videos
-if V01/V02 cannot answer that question.
+or a general recognition failure**. V01/V02 have now supplied a bounded top-three suggestion result
+on labelled human review groups: one of two distinct known people
+appeared within the top three on an initial group in each clip.
+Add only a few approved, already-local representative videos if
+a material unanswered product question justifies them.
 
 **V01/V02 targeted review is now complete.** The operator reviewed all
 V01/V02 C-groups and each N/U observation from the existing PR #808
-report, without needing new model inference, database queries or extraction. Inspect per-video recognizable-person coverage,
-false/background groups, manual merges, noise/singleton survival, and
-qualitative top-three usefulness on human-identifiable faces. Proceed with at most one bounded, review-oriented implementation
-improvement aimed at compact grouping plus safe singleton/noise access,
-then compare its human workload to this accepted baseline. Stop further
-threshold sweeps, V03 recognition tuning and ever-larger review samples
-when progress is marginal; document remaining limitations and choose
-a smallest safe next slice or deferred follow-up. Keep the human-governed three-tier workflow and
+report, without needing new model inference, database queries or
+extraction. Use these results as the current baseline for recognizable-
+person coverage, background dismissals, manual merges, singletons
+and partial top-three usefulness. Proceed with at most one bounded,
+review-oriented implementation improvement aimed at compact grouping
+plus safe singleton/noise access, then compare its human workload
+to this accepted baseline. Stop further threshold sweeps, V03
+recognition tuning and ever-larger samples when progress is
+marginal; document limitations and choose the smallest safe next
+slice or defer. Keep the human-governed three-tier workflow and
 original-video/still-exemplar isolation rules unchanged.
 
-**Status as of this review:** PR #809's PowerShell synthetic gallery/rank
+**Earlier V03 evidence (PR #809):** PowerShell synthetic gallery/rank
 test and three V03 galleries passed locally; all four private aggregate
 measurement scripts completed with validated evidence. Of the
 corroborated-only V03 **18 C-groups**, the reviewer kept 3, marked 15
@@ -62,8 +65,8 @@ U samples, 15 were labelled real faces, 67 background, 14 uncertain,
 with two known people represented. Neither sample is a population
 precision/recall estimate. CenterFace must remain advisory; it may
 prioritize candidates but cannot safely discard the uncorroborated
-true faces. See operations checkpoint 41 for the precise next
-low-burden review and stop/go decision.
+true faces. See operations checkpoint 42 and the final work-item
+checkpoint below for completed V01/V02 results and the next decision.
 
 
 **Current video-level review requirement (maintainer, 2026-11-10):**
