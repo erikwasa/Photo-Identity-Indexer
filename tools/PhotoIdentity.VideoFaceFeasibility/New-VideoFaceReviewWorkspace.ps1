@@ -46,8 +46,23 @@ function EvidenceLane(
           [int]$Audit.TotalUnassignedObservations) {
         throw 'Audit candidate and unrepresented counts did not reconcile.'
     }
+    $source = if ($Prefix -ceq 'N') { 'CenterFaceNoise' }
+        elseif ($Prefix -ceq 'U') { 'CenterFaceUncorroborated' }
+        else { throw 'Unexpected private audit source.' }
+    if ($Audit.AuditSource -cne $source) {
+        throw 'Private audit source does not match its preview lane.'
+    }
     $folder = Split-Path -Parent $Audit.GalleryPath
     $galleryLink = RelativeLocal $GroupFolder $Audit.GalleryPath
+    # Copy only generated private thumbnails into the entry-point folder.
+    # Chromium file:// origins and a self-only image CSP can block images
+    # linked directly from a sibling gallery's directory.
+    $previewFolder = Join-Path $GroupFolder 'audit-previews'
+    New-Item -ItemType Directory -Path $previewFolder -Force | Out-Null
+    if (((Get-Item -LiteralPath $previewFolder -Force).Attributes -band
+         [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Private thumbnail folder cannot be a link.'
+    }
     $selected = [Collections.Generic.HashSet[int]]::new()
     $firstCount = [Math]::Min($count,$Spotlight)
     for ($i=0; $i -lt $firstCount; $i++) {
@@ -75,9 +90,13 @@ function EvidenceLane(
         if (-not (Test-Path -LiteralPath $crop -PathType Leaf)) {
             throw 'Expected private review thumbnail is missing.'
         }
-        $cropLink = RelativeLocal $GroupFolder $crop
-        $tile = ('<a class="evidence-tile" href="{0}#sample-{1}" target="_blank" rel="noopener"><img loading="lazy" src="{2}" alt="Unassigned review crop {1}"><span>{1} · open to label</span></a>' -f
-            (Html $galleryLink),(Html $sample),(Html $cropLink))
+        $destination = Join-Path $previewFolder ('{0}.png' -f $sample)
+        Copy-Item -LiteralPath $crop -Destination $destination -ErrorAction Stop
+        $cropLink = 'audit-previews/{0}.png' -f $sample
+        $tile = ('<article class="ws-audit-card" data-source="{0}" data-clip="{1}" data-report="{2}" data-sample="{3}" data-frame="{4}" data-face="{5}"><a class="evidence-tile" href="{6}#sample-{3}" target="_blank" rel="noopener"><img loading="lazy" src="{7}" alt="Review crop {3}"><span>{3} · context / enlarged crop</span></a><label>Face classification <select class="ws-label"><option value="">Not reviewed</option><option>Real face</option><option>Not a face</option><option>Cannot tell</option></select></label><label>Person alias (optional) <input class="ws-person" maxlength="7" placeholder="P0001 or UNKNOWN" disabled></label></article>' -f
+            (Html $source),(Html $Clip),(Html $ReportHash),(Html $sample),
+            (Html $row.Frame),(Html $row.Face),
+            (Html $galleryLink),(Html $cropLink))
         if ($selected.Contains($i)) {
             $first.Add($tile)
         } else {
@@ -89,14 +108,12 @@ function EvidenceLane(
         $extra = ('<details class="evidence-extra"><summary>Show {0} more sampled crops</summary><div class="evidence-tiles">{1}</div></details>' -f
             $remaining.Count,($remaining -join [Environment]::NewLine))
     }
-    return ('<section id="lane-{0}" class="evidence-lane"><details><summary><strong>{1}</strong> · {2} sampled of {3} observations · {4} not represented</summary><p class="note">These are detection observations, NOT separate people. Sampling is quality-biased. Open a crop to label it in its dedicated source-checked gallery and save that separate CSV. Unrepresented observations remain counted; never assume they are background.</p><p><a href="{5}" target="_blank" rel="noopener">Open full {6} gallery and save reviewed CSV</a></p><div class="evidence-tiles">{7}</div>{8}</details></section>' -f
+    return ('<section id="lane-{0}" class="evidence-lane"><details><summary><strong>{1}</strong> · {2} sampled of {3} observations · {4} not represented</summary><p class="note">These observations are NOT separate people and sampling is quality-biased. Classify directly below each crop, and optionally resolve a private person alias. Open the linked context image if uncertain. Save all C/N/U decisions together with the workspace button. Unrepresented observations remain counted; never assume they are background.</p><div class="evidence-tiles">{5}</div>{6}</details></section>' -f
         (Html $SectionId),(Html $Title),$count,
         [int]$Audit.TotalUnassignedObservations,
         [int]$Audit.UnrepresentedObservations,
-        (Html $galleryLink),(Html $Prefix),
         ($first -join [Environment]::NewLine),$extra)
 }
-
 $groupCmd = Join-Path $PSScriptRoot 'New-VideoFaceGroupReview.ps1'
 $auditCmd = Join-Path $PSScriptRoot 'New-VideoFaceUnassignedReview.ps1'
 $common = @{
@@ -148,6 +165,12 @@ if (-not $page.Contains($styleAnchor) -or
     throw 'Unexpected group gallery HTML structure.'
 }
 $css = @'
+#save-groups,#import-groups{display:none}
+.ws-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px;margin:10px 0;border:1px solid #59718a;border-radius:8px}
+.ws-audit-card{border:1px solid #4c6378;border-radius:8px;background:#1a2c3d;padding:10px;min-width:0}
+.ws-audit-card label{display:block;font-size:12px;margin-top:7px;color:#d2e5f3}
+.ws-audit-card select,.ws-audit-card input{width:100%;box-sizing:border-box;margin-top:3px}
+.ws-audit-card[hidden]{display:none}
 .evidence-lane{margin-top:22px;border:1px solid #526c82;border-radius:8px;padding:12px;background:#172a3b}
 .evidence-lane summary{cursor:pointer;padding:8px;font-size:15px;color:#e9f5ff}
 .evidence-lane a{color:#acd9ff}
@@ -157,13 +180,20 @@ $css = @'
 .evidence-tile span{font-size:12px;margin-top:6px}
 .evidence-extra{border-top:1px solid #526c82;padding:8px 0}
 '@
-$intro = ('<p class="note"><strong>Group-first private review · {0}.</strong> Review the {1} provisional C-groups first, then expand either evidence lane below for possible faces outside groups. Each source has its own private CSV; nothing here automatically merges groups, rejects faces or writes identities.</p><p><a href="#lane-noise">Ungrouped corroborated evidence</a> · <a href="#lane-uncorroborated">Detector disagreements</a></p>' -f
-    (Html $ClipAlias),[int]$groups.Groups)
+$intro = ('<div id="ws-toolbar" class="ws-toolbar" data-clip="{0}" data-report="{1}"><button type="button" id="ws-save">Save all C/N/U decisions (one CSV)</button><button type="button" id="ws-import">Import combined CSV</button><input type="file" id="ws-file" accept=".csv,text/csv" hidden><span id="ws-status" aria-live="polite">No decisions saved yet</span></div><p class="note"><strong>Private group-first review · {0}.</strong> Review the {2} C-groups first. Expand N and U below, classify their crops in this same page, then save everything using the single button above. Earlier individual galleries remain available for context, but their separate Save buttons are not needed. This is a private worksheet, not a production identity update.</p><p><a href="#lane-noise">Ungrouped corroborated evidence</a> · <a href="#lane-uncorroborated">Detector disagreements</a></p>' -f
+    (Html $ClipAlias),(Html $reportHash),[int]$groups.Groups)
 $page = $page.Replace($styleAnchor,($css + $styleAnchor))
 $page = $page.Replace($gridAnchor,($intro + $gridAnchor))
 $page = $page.Replace($endAnchor,(
     $noiseLane + [Environment]::NewLine + $uncorroboratedLane +
-    [Environment]::NewLine + $endAnchor))
+    [Environment]::NewLine + $endAnchor +
+    '<script src="review-workspace.js"></script>'))
+$workspaceJs = Join-Path $PSScriptRoot 'VideoFaceReviewWorkspace.js'
+if (-not (Test-Path -LiteralPath $workspaceJs -PathType Leaf)) {
+    throw 'Private combined review script is missing.'
+}
+Copy-Item -LiteralPath $workspaceJs -Destination (
+    Join-Path $groups.ReviewFolder 'review-workspace.js')
 $page | Set-Content -LiteralPath $groups.GalleryPath -Encoding utf8
 
 if ($OpenGallery) { Invoke-Item -LiteralPath $groups.GalleryPath }

@@ -291,7 +291,16 @@ try {
         $hub.Contains('Save group-review CSV') -and
         $hub.Contains('group-review.js') -and
         $hub.Contains('not represented') -and
-        $hub.Contains('Top-3 catalogue suggestions')) 'Incomplete group-first workspace.'
+        $hub.Contains('Top-3 catalogue suggestions') -and
+        $hub.Contains('id="ws-save"') -and
+        $hub.Contains('id="ws-import"') -and
+        $hub.Contains('review-workspace.js') -and
+        $hub.Contains('class="ws-audit-card"') -and
+        $hub.Contains('Face classification')) 'Incomplete group-first workspace.'
+    Check ((Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\N001.png') -PathType Leaf) -and
+        (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\U001.png') -PathType Leaf) -and
+        $hub.Contains('audit-previews/N001.png') -and
+        $hub.Contains('audit-previews/U001.png')) 'Local private audit previews are missing.'
     Check ((Get-Content -LiteralPath $workspace.NoiseGalleryPath -Raw).Contains(
         'id="sample-N003"') -and
         (Get-Content -LiteralPath $workspace.UncorroboratedGalleryPath -Raw).Contains(
@@ -299,6 +308,64 @@ try {
     Check (@(Import-Csv -LiteralPath $workspace.GroupWorksheetPath).Count -eq 1 -and
         @(Import-Csv -LiteralPath $workspace.NoiseWorksheetPath).Count -eq 3 -and
         @(Import-Csv -LiteralPath $workspace.UncorroboratedWorksheetPath).Count -eq 2) 'Group-first source workbooks were changed.'
+    Write-Host 'Synthetic combined one-save review measurement: START'
+    $unified = [Collections.Generic.List[object]]::new()
+    $sourceHash = (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    foreach ($row in @(Import-Csv -LiteralPath $workspace.GroupWorksheetPath)) {
+        $decision = if ($row.Group -ceq 'C001') { 'Keep group' } else { '' }
+        $person = if ($row.Group -ceq 'C001') { 'P0002' } else { '' }
+        $unified.Add([pscustomobject][ordered]@{
+            Source='CenterFaceShadow';Clip=$row.Clip;AuditReportSha256=$sourceHash
+            Group=$row.Group;Observations=$row.Observations;Decision=$decision
+            MergeInto='';SelectedPerson=$person;ReviewerNotes=''
+            Sample='';Frame='';Face='';Label='';PersonAlias=''
+        })
+    }
+    foreach ($type in @(
+        @{ Source='CenterFaceNoise'; Path=$workspace.NoiseWorksheetPath },
+        @{ Source='CenterFaceUncorroborated'; Path=$workspace.UncorroboratedWorksheetPath }
+    )) {
+        foreach ($row in @(Import-Csv -LiteralPath $type.Path)) {
+            $label = if ($row.Sample -match '001$') { 'Real face' } else { '' }
+            $unified.Add([pscustomobject][ordered]@{
+                Source=$type.Source;Clip=$row.Clip;AuditReportSha256=$row.AuditReportSha256
+                Group='';Observations='';Decision='';MergeInto=''
+                SelectedPerson='';ReviewerNotes='';Sample=$row.Sample
+                Frame=$row.Frame;Face=$row.Face;Label=$label;PersonAlias=''
+            })
+        }
+    }
+    $unifiedCsv = Join-Path $private 'one-save-reviewed.csv'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    $unifiedCmd = Join-Path $PSScriptRoot 'Measure-VideoFaceReviewWorkspace.ps1'
+    $combinedArgs = @{
+        ReviewedCsvPath=$unifiedCsv
+        PrivateGroupReportPath=$reportPath
+        PrivatePeopleMapPath=$mapPath
+        ClipAlias='V03'
+    }
+    $measured = & $unifiedCmd @combinedArgs
+    Check ($measured.CombinedEvidenceValidated -and
+        $measured.ClipAlias -ceq 'V03' -and
+        $measured.GroupMetrics.TotalGroups -eq 1 -and
+        $measured.RankMetrics.CorrectTop3Groups -eq 1 -and
+        $measured.NoiseMetrics.SampledObservations -eq 3 -and
+        $measured.NoiseMetrics.RealFaceSamples -eq 1 -and
+        $measured.UncorroboratedMetrics.SampledObservations -eq 2 -and
+        $measured.UncorroboratedMetrics.RealFaceSamples -eq 1) 'Combined worksheet measurement changed source evidence.'
+    $unified[1].AuditReportSha256 = ('f' * 64)
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted wrong source report hash.'
+    $unified[1].AuditReportSha256 = $sourceHash
+    $unified[1].Source = 'CenterFaceUncorroborated'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted cross-source noise.'
+    $unified[1].Source = 'CenterFaceNoise'
+    $unified[1].Sample = 'N003'
+    $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
+    Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted repeated sample.'
+    Write-Host 'Synthetic combined one-save review measurement: PASS'
+
     Write-Host 'Synthetic group-first review workspace: PASS'
 
     foreach ($file in $hashes.Keys) {

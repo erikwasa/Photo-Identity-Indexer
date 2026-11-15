@@ -169,6 +169,12 @@
     }
     fileInput.value = "";
   });
+  // The optional combined-workspace saver preserves these same decisions
+  // in its C/N/U worksheet, so do not warn that C-only edits are unsaved.
+  window.addEventListener("wi0155-workspace-saved", () => {
+    dirty = false;
+    review();
+  });
   window.addEventListener("beforeunload", e => {
     if (dirty) {e.preventDefault(); e.returnValue = "";}
   });
