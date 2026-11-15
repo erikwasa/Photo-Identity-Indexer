@@ -168,7 +168,7 @@ work_items:
   - type: implementation
     value: '2026-11-15: PR814 documentation acceptance merged. Focused optional offline CenterFace C-group merge-assist prototype presents up to 12 rank-overlap/reviewer-alias leads with side-by-side crops, requires per-pair visual human consent, offers one confirmed batch for already human-labelled same known person and vetoes overlapping representative frames/conflicting aliases. Uses original combined C/N/U CSV with no automatic identity/model/DB writes. Node and Windows gallery synthetic tests added; V02 browser effort and safety acceptance pending.'
   - type: documentation
-    value: '2026-11-15: Next local check should assess whether human-confirmed merge assistance materially reduces V02's four manual group merges without wrong-person merges; reject if it merely adds review complexity. No new face model run, threshold sweep, catalogue enrollment, N/U suppression or main integration. Actual automatic group consolidation and full same-frame membership remains open.'
+    value: '2026-11-15: Next local check should assess whether human-confirmed merge assistance materially reduces the four manual V02 group merges without wrong-person merges; reject if it merely adds review complexity. No new face model run, threshold sweep, catalogue enrollment, N/U suppression or main integration. Actual automatic group consolidation and full same-frame membership remains open.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
