@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Recognition.Onnx.Models;
+using PhotoIdentity.Recognition.Onnx.CenterFace;
 using PhotoIdentity.Recognition.Onnx.SFace;
 using PhotoIdentity.Recognition.Onnx.YuNet;
 
@@ -21,6 +22,7 @@ public static class VideoFaceCatalogueRunner
         bool ProvisionalGroups,
         bool UnassignedAudit,
         bool ShadowDbscan,
+        bool ShadowCenterFace,
         string? PrivatePeopleMap);
 
     public static async Task<int> RunAsync(string[] args)
@@ -32,7 +34,7 @@ public static class VideoFaceCatalogueRunner
             VideoFaceCatalogueCases cases = await VideoFaceCatalogueCasesLoader.LoadAsync(
                 options.Cases, options.Root);
             bool allPeople = cases.CatalogueScope == "all-eligible";
-            if (options.ShadowDbscan && !allPeople)
+            if ((options.ShadowDbscan || options.ShadowCenterFace) && !allPeople)
             {
                 throw new ArgumentException("Video shadow DBSCAN requires the all-eligible catalogue, not selected references.");
             }
@@ -76,7 +78,19 @@ public static class VideoFaceCatalogueRunner
             ModelFileVerifier verifier = new();
             await verifier.VerifyOrThrowAsync(detectorPath, detectorManifest);
             await verifier.VerifyOrThrowAsync(embedderPath, embedderManifest);
+            ModelManifest? independentManifest = options.ShadowCenterFace
+                ? await loader.LoadAsync(
+                    Path.Combine(manifests, "centerface-2019-fp32.json"),
+                    CancellationToken.None) : null;
+            string? independentPath = independentManifest is not null
+                ? Path.Combine(options.ModelDirectory, independentManifest.FileName) : null;
+            if (independentManifest is not null)
+                await verifier.VerifyOrThrowAsync(independentPath!, independentManifest);
 
+            using CenterFaceFaceDetector? independent = independentManifest is not null
+                ? new CenterFaceFaceDetector(independentManifest, independentPath!,
+                    new CenterFaceDetectorOptions { ConfidenceThreshold = .30 })
+                : null;
             using YuNetFaceDetector detector = new(
                 detectorManifest, detectorPath,
                 options.Detection.CreateOptions(options.DetectorConfidence));
@@ -100,7 +114,8 @@ public static class VideoFaceCatalogueRunner
                     frames, folder, matcher, options.DetectorConfidence,
                     provisionalGroups: options.ProvisionalGroups,
                     unassignedAudit: options.UnassignedAudit,
-                    shadowDbscan: options.ShadowDbscan);
+                    shadowDbscan: options.ShadowDbscan,
+                    independentDetector: independent);
                 var personRanks = review.Diagnostics!.RankedFaces
                     .GroupBy(face => face.TopReferenceAlias, StringComparer.Ordinal)
                     .Select(group => new VideoFaceCataloguePersonRankSummary(
@@ -180,6 +195,21 @@ public static class VideoFaceCatalogueRunner
                     ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.GroupsNotRepresentedForReview) : 0,
                 shadowDbscanSameFrameCollisions = options.ShadowDbscan
                     ? reviews.Sum(r => r.Review.Diagnostics!.ShadowDbscan!.SameFrameCollisions) : 0,
+                shadowCenterFaceRequested = options.ShadowCenterFace,
+                independentFramesChecked = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.FramesChecked) : 0,
+                independentCandidatesConsidered = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.RetainedYuNetObservations) : 0,
+                independentCorroboratedAt030 = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.CorroboratedAt030) : 0,
+                independentCorroboratedAt050 = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.CorroboratedAt050) : 0,
+                independentNotCorroborated = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.NotCorroboratedAt030) : 0,
+                independentCorroboratedShadowGroups = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.CorroboratedOnlyDbscan.ClusterCount) : 0,
+                independentCorroboratedShadowNoise = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.CorroboratedOnlyDbscan.NoiseObservations) : 0,
                 elapsedMilliseconds = Math.Round(reviews.Sum(
                     r => r.Review.Aggregate.ElapsedMilliseconds), 3),
                 privateReportWritten = true,
@@ -210,6 +240,7 @@ public static class VideoFaceCatalogueRunner
         bool provisionalGroups = false;
         bool unassignedAudit = false;
         bool shadowDbscan = false;
+        bool shadowCenterFace = false;
         for (int i = 0; i < args.Length; i++)
         {
             string name = args[i];
@@ -236,6 +267,13 @@ public static class VideoFaceCatalogueRunner
                 if (shadowDbscan)
                     throw new ArgumentException("Duplicate shadow-dbscan option.");
                 shadowDbscan = true;
+                continue;
+            }
+            if (name == "--shadow-centerface")
+            {
+                if (shadowCenterFace)
+                    throw new ArgumentException("Duplicate shadow-centerface option.");
+                shadowCenterFace = true;
                 continue;
             }
             if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
@@ -271,6 +309,8 @@ public static class VideoFaceCatalogueRunner
         {
             throw new ArgumentException("Shadow DBSCAN requires both --provisional-groups and --unassigned-audit.");
         }
+        if (shadowCenterFace && !shadowDbscan)
+            throw new ArgumentException("Full-candidate CenterFace shadow requires --shadow-dbscan with the original grouping and audit.");
 
         string repo = Path.GetFullPath(root ?? Directory.GetCurrentDirectory());
         string dir = Path.GetFullPath(models ?? Path.Combine(repo, "models", "files"));
@@ -307,6 +347,6 @@ public static class VideoFaceCatalogueRunner
             throw new ArgumentException("Private people map requires a fully qualified path.");
         }
         return new Options(cases, report, repo, dir, threshold, selected, policy,
-            provisionalGroups, unassignedAudit, shadowDbscan, peopleMap);
+            provisionalGroups, unassignedAudit, shadowDbscan, shadowCenterFace, peopleMap);
     }
 }
