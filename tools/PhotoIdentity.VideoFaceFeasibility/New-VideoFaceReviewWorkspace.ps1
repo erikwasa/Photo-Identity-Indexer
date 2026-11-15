@@ -54,6 +54,15 @@ function EvidenceLane(
     }
     $folder = Split-Path -Parent $Audit.GalleryPath
     $galleryLink = RelativeLocal $GroupFolder $Audit.GalleryPath
+    # Copy only generated private thumbnails into the entry-point folder.
+    # Chromium file:// origins and a self-only image CSP can block images
+    # linked directly from a sibling gallery's directory.
+    $previewFolder = Join-Path $GroupFolder 'audit-previews'
+    New-Item -ItemType Directory -Path $previewFolder -Force | Out-Null
+    if (((Get-Item -LiteralPath $previewFolder -Force).Attributes -band
+         [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Private thumbnail folder cannot be a link.'
+    }
     $selected = [Collections.Generic.HashSet[int]]::new()
     $firstCount = [Math]::Min($count,$Spotlight)
     for ($i=0; $i -lt $firstCount; $i++) {
@@ -81,7 +90,9 @@ function EvidenceLane(
         if (-not (Test-Path -LiteralPath $crop -PathType Leaf)) {
             throw 'Expected private review thumbnail is missing.'
         }
-        $cropLink = RelativeLocal $GroupFolder $crop
+        $destination = Join-Path $previewFolder ('{0}.png' -f $sample)
+        Copy-Item -LiteralPath $crop -Destination $destination -ErrorAction Stop
+        $cropLink = 'audit-previews/{0}.png' -f $sample
         $tile = ('<article class="ws-audit-card" data-source="{0}" data-clip="{1}" data-report="{2}" data-sample="{3}" data-frame="{4}" data-face="{5}"><a class="evidence-tile" href="{6}#sample-{3}" target="_blank" rel="noopener"><img loading="lazy" src="{7}" alt="Review crop {3}"><span>{3} · context / enlarged crop</span></a><label>Face classification <select class="ws-label"><option value="">Not reviewed</option><option>Real face</option><option>Not a face</option><option>Cannot tell</option></select></label><label>Person alias (optional) <input class="ws-person" maxlength="7" placeholder="P0001 or UNKNOWN" disabled></label></article>' -f
             (Html $source),(Html $Clip),(Html $ReportHash),(Html $sample),
             (Html $row.Frame),(Html $row.Face),
