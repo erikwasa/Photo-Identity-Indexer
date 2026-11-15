@@ -4123,3 +4123,53 @@ If a gallery lacks human-identifiable faces, it is **not** a
 top-three validation case. No extra synthetic tests or model
 runs are necessary merely to repeat already passed PR #809
 verification.
+
+## Checkpoint 42 — V01/V02 local reviewed metrics and narrow next slice (2026-11-15)
+
+All four read-only aggregate readers completed with matching
+private evidence for each clip. This is human-reviewed experiment
+evidence, not automatic production recognition acceptance.
+
+| Metric | V01 | V02 |
+| --- | ---: | ---: |
+| YuNet candidates / CenterFace corroborated | 36 / 17 | 38 / 32 |
+| Initial C groups | 2 | 6 |
+| Kept / manual merge / dismissed | 2 / 0 / 0 | 2 / 4 / 0 |
+| Proposed final groups | 2 | 2 |
+| Grouped observations / corroborated noise | 10 / 7 | 17 / 15 |
+| Labelled distinct known people | 2 | 2 |
+| Correct top-three initial groups | 1 of 2 | 2 of 6 |
+| Distinct people correctly in top three | 1 of 2 | 1 of 2 |
+| N-noise reviewed: real / background / uncertain | 7 / 0 / 0 | 12 / 0 / 3 |
+| U-noncorroborated reviewed: real / background / uncertain | 7 / 9 / 3 | 1 / 3 / 2 |
+
+All N and U observations for these two videos were reviewed, unlike
+the sampled V03 audit. Both clips produced **two proposed final
+human groups**, not yet automatic two-group outputs. V02 required
+four manual merges. No C-group required a background dismissal,
+and one of the two distinct known people per clip appeared within
+the full-eligible-catalogue top three for at least one initial
+C-group. The measured ranks do **not** automatically recompute
+after manual merges. Imperfect top-three suggestions are acceptable.
+
+**Important:** 19 of the 22 N-noise observations across V01/V02
+were labelled real faces, while 8 of the 25 U-noncorroborated
+observations were real faces. Neither noise nor disagreement may
+be silently discarded; CenterFace is a **review-priority signal**,
+not a universal face validator or hard filter. Some observations
+are correlated repeats; do not infer distinct person counts or
+population video-level recall from them.
+
+**No more broad evaluation is requested at this point.** Preserve
+the existing case/report/CSV evidence. The next development
+increment, only if it materially improves usability, should
+present a compact CenterFace-prioritized group-first review,
+with bounded access to representative, currently ungrouped
+face candidates (noise and CenterFace nonmatches), and count
+human dismissals, merges and potentially missed people.
+Avoid showing every observation as a separate group. Preserve
+human identification and manual fallback; no production
+identity writes, no canonical still-image exemplar enrichment,
+no automatic filtering, and no `main` integration approval.
+Do not repeat video extraction or the full-catalogue model
+run merely to produce another evaluation.

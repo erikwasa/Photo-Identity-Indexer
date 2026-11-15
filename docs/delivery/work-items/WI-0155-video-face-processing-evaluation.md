@@ -10,7 +10,7 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
-## Current maintainer direction — after PR #809 human review (2026-11-15)
+## Current maintainer direction — after V01/V02 human review (2026-11-15)
 
 **Prioritize a usable production review over perfect recognition scores or more
 V03-only experiments.** The practical goal is to show *as few groups per
@@ -31,26 +31,27 @@ PR #809 V03 human review, and does not consider V03 suitable as the deciding
 top-three benchmark. The audit script's 0/3 top-three result on three
 labelled C-groups is a valid computational comparison *for those selected
 groups*, but it is **not a human-reviewed judgement of suggestion utility
-or a general recognition failure**. Use V01 and V02 first for top-three
-suggestion usefulness, if their real crops are sufficiently identifiable;
-add only a few specifically approved, already-local representative videos
-if V01/V02 cannot answer that question.
+or a general recognition failure**. V01/V02 have now supplied a bounded top-three suggestion result
+on labelled human review groups: one of two distinct known people
+appeared within the top three on an initial group in each clip.
+Add only a few approved, already-local representative videos if
+a material unanswered product question justifies them.
 
-**Time-box the remaining exploratory work.** Prefer reviewing existing
-V01/V02 C-groups, corroborated DBSCAN noise and noncorroborated samples
-from the existing PR #808 report, without new model inference, database
-queries or extraction. Inspect per-video recognizable-person coverage,
-false/background groups, manual merges, noise/singleton survival, and
-qualitative top-three usefulness on human-identifiable faces. Only make
-a focused implementation change and re-test if the evidence points to
-a substantial reduction in review effort or meaningful person-coverage
-gain. Stop further threshold sweeps, V03 recognition tuning and
-ever-larger review samples when progress is marginal; record the
-remaining limitations and choose a smallest safe next slice or a
-deferred follow-up. Keep the human-governed three-tier workflow and
+**V01/V02 targeted review is now complete.** The operator reviewed all
+V01/V02 C-groups and each N/U observation from the existing PR #808
+report, without needing new model inference, database queries or
+extraction. Use these results as the current baseline for recognizable-
+person coverage, background dismissals, manual merges, singletons
+and partial top-three usefulness. Proceed with at most one bounded,
+review-oriented implementation improvement aimed at compact grouping
+plus safe singleton/noise access, then compare its human workload
+to this accepted baseline. Stop further threshold sweeps, V03
+recognition tuning and ever-larger samples when progress is
+marginal; document limitations and choose the smallest safe next
+slice or defer. Keep the human-governed three-tier workflow and
 original-video/still-exemplar isolation rules unchanged.
 
-**Status as of this review:** PR #809's PowerShell synthetic gallery/rank
+**Earlier V03 evidence (PR #809):** PowerShell synthetic gallery/rank
 test and three V03 galleries passed locally; all four private aggregate
 measurement scripts completed with validated evidence. Of the
 corroborated-only V03 **18 C-groups**, the reviewer kept 3, marked 15
@@ -64,8 +65,8 @@ U samples, 15 were labelled real faces, 67 background, 14 uncertain,
 with two known people represented. Neither sample is a population
 precision/recall estimate. CenterFace must remain advisory; it may
 prioritize candidates but cannot safely discard the uncorroborated
-true faces. See operations checkpoint 41 for the precise next
-low-burden review and stop/go decision.
+true faces. See operations checkpoint 42 and the final work-item
+checkpoint below for completed V01/V02 results and the next decision.
 
 
 **Current video-level review requirement (maintainer, 2026-11-10):**
@@ -2435,3 +2436,76 @@ and define the smallest safe production-oriented pilot and
 remaining limitations, subject to maintainer approval. No
 automatic suppression, canonical writes, source hydration,
 still-image exemplar enrichment or main-branch promotion.
+
+## Experimental checkpoint 42 — V01/V02 human review complete; exploratory stop/go (2026-11-15)
+
+**Local PR #810 follow-up verification: PASS for the supplied aggregate
+readers.** The operator ran matched full-catalogue report and reviewed
+C/N/U CSV measurements for both V01 and V02. All group, rank and
+sample readers returned validated source evidence. Previously recorded
+PR #809 PowerShell synthetic tests and gallery rendering remain
+accepted; no new inference, extraction or database access was needed
+for this review.
+
+| Reviewed measurement | V01 | V02 |
+| --- | ---: | ---: |
+| CenterFace-corroborated retained observations | 17 / 36 YuNet candidates | 32 / 38 |
+| Initial C-groups | 2 | 6 |
+| Kept / manually merged / dismissed C-groups | 2 / 0 / 0 | 2 / 4 / 0 |
+| Proposed final groups after review | 2 | 2 |
+| C-group observations / corroborated DBSCAN noise | 10 / 7 | 17 / 15 |
+| Distinct known people labelled in grouped review | 2 | 2 |
+| Top-three correct initial groups | 1 / 2 | 2 / 6 |
+| Distinct known people with at least one correct top-three group | 1 / 2 | 1 / 2 |
+| N corroborated noise: real / background / cannot tell | 7 / 0 / 0 (all 7) | 12 / 0 / 3 (all 15) |
+| U noncorroborated: real / background / cannot tell | 7 / 9 / 3 (all 19) | 1 / 3 / 2 (all 6) |
+
+The full-catalogue read-only ranking comparison used 241 canonical
+people, 240 eligible and 596 still-image exemplars. V01 found two
+human-kept groups for two labelled people with no merge burden;
+V02 needed four **human** merges to produce two proposed final
+groups for two labelled people. These are not automatically
+consolidated production groups. No reviewed group was dismissed as
+background. The group-level 1/2 and 2/6 top-three outcomes are
+genuinely useful partial suggestions, not calibrated success rates
+or mandatory per-person quotas; ranks refer to initial C-groups
+before human merge, and reviewing the two proposed final V02
+groups would need a separate ranking algorithm.
+
+Unlike V03's quality-biased 96-of-many audits, both V01 and V02
+N and U review sets covered **every** observation in those
+particular report subsets. Of 22 corroborated-but-ungrouped
+observations across both clips, 19 were labelled real faces and
+3 uncertain; none was labelled background. Of 25 YuNet
+observations without CenterFace corroboration, 8 were labelled
+real faces, 12 background and 5 uncertain. It is therefore
+unsafe to suppress all CenterFace nonmatches or to omit DBSCAN
+noise from the person's discovery path. These counts are
+per-detection observations, not distinct people or unconditional
+video-level recall.
+
+**Stop/go decision from current evidence:** Enough practical
+progress has been demonstrated in the *group-first* idea to
+stop repeated V03-only detector/DBSCAN cutoff sweeps and
+unfocused evaluation rounds. Next develop/design **one bounded
+review-facing prototype improvement**: start with a compact
+CenterFace-prioritized C-group shortlist; make ungrouped genuine
+faces discoverable in a separate, capped/expandable review lane,
+with representative crops and context, without flooding the
+reviewer or silently dropping potential people. Prefer
+reusing existing reports for a targeted before/after comparison;
+only request another approved clip or inference pass if a
+concrete missing capability cannot be judged from V01/V02/V03.
+Accept human correction, manual fallback, and occasional missed
+top-three suggestions; do not pursue perfection or automatic
+person assignment in this stage.
+
+**Open risks before any production integration:** one-group-per-
+person automation (V02 still needs four manual merges), meaningful
+singleton/noise triage and coverage, background burden on
+other scenes, runtime and adaptive-sampling efficiency,
+CenterFace model-weight/training rights, and explicit choice
+of integration boundary. Original media and production
+catalogue/embeddings remain untouched. No PR should target
+`main` without separate maintainer approval; the smallest
+production slice remains a later explicit decision.
