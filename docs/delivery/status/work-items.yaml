@@ -157,6 +157,8 @@ work_items:
     value: '2026-11-15: Stop broad V03 threshold sweeps and repetitive evaluations; V01/V02 already show useful partial top-three and small proposed final human groups, but V02 required four manual merges and genuine faces remain in N/U evidence. Next candidate is one compact group-first review prototype with bounded expandable singleton/noise access; judge benefit by reduced human burden and person coverage, not perfect top-three. No production write or main integration without explicit approval.'
   - type: implementation
     value: '2026-11-15: Opt-in private group-first review workspace combines existing CenterFace C-groups with collapsed, temporally spread N-noise and U-disagreement sample lanes, links to exact audit sample for labeling and preserves three independent CSV readers. No new inference, PostgreSQL/source writes, automatic suppression or merging. Synthetic regression extended; Windows local human UI acceptance pending; empty-source clips and full >96 noise navigation remain deferred.'
+  - type: implementation
+    value: '2026-11-15: PR812 browser review received usability FAIL despite synthetic PASS: C/N/U required three saves, duplicate default audit filenames and manual renaming/moving. Follow-up changes group-first page to edit N/U labels inline and save/import ONE source-bound combined CSV; a new read-only measurement wrapper reuses original strict C/N/U readers with temporary cleanup. Windows synthetic and real-browser acceptance pending; source/model/database safety unchanged.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
