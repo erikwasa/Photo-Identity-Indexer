@@ -2618,7 +2618,7 @@ from `main` pending explicit maintainer approval.
 ## Experimental checkpoint 45 — PR #813 single-save human acceptance (2026-11-15)
 
 **Maintainer local acceptance: PASS.** PR #813 was merged into the
-isolated \`wi-0155\` integration branch after its final Windows CI
+isolated `wi-0155` integration branch after its final Windows CI
 checks passed. The operator verified the combined V01 private
 review workspace in the local browser:
 
@@ -2634,9 +2634,9 @@ review workspace in the local browser:
 - After page reload, **Import combined CSV** restored all
   three sets of decisions: **PASS**.
 
-The read-only \`Measure-VideoFaceReviewWorkspace.ps1\`
-returned \`SchemaVersion=1\`, \`ClipAlias=V01\` and
-\`CombinedEvidenceValidated=True\` for the saved worksheet.
+The read-only `Measure-VideoFaceReviewWorkspace.ps1`
+returned `SchemaVersion=1`, `ClipAlias=V01` and
+`CombinedEvidenceValidated=True` for the saved worksheet.
 This confirms the combined worksheet matched its report and
 source-specific validators. The operator reported that the
 corrected workflow looked good. The prior PR #812
@@ -2660,7 +2660,7 @@ consolidation/review prototype against existing private
 evidence; gate any additional experiment on a meaningful
 reduction in operator effort without person-coverage loss.
 No all-N/U suppression, persistent identity writes,
-catalogue exemplar enrichment or \`main\` integration
+catalogue exemplar enrichment or `main` integration
 is authorized. No-face/empty-source handling, capped
 N/U sampling coverage, licensing/packaging and production
 integration boundary remain open.
