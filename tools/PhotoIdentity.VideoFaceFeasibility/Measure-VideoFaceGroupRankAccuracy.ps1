@@ -18,7 +18,7 @@ param(
     [Parameter(Mandatory)][string]$PrivateGroupReportPath,
     [Parameter(Mandatory)][string]$PrivatePeopleMapPath,
     [Parameter(Mandatory)][ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias,
-    [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional'
+    [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -85,8 +85,11 @@ try {
     }
 
     $clip = $clips[0]
-    $isShadow = $GroupSource -ceq 'ShadowDbscan'
-    $groupReview = if ($isShadow) {
+    $isCenterFace = $GroupSource -ceq 'CenterFaceShadow'
+    $isShadow = $GroupSource -cne 'Provisional'
+    $groupReview = if ($isCenterFace) {
+        $clip.review.diagnostics.centerFaceCounterfactual.corroboratedOnlyDbscan
+    } elseif ($isShadow) {
         $clip.review.diagnostics.shadowDbscan
     } else {
         $clip.review.diagnostics.provisionalGroups
@@ -94,7 +97,212 @@ try {
     if ($null -eq $groupReview) {
         throw 'Missing the selected group evidence.'
     }
-    $groups = @($groupReview.groups)
+    $groups = if ($isCenterFace) {
+        @($groupReview.groups | ForEach-Object {
+            if ([string]$_.alias -cnotmatch '^D(?!000)[0-9]{3}
+        @($groups | ForEach-Object {
+            [pscustomobject]@{
+                groupAlias = $_.alias
+                groupObservations = $_.observations
+                representativeCount = @($_.representativeCrops).Count
+                topCandidates = $_.topCandidates
+            }
+        })
+    } else { @($clip.review.diagnostics.groupSuggestions) }
+    if ($groups.Count -ne $ranked.Count -or $ranked.Count -ne $rows.Count) {
+        throw 'The report does not contain complete group rankings.'
+    }
+
+    $byGroup = [Collections.Generic.Dictionary[string,object]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($g in $groups) {
+        if (-not $byGroup.TryAdd([string]$g.alias, $g)) {
+            throw 'Duplicate report group.'
+        }
+    }
+    $byRank = [Collections.Generic.Dictionary[string,object]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($rank in $ranked) {
+        $alias = [string]$rank.groupAlias
+        if (-not $byRank.TryAdd($alias, $rank) -or
+            -not $byGroup.ContainsKey($alias) -or
+            [int]$rank.groupObservations -ne [int]$byGroup[$alias].observations -or
+            [int]$rank.representativeCount -ne @($byGroup[$alias].representativeCrops).Count) {
+            throw 'Group suggestions are not from the reviewed group evidence.'
+        }
+        $candidates = @($rank.topCandidates)
+        if ($candidates.Count -ne [Math]::Min(3, [int]$report.catalogue.eligiblePeople)) {
+            throw 'Incomplete person ranks.'
+        }
+        $distinct = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        $previous = [double]::PositiveInfinity
+        foreach ($candidate in $candidates) {
+            $score = [double]$candidate.score
+            if (-not $people.Contains([string]$candidate.alias) -or
+                -not $distinct.Add([string]$candidate.alias) -or
+                -not [double]::IsFinite($score) -or
+                $score -lt -1 -or $score -gt 1 -or $score -gt $previous) {
+                throw 'Invalid or unordered top-three person candidates.'
+            }
+            $previous = $score
+        }
+    }
+
+    $known = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $knownTop1 = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $knownTop3 = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $dismissedConf = [Collections.Generic.List[double]]::new()
+    $retainedConf = [Collections.Generic.List[double]]::new()
+    $dismissedQuality = [Collections.Generic.List[double]]::new()
+    $retainedQuality = [Collections.Generic.List[double]]::new()
+    $dismissedScore = [Collections.Generic.List[double]]::new()
+    $retainedScore = [Collections.Generic.List[double]]::new()
+    $knownGroups = 0
+    $unknownGroups = 0
+    $unlabelledRetained = 0
+    $top1 = 0
+    $top3 = 0
+    $knownNotTop3 = 0
+    $dismissedExploratory = 0
+    $dismissedExploratoryWithMargin = 0
+    $retainedExploratory = 0
+
+    foreach ($row in $rows) {
+        $groupAlias = [string]$row.Group
+        $rank = $byRank[$groupAlias]
+        $person = [string]$row.SelectedPerson
+        $decision = [string]$row.Decision
+        if ($person -ne '' -and $person -cne 'UNKNOWN' -and
+            -not $people.Contains($person)) {
+            throw 'Human selected-person alias is not in this snapshot.'
+        }
+        if ($person -ne '' -and
+            $decision -notin @('Keep group','Merge group')) {
+            throw 'Only reviewed retained real-face groups can have a person label.'
+        }
+        $candidate = @($rank.topCandidates)
+        $score = [double]$candidate[0].score
+        $gap = if ($candidate.Count -gt 1) {
+            $score - [double]$candidate[1].score
+        } else { $null }
+        $exploratory = $score -ge 0.80
+        $strong = $exploratory -and $null -ne $gap -and $gap -ge 0.05
+        $samples = @($byGroup[$groupAlias].representativeCrops)
+        if ($samples.Count -lt 1 -or $samples.Count -gt 5) {
+            throw 'Group lacks the representative crop diagnostic.'
+        }
+        $confValues = [Collections.Generic.List[double]]::new()
+        $qualityValues = [Collections.Generic.List[double]]::new()
+        foreach ($sample in $samples) {
+            $confidence = [double]$sample.detectorConfidence
+            $quality = [double]$sample.quality
+            if (-not [double]::IsFinite($confidence) -or
+                -not [double]::IsFinite($quality) -or
+                $confidence -lt 0 -or $confidence -gt 1 -or
+                $quality -lt 0 -or $quality -gt 1) {
+                throw 'Invalid representative-crop quality diagnostic.'
+            }
+            $confValues.Add($confidence)
+            $qualityValues.Add($quality)
+        }
+        $meanConfidence = ($confValues | Measure-Object -Average).Average
+        $meanQuality = ($qualityValues | Measure-Object -Average).Average
+
+        if ($decision -ceq 'Dismiss false detection') {
+            $dismissedScore.Add($score)
+            $dismissedConf.Add([double]$meanConfidence)
+            $dismissedQuality.Add([double]$meanQuality)
+            if ($exploratory) { $dismissedExploratory++ }
+            if ($strong) { $dismissedExploratoryWithMargin++ }
+        }
+        if ($decision -in @('Keep group','Merge group')) {
+            $retainedScore.Add($score)
+            $retainedConf.Add([double]$meanConfidence)
+            $retainedQuality.Add([double]$meanQuality)
+            if ($exploratory) { $retainedExploratory++ }
+            if ($person -ceq '') {
+                $unlabelledRetained++
+            } elseif ($person -ceq 'UNKNOWN') {
+                $unknownGroups++
+            } else {
+                $knownGroups++
+                [void]$known.Add($person)
+                if ([string]$candidate[0].alias -ceq $person) {
+                    $top1++
+                    [void]$knownTop1.Add($person)
+                }
+                if (@($candidate | Where-Object { $_.alias -ceq $person }).Count -gt 0) {
+                    $top3++
+                    [void]$knownTop3.Add($person)
+                } else {
+                    $knownNotTop3++
+                }
+            }
+        }
+    }
+
+    # A missing label is NOT a wrong suggestion. Distinct-person counts
+    # intentionally do not include unreviewed, unknown or unassigned faces.
+    [pscustomobject][ordered]@{
+        SchemaVersion = 1
+        GroupSource = $GroupSource
+        ShadowTotalClusters = $baseline.ShadowTotalClusters
+        ShadowNoiseObservations = $baseline.ShadowNoiseObservations
+        ShadowMembersOutsideReview = $baseline.ShadowMembersOutsideReview
+        InputEvidenceValidated = $true
+        CanonicalPeople = [int]$report.catalogue.selectedPeople
+        EligiblePeople = [int]$report.catalogue.eligiblePeople
+        ExemplarsLoaded = [int]$report.catalogue.exemplarsLoaded
+        TotalDetectedCandidates = [int]$clip.review.aggregate.facesDetected
+        CorroboratedCandidateSubset = $(if ($isCenterFace) {
+            [int]$clip.review.diagnostics.centerFaceCounterfactual.corroboratedAt030
+        } else { $null })
+        AssignedObservations = [int]$baseline.AssignedGroupObservations
+        UnassignedObservations = [int]$baseline.ObservationsUnassigned
+        GroupCapacityReached = [bool]$baseline.GroupCapacityReached
+        TotalGroups = [int]$baseline.TotalGroups
+        DismissedGroups = [int]$baseline.DismissedGroups
+        RetainedGroups = [int]$baseline.KeptGroups + [int]$baseline.MergeGroups
+        LabelledKnownGroups = $knownGroups
+        LabelledUnknownGroups = $unknownGroups
+        UnlabelledRetainedGroups = $unlabelledRetained
+        CorrectTop1Groups = $(if ($knownGroups -gt 0) { $top1 } else { $null })
+        CorrectTop3Groups = $(if ($knownGroups -gt 0) { $top3 } else { $null })
+        MissedTop3Groups = $(if ($knownGroups -gt 0) { $knownNotTop3 } else { $null })
+        DistinctKnownPeopleLabelled = $(if ($knownGroups -gt 0) { $known.Count } else { $null })
+        DistinctKnownPeopleTop1 = $(if ($knownGroups -gt 0) { $knownTop1.Count } else { $null })
+        DistinctKnownPeopleTop3 = $(if ($knownGroups -gt 0) { $knownTop3.Count } else { $null })
+        DistinctKnownPeopleMissedTop3 = $(if ($knownGroups -gt 0) { $known.Count - $knownTop3.Count } else { $null })
+        DismissedGroupsAboveExploratorySimilarity = $dismissedExploratory
+        DismissedGroupsWithExploratoryReviewLead = $dismissedExploratoryWithMargin
+        RetainedGroupsAboveExploratorySimilarity = $retainedExploratory
+        MedianDismissedGroupDetectorConfidence = Median $dismissedConf.ToArray()
+        MedianRetainedGroupDetectorConfidence = Median $retainedConf.ToArray()
+        MedianDismissedGroupQualityProxy = Median $dismissedQuality.ToArray()
+        MedianRetainedGroupQualityProxy = Median $retainedQuality.ToArray()
+        MedianDismissedGroupTopCatalogueScore = Median $dismissedScore.ToArray()
+        MedianRetainedGroupTopCatalogueScore = Median $retainedScore.ToArray()
+    }
+}
+catch {
+    # No raw exception message may leak a private path, alias, ID or score.
+    throw 'WI-0155 private group rank audit rejected unavailable or inconsistent evidence.'
+}
+) {
+                throw 'Invalid corroborated-only group alias.'
+            }
+            [pscustomobject]@{
+                alias = ([string]$_.alias -creplace '^D','C')
+                observations = $_.observations
+                representativeCrops = $_.representativeCrops
+                topCandidates = $_.topCandidates
+            }
+        })
+    } else { @($groupReview.groups) }
     $ranked = if ($isShadow) {
         @($groups | ForEach-Object {
             [pscustomobject]@{
