@@ -4325,3 +4325,30 @@ footage merely to create a combined file. The combined
 page does not migrate these older CSVs automatically.
 No production DB writes, source media changes or
 identity auto-assignment are introduced.
+
+## Checkpoint 45 — PR #813 one-save V01 browser acceptance (2026-11-15)
+
+The maintainer reports **all six browser acceptance checks PASS**:
+C-group images/suggestions/decision controls; inline N and U
+classification; one combined C/N/U CSV per save with a
+distinct filename and no manual renaming/moving; and
+one-file import restoring all three evidence sources after
+page reload.
+
+PowerShell aggregate measurement of the saved V01 combined
+CSV returned \`SchemaVersion=1\`, \`ClipAlias=V01\`,
+\`CombinedEvidenceValidated=True\`.
+The corresponding final PR #813 CI run was successful.
+This supersedes checkpoint 44's local-acceptance-pending
+note, but does **not** imply automatic identity/grouping
+quality acceptance, complete recall of unsampled N/U
+observations, or permission to integrate into production.
+
+**No further local verification is required for PR #813.**
+Do not ask for another full detector run or repeat the same
+V01 face labels. Future WI-0155 work should prioritize
+materially lowering human group-merge effort (V02 needed
+four merges to reach two proposed people), preserving
+genuine singleton/noise access, and explicitly deciding
+the eventual production boundary. Keep prototypes
+read-only and isolated on \`wi-0155\`.
