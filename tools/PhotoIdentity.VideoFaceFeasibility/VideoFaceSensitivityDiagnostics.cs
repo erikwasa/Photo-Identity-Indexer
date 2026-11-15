@@ -83,6 +83,11 @@ public sealed record VideoFaceSensitivityDiagnostics(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public VideoFaceShadowDbscanReview? ShadowDbscan { get; init; }
 
+    // Explicitly opt-in full-frame CenterFace counterfactual; never changes the
+    // original detector/grouping or makes a negative face-validity decision.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceCenterFaceCounterfactual? CenterFaceCounterfactual { get; init; }
+
     // Model tensor size is *not* the decoded frame resolution. In multi-scale
     // mode every source region is separately projected onto that tensor.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -71,6 +71,7 @@ public static class Program
                 "[--detector-pipeline <single-pass|multi-scale>] [--tile-size <640|1024>] " +
                 "[--face-overflow-policy <fail|retain-top-32>] [--provisional-groups] " +
                 "[--unassigned-audit] [--shadow-dbscan (requires both flags)] " +
+                "[--shadow-centerface (requires shadow DBSCAN; independent full-candidate run)] " +
                 "[--private-people-map <new-private-map.json> for catalogueScope=all-eligible]\n" +
                 "Visual review geometry (NO database): --review-geometry-selection <existing-selection.json> " +
                 "--catalogue-cases <private-cases.json> --private-catalogue-report <existing-report.json> " +

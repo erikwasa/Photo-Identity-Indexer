@@ -3778,3 +3778,131 @@ known-person top-three retrieval, missed brief appearances and cost.
 Use independent validation rather than tuning the threshold solely to
 these already-reviewed V03 crops. Existing CenterFace weight/training-
 data licensing is still provisional and needs a separate adoption review.
+
+## Checkpoint 39 — PR #808: full-candidate CenterFace corroboration shadow (2026-11-15)
+
+PR #806's real V03 selected cohort was encouraging but biased:
+**0/100** confirmed cracked-paving non-faces corroborated by CenterFace
+at confidence 0.30/0.50 with IoU >= 0.25; **24/24** confirmed human
+faces corroborated at 0.30 and **23/24** at 0.50. These correlated,
+reviewer-selected crops cannot establish all-video detection precision
+or recall and do not justify suppressing missing matches.
+
+PR #808 adds a guarded optional `--shadow-centerface` to the
+**existing full all-eligible catalogue runner**, requiring
+`--provisional-groups --unassigned-audit --shadow-dbscan`. The
+existing governed CenterFace model is integrity checked before
+the one SELECT-only catalogue snapshot. CenterFace runs **once per
+decoded frame**, measuring two independent confidence levels
+(0.30/0.50 and box IoU >= 0.25) for **every retained YuNet candidate**.
+The original YuNet/SFace workflow, frame integrity, standard G-groups,
+uncorroborated D-groups and all top-three individual ranks are unchanged.
+All uncorroborated observations remain accounted for; up to 96
+temporally stratified private crop examples remain reviewable.
+The independent corroborated-only DBSCAN is another, separate
+shadow result and still uses same-frame cannot-link constraints.
+Its reduced number of groups is NOT an acceptance criterion.
+
+The private report adds `clips[].review.diagnostics.centerFaceCounterfactual`:
+`framesChecked`, `retainedYuNetObservations`,
+`corroboratedAt030`, `corroboratedAt050`,
+`notCorroboratedAt030`, `notCorroboratedAudit` and
+`corroboratedOnlyDbscan`. All observations must reconcile as
+`corroboratedAt030 + notCorroboratedAt030 =
+retainedYuNetObservations` and
+`corroboratedOnlyDbscan.clusterMembers +
+corroboratedOnlyDbscan.noiseObservations =
+corroboratedAt030`. Every same-frame collision must equal zero.
+
+### Optional post-merge consolidated read-only verification
+
+Do not rerun video extraction or the already completed PR #806
+limited-crop diagnostic. A new full-candidate model run is
+necessary because the private prior report appropriately contains
+no SFace vectors. Reuse the **same approved V01–V03 multi-clip
+`$casesPath` and governed `$modelDir`**, and the existing
+`PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING` with SELECT-only
+permissions. PowerShell 7.6:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+
+dotnet test tests/PhotoIdentity.VideoFaceFeasibility.Tests/PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Focused WI-0155 tests failed' }
+
+if (-not $env:PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING) {
+    throw 'Approved SELECT-only catalogue connection required'
+}
+foreach ($input in @($casesPath, $modelDir)) {
+    if (-not (Test-Path -LiteralPath $input)) {
+        throw 'Existing approved private manifest or models missing'
+    }
+}
+
+$folder = Join-Path $env:LOCALAPPDATA (
+    'PhotoIdentity\WI0155\centerface-all-' +
+    (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
+New-Item -ItemType Directory -Path $folder -Force | Out-Null
+$allReport = Join-Path $folder 'full-candidate-shadow.json'
+$allMap = Join-Path $folder 'private-people-map.json'
+
+dotnet run --project tools/PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --catalogue-cases $casesPath --private-report $allReport `
+    --private-people-map $allMap `
+    --root (Get-Location).Path --model-dir $modelDir `
+    --detector-confidence 0.5 --detector-pipeline multi-scale `
+    --tile-size 1024 --face-overflow-policy retain-top-32 `
+    --provisional-groups --unassigned-audit --shadow-dbscan `
+    --shadow-centerface
+if ($LASTEXITCODE -ne 0) { throw 'Full-candidate shadow failed' }
+
+$private = Get-Content -LiteralPath $allReport -Raw | ConvertFrom-Json
+$summary = foreach ($clip in @($private.clips)) {
+    $old = $clip.review.diagnostics.provisionalGroups
+    $base = $clip.review.diagnostics.shadowDbscan
+    $cf = $clip.review.diagnostics.centerFaceCounterfactual
+    if ($null -eq $cf -or $null -eq $base -or
+        $cf.retainedYuNetObservations -ne $clip.review.aggregate.facesDetected -or
+        $cf.corroboratedAt030 + $cf.notCorroboratedAt030 -ne
+            $cf.retainedYuNetObservations -or
+        $cf.corroboratedAt050 -gt $cf.corroboratedAt030 -or
+        $cf.corroboratedOnlyDbscan.clusterMembers +
+            $cf.corroboratedOnlyDbscan.noiseObservations -ne
+            $cf.corroboratedAt030 -or
+        $base.clusterMembers + $base.noiseObservations -ne
+            $cf.retainedYuNetObservations -or
+        $cf.corroboratedOnlyDbscan.sameFrameCollisions -ne 0) {
+        throw 'Original/corroborated accounting mismatch'
+    }
+    [pscustomobject]@{
+        Clip = $clip.alias
+        Frames = $cf.framesChecked
+        YuNet = $cf.retainedYuNetObservations
+        CenterFace030 = $cf.corroboratedAt030
+        CenterFace050 = $cf.corroboratedAt050
+        Uncorroborated = $cf.notCorroboratedAt030
+        UncorroboratedSamples = @($cf.notCorroboratedAudit.sampledCrops).Count
+        OriginalGroups = @($old.groups).Count
+        OriginalDBSCAN = $base.clusterCount
+        CorroboratedDBSCAN = $cf.corroboratedOnlyDbscan.clusterCount
+        CorroboratedNoise = $cf.corroboratedOnlyDbscan.noiseObservations
+        SameFrameCollisions = $cf.corroboratedOnlyDbscan.sameFrameCollisions
+    }
+}
+$summary | Format-Table -AutoSize
+~~~
+
+Historical original V03 comparison: 180 frames; 3,912 retained
+YuNet detections; G-group 64/407 assigned/3,505 unassigned;
+unfiltered D-group 259 clusters, 2,636 members, 1,276 noise.
+Any baseline changes require investigation; new corroboration
+and alternative group counts have **no invented expected values**.
+
+**Pending acceptance:** synthetic tests and per-clip accounting
+PASS are necessary but not sufficient. Human review must establish
+whether genuine faces, singletons and brief unobscured appearances
+survive; whether largest corroborated groups cease being background;
+whether identifiable known people and top-three ranks improve;
+and whether results generalize to additional varied videos. Never
+auto-delete non-matching candidates, merge into main, or distribute
+provisionally governed model weights on this evidence alone.

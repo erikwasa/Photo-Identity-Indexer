@@ -301,6 +301,99 @@ public sealed class VideoFaceExperimentTests
         }
     }
 
+    [Fact]
+    public async Task Full_candidate_independent_shadow_preserves_original_ranks_groups_and_source_files()
+    {
+        string dir = CreateTempDirectory();
+        try
+        {
+            byte[] first = [137, 80, 78, 71, 13, 10, 26, 10, 1];
+            byte[] second = [137, 80, 78, 71, 13, 10, 26, 10, 2];
+            await File.WriteAllBytesAsync(Path.Combine(dir, "one.png"), first);
+            await File.WriteAllBytesAsync(Path.Combine(dir, "two.png"), second);
+            var cases = new VideoFaceFrameSet(1,
+                [new(1000, "one.png"), new(2000, "two.png")]);
+            var matcher = new VideoFaceCataloguePersonMatcher(
+            [
+                new("P01", new string('a', 64),
+                    new EmbeddingVector(new float[] { 1, 0, 0 })),
+            ]);
+            var experiment = new VideoFaceExperiment(
+                new FakeDecoder(), new FakeDetector(), new FakeAligner(), new FakeEmbedder());
+
+            var reference = await experiment.RunWithPreparedMatcherAsync(
+                cases, dir, matcher, detectorConfidence: .5,
+                provisionalGroups: true, unassignedAudit: true, shadowDbscan: true);
+
+            var independent = new SparseIndependentDetector();
+            var compared = await experiment.RunWithPreparedMatcherAsync(
+                cases, dir, matcher, detectorConfidence: .5,
+                provisionalGroups: true, unassignedAudit: true, shadowDbscan: true,
+                independentDetector: independent);
+
+            Assert.Equal(2, independent.Calls);
+            Assert.Null(reference.Diagnostics!.CenterFaceCounterfactual);
+            Assert.Equal(
+                JsonSerializer.Serialize(reference.Diagnostics.ProvisionalGroups),
+                JsonSerializer.Serialize(compared.Diagnostics!.ProvisionalGroups));
+            Assert.Equal(
+                JsonSerializer.Serialize(reference.Diagnostics.ShadowDbscan),
+                JsonSerializer.Serialize(compared.Diagnostics.ShadowDbscan));
+            Assert.Equal(
+                JsonSerializer.Serialize(reference.Diagnostics.GroupSuggestions),
+                JsonSerializer.Serialize(compared.Diagnostics.GroupSuggestions));
+            Assert.Equal(JsonSerializer.Serialize(reference.Findings),
+                JsonSerializer.Serialize(compared.Findings));
+            var shadow = compared.Diagnostics.CenterFaceCounterfactual!;
+            Assert.Equal(2, shadow.FramesChecked);
+            Assert.Equal(2, shadow.RetainedYuNetObservations);
+            Assert.Equal(1, shadow.CorroboratedAt030);
+            Assert.Equal(1, shadow.CorroboratedAt050);
+            Assert.Equal(1, shadow.NotCorroboratedAt030);
+            Assert.Single(shadow.NotCorroboratedAudit.SampledCrops);
+            Assert.Equal(1, shadow.CorroboratedOnlyDbscan.NoiseObservations);
+            Assert.True(shadow.AllCandidatesAccountedFor);
+            Assert.Equal(first, await File.ReadAllBytesAsync(Path.Combine(dir, "one.png")));
+            Assert.Equal(second, await File.ReadAllBytesAsync(Path.Combine(dir, "two.png")));
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                experiment.RunWithPreparedMatcherAsync(
+                    cases, dir, matcher, detectorConfidence: .5,
+                    provisionalGroups: true, unassignedAudit: true,
+                    independentDetector: new SparseIndependentDetector()));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    private sealed class SparseIndependentDetector : IFaceDetector
+    {
+        public int Calls { get; private set; }
+        public ModelDescriptor Descriptor { get; } = new(
+            new ModelId("fake-second-detector"), ModelRole.FaceDetection,
+            ModelFormat.Onnx, new Sha256Digest(new string('c', 64)),
+            new ImageSize(640, 640), "fake", "test", "test");
+
+        public Task<IReadOnlyList<DetectedFaceCandidate>> DetectAsync(
+            ImageFrame image, CancellationToken cancellationToken)
+        {
+            Calls++;
+            if (Calls > 1)
+                return Task.FromResult<IReadOnlyList<DetectedFaceCandidate>>([]);
+            return Task.FromResult<IReadOnlyList<DetectedFaceCandidate>>(
+            [
+                new DetectedFaceCandidate(
+                    new NormalizedBoundingBox(.2, .2, .5, .5),
+                    new NormalizedFaceLandmarks(
+                        new NormalizedPoint(.6, .4), new NormalizedPoint(.4, .4),
+                        new NormalizedPoint(.5, .5), new NormalizedPoint(.6, .6),
+                        new NormalizedPoint(.4, .6)), .8)
+            ]);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"wi0155-{Guid.NewGuid():N}");

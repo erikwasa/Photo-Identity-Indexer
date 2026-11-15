@@ -137,6 +137,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/807
   - type: maintainer_verification
     value: '2026-11-15: PR806 merged; focused C# tests, CenterFace governed model check, private source-safe CenterFace cross-check PASS. V03 77 frames; CenterFace agreed with 0/100 human-confirmed cracked-paving group crops at confidence >=0.30 and >=0.50; agreed with 24/24 known real-face noise examples at >=0.30 and 23/24 at >=0.50 (IoU >=0.25). Private report written, automatic suppression OFF. Selected, correlated V03 samples; no population accuracy, safe filtering or grouping/identity acceptance claimed.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/808
+  - type: implementation
+    value: '2026-11-15: Read-only opt-in full-frame independent CenterFace corroboration for every retained YuNet candidate in all-eligible video catalogue experiment. Records agreement confidence 0.30/0.50, preserves all unmatched examples in counted private temporal audit, and compares separate corroborated-only DBSCAN groups with same-frame constraints; original G-groups, unfiltered D-groups, identities and source frames unchanged. Real multi-video human quality acceptance pending.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36

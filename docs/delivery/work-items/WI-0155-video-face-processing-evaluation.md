@@ -2245,3 +2245,46 @@ retention, multi-video generalization and model rights. No revised
 production detector threshold or grouping adoption is authorized.
 FACE-QUALITY-01, GROUP-QUALITY-01, CATALOGUE-TOP3-01,
 DIVERSE-VIDEOS-01 and MERGE-01 still OPEN.
+
+## Experimental checkpoint 39 — full-candidate CenterFace comparison without dropping evidence (2026-11-15)
+
+PR #808 builds on PR #806's selected V03 independent-detector
+positive-versus-negative result: CenterFace corroborated **0/100**
+human-confirmed paving non-faces and **24/24** human-confirmed
+real-face noise crops at confidence 0.30, but only **23/24**
+real faces at 0.50. This is not representative of all V03
+detections; no automatic face-rejection cutoff is justified.
+
+An explicitly opt-in `--shadow-centerface` stage in the
+read-only, all-eligible experiment performs **one independent
+CenterFace pass per approved decoded frame** and records
+per-candidate spatial agreement for **all retained YuNet
+detections**, not only previous representative samples. It
+reuses the same frame's SFace vectors in a **separate
+corroborated-only M25 DBSCAN shadow**, while preserving all
+original provisional G-group assignments, unfiltered DBSCAN
+results, top-three catalogue evidence and source images.
+Every unsupported observation remains explicitly counted;
+up to 96 temporally stratified private review crops are
+retained, and any additional exclusions remain visible as a
+count. The independent shadow still enforces same-frame
+cannot-link and cluster/noise member accounting.
+
+The opt-in stage repeats one approved **SELECT-only catalogue
+experiment** because embeddings are deliberately not persisted
+in existing private reports. No video extraction, source changes,
+identity writes, background jobs or application integration
+are involved. Synthetic regressions cover co-present candidates,
+false-background separation, retained genuine singleton
+disagreements, baseline invariance and source integrity.
+
+**Acceptance is not yet complete.** We still require actual
+all-candidate V01–V03 results; independent human quality
+review of alternate groups and non-matches; preservation of
+short-exposure genuine faces; ranking accuracy and person-level
+coverage; varied-video generalization; and review of the
+CenterFace model's provisional rights. See operational
+checkpoint 39. `FACE-QUALITY-01`, `GROUP-QUALITY-01`,
+`CATALOGUE-TOP3-01`, `DIVERSE-VIDEOS-01` and `MERGE-01`
+remain open. `SAMPLING-01`'s two-pass V03 mechanics remain
+previously verified, but overall efficiency remains open.
