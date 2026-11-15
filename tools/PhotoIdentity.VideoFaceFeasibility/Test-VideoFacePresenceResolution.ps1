@@ -15,35 +15,35 @@ function Refused([scriptblock]$Action) {
     try { & $Action | Out-Null; return $false }
     catch { return $true }
 }
-function Group([string]$Id,[string]$Decision,[string]$Person,[string]$Merge='') {
+function MakeGroup([string]$Id,[string]$Decision,[string]$Person,[string]$Merge='') {
     [pscustomobject]@{
         Group=$Id;Decision=$Decision;SelectedPerson=$Person;MergeInto=$Merge
     }
 }
-function Sample([string]$Source,[string]$Label,[string]$Person) {
+function MakeAuditSample([string]$Source,[string]$Label,[string]$Person) {
     [pscustomobject]@{
         Source=$Source;Label=$Label;PersonAlias=$Person
     }
 }
 $groups = @(
-    (Group 'C001' 'Keep group' 'P0001'),
-    (Group 'C002' 'Merge group' 'P0001' 'C001'),
-    (Group 'C003' 'Keep group' 'P0002'),
-    (Group 'C004' 'Keep group' 'UNKNOWN'),
-    (Group 'C005' 'Keep group' 'UNKNOWN'),
-    (Group 'C006' 'Keep group' ''),
-    (Group 'C007' 'Cannot tell' ''),
-    (Group 'C008' 'Dismiss false detection' '')
+    (MakeGroup 'C001' 'Keep group' 'P0001'),
+    (MakeGroup 'C002' 'Merge group' 'P0001' 'C001'),
+    (MakeGroup 'C003' 'Keep group' 'P0002'),
+    (MakeGroup 'C004' 'Keep group' 'UNKNOWN'),
+    (MakeGroup 'C005' 'Keep group' 'UNKNOWN'),
+    (MakeGroup 'C006' 'Keep group' ''),
+    (MakeGroup 'C007' 'Cannot tell' ''),
+    (MakeGroup 'C008' 'Dismiss false detection' '')
 )
 $audit = @(
-    (Sample 'CenterFaceNoise' 'Real face' 'P0001'),
-    (Sample 'CenterFaceNoise' 'Real face' 'P0003'),
-    (Sample 'CenterFaceNoise' 'Real face' 'UNKNOWN'),
-    (Sample 'CenterFaceNoise' 'Cannot tell' ''),
-    (Sample 'CenterFaceUncorroborated' 'Real face' 'P0003'),
-    (Sample 'CenterFaceUncorroborated' 'Real face' ''),
-    (Sample 'CenterFaceUncorroborated' 'Not a face' ''),
-    (Sample 'CenterFaceUncorroborated' '' '')
+    (MakeAuditSample 'CenterFaceNoise' 'Real face' 'P0001'),
+    (MakeAuditSample 'CenterFaceNoise' 'Real face' 'P0003'),
+    (MakeAuditSample 'CenterFaceNoise' 'Real face' 'UNKNOWN'),
+    (MakeAuditSample 'CenterFaceNoise' 'Cannot tell' ''),
+    (MakeAuditSample 'CenterFaceUncorroborated' 'Real face' 'P0003'),
+    (MakeAuditSample 'CenterFaceUncorroborated' 'Real face' ''),
+    (MakeAuditSample 'CenterFaceUncorroborated' 'Not a face' ''),
+    (MakeAuditSample 'CenterFaceUncorroborated' '' '')
 )
 $frames = @{
     C001=@(1);C002=@(2);C003=@(3);C004=@(4)
