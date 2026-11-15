@@ -98,6 +98,34 @@ try {
     $audits = @($rows | Where-Object {
         [string]$_.Source -cin @('CenterFaceNoise','CenterFaceUncorroborated')
     })
+    # The audit validators check label syntax and source sample identity,
+    # but do not resolve audit pseudonyms against the catalogue people map.
+    # A syntactically valid yet nonexistent alias must NOT become a known
+    # video/person presence proposal.
+    $privateMap = Get-Content -LiteralPath $mapPath -Raw -Encoding utf8 |
+        ConvertFrom-Json
+    $eligible = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($person in @($privateMap.people)) {
+        $alias = [string]$person.alias
+        if ($alias -cnotmatch '^P(?!0000$)[0-9]{4}$' -or
+            -not $eligible.Add($alias)) {
+            throw 'Private catalogue alias map is not source-consistent.'
+        }
+    }
+    if ([int]$privateMap.schemaVersion -ne 1 -or
+        $eligible.Count -ne [int]$report.catalogue.selectedPeople) {
+        throw 'Private catalogue people count changed.'
+    }
+    foreach ($row in $rows) {
+        $person = if ([string]$row.Source -ceq 'CenterFaceShadow') {
+            [string]$row.SelectedPerson
+        } else { [string]$row.PersonAlias }
+        if ($person -cne '' -and $person -cne 'UNKNOWN' -and
+            -not $eligible.Contains($person)) {
+            throw 'Reviewer alias is not part of the eligible catalogue snapshot.'
+        }
+    }
     Import-Module (Join-Path $PSScriptRoot 'VideoFacePresenceResolution.psm1') -Force
     $resolved = Resolve-VideoFacePresenceEvidence -GroupRows $groupRows -AuditRows $audits -RepresentativeFrames $frames
 
