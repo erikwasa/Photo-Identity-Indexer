@@ -227,6 +227,7 @@ jobs:
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupReview.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupRankAccuracy.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceShadowGroupReview.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceResolution.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceReviewPriority.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceUnassignedReview.ps1
 
