@@ -290,7 +290,8 @@ public sealed class VideoFaceExperiment
         CancellationToken cancellationToken = default,
         bool provisionalGroups = false,
         bool unassignedAudit = false,
-        bool shadowDbscan = false)
+        bool shadowDbscan = false,
+        IFaceDetector? independentDetector = null)
     {
         ArgumentNullException.ThrowIfNull(matcher);
         if (detectorConfidence is not (0.5 or 0.7 or 0.9))
@@ -307,6 +308,12 @@ public sealed class VideoFaceExperiment
         {
             throw new ArgumentException("Shadow DBSCAN requires full-catalogue provisional groups and unassigned audit.");
         }
+        if (independentDetector is not null && (!shadowDbscan ||
+            independentDetector.Descriptor.Id == _detector.Descriptor.Id ||
+            independentDetector.Descriptor.ModelHash == _detector.Descriptor.ModelHash))
+        {
+            throw new ArgumentException("Independent shadow requires the full baseline DBSCAN and a genuinely different detector.");
+        }
 
         // Include up to 180 pre-extracted local frames, without requiring
         // heuristic groups/tracks to identify a person.
@@ -316,7 +323,8 @@ public sealed class VideoFaceExperiment
             cancellationToken: cancellationToken,
             provisionalGroups: provisionalGroups,
             unassignedAudit: unassignedAudit,
-            shadowDbscan: shadowDbscan);
+            shadowDbscan: shadowDbscan,
+            independentDetector: independentDetector);
     }
 
     private async Task<VideoFacePrivateReview> RunCoreAsync(
@@ -329,7 +337,8 @@ public sealed class VideoFaceExperiment
         CancellationToken cancellationToken,
         bool provisionalGroups = false,
         bool unassignedAudit = false,
-        bool shadowDbscan = false)
+        bool shadowDbscan = false,
+        IFaceDetector? independentDetector = null)
     {
         VideoFaceFrameSetLoader.Validate(set, coverage);
         ArgumentException.ThrowIfNullOrWhiteSpace(manifestDirectory);
@@ -362,6 +371,11 @@ public sealed class VideoFaceExperiment
             : null;
         VideoFaceShadowDbscan? shadow = shadowDbscan
             ? new VideoFaceShadowDbscan()
+            : null;
+        VideoFaceCenterFaceShadow? independentShadow = independentDetector is not null
+            ? new VideoFaceCenterFaceShadow(
+                set.Frames![0].TimestampMs, set.Frames[^1].TimestampMs,
+                independentDetector.Descriptor)
             : null;
         List<VideoFaceReferenceFinding> findings = [];
         List<VideoFaceFrameDetectionDiagnostic> frameDetections = [];
@@ -435,6 +449,15 @@ public sealed class VideoFaceExperiment
                 }
 
                 long timestamp = set.Frames![index].TimestampMs;
+                if (independentDetector is not null)
+                {
+                    stage = "independent-face-detection";
+                    var crossDetections = await independentDetector.DetectAsync(
+                        image, cancellationToken);
+                    independentShadow!.ObserveFrame(
+                        index + 1, timestamp, image.Size, detections,
+                        current, crossDetections);
+                }
                 if (coverageGrouper is not null && current.Count > 1)
                 {
                     sameFramePairs.AddRange(VideoFaceCoverageSensitivity.DescribeSameFrame(
@@ -519,6 +542,14 @@ public sealed class VideoFaceExperiment
             ? await shadow.EvaluateAsync((VideoFaceCataloguePersonMatcher)matcher!,
                 cancellationToken)
             : null;
+        VideoFaceCenterFaceCounterfactual? independentReview = independentShadow is not null
+            ? await independentShadow.EvaluateAsync(
+                (VideoFaceCataloguePersonMatcher)matcher!, cancellationToken)
+            : null;
+        if (independentReview is not null &&
+            (independentReview.RetainedYuNetObservations != totalFaces ||
+             shadowReview?.ObservationsEvaluated != totalFaces))
+            throw new InvalidOperationException("Independent shadow and original observation accounting diverged.");
 
         VideoFaceAggregate aggregate = new(
             1,
@@ -549,6 +580,7 @@ public sealed class VideoFaceExperiment
                         ? provisional.RankGroups(catalogueMatcher)
                         : null,
                     ShadowDbscan = shadowReview,
+                    CenterFaceCounterfactual = independentReview,
                     Coverage = coverageGrouper is null ? null : new VideoFaceCoverageReview(
                         coverageGrouper.Groups.Count,
                         coverageGrouper.Groups,
