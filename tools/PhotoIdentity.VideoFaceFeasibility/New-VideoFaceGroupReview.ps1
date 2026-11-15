@@ -976,7 +976,9 @@ if ($OpenGallery) { Invoke-Item -LiteralPath $page }
   GroupsNotRepresented=$(if ($isShadow) { [int]$groupReview.groupsNotRepresentedForReview } else { $null })
 }
  }
-$counterfactual = $clip.review.diagnostics.centerFaceCounterfactual
+$counterfactual = if ($isCenterFace) {
+  $clip.review.diagnostics.centerFaceCounterfactual
+} else { $null }
 $groupReview = if ($isCenterFace) {
   $counterfactual.corroboratedOnlyDbscan
 } elseif ($isShadow) {
