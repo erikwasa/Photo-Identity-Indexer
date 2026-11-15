@@ -1567,7 +1567,7 @@ under `%LOCALAPPDATA%\PhotoIdentity\WI0155\review-galleries` with:
 - `review-worksheet.csv` — a small shortlist of the same observations
   with blank `HumanDecision` and `ReviewerNotes` columns for private
   reviewer input.
-- `thumbnails\` — local, explicitly derived *review copies* (not model
+- `thumbnails` — local, explicitly derived *review copies* (not model
   inputs or claimed recognition artifacts). The script creates these
   only for shortlisted frames; it does not duplicate the full frame
   collection or overwrite source material.
@@ -4336,8 +4336,8 @@ one-file import restoring all three evidence sources after
 page reload.
 
 PowerShell aggregate measurement of the saved V01 combined
-CSV returned \`SchemaVersion=1\`, \`ClipAlias=V01\`,
-\`CombinedEvidenceValidated=True\`.
+CSV returned `SchemaVersion=1`, `ClipAlias=V01`,
+`CombinedEvidenceValidated=True`.
 The corresponding final PR #813 CI run was successful.
 This supersedes checkpoint 44's local-acceptance-pending
 note, but does **not** imply automatic identity/grouping
@@ -4351,4 +4351,4 @@ materially lowering human group-merge effort (V02 needed
 four merges to reach two proposed people), preserving
 genuine singleton/noise access, and explicitly deciding
 the eventual production boundary. Keep prototypes
-read-only and isolated on \`wi-0155\`.
+read-only and isolated on `wi-0155`.
