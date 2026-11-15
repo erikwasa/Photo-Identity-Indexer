@@ -2722,3 +2722,64 @@ V02 C-groups into two; actual clustering improvement,
 full same-frame membership proof, N/U singleton coverage
 beyond the 96-sample cap, no-face handling, model licensing
 and `main` integration remain open.
+
+## Experimental checkpoint 47 — PR #815 accepted, reviewed video-person presence proposals (2026-11-15)
+
+The maintainer merged PR #815, then reported **PASS on all 12**
+V02 browser checks: preview pairs, explicit consent before
+merging, correct keeper/target decisions, refusal of
+distinct-person proposals, no N/U or person-label changes,
+and a working already-labelled same-person batch.
+The operator rated review work **somewhat easier** and
+explicitly said the improvement is sufficient. This is
+**human-review ergonomics accepted**, not a claim that
+DBSCAN automatically produced fewer fragments. Do not
+continue refining merging UI without a new meaningful
+product need or rerun the full V02 review just to confirm.
+
+The next opt-in **report-only video/person presence proposal**
+consumes one source-validated V01/V02/V03 combined C/N/U CSV,
+the exact matching full-catalogue private report and its
+private still-photo person-alias map. The new
+`Measure-VideoFaceReviewedPresence.ps1` first invokes the
+existing strict four-source validators, then derives at most
+one candidate **video-to-known-person association** per
+reviewer-confirmed private P-alias. It accounts separately
+for retained/merged C-group roots and distinct N/U audit
+sample evidence. It does NOT infer identities from rank
+suggestions, nor deduplicate unknown faces or assume that
+unlabelled/cannot-tell detections are background.
+
+The pure `VideoFacePresenceResolution.psm1` requires
+all merge chains to end at an explicitly kept group,
+refuses contradictory person aliases within one merge,
+prevents labels on dismissed/unresolved groups from
+creating a presence association, and vetoes C-group
+merges whose sampled representative frames overlap.
+That check is necessary but not sufficient to prove
+non-overlap of all unsampled source members; the full
+frame-to-person safety boundary remains open. A video
+cannot be declared free of a person on these samples.
+
+Default output is **aggregate counts only**. Optional
+`-PrivateDraftPath` emits a create-new JSON under
+`%LOCALAPPDATA%\PhotoIdentity\WI0155\reviewed-presence`
+with only reviewer pseudonym aliases and bounded support
+counts; it contains no names, canonical IDs, frames,
+timestamps, embeddings or source paths. The input
+file hashes provide provenance. An existing draft cannot
+be overwritten and no database or permanent identity
+association is written.
+
+Pure Windows synthetic tests cover deduplication,
+N/U-only known evidence, UNKNOWN isolation, cycles,
+cross-person merge conflicts, selected-label misuse,
+simultaneous sampled-frame veto, and malformed audit
+labels. The existing synthetic full-report test checks
+the end-to-end V03 source-bound wrapper, zero original
+writes and create-new draft safety. The existing
+one-file C/N/U workflow is unchanged. Windows CI and
+a **single local V02 presence summary** remain pending.
+This is an isolated product-evidence handoff toward
+the required video/person association, not production
+persistence or permission to merge to `main`.
