@@ -2288,3 +2288,39 @@ checkpoint 39. `FACE-QUALITY-01`, `GROUP-QUALITY-01`,
 `CATALOGUE-TOP3-01`, `DIVERSE-VIDEOS-01` and `MERGE-01`
 remain open. `SAMPLING-01`'s two-pass V03 mechanics remain
 previously verified, but overall efficiency remains open.
+
+## Experimental checkpoint 40 — full all-candidate independent agreement measured (2026-11-15)
+
+The maintainer passed PR #808 focused tests (103/103), three governed
+model hashes, V01–V03 all-eligible read-only run, and source/accounting
+checks. 252 frames held 3,986 retained YuNet candidates. CenterFace
+corroborated **337** at confidence >=0.30 (276 at >=0.50);
+**3,649** nonmatches remain accounted for, not discarded.
+The original V03 baseline of 3,912 candidates, 64 chronological
+groups and 259 unfiltered DBSCAN clusters was **unchanged**.
+
+V03 contained 288 independently corroborated observations, forming
+18 corroborated-only DBSCAN clusters (54 cluster members) and leaving
+234 corroborated candidates as DBSCAN noise. 3,624 YuNet V03
+candidates were not corroborated, but this is **not a count of false
+detections**. Original and new grouping had no same-frame collisions.
+The measured three-clip elapsed time was about 302 seconds; no
+throughput or generalization acceptance can be inferred yet.
+
+PR #809 extends offline group and crop review to separate **C###
+corroborated groups**, **N### corroborated-but-ungrouped noise**
+and **U### noncorroborated candidate samples**. The two latter
+sample sets are quality-biased, not population estimates. Private
+CSV measurement now distinguishes sources. The review must answer
+whether C-groups contain real faces and identifiable people,
+whether N contains brief genuine faces, and whether U contains
+significant false negatives. Until human review and additional
+video evidence, no automatic rejection, threshold calibration,
+DBSCAN adoption, identity writeback or integration is justified.
+
+See operations checkpoint 40 for the Windows PowerShell 7.6
+post-merge gallery and aggregate-verification procedure.
+`FACE-QUALITY-01`, `GROUP-QUALITY-01`,
+`CATALOGUE-TOP3-01`, `DIVERSE-VIDEOS-01` and
+`MERGE-01` remain OPEN; `SAMPLING-01`'s V03
+mechanics remain verified while efficiency is pending.
