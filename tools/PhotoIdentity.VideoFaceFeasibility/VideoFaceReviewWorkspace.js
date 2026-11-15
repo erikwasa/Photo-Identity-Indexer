@@ -11,7 +11,13 @@
   if (!/^V(?!00)\d{2}$/.test(clip) || !/^[0-9a-f]{64}$/.test(hash)) return;
 
   const groups = [...document.querySelectorAll(".group-card")];
-  const audits = [...document.querySelectorAll(".ws-audit-card")];
+  // Spotlight tiles appear out of sample order in the DOM. Serialize in
+  // source/ordinal order to retain strict N/U evidence validation.
+  const audits = [...document.querySelectorAll(".ws-audit-card")].sort((a, b) => {
+    const rank = source => source === "CenterFaceNoise" ? 0 : 1;
+    return rank(a.dataset.source) - rank(b.dataset.source) ||
+      Number(a.dataset.sample.slice(1)) - Number(b.dataset.sample.slice(1));
+  });
   const status = document.getElementById("ws-status");
   const fileInput = document.getElementById("ws-file");
   const columns = [
