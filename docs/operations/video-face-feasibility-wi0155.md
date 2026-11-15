@@ -4173,3 +4173,84 @@ identity writes, no canonical still-image exemplar enrichment,
 no automatic filtering, and no `main` integration approval.
 Do not repeat video extraction or the full-catalogue model
 run merely to produce another evaluation.
+
+## Checkpoint 43 — one-entry C/N/U group-first private gallery (new; 2026-11-15)
+
+The opt-in `New-VideoFaceReviewWorkspace.ps1` is an **offline
+read-only review UX**. It calls the already validated C-group,
+N-noise and U-uncorroborated gallery builders once each, then
+augments the newly created C-group HTML with two collapsed lanes.
+The initial viewport is groups and their original top-three
+suggestions / keep-merge-dismiss controls. The N/U lanes display
+up to eight temporally spread preview crops before a second
+explicit expansion for the rest of the **sampled** audit.
+Selecting a crop opens the corresponding audited sample
+in its source gallery, where classification and CSV save/import
+happen. The three worksheets remain **separate** and compatible
+with the previous aggregate readers. The UI does not
+automatically identify, suppress or merge anything; it does
+not modify earlier evidence files or still-photo exemplars.
+
+### Local verification (Windows PowerShell 7.6)
+
+From a clean, updated isolated `wi-0155` worktree:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$ErrorActionPreference = 'Stop'
+$tools = 'tools\PhotoIdentity.VideoFaceFeasibility'
+& "$tools\Test-VideoFaceShadowGroupReview.ps1"
+if (-not $?) { throw 'WI-0155 private synthetic gallery tests failed' }
+~~~
+
+With the **existing** private `$allReport` from PR #808,
+matching `$casesPath`, approved local frames and optional
+`$allMap` for later aggregate ranking, run **one clip first**:
+
+~~~powershell
+$workspace = & "$tools\New-VideoFaceReviewWorkspace.ps1" -PrivateReportPath $allReport -PrivateCasesPath $casesPath -ClipAlias V01 -SpotlightPerLane 8 -OpenGallery
+$workspace | Format-List
+~~~
+
+V01 expected: `Groups=2`, `NoiseSamples=7`,
+`UncorroboratedSamples=19`,
+`NoiseNotRepresented=0` and
+`UncorroboratedNotRepresented=0`.
+For V02 change only `-ClipAlias V02` and expect
+`Groups=6`, `NoiseSamples=15`,
+`UncorroboratedSamples=6`, both unrepresented = 0.
+Neither run performs new catalogue queries, models or
+video extraction.
+
+1. Confirm the first page shows C-groups and existing
+   suggestions/controls. Change one temporary decision,
+   then save and re-import **only the C-group CSV**; no
+   application state or canonical identity should change.
+2. Expand N and U separately. Confirm a bounded first
+   selection (up to eight each), followed by a secondary
+   `Show more sampled crops` disclosure where applicable.
+   For V01 N=7 has no second disclosure; U=19 has 11
+   remaining crops. Check that selecting a thumbnail
+   navigates to its exact `#sample-N###` or
+   `#sample-U###` source gallery card.
+3. Label a temporary real face in each audit gallery,
+   explicitly save **separate** N and U CSVs, and
+   import each back into its own gallery. These files
+   should still work with `Measure-VideoFaceUnassignedReview.ps1`
+   using the corresponding `-AuditSource`; C groups
+   use the separate group/rank measurement source.
+4. If useful, perform the same focused V02 UI review.
+   Keep source frame/image hashes unchanged and share
+   only qualitative observations and aggregate counts.
+   No need to repeat V03 human labels or full-catalogue
+   inference. A future production implementation must
+   handle empty/no-face cases and give a path to more
+   than 96 audit samples; this prototype does not.
+
+This is deliberately **not** a new empirical detector
+evaluation. Judge whether it makes the established
+V01/V02 face evidence easier to review with manageable
+background dismissals and manual merges. If it does not,
+avoid further UI iterations without a clear high-impact
+human-usability gain. Keep `wi-0155` isolated until
+maintainer-approved integration or separate-component decision.
