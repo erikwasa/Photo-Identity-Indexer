@@ -4419,3 +4419,72 @@ manual effort for the V02 case without wrong-person
 merges. It is deliberately not a new grouping algorithm,
 automatic identity assertion or permission to integrate
 video recognition into the main application.
+
+## Checkpoint 47 — V02 merge assist accepted and private person-presence proof
+
+PR #815 merged into `wi-0155`. The maintainer completed
+all twelve browser checks: PASS. Side-by-side suggestions
+were human confirmed, conflicts remained separate,
+known-person batch consolidation changed only intended
+C-group merge targets, and the N/U classifications were
+unchanged. Review effort: **somewhat easier**, and the
+maintainer found this sufficient. No more merge-UI
+iteration is needed for this accepted slice.
+
+The next experimental script converts an **already
+saved combined** C/N/U worksheet into a read-only
+deduplicated video/person *proposal*. No video rerun,
+model inference, PostgreSQL access, source-frame
+changes or production association writes occur.
+
+### Local check after merging the follow-up PR
+
+In Windows PowerShell 7.6, after updating the isolated
+`wi-0155` worktree:
+
+~~~powershell
+$ErrorActionPreference = 'Stop'
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$tools = 'tools\PhotoIdentity.VideoFaceFeasibility'
+& "$tools\Test-VideoFacePresenceResolution.ps1"
+& "$tools\Test-VideoFaceShadowGroupReview.ps1"
+if (-not $?) { throw 'WI-0155 reviewed presence synthetic tests failed' }
+~~~
+
+Use the **matching** existing V02 full private report,
+people map, and the combined V02 CSV saved by the
+accepted gallery. You can reuse `$allReport`, `$allMap`
+and `$combinedCsv`, or prompt for their paths.
+
+~~~powershell
+$proposal = & "$tools\Measure-VideoFaceReviewedPresence.ps1" -ReviewedCsvPath $combinedCsv -PrivateGroupReportPath $allReport -PrivatePeopleMapPath $allMap -ClipAlias V02
+$proposal | Format-List
+~~~
+
+Expected `CombinedEvidenceValidated=True`,
+`PersonCoverageProven=False`,
+`ProductionAssignmentsMade=0`. The number of
+`KnownPersonPresenceProposals` depends on saved
+human P-alias labels, not model ranks. UNKNOWN is
+never treated as a single person.
+
+If a private pseudonym-only draft is useful, opt in
+to one **new** file in the approved local directory:
+
+~~~powershell
+$draftDir = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\reviewed-presence'
+$draftFile = Join-Path $draftDir ('wi0155-V02-presence-' + [guid]::NewGuid().ToString('N') + '.json')
+$proposal = & "$tools\Measure-VideoFaceReviewedPresence.ps1" -ReviewedCsvPath $combinedCsv -PrivateGroupReportPath $allReport -PrivatePeopleMapPath $allMap -ClipAlias V02 -PrivateDraftPath $draftFile
+$proposal | Format-List
+~~~
+
+**Do not upload this draft**: it contains private person
+pseudonyms. Only aggregate results and qualitative
+observations should be shared. It is neither an
+approved video-person persistence record nor evidence
+of complete detection/person recall. Remaining unknown
+and unrepresented N/U samples are accounted for,
+never silently suppressed. All changes remain outside
+`main`; CenterFace licensing, fuller corpus coverage,
+same-frame full membership proof and production
+integration decision are still outstanding.
