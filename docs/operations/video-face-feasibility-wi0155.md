@@ -4352,3 +4352,70 @@ four merges to reach two proposed people), preserving
 genuine singleton/noise access, and explicitly deciding
 the eventual production boundary. Keep prototypes
 read-only and isolated on `wi-0155`.
+
+## Checkpoint 46 — optional visual and reviewed-alias C-group merge assistance
+
+The combined offline V01/V02 workspace gains a collapsed
+**Review possible same-person group fragments** section.
+Existing report pseudonym ranks and representative frame
+numbers supply its leads and frame-collision veto.
+At most twelve shared-top-three/known-person-alias pairs
+are displayed side by side; the operator must verify a pair
+visually, explicitly tick the same-person confirmation,
+then click `Merge C... into C...`. This sets only local
+group Decision/MergeInto fields and marks the existing
+combined worksheet unsaved. It does not infer a person
+or mutate original DBSCAN assignments.
+
+For a video where the operator has already entered the same
+**known-person alias** for more than one C-group, the separate
+**Batch merge groups you already labelled as the same known person**
+action proposes a keeper, refuses overlapping representative
+frames and conflicting statuses, and requires a separate bulk
+human confirmation. UNKNOWN is excluded. This may reduce
+the mechanical four manual merges observed in V02, but
+requires correctness of the human-entered labels and a
+check for same-frame conflicts beyond the displayed
+representatives.
+
+### Focused verification once the PR is merged
+
+Synthetic Windows PowerShell:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$tools = 'tools\PhotoIdentity.VideoFaceFeasibility'
+& "$tools\Test-VideoFaceShadowGroupReview.ps1"
+if (-not $?) { throw 'Group merge assistance synthetic gallery failed' }
+~~~
+
+The merged PR CI runs `node
+tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupMergeAssist.js`
+with synthetic reviewer actions. Node is not required for
+local browser verification.
+
+With the previously approved **V02** private `$allReport`
+and `$casesPath` (without any rerun of inference), open
+the existing `New-VideoFaceReviewWorkspace.ps1` using
+`-ClipAlias V02 -OpenGallery`. Expand the collapsed
+merge-assistance pane. Confirm representative crops are
+side by side, unconfirmed rank-overlap pairs make **no**
+changes, selecting a pair requires explicit acknowledgement,
+and a confirmed pair writes only Decision/MergeInto.
+For a reversible test, set two verified-same-person C
+groups to the same private P... alias, preview the batch,
+confirm once, then verify the original group cards show
+one kept group with the other merged into it. Keep
+two visibly different people labelled separately; the
+batch must not propose merging them. N/U inline
+classification and **one combined CSV save/import** must
+still work. The user may close without saving test
+changes. Avoid comparing identities by source group
+rank alone. Only share aggregate feedback; private crop
+files and aliases remain local.
+
+**Acceptance pending**: whether this removes meaningful
+manual effort for the V02 case without wrong-person
+merges. It is deliberately not a new grouping algorithm,
+automatic identity assertion or permission to integrate
+video recognition into the main application.
