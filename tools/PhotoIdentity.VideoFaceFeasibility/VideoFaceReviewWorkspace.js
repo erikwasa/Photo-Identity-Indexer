@@ -84,6 +84,15 @@
     card.addEventListener("change", () => { dirty = true; refresh(); });
   }
 
+  // The existing quick-dismiss handler updates its select programmatically,
+  // so also observe the button to mark the combined worksheet unsaved.
+  for (const card of groups) {
+    card.querySelector(".quick-dismiss").addEventListener("click", () => {
+      dirty = true;
+      refresh();
+    });
+  }
+
   const quote = text => '"' + String(text ?? "").replaceAll('"', '""') + '"';
   const serialize = rows => "\uFEFF" + [
     columns.map(quote).join(","),
