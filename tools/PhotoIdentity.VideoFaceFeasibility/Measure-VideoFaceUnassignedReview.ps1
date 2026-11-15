@@ -47,7 +47,9 @@ try {
         throw 'Private report does not identify the requested video once.'
     }
     $isCenterFace = $AuditSource -cne 'Provisional'
-    $cf = $clips[0].review.diagnostics.centerFaceCounterfactual
+    $cf = if ($isCenterFace) {
+        $clips[0].review.diagnostics.centerFaceCounterfactual
+    } else { $null }
     if ($isCenterFace -and (
         $null -eq $cf -or [int]$cf.schemaVersion -ne 1 -or
         [int]$cf.retainedYuNetObservations -ne
