@@ -54,7 +54,9 @@ if ($report.schemaVersion -ne 1 -or $cases.schemaVersion -ne 1 -or
 }
 $clip = $clips[0]
 $isCenterFace = $AuditSource -cne 'Provisional'
-$counterfactual = $clip.review.diagnostics.centerFaceCounterfactual
+$counterfactual = if ($isCenterFace) {
+    $clip.review.diagnostics.centerFaceCounterfactual
+} else { $null }
 if ($isCenterFace) {
     if ($null -eq $counterfactual -or [int]$counterfactual.schemaVersion -ne 1 -or
         [int]$counterfactual.retainedYuNetObservations -ne
