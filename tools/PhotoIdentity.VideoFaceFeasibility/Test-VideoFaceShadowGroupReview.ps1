@@ -297,6 +297,10 @@ try {
         $hub.Contains('review-workspace.js') -and
         $hub.Contains('class="ws-audit-card"') -and
         $hub.Contains('Face classification')) 'Incomplete group-first workspace.'
+    Check ((Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\N001.png') -PathType Leaf) -and
+        (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\U001.png') -PathType Leaf) -and
+        $hub.Contains('audit-previews/N001.png') -and
+        $hub.Contains('audit-previews/U001.png')) 'Local private audit previews are missing.'
     Check ((Get-Content -LiteralPath $workspace.NoiseGalleryPath -Raw).Contains(
         'id="sample-N003"') -and
         (Get-Content -LiteralPath $workspace.UncorroboratedGalleryPath -Raw).Contains(
