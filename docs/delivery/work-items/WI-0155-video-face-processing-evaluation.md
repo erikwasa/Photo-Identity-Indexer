@@ -2566,3 +2566,51 @@ faces, representative corpus, Windows runtime,
 CenterFace licensing/training rights, and explicit choice of
 video-component versus in-app boundary still require decisions.
 No changes may target `main` without maintainer sign-off.
+
+## Experimental checkpoint 44 — single-save C/N/U review repair (2026-11-15)
+
+The maintainer merged PR #812 and passed its Windows synthetic tests,
+but **did not accept the browser workflow as more convenient**.
+Although C/N/U evidence appeared together, C decisions used one
+explicit save picker and the separate N/U audit pages each downloaded
+a default-named CSV; review still required three saves, renames and
+manual moves. This is a meaningful usability failure, despite
+correct underlying report/CSV validation.
+
+The follow-up adds one combined **C + N + U worksheet** in the
+existing private group-first page. N/U thumbnails now have their
+own face classification and optional private alias controls
+directly beneath each crop; linking to the earlier source gallery
+still allows enlarged/context review. A single `Save all C/N/U`
+action uses the browser file picker when supported (otherwise one
+uniquely named fallback download per save). `Import combined CSV`
+restores all three sets of decisions with all-or-nothing
+clip/source/report-hash/crop-identity validation. Previous
+individual galleries and source-specific CSV readers remain
+available, but are not required for the combined workflow.
+
+The new `Measure-VideoFaceReviewWorkspace.ps1` takes the
+**one combined CSV** and the existing matching private report,
+people map and clip alias. It checks source identifiers, clip and
+SHA-256, splits the worksheet into temporary private C/N/U CSVs
+and delegates to the existing strict group/rank/noise/disagreement
+validators, then deletes the temporary files. Only aggregate
+metrics are returned. No new model inference, database access,
+automatic identification/merging or still-exemplar enrichment.
+
+Synthetic regression covers combined source-bound aggregation,
+correct top-three preservation, N/U classifications, rejection
+of wrong report hashes, cross-source rows and duplicated samples;
+the existing Windows suite also checks source-frame immutability.
+**Local acceptance pending** for one save picker, one combined
+CSV re-import, labels and comments retained across all three
+sections, and matching aggregate output. Previously saved separate
+V01 C/N/U CSVs remain valid under the old measurement scripts;
+this change does not silently overwrite or migrate them.
+
+The earlier V01/V02 recognition and grouping conclusions remain
+unchanged. This addresses a **workflow defect**, not unresolved
+automatic person-group consolidation, unrepresented evidence
+outside the capped 96 samples, no-face inputs, CenterFace model
+rights or future integration scope. Keep all changes isolated
+from `main` pending explicit maintainer approval.
