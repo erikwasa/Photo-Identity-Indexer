@@ -10,6 +10,64 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## Current maintainer direction — after PR #809 human review (2026-11-15)
+
+**Prioritize a usable production review over perfect recognition scores or more
+V03-only experiments.** The practical goal is to show *as few groups per
+actual person as reasonable* (ideally one), avoid repeatedly asking the user
+to dismiss background objects, and provide a reviewable path for every face
+that a human could identify, including brief/single-frame appearances.
+Manual merges/splits and false-group dismissals also count toward review
+burden; reducing cluster count by hiding genuine faces is not progress.
+A correct existing-person suggestion anywhere in the top three is excellent
+when available, **not a mandatory outcome for every face or person**.
+Unknown/ambiguous/manual identification is normal and must remain possible.
+
+**Separate the evaluation roles of the clips.** V03 is a hard,
+distant/oblique, low-quality case useful for face discovery, background
+rejection, over-splitting, missed-singleton and grouping stress tests.
+The maintainer did **not** review top-three suggestion accuracy during the
+PR #809 V03 human review, and does not consider V03 suitable as the deciding
+top-three benchmark. The audit script's 0/3 top-three result on three
+labelled C-groups is a valid computational comparison *for those selected
+groups*, but it is **not a human-reviewed judgement of suggestion utility
+or a general recognition failure**. Use V01 and V02 first for top-three
+suggestion usefulness, if their real crops are sufficiently identifiable;
+add only a few specifically approved, already-local representative videos
+if V01/V02 cannot answer that question.
+
+**Time-box the remaining exploratory work.** Prefer reviewing existing
+V01/V02 C-groups, corroborated DBSCAN noise and noncorroborated samples
+from the existing PR #808 report, without new model inference, database
+queries or extraction. Inspect per-video recognizable-person coverage,
+false/background groups, manual merges, noise/singleton survival, and
+qualitative top-three usefulness on human-identifiable faces. Only make
+a focused implementation change and re-test if the evidence points to
+a substantial reduction in review effort or meaningful person-coverage
+gain. Stop further threshold sweeps, V03 recognition tuning and
+ever-larger review samples when progress is marginal; record the
+remaining limitations and choose a smallest safe next slice or a
+deferred follow-up. Keep the human-governed three-tier workflow and
+original-video/still-exemplar isolation rules unchanged.
+
+**Status as of this review:** PR #809's PowerShell synthetic gallery/rank
+test and three V03 galleries passed locally; all four private aggregate
+measurement scripts completed with validated evidence. Of the
+corroborated-only V03 **18 C-groups**, the reviewer kept 3, marked 15
+for merge, dismissed 0 and left 0 unresolved. This is **3 proposed
+final groups after human decisions**, *not* 3 automatically generated
+groups over all V03 faces: only 54 of 288 corroborated candidates were
+clustered; 234 corroborated candidates remained DBSCAN noise. In
+96 quality-biased N samples, 69 were labelled real faces, 0 background,
+27 uncertain, with three known people represented. In 96 quality-biased
+U samples, 15 were labelled real faces, 67 background, 14 uncertain,
+with two known people represented. Neither sample is a population
+precision/recall estimate. CenterFace must remain advisory; it may
+prioritize candidates but cannot safely discard the uncorroborated
+true faces. See operations checkpoint 41 for the precise next
+low-burden review and stop/go decision.
+
+
 **Current video-level review requirement (maintainer, 2026-11-10):**
 The review output is a small set of **provisional face/person groups per
 video**, each showing several of its best crops plus top 2–3
@@ -104,7 +162,10 @@ from a small reviewed test suite.
   faces. Keep genuine uncertain/ungrouped evidence visible instead of
   silently discarding it at a fixed 64-group ceiling. Prefer fewer
   review groups but prioritize person coverage and zero known
-  wrong-person merges over perfect compression.
+  wrong-person merges over perfect compression. Count the operator's
+  required manual merges/splits as workload; aim for one coherent
+  review group per person wherever achievable without hiding a
+  genuine singleton or incorrectly joining different people.
 - [ ] **SAMPLING-01 — Content- and duration-adaptive frames.**
   The count of **frames sampled per video** (not frames per image)
   is decided from the duration and observed content, rather than
@@ -136,23 +197,31 @@ from a small reviewed test suite.
   model/hash/alignment, eligible assignment filtering, stable
   snapshot provenance, privacy and separate read-only access.
   An initial proof may rank human-confirmed true-face crops independently
-  of noisy groups; final acceptance requires group-level suggestions.
+  of noisy groups; final acceptance requires group-level suggestions
+  on **suitably identifiable** V01/V02 or additional approved cases.
+  A correct top-three suggestion is valuable but is not required for
+  every difficult face. Do not use the unreviewed-for-suggestions V03
+  PR #809 0/3 as a hard merge blocker, chase automatic assignment,
+  or tune thresholds merely to raise that single metric.
   Do not auto-assign, create canonical tags or enrich photo
   identity references with video crops/embeddings.
-- [ ] **DIVERSE-VIDEOS-01 — Expand the evaluation corpus.**
-  Retain V01–V03 as historical/regression cases (V03 especially
-  for hard distant-face/background grouping) and add **several
-  explicitly approved, already-local videos**, preferably four
-  to six if practical, spanning lighting, strong colour changes,
-  camera/subject motion, people entering/leaving or crossing,
-  identifiable people in the foreground and background,
-  short appearances, multiple known people, unknown people and
-  no-face/background negatives. Annotate by a human who is
+- [ ] **DIVERSE-VIDEOS-01 — Evaluate a small representative corpus.**
+  Keep V01–V03 as regression cases: use V03 for the unusually
+  hard distant-face/background-grouping workload, **V01/V02 first**
+  for top-three utility where the faces are actually identifiable.
+  Reuse existing private results before any rerun. Only if necessary,
+  add a small number of expressly approved, already-local videos
+  that cover a material gap (clear known faces, short appearances,
+  overlapping people, unknown people or no-face negatives). Do not
+  impose a four-to-six-new-video quota or keep evaluating without
+  meaningful information gain. Annotate by a human who is
   actually visually identifiable and which intervals/persons
-  may be missed; an image of a person's body is not necessarily
-  a recognisable face. Measure per-video actual-person coverage,
-  false/fragmented/merged group burden, top-3 success, reviewed
-  workload, sample count and time. Avoid tuning solely to V03.
+  may be missed; a body without a recognizable face does not count.
+  Record per-video recognizable-person coverage, false/background
+  groups, human merges/splits, surviving noise/singletons, optional
+  top-three successes/uncertainty, review effort and processing cost.
+  Stop once the evidence supports a bounded decision about a safe
+  useful next slice; avoid tuning solely to V03.
 - [ ] **MERGE-01 — Safety, integration and operator sign-off.**
   Reconcile `wi-0155` with current `main`; verify focused
   and repository tests, Windows PowerShell 7.6 synthetic tools,
@@ -2324,3 +2393,45 @@ post-merge gallery and aggregate-verification procedure.
 `CATALOGUE-TOP3-01`, `DIVERSE-VIDEOS-01` and
 `MERGE-01` remain OPEN; `SAMPLING-01`'s V03
 mechanics remain verified while efficiency is pending.
+
+## Experimental checkpoint 41 — PR #809 reviewed; target product usefulness (2026-11-15)
+
+**Local PR #809 technical and human-review verification: PASS.** The
+PowerShell 7.6 synthetic test and C/N/U gallery generation passed, and
+all four matching private measurement readers completed with validated
+evidence and source-specific CSV checks. V03's CenterFace corroborated
+subset yielded 18 C-groups (54 members), human-reviewed as 3 kept
+plus 15 merges, zero dismissed/split/uncertain/unreviewed, giving
+3 **proposed** final groups. The independent script's
+`RetainedGroups=18` includes merge rows: it does not contradict
+`ProposedFinalGroups=3`. There were 234 additional corroborated
+DBSCAN noise observations; of 96 biased samples, 69 were labelled
+real faces belonging to three distinct known people, 27 uncertain,
+zero background. Of 96 biased uncorroborated U samples from 3,624
+candidates, 15 were real faces belonging to two distinct known
+people, 67 background and 14 uncertain. More clusters eliminated
+does **not** equate to that many saved production review decisions;
+all real-face noise/unconfirmed detections need a safe path.
+
+**Identity suggestion results are deliberately not accepted or
+rejected from this review.** The operator did not inspect top-three
+suggestions; the measured 0/3 on the three kept C-groups is valid
+for those labels but is not an appropriate assessment of full
+catalogue suggestion value on V03. Catalogue 241 canonical /
+240 eligible / 596 exemplars and read-only evidence accounting
+were validated. Reassess suggestions only on visually suitable
+V01/V02 and, if needed, a few better-quality approved clips.
+
+**Next smallest evidence step:** reuse the already generated PR #808
+all-eligible report and private case/people map to review V01/V02
+CenterFace C-groups (2 and 6), corroborated noise (7 and 15
+observations) and uncorroborated samples (19 and 6). Do not
+re-run inference just to produce another diagnostic. Judge *total*
+human burden, recognizable-person discovery, wrong merges and
+suggestion utility on suitable crops. If there is clear progress,
+choose one contained implementation improvement, with one
+focused comparison; otherwise stop the exploratory ablations
+and define the smallest safe production-oriented pilot and
+remaining limitations, subject to maintainer approval. No
+automatic suppression, canonical writes, source hydration,
+still-image exemplar enrichment or main-branch promotion.
