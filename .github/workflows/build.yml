@@ -163,6 +163,9 @@ jobs:
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_manual_quality_suggestions.ps1'
             'tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/VideoFacePresenceResolution.psm1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/Measure-VideoFaceReviewedPresence.ps1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceResolution.ps1'
           )
           foreach ($script in $scripts) {
             $tokens = $null
