@@ -2664,3 +2664,61 @@ catalogue exemplar enrichment or `main` integration
 is authorized. No-face/empty-source handling, capped
 N/U sampling coverage, licensing/packaging and production
 integration boundary remain open.
+
+## Experimental checkpoint 46 — human-confirmed C-group merge assistance (implementation; local review pending)
+
+The merged PR #813 one-save C/N/U workflow and its validated
+CSV remain the accepted foundation. This development increment adds
+**optional reviewed-group merge assistance** to the private
+CenterFace C-group workspace, without recomputing faces, SFace
+embeddings, DBSCAN memberships or existing catalogue rankings.
+
+- A collapsed **possible same-person fragments** pane shows up to
+  twelve candidate group pairs with side-by-side existing
+  representative crops. A pair is a *review lead* if the two
+  groups share a catalogue top-three alias, or if the operator
+  has explicitly selected the same known-person alias.
+  Rank overlap is not calibrated, and it is NOT an identity or
+  automatic merge. The reviewer must separately tick an
+  explicit same-person/simultaneous-face confirmation and
+  click the corresponding merge action. Other groups remain
+  available through their original manual controls.
+- A separate **reviewer-labelled batch consolidation** proposes
+  a target for each repeat of an operator-entered known-person
+  alias (never UNKNOWN), preferring an already kept group,
+  then a larger group. It applies eligible merges only
+  after one explicit bulk confirmation and never changes
+  a SelectedPerson value. This reduces *mechanical*
+  review actions after identities are established; it does
+  not change automatic clustering quality.
+- Both paths refuse groups already marked Merge, Dismiss,
+  Split or Cannot tell, refuse distinct nonempty selected
+  person aliases, and refuse pairs with **overlapping
+  representative frame numbers**. This is a necessary
+  review veto, not a proof that groups never overlapped in
+  frames absent from the representative crop subset.
+  The reviewer must still check that they depict the same
+  person and never merge simultaneously visible distinct faces.
+- Only existing `Decision` / `MergeInto` fields are written
+  in the private **combined** C/N/U worksheet when the user
+  explicitly saves; N/U decisions, source counts, model
+  evidence and the validated CSV schema are unchanged.
+  No persistent group or person writes, inferred identities,
+  video extraction, additional model inference or
+  catalogue reference enrollment occur.
+
+Windows PowerShell gallery tests now check the C-group
+rank/frame attributes, merge-pane HTML and copied script.
+A dependency-free Node synthetic test exercises explicit
+confirmations, rank-only no-auto-merge, distinct-person
+conflicts, representative-frame veto, chosen target,
+known-alias batch and invalidation after edits; the Windows
+CI workflow invokes it. Real Windows browser acceptance,
+and whether V02's four manual merges are practically less
+burdensome, remain **pending**. Previous V01/V02 group
+quality baselines remain unchanged and are not replayed.
+No claim is made that this automatically consolidates six
+V02 C-groups into two; actual clustering improvement,
+full same-frame membership proof, N/U singleton coverage
+beyond the 96-sample cap, no-face handling, model licensing
+and `main` integration remain open.

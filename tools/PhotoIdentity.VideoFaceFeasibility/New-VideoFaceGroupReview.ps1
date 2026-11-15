@@ -374,9 +374,22 @@ foreach ($row in $rows) {
     $rankHtml='<div class="ranked"><strong>Top-{0} catalogue suggestions</strong><small> · {1}</small><ol>{2}</ol></div>' -f
       $ranked.Count,(Esc $status),$list
   }
-  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="{6}"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
+  # A private review hint only: catalogue aliases and frames from the
+  # already-validated representative crops. These are NOT automatic merges.
+  $hintAttributes = ''
+  if ($isCenterFace) {
+    $topAliases = @($rankings[$row.Group].topCandidates |
+      ForEach-Object { [string]$_.alias }) -join ','
+    $frameNumbers = @($imgs | ForEach-Object {
+      [int]$_.Box.frameNumber
+    } | Sort-Object -Unique) -join ','
+    $hintAttributes = (' data-rank-aliases="{0}" data-sampled-frames="{1}"' -f
+      (Esc $topAliases),(Esc $frameNumbers))
+  }
+  $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"{7}><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="{6}"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
     (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures,$rankHtml,
-    $(if ($isCenterFace) { 'C002' } elseif ($isShadow) { 'D002' } else { 'G002' })))
+    $(if ($isCenterFace) { 'C002' } elseif ($isShadow) { 'D002' } else { 'G002' }),
+    $hintAttributes))
 }
 $html.Add('</div><p class="note">These are experimental candidate groups, not confirmed people. Export your review CSV before leaving; do not mix G-prefixed baseline and D-prefixed shadow worksheets.</p></main><script src="group-review.js"></script></body></html>')
 $page=Join-Path $folder 'group-review.html'

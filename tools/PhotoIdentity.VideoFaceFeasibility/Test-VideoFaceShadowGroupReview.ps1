@@ -204,6 +204,8 @@ try {
     Check ($cfHtml.Contains('C001') -and
         $cfHtml.Contains('crops/V03-C001-01.png') -and
         $cfHtml.Contains('128 were NOT corroborated') -and
+        $cfHtml.Contains('data-rank-aliases="P0001,P0002,P0003"') -and
+        $cfHtml.Contains('data-sampled-frames="1"') -and
         -not $cfHtml.Contains('crops/V03-D001-01.png')) 'CenterFace gallery not isolated.'
     $cfRows = @(Import-Csv -LiteralPath $cfGallery.WorksheetPath)
     Check ($cfRows.Count -eq 1 -and $cfRows[0].Group -ceq 'C001') 'Corroborated CSV alias incorrect.'
@@ -295,8 +297,14 @@ try {
         $hub.Contains('id="ws-save"') -and
         $hub.Contains('id="ws-import"') -and
         $hub.Contains('review-workspace.js') -and
+        $hub.Contains('id="ws-merge-assist"') -and
+        $hub.Contains('id="ws-merge-batch-apply"') -and
+        $hub.Contains('id="ws-merge-batch-confirm"') -and
+        $hub.Contains('merge-assist.js') -and
         $hub.Contains('class="ws-audit-card"') -and
         $hub.Contains('Face classification')) 'Incomplete group-first workspace.'
+    Check ((Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'merge-assist.js') -PathType Leaf) -and
+        (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'merge-assist.js') -Raw).Contains('batchPlan(')) 'Private merge assistant script missing.'
     Check ((Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\N001.png') -PathType Leaf) -and
         (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\U001.png') -PathType Leaf) -and
         $hub.Contains('audit-previews/N001.png') -and
