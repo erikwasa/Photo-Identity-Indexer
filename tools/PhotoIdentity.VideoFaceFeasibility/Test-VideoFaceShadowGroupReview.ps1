@@ -361,6 +361,41 @@ try {
         $measured.NoiseMetrics.RealFaceSamples -eq 1 -and
         $measured.UncorroboratedMetrics.SampledObservations -eq 2 -and
         $measured.UncorroboratedMetrics.RealFaceSamples -eq 1) 'Combined worksheet measurement changed source evidence.'
+    $presenceCmd = Join-Path $PSScriptRoot 'Measure-VideoFaceReviewedPresence.ps1'
+    $presence = & $presenceCmd @combinedArgs
+    Check ($presence.CombinedEvidenceValidated -and
+        $presence.KnownPersonPresenceProposals -eq 1 -and
+        $presence.KnownPeopleFromRetainedGroups -eq 1 -and
+        $presence.KnownPeopleFromAuditsOnly -eq 0 -and
+        $presence.ReviewerKeptGroupRoots -eq 1 -and
+        $presence.ReviewerMergeActions -eq 0 -and
+        $presence.RealFaceNoiseSamples -eq 1 -and
+        $presence.RealFaceUncorroboratedSamples -eq 1 -and
+        $presence.RealFaceAuditSamplesUnidentified -eq 2 -and
+        $presence.UnreviewedAuditSamples -eq 3 -and
+        $presence.UnsampledUncorroboratedObservations -eq 126 -and
+        -not $presence.PersonCoverageProven -and
+        $presence.ProductionAssignmentsMade -eq 0 -and
+        -not $presence.PrivateDraftWritten) 'Reviewed presence did not preserve unresolved C/N/U evidence.'
+    $draftFolder = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\reviewed-presence'
+    $privateDraft = Join-Path $draftFolder ('wi0155-V03-presence-' + [Guid]::NewGuid().ToString('N') + '.json')
+    try {
+        $withDraft = & $presenceCmd @combinedArgs -PrivateDraftPath $privateDraft
+        Check ($withDraft.PrivateDraftWritten -and
+            (Test-Path -LiteralPath $privateDraft -PathType Leaf)) 'Private proposal was not created once.'
+        $draftObject = Get-Content -LiteralPath $privateDraft -Raw | ConvertFrom-Json
+        Check ($draftObject.status -ceq 'human-reviewed-candidate-only' -and
+            @($draftObject.knownPersonProposals).Count -eq 1 -and
+            $draftObject.knownPersonProposals[0].personAlias -ceq 'P0002' -and
+            $draftObject.knownPersonProposals[0].retainedGroupRoots -eq 1 -and
+            -not $draftObject.personCoverageProven) 'Private person support was not deduplicated.'
+        Check (Refused { & $presenceCmd @combinedArgs -PrivateDraftPath $privateDraft }) 'Private draft was overwritten.'
+    } finally {
+        if (Test-Path -LiteralPath $privateDraft -PathType Leaf) {
+            Remove-Item -LiteralPath $privateDraft -Force
+        }
+    }
+    Write-Host 'Synthetic reviewed person presence proposal: PASS'
     $unified[1].AuditReportSha256 = ('f' * 64)
     $unified | Export-Csv -LiteralPath $unifiedCsv -NoTypeInformation -Encoding utf8
     Check (Refused { & $unifiedCmd @combinedArgs }) 'Combined worksheet accepted wrong source report hash.'
