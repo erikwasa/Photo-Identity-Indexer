@@ -215,12 +215,16 @@ try {
         ReviewedCsvPath=$cfCsv;PrivateGroupReportPath=$reportPath
         ClipAlias='V03';GroupSource='CenterFaceShadow'
     }
+    Write-Host 'Synthetic CenterFace C-group aggregate: START'
     $cfCounts = & $measureCmd @cfMeasureArgs
+    Write-Host 'Synthetic CenterFace C-group aggregate: PASS'
     Check ($cfCounts.GroupSource -ceq 'CenterFaceShadow' -and
         $cfCounts.TotalGroups -eq 1 -and
         $cfCounts.AssignedGroupObservations -eq 2 -and
         $cfCounts.ObservationsUnassigned -eq 3) 'Corroborated group count mismatch.'
+    Write-Host 'Synthetic CenterFace C-group ranks: START'
     $cfRanks = & $rankCmd @cfMeasureArgs -PrivatePeopleMapPath $mapPath
+    Write-Host 'Synthetic CenterFace C-group ranks: PASS'
     Check ($cfRanks.InputEvidenceValidated -and
         $cfRanks.CorroboratedCandidateSubset -eq 5 -and
         $cfRanks.CorrectTop3Groups -eq 1) 'Corroborated-only rank mismatch.'
@@ -248,6 +252,7 @@ try {
         $auditRows[0].Label='Real face'
         $reviewedAudit=Join-Path $private ("$auditSource-reviewed.csv")
         $auditRows | Export-Csv -LiteralPath $reviewedAudit -NoTypeInformation -Encoding utf8
+        Write-Host "Synthetic private sample aggregate $auditSource : START"
         $auditStats=& $auditMeasureCmd -ReviewedCsvPath $reviewedAudit `
             -PrivateGroupReportPath $reportPath -ClipAlias V03 -AuditSource $auditSource
         Check ($auditStats.SourceEvidenceValidated -and
@@ -293,7 +298,9 @@ try {
         ReviewedCsvPath=$csv;PrivateGroupReportPath=$reportPath
         ClipAlias='V03';GroupSource='ShadowDbscan'
     }
+    Write-Host 'Synthetic original D-group aggregate: START'
     $counts = & $measureCmd @argsForMeasure
+    Write-Host 'Synthetic original D-group aggregate: PASS'
     Check ($counts.TotalGroups -eq 64 -and $counts.GroupsReviewed -eq 64 -and
         $counts.AssignedGroupObservations -eq 128 -and
         $counts.ObservationsUnassigned -eq 5 -and
