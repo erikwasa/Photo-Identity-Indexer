@@ -13,6 +13,8 @@ param(
     [Parameter(Mandatory)][string]$PrivateReportPath,
     [Parameter(Mandatory)][string]$PrivateCasesPath,
     [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
+    [ValidateSet('Provisional','CenterFaceUncorroborated','CenterFaceNoise')]
+    [string]$AuditSource = 'Provisional',
     [ValidateRange(240, 640)][int]$CropLongEdge = 512,
     [switch]$OpenGallery
 )
@@ -54,18 +56,54 @@ if ($report.schemaVersion -ne 1 -or $cases.schemaVersion -ne 1 -or
     throw 'Audit report and private cases do not identify exactly one matching clip.'
 }
 $clip = $clips[0]
-$review = $clip.review.diagnostics.provisionalGroups
-$audit = $review.unassignedAudit
-if ($null -eq $review -or $review.schemaVersion -ne 1 -or
-    [int]$review.maximumGroups -ne 64 -or
-    [int]$review.observationsConsidered -ne [int]$clip.review.aggregate.facesDetected -or
-    [int]$review.observationsAssigned + [int]$review.observationsUnassigned -ne
-      [int]$review.observationsConsidered -or
+$isCenterFace = $AuditSource -cne 'Provisional'
+$counterfactual = if ($isCenterFace) {
+    $clip.review.diagnostics.centerFaceCounterfactual
+} else { $null }
+if ($isCenterFace) {
+    if ($null -eq $counterfactual -or [int]$counterfactual.schemaVersion -ne 1 -or
+        [int]$counterfactual.retainedYuNetObservations -ne
+          [int]$clip.review.aggregate.facesDetected -or
+        [int]$counterfactual.corroboratedAt030 + [int]$counterfactual.notCorroboratedAt030 -ne
+          [int]$counterfactual.retainedYuNetObservations -or
+        [int]$counterfactual.corroboratedAt050 -gt [int]$counterfactual.corroboratedAt030 -or
+        [int]$counterfactual.corroboratedOnlyDbscan.observationsEvaluated -ne
+          [int]$counterfactual.corroboratedAt030 -or
+        [int]$counterfactual.corroboratedOnlyDbscan.clusterMembers +
+          [int]$counterfactual.corroboratedOnlyDbscan.noiseObservations -ne
+          [int]$counterfactual.corroboratedAt030 -or
+        [int]$counterfactual.corroboratedOnlyDbscan.sameFrameCollisions -ne 0) {
+        throw 'Inconsistent independent-detector counterfactual evidence.'
+    }
+}
+$review = if ($AuditSource -ceq 'Provisional') {
+    $clip.review.diagnostics.provisionalGroups
+} elseif ($AuditSource -ceq 'CenterFaceNoise') {
+    $counterfactual.corroboratedOnlyDbscan
+} else { $counterfactual }
+$audit = if ($AuditSource -ceq 'Provisional') {
+    $review.unassignedAudit
+} elseif ($AuditSource -ceq 'CenterFaceNoise') {
+    $review.noiseAudit
+} else { $review.notCorroboratedAudit }
+$expectedTotal = if ($AuditSource -ceq 'Provisional') {
+    [int]$review.observationsUnassigned
+} elseif ($AuditSource -ceq 'CenterFaceNoise') {
+    [int]$review.noiseObservations
+} else { [int]$review.notCorroboratedAt030 }
+if ($null -eq $review -or [int]$review.schemaVersion -ne 1 -or
     $null -eq $audit -or [int]$audit.schemaVersion -ne 1 -or
     [int]$audit.maximumReviewSamples -ne 96 -or
     [int]$audit.temporalStrata -ne 12 -or
-    [int]$audit.totalUnassignedObservations -ne [int]$review.observationsUnassigned) {
-    throw 'Report does not contain a consistent bounded WI-0155 unassigned audit.'
+    [int]$audit.totalUnassignedObservations -ne $expectedTotal) {
+    throw 'Missing or inconsistent private review audit.'
+}
+if (-not $isCenterFace -and (
+    [int]$review.maximumGroups -ne 64 -or
+    [int]$review.observationsConsidered -ne [int]$clip.review.aggregate.facesDetected -or
+    [int]$review.observationsAssigned + [int]$review.observationsUnassigned -ne
+      [int]$review.observationsConsidered)) {
+    throw 'Original provisional group audit counts are inconsistent.'
 }
 
 $samples = @($audit.sampledCrops | Sort-Object timestampMs,frameNumber,faceNumber)
@@ -75,16 +113,18 @@ if ($samples.Count -lt 1 -or $samples.Count -gt 96 -or
     [int]$audit.strataRepresented -gt 12) {
     throw 'Invalid private audit sample count.'
 }
-if (@($review.groups).Count -ne 64 -or
-    [int]$review.observationsUnassigned -lt 1) {
-    throw 'An unassigned capacity audit requires all 64 provisional groups.'
-}
-$assigned = 0
-foreach ($group in @($review.groups)) {
-    $assigned += [int]$group.observations
-}
-if ($assigned -ne [int]$review.observationsAssigned) {
-    throw 'Original grouped observations do not reconcile.'
+if (-not $isCenterFace) {
+    if (@($review.groups).Count -ne 64 -or
+        [int]$review.observationsUnassigned -lt 1) {
+        throw 'An unassigned capacity audit requires all 64 provisional groups.'
+    }
+    $assigned = 0
+    foreach ($group in @($review.groups)) {
+        $assigned += [int]$group.observations
+    }
+    if ($assigned -ne [int]$review.observationsAssigned) {
+        throw 'Original grouped observations do not reconcile.'
+    }
 }
 
 $manifestPath = LocalFile ([string]$matches[0].manifest) (16KB)
@@ -143,7 +183,8 @@ for ($i=0; $i -lt $samples.Count; $i++) {
     if (-not $perFrame.ContainsKey($frameKey)) { $perFrame[$frameKey]=0 }
     $strata[$stratumKey]++
     $perFrame[$frameKey]++
-    if ($strata[$stratumKey] -gt 8 -or $perFrame[$frameKey] -gt 2) {
+    if (($AuditSource -cne 'CenterFaceNoise' -and $strata[$stratumKey] -gt 8) -or
+        $perFrame[$frameKey] -gt 2) {
         throw 'Unassigned sample exceeds temporal or per-frame audit bounds.'
     }
 
@@ -152,7 +193,11 @@ for ($i=0; $i -lt $samples.Count; $i++) {
         throw 'Invalid approved private source frame filename.'
     }
     $file = LocalFile (Join-Path $frameFolder $filename) (8MB)
-    $id = 'S{0:D3}' -f ($i + 1)
+    $id = ('{0}{1:D3}' -f $(switch ($AuditSource) {
+        'CenterFaceUncorroborated' { 'U' }
+        'CenterFaceNoise' { 'N' }
+        default { 'S' }
+    }),($i + 1))
     $rows.Add([pscustomobject][ordered]@{
         Clip=$ClipAlias
         AuditReportSha256=$reportHash
@@ -167,7 +212,8 @@ for ($i=0; $i -lt $samples.Count; $i++) {
         Stratum=$stratum+1
     })
 }
-if ($strata.Count -ne [int]$audit.strataRepresented) {
+if ($AuditSource -cne 'CenterFaceNoise' -and
+    $strata.Count -ne [int]$audit.strataRepresented) {
     throw 'Private audit strata do not match declared review evidence.'
 }
 
@@ -178,7 +224,8 @@ if (((Get-Item -LiteralPath $outputRoot -Force).Attributes -band
     throw 'Private unassigned-review output directory must be regular.'
 }
 $output = Join-Path $outputRoot (
-    'audit-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '-' +
+    ('audit-' + $AuditSource.ToLowerInvariant() + '-') +
+    (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '-' +
     [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $output | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $output 'crops') | Out-Null
@@ -282,6 +329,22 @@ try {
             $task.Confidence,$task.Quality))
     }
     $gallery[0] = $gallery[0].Replace('CLIP_ALIAS_TOKEN', (Esc $ClipAlias)).Replace('REPORT_HASH_TOKEN', $reportHash)
+    if ($isCenterFace) {
+        $sourceText = if ($AuditSource -ceq 'CenterFaceNoise') {
+            'CenterFace-corroborated DBSCAN noise (confirmed by CenterFace, not grouped)'
+        } else {
+            'YuNet candidates NOT corroborated by CenterFace (NOT confirmed background)'
+        }
+        $gallery[0] = $gallery[0].Replace('WI-0155 · Unassigned detections',
+            ('WI-0155 · ' + (Esc $sourceText)))
+        $gallery[0] = $gallery[0].Replace(
+            'PRIVATE, read-only human review of the bounded audit samples that did not join a provisional group after capacity was reached.',
+            ('PRIVATE, read-only human review of the bounded audit samples: ' +
+             (Esc $sourceText) + '.'))
+        $gallery[0] = $gallery[0].Replace(
+            'These are NOT all unassigned detections',
+            'These are NOT all observations in this category')
+    }
     $gallery.Add('</div><script src="unassigned-review.js"></script></main></body></html>')
 
     $worksheet = Join-Path $output 'unassigned-review.csv'
@@ -305,6 +368,7 @@ if ($OpenGallery) { Invoke-Item -LiteralPath $htmlFile }
     ClipAlias = $ClipAlias
     GalleryPath = $htmlFile
     WorksheetPath = $worksheet
+    AuditSource = $AuditSource
     SampledCrops = $rows.Count
     TotalUnassignedObservations = [int]$audit.totalUnassignedObservations
     UnrepresentedObservations = [int]$audit.totalUnassignedObservations - $rows.Count

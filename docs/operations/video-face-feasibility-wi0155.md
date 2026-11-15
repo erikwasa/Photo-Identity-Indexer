@@ -3906,3 +3906,136 @@ whether identifiable known people and top-three ranks improve;
 and whether results generalize to additional varied videos. Never
 auto-delete non-matching candidates, merge into main, or distribute
 provisionally governed model weights on this evidence alone.
+
+## Checkpoint 40 — V01–V03 full-candidate CenterFace shadow: local verification PASS (2026-11-15)
+
+**Confirmed maintainer results for merged PR #808:** focused tests
+**103/103 PASS**, YuNet/SFace/CenterFace models verified against
+governed manifests, V01–V03 SELECT-only all-eligible run PASS,
+complete per-clip observation accounting PASS, original V03 baseline
+PASS, no same-frame collisions. **252 approved source frames** held
+**3,986 retained YuNet candidates**; CenterFace (IoU >= 0.25)
+corroborated **337** at confidence >= 0.30 and **276** at >= 0.50.
+The remaining **3,649** are explicitly counted *nonmatches*, not
+verified non-faces and not discarded. All three original group
+summaries were preserved.
+
+| Clip | Frames | YuNet candidates | Corroborated 0.30 / 0.50 | Not corroborated | Corroborated-only clusters / members / DBSCAN noise |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| V01 | 36 | 36 | 17 / 14 | 19 | 2 / 10 / 7 |
+| V02 | 36 | 38 | 32 / 24 | 6 | 6 / 17 / 15 |
+| V03 | 180 | 3912 | 288 / 238 | 3624 | 18 / 54 / 234 |
+
+V03 baseline remains **64 G-groups (407 assigned / 3505
+unassigned)** and **259 original unfiltered D-clusters (2636 members /
+1276 noise)**. The new V03 corroborated-only subset contains **288
+observations**, including only **54 group members** and **234
+DBSCAN noise observations**. Moreover, 96 of the 3,624
+uncorroborated V03 candidates are sampled for *private quality-biased
+human review*. A reduction from 259 to 18 groups does NOT yet prove
+that the groups are real people; **234 corroborated noise observations
+may contain important one-frame appearances**.
+
+**Human quality decision: PENDING.** We know the earlier selected
+paving crops were rejected by CenterFace while selected face crops
+were retained; the *population* result is much more selective
+(288/3912 V03 observations). It is unsafe to call the other
+3,624 false positives. There is no authorization to suppress them.
+No new photo identities were saved and there is no production
+integration. Total runtime of the three-clip host experiment was
+301.9 seconds; this is not an accepted sustained throughput
+benchmark. The input still retained 32 of each overflowing frame's
+candidates and discarded 57 raw overflow candidates across 17
+frames, another possible real-face coverage risk.
+
+### PR #809 — offline human review of all three evidence types
+
+The existing private PowerShell galleries and aggregate measurements
+gain explicit **separate review sources**, retaining ordinary
+source selection as defaults:
+
+1. `New-VideoFaceGroupReview.ps1 -GroupSource CenterFaceShadow`
+   shows the new corroborated-only DBSCAN clusters as **C001…**
+   (distinct from original **D001…** and provisional **G001…**).
+   Group CSV choices and person-rank measurement can then be run
+   with `-GroupSource CenterFaceShadow`; baseline D/G workbooks
+   cannot silently enter the C-source measurement.
+2. `New-VideoFaceUnassignedReview.ps1 -AuditSource CenterFaceNoise`
+   shows up to 96 CenterFace-**corroborated** candidates left
+   unclustered by DBSCAN, in a private **N###** sample worksheet.
+   These candidates may represent genuine faces not grouped.
+3. `New-VideoFaceUnassignedReview.ps1 -AuditSource CenterFaceUncorroborated`
+   shows up to 96 of the YuNet candidates which **did not receive
+   an overlapping CenterFace box**, in a private **U###** worksheet.
+   A true human face in U is an experimental false negative,
+   not an error to auto-delete.
+
+The U/N samples were quality-prioritized within temporal strata:
+they are **not random and not an estimate of the full video
+population**. The three audits keep explicit independent counts
+and private source-frame location/hash/geometry constraints.
+They reuse the approved cases manifest and *existing* PR #808
+report; **no new database access, model inference or video
+frame extraction**. Only local files under LOCALAPPDATA are created.
+
+After PR #809 merges, using Windows PowerShell 7.6 in the isolated
+worktree and **already existing** `$allReport`,
+`$casesPath`, and `$allMap` (the latter contains private
+pseudonym mappings), run:
+
+~~~powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$tools = 'tools\PhotoIdentity.VideoFaceFeasibility'
+& "$tools\Test-VideoFaceShadowGroupReview.ps1"
+if (-not $?) { throw 'Synthetic gallery/rank tests failed' }
+
+$groups = & "$tools\New-VideoFaceGroupReview.ps1" `
+    -PrivateReportPath $allReport -PrivateCasesPath $casesPath `
+    -ClipAlias V03 -GroupSource CenterFaceShadow -OpenGallery
+$groups | Format-List
+
+$noise = & "$tools\New-VideoFaceUnassignedReview.ps1" `
+    -PrivateReportPath $allReport -PrivateCasesPath $casesPath `
+    -ClipAlias V03 -AuditSource CenterFaceNoise -OpenGallery
+$noise | Format-List
+
+$disagreements = & "$tools\New-VideoFaceUnassignedReview.ps1" `
+    -PrivateReportPath $allReport -PrivateCasesPath $casesPath `
+    -ClipAlias V03 -AuditSource CenterFaceUncorroborated -OpenGallery
+$disagreements | Format-List
+~~~
+
+Review **all 18 C-groups** and their representative crops,
+as many of the selected N-crops and U-crops as feasible, and
+**save each private review CSV from the HTML**. Do not post
+images, person aliases or private filenames; share only
+aggregate counts and descriptive human verdicts. For each
+saved CSV, with actual private paths from the gallery
+(save is an explicit browser action), call:
+
+~~~powershell
+$groupCsv = Read-Host 'Full path to saved C-group CSV'
+& "$tools\Measure-VideoFaceGroupReview.ps1" `
+    -ReviewedCsvPath $groupCsv -PrivateGroupReportPath $allReport `
+    -ClipAlias V03 -GroupSource CenterFaceShadow
+& "$tools\Measure-VideoFaceGroupRankAccuracy.ps1" `
+    -ReviewedCsvPath $groupCsv -PrivateGroupReportPath $allReport `
+    -PrivatePeopleMapPath $allMap -ClipAlias V03 `
+    -GroupSource CenterFaceShadow
+
+$noiseCsv = Read-Host 'Full path to saved N-noise CSV'
+& "$tools\Measure-VideoFaceUnassignedReview.ps1" `
+    -ReviewedCsvPath $noiseCsv -PrivateGroupReportPath $allReport `
+    -ClipAlias V03 -AuditSource CenterFaceNoise
+
+$nonmatchCsv = Read-Host 'Full path to saved U-nonmatch CSV'
+& "$tools\Measure-VideoFaceUnassignedReview.ps1" `
+    -ReviewedCsvPath $nonmatchCsv -PrivateGroupReportPath $allReport `
+    -ClipAlias V03 -AuditSource CenterFaceUncorroborated
+~~~
+
+**Quality acceptance still OPEN:** face validity, overall
+genuine-face recall and singleton retention, original versus C-group
+review burden, per-person distinct known-person top-three accuracy,
+diverse videos and runtime overhead. Also review the CenterFace
+manifest's provisional model-weight and training-data rights.

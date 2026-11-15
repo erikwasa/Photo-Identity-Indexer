@@ -112,6 +112,50 @@ try {
             }
         )
     }
+    # C-prefixed gallery evidence must never mix with original D-group CSVs.
+    $corroboratedGroup = @{
+        alias='D001';observations=2
+        representativeCrops=@($groups[0].representativeCrops)
+        topCandidates=@($groups[0].topCandidates)
+    }
+    function ReviewCrop([int]$Frame,[int]$Face) {
+        return @{
+            frameNumber=$Frame;timestampMs=($Frame*1000);faceNumber=$Face
+            x=.2;y=.2;width=.3;height=.4
+            detectorConfidence=.85;quality=.4
+        }
+    }
+    $cfNoiseSamples = @(
+        (ReviewCrop 1 3), (ReviewCrop 3 1), (ReviewCrop 5 1)
+    )
+    $cfNotSamples = @(
+        (ReviewCrop 1 4), (ReviewCrop 5 2)
+    )
+    $corroboratedShadow = @{
+        schemaVersion=1;policyVersion='wi0155-video-shadow-dbscan-e018-min2-v1'
+        maximumCosineDistance=.18;minimumSamples=2;minimumClusterSize=2
+        observationsEvaluated=5;clusterCount=1;clusterMembers=2
+        noiseObservations=3;notSameFrameConstraints=0
+        groupsRepresentedForReview=1;groupsNotRepresentedForReview=0
+        membersInUnrepresentedGroups=0;sameFrameCollisions=0
+        groups=@($corroboratedGroup)
+        noiseAudit=@{
+            schemaVersion=1;totalUnassignedObservations=3;maximumReviewSamples=96
+            temporalStrata=12;strataRepresented=3;sampledCrops=$cfNoiseSamples
+        }
+    }
+    $counterfactual = @{
+        schemaVersion=1;independentDetectorId='synthetic-centerface'
+        independentDetectorSha256=('d'*64);minimumIntersectionOverUnion=.25
+        framesChecked=5;retainedYuNetObservations=133;corroboratedAt030=5
+        corroboratedAt050=4;notCorroboratedAt030=128
+        corroboratedOnlyDbscan=$corroboratedShadow
+        notCorroboratedAudit=@{
+            schemaVersion=1;totalUnassignedObservations=128;maximumReviewSamples=96
+            temporalStrata=12;strataRepresented=2;sampledCrops=$cfNotSamples
+        }
+    }
+    $report.clips[0].review.diagnostics.centerFaceCounterfactual=$counterfactual
     $reportPath = Join-Path $private 'shadow.json'
     $report | ConvertTo-Json -Depth 20 |
         Set-Content -LiteralPath $reportPath -Encoding utf8
@@ -148,6 +192,97 @@ try {
     Check ($baseline.GroupSource -ceq 'Provisional' -and $baseline.Groups -eq 1 -and
         (Get-Content -LiteralPath $baseline.GalleryPath -Raw).Contains('G001')) 'Default baseline gallery changed.'
 
+    $cfGallery = & $galleryCmd -PrivateReportPath $reportPath -PrivateCasesPath $casesPath `
+        -ClipAlias V03 -GroupSource CenterFaceShadow
+    $folders.Add($cfGallery.ReviewFolder)
+    Check ($cfGallery.Groups -eq 1 -and $cfGallery.Crops -eq 1 -and
+        $cfGallery.GroupSource -ceq 'CenterFaceShadow' -and
+        $cfGallery.NonCorroboratedObservations -eq 128 -and
+        $cfGallery.NoiseObservations -eq 3 -and
+        $cfGallery.GroupsNotRepresented -eq 0) 'Incorrect CenterFace group gallery accounting.'
+    $cfHtml = Get-Content -LiteralPath $cfGallery.GalleryPath -Raw
+    Check ($cfHtml.Contains('C001') -and
+        $cfHtml.Contains('crops/V03-C001-01.png') -and
+        $cfHtml.Contains('128 were NOT corroborated') -and
+        -not $cfHtml.Contains('crops/V03-D001-01.png')) 'CenterFace gallery not isolated.'
+    $cfRows = @(Import-Csv -LiteralPath $cfGallery.WorksheetPath)
+    Check ($cfRows.Count -eq 1 -and $cfRows[0].Group -ceq 'C001') 'Corroborated CSV alias incorrect.'
+    $cfRows[0].Decision='Keep group'
+    $cfRows[0].SelectedPerson='P0002'
+    $cfCsv = Join-Path $private 'corroborated-reviewed.csv'
+    $cfRows | Export-Csv -LiteralPath $cfCsv -NoTypeInformation -Encoding utf8
+    $cfMeasureArgs=@{
+        ReviewedCsvPath=$cfCsv;PrivateGroupReportPath=$reportPath
+        ClipAlias='V03';GroupSource='CenterFaceShadow'
+    }
+    Write-Host 'Synthetic CenterFace C-group aggregate: START'
+    $cfCounts = & $measureCmd @cfMeasureArgs
+    Write-Host 'Synthetic CenterFace C-group aggregate: PASS'
+    Check ($cfCounts.GroupSource -ceq 'CenterFaceShadow' -and
+        $cfCounts.TotalGroups -eq 1 -and
+        $cfCounts.AssignedGroupObservations -eq 2 -and
+        $cfCounts.ObservationsUnassigned -eq 3) 'Corroborated group count mismatch.'
+    Write-Host 'Synthetic CenterFace C-group ranks: START'
+    $cfRanks = & $rankCmd @cfMeasureArgs -PrivatePeopleMapPath $mapPath
+    Write-Host 'Synthetic CenterFace C-group ranks: PASS'
+    Check ($cfRanks.InputEvidenceValidated -and
+        $cfRanks.CorroboratedCandidateSubset -eq 5 -and
+        $cfRanks.CorrectTop3Groups -eq 1) 'Corroborated-only rank mismatch.'
+    Check (Refused { & $measureCmd -ReviewedCsvPath $cfCsv `
+        -PrivateGroupReportPath $reportPath -ClipAlias V03 `
+        -GroupSource ShadowDbscan }) 'C-group CSV accepted as original D-group.'
+    Check (Refused { & $measureCmd -ReviewedCsvPath $cfCsv `
+        -PrivateGroupReportPath $reportPath -ClipAlias V03 }) 'C-group CSV accepted as original G-group.'
+
+    $auditCmd = Join-Path $PSScriptRoot 'New-VideoFaceUnassignedReview.ps1'
+    $auditMeasureCmd = Join-Path $PSScriptRoot 'Measure-VideoFaceUnassignedReview.ps1'
+    foreach ($auditSource in @('CenterFaceUncorroborated','CenterFaceNoise')) {
+        $auditGallery=& $auditCmd -PrivateReportPath $reportPath `
+            -PrivateCasesPath $casesPath -ClipAlias V03 -AuditSource $auditSource
+        $folders.Add((Split-Path -Parent $auditGallery.GalleryPath))
+        $expectedCount = if ($auditSource -ceq 'CenterFaceNoise') { 3 } else { 2 }
+        $expectedTotal = if ($auditSource -ceq 'CenterFaceNoise') { 3 } else { 128 }
+        $expectedPrefix = if ($auditSource -ceq 'CenterFaceNoise') { 'N' } else { 'U' }
+        Check ($auditGallery.AuditSource -ceq $auditSource -and
+            $auditGallery.SampledCrops -eq $expectedCount -and
+            $auditGallery.TotalUnassignedObservations -eq $expectedTotal) 'Wrong independent audit selection.'
+        $auditRows=@(Import-Csv -LiteralPath $auditGallery.WorksheetPath)
+        Check ($auditRows.Count -eq $expectedCount -and
+            $auditRows[0].Sample -ceq ($expectedPrefix+'001')) 'Independent sample-prefix mismatch.'
+        $auditRows[0].Label='Real face'
+        $reviewedAudit=Join-Path $private ("$auditSource-reviewed.csv")
+        $auditRows | Export-Csv -LiteralPath $reviewedAudit -NoTypeInformation -Encoding utf8
+        Write-Host "Synthetic private sample aggregate $auditSource : START"
+        $auditStats=& $auditMeasureCmd -ReviewedCsvPath $reviewedAudit `
+            -PrivateGroupReportPath $reportPath -ClipAlias V03 -AuditSource $auditSource
+        Check ($auditStats.SourceEvidenceValidated -and
+            $auditStats.AuditSource -ceq $auditSource -and
+            $auditStats.RealFaceSamples -eq 1 -and
+            $auditStats.TotalUnassignedObservations -eq $expectedTotal) 'Independent sample measurement mismatch.'
+        $wrongSource = if ($auditSource -ceq 'CenterFaceNoise') {
+            'CenterFaceUncorroborated'
+        } else { 'CenterFaceNoise' }
+        Check (Refused { & $auditMeasureCmd -ReviewedCsvPath $reviewedAudit `
+            -PrivateGroupReportPath $reportPath -ClipAlias V03 -AuditSource $wrongSource }) 'Wrong independent sample class was accepted.'
+    }
+
+    foreach ($file in $hashes.Keys) {
+        Check ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ceq
+            $hashes[$file]) 'Independent gallery modified a source frame.'
+    }
+    $cfBad = $counterfactual.Clone()
+    $cfBad.corroboratedAt030 = 6
+    $report.clips[0].review.diagnostics.centerFaceCounterfactual=$cfBad
+    $badCfPath = Join-Path $private 'bad-corroboration.json'
+    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $badCfPath -Encoding utf8
+    Check (Refused { & $galleryCmd -PrivateReportPath $badCfPath `
+        -PrivateCasesPath $casesPath -ClipAlias V03 `
+        -GroupSource CenterFaceShadow }) 'Malformed corroboration accepted.'
+    Check (Refused { & $measureCmd -ReviewedCsvPath $cfCsv `
+        -PrivateGroupReportPath $badCfPath -ClipAlias V03 `
+        -GroupSource CenterFaceShadow }) 'Malformed corroboration accepted by measurement.'
+    $report.clips[0].review.diagnostics.centerFaceCounterfactual=$counterfactual
+
     # One known face has correct rank two. Another is absent from top three.
     # One group is unknown-to-the-catalogue and the other 61 are dismissed.
     $rows[0].Decision='Keep group'; $rows[0].SelectedPerson='P0002'
@@ -163,7 +298,9 @@ try {
         ReviewedCsvPath=$csv;PrivateGroupReportPath=$reportPath
         ClipAlias='V03';GroupSource='ShadowDbscan'
     }
+    Write-Host 'Synthetic original D-group aggregate: START'
     $counts = & $measureCmd @argsForMeasure
+    Write-Host 'Synthetic original D-group aggregate: PASS'
     Check ($counts.TotalGroups -eq 64 -and $counts.GroupsReviewed -eq 64 -and
         $counts.AssignedGroupObservations -eq 128 -and
         $counts.ObservationsUnassigned -eq 5 -and

@@ -8,7 +8,7 @@ param(
   [Parameter(Mandatory)][string]$PrivateReportPath,
   [Parameter(Mandatory)][string]$PrivateCasesPath,
   [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
-  [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional',
+  [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional',
   [ValidateRange(240,640)][int]$CropLongEdge = 512,
   [switch]$OpenGallery
 )
@@ -42,17 +42,34 @@ if ($report.schemaVersion -ne 1 -or $cases.schemaVersion -ne 1 -or
   throw 'Private report and cases must contain the requested video once.'
 }
 $clip = $matches[0]
-$isShadow = $GroupSource -ceq 'ShadowDbscan'
-$aliasPattern = if ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
-$groupReview = if ($isShadow) {
+$isCenterFace = $GroupSource -ceq 'CenterFaceShadow'
+$isShadow = $GroupSource -cne 'Provisional'
+$aliasPattern = if ($isCenterFace) { '^C(?!000)[0-9]{3}$' } elseif ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
+$counterfactual = if ($isCenterFace) {
+  $clip.review.diagnostics.centerFaceCounterfactual
+} else { $null }
+$groupReview = if ($isCenterFace) {
+  $counterfactual.corroboratedOnlyDbscan
+} elseif ($isShadow) {
   $clip.review.diagnostics.shadowDbscan
 } else {
   $clip.review.diagnostics.provisionalGroups
 }
+if ($isCenterFace -and ($null -eq $counterfactual -or
+    [int]$counterfactual.schemaVersion -ne 1 -or
+    [int]$counterfactual.retainedYuNetObservations -ne [int]$clip.review.aggregate.facesDetected -or
+    [int]$counterfactual.corroboratedAt030 + [int]$counterfactual.notCorroboratedAt030 -ne
+      [int]$counterfactual.retainedYuNetObservations -or
+    [int]$counterfactual.corroboratedAt050 -gt [int]$counterfactual.corroboratedAt030 -or
+    [int]$counterfactual.notCorroboratedAudit.totalUnassignedObservations -ne
+      [int]$counterfactual.notCorroboratedAt030)) {
+  throw 'Invalid independent detector counterfactual accounting.'
+}
 if ($isShadow) {
   if ($null -eq $groupReview -or [int]$groupReview.schemaVersion -ne 1 -or
       [string]$groupReview.policyVersion -cne 'wi0155-video-shadow-dbscan-e018-min2-v1' -or
-      [int]$groupReview.observationsEvaluated -ne [int]$clip.review.aggregate.facesDetected -or
+      [int]$groupReview.observationsEvaluated -ne
+        $(if ($isCenterFace) { [int]$counterfactual.corroboratedAt030 } else { [int]$clip.review.aggregate.facesDetected }) -or
       [int]$groupReview.observationsEvaluated -gt 5760 -or
       [int]$groupReview.clusterCount -lt 1 -or
       [int]$groupReview.clusterMembers -lt 1 -or
@@ -73,7 +90,20 @@ if ($isShadow) {
       [int]$clip.review.aggregate.facesDetected) {
   throw 'The report lacks validated opt-in provisional groups.'
 }
-$groups = @($groupReview.groups)
+$groups = if ($isCenterFace) {
+  @($groupReview.groups | ForEach-Object {
+    if ([string]$_.alias -cnotmatch '^D(?!000)[0-9]{3}$') {
+      throw 'Invalid corroborated-only source cluster alias.'
+    }
+    [pscustomobject]@{
+      alias = ([string]$_.alias -creplace '^D','C')
+      observations = $_.observations
+      representativeCrops = $_.representativeCrops
+      topCandidates = $_.topCandidates
+    }
+  })
+} else { @($groupReview.groups) }
+# Derived C-prefixed review labels are incompatible with D- and G-group CSVs.
 # For new catalogue reports, require rank evidence for exactly these groups.
 # Older reports without group suggestions remain valid and reviewable.
 $rankings = @{}
@@ -214,7 +244,7 @@ if (((Get-Item -LiteralPath $outputRoot).Attributes -band
   throw 'Group review output directory must not be linked.'
 }
 $folder=Join-Path $outputRoot (
-  $(if ($isShadow) { 'shadow-groups-' } else { 'groups-' }) +
+  $(if ($isCenterFace) { 'centerface-shadow-groups-' } elseif ($isShadow) { 'shadow-groups-' } else { 'groups-' }) +
   (Get-Date -Format 'yyyyMMdd-HHmmssfff') +
   '-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $folder | Out-Null
@@ -293,10 +323,20 @@ if ($isShadow) {
   $intro = $intro.Replace('Provisional groups','Shadow DBSCAN groups')
   $intro = $intro.Replace('provisional group','shadow DBSCAN cluster')
   $intro = $intro.Replace('G-number','D-number')
-  $intro = $intro.Replace('G002','D002')
+  $intro = $intro.Replace('G002',$(if ($isCenterFace) { 'C002' } else { 'D002' }))
+  if ($isCenterFace) {
+    $intro = $intro.Replace('Shadow DBSCAN groups','CenterFace-corroborated shadow groups')
+    $intro = $intro.Replace('D-number','C-number')
+  }
 }
 $html.Add($intro)
-if ($isShadow) {
+if ($isCenterFace) {
+  $html.Add(('<p class="warning">Independent CenterFace corroboration only: {0} of {1} retained YuNet candidates corroborated at confidence 0.30 and IoU 0.25; {2} were NOT corroborated and remain reviewable. This alternate clustering has {3} groups, {4} noise observations and {5} hidden groups ({6} members). C-groups are NOT production identities and are incompatible with original D- and G-group CSVs.</p>' -f
+    [int]$counterfactual.corroboratedAt030,[int]$counterfactual.retainedYuNetObservations,
+    [int]$counterfactual.notCorroboratedAt030,[int]$groupReview.clusterCount,
+    [int]$groupReview.noiseObservations,[int]$groupReview.groupsNotRepresentedForReview,
+    [int]$groupReview.membersInUnrepresentedGroups))
+} elseif ($isShadow) {
   $html.Add(('<p class="warning">Shadow comparison only: {0} clusters total, {1} displayed, {2} clusters ({3} observations) outside this shortlist, plus {4} noise observations. Noise may contain genuine singleton faces. The displayed groups are NOT full person coverage; the baseline grouping is unchanged. Never import shadow decisions as baseline review.</p>' -f
     [int]$groupReview.clusterCount,$groups.Count,
     [int]$groupReview.groupsNotRepresentedForReview,
@@ -336,7 +376,7 @@ foreach ($row in $rows) {
   }
   $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="{6}"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
     (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures,$rankHtml,
-    $(if ($isShadow) { 'D002' } else { 'G002' })))
+    $(if ($isCenterFace) { 'C002' } elseif ($isShadow) { 'D002' } else { 'G002' })))
 }
 $html.Add('</div><p class="note">These are experimental candidate groups, not confirmed people. Export your review CSV before leaving; do not mix G-prefixed baseline and D-prefixed shadow worksheets.</p></main><script src="group-review.js"></script></body></html>')
 $page=Join-Path $folder 'group-review.html'
@@ -351,6 +391,7 @@ if ($OpenGallery) { Invoke-Item -LiteralPath $page }
   Crops=$cropList.Count
   UnassignedObservations=$hiddenObservations
   GroupSource=$GroupSource
+  NonCorroboratedObservations=$(if ($isCenterFace) { [int]$counterfactual.notCorroboratedAt030 } else { $null })
   NoiseObservations=$(if ($isShadow) { [int]$groupReview.noiseObservations } else { $null })
   GroupsNotRepresented=$(if ($isShadow) { [int]$groupReview.groupsNotRepresentedForReview } else { $null })
 }

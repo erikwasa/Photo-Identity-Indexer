@@ -18,7 +18,7 @@ param(
     [Parameter(Mandatory)][string]$PrivateGroupReportPath,
     [Parameter(Mandatory)][string]$PrivatePeopleMapPath,
     [Parameter(Mandatory)][ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias,
-    [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional'
+    [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -85,8 +85,11 @@ try {
     }
 
     $clip = $clips[0]
-    $isShadow = $GroupSource -ceq 'ShadowDbscan'
-    $groupReview = if ($isShadow) {
+    $isCenterFace = $GroupSource -ceq 'CenterFaceShadow'
+    $isShadow = $GroupSource -cne 'Provisional'
+    $groupReview = if ($isCenterFace) {
+        $clip.review.diagnostics.centerFaceCounterfactual.corroboratedOnlyDbscan
+    } elseif ($isShadow) {
         $clip.review.diagnostics.shadowDbscan
     } else {
         $clip.review.diagnostics.provisionalGroups
@@ -94,7 +97,19 @@ try {
     if ($null -eq $groupReview) {
         throw 'Missing the selected group evidence.'
     }
-    $groups = @($groupReview.groups)
+    $groups = if ($isCenterFace) {
+        @($groupReview.groups | ForEach-Object {
+            if ([string]$_.alias -cnotmatch '^D(?!000)[0-9]{3}$') {
+                throw 'Invalid corroborated-only group alias.'
+            }
+            [pscustomobject]@{
+                alias = ([string]$_.alias -creplace '^D','C')
+                observations = $_.observations
+                representativeCrops = $_.representativeCrops
+                topCandidates = $_.topCandidates
+            }
+        })
+    } else { @($groupReview.groups) }
     $ranked = if ($isShadow) {
         @($groups | ForEach-Object {
             [pscustomobject]@{
@@ -254,6 +269,9 @@ try {
         EligiblePeople = [int]$report.catalogue.eligiblePeople
         ExemplarsLoaded = [int]$report.catalogue.exemplarsLoaded
         TotalDetectedCandidates = [int]$clip.review.aggregate.facesDetected
+        CorroboratedCandidateSubset = $(if ($isCenterFace) {
+            [int]$clip.review.diagnostics.centerFaceCounterfactual.corroboratedAt030
+        } else { $null })
         AssignedObservations = [int]$baseline.AssignedGroupObservations
         UnassignedObservations = [int]$baseline.ObservationsUnassigned
         GroupCapacityReached = [bool]$baseline.GroupCapacityReached

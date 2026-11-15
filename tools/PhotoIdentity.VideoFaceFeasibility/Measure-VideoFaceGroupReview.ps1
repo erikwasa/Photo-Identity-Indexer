@@ -14,7 +14,7 @@ param(
     [Parameter(Mandatory)][string]$ReviewedCsvPath,
     [string]$PrivateGroupReportPath,
     [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias,
-    [ValidateSet('Provisional','ShadowDbscan')][string]$GroupSource = 'Provisional'
+    [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -38,6 +38,7 @@ function Test-LocalRegularFile {
     return $item.FullName
 }
 
+$safeStage = 'review-csv'
 try {
     $csv = Test-LocalRegularFile $ReviewedCsvPath (256KB)
     $rows = @(Import-Csv -LiteralPath $csv -Encoding utf8)
@@ -69,8 +70,9 @@ try {
     $byAlias = [Collections.Generic.Dictionary[string,object]]::new(
         [StringComparer]::Ordinal)
     $observations = 0
-    $isShadow = $GroupSource -ceq 'ShadowDbscan'
-    $aliasPattern = if ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
+    $isCenterFace = $GroupSource -ceq 'CenterFaceShadow'
+    $isShadow = $GroupSource -cne 'Provisional'
+    $aliasPattern = if ($isCenterFace) { '^C(?!000)[0-9]{3}$' } elseif ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
     foreach ($row in $rows) {
         if ([string]$row.Group -cnotmatch $aliasPattern -or
             -not $byAlias.TryAdd([string]$row.Group, $row) -or
@@ -81,6 +83,7 @@ try {
         $observations += [int]$row.Observations
     }
 
+    $safeStage = 'review-decisions'
     foreach ($row in $rows) {
         if ([string]$row.Decision -ne 'Merge group') { continue }
         $visited = [Collections.Generic.HashSet[string]]::new(
@@ -108,10 +111,14 @@ try {
     $active = @($rows | Where-Object {
         $_.Decision -in @('Keep group','Merge group')
     })
-    $dismissedObservations = [int](($dismissed |
-        Measure-Object -Property Observations -Sum).Sum)
-    $activeObservations = [int](($active |
-        Measure-Object -Property Observations -Sum).Sum)
+    # A valid review can have zero dismissed (or zero retained) groups.
+    # Measure-Object returns no result for an empty pipeline under StrictMode.
+    $dismissedObservations = if ($dismissed.Count -eq 0) { 0 } else {
+        [int](($dismissed | Measure-Object -Property Observations -Sum).Sum)
+    }
+    $activeObservations = if ($active.Count -eq 0) { 0 } else {
+        [int](($active | Measure-Object -Property Observations -Sum).Sum)
+    }
     $unresolved = $uncertain.Count + $split.Count + $pending.Count
 
     $unassigned = $null
@@ -119,6 +126,7 @@ try {
     $noise = $null
     $hiddenClusterMembers = $null
     $totalClusters = $null
+    $safeStage = 'private-report'
     if (-not [string]::IsNullOrWhiteSpace($PrivateGroupReportPath)) {
         $jsonPath = Test-LocalRegularFile $PrivateGroupReportPath (64MB)
         $report = Get-Content -LiteralPath $jsonPath -Raw -Encoding utf8 |
@@ -129,13 +137,41 @@ try {
         if ([int]$report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
             throw 'Expected corresponding private grouped report.'
         }
-        $review = if ($isShadow) {
+        $safeStage = 'counterfactual-contract'
+        $cf = if ($isCenterFace) {
+            $clips[0].review.diagnostics.centerFaceCounterfactual
+        } else { $null }
+        if ($isCenterFace -and (
+            $null -eq $cf -or [int]$cf.schemaVersion -ne 1 -or
+            [int]$cf.retainedYuNetObservations -ne
+                [int]$clips[0].review.aggregate.facesDetected -or
+            [int]$cf.corroboratedAt030 + [int]$cf.notCorroboratedAt030 -ne
+                [int]$cf.retainedYuNetObservations -or
+            [int]$cf.corroboratedAt050 -gt [int]$cf.corroboratedAt030 -or
+            [int]$cf.notCorroboratedAudit.totalUnassignedObservations -ne
+                [int]$cf.notCorroboratedAt030)) {
+            throw 'Independent detector agreement evidence is inconsistent.'
+        }
+        $review = if ($isCenterFace) {
+            $cf.corroboratedOnlyDbscan
+        } elseif ($isShadow) {
             $clips[0].review.diagnostics.shadowDbscan
         } else { $clips[0].review.diagnostics.provisionalGroups }
         if ($null -eq $review) {
             throw 'The requested group source is absent.'
         }
-        $reportGroups = @($review.groups)
+        $safeStage = 'group-evidence'
+        $reportGroups = if ($isCenterFace) {
+            @($review.groups | ForEach-Object {
+                if ([string]$_.alias -cnotmatch '^D(?!000)[0-9]{3}$') {
+                    throw 'Invalid corroborated-only cluster alias.'
+                }
+                [pscustomobject]@{
+                    alias = ([string]$_.alias -creplace '^D','C')
+                    observations = $_.observations
+                }
+            })
+        } else { @($review.groups) }
         if ($isShadow) {
             if ([int]$review.schemaVersion -ne 1 -or
                 [string]$review.policyVersion -cne 'wi0155-video-shadow-dbscan-e018-min2-v1' -or
@@ -152,7 +188,7 @@ try {
                 [int]$review.clusterMembers + [int]$review.noiseObservations -ne
                     [int]$review.observationsEvaluated -or
                 [int]$review.observationsEvaluated -ne
-                    [int]$clips[0].review.aggregate.facesDetected -or
+                    $(if ($isCenterFace) { [int]$cf.corroboratedAt030 } else { [int]$clips[0].review.aggregate.facesDetected }) -or
                 [int]$review.sameFrameCollisions -ne 0) {
                 throw 'Shadow group accounting is inconsistent.'
             }
@@ -176,6 +212,7 @@ try {
             $unassigned = [int]$review.observationsUnassigned
             $atCapacity = $reportGroups.Count -eq [int]$review.maximumGroups
         }
+        $safeStage = 'group-row-consistency'
         $expected = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
         foreach ($group in $reportGroups) {
@@ -189,6 +226,7 @@ try {
         }
     }
 
+    $safeStage = 'aggregate-output'
     # Output deliberately excludes group aliases, notes, identities,
     # timestamp positions, private paths and any source image data.
     [pscustomobject][ordered]@{
@@ -221,5 +259,5 @@ try {
 catch {
     # Do not disclose private file paths, clip aliases, group IDs or
     # review annotations in terminal output/CI logs.
-    throw 'WI-0155 private group measurement rejected inconsistent or unsafe inputs.'
+    throw ('WI-0155 private group measurement rejected inconsistent or unsafe inputs (stage: ' + $safeStage + ').')
 }

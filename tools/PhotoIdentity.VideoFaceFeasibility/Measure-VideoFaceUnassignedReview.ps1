@@ -10,7 +10,9 @@ detector precision and must not be extrapolated to all unassigned observations.
 param(
     [Parameter(Mandatory)][string]$ReviewedCsvPath,
     [Parameter(Mandatory)][string]$PrivateGroupReportPath,
-    [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03'
+    [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
+    [ValidateSet('Provisional','CenterFaceUncorroborated','CenterFaceNoise')]
+    [string]$AuditSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -47,19 +49,54 @@ try {
     if ($report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
         throw 'Private report does not identify the requested video once.'
     }
-    $review = $clips[0].review.diagnostics.provisionalGroups
-    $audit = $review.unassignedAudit
-    if ($review.schemaVersion -ne 1 -or $audit.schemaVersion -ne 1 -or
+    $isCenterFace = $AuditSource -cne 'Provisional'
+    $cf = if ($isCenterFace) {
+        $clips[0].review.diagnostics.centerFaceCounterfactual
+    } else { $null }
+    if ($isCenterFace -and (
+        $null -eq $cf -or [int]$cf.schemaVersion -ne 1 -or
+        [int]$cf.retainedYuNetObservations -ne
+          [int]$clips[0].review.aggregate.facesDetected -or
+        [int]$cf.corroboratedAt030 + [int]$cf.notCorroboratedAt030 -ne
+          [int]$cf.retainedYuNetObservations -or
+        [int]$cf.corroboratedAt050 -gt [int]$cf.corroboratedAt030 -or
+        [int]$cf.corroboratedOnlyDbscan.observationsEvaluated -ne
+          [int]$cf.corroboratedAt030 -or
+        [int]$cf.corroboratedOnlyDbscan.clusterMembers +
+          [int]$cf.corroboratedOnlyDbscan.noiseObservations -ne
+          [int]$cf.corroboratedAt030 -or
+        [int]$cf.corroboratedOnlyDbscan.sameFrameCollisions -ne 0)) {
+        throw 'Independent corroboration counts are inconsistent.'
+    }
+    $review = if ($AuditSource -ceq 'Provisional') {
+        $clips[0].review.diagnostics.provisionalGroups
+    } elseif ($AuditSource -ceq 'CenterFaceNoise') {
+        $cf.corroboratedOnlyDbscan
+    } else { $cf }
+    $audit = if ($AuditSource -ceq 'Provisional') {
+        $review.unassignedAudit
+    } elseif ($AuditSource -ceq 'CenterFaceNoise') {
+        $review.noiseAudit
+    } else { $review.notCorroboratedAudit }
+    $expectedTotal = if ($AuditSource -ceq 'Provisional') {
+        [int]$review.observationsUnassigned
+    } elseif ($AuditSource -ceq 'CenterFaceNoise') {
+        [int]$review.noiseObservations
+    } else { [int]$review.notCorroboratedAt030 }
+    if ($null -eq $review -or [int]$review.schemaVersion -ne 1 -or
+        $null -eq $audit -or [int]$audit.schemaVersion -ne 1 -or
+        [int]$audit.totalUnassignedObservations -ne $expectedTotal -or
+        [int]$audit.maximumReviewSamples -ne 96 -or
+        [int]$audit.temporalStrata -ne 12) {
+        throw 'Private report has invalid or incomplete audit evidence.'
+    }
+    if (-not $isCenterFace -and (
         [int]$review.observationsConsidered -ne
           [int]$clips[0].review.aggregate.facesDetected -or
         [int]$review.observationsAssigned + [int]$review.observationsUnassigned -ne
           [int]$review.observationsConsidered -or
-        @($review.groups).Count -ne 64 -or
-        [int]$audit.totalUnassignedObservations -ne
-          [int]$review.observationsUnassigned -or
-        [int]$audit.maximumReviewSamples -ne 96 -or
-        [int]$audit.temporalStrata -ne 12) {
-        throw 'Private report has invalid or incomplete audit evidence.'
+        @($review.groups).Count -ne 64)) {
+        throw 'Original provisional unassigned audit is inconsistent.'
     }
     $samples = @($audit.sampledCrops | Sort-Object timestampMs,frameNumber,faceNumber)
     if ($samples.Count -lt 1 -or $samples.Count -gt 96 -or
@@ -90,7 +127,11 @@ try {
         $key = '{0}:{1}' -f $row.Frame,$row.Face
         if ($row.Clip -cne $ClipAlias -or
             [string]$row.AuditReportSha256 -cne $reportHash -or
-            $row.Sample -cne ('S{0:D3}' -f ($i+1)) -or
+            $row.Sample -cne ('{0}{1:D3}' -f $(switch ($AuditSource) {
+                'CenterFaceUncorroborated' { 'U' }
+                'CenterFaceNoise' { 'N' }
+                default { 'S' }
+            }),($i+1)) -or
             [string]$row.Frame -cne [string]$sample.frameNumber -or
             [string]$row.Face -cne [string]$sample.faceNumber -or
             -not $seen.Add($key) -or -not $labels.Contains($label) -or
@@ -126,6 +167,7 @@ try {
     # timestamps or individual detector scores are printed.
     [pscustomobject][ordered]@{
         SchemaVersion = 1
+        AuditSource = $AuditSource
         SourceEvidenceValidated = $true
         TotalUnassignedObservations = [int]$audit.totalUnassignedObservations
         SampledObservations = $samples.Count
