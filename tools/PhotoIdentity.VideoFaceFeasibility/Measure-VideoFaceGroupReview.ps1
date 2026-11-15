@@ -130,7 +130,9 @@ try {
         if ([int]$report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
             throw 'Expected corresponding private grouped report.'
         }
-        $cf = $clips[0].review.diagnostics.centerFaceCounterfactual
+        $cf = if ($isCenterFace) {
+            $clips[0].review.diagnostics.centerFaceCounterfactual
+        } else { $null }
         if ($isCenterFace -and (
             $null -eq $cf -or [int]$cf.schemaVersion -ne 1 -or
             [int]$cf.retainedYuNetObservations -ne
