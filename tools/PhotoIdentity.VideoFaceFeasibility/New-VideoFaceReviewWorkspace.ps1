@@ -126,10 +126,65 @@ if ($groupRows.Count -ne [int]$groups.Groups -or
     $groupRows.Count -lt 1 -or $groupRows.Count -gt 64) {
     throw 'Group-first worksheet is missing or incomplete.'
 }
-for ($i=0; $i -lt $groupRows.Count; $i++) {
-    if ($groupRows[$i].Clip -cne $ClipAlias -or
-        $groupRows[$i].Group -cne ('C{0:D3}' -f ($i+1))) {
-        throw 'Unexpected group-first group identity.'
+$uniqueGroups = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+foreach ($row in $groupRows) {
+    if ($row.Clip -cne $ClipAlias -or
+        [string]$row.Group -cnotmatch '^C(?!000)[0-9]{3}
+$reportHash = (Get-FileHash -LiteralPath $PrivateReportPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$noiseLane = EvidenceLane $noise 'Corroborated, ungrouped candidates (N)' 'noise' 'N' $groups.ReviewFolder $ClipAlias $reportHash $SpotlightPerLane
+$uncorroboratedLane = EvidenceLane $uncorroborated 'YuNet/CenterFace disagreements (U)' 'uncorroborated' 'U' $groups.ReviewFolder $ClipAlias $reportHash $SpotlightPerLane
+
+$page = Get-Content -LiteralPath $groups.GalleryPath -Raw -Encoding utf8
+$styleAnchor = '</style>'
+$gridAnchor = '<div class="grid">'
+$endAnchor = '</main><script src="group-review.js"></script>'
+if (-not $page.Contains($styleAnchor) -or
+    -not $page.Contains($gridAnchor) -or
+    -not $page.Contains($endAnchor)) {
+    throw 'Unexpected group gallery HTML structure.'
+}
+$css = @'
+.evidence-lane{margin-top:22px;border:1px solid #526c82;border-radius:8px;padding:12px;background:#172a3b}
+.evidence-lane summary{cursor:pointer;padding:8px;font-size:15px;color:#e9f5ff}
+.evidence-lane a{color:#acd9ff}
+.evidence-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:10px;margin:12px 0}
+.evidence-tile{display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:8px;border:1px solid #455d71;border-radius:5px;text-decoration:none;background:#101c2a}
+.evidence-tile img{width:100%;height:110px;object-fit:contain}
+.evidence-tile span{font-size:12px;margin-top:6px}
+.evidence-extra{border-top:1px solid #526c82;padding:8px 0}
+'@
+$intro = ('<p class="note"><strong>Group-first private review · {0}.</strong> Review the {1} provisional C-groups first, then expand either evidence lane below for possible faces outside groups. Each source has its own private CSV; nothing here automatically merges groups, rejects faces or writes identities.</p><p><a href="#lane-noise">Ungrouped corroborated evidence</a> · <a href="#lane-uncorroborated">Detector disagreements</a></p>' -f
+    (Html $ClipAlias),[int]$groups.Groups)
+$page = $page.Replace($styleAnchor,($css + $styleAnchor))
+$page = $page.Replace($gridAnchor,($intro + $gridAnchor))
+$page = $page.Replace($endAnchor,(
+    $noiseLane + [Environment]::NewLine + $uncorroboratedLane +
+    [Environment]::NewLine + $endAnchor))
+$page | Set-Content -LiteralPath $groups.GalleryPath -Encoding utf8
+
+if ($OpenGallery) { Invoke-Item -LiteralPath $groups.GalleryPath }
+# Operator output contains only aggregate counts and private local paths.
+[pscustomobject]@{
+    SchemaVersion = 1
+    ClipAlias = $ClipAlias
+    GroupSource = 'CenterFaceShadow'
+    GalleryPath = $groups.GalleryPath
+    GroupWorksheetPath = $groups.WorksheetPath
+    NoiseGalleryPath = $noise.GalleryPath
+    NoiseWorksheetPath = $noise.WorksheetPath
+    UncorroboratedGalleryPath = $uncorroborated.GalleryPath
+    UncorroboratedWorksheetPath = $uncorroborated.WorksheetPath
+    Groups = [int]$groups.Groups
+    GroupCrops = [int]$groups.Crops
+    NoiseSamples = [int]$noise.SampledCrops
+    NoiseNotRepresented = [int]$noise.UnrepresentedObservations
+    UncorroboratedSamples = [int]$uncorroborated.SampledCrops
+    UncorroboratedNotRepresented = [int]$uncorroborated.UnrepresentedObservations
+    SpotlightPerLane = $SpotlightPerLane
+}
+ -or
+        -not $uniqueGroups.Add([string]$row.Group)) {
+        throw 'Unexpected or duplicate group-first group identity.'
     }
 }
 $reportHash = (Get-FileHash -LiteralPath $PrivateReportPath -Algorithm SHA256).Hash.ToLowerInvariant()
