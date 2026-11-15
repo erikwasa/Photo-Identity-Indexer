@@ -147,6 +147,8 @@ try {
         CannotTellAuditSamples=$resolved.Metrics.CannotTellAuditSamples
         RealFaceAuditSamplesUnidentified=$resolved.Metrics.RealFaceAuditSamplesUnidentified
         RealFaceAuditSamplesMarkedUnknown=$resolved.Metrics.RealFaceAuditSamplesMarkedUnknown
+        RealFaceNoiseSamples=$resolved.Metrics.RealFaceNoiseSamples
+        RealFaceUncorroboratedSamples=$resolved.Metrics.RealFaceUncorroboratedSamples
         UnsampledNoiseObservations=$validated.NoiseMetrics.UnrepresentedObservations
         UnsampledUncorroboratedObservations=$validated.UncorroboratedMetrics.UnrepresentedObservations
         PersonCoverageProven=$false
