@@ -3737,3 +3737,44 @@ and broader diverse-video validation are complete, all
 `FACE-QUALITY-01`, `GROUP-QUALITY-01` and
 `CATALOGUE-TOP3-01` gates remain open and **no automatic
 suppression is permitted**.
+
+## Checkpoint 38 — PR #806 V03 independent CenterFace cross-check: local PASS (2026-11-15)
+
+**Maintainer acceptance evidence:** Focused WI-0155 tests PASS, pinned
+CenterFace model integrity PASS, the standalone CenterFace cross-check
+PASS, and the private agreement report was written. The comparison
+reused the existing approved V03 shadow evidence and 77 selected frames;
+no PostgreSQL, new original-video extraction, SFace embedding run or
+production write was needed.
+
+With exploratory YuNet/CenterFace box intersection-over-union >= 0.25:
+
+| Previously human-reviewed selection | Checked crops | CenterFace confidence >= 0.30 | CenterFace confidence >= 0.50 |
+| --- | ---: | ---: | ---: |
+| D001–D020 background/paving group representatives | 100 | **0** | **0** |
+| First 24 sampled genuine-face DBSCAN-noise detections | 24 | **24** | **23** |
+
+**Interpretation:** The independent detector perfectly separated the
+*selected* V03 human-positive/negative examples at confidence 0.30,
+whereas the higher 0.50 level missed one reviewed genuine face.
+This is an especially promising candidate signal for reducing the
+repeated cracked-paving false-positive burden **before SFace / DBSCAN**.
+The groups represent one frequently repeated paving pattern and the
+noise examples are quality-prioritized—not randomly chosen or
+independent. Do not treat 0/100 and 24/24 as model-wide false-positive
+or true-positive rates, infer performance on all 3,912 V03 detections,
+or declare unknown/oblique/low-resolution faces invalid by detector
+disagreement.
+
+**Decision:** The *diagnostic implementation and this local sample*
+PASS. FACE-QUALITY-01, GROUP-QUALITY-01, known-person TOP3 accuracy,
+diverse-video acceptance and production integration **remain OPEN**.
+Automatic suppression stays disabled. A follow-on **opt-in shadow-only
+counterfactual** should apply independent corroboration to **every
+retained candidate in each approved frame**, retain disconfirmed
+candidates as explicit reviewable evidence, then compare full V01–V03
+and additional diverse videos: real-face retention, false-group burden,
+known-person top-three retrieval, missed brief appearances and cost.
+Use independent validation rather than tuning the threshold solely to
+these already-reviewed V03 crops. Existing CenterFace weight/training-
+data licensing is still provisional and needs a separate adoption review.
