@@ -22,6 +22,7 @@ $private = Join-Path $root 'private'
 $images = Join-Path $root 'frames'
 New-Item -ItemType Directory -Path $private,$images | Out-Null
 $galleryFolder = $null
+$independentGalleryFolder = $null
 
 try {
     $frames = [Collections.Generic.List[object]]::new()
@@ -77,6 +78,22 @@ try {
             }}
         )
     }
+    $independentAudit = @{
+        schemaVersion=1;totalUnassignedObservations=120;maximumReviewSamples=96
+        temporalStrata=12;strataRepresented=12;sampledCrops=@($samples)
+        selectionPolicy='quality-extremes-v1'
+    }
+    $cf = @{
+        schemaVersion=1;retainedYuNetObservations=184
+        corroboratedAt030=0;corroboratedAt050=0;notCorroboratedAt030=184
+        corroboratedOnlyDbscan=@{
+            observationsEvaluated=0;clusterMembers=0;noiseObservations=0
+            sameFrameCollisions=0
+        }
+        independentDetectionsAt030=120;independentOnlyAt030=120
+        independentOnlyAudit=$independentAudit
+    }
+    $report['clips'][0]['review']['diagnostics']['centerFaceCounterfactual'] = $cf
     $reportPath = Join-Path $private 'audit.json'
     $report | ConvertTo-Json -Depth 18 |
         Set-Content -LiteralPath $reportPath -Encoding utf8
@@ -145,6 +162,32 @@ try {
         -not $stats.SuppressionRulesValidated) 'Labelled audit aggregate measurements incorrect.'
     Check (-not (($stats | Out-String) -match 'P0001|P0002|S00[1-9]|frame-')) 'Private sample details leaked.'
 
+    # The new I evidence is distinct from corroborated noise (N) and YuNet
+    # disagreement (U). It can be reviewed without inventing SFace vectors
+    # or modifying the original C/N/U presence evidence.
+    $independentGallery = & $generator -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -AuditSource CenterFaceOnly
+    $independentGalleryFolder = Split-Path -Parent $independentGallery.GalleryPath
+    $independentRows = @(Import-Csv -LiteralPath $independentGallery.WorksheetPath)
+    Check ($independentGallery.SampledCrops -eq 12 -and
+        $independentGallery.SelectionPolicy -ceq 'quality-extremes-v1' -and
+        $independentRows[0].Sample -ceq 'I001' -and
+        $independentRows[-1].Sample -ceq 'I012') 'Independent-only gallery provenance incorrect.'
+    $independentHtml = Get-Content -LiteralPath $independentGallery.GalleryPath -Raw
+    Check ($independentHtml.Contains('CenterFace-only detections missing YuNet overlap') -and
+        $independentHtml.Contains('crops/I001.png')) 'Independent-only review warning missing.'
+    $independentStats = & $measurer -ReviewedCsvPath $independentGallery.WorksheetPath -PrivateGroupReportPath $reportPath -ClipAlias V03 -AuditSource CenterFaceOnly
+    Check ($independentStats.SourceEvidenceValidated -and
+        $independentStats.UnreviewedSamples -eq 12 -and
+        $independentStats.TotalUnassignedObservations -eq 120 -and
+        $independentStats.SelectionPolicy -ceq 'quality-extremes-v1') 'Independent-only measurement invalid.'
+    $cf.independentOnlyAt030=121
+    $badIndependent = Join-Path $private 'bad-independent.json'
+    $report | ConvertTo-Json -Depth 18 | Set-Content -LiteralPath $badIndependent -Encoding utf8
+    MustReject {
+        & $generator -PrivateReportPath $badIndependent -PrivateCasesPath $casesPath -AuditSource CenterFaceOnly
+    } 'Independent-only count mismatch was accepted.'
+    $cf.independentOnlyAt030=120
+
     $worksheet[0].PersonAlias='=HYPERLINK("http://unsafe")'
     $tamperPath = Join-Path $private 'tamper.csv'
     $worksheet | Export-Csv -LiteralPath $tamperPath -NoTypeInformation -Encoding utf8
@@ -188,6 +231,9 @@ try {
     Write-Host 'WI-0155 unassigned audit gallery and measurement synthetic tests: PASS'
 }
 finally {
+    if ($independentGalleryFolder -and (Test-Path -LiteralPath $independentGalleryFolder)) {
+        Remove-Item -LiteralPath $independentGalleryFolder -Force -Recurse
+    }
     if ($galleryFolder -and (Test-Path -LiteralPath $galleryFolder)) {
         Remove-Item -LiteralPath $galleryFolder -Force -Recurse
     }
