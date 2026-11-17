@@ -2783,3 +2783,121 @@ a **single local V02 presence summary** remain pending.
 This is an isolated product-evidence handoff toward
 the required video/person association, not production
 persistence or permission to merge to `main`.
+
+
+## Experimental checkpoint 48 — complete-member same-frame merge safety (synthetic-only gate; 2026-11-17)
+
+**Maintainer's V01 acceptance after PR #816:** The matching legacy
+combined V01 review and full-catalogue report validated. Re-review
+finished with **two known-person proposals from two kept C-groups,
+zero merges, zero unlabelled kept groups, zero unreviewed N/U samples,
+14 human-labelled real-face N/U observations (7 N and 7 U), three
+cannot-tell samples, zero unsampled N/U observations and zero
+production writes**. This is *review completeness for available
+V01 observations*, NOT complete person detection recall. The
+existing PR #816 provenance / human-person proposal functionality
+is accepted for that V01 evidence; no further V01 local review is
+needed for this slice.
+
+**New experimental full-member proof:** The shadow DBSCAN result
+already enforces not-same-frame inside each computed cluster, but
+until now the private report serialized only its at-most-five
+representative crops. Newly produced PRIVATE source reports now
+also retain *every* source member's sorted frame ordinal per
+reviewable D-group (and derived C-group). The complete list length
+must equal the reported group observation count and must include
+all shown representative frames; within-group frame repetitions
+are invalid. This bounded local-only evidence contains **no face
+IDs, model vectors, source paths, names or canonical identity IDs**.
+Noise and clusters outside the 64-group review shortlist remain
+accounted for separately; this change does not claim coverage of
+their full membership or classify them.
+
+The C-group browser assistant can veto a merge if *any complete
+member frame* overlaps between the source groups, including hidden
+members absent from representative crops. Invalid complete
+membership attributes reject suggestions. Legacy reports retain
+their representative-only behavior, explicitly warned as not
+sufficient to certify full merge safety.
+
+More importantly, the independent **read-only presence resolver**
+accepts a reviewed merge only if ALL fragments (including its
+keeper) have valid full source membership and every distinct
+member frame is nonoverlapping across the entire merged component.
+It rejects missing, partial, unordered, duplicated, out-of-bound
+or representative-inconsistent membership; self/cyclic/conflicting
+identity merges remain rejected. A legacy report with **zero
+merges** still passes unchanged; a legacy saved report with one
+or more manual merges **cannot be retroactively certified** by
+up to five representative crops and is deliberately refused
+for a fully certified merged presence proposal. The browser
+can still import the older CSV for private human review; do
+not misrepresent it as complete-member certification.
+
+Aggregate-only output now includes
+\`FullFrameMemberGroupsAvailable\`,
+\`FullMemberMergeSafetyValidated\` and
+\`FullMemberMergeSafetyStatus\` (\`no-merges-to-verify\` or
+\`verified-complete-membership\`). The opt-in create-new
+pseudonym-only private draft carries the status but **no
+frame lists**. Existing report schema and human CSV format
+remain backward-compatible; no production PostgreSQL,
+source, video extraction, identity/reference or automatic
+merge writes occur. This proof only establishes **no distinct
+source frame repeated across the merged groups** for the
+reviewable captured membership; it does not prove same-person
+identity, rule out duplicate detections or correct false
+detections, or prove all faces were found.
+
+Automated CI tests cover the actual C# emitted full membership
+(including members not chosen for representative crops),
+PowerShell strict full-count/non-overlap validation, hidden
+same-frame collisions, legacy no-merge acceptance and merge
+refusal, malformed evidence, and JavaScript human-confirmed
+UI merge-veto logic. **No operator local verification of this
+synthetic safety change is required now.** Existing V01/V02
+private reports cannot acquire these new lists without a
+new explicitly approved evaluation run; do not rerun the
+videos just to verify this PR. Any later genuine real-video
+proof belongs to one consolidated near-merge review.
+
+### Remaining sequence before choosing whether to target main
+
+1. **Person-coverage / false-face burden (FACE-QUALITY-01,
+   GROUP-QUALITY-01).** Reuse accepted V01/V02 human review and
+   V03 distant-face stress evidence. Implement only the remaining
+   bounded, measurable grouping/face-prioritization changes that
+   reduce false groups/merges without losing real singletons,
+   N/U faces or identifiable people. Confirm no silent 64-group
+   cap losses or false-negative shortcut. This is NOT a request
+   for more threshold sweeps or further merge-UI polish.
+2. **Adaptive sampling / empty and long clips (SAMPLING-01).**
+   Reconcile current opt-in adaptive timestamp/cue prototype
+   with duration/content-driven extraction, whole-video
+   coverage, safe continuation and honest incomplete-coverage
+   accounting. Add synthetic short/no-face and long/scene-change
+   regression tests. No OneDrive hydration or batch archive
+   processing.
+3. **Existing full-catalogue evidence and small diverse
+   acceptance (CATALOGUE-TOP3-01, DIVERSE-VIDEOS-01).**
+   Preserve current 240 eligible-person read-only SFace
+   baseline. Use V01/V02 for recognizably identifiable
+   top-three usefulness, V03 for grouping stress, and only
+   a few *explicitly approved already-local* additional
+   examples if a concrete coverage gap remains (brief
+   faces, simultaneous people, unknown/no-face). Measure
+   person coverage, rank utility, false groups, manual
+   work, N/U survival and uncertainty together. No fixed
+   quota, no mandatory correct top-three for every face.
+4. **Boundary readiness (MERGE-01).** Resolve independent
+   CenterFace model rights/distribution, environment and
+   security/privacy retention/cleanup, main-branch code
+   reconciliation, CPU/time/storage bounds, original hash
+   safety, zero unwanted DB writes and OneDrive hydration,
+   CI and aggregate review evidence. Explicitly choose
+   integrate-vs-separate with maintainer and write rollout
+   and rollback decision. Only then plan the scope of a
+   PR targeting \`main\`. Production video/person database
+   persistence and normal three-tier production review
+   remain *post-merge implementation*, not requirements
+   for today's prototype PR.
