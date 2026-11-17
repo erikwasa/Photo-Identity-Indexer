@@ -39,6 +39,13 @@ public static class Program
             return await VideoFaceAdaptiveCueCommand.RunAsync(args);
         }
 
+        // Structural accounting of completed, owned, already-local adaptive
+        // frame windows; no original video, models or catalogue access.
+        if (args.Contains("--audit-adaptive-coverage", StringComparer.Ordinal))
+        {
+            return await VideoFaceWholeClipCoverageCommand.RunAsync(args);
+        }
+
         // Explicit source-free timestamp planning does not open video or databases.
         if (args.Contains("--adaptive-sampling-plan", StringComparer.Ordinal))
         {
@@ -89,7 +96,10 @@ public static class Program
                 "[--max-groups 20] [--max-noise 24] [--root <repo>] [--model-dir <approved-models>]\\n" +
                 "Private adaptive cues: --derive-adaptive-cues --manifest <owned-coarse-frames.json> " +
                 "--private-diagnostics <same-window-report.json> " +
-                "--private-cues-output <new-private-cues.json> [--include-visual-cues] [--root <repo>]");
+                "--private-cues-output <new-private-cues.json> [--include-visual-cues] [--root <repo>]\\n" +
+                "Whole-clip structural coverage: --audit-adaptive-coverage " +
+                "--manifest <window-0-frames.json> [--manifest <next-window-frames.json> ...] " +
+                "--private-report <new-private-coverage-receipt.json> [--root <repo>]");
             return 0;
         }
 
