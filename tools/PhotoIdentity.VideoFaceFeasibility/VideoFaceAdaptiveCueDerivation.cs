@@ -1,4 +1,7 @@
 using System.Text.Json;
+using PhotoIdentity.Core.Geometry;
+using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Imaging.OpenCv;
 
 namespace PhotoIdentity.VideoFaceFeasibility;
 
@@ -134,6 +137,7 @@ public static class VideoFaceAdaptiveCueCommand
         {
             string? manifest = null, report = null, output = null, root = null;
             bool commandSeen = false;
+            bool includeVisualCues = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string option = args[i];
@@ -141,6 +145,12 @@ public static class VideoFaceAdaptiveCueCommand
                 {
                     if (commandSeen) throw new ArgumentException("Repeated command.");
                     commandSeen = true;
+                    continue;
+                }
+                if (option == "--include-visual-cues")
+                {
+                    if (includeVisualCues) throw new ArgumentException("Repeated visual cue flag.");
+                    includeVisualCues = true;
                     continue;
                 }
                 if (++i >= args.Length || string.IsNullOrWhiteSpace(args[i]))
@@ -169,7 +179,7 @@ public static class VideoFaceAdaptiveCueCommand
                 throw new ArgumentException("Explicit private diagnostic inputs and output required.");
 
             var cues = await DeriveFromPrivateFilesAsync(
-                manifest, report, root ?? Directory.GetCurrentDirectory());
+                manifest, report, root ?? Directory.GetCurrentDirectory(), includeVisualCues);
             await WriteCuesAsync(output, root ?? Directory.GetCurrentDirectory(),
                 Path.GetDirectoryName(Path.GetFullPath(manifest))!, cues);
             // Never print private timestamps, paths, confidence, people or ranks.
@@ -186,7 +196,8 @@ public static class VideoFaceAdaptiveCueCommand
     }
 
     public static async Task<IReadOnlyList<VideoFaceSamplingCue>> DeriveFromPrivateFilesAsync(
-        string manifestPath, string reportPath, string repositoryRoot)
+        string manifestPath, string reportPath, string repositoryRoot,
+        bool includeVisualCues = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
         string manifest = RequireLocalFile(manifestPath, VideoFaceFrameSetLoader.MaximumCoverageFrames * 128);
@@ -229,6 +240,7 @@ public static class VideoFaceAdaptiveCueCommand
         if (frames.Frames!.Count != coarse.CoarseFrameCount)
             throw new ArgumentException("Only complete coarse-only frame runs may produce cues.");
 
+        var approvedFramePaths = new List<string>(frames.Frames.Count);
         // Require the exact window-relative manifest timestamps from the
         // trusted planner. Fixed/partial/refined/other-window manifests fail.
         for (int i = 0; i < frames.Frames.Count; i++)
@@ -239,7 +251,8 @@ public static class VideoFaceAdaptiveCueCommand
             // inputs. Do not follow online-only, offline or linked files.
             string frameFile = VideoFaceFrameSetLoader.ResolveApprovedFrame(
                 folder, frames.Frames[i].File);
-            _ = RequireLocalFile(frameFile, VideoFaceFrameSetLoader.MaximumFrameBytes);
+            approvedFramePaths.Add(RequireLocalFile(frameFile,
+                VideoFaceFrameSetLoader.MaximumFrameBytes));
         }
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllBytesAsync(report));
@@ -272,7 +285,38 @@ public static class VideoFaceAdaptiveCueCommand
                 discarded));
         }
 
-        return VideoFaceAdaptiveCueDeriver.Derive(coarse, observations);
+        IReadOnlyList<VideoFaceSamplingCue> detectorCues =
+            VideoFaceAdaptiveCueDeriver.Derive(coarse, observations);
+        if (!includeVisualCues)
+            return detectorCues;
+
+        // Visual analysis uses ONLY already-approved, local, extracted stills.
+        // The image decoder is bounded to 64px, with no original-video open,
+        // model inference, catalogue read, image persistence or identity signal.
+        var decoder = new OpenCvImageDecoder();
+        var fingerprints = new List<byte[]>(approvedFramePaths.Count);
+        foreach (string approvedPath in approvedFramePaths)
+        {
+            byte[] encoded = await VideoFaceExperiment.ReadApprovedStillAsync(
+                approvedPath, CancellationToken.None);
+            using var stream = new MemoryStream(encoded, writable: false);
+            ImageFrame thumbnail = await decoder.DecodeAsync(
+                stream, new DecodeOptions(new ImageSize(64, 64)),
+                CancellationToken.None);
+            fingerprints.Add(VideoFaceAdaptiveVisualCueDeriver.Capture(thumbnail));
+        }
+
+        IReadOnlyList<VideoFaceSamplingCue> visualCues =
+            VideoFaceAdaptiveVisualCueDeriver.Derive(coarse, fingerprints);
+        VideoFaceSamplingCue[] combined = detectorCues.Concat(visualCues)
+            .GroupBy(c => c.ObservedFrameTimestampMs)
+            .OrderBy(group => group.Key)
+            .Select(group => new VideoFaceSamplingCue(group.Key,
+                group.Max(c => c.Kind)))
+            .ToArray();
+        if (combined.Length > VideoFaceAdaptiveSamplingPlanner.MaximumCuesPerWindow)
+            throw new InvalidOperationException("Combined adaptive cues exceeded the bounded plan.");
+        return combined;
     }
 
     private static int? OptionalInt(JsonElement item, string name)
