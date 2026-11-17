@@ -63,6 +63,7 @@ public sealed class VideoFaceShadowDbscanTests
             Assert.Equal(2, group.Observations);
             Assert.Equal(2, group.RepresentativeCrops.Count);
             Assert.Equal("P0001", group.TopCandidates[0].Alias);
+            Assert.Equal(new[] { 1, 5 }, group.AllMemberFrameNumbers);
         });
 
         string json = JsonSerializer.Serialize(report);
@@ -71,6 +72,8 @@ public sealed class VideoFaceShadowDbscanTests
         Assert.DoesNotContain("PersonId", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("FaceOccurrenceId", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("AssetRevisionId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AllMemberFrameNumbers", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("FaceNumber\"", JsonSerializer.Serialize(report.Groups[0].AllMemberFrameNumbers), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -99,6 +102,8 @@ public sealed class VideoFaceShadowDbscanTests
         {
             Assert.InRange(group.RepresentativeCrops.Count, 1, 5);
             Assert.Equal(2, group.Observations);
+            Assert.Equal(2, group.AllMemberFrameNumbers!.Count);
+            Assert.Equal(2, group.AllMemberFrameNumbers.Distinct().Count());
         });
         Assert.Equal(64, report.Groups.Select(g => g.Alias).Distinct().Count());
         Assert.All(report.Groups, g => Assert.StartsWith("D", g.Alias));
