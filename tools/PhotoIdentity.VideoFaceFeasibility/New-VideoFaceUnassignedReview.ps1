@@ -13,7 +13,7 @@ param(
     [Parameter(Mandatory)][string]$PrivateReportPath,
     [Parameter(Mandatory)][string]$PrivateCasesPath,
     [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
-    [ValidateSet('Provisional','CenterFaceUncorroborated','CenterFaceNoise')]
+    [ValidateSet('Provisional','CenterFaceUncorroborated','CenterFaceNoise','CenterFaceOnly')]
     [string]$AuditSource = 'Provisional',
     [ValidateRange(240, 640)][int]$CropLongEdge = 512,
     [switch]$OpenGallery
@@ -85,12 +85,26 @@ $audit = if ($AuditSource -ceq 'Provisional') {
     $review.unassignedAudit
 } elseif ($AuditSource -ceq 'CenterFaceNoise') {
     $review.noiseAudit
+} elseif ($AuditSource -ceq 'CenterFaceOnly') {
+    $review.independentOnlyAudit
 } else { $review.notCorroboratedAudit }
 $expectedTotal = if ($AuditSource -ceq 'Provisional') {
     [int]$review.observationsUnassigned
 } elseif ($AuditSource -ceq 'CenterFaceNoise') {
     [int]$review.noiseObservations
+} elseif ($AuditSource -ceq 'CenterFaceOnly') {
+    [int]$review.independentOnlyAt030
 } else { [int]$review.notCorroboratedAt030 }
+if ($AuditSource -ceq 'CenterFaceOnly' -and (
+    $null -eq $counterfactual.PSObject.Properties['independentDetectionsAt030'] -or
+    $null -eq $counterfactual.PSObject.Properties['independentOnlyAt030'] -or
+    $null -eq $counterfactual.PSObject.Properties['independentOnlyAudit'] -or
+    [int]$counterfactual.independentDetectionsAt030 -lt 0 -or
+    [int]$counterfactual.independentOnlyAt030 -lt 0 -or
+    [int]$counterfactual.independentOnlyAt030 -gt
+      [int]$counterfactual.independentDetectionsAt030)) {
+    throw 'Missing or inconsistent independent-only candidate accounting.'
+}
 if ($null -eq $review -or [int]$review.schemaVersion -ne 1 -or
     $null -eq $audit -or [int]$audit.schemaVersion -ne 1 -or
     [int]$audit.maximumReviewSamples -ne 96 -or
@@ -196,6 +210,7 @@ for ($i=0; $i -lt $samples.Count; $i++) {
     $id = ('{0}{1:D3}' -f $(switch ($AuditSource) {
         'CenterFaceUncorroborated' { 'U' }
         'CenterFaceNoise' { 'N' }
+        'CenterFaceOnly' { 'I' }
         default { 'S' }
     }),($i + 1))
     $rows.Add([pscustomobject][ordered]@{
@@ -255,7 +270,7 @@ article select,article input{width:100%;box-sizing:border-box}
 article[hidden]{display:none}
 </style></head><body><main data-clip="CLIP_ALIAS_TOKEN" data-report-sha256="REPORT_HASH_TOKEN">
 <h1>WI-0155 · Unassigned detections</h1>
-<p class="note">PRIVATE, read-only human review of the bounded audit samples that did not join a provisional group after capacity was reached. These are NOT all unassigned detections, not independent random samples, not identified people and not a detection precision estimate. The temporal sampler deliberately favors higher quality-proxy examples. A real face here is evidence for missed reviewable material, not an automatic identity.</p>
+<p class="note">PRIVATE, read-only human review of the bounded audit samples that did not join a provisional group after capacity was reached. These are NOT all unassigned detections, not independent random samples, not identified people and not a detection precision estimate. The temporal sampler is deliberately quality-biased: newer N/U/I reports include higher- and lower-quality proxy examples to expose difficult possible faces. A real face here is evidence for missed reviewable material, not an automatic identity.</p>
 <p class="note">Classify each crop as Real face, Not a face, or Cannot tell. If you recognize a real face, optionally enter its existing PRIVATE P0001-style alias or UNKNOWN. No real names, notes, raw frames, scores, or identity decisions leave this folder. CSV files remain local, and importing them never changes the database. Use the enlarged crop and context image to check tiny and oblique faces.</p>
 <div class="toolbar"><button type="button" id="save-audit">Save reviewed CSV</button><button type="button" id="import-audit">Import reviewed CSV</button><label><input type="checkbox" id="hide-nonface"> Hide not-face samples</label><input type="file" id="audit-file" accept=".csv,text/csv" hidden><span id="audit-status" aria-live="polite"></span></div>
 <div class="grid" id="audit-grid">
@@ -332,6 +347,8 @@ try {
     if ($isCenterFace) {
         $sourceText = if ($AuditSource -ceq 'CenterFaceNoise') {
             'CenterFace-corroborated DBSCAN noise (confirmed by CenterFace, not grouped)'
+        } elseif ($AuditSource -ceq 'CenterFaceOnly') {
+            'CenterFace-only detections missing YuNet overlap (NOT verified faces or SFace identities)'
         } else {
             'YuNet candidates NOT corroborated by CenterFace (NOT confirmed background)'
         }
@@ -369,6 +386,7 @@ if ($OpenGallery) { Invoke-Item -LiteralPath $htmlFile }
     GalleryPath = $htmlFile
     WorksheetPath = $worksheet
     AuditSource = $AuditSource
+    SelectionPolicy = $(if ($audit.selectionPolicy) { [string]$audit.selectionPolicy } else { 'highest-quality-only-v1' })
     SampledCrops = $rows.Count
     TotalUnassignedObservations = [int]$audit.totalUnassignedObservations
     UnrepresentedObservations = [int]$audit.totalUnassignedObservations - $rows.Count
