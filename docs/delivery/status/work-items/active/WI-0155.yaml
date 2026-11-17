@@ -5,7 +5,7 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0155-video-face-processing-evaluation.md
 started_at: 2026-11-05
-last_updated_at: 2026-11-15
+last_updated_at: 2026-11-17
 branch: wi-0155
 blockers:
 - WI-0151
@@ -143,3 +143,6 @@ evidence:
   value: '2026-11-17: User completed V01 C/N/U review: two reviewed known people from two kept groups, 0 merges, 0 unlabelled groups, 0 unreviewed N/U samples, 14 reviewed real-face N/U observations, 3 cannot-tell, 0 unsampled N/U observations and 0 production writes. New full-member frame proof preserves all sorted source frame ordinals for represented C-groups in future PRIVATE reports, rejects any reviewed merge with missing/inconsistent complete membership or same-frame overlap across any members, retains legacy unmerged report compatibility and zero DB/media writes. CI synthetic-only gate; no local rerun required.'
 - type: documentation
   value: '2026-11-17: Remaining prior to planning main merge: measurable face/group quality and genuine singleton/N/U coverage; truly duration/content-adaptive bounded sampling and empty/long-case handling; small diversified existing full-catalogue real review evidence; model rights/privacy cleanup, main reconciliation, rollout/rollback and explicit integrate-or-separate maintainer decision. Existing private reports cannot retroactively establish complete frame membership without approved rerun.'
+
+- type: implementation
+  value: '2026-11-17: New opt-in read-only CenterFace-only I-audit captures independently detected candidate boxes without a YuNet match, separately from confirmed C groups, corroborated N noise and uncorroborated YuNet U candidates. N/U/I temporal audits include both low/high quality-proxy examples within the unchanged 96-crop cap, preserve unsampled counts and do not suppress or rank any detection. Offline I gallery/CSV/aggregate measurement and synthetic coverage added. Historical reports unchanged, no new local verification required until consolidated review; model rights and true singleton quality remain open.'
