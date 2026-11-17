@@ -323,7 +323,7 @@ if ($AdaptiveSampling) {
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $output 'frames.json') -Encoding utf8
 
-@{
+$extractionMetadata = @{
     schemaVersion = 1
     frameEncoding = $FrameEncoding
     sourceCodec = $metadata.streams[0].codec_name
@@ -336,7 +336,6 @@ if ($AdaptiveSampling) {
     extractedFrameBytes = $workspaceBytes
     maximumWorkspaceMiB = $MaximumWorkspaceMiB
     samplingMode = if ($AdaptiveSampling) { 'Adaptive' } else { 'Fixed' }
-    sourceDescriptorSha256 = $sourceDescriptorSha256
     samplingCoarseFrameCount = $coarseFrameCount
     samplingRefinementBudgetReached = $refinementBudgetReached
     samplingHasMoreWindows = $hasMoreWindows
@@ -344,7 +343,11 @@ if ($AdaptiveSampling) {
     samplingWindowStartMs = if ($AdaptiveSampling) { $startMs } else { $null }
     samplingWindowEndMs = $windowEndMs
     note = 'NativeLosslessPng uses lossless PNG after decoder RGB24 conversion; original 10-bit precision is not preserved.'
-} | ConvertTo-Json -Depth 5 |
+}
+if ($AdaptiveSampling) {
+    $extractionMetadata.sourceDescriptorSha256 = $sourceDescriptorSha256
+}
+$extractionMetadata | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $output 'extraction-metadata.json') -Encoding utf8
 
 @{
