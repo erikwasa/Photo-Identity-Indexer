@@ -4730,3 +4730,292 @@ was correctly suggested, or that the original bytes were
 verified by SHA-256. Run human C/N/U/I person coverage review
 separately after operator approval; do not silently discard
 true singletons or unknown/no-face observations.
+
+## Checkpoint 52 — two-video coarse/refined recognition acceptance (2026-11-18)
+
+Two expressly approved local videos have completed opt-in adaptive sampling,
+source SHA-256 before/after checks and source-descriptor-bound one-window
+audits. Video A (105.70 seconds) had 15 coarse and 127 refined frames,
+15 cues, 1,536-ms maximum requested gap and 391,502,696 refined
+frame bytes. Video B (43.49 seconds) had 7 coarse and 55 refined frames,
+7 cues, 1,500-ms maximum requested gap and 99,466,064 refined bytes.
+Coarse YuNet found 6 observations in A and 53 in B; refined B found
+404 observations across 55 frames. B's seven selected cues were all
+`PossibleNewOrPoorlyObservedFace`; there were no selected visual-only
+motion/scene-change cues. The maintainer visually saw approximately
+ten persons of interest **already in B's coarse frames**, with no
+new people seen in refinement but possibly one or two clearer
+identification frames. These are observations, **not measured
+person recall or identity accuracy**; the 404 are not 404 people.
+The refined detector count for A is still unmeasured. The trials
+do not verify no-face or >10-minute multi-window cases.
+
+The next evaluation intentionally uses **four aliases for only TWO
+physical videos**, all reusing existing extracted frames:
+V04=Video A/coarse (15), V05=Video A/refined (127),
+V06=Video B/coarse (7), V07=Video B/refined (55).
+The one four-clip catalogue run takes **one** SELECT-only,
+REPEATABLE READ eligible-person snapshot for fair within-video
+comparison. Neither this step nor the galleries reopen the original
+videos or extract additional frames. Maintain the isolated
+`wi-0155` branch; the main branch and production identities are not
+changed. This run is optional operator-approved **inference on
+already-local frames**, unlike the previous source-free audit.
+
+### 52A. Explicitly select the four private frame manifests
+
+Use Windows PowerShell 7.6 in the WI-0155 worktree. Enter **existing
+absolute** `frames.json` paths, NOT original video paths. Paths and
+private metadata must remain outside Git and never be sent to
+issue/PR comments. Do not reuse session `$coarseRuns` or
+`$coverageRuns` arrays without confirming the source; those arrays
+may refer only to the most recently processed video. Do not
+change old reports, frame manifests or metadata.
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+$ErrorActionPreference = 'Stop'
+$repo = (Get-Location).Path
+$tools = Join-Path $repo 'tools\PhotoIdentity.VideoFaceFeasibility'
+$project = Join-Path $tools 'PhotoIdentity.VideoFaceFeasibility.csproj'
+$modelDir = (Read-Host 'Existing approved models/files directory').Trim('"')
+
+if ((git branch --show-current) -cne 'wi-0155' -or
+    -not (Test-Path -LiteralPath $project -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $modelDir -PathType Container) -or
+    [string]::IsNullOrWhiteSpace(
+        $env:PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING)) {
+    throw 'Need the isolated branch, approved models and separate SELECT-only PostgreSQL login.'
+}
+
+$items = @(
+    [pscustomobject]@{Alias='V04';Video='A';Pass='Coarse';Expected=15;Manifest=(Read-Host 'Video A COARSE frames.json').Trim('"')}
+    [pscustomobject]@{Alias='V05';Video='A';Pass='Refined';Expected=127;Manifest=(Read-Host 'Video A REFINED frames.json').Trim('"')}
+    [pscustomobject]@{Alias='V06';Video='B';Pass='Coarse';Expected=7;Manifest=(Read-Host 'Video B COARSE frames.json').Trim('"')}
+    [pscustomobject]@{Alias='V07';Video='B';Pass='Refined';Expected=55;Manifest=(Read-Host 'Video B REFINED frames.json').Trim('"')}
+)
+
+$blocked = [long][IO.FileAttributes]::Offline -bor
+    [long][IO.FileAttributes]::ReparsePoint -bor
+    [long]0x00040000 -bor [long]0x00400000
+$descriptors = @()
+$manifestPaths = @()
+foreach ($item in $items) {
+    if (-not [IO.Path]::IsPathFullyQualified($item.Manifest)) {
+        throw 'Require absolute private manifests.'
+    }
+    $file = Get-Item -LiteralPath $item.Manifest -Force
+    if ($file.PSIsContainer -or
+        ([long]$file.Attributes -band $blocked) -ne 0 -or
+        ([long]$file.Directory.Attributes -band $blocked) -ne 0) {
+        throw 'Manifest is not a regular fully-local file.'
+    }
+    $manifestPaths += $file.FullName
+    $frameSet = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+    if ([int]$frameSet.schemaVersion -ne 1 -or
+        @($frameSet.frames).Count -ne $item.Expected) {
+        throw 'Unexpected frame count or schema for selected pass.'
+    }
+    $metaPath = Join-Path $file.DirectoryName 'extraction-metadata.json'
+    $meta = Get-Content -LiteralPath $metaPath -Raw | ConvertFrom-Json
+    if ([string]$meta.samplingMode -cne 'Adaptive' -or
+        [string]::IsNullOrWhiteSpace($meta.sourceDescriptorSha256)) {
+        throw 'Expected completed source-bound adaptive extraction.'
+    }
+    $descriptors += [string]$meta.sourceDescriptorSha256
+}
+if (@($manifestPaths | Sort-Object -Unique).Count -ne 4 -or
+    $descriptors[0] -cne $descriptors[1] -or
+    $descriptors[2] -cne $descriptors[3]) {
+    throw 'Coarse/refined same-source pairing or distinct manifests failed.'
+}
+```
+
+The C# runner performs stricter file/workspace/model checks.
+The descriptor is **not a video-content hash**; the maintainer's
+independent original SHA-256 comparison is separate evidence.
+The run needs the **already approved** YuNet, SFace and CenterFace
+models. Never download or substitute a model to make the test pass.
+The configured `PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING`
+must be an existing separate least-privilege, loopback SELECT-only
+PostgreSQL login, **not** the production administrator.
+
+### 52B. Analyze all four passes in one catalogue run
+
+```powershell
+$privateDir = Join-Path $env:LOCALAPPDATA (
+    'PhotoIdentity\WI0155\coarse-refined-' +
+    (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
+New-Item -ItemType Directory -Path $privateDir -ErrorAction Stop | Out-Null
+$casesPath = Join-Path $privateDir 'four-pass-cases.json'
+$reportPath = Join-Path $privateDir 'four-pass-report.json'
+$peopleMapPath = Join-Path $privateDir 'four-pass-people-map.json'
+$casesObject = @{
+    schemaVersion = 1
+    catalogueScope = 'all-eligible'
+    clips = @($items | ForEach-Object {
+        @{ alias = $_.Alias; manifest = $_.Manifest }
+    })
+}
+[IO.File]::WriteAllText(
+    $casesPath, ($casesObject | ConvertTo-Json -Depth 6),
+    [Text.UTF8Encoding]::new($false))
+
+$catalogueArgs = @(
+    '--catalogue-cases', $casesPath,
+    '--private-report', $reportPath,
+    '--private-people-map', $peopleMapPath,
+    '--root', $repo,
+    '--model-dir', $modelDir,
+    '--detector-confidence', '0.5',
+    '--detector-pipeline', 'multi-scale',
+    '--tile-size', '1024',
+    '--face-overflow-policy', 'retain-top-32',
+    '--provisional-groups', '--unassigned-audit',
+    '--shadow-dbscan', '--shadow-centerface'
+)
+$start = Get-Date
+dotnet run --project $project -c Release -- @catalogueArgs
+if ($LASTEXITCODE -ne 0) {
+    throw 'Four-pass private read-only catalogue evaluation failed.'
+}
+'Elapsed minutes: {0:N2}' -f ((Get-Date) - $start).TotalMinutes
+```
+
+The experiment performs face inference on the 204 already-existing
+frames, producing one private source-bound report and people map.
+No original video is decoded or opened by the catalogue runner,
+no new FFmpeg extraction is launched, and no PostgreSQL writes
+or automatic identity decisions occur. If any model/DB/source
+preflight fails, stop and report the rejection; do not weaken
+the privileges, model hash validation or privacy boundary.
+
+### 52C. Compare per-clip aggregate diagnostics first
+
+```powershell
+$report = Get-Content -LiteralPath $reportPath -Raw |
+    ConvertFrom-Json
+$comparison = foreach ($item in $items) {
+    $clip = @($report.clips | Where-Object alias -CEQ $item.Alias)
+    if ($clip.Count -ne 1) { throw 'Missing or repeated alias.' }
+    $review = $clip[0].review
+    $cf = $review.diagnostics.centerFaceCounterfactual
+    $c = $cf.corroboratedOnlyDbscan
+    [pscustomobject]@{
+        Video = $item.Video
+        Pass = $item.Pass
+        Alias = $item.Alias
+        Frames = [int]$review.aggregate.framesExamined
+        YuNetDetections = [int]$review.aggregate.facesDetected
+        Corroborated = [int]$cf.corroboratedAt030
+        PresentedCGroups = @($c.groups).Count
+        HiddenCGroups = [int]$c.groupsNotRepresentedForReview
+        CNoise = [int]$c.noiseObservations
+        UncorroboratedYuNet = [int]$cf.notCorroboratedAt030
+        IndependentOnly = [int]$cf.independentOnlyAt030
+    }
+}
+$comparison | Format-Table -AutoSize
+```
+
+Compare **V04 vs V05** and **V06 vs V07**; these are two
+within-video comparisons, not four independent clips. Count
+distinct people only by explicit human review. A face in noise,
+uncorroborated or CenterFace-only evidence is not automatically
+invalid, and group/observation caps are not claims of absence.
+
+### 52D. Group-first review, if the case supports the combined gallery
+
+The prototype combined C/N/U browser requires a nonempty set
+of C groups, N samples and U samples, with no unpresented C
+groups. It does not support no-group/empty-lane or over-capacity
+inputs. **Inspect the aggregate summary above first**. An
+unsupported gallery is a review UX limitation, not a negative
+person result. Start with `$alias='V04'`, repeat for V05, V06,
+V07 as applicable; open a browser and save one distinct
+combined CSV per alias.
+
+```powershell
+$alias = 'V04'
+$clip = @($report.clips | Where-Object alias -CEQ $alias)[0]
+$cf = $clip.review.diagnostics.centerFaceCounterfactual
+$c = $cf.corroboratedOnlyDbscan
+$canReview = @($c.groups).Count -gt 0 -and
+    [int]$c.groupsNotRepresentedForReview -eq 0 -and
+    @($c.noiseAudit.sampledCrops).Count -gt 0 -and
+    @($cf.notCorroboratedAudit.sampledCrops).Count -gt 0
+
+if ($canReview) {
+    $gallery = & (Join-Path $tools 'New-VideoFaceReviewWorkspace.ps1') -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias $alias -OpenGallery
+    $gallery | Select-Object Groups, NoiseSamples, NoiseNotRepresented, UncorroboratedSamples, UncorroboratedNotRepresented | Format-List
+} else {
+    Write-Warning 'Combined C/N/U gallery cannot represent this case; do not drop its counts.'
+}
+```
+
+For the reviewed case, record C-group quality, wrong/background
+groups, reviewed merges/splits, manually identified distinct
+people, and top-three usefulness. Classify N and U real/background/
+uncertain samples, retain unresolved evidence and avoid hard
+CenterFace suppression. Some people may only occur once.
+Saved CSVs must match the **four-pass** report's SHA-256; older
+V01/V02/V03 CSVs cannot be reused with this new report.
+
+Only once an alias has a saved, reviewed combined worksheet:
+
+```powershell
+$csv = (Read-Host "$alias saved combined C/N/U CSV").Trim('"')
+$measured = & (Join-Path $tools 'Measure-VideoFaceReviewWorkspace.ps1') -ReviewedCsvPath $csv -PrivateGroupReportPath $reportPath -PrivatePeopleMapPath $peopleMapPath -ClipAlias $alias
+$measured | Select-Object ClipAlias, CombinedEvidenceValidated | Format-List
+$measured.GroupMetrics | Format-List
+$measured.RankMetrics | Format-List
+$measured.NoiseMetrics | Format-List
+$measured.UncorroboratedMetrics | Format-List
+
+$presence = & (Join-Path $tools 'Measure-VideoFaceReviewedPresence.ps1') -ReviewedCsvPath $csv -PrivateGroupReportPath $reportPath -PrivatePeopleMapPath $peopleMapPath -ClipAlias $alias
+$presence | Format-List
+if (-not $measured.CombinedEvidenceValidated -or
+    -not $presence.CombinedEvidenceValidated -or
+    $presence.ProductionAssignmentsMade -ne 0) {
+    throw 'Private reviewed evidence or production-write guard failed.'
+}
+```
+
+New reports contain full-member-frame information for safe
+reviewed merges. Never disable the same-frame collision veto
+to make an incompatible merge succeed.
+
+For a case with nonzero `$cf.independentOnlyAt030` and
+nonempty `$cf.independentOnlyAudit.sampledCrops`, the optional
+**separate I-only** gallery can be opened without new inference:
+
+```powershell
+if ([int]$cf.independentOnlyAt030 -gt 0 -and
+    @($cf.independentOnlyAudit.sampledCrops).Count -gt 0) {
+    & (Join-Path $tools 'New-VideoFaceUnassignedReview.ps1') -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias $alias -AuditSource CenterFaceOnly -OpenGallery | Format-List
+}
+```
+
+If its CSV is saved, validate separately using
+`Measure-VideoFaceUnassignedReview.ps1 -AuditSource CenterFaceOnly`.
+The existing combined presence resolver does not include I.
+
+### 52E. Stop and compare the two physical videos
+
+For each video pair, report: human-distinct people in coarse
+vs refined observations; people **only** discoverable through
+refinement; people clearer for manual identification; C-group
+purity and false background burden; manual merge/split count;
+distinct known people within top-three suggestions; N/U/I
+real singletons/unknowns preserved; unreviewed and unsampled
+evidence; and extraction/inference time and storage overhead.
+Do not silently classify unrepresented candidates as absent,
+or claim all people were found because a structural coverage
+receipt was complete.
+
+Preserve all private evidence and owned workspaces until the
+comparative review is finished. Only separately approved cleanup
+through the existing `Complete-VideoFaceCoverageRun.ps1` is allowed.
+No new video source, PostgreSQL write, production link, main
+branch integration, face suppression or OneDrive hydration is
+authorized by this acceptance procedure.
