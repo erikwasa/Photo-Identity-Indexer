@@ -78,7 +78,7 @@ function Resolve-VideoFacePresenceEvidence {
         $previous = 0
         foreach ($v in $values) {
             $number = 0
-            if ($v -isnot [int] -or
+            if (($v -isnot [int] -and $v -isnot [long]) -or
                 -not [int]::TryParse([string]$v,[ref]$number) -or
                 $number -le $previous -or $number -gt 180) {
                 throw 'Full-frame membership is invalid, repeated or out of order.'
