@@ -3054,3 +3054,87 @@ face/group burden and genuine singleton preservation; then perform
 one consolidated acceptance on only approved already-local clips,
 followed by rights/privacy/runtime and branch reconciliation, and
 an explicit integrate-versus-separate decision.
+
+
+## Experimental checkpoint 51 — whole-clip adaptive coverage receipt (2026-11-17)
+
+**Gap:** Earlier sampling plans safely returned `hasMoreWindows` and
+`nextWindowStartSeconds` but had no source-bound *whole-clip* accounting.
+Someone could report a completed first/last ten-minute window while silently
+missing the middle ten minutes, double-count a window, or accidentally
+mix windows from different videos. This invalidates any assertion that
+whole-video coverage is complete, regardless of the individual frames'
+face-recognition quality.
+
+**New experimental vertical slice:**
+
+- Each NEW approved `-AdaptiveSampling` extraction records
+  `sourceDescriptorSha256` in private `extraction-metadata.json`.
+  The input is a stable local-path + original-file size/mtime +
+  FFprobe duration/dimensions/codec/pixel-format/rotation descriptor,
+  SHA-256 hashed without a second opening of the source video. The
+  source size, time and availability are checked again at the end
+  of extraction. The hash **is not a SHA-256 of the original bytes**:
+  same-size/time replacements remain possible and no source-content
+  authenticity claim follows. The path and digest are never printed.
+  Old extracted manifests intentionally lack this field and cannot
+  be certified for cross-window coherence by the new auditor.
+- `--audit-adaptive-coverage` accepts 1–6 explicit private,
+  completed `frames.json` manifests for **one clip**, in any
+  order. It verifies each ownership marker/run ID, adaptive metadata,
+  declared source descriptor, duration, canonical ten-minute
+  window positions, required whole-window coarse samples, frame
+  order/count and naming/encoding, fully-local frame-file existence,
+  per-frame 8-MiB bound, extracted byte total and workspace budget.
+  Duplicate run IDs/windows, mismatched sources, incomplete/modified
+  inputs, malformed metadata and missing coarse frames **fail closed**.
+- A valid yet incomplete selection yields a **successful, explicitly
+  incomplete audit**, with missing windows, earliest missing start,
+  covered-window duration and maximum requested-frame gap. Only a
+  complete collection of every canonical window may report
+  `wholeClipCoverageComplete=true`. An incomplete video must never
+  be mistaken for a no-face video or used as evidence that a person
+  was absent. The tool never starts a missing window automatically.
+- A create-new, private, no-path coverage JSON receipt includes
+  the window positions and source descriptor. Stdout contains only
+  aggregate window/frame counts, bytes, maximum gap, saturation,
+  `sourceContentHashVerified=false`, and completion status; no
+  original/video/frame paths, identity labels, scores or pixels.
+  No PostgreSQL, SFace, YuNet, OneDrive hydration, video open,
+  pixel decoding, crop write, cleanup or identity writes occur.
+- Synthetic no-media C# tests cover short/boundary and full-hour
+  clips, multi-window partial and complete receipts, arbitrary
+  submission order, the earliest missing window, false completion
+  prevention, duplicate/mixed sources and run IDs, missing coarse
+  timestamps, forged cap flags, tampered manifests, frame files,
+  metadata and incomplete ownership markers. The CI suite verifies
+  this without asking for additional V01/V02/V03 inference.
+
+**What this proves and does not prove:** This is structural
+timeline-plan/extracted-file accounting under the documented
+<=8-second coarse-gap policy, not proof that the original bytes
+are unchanged, that FFmpeg selected the intended pixels, or that
+every human-identifiable face has been detected. Visual or
+detector-selected refinements remain content-adaptive *opportunities*
+and can saturate the 180-frame cap. New receipts cannot
+retroactively certify old V01/V02/V03 manifests.
+
+**Remaining before `main`:**
+
+1. **FACE/GROUP-QUALITY:** compare false-group burden, purity,
+   over-splitting and genuine singletons across C/N/U/I; do not
+   require corroboration to keep a real face or shortcut at the
+   group cap. Reuse the completed V01/V02/V03 human evidence.
+2. **SAMPLING/COVERAGE acceptance:** account for actual whole-
+   video clips, bounded extraction/CPU/storage, no-face and
+   short-appearance examples; choose a tiny number of explicitly
+   approved, already-local new clips *only if* existing data has
+   a material gap. Require complete windows before interpreting
+   no-face/absent-person outcomes.
+3. **MERGE readiness:** reconcile production/main separation,
+   CenterFace model licensing and redistribution, original-content
+   SHA safety if required for deployment, privacy retention,
+   zero unapproved writes/hydration, test/CI/rollback. Explicit
+   maintainer decision integrate versus separate, THEN plan PR
+   to `main`. The three-tier integrated presence review and
+   production DB association remain post-merge implementation.

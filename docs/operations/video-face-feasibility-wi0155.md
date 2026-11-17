@@ -4655,3 +4655,78 @@ singletons (N/U/I) and do not treat unsampled evidence as
 background. For clips over ten minutes, explicitly continue
 each remaining window: this flag does not silently analyze the
 rest of a clip. No local video run is requested at this stage.
+
+
+## Checkpoint 51 — source-descriptor-bound whole-video adaptive audit
+
+The optional experiment now audits **all explicitly extracted
+adaptive windows for one clip** without reopening its original
+video. New approved adaptive extractions capture a stable
+`sourceDescriptorSha256` from local filename/size/mtime and
+FFprobe stream metadata, recheck source size/mtime after
+extraction, and keep the fingerprint only in private metadata.
+It is **NOT** a content hash of source bytes. Old extraction
+metadata has no source descriptor and fails this audit; do not
+rerun accepted V01/V02/V03 video evaluations merely to test
+this synthetic CI-covered increment.
+
+### Synthetic tests (PowerShell 7.6)
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+dotnet test .\tests\PhotoIdentity.VideoFaceFeasibility.Tests\PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release --filter 'FullyQualifiedName~VideoFaceWholeClipCoverageTests|FullyQualifiedName~VideoFaceAdaptiveSamplingPlannerTests'
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 coverage evidence regressions failed' }
+```
+
+### Optional consolidated local trial, after approval of one fully local source
+
+Reuse the operator-approved extractor for **each** required
+ten-minute window, carrying forward its reported
+`NextWindowStartSeconds`, until `HasMoreWindows=False`.
+Each invocation requires explicit `-ApprovePrivateLocalVideo`,
+may consume substantial private frame space, and performs
+only extraction for that window. Do not pass online-only or
+unapproved sources. For a real source choose a suitable
+`-MaximumWorkspaceMiB` per window and observe disk budgets.
+
+```powershell
+# $video and $ffmpeg must be already approved, fully local absolute paths.
+$windows = @()
+$start = 0.0
+do {
+    $run = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+        -VideoPath $video -FfmpegPath $ffmpeg `
+        -ApprovePrivateLocalVideo -AdaptiveSampling `
+        -WindowStartSeconds $start -FrameEncoding NativeLosslessPng `
+        -MaximumWorkspaceMiB 1024
+    $windows += $run
+    if ($run.HasMoreWindows) { $start = $run.NextWindowStartSeconds }
+} while ($run.HasMoreWindows)
+
+$privateDir = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\adaptive'
+New-Item -ItemType Directory -Path $privateDir -Force | Out-Null
+$receipt = Join-Path $privateDir ('whole-video-coverage-' + [guid]::NewGuid().ToString('N') + '.json')
+$manifests = @(
+    foreach ($run in $windows) { '--manifest'; [string]$run.ManifestPath }
+)
+dotnet run --project .\tools\PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --audit-adaptive-coverage @manifests `
+    --private-report $receipt --root (Get-Location).Path
+if ($LASTEXITCODE -ne 0) { throw 'Owned adaptive window audit refused the inputs' }
+$coverage = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+$coverage | Select-Object wholeClipCoverageComplete,expectedWindows,verifiedWindows,missingWindowStartsMs,maximumRequestedFrameGapMs,windowsAtRefinementBudget
+```
+
+This is an **optional future acceptance procedure**, not an
+instruction to extract videos today. A missing window results
+in `wholeClipCoverageComplete=False` and a specific
+`nextMissingWindowStartMs`; inconsistent or unsafe evidence
+is refused with nonzero exit. Only the private receipt carries
+window timestamps and a source-descriptor digest. A
+`WholeClipCoverageComplete=True` result proves a complete
+verified *sampling plan and local extracted file set*—not
+that the video has no unobserved faces, that an identity
+was correctly suggested, or that the original bytes were
+verified by SHA-256. Run human C/N/U/I person coverage review
+separately after operator approval; do not silently discard
+true singletons or unknown/no-face observations.

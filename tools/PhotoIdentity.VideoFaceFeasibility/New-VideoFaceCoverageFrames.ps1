@@ -111,6 +111,7 @@ $hasMoreWindows = $false
 $refinementBudgetReached = $false
 $clipDurationMs = $null
 $windowEndMs = $null
+$sourceDescriptorSha256 = $null
 if ($AdaptiveSampling) {
     # The C# planner is source-free. It returns strict JSON captured locally,
     # while FFprobe and all original-file safety checks remain in this script.
@@ -119,6 +120,22 @@ if ($AdaptiveSampling) {
         throw 'Adaptive sampling supports approved clips of at most one hour.'
     }
     $clipDurationMs = [long][math]::Floor($duration * 1000)
+    # Explicit cross-window source *descriptor* binding without an extra
+    # original-video byte read. This is NOT a content SHA-256 of the video.
+    $sourceDescriptorFields = @(
+        $video.ToUpperInvariant()
+        $source.Length.ToString([Globalization.CultureInfo]::InvariantCulture)
+        $source.LastWriteTimeUtc.Ticks.ToString([Globalization.CultureInfo]::InvariantCulture)
+        $clipDurationMs.ToString([Globalization.CultureInfo]::InvariantCulture)
+        $sourceWidth.ToString([Globalization.CultureInfo]::InvariantCulture)
+        $sourceHeight.ToString([Globalization.CultureInfo]::InvariantCulture)
+        [string]$metadata.streams[0].codec_name
+        [string]$metadata.streams[0].pix_fmt
+        $rotation.ToString([Globalization.CultureInfo]::InvariantCulture)
+    )
+    $sourceDescriptorSha256 = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData(
+            [Text.Encoding]::UTF8.GetBytes(($sourceDescriptorFields -join "`n"))))
     $startMs = [long][math]::Round($WindowStartSeconds * 1000)
     if ([math]::Abs(($WindowStartSeconds * 1000) - $startMs) -gt 0.0001) {
         throw 'Adaptive window starts must be specified to millisecond precision.'
@@ -288,13 +305,25 @@ for ($index = 0; $index -lt $frameTotal; $index++) {
     $frames.Add([ordered]@{ timestampMs = $timestampMs; file = $file })
 }
 
+if ($AdaptiveSampling) {
+    # Recheck source metadata after extraction. A same-size, same-time byte
+    # rewrite is still possible and is NOT certified by this descriptor.
+    $sourceAfter = Get-Item -LiteralPath $video -ErrorAction Stop
+    if ($sourceAfter.PSIsContainer -or
+        ([long]$sourceAfter.Attributes -band $disallowedAttributes) -ne 0 -or
+        $sourceAfter.Length -ne $source.Length -or
+        $sourceAfter.LastWriteTimeUtc.Ticks -ne $source.LastWriteTimeUtc.Ticks) {
+        throw 'Approved video source descriptor changed during adaptive extraction.'
+    }
+}
+
 @{
     schemaVersion = 1
     frames = @($frames)
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $output 'frames.json') -Encoding utf8
 
-@{
+$extractionMetadata = @{
     schemaVersion = 1
     frameEncoding = $FrameEncoding
     sourceCodec = $metadata.streams[0].codec_name
@@ -314,7 +343,11 @@ for ($index = 0; $index -lt $frameTotal; $index++) {
     samplingWindowStartMs = if ($AdaptiveSampling) { $startMs } else { $null }
     samplingWindowEndMs = $windowEndMs
     note = 'NativeLosslessPng uses lossless PNG after decoder RGB24 conversion; original 10-bit precision is not preserved.'
-} | ConvertTo-Json -Depth 5 |
+}
+if ($AdaptiveSampling) {
+    $extractionMetadata.sourceDescriptorSha256 = $sourceDescriptorSha256
+}
+$extractionMetadata | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $output 'extraction-metadata.json') -Encoding utf8
 
 @{
