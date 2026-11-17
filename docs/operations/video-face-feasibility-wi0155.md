@@ -4595,3 +4595,63 @@ this change closes an *audit visibility* gap only.
 Next development is adaptive full-window coverage,
 followed by consolidated small-sample acceptance and
 model-rights/privacy/main-branch integration decisions.
+
+
+## Checkpoint 50 — opt-in local visual scene/motion refinement
+
+A coarse scene change with no YuNet detection previously had no
+detector-only refinement cue. With this checkpoint, the optional
+`--include-visual-cues` flag inspects **only** the complete
+pre-extracted coarse images after their owned workspace, source
+manifest and detector-only report have passed existing checks.
+The source video is **not opened** by this command. An 8x8
+in-memory luminance proxy generates exploratory `Motion` and
+`SceneChange` cues on both sides of a changed interval;
+detector cues remain authoritative when their priority is higher.
+The private cue output is create-new, outside the repository,
+and contains only planned frame timestamps and cue names.
+
+### Synthetic verification (PowerShell 7.6, CI-owned)
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+dotnet test .\tests\PhotoIdentity.VideoFaceFeasibility.Tests\PhotoIdentity.VideoFaceFeasibility.Tests.csproj -c Release --filter 'FullyQualifiedName~VideoFaceAdaptive'
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 adaptive synthetic tests failed' }
+```
+
+### Optional consolidated local trial — only on an approved, still-local video
+
+Reuse the already completed *coarse-only* adaptive extraction object
+`$coarse` and its matching detector-only private diagnostic report
+`$coarseReport`. Do not run these commands on an online-only original.
+Choose a unique new private cue JSON path outside the repository and
+frame workspace; do **not** overwrite older cue files.
+
+```powershell
+$privateDir = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\WI0155\adaptive'
+New-Item -ItemType Directory -Path $privateDir -Force | Out-Null
+$visualCuePath = Join-Path $privateDir ('visual-cues-' + [guid]::NewGuid().ToString('N') + '.json')
+dotnet run --project .\tools\PhotoIdentity.VideoFaceFeasibility -c Release -- `
+    --derive-adaptive-cues --include-visual-cues `
+    --manifest $coarse.ManifestPath --private-diagnostics $coarseReport `
+    --private-cues-output $visualCuePath --root (Get-Location).Path
+if ($LASTEXITCODE -ne 0) { throw 'Private visual cue derivation failed' }
+
+$refined = .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceCoverageFrames.ps1 `
+    -VideoPath $video -FfmpegPath $ffmpeg `
+    -ApprovePrivateLocalVideo -AdaptiveSampling -AdaptiveCuesPath $visualCuePath `
+    -WindowStartSeconds $coarse.WindowStartSeconds `
+    -FrameEncoding NativeLosslessPng -MaximumWorkspaceMiB 1024
+$refined | Select-Object FrameCount,CoarseFrameCount,RefinementBudgetReached,HasMoreWindows,NextWindowStartSeconds
+```
+
+Preflight and the visual cue pass do not need SFace, PostgreSQL
+or a full-catalogue identity snapshot. After a real approved
+extract, compare person coverage and false-group burden using
+the established reviewed workflow; the presence of a
+`SceneChange` or `Motion` cue **does not** establish a real
+face, an entrant, or improved recall. Preserve genuine
+singletons (N/U/I) and do not treat unsampled evidence as
+background. For clips over ten minutes, explicitly continue
+each remaining window: this flag does not silently analyze the
+rest of a clip. No local video run is requested at this stage.
