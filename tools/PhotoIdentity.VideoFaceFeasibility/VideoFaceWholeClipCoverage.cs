@@ -227,6 +227,21 @@ public static class VideoFaceWholeClipCoverage
             actualBytes = checked(actualBytes + new FileInfo(file).Length);
             requested.Add(checked(start + frame.TimestampMs));
         }
+        // A completed workspace must contain ONLY its owned manifest,
+        // metadata, marker and declared frames. Unknown extra files
+        // (including links and unlisted crops) invalidate completeness.
+        var allowedNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "frames.json", "wi0155-run.json", "extraction-metadata.json",
+        };
+        foreach (VideoFaceFrame frame in frames.Frames)
+            allowedNames.Add(frame.File);
+        foreach (string entry in Directory.EnumerateFileSystemEntries(folder))
+        {
+            if (!allowedNames.Contains(Path.GetFileName(entry)))
+                throw new ArgumentException("Unexpected file in completed coverage workspace.");
+        }
+
         if (actualBytes != declaredBytes)
             throw new ArgumentException("The extracted-frame byte total does not match metadata.");
 
