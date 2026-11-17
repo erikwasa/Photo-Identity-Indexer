@@ -77,6 +77,25 @@ public sealed class VideoFaceShadowDbscanTests
     }
 
     [Fact]
+    public async Task Source_membership_includes_frames_not_selected_as_representative_crops()
+    {
+        VideoFaceShadowDbscan shadow = new();
+        for (int frame = 1; frame <= 10; frame++)
+            shadow.Observe(frame, frame * 1000L, 1, Vector(0), Face(), Size);
+
+        var result = await shadow.EvaluateAsync(Matcher());
+        var group = Assert.Single(result.Groups);
+        Assert.Equal(10, group.Observations);
+        Assert.Equal(Enumerable.Range(1, 10), group.AllMemberFrameNumbers);
+        Assert.True(group.RepresentativeCrops.Count <= 5);
+        Assert.True(group.AllMemberFrameNumbers!.Count > group.RepresentativeCrops.Count);
+
+        string json = JsonSerializer.Serialize(result);
+        Assert.Contains("\"AllMemberFrameNumbers\"", json);
+        Assert.DoesNotContain("\"FaceOccurrenceId\"", json);
+    }
+
+    [Fact]
     public async Task Many_valid_clusters_are_bounded_for_review_but_all_members_are_counted()
     {
         VideoFaceShadowDbscan shadow = new();
