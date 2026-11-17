@@ -386,7 +386,7 @@ if ($OpenGallery) { Invoke-Item -LiteralPath $htmlFile }
     GalleryPath = $htmlFile
     WorksheetPath = $worksheet
     AuditSource = $AuditSource
-    SelectionPolicy = $(if ($audit.selectionPolicy) { [string]$audit.selectionPolicy } else { 'highest-quality-only-v1' })
+    SelectionPolicy = $(if ($null -ne $audit.PSObject.Properties['selectionPolicy'] -and $audit.selectionPolicy) { [string]$audit.selectionPolicy } else { 'highest-quality-only-v1' })
     SampledCrops = $rows.Count
     TotalUnassignedObservations = [int]$audit.totalUnassignedObservations
     UnrepresentedObservations = [int]$audit.totalUnassignedObservations - $rows.Count
