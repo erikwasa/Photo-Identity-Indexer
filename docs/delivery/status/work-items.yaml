@@ -179,8 +179,6 @@ work_items:
     value: '2026-11-17: User completed V01 C/N/U review: two reviewed known people from two kept groups, 0 merges, 0 unlabelled groups, 0 unreviewed N/U samples, 14 reviewed real-face N/U observations, 3 cannot-tell, 0 unsampled N/U observations and 0 production writes. New full-member frame proof preserves all sorted source frame ordinals for represented C-groups in future PRIVATE reports, rejects any reviewed merge with missing/inconsistent complete membership or same-frame overlap across any members, retains legacy unmerged report compatibility and zero DB/media writes. CI synthetic-only gate; no local rerun required.'
   - type: documentation
     value: '2026-11-17: Remaining prior to planning main merge: measurable face/group quality and genuine singleton/N/U coverage; truly duration/content-adaptive bounded sampling and empty/long-case handling; small diversified existing full-catalogue real review evidence; model rights/privacy cleanup, main reconciliation, rollout/rollback and explicit integrate-or-separate maintainer decision. Existing private reports cannot retroactively establish complete frame membership without approved rerun.'
-  - type: implementation
-    value: '2026-11-17: New opt-in CenterFace-only I audit records independent boxes without YuNet overlap; bounded quality-extremes-v1 N/U/I samples include both weak/strong crop proxies, no detector suppression or identity assignments. Private offline I gallery and aggregate measurements; automated tests and remaining real group/singleton quality evidence pending. Main merge deferred.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
