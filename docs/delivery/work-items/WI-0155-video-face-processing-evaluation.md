@@ -3001,3 +3001,56 @@ rerun is requested to validate this implementation.
    rollback. Only **then** scope a PR against `main`.
    Production person-presence persistence and three-tier
    integrated review are deferred follow-on work.
+
+
+## Experimental checkpoint 50 — visual-change cues for adaptive coverage (2026-11-17)
+
+The source-free adaptive planner already covers each complete <=10-minute
+window with <=8-second coarse timestamp gaps and requires explicit
+continuation to cover clips longer than ten minutes (up to one hour).
+However, prior optional refinement was driven only by YuNet detections:
+when the detector found no face, a scene cut or changed background
+was not eligible for additional nearby samples. A missed short
+appearance could therefore have had no detector-derived cue.
+
+**Opt-in private experimental change:** `--derive-adaptive-cues
+--include-visual-cues` now reads the *same preflighted, completed,
+already-local coarse frame workspace* after verifying its manifest,
+ownership metadata and per-frame detector report. Images are decoded
+to at most 64x64 pixels in memory and reduced to an 8x8 luminance
+grid. Significant change across >=4 cells produces a `Motion` cue;
+across >=24 cells produces a `SceneChange` cue. Both boundary frames
+are candidates for bounded refinement. Cues are deduplicated against
+detector-based entrances/exits, small/uncertain detections and
+candidate overflow, retaining the higher-priority cue per planned
+timestamp. They can only refine an existing coarse plan and never
+drop a coarse frame, stop at the first identified face, infer a person,
+or write source/video/identity/embedding/database state. The normal
+`--derive-adaptive-cues` behavior remains backward compatible.
+
+These 8x8 thresholds are **not calibrated face quality, optical flow,
+scene segmentation, recall or detection confidence**. Camera
+movement, lighting/exposure changes and edits may also produce
+cues; sub-8-second genuine faces can still be missed entirely.
+An 180-frame window cap and explicit
+`refinementBudgetReached` indicator apply unchanged. Video windows
+after the first still require explicit continuation; this is not yet
+a whole-clip orchestrator or proof of full person coverage.
+
+Synthetic C# regressions cover a no-detection scene change, localized
+motion, stable no-face footage, unchanged/coarse frame preservation,
+deduplicated detector + visual cues, incomplete/tampered plans, a
+long clip's last window, source-only 64x64 decoding and bounded
+review workload. Existing coarse-only reports remain readable,
+and the visual option is off by default. No V01/V02/V03 local
+video rerun is required for this checkpoint; the optional visual
+workflow belongs to the consolidated review after remaining
+development. Main remains untouched.
+
+**Next before planning `main`:** finalize explicit whole-clip
+window completion accounting and resource limits; use the existing
+human V01/V02/V03 C/N/U reviews and any justified I evidence for
+face/group burden and genuine singleton preservation; then perform
+one consolidated acceptance on only approved already-local clips,
+followed by rights/privacy/runtime and branch reconciliation, and
+an explicit integrate-versus-separate decision.

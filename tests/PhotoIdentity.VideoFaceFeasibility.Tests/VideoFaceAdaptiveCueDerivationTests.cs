@@ -1,4 +1,7 @@
 using System.Text.Json;
+using PhotoIdentity.Core.Geometry;
+using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.VideoFaceFeasibility;
 using Xunit;
 
@@ -132,7 +135,8 @@ public sealed class VideoFaceAdaptiveCueDerivationTests
             await File.WriteAllTextAsync(manifest,
                 JsonSerializer.Serialize(new { schemaVersion = 1, frames = frameEntries }));
             foreach (var frame in frameEntries)
-                await File.WriteAllBytesAsync(Path.Combine(workspace, frame.file), [0x89, 0x50, 0x4E, 0x47]);
+                await File.WriteAllBytesAsync(Path.Combine(workspace, frame.file),
+                    [137, 80, 78, 71, 13, 10, 26, 10, 1]);
 
             var observations = plan.FrameTimestampsMs.Select((timestamp, i) => new
             {
@@ -168,6 +172,27 @@ public sealed class VideoFaceAdaptiveCueDerivationTests
             Assert.DoesNotContain("must-not-be-in-output", outputText);
             var loaded = await VideoFaceAdaptiveSamplingCommand.LoadCuesAsync(output);
             Assert.Equal(cues, loaded);
+            // The opt-in visual pass is independent of the detector counts.
+            // The synthetic decoder sees only the already-selected coarse
+            // stills; a scene change with no detected face is still sampled.
+            var visualDecoder = new SyntheticVisualDecoder();
+            var visualCombined = await VideoFaceAdaptiveCueCommand.DeriveFromPrivateFilesAsync(
+                manifest, report, repo, includeVisualCues: true,
+                visualDecoder: visualDecoder);
+            Assert.Equal(plan.CoarseFrameCount, visualDecoder.Calls);
+            Assert.Contains(visualCombined, cue =>
+                cue.Kind == VideoFaceSamplingCueKind.SceneChange &&
+                cue.ObservedFrameTimestampMs == plan.FrameTimestampsMs[3]);
+            Assert.Contains(visualCombined, cue =>
+                cue.Kind == VideoFaceSamplingCueKind.SceneChange &&
+                cue.ObservedFrameTimestampMs == plan.FrameTimestampsMs[4]);
+            Assert.All(cues, original =>
+                Assert.Contains(visualCombined, combined =>
+                    combined.ObservedFrameTimestampMs == original.ObservedFrameTimestampMs &&
+                    combined.Kind >= original.Kind));
+            Assert.Equal(visualCombined.Count,
+                visualCombined.Select(x => x.ObservedFrameTimestampMs).Distinct().Count());
+
             var refined = VideoFaceAdaptiveSamplingCommand.CreatePlan(duration, start, loaded);
             Assert.True(refined.FrameTimestampsMs.Count > plan.FrameTimestampsMs.Count);
 
@@ -191,6 +216,20 @@ public sealed class VideoFaceAdaptiveCueDerivationTests
         finally
         {
             Directory.Delete(tmp, recursive: true);
+        }
+    }
+
+    private sealed class SyntheticVisualDecoder : IImageDecoder
+    {
+        public int Calls { get; private set; }
+
+        public Task<ImageFrame> DecodeAsync(
+            Stream source, DecodeOptions options, CancellationToken cancellationToken)
+        {
+            byte value = Calls++ >= 4 ? (byte)255 : (byte)0;
+            return Task.FromResult(new ImageFrame(
+                new ImageSize(16, 16), PixelFormat.Bgr24, 48,
+                Enumerable.Repeat(value, 16 * 16 * 3).ToArray()));
         }
     }
 }

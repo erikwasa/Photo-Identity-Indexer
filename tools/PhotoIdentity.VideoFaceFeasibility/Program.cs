@@ -89,7 +89,7 @@ public static class Program
                 "[--max-groups 20] [--max-noise 24] [--root <repo>] [--model-dir <approved-models>]\\n" +
                 "Private adaptive cues: --derive-adaptive-cues --manifest <owned-coarse-frames.json> " +
                 "--private-diagnostics <same-window-report.json> " +
-                "--private-cues-output <new-private-cues.json> [--root <repo>]");
+                "--private-cues-output <new-private-cues.json> [--include-visual-cues] [--root <repo>]");
             return 0;
         }
 
