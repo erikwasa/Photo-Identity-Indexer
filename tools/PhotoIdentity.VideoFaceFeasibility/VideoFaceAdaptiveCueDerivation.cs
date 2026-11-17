@@ -197,7 +197,7 @@ public static class VideoFaceAdaptiveCueCommand
 
     public static async Task<IReadOnlyList<VideoFaceSamplingCue>> DeriveFromPrivateFilesAsync(
         string manifestPath, string reportPath, string repositoryRoot,
-        bool includeVisualCues = false)
+        bool includeVisualCues = false, IImageDecoder? visualDecoder = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
         string manifest = RequireLocalFile(manifestPath, VideoFaceFrameSetLoader.MaximumCoverageFrames * 128);
@@ -293,7 +293,7 @@ public static class VideoFaceAdaptiveCueCommand
         // Visual analysis uses ONLY already-approved, local, extracted stills.
         // The image decoder is bounded to 64px, with no original-video open,
         // model inference, catalogue read, image persistence or identity signal.
-        var decoder = new OpenCvImageDecoder();
+        IImageDecoder decoder = visualDecoder ?? new OpenCvImageDecoder();
         var fingerprints = new List<byte[]>(approvedFramePaths.Count);
         foreach (string approvedPath in approvedFramePaths)
         {
