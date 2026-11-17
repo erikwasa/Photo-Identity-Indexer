@@ -74,6 +74,9 @@ public sealed class VideoFaceCenterFaceShadowTests
         Assert.Equal("P0001", Assert.Single(
             result.CorroboratedOnlyDbscan.Groups).TopCandidates[0].Alias);
         Assert.Equal(4, result.FramesChecked);
+        Assert.Equal(4, result.IndependentDetectionsAt030);
+        Assert.Equal(0, result.IndependentOnlyAt030);
+        Assert.Empty(result.IndependentOnlyAudit!.SampledCrops);
         Assert.True(result.AllCandidatesAccountedFor);
 
         string serialized = JsonSerializer.Serialize(result);
@@ -122,6 +125,51 @@ public sealed class VideoFaceCenterFaceShadowTests
     }
 
     [Fact]
+    public async Task Independent_only_face_candidates_are_preserved_without_claiming_identity()
+    {
+        var counterfactual = new VideoFaceCenterFaceShadow(
+            1000, 1000, IndependentDescriptor());
+        counterfactual.ObserveFrame(1, 1000, Size,
+            [Detection(.10, .10)], [Vector(0)],
+            [Detection(.10, .10, .8), Detection(.65, .65, .4)]);
+        var result = await counterfactual.EvaluateAsync(Matcher());
+
+        Assert.Equal(1, result.RetainedYuNetObservations);
+        Assert.Equal(1, result.CorroboratedAt030);
+        Assert.Equal(0, result.NotCorroboratedAt030);
+        Assert.Equal(2, result.IndependentDetectionsAt030);
+        Assert.Equal(1, result.IndependentOnlyAt030);
+        var candidate = Assert.Single(result.IndependentOnlyAudit!.SampledCrops);
+        Assert.Equal(2, candidate.FaceNumber);
+        Assert.Equal(VideoFaceUnassignedAuditSampler.QualityExtremesPolicy,
+            result.IndependentOnlyAudit.SelectionPolicy);
+        Assert.Equal(1, result.CorroboratedOnlyDbscan.NoiseObservations);
+        Assert.True(result.AllCandidatesAccountedFor);
+        string json = JsonSerializer.Serialize(result);
+        Assert.DoesNotContain("PersonId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Embedding", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Independent_only_audit_keeps_easy_and_hard_examples_in_bounded_sample()
+    {
+        var counterfactual = new VideoFaceCenterFaceShadow(
+            1000, 2000, IndependentDescriptor());
+        var candidates = Enumerable.Range(0, 20)
+            .Select(i => Detection(.60, .60, i < 10 ? .9 : .31)).ToArray();
+        // Source boxes are independent detections, not YuNet embeddings.
+        // A single frame cannot consume the review stratum (two samples).
+        counterfactual.ObserveFrame(1, 1000, Size, [], [],
+            candidates.Take(20).ToArray());
+        counterfactual.ObserveFrame(2, 2000, Size, [], [], []);
+        var result = await counterfactual.EvaluateAsync(Matcher());
+        Assert.Equal(20, result.IndependentOnlyAt030);
+        Assert.Equal(20, result.IndependentDetectionsAt030);
+        Assert.Equal(2, result.IndependentOnlyAudit!.SampledObservations);
+        Assert.True(result.AllCandidatesAccountedFor);
+    }
+
+    [Fact]
     public void Refuses_wrong_frame_order_and_inconsistent_embedding_count()
     {
         var result = new VideoFaceCenterFaceShadow(1000, 2000, IndependentDescriptor());
@@ -130,6 +178,8 @@ public sealed class VideoFaceCenterFaceShadowTests
         Assert.Throws<ArgumentException>(() =>
             result.ObserveFrame(1, 1000, Size,
                 [Detection(.2, .2)], [], []));
+        Assert.Throws<ArgumentException>(() => result.ObserveFrame(1, 1000, Size,
+            [], [], Enumerable.Repeat(Detection(.2, .2), 33).ToArray()));
         result.ObserveFrame(1, 1000, Size, [], [], []);
         Assert.Throws<ArgumentException>(() =>
             result.ObserveFrame(1, 1000, Size, [], [], []));

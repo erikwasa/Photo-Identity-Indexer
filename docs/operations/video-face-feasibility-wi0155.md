@@ -4535,3 +4535,63 @@ lifecycle and main reconciliation; decide integrate-or-separate
 plus safe rollout/rollback. All prototype PRs still target
 \`wi-0155\`. Production person-presence database writes and
 the integrated three-tier review UI are post-merge scope.
+
+
+## Checkpoint 49 — CenterFace-only I audit and singleton-preserving sampling
+
+The full-frame CenterFace comparison now captures **reverse
+detector disagreements**: independent CenterFace boxes not
+overlapping any retained YuNet candidate at exploratory IoU
+0.25, at CenterFace confidence >=0.30. These are separate
+`independentDetectionsAt030` and `independentOnlyAt030`
+counts, plus the `independentOnlyAudit` in NEW PRIVATE
+counterfactual reports. No new YuNet detections or SFace
+identity matches are inferred. CenterFace-only boxes can
+include background, duplicates and missed true faces.
+
+New N/U/I audits use `quality-extremes-v1`: strongest and
+weakest quality-proxy candidates per temporal stratum
+(up to four from each, eight per stratum, 96 total, no
+more than two from one frame). This makes difficult
+singletons reviewable without treating low quality as
+absence; unsampled candidate counts are preserved.
+The baseline G unassigned audit keeps its old policy.
+Both high and low tails are biased diagnostic samples,
+not a detection precision estimate or confirmed faces.
+
+Optional operator review *only after a newly approved
+private source run has generated these fields*:
+
+```powershell
+pwsh -NoProfile -File .\tools\PhotoIdentity.VideoFaceFeasibility\New-VideoFaceUnassignedReview.ps1 `
+    -PrivateReportPath 'C:\Private\wi0155\new-report.json' `
+    -PrivateCasesPath 'C:\Private\wi0155\cases.json' `
+    -ClipAlias V01 -AuditSource CenterFaceOnly
+# Then after human CSV review:
+pwsh -NoProfile -File .\tools\PhotoIdentity.VideoFaceFeasibility\Measure-VideoFaceUnassignedReview.ps1 `
+    -ReviewedCsvPath 'C:\Private\wi0155\I-reviewed.csv' `
+    -PrivateGroupReportPath 'C:\Private\wi0155\new-report.json' `
+    -ClipAlias V01 -AuditSource CenterFaceOnly
+```
+
+The gallery is offline, source/report SHA-bound, never
+writes PostgreSQL, never assigns identities, and creates
+all crops and worksheet files only in the private local
+review folder. It rejects legacy reports without I
+evidence; do **not** rerun V01/V02/V03 to obtain it merely
+for this synthetic-only checkpoint. I reviews are not
+merged into the current C/N/U presence resolver.
+
+Automated test commands for Windows PowerShell 7.6:
+
+```powershell
+dotnet test .\tests\PhotoIdentity.VideoFaceFeasibility.Tests\PhotoIdentity.VideoFaceFeasibility.Tests.csproj --filter 'FullyQualifiedName~VideoFaceUnassignedAuditTests|FullyQualifiedName~VideoFaceCenterFaceShadowTests|FullyQualifiedName~VideoFaceShadowDbscanTests'
+pwsh -NoProfile -File .\tools\PhotoIdentity.VideoFaceFeasibility\Test-VideoFaceUnassignedReview.ps1
+```
+
+**Status:** face/group fidelity and genuine singleton
+preservation remain to be established on human evidence;
+this change closes an *audit visibility* gap only.
+Next development is adaptive full-window coverage,
+followed by consolidated small-sample acceptance and
+model-rights/privacy/main-branch integration decisions.

@@ -22,13 +22,32 @@ public sealed record VideoFaceCenterFaceCounterfactual(
     VideoFaceUnassignedAudit NotCorroboratedAudit,
     VideoFaceShadowDbscanReview CorroboratedOnlyDbscan)
 {
+    // Optional on old reports. CenterFace-only boxes are NOT YuNet faces,
+    // SFace embeddings or verified people, merely independent-only evidence.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? IndependentDetectionsAt030 { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? IndependentOnlyAt030 { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VideoFaceUnassignedAudit? IndependentOnlyAudit { get; init; }
+
+    public bool IndependentOnlyAccountingComplete =>
+        (IndependentDetectionsAt030 is null && IndependentOnlyAt030 is null &&
+         IndependentOnlyAudit is null) ||
+        (IndependentDetectionsAt030 is int detected && detected >= 0 &&
+         IndependentOnlyAt030 is int unmatched && unmatched >= 0 &&
+         unmatched <= detected && IndependentOnlyAudit is not null &&
+         IndependentOnlyAudit.TotalUnassignedObservations == unmatched &&
+         IndependentOnlyAudit.SampledObservations <= unmatched);
+
     public bool AllCandidatesAccountedFor =>
         CorroboratedAt030 + NotCorroboratedAt030 == RetainedYuNetObservations &&
         CorroboratedAt050 <= CorroboratedAt030 &&
         NotCorroboratedAudit.TotalUnassignedObservations == NotCorroboratedAt030 &&
         CorroboratedOnlyDbscan.ObservationsEvaluated == CorroboratedAt030 &&
         CorroboratedOnlyDbscan.AllObservationsAccountedFor &&
-        CorroboratedOnlyDbscan.SameFrameCollisions == 0;
+        CorroboratedOnlyDbscan.SameFrameCollisions == 0 &&
+        IndependentOnlyAccountingComplete;
 }
 
 /// <summary>
@@ -41,18 +60,24 @@ public sealed class VideoFaceCenterFaceShadow
 {
     private readonly VideoFaceShadowDbscan _corroborated = new();
     private readonly VideoFaceUnassignedAuditSampler _notCorroborated;
+    private readonly VideoFaceUnassignedAuditSampler _independentOnly;
     private readonly string _detectorId;
     private readonly string _detectorSha256;
     private int _frames;
     private int _observed;
     private int _agreed030;
     private int _agreed050;
+    private int _independentObserved;
+    private int _independentUnmatched;
 
     public VideoFaceCenterFaceShadow(
         long firstTimestampMs, long lastTimestampMs, ModelDescriptor independentDescriptor)
     {
         ArgumentNullException.ThrowIfNull(independentDescriptor);
-        _notCorroborated = new(firstTimestampMs, lastTimestampMs);
+        _notCorroborated = new(firstTimestampMs, lastTimestampMs,
+            preserveLowQualityCandidates: true);
+        _independentOnly = new(firstTimestampMs, lastTimestampMs,
+            preserveLowQualityCandidates: true);
         _detectorId = independentDescriptor.Id.Value;
         _detectorSha256 = independentDescriptor.ModelHash.Value;
     }
@@ -71,6 +96,7 @@ public sealed class VideoFaceCenterFaceShadow
             timestampMs < 0 ||
             imageSize.Width < 1 || imageSize.Height < 1 ||
             yunet.Count != vectors.Count || yunet.Count > 32 ||
+            independent.Count > 32 ||
             _observed + yunet.Count > VideoFaceShadowDbscan.MaximumObservations)
         {
             throw new ArgumentException("Independent shadow frame/candidate accounting mismatch.");
@@ -111,6 +137,33 @@ public sealed class VideoFaceCenterFaceShadow
             }
             if (agrees050) _agreed050++;
         }
+        // Reverse direction is material: candidates found by the independent
+        // detector but absent from YuNet are otherwise invisible to the
+        // shadow's N/U accounting. Do NOT silently enroll, merge or filter.
+        for (int i = 0; i < independent.Count; i++)
+        {
+            DetectedFaceCandidate candidate = independent[i];
+            if (!double.IsFinite(candidate.Confidence) ||
+                candidate.Confidence is < 0 or > 1)
+                throw new ArgumentException("Invalid independent detection confidence.");
+            if (candidate.Confidence < .30) continue;
+
+            _independentObserved++;
+            NormalizedBoundingBox box = candidate.BoundingBox;
+            double size = Math.Min(box.Width * imageSize.Width,
+                box.Height * imageSize.Height);
+            var crop = new VideoFaceGroupCrop(frameNumber, timestampMs, i + 1,
+                box.X, box.Y, box.Width, box.Height,
+                Math.Round(candidate.Confidence, 4),
+                Math.Round(candidate.Confidence *
+                    Math.Min(1d, Math.Max(0d, size) / 160d), 4));
+            if (VideoFaceIndependentDetectorAudit.BestOverlap(
+                    crop, yunet, 0) < VideoFaceIndependentDetectorAudit.OverlapForExploration)
+            {
+                _independentUnmatched++;
+                _independentOnly.Observe(crop);
+            }
+        }
         _frames++;
     }
 
@@ -125,7 +178,12 @@ public sealed class VideoFaceCenterFaceShadow
             VideoFaceIndependentDetectorAudit.OverlapForExploration,
             _frames, _observed, _agreed030, _agreed050, notCorroborated,
             _notCorroborated.CreateReview(notCorroborated),
-            await _corroborated.EvaluateAsync(catalogue, cancellationToken));
+            await _corroborated.EvaluateAsync(catalogue, cancellationToken))
+        {
+            IndependentDetectionsAt030 = _independentObserved,
+            IndependentOnlyAt030 = _independentUnmatched,
+            IndependentOnlyAudit = _independentOnly.CreateReview(_independentUnmatched),
+        };
         if (!result.AllCandidatesAccountedFor)
             throw new InvalidOperationException(
                 "Independent shadow lost observations or merged simultaneous faces.");

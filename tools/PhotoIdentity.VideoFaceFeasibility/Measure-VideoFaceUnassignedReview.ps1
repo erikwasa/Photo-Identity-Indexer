@@ -11,7 +11,7 @@ param(
     [Parameter(Mandatory)][string]$ReviewedCsvPath,
     [Parameter(Mandatory)][string]$PrivateGroupReportPath,
     [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
-    [ValidateSet('Provisional','CenterFaceUncorroborated','CenterFaceNoise')]
+    [ValidateSet('Provisional','CenterFaceUncorroborated','CenterFaceNoise','CenterFaceOnly')]
     [string]$AuditSource = 'Provisional'
 )
 Set-StrictMode -Version Latest
@@ -77,12 +77,25 @@ try {
         $review.unassignedAudit
     } elseif ($AuditSource -ceq 'CenterFaceNoise') {
         $review.noiseAudit
+    } elseif ($AuditSource -ceq 'CenterFaceOnly') {
+        $review.independentOnlyAudit
     } else { $review.notCorroboratedAudit }
     $expectedTotal = if ($AuditSource -ceq 'Provisional') {
         [int]$review.observationsUnassigned
     } elseif ($AuditSource -ceq 'CenterFaceNoise') {
         [int]$review.noiseObservations
+    } elseif ($AuditSource -ceq 'CenterFaceOnly') {
+        [int]$review.independentOnlyAt030
     } else { [int]$review.notCorroboratedAt030 }
+    if ($AuditSource -ceq 'CenterFaceOnly' -and (
+        $null -eq $cf.PSObject.Properties['independentDetectionsAt030'] -or
+        $null -eq $cf.PSObject.Properties['independentOnlyAt030'] -or
+        $null -eq $cf.PSObject.Properties['independentOnlyAudit'] -or
+        [int]$cf.independentDetectionsAt030 -lt 0 -or
+        [int]$cf.independentOnlyAt030 -lt 0 -or
+        [int]$cf.independentOnlyAt030 -gt [int]$cf.independentDetectionsAt030)) {
+        throw 'Missing or inconsistent independent-only candidate accounting.'
+    }
     if ($null -eq $review -or [int]$review.schemaVersion -ne 1 -or
         $null -eq $audit -or [int]$audit.schemaVersion -ne 1 -or
         [int]$audit.totalUnassignedObservations -ne $expectedTotal -or
@@ -130,6 +143,7 @@ try {
             $row.Sample -cne ('{0}{1:D3}' -f $(switch ($AuditSource) {
                 'CenterFaceUncorroborated' { 'U' }
                 'CenterFaceNoise' { 'N' }
+                'CenterFaceOnly' { 'I' }
                 default { 'S' }
             }),($i+1)) -or
             [string]$row.Frame -cne [string]$sample.frameNumber -or
@@ -168,6 +182,7 @@ try {
     [pscustomobject][ordered]@{
         SchemaVersion = 1
         AuditSource = $AuditSource
+        SelectionPolicy = $(if ($null -ne $audit.PSObject.Properties['selectionPolicy'] -and $audit.selectionPolicy) { [string]$audit.selectionPolicy } else { 'highest-quality-only-v1' })
         SourceEvidenceValidated = $true
         TotalUnassignedObservations = [int]$audit.totalUnassignedObservations
         SampledObservations = $samples.Count

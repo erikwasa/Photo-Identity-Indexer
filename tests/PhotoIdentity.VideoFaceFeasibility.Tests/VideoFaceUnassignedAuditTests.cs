@@ -91,6 +91,37 @@ public sealed class VideoFaceUnassignedAuditTests
     }
 
     [Fact]
+    public void Quality_diverse_audit_exposes_low_quality_singletons_without_changing_default_policy()
+    {
+        static VideoFaceUnassignedAudit Create(bool preserveLow)
+        {
+            var sampler = new VideoFaceUnassignedAuditSampler(0, 1_000,
+                preserveLowQualityCandidates: preserveLow);
+            for (int frame = 1; frame <= 20; frame++)
+                sampler.Observe(Crop(frame, 100, 1, .9));
+            for (int frame = 21; frame <= 40; frame++)
+                sampler.Observe(Crop(frame, 100, 1, .1));
+            return sampler.CreateReview(40);
+        }
+
+        var legacy = Create(false);
+        var diversified = Create(true);
+        Assert.Equal(8, legacy.SampledObservations);
+        Assert.All(legacy.SampledCrops, crop => Assert.Equal(.9, crop.Quality));
+        Assert.Null(legacy.SelectionPolicy);
+        Assert.Equal(8, diversified.SampledObservations);
+        Assert.Equal(VideoFaceUnassignedAuditSampler.QualityExtremesPolicy,
+            diversified.SelectionPolicy);
+        Assert.Equal(4, diversified.SampledCrops.Count(crop => crop.Quality == .9));
+        Assert.Equal(4, diversified.SampledCrops.Count(crop => crop.Quality == .1));
+        Assert.Equal(32, diversified.UnrepresentedObservations);
+        Assert.Equal(8, diversified.SampledCrops.Select(c =>
+            (c.FrameNumber, c.FaceNumber)).Distinct().Count());
+        Assert.Equal(JsonSerializer.Serialize(diversified),
+            JsonSerializer.Serialize(Create(true)));
+    }
+
+    [Fact]
     public void Saturated_group_cap_leaves_group_counts_and_assignments_unchanged()
     {
         var legacy = new VideoFaceProvisionalGrouper();
