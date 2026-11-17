@@ -2901,3 +2901,103 @@ proof belongs to one consolidated near-merge review.
    persistence and normal three-tier production review
    remain *post-merge implementation*, not requirements
    for today's prototype PR.
+
+
+## Experimental checkpoint 49 — independent-only face candidates and quality-diverse singleton review (2026-11-17)
+
+**Problem observed in the code path:** CenterFace had only been used
+to test overlap *against previously retained YuNet candidates*. Thus
+even a valid CenterFace-only face was invisible in the C/N/U
+review evidence. Also, the high-quality-only 96-sample temporal
+audits could preferentially show clear crops while missing
+tiny, blurred, briefly visible or low-confidence **genuine
+singleton faces**. None of the existing human review proves
+a safe hard rejection threshold.
+
+**New source-safe, strictly experimental behaviour:**
+
+- For each approved, already-local frame, the CenterFace shadow
+  now counts all confidence >=0.30 independent detector boxes,
+  and separately counts those with no retained YuNet candidate
+  overlapping at IoU >=0.25. These are **I candidates**,
+  not additional YuNet detections, matched SFace identities,
+  true faces, track segments, DBSCAN group members or person
+  presence proposals. CenterFace-only false positives and
+  possible duplicate boxes remain for human judgement.
+- Up to 96 *I* candidate crops (8 per 12 temporal strata,
+  at most 2 from one frame) can be exported from the opt-in
+  private report to the existing offline gallery using
+  `-AuditSource CenterFaceOnly`, with source-bound I001...
+  rows and the same human Real face / Not a face / Cannot tell
+  worksheet. The independent-only aggregate has its own
+  counts and unrepresented observations; missing legacy
+  independent-only fields fail closed rather than appearing
+  as zero review work. A single frame is limited to 32
+  independent boxes; excess fails closed, never truncates.
+- Future shadow N (corroborated DBSCAN singleton noise),
+  U (YuNet not corroborated) and I (CenterFace-only)
+  samples use `quality-extremes-v1`: each temporal stratum
+  retains the strongest and weakest candidate crop-quality
+  proxies and offers up to four of each within the old
+  eight-sample limit. Other provisional G-overflow audits
+  retain their earlier highest-quality sampling policy.
+  The sampling policy is explicit in new private reports,
+  with legacy reports remaining readable. An unmatched
+  candidate is NEVER suppressed if it is not sampled.
+- The private report/aggregate console adds independent-only
+  detections and bounded sample totals, without writing
+  any face vector, canonical person ID, file path or sampled
+  image to stdout. Existing YuNet C/N/U counts, clustering,
+  rank suggestions, reviewed merge constraints and the
+  two-person accepted V01 presence summary are unchanged.
+  **I worksheets do not feed the current reviewed-presence
+  resolver**; doing so without a human-and-source agreement
+  design would overstate independent-only face evidence.
+
+These changes improve **visibility and audit coverage**, not
+verified detector recall, face probability, grouping purity
+or actual person coverage. No automatic background suppression,
+CenterFace-only SFace embedding, catalogue matching, data
+retention policy change, production database write, OneDrive
+hydration or video extraction has been authorized. Reports
+created before this checkpoint contain no I evidence and
+must not be reinterpreted as if they did.
+
+**Synthetic verification in Windows CI:** C# tests exercise
+normal and independent-only frame accounting, non-loss of
+N/U noise, deterministic high-and-low proxy samples, per-frame
+limits and legacy policy behaviour. PowerShell gallery
+tests cover I aliases, source hash, measured counts and
+malformed I-accounting rejection. No V01/V02/V03 inference
+rerun is requested to validate this implementation.
+
+**What remains before planning a `main` integration:**
+
+1. **Face/group quality (partially advanced here):** establish
+   operationally useful, low-burden C groups without silent
+   loss of genuine N/U/I singletons. Existing human C/N/U
+   evidence is encouraging for V01/V02 but needs consistent
+   group purity, split burden and any I-only missed-face
+   contribution assessed; no unjustified grouping threshold
+   or automatic suppression rule.
+2. **Adaptive coverage:** implement and bound actual
+   duration/content-driven extraction/continuation with
+   honest missed-window accounting and synthetic empty,
+   brief-face, scene-change and long-video tests. The
+   earlier 22-coarse-to-180-refined V03 run verified
+   mechanics, not recall, efficiency or all-duration policy.
+3. **Small consolidated acceptance:** combine existing full
+   240-eligible-person, V01/V02 usefulness and V03 stress
+   evidence; only run a few additional expressly approved
+   already-local videos if there is a material remaining
+   scenario gap. Measure review work, person coverage,
+   true singletons, N/U/I survival, uncertainty and rank
+   utility together without fixed top-three quotas.
+4. **Merge readiness boundary:** decide CenterFace model
+   rights/distribution, privacy/retention, runtime budgets,
+   build/CI health, source hashes and absence of writes/
+   unwanted hydration; reconcile divergence with main,
+   decide integrate-versus-separate and plan rollout/
+   rollback. Only **then** scope a PR against `main`.
+   Production person-presence persistence and three-tier
+   integrated review are deferred follow-on work.
