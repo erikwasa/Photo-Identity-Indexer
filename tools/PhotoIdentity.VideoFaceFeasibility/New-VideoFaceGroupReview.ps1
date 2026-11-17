@@ -100,6 +100,9 @@ $groups = if ($isCenterFace) {
       observations = $_.observations
       representativeCrops = $_.representativeCrops
       topCandidates = $_.topCandidates
+      allMemberFrameNumbers = $(if ($null -ne $_.PSObject.Properties['allMemberFrameNumbers']) {
+        $_.allMemberFrameNumbers
+      } else { $null })
     }
   })
 } else { @($groupReview.groups) }
@@ -186,10 +189,13 @@ if ($manifest.schemaVersion -ne 1 -or $frames.Count -lt 1 -or
 $frameFolder = Split-Path -Parent ([string]$caseMatches[0].manifest)
 $rows = [Collections.Generic.List[object]]::new()
 $cropList = [Collections.Generic.List[object]]::new()
+$groupsByAlias = @{}
+$fullFramesByAlias = @{}
 $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($group in $groups) {
   $alias = [string]$group.alias
   $crops = @($group.representativeCrops)
+  $groupsByAlias[$alias] = $group
   if ($hasRankings) {
     if (-not $rankings.ContainsKey($alias) -or
         [int]$rankings[$alias].groupObservations -ne [int]$group.observations -or
@@ -201,6 +207,33 @@ foreach ($group in $groups) {
       [int]$group.observations -lt 1 -or $crops.Count -lt 1 -or
       $crops.Count -gt 5 -or $crops.Count -gt [int]$group.observations) {
     throw 'Invalid or duplicate provisional group.'
+  }
+  # Full frame membership exists only in newly generated source-bound
+  # shadow reports. Never synthesize it from the representative crop subset.
+  $memberProperty = $group.PSObject.Properties['allMemberFrameNumbers']
+  if ($isCenterFace -and $null -ne $memberProperty -and
+      $null -ne $memberProperty.Value) {
+    $full = @($memberProperty.Value)
+    $previousFrame = 0
+    if ($full.Count -ne [int]$group.observations) {
+      throw 'Incomplete full-member frame source evidence.'
+    }
+    foreach ($value in $full) {
+      $frameValue = 0
+      if (($value -isnot [int] -and $value -isnot [long]) -or
+          -not [int]::TryParse([string]$value,[ref]$frameValue) -or
+          $frameValue -le $previousFrame -or
+          $frameValue -gt $frames.Count) {
+        throw 'Unordered, duplicated or invalid full-member frames.'
+      }
+      $previousFrame = $frameValue
+    }
+    foreach ($crop in $crops) {
+      if ([int]$crop.frameNumber -notin $full) {
+        throw 'Representative crop missing from full source membership.'
+      }
+    }
+    $fullFramesByAlias[$alias] = ($full -join ',')
   }
   $rows.Add([pscustomobject][ordered]@{
     Clip=$ClipAlias; Group=$alias; Observations=[int]$group.observations
@@ -383,8 +416,11 @@ foreach ($row in $rows) {
     $frameNumbers = @($imgs | ForEach-Object {
       [int]$_.Box.frameNumber
     } | Sort-Object -Unique) -join ','
-    $hintAttributes = (' data-rank-aliases="{0}" data-sampled-frames="{1}"' -f
-      (Esc $topAliases),(Esc $frameNumbers))
+    $fullHint = if ($fullFramesByAlias.ContainsKey([string]$row.Group)) {
+      ' data-all-member-frames="{0}"' -f (Esc $fullFramesByAlias[[string]$row.Group])
+    } else { '' }
+    $hintAttributes = (' data-rank-aliases="{0}" data-sampled-frames="{1}"{2}' -f
+      (Esc $topAliases),(Esc $frameNumbers),$fullHint)
   }
   $html.Add(('<article class="group-card" data-clip="{0}" data-group="{1}" data-observations="{2}"{7}><h2>{0} · {1}</h2><small>{2} observations · {3} crops</small><div class="photos">{4}</div>{5}<label>Decision</label><select class="decision"><option value="">Not reviewed</option><option>Keep group</option><option>Merge group</option><option>Dismiss false detection</option><option>Split required</option><option>Cannot tell</option></select><label>MergeInto (same-video group alias)</label><input class="merge-target" maxlength="4" placeholder="{6}"><label>SelectedPerson (optional pseudonym)</label><input class="person" maxlength="120"><label>ReviewerNotes</label><textarea class="notes" maxlength="1000"></textarea><button class="quick-dismiss" type="button">Dismiss obvious background</button></article>' -f
     (Esc $row.Clip),(Esc $row.Group),$row.Observations,$imgs.Count,$pictures,$rankHtml,
