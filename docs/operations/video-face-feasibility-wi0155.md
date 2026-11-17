@@ -4942,8 +4942,10 @@ $cf = $clip.review.diagnostics.centerFaceCounterfactual
 $c = $cf.corroboratedOnlyDbscan
 $canReview = @($c.groups).Count -gt 0 -and
     [int]$c.groupsNotRepresentedForReview -eq 0 -and
-    @($c.noiseAudit.sampledCrops).Count -gt 0 -and
-    @($cf.notCorroboratedAudit.sampledCrops).Count -gt 0
+    $null -ne $c.noiseAudit -and
+    [int]$c.noiseAudit.sampledObservations -gt 0 -and
+    $null -ne $cf.notCorroboratedAudit -and
+    [int]$cf.notCorroboratedAudit.sampledObservations -gt 0
 
 if ($canReview) {
     $gallery = & (Join-Path $tools 'New-VideoFaceReviewWorkspace.ps1') -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias $alias -OpenGallery
@@ -4960,6 +4962,31 @@ uncertain samples, retain unresolved evidence and avoid hard
 CenterFace suppression. Some people may only occur once.
 Saved CSVs must match the **four-pass** report's SHA-256; older
 V01/V02/V03 CSVs cannot be reused with this new report.
+
+When the combined gallery cannot run, selectively inspect **available**
+sources without inventing empty rows. For example, a case with no C
+groups but nonempty N and/or U audit samples can still be examined
+using the independent offline gallery commands:
+
+```powershell
+if (@($c.groups).Count -gt 0) {
+    & (Join-Path $tools 'New-VideoFaceGroupReview.ps1') -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias $alias -GroupSource CenterFaceShadow -OpenGallery | Format-List
+}
+if ($null -ne $c.noiseAudit -and
+    [int]$c.noiseAudit.sampledObservations -gt 0) {
+    & (Join-Path $tools 'New-VideoFaceUnassignedReview.ps1') -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias $alias -AuditSource CenterFaceNoise -OpenGallery | Format-List
+}
+if ($null -ne $cf.notCorroboratedAudit -and
+    [int]$cf.notCorroboratedAudit.sampledObservations -gt 0) {
+    & (Join-Path $tools 'New-VideoFaceUnassignedReview.ps1') -PrivateReportPath $reportPath -PrivateCasesPath $casesPath -ClipAlias $alias -AuditSource CenterFaceUncorroborated -OpenGallery | Format-List
+}
+```
+
+Separate saved worksheets can be validated with the matching
+`Measure-VideoFaceGroupReview.ps1` / `Measure-VideoFaceUnassignedReview.ps1`
+commands, but are **not** a combined CSV and cannot be passed to the
+combined reviewed-presence resolver. Report this limitation honestly.
+
 
 Only once an alias has a saved, reviewed combined worksheet:
 
