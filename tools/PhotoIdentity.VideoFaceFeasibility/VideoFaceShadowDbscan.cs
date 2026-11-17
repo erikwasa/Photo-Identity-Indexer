@@ -264,7 +264,8 @@ public sealed class VideoFaceShadowDbscan
 
         int selectedMembers = clusters.Take(MaximumReviewGroups).Sum(g => g.Length);
         var noiseSampler = new VideoFaceUnassignedAuditSampler(
-            _observations[0].Crop.TimestampMs, _observations[^1].Crop.TimestampMs);
+            _observations[0].Crop.TimestampMs, _observations[^1].Crop.TimestampMs,
+            preserveLowQualityCandidates: true);
         foreach (Observation candidate in _observations)
         {
             if (memberships[candidate.Id].Role == ProvisionalFaceClusterMemberRole.Noise)
