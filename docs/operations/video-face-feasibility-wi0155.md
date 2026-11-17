@@ -4847,7 +4847,12 @@ $privateDir = Join-Path $env:LOCALAPPDATA (
     'PhotoIdentity\WI0155\coarse-refined-' +
     (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
 New-Item -ItemType Directory -Path $privateDir -ErrorAction Stop | Out-Null
-$casesPath = Join-Path $privateDir 'four-pass-cases.json'
+# IMPORTANT: the source-bound C# map/report writers forbid output inside
+# the directory that holds the cases file (including that directory itself).
+# Keep the cases in their own nested input directory; results live in its parent.
+$casesDir = Join-Path $privateDir 'case-input'
+New-Item -ItemType Directory -Path $casesDir -ErrorAction Stop | Out-Null
+$casesPath = Join-Path $casesDir 'four-pass-cases.json'
 $reportPath = Join-Path $privateDir 'four-pass-report.json'
 $peopleMapPath = Join-Path $privateDir 'four-pass-people-map.json'
 $casesObject = @{
@@ -4886,7 +4891,18 @@ The experiment performs face inference on the 204 already-existing
 frames, producing one private source-bound report and people map.
 No original video is decoded or opened by the catalogue runner,
 no new FFmpeg extraction is launched, and no PostgreSQL writes
-or automatic identity decisions occur. If any model/DB/source
+or automatic identity decisions occur.
+
+**Input-selection troubleshooting:** The catalogue reader explicitly
+rejects a `--private-people-map` placed in the same directory as
+`--catalogue-cases` (or any descendant of that folder). The
+report writer imposes the same separation. An `input-selection /
+invalid-input` failure can therefore occur **before PostgreSQL is
+opened**, even when all four frame manifests exist. Place the cases
+file in the dedicated `case-input` folder above and leave both
+output JSON files in its parent. The experiment also requires the
+existing `PHOTOIDENTITY_WI0155_READONLY_CONNECTION_STRING` pointing to a
+dedicated SELECT-only login; never replace it with an app admin role. If any model/DB/source
 preflight fails, stop and report the rejection; do not weaken
 the privileges, model hash validation or privacy boundary.
 
