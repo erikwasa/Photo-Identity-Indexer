@@ -3138,3 +3138,80 @@ retroactively certify old V01/V02/V03 manifests.
    maintainer decision integrate versus separate, THEN plan PR
    to `main`. The three-tier integrated presence review and
    production DB association remain post-merge implementation.
+
+## Experimental checkpoint 52 — two approved real-video coverage runs and V01 review acceptance (2026-11-18)
+
+**Maintainer local evidence (runs on 2026-11-17; no private paths or
+identities retained in Git):** The merged PR #820 whole-clip audit and
+PR #819 visual/refinement machinery were exercised on two different,
+explicitly approved and fully local videos. Both source originals had
+matching SHA-256 before and after the run, and both structural audits
+reported `wholeClipCoverageComplete=true`, one expected/verified
+window, zero missing windows, and zero windows at the 180-frame cap.
+The coverage receipts set `sourceBoundByDescriptor=true` and
+`sourceContentHashVerified=false` (source descriptor is not a
+content hash; the maintainer's independent before/after SHA-256
+comparison is separate evidence).
+
+| Operator evidence | Video A | Video B |
+| --- | ---: | ---: |
+| Source length (seconds) | 105.70 | 43.49 |
+| Coarse frames | 15 | 7 |
+| Refined frames / added samples | 127 / 112 | 55 / 48 |
+| Derived refinement cues | 15 | 7 |
+| Maximum requested timestamp gap (ms) | 1536 | 1500 |
+| Refined extracted frame bytes | 391,502,696 | 99,466,064 |
+| Coarse detector frames with faces / detections | 5 / 6 | 7 / 53 |
+| Refined detector detections | Not yet measured | 404, in 51/55 frames |
+| Structural whole-window / source SHA-256 | PASS / PASS | PASS / PASS |
+
+Video B's seven selected cues were **all**
+`PossibleNewOrPoorlyObservedFace`: none were selected as
+`SceneChange` or `Motion`. The operator visually estimated
+approximately ten distinct people of interest **already represented
+in the seven coarse frames**, usually only once. No new person was
+observed solely in refinement; one or two may be easier to identify
+from refined images. These observations are human estimates, not
+ground-truth labelled recall or catalogue identity accuracy. The
+increase from 53 coarse detections to 404 across all 55 refined
+frames is not an increase from 53 to 404 *people*; repeated faces,
+missed identities and false positives remain possible. Visual-cue
+benefit remains unverified on real footage. These trials do not
+establish no-face or >10-minute multi-window case behaviour.
+
+**V01 consolidated review verification, independently rerun from
+existing matching private files:** `CombinedEvidenceValidated=true`;
+240 eligible people, 596 exemplars; two of two C groups kept, none
+merged, dismissed, split or unreviewed; two known-person proposals,
+one of two distinct people in initial top-three suggestions. All
+seven C-noise/N samples were genuine labelled known-person faces;
+19 U samples were all reviewed (7 real, 9 background, 3 uncertain).
+Zero N/U unrepresented observations, zero unknown or unlabelled
+reviewed presence units, and zero production assignments. The
+presence resolver correctly reported `no-merges-to-verify`.
+PowerShell `-NoTypeInformation` deprecation warnings did not affect
+validation. Previously accepted **V02** human-review metrics remain
+historical evidence (6 C groups, 4 manual merges to 2 kept groups);
+no new V02 combined worksheet was available, so no fresh V02 source
+validation is claimed.
+
+**Next bounded local acceptance (runbook checkpoint 52):** Reuse the
+already-extracted coarse/refined owned frame sets from BOTH videos
+in **one** read-only all-eligible catalogue run with four distinct
+case aliases: V04=Video A/coarse, V05=Video A/refined,
+V06=Video B/coarse, V07=Video B/refined. All four compare against
+the same one-time eligible-person database snapshot. Review actual
+C/N/U and, if available, independent-only I evidence, preserving
+real singletons and unknown faces; compare the same persons and
+review effort *within each pair*. Do not claim these aliases are four
+independent videos. Do not request further extraction, V01/V02/V03
+reruns or automatic association writes. Keep reviewer-selected
+people and files strictly private.
+
+**Pre-main gates remain:** face/group purity and manual burden,
+distinct-person coverage and ranking utility for both videos;
+resource-efficiency judgment on heavy 15->127 and 7->55 refinements;
+CenterFace rights/distribution, retention/cleanup, safe runtime and
+source integrity, main branch reconciliation/rollback, and a
+maintainer integrate-vs-separate decision. Production video-person
+persistence is still out of this experimental branch's scope.
