@@ -202,6 +202,18 @@ public sealed class VideoFaceWholeClipCoverageTests
     }
 
     [Fact]
+    public async Task Completed_workspace_rejects_unlisted_files_without_touching_them()
+    {
+        using var f = new Fixture();
+        string manifest = await f.CreateWindowAsync(45_000, 0);
+        string unexpected = Path.Combine(Path.GetDirectoryName(manifest)!, "unlisted-crop.png");
+        await File.WriteAllBytesAsync(unexpected, [1, 2, 3]);
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            VideoFaceWholeClipCoverage.AuditAsync([manifest], f.Repository));
+        Assert.True(File.Exists(unexpected));
+    }
+
+    [Fact]
     public async Task Distinct_locally_owned_windows_with_different_source_descriptors_are_rejected()
     {
         using var f = new Fixture();
