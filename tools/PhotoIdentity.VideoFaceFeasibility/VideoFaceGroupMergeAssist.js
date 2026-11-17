@@ -28,22 +28,36 @@
       .filter(value => knownAlias.test(value)).slice(0, 3);
     const frames = (card.dataset.sampledFrames || "").split(",")
       .filter(value => /^[1-9]\d{0,2}$/.test(value));
+    const hasFull = Object.prototype.hasOwnProperty.call(
+      card.dataset, "allMemberFrames");
+    const complete = hasFull ?
+      card.dataset.allMemberFrames.split(",") : [];
+    // The source gallery validates this attribute against the private
+    // report; malformed UI data must not establish non-overlap.
+    const validComplete = !hasFull || (
+      complete.length === Number(card.dataset.observations) &&
+      complete.every((v, i) => /^[1-9]\d{0,2}$/.test(v) &&
+        Number(v) <= 180 &&
+        (i === 0 || Number(v) > Number(complete[i - 1]))) &&
+      frames.every(v => complete.includes(v)));
     const decision = card.querySelector(".decision").value;
     const selected = escapeFreeText(card.querySelector(".person").value);
     return {
       id: card.dataset.group, card, ranks,
-      frames: new Set(frames),
+      frames: new Set(hasFull ? complete : frames),
+      fullMemberEvidence: hasFull && validComplete,
+      frameEvidenceValid: validComplete,
       observations: Number(card.dataset.observations),
       selected, decision
     };
   }
-  const eligible = group => group.decision === "" ||
-    group.decision === "Keep group";
-  const sharesRepresentativeFrame = (a, b) =>
+  const eligible = group => group.frameEvidenceValid &&
+    (group.decision === "" || group.decision === "Keep group");
+  const sharesSourceFrame = (a, b) =>
     [...a.frames].some(frame => b.frames.has(frame));
   function pairAllowed(a, b) {
     if (!eligible(a) || !eligible(b) ||
-        sharesRepresentativeFrame(a, b)) return false;
+        sharesSourceFrame(a, b)) return false;
     // Explicit different known labels must never be overridden by a hint.
     if (knownAlias.test(a.selected) && knownAlias.test(b.selected) &&
         a.selected !== b.selected) return false;
@@ -130,8 +144,9 @@
   }
   // Batch proposals are based ONLY on explicit reviewer-selected known
   // person aliases. UNKNOWN and catalogue rank hints cannot cause a batch.
-  // Representative frame overlap is a hard veto, but absence of overlap in
-  // the representative subset does not prove absence in full membership.
+  // Complete frame overlap is a veto when full membership is present.
+  // Legacy reports remain representative-only and cannot certify
+  // future merged person-presence exports.
   function batchPlan(items) {
     const byPerson = new Map();
     for (const item of items) {
@@ -146,7 +161,7 @@
       let conflict = false;
       for (let i = 0; i < grouped.length; i++) {
         for (let j = i + 1; j < grouped.length; j++) {
-          if (sharesRepresentativeFrame(grouped[i], grouped[j])) {
+          if (sharesSourceFrame(grouped[i], grouped[j])) {
             conflict = true;
           }
         }
@@ -208,9 +223,13 @@
       for (const pair of pairs.slice(0, pairLimit)) {
         proposals.appendChild(showPair(pair));
       }
+      const legacy = items.some(item => !item.fullMemberEvidence);
       summary.textContent = pairs.length + " rank/label-overlap pairs to inspect; " +
         Math.min(pairLimit, pairs.length) + " displayed. Other combinations " +
-        "remain available in the original manual group controls.";
+        "remain available in the original manual group controls." +
+        (legacy ? " Legacy report: representative frames only; manual merges " +
+          "cannot be certified as full-frame-safe for presence export." :
+          " Full member-frame evidence available; all source frames checked.");
       if (!pairs.length) {
         proposals.appendChild(addText("p",
           "No safe shortlist from current evidence. Use manual review; do not infer a face is absent."));
@@ -219,7 +238,7 @@
       batchCount.textContent = batch.result.length +
         " possible merges from explicit same-person labels" +
         (batch.blockedSets ? "; " + batch.blockedSets +
-          " label set(s) withheld due to overlapping representative frames" : "") +
+          " label set(s) withheld due to overlapping source frames" : "") +
         ". No automatic identities or merges.";
       batchConfirm.checked = false;
       batchApply.disabled = true;
