@@ -182,7 +182,7 @@ try {
     [pscustomobject][ordered]@{
         SchemaVersion = 1
         AuditSource = $AuditSource
-        SelectionPolicy = $(if ($audit.selectionPolicy) { [string]$audit.selectionPolicy } else { 'highest-quality-only-v1' })
+        SelectionPolicy = $(if ($null -ne $audit.PSObject.Properties['selectionPolicy'] -and $audit.selectionPolicy) { [string]$audit.selectionPolicy } else { 'highest-quality-only-v1' })
         SourceEvidenceValidated = $true
         TotalUnassignedObservations = [int]$audit.totalUnassignedObservations
         SampledObservations = $samples.Count
