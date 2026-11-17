@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
 
 namespace PhotoIdentity.VideoFaceFeasibility;
