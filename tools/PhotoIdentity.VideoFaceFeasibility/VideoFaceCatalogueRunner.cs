@@ -210,6 +210,10 @@ public static class VideoFaceCatalogueRunner
                     ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.CorroboratedOnlyDbscan.ClusterCount) : 0,
                 independentCorroboratedShadowNoise = options.ShadowCenterFace
                     ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.CorroboratedOnlyDbscan.NoiseObservations) : 0,
+                independentOnlyDetectionsAt030 = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.IndependentOnlyAt030 ?? 0) : 0,
+                independentOnlyAuditSamples = options.ShadowCenterFace
+                    ? reviews.Sum(r => r.Review.Diagnostics!.CenterFaceCounterfactual!.IndependentOnlyAudit?.SampledObservations ?? 0) : 0,
                 elapsedMilliseconds = Math.Round(reviews.Sum(
                     r => r.Review.Aggregate.ElapsedMilliseconds), 3),
                 privateReportWritten = true,
