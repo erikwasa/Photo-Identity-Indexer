@@ -103,7 +103,7 @@ try {
                 throw 'Complete group membership count mismatch.'
             }
             $completeFrames[$id] = @($memberValues | ForEach-Object {
-                if ($_ -isnot [int]) {
+                if ($_ -isnot [int] -and $_ -isnot [long]) {
                     throw 'Noninteger complete member frame.'
                 }
                 [int]$_
