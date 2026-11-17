@@ -47,12 +47,13 @@ function descendants(node, match) {
   }
   return result;
 }
-function group(id, observations, ranks, frames, selected = "", decision = "") {
+function group(id, observations, ranks, frames, selected = "", decision = "", fullFrames = null) {
   const card = new Element("article");
   card.dataset = {
     group: id, observations: String(observations),
     rankAliases: ranks.join(","), sampledFrames: frames.join(",")
   };
+  if (fullFrames !== null) card.dataset.allMemberFrames = fullFrames.join(",");
   const control = (selector, value) => {
     const element = new Element("input");
     element.value = value;
@@ -168,5 +169,41 @@ function input(card, selector, value) {
   assert(state.batch.disabled, "Editing a person alias invalidates acknowledgement");
   assert.equal(state.tick.checked, false);
   assert.equal(pairs(state).length, 0, "Different reviewed people cannot be merged");
+}
+{
+  // Representative subsets do not collide, but a hidden full member does.
+  const a = group("C001", 2, ["P0001"], ["1"], "P0001", "", ["1","9"]);
+  const b = group("C002", 2, ["P0001"], ["2"], "P0001", "", ["2","9"]);
+  const state = prepare([a, b]);
+  assert.equal(pairs(state).length, 0, "Hidden same-frame overlap must block suggested merges");
+  assert.match(state["ws-merge-batch-count"].textContent, /withheld due to overlapping source frames/);
+  assert.equal(state.batch.disabled, true);
+}
+{
+  // All true members are disjoint and a human still must confirm.
+  const a = group("C001", 2, ["P0001"], ["1"], "P0001", "", ["1","9"]);
+  const b = group("C002", 2, ["P0001"], ["2"], "P0001", "", ["2","10"]);
+  const state = prepare([a, b]);
+  assert.match(state["ws-merge-summary"].textContent, /Full member-frame evidence available/);
+  assert.equal(pairs(state).length, 1);
+  clickConfirmedPair(pairs(state)[0]);
+  assert.equal(b.querySelector(".merge-target").value, "C001");
+}
+{
+  // Malformed or incomplete membership must never pass through an
+  // apparently safe data attribute, even when representative crops differ.
+  const a = group("C001", 2, ["P0001"], ["1"], "P0001", "", ["1"]);
+  const b = group("C002", 2, ["P0001"], ["2"], "P0001", "", ["2","10"]);
+  const state = prepare([a, b]);
+  assert.equal(pairs(state).length, 0, "Incomplete full membership must block UI proposals");
+  assert.equal(state.batch.disabled, true);
+}
+{
+  // Historic report remains usable for human review, but it cannot claim
+  // the stronger full-membership safety proof.
+  const a = group("C001", 2, ["P0001"], ["1"]);
+  const b = group("C002", 2, ["P0001"], ["2"]);
+  const state = prepare([a, b]);
+  assert.match(state["ws-merge-summary"].textContent, /Legacy report/);
 }
 console.log("WI-0155 synthetic reviewed merge assistant: PASS");
