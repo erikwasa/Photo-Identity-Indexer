@@ -117,6 +117,7 @@ try {
         alias='D001';observations=2
         representativeCrops=@($groups[0].representativeCrops)
         topCandidates=@($groups[0].topCandidates)
+        allMemberFrameNumbers=@(1,2)
     }
     function ReviewCrop([int]$Frame,[int]$Face) {
         return @{
@@ -206,6 +207,7 @@ try {
         $cfHtml.Contains('128 were NOT corroborated') -and
         $cfHtml.Contains('data-rank-aliases="P0001,P0002,P0003"') -and
         $cfHtml.Contains('data-sampled-frames="1"') -and
+        $cfHtml.Contains('data-all-member-frames="1,2"') -and
         -not $cfHtml.Contains('crops/V03-D001-01.png')) 'CenterFace gallery not isolated.'
     $cfRows = @(Import-Csv -LiteralPath $cfGallery.WorksheetPath)
     Check ($cfRows.Count -eq 1 -and $cfRows[0].Group -ceq 'C001') 'Corroborated CSV alias incorrect.'
@@ -369,6 +371,9 @@ try {
         $presence.KnownPeopleFromAuditsOnly -eq 0 -and
         $presence.ReviewerKeptGroupRoots -eq 1 -and
         $presence.ReviewerMergeActions -eq 0 -and
+        $presence.FullFrameMemberGroupsAvailable -eq 1 -and
+        $presence.FullMemberMergeSafetyValidated -and
+        $presence.FullMemberMergeSafetyStatus -ceq 'no-merges-to-verify' -and
         $presence.RealFaceNoiseSamples -eq 1 -and
         $presence.RealFaceUncorroboratedSamples -eq 1 -and
         $presence.RealFaceAuditSamplesUnidentified -eq 2 -and

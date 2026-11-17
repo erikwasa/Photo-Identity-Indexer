@@ -74,6 +74,7 @@ try {
     $cf = $clips[0].review.diagnostics.centerFaceCounterfactual
     $reviewGroups = @($cf.corroboratedOnlyDbscan.groups)
     $frames = @{}
+    $completeFrames = @{}
     foreach ($group in $reviewGroups) {
         $id = [string]$group.alias -creplace '^D','C'
         if ($id -cnotmatch '^C(?!000)[0-9]{3}$' -or
@@ -90,6 +91,24 @@ try {
             $list.Add($frame)
         }
         $frames[$id] = @($list.ToArray())
+        # This optional field is absent in older approved reports. Do NOT
+        # synthesize complete membership from the representative subset.
+        $memberProperty = $group.PSObject.Properties['allMemberFrameNumbers']
+        if ($null -ne $memberProperty) {
+            if ($null -eq $memberProperty.Value) {
+                throw 'Null complete group membership.'
+            }
+            $memberValues = @($memberProperty.Value)
+            if ($memberValues.Count -ne [int]$group.observations) {
+                throw 'Complete group membership count mismatch.'
+            }
+            $completeFrames[$id] = @($memberValues | ForEach-Object {
+                if ($_ -isnot [int] -and $_ -isnot [long]) {
+                    throw 'Noninteger complete member frame.'
+                }
+                [int]$_
+            })
+        }
     }
 
     $stage = 'presence-resolution'
@@ -127,7 +146,7 @@ try {
         }
     }
     Import-Module (Join-Path $PSScriptRoot 'VideoFacePresenceResolution.psm1') -Force
-    $resolved = Resolve-VideoFacePresenceEvidence -GroupRows $groupRows -AuditRows $audits -RepresentativeFrames $frames
+    $resolved = Resolve-VideoFacePresenceEvidence -GroupRows $groupRows -AuditRows $audits -RepresentativeFrames $frames -CompleteMemberFrames $completeFrames
 
     # Do not report a person as absent. N/U audits can be biased and
     # capped, and some actual faces may not have been detected.
@@ -140,6 +159,9 @@ try {
         KnownPeopleFromAuditsOnly=$resolved.Metrics.KnownPeopleFromAuditsOnly
         ReviewerKeptGroupRoots=$resolved.Metrics.ReviewerKeptGroupRoots
         ReviewerMergeActions=$resolved.Metrics.ReviewerMergeActions
+        FullFrameMemberGroupsAvailable=$resolved.Metrics.FullFrameMemberGroupsAvailable
+        FullMemberMergeSafetyValidated=$resolved.Metrics.FullMemberMergeSafetyValidated
+        FullMemberMergeSafetyStatus=$resolved.Metrics.FullMemberMergeSafetyStatus
         UnknownGroupEvidenceUnits=$resolved.Metrics.UnknownGroupEvidenceUnits
         UnlabelledKeptGroupRoots=$resolved.Metrics.UnlabelledKeptGroupRoots
         OtherUnresolvedGroups=$resolved.Metrics.OtherUnresolvedGroups
@@ -198,6 +220,7 @@ try {
             privatePeopleMapSha256=$mapHash
             personCoverageProven=$false
             productionAssignmentsMade=0
+            fullMemberMergeSafetyStatus=$resolved.Metrics.FullMemberMergeSafetyStatus
             # Only private P-aliases and support counts; no names,
             # canonical IDs, crops, frame timestamps or locations.
             knownPersonProposals=@($resolved.People | ForEach-Object {

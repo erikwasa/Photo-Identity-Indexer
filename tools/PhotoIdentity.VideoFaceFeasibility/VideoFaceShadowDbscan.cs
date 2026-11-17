@@ -16,7 +16,16 @@ public sealed record VideoFaceShadowDbscanGroup(
     string Alias,
     int Observations,
     IReadOnlyList<VideoFaceGroupCrop> RepresentativeCrops,
-    IReadOnlyList<VideoFaceCatalogueRank> TopCandidates);
+    IReadOnlyList<VideoFaceCatalogueRank> TopCandidates)
+{
+    // New private reports retain the complete membership frame ordinals of
+    // every reviewable cluster (not just its up-to-five representatives).
+    // No face IDs, embeddings, names, asset IDs or media paths are exported.
+    // Legacy private reports lack this optional field and CANNOT be used
+    // to certify a later manual merge's full-frame non-overlap.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<int>? AllMemberFrameNumbers { get; init; }
+}
 
 public sealed record VideoFaceShadowDbscanReview(
     int SchemaVersion,
@@ -244,7 +253,13 @@ public sealed class VideoFaceShadowDbscan
                     $"D{i + 1:D3}", group.Length,
                     selected.Select(o => o.Crop).ToArray(),
                     matcher.RankRepresentatives(
-                        selected.Select(o => o.Embedding).ToArray()));
+                        selected.Select(o => o.Embedding).ToArray()))
+                {
+                    // Cluster members are already sorted by (frame,face)
+                    // and DBSCAN's same-frame constraints guarantee distinct
+                    // frame ordinals within each source group.
+                    AllMemberFrameNumbers = group.Select(o => o.FrameNumber).ToArray(),
+                };
             }).ToArray();
 
         int selectedMembers = clusters.Take(MaximumReviewGroups).Sum(g => g.Length);

@@ -13,7 +13,8 @@ function Resolve-VideoFacePresenceEvidence {
     param(
         [Parameter(Mandatory)][object[]]$GroupRows,
         [Parameter(Mandatory)][object[]]$AuditRows,
-        [Parameter(Mandatory)][hashtable]$RepresentativeFrames
+        [Parameter(Mandatory)][hashtable]$RepresentativeFrames,
+        [hashtable]$CompleteMemberFrames = @{}  # New private reports only
     )
     $knownPattern = '^P(?!0000$)[0-9]{4}$'
     $groupPattern = '^C(?!000)[0-9]{3}$'
@@ -51,6 +52,47 @@ function Resolve-VideoFacePresenceEvidence {
     }
     if ($RepresentativeFrames.Count -ne $byId.Count) {
         throw 'Unexpected representative frame evidence.'
+    }
+
+    # Strictly validate every full-member list supplied by a new report.
+    # A group has at most one distinct detection per source frame by the
+    # original DBSCAN not-same-frame constraints. Every representative frame
+    # MUST be present in its complete source membership.
+    $verifiedFull = [Collections.Generic.Dictionary[string,int[]]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($id in @($CompleteMemberFrames.Keys)) {
+        if (-not $byId.ContainsKey([string]$id)) {
+            throw 'Full-frame evidence contains an unknown C-group.'
+        }
+        $row = $byId[[string]$id]
+        $sourceCount = 0
+        if (-not [int]::TryParse([string]$row.Observations,[ref]$sourceCount) -or
+            $sourceCount -lt 1 -or $sourceCount -gt 5760) {
+            throw 'Full-frame evidence lacks an exact source group count.'
+        }
+        $values = @($CompleteMemberFrames[$id])
+        if ($values.Count -ne $sourceCount) {
+            throw 'Full-frame evidence does not cover all source observations.'
+        }
+        $numbered = [Collections.Generic.List[int]]::new()
+        $previous = 0
+        foreach ($v in $values) {
+            $number = 0
+            if (($v -isnot [int] -and $v -isnot [long]) -or
+                -not [int]::TryParse([string]$v,[ref]$number) -or
+                $number -le $previous -or $number -gt 180) {
+                throw 'Full-frame membership is invalid, repeated or out of order.'
+            }
+            $numbered.Add($number)
+            $previous = $number
+        }
+        $members = $numbered.ToArray()
+        foreach ($f in @($RepresentativeFrames[$id])) {
+            if ([array]::BinarySearch($members,[int]$f) -lt 0) {
+                throw 'A representative crop is absent from complete frame membership.'
+            }
+        }
+        $verifiedFull.Add([string]$id,$members)
     }
 
     # Resolve all merge chains to a *kept* root. An observed same-frame
@@ -92,14 +134,33 @@ function Resolve-VideoFacePresenceEvidence {
         $person = [string]$root.SelectedPerson
         $members = @($components[$rootId].ToArray())
         $frames = [Collections.Generic.HashSet[int]]::new()
+        $hasMerge = @($members | Where-Object {
+            [string]$_.Decision -ceq 'Merge group'
+        }).Count -gt 0
+        if ($hasMerge -and @($members | Where-Object {
+            -not $verifiedFull.ContainsKey([string]$_.Group)
+        }).Count -gt 0) {
+            # Legacy source reports contain only representative crops.
+            # A reviewed merged presence proposal cannot claim full
+            # simultaneous-frame safety from that incomplete evidence.
+            throw 'Reviewed merge requires complete frame membership for every fragment.'
+        }
         foreach ($member in $members) {
             $memberPerson = [string]$member.SelectedPerson
             if ($memberPerson -cne '' -and $memberPerson -cne $person) {
                 throw 'Reviewed merge contains conflicting identity evidence.'
             }
-            foreach ($frame in @($RepresentativeFrames[[string]$member.Group])) {
+            # Complete member frames when available; representative-only
+            # evidence is still sufficient for an UNMERGED single group.
+            $memberId = [string]$member.Group
+            $checkedFrames = if ($verifiedFull.ContainsKey($memberId)) {
+                $verifiedFull[$memberId]
+            } else {
+                @($RepresentativeFrames[$memberId])
+            }
+            foreach ($frame in $checkedFrames) {
                 if (-not $frames.Add([int]$frame)) {
-                    throw 'Reviewed merge contains simultaneous representative frames.'
+                    throw 'Reviewed merge contains simultaneous source frames.'
                 }
             }
             if ([string]$member.Decision -ceq 'Merge group') { $mergedCount++ }
@@ -175,6 +236,11 @@ function Resolve-VideoFacePresenceEvidence {
         KnownPeopleFromAuditsOnly = $auditOnly
         ReviewerKeptGroupRoots = $components.Count
         ReviewerMergeActions = $mergedCount
+        FullFrameMemberGroupsAvailable = $verifiedFull.Count
+        FullMemberMergeSafetyValidated = $true
+        FullMemberMergeSafetyStatus = $(if ($mergedCount -gt 0) {
+            'verified-complete-membership'
+        } else { 'no-merges-to-verify' })
         UnknownGroupEvidenceUnits = $unknownRoots
         UnlabelledKeptGroupRoots = $unlabelledRoots
         OtherUnresolvedGroups = $unresolvedGroup

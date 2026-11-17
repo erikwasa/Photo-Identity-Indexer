@@ -4488,3 +4488,50 @@ never silently suppressed. All changes remain outside
 `main`; CenterFace licensing, fuller corpus coverage,
 same-frame full membership proof and production
 integration decision are still outstanding.
+
+
+## Checkpoint 48 — complete-member frame constraints for reviewed merges
+
+The maintainer completed a final local V01 review after PR #816:
+two person proposals, two kept groups, no merges, no unlabelled
+group, no unreviewed N/U samples, 14 classified real N/U faces,
+three cannot-tell samples, no unrepresented N/U observations and
+zero production assignments. This verifies the existing V01
+review-path behaviour, not complete detector recall.
+
+For NEW private reports the in-memory DBSCAN source membership
+of each represented review group is serialized as the
+\`allMemberFrameNumbers\` array. It is bounded and ordered,
+includes every member frame (not just the display crops), and
+excludes embeddings, names, canonical IDs and original paths.
+The gallery and person-presence resolver validate count,
+monotonicity and representative subset membership. Merge
+assistance refuses full-member same-frame overlaps.
+A reviewed merged presence proposal is **fail-closed**
+unless complete membership for ALL merged components is present
+and mutually disjoint; no source-report verification can be
+synthesized from old representative crops. Legacy unmerged V01
+reviews remain valid; the older merged V02 human report remains
+valid human-review evidence but cannot assert the new proof.
+The source report/combined CSV hashes continue to bind inputs.
+No database or still-photo exemplar modifications.
+
+**Automated proof, no new operator action required:**
+GitHub Windows CI runs the offline PowerShell resolver and full
+synthetic gallery tests, the Node UI tests and the dedicated
+C# DBSCAN tests. The synthetic corpus explicitly contains a
+pair whose cropped representative frames do not overlap but
+whose complete group members do, and refuses the merge.
+Do NOT ask the maintainer to rerun V01, V02 or full catalogue
+evaluation to verify this PR.
+
+**Remaining pre-main work:** Review PERSON coverage plus false
+group/merge burden without suppressing singleton/N/U genuine
+faces; complete bounded duration/content-adaptive and no-face/
+long-clip sampling; consolidate small existing/full-catalogue
+V01/V02/V03 acceptance with only necessary approved new
+examples; resolve CenterFace distribution/rights, privacy
+lifecycle and main reconciliation; decide integrate-or-separate
+plus safe rollout/rollback. All prototype PRs still target
+\`wi-0155\`. Production person-presence database writes and
+the integrated three-tier review UI are post-merge scope.
