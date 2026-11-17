@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PhotoIdentity.VideoFaceFeasibility;
 
 /// <summary>
@@ -15,6 +17,10 @@ public sealed record VideoFaceUnassignedAudit(
 {
     public int SampledObservations => SampledCrops.Count;
     public int UnrepresentedObservations => TotalUnassignedObservations - SampledCrops.Count;
+
+    // Absent on legacy highest-quality-only private reports.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SelectionPolicy { get; init; }
 }
 
 /// <summary>
@@ -30,15 +36,24 @@ public sealed class VideoFaceUnassignedAuditSampler
     public const int MaximumSamplesPerStratum = 8;
     public const int MaximumSamples = TemporalStrata * MaximumSamplesPerStratum;
     public const int MaximumSamplesPerFramePerStratum = 2;
+    public const string QualityExtremesPolicy = "quality-extremes-v1";
 
     private readonly long _firstTimestampMs;
     private readonly long _lastTimestampMs;
-    private readonly List<VideoFaceGroupCrop>[] _bins =
+    private readonly List<VideoFaceGroupCrop>[] _bins = NewBins();
+    // Opt-in review diversity: independently retain the eight lowest quality
+    // proxies as well as the eight highest in each time stratum, then select
+    // up to four from each extreme. No actual observation is suppressed.
+    private readonly List<VideoFaceGroupCrop>[]? _lowQualityBins;
+
+    private static List<VideoFaceGroupCrop>[] NewBins() =>
         Enumerable.Range(0, TemporalStrata)
             .Select(_ => new List<VideoFaceGroupCrop>(MaximumSamplesPerStratum))
             .ToArray();
 
-    public VideoFaceUnassignedAuditSampler(long firstTimestampMs, long lastTimestampMs)
+    public VideoFaceUnassignedAuditSampler(
+        long firstTimestampMs, long lastTimestampMs,
+        bool preserveLowQualityCandidates = false)
     {
         if (firstTimestampMs < 0 || lastTimestampMs < firstTimestampMs ||
             lastTimestampMs > VideoFaceFrameSetLoader.MaximumTimestampMs)
@@ -48,6 +63,7 @@ public sealed class VideoFaceUnassignedAuditSampler
 
         _firstTimestampMs = firstTimestampMs;
         _lastTimestampMs = lastTimestampMs;
+        if (preserveLowQualityCandidates) _lowQualityBins = NewBins();
     }
 
     /// <summary>
@@ -73,18 +89,22 @@ public sealed class VideoFaceUnassignedAuditSampler
         long span = _lastTimestampMs - _firstTimestampMs + 1;
         int bin = (int)Math.Min(TemporalStrata - 1,
             (crop.TimestampMs - _firstTimestampMs) * TemporalStrata / span);
-        List<VideoFaceGroupCrop> samples = _bins[bin];
-        // Prevent one crowded frame from consuming every slot, without
-        // discarding a second distinct face simply because it co-occurs.
-        VideoFaceGroupCrop[] sameFrame = samples
-            .Where(sample => sample.FrameNumber == crop.FrameNumber)
-            .OrderBy(sample => sample, CropQualityComparer.Instance)
-            .ToArray();
+        AddCandidate(_bins[bin], crop, CropQualityComparer.Instance);
+        if (_lowQualityBins is not null)
+            AddCandidate(_lowQualityBins[bin], crop, ReverseQualityComparer.Instance);
+    }
 
+    private static void AddCandidate(List<VideoFaceGroupCrop> samples,
+        VideoFaceGroupCrop crop, IComparer<VideoFaceGroupCrop> priority)
+    {
+        // Cap two examples from the same frame independently of quality.
+        VideoFaceGroupCrop[] sameFrame = samples
+            .Where(sample => sample.FrameNumber == crop.FrameNumber).ToArray();
         if (sameFrame.Length >= MaximumSamplesPerFramePerStratum)
         {
-            VideoFaceGroupCrop weakestSame = sameFrame[0];
-            if (CropQualityComparer.Instance.Compare(crop, weakestSame) > 0)
+            VideoFaceGroupCrop weakestSame = sameFrame.MinBy(
+                sample => sample, priority)!;
+            if (priority.Compare(crop, weakestSame) > 0)
             {
                 samples.Remove(weakestSame);
                 samples.Add(crop);
@@ -99,18 +119,56 @@ public sealed class VideoFaceUnassignedAuditSampler
         }
 
         VideoFaceGroupCrop weakest = samples.MinBy(
-            sample => sample, CropQualityComparer.Instance)!;
-        if (CropQualityComparer.Instance.Compare(crop, weakest) > 0)
+            sample => sample, priority)!;
+        if (priority.Compare(crop, weakest) > 0)
         {
             samples.Remove(weakest);
             samples.Add(crop);
         }
     }
 
+    private static IReadOnlyList<VideoFaceGroupCrop> SelectQualityExtremes(
+        List<VideoFaceGroupCrop> strongest, List<VideoFaceGroupCrop> weakest)
+    {
+        var selected = new List<VideoFaceGroupCrop>(MaximumSamplesPerStratum);
+        var ids = new HashSet<(int Frame, int Face)>();
+        var perFrame = new Dictionary<int, int>();
+
+        void Take(IEnumerable<VideoFaceGroupCrop> ordered, int limit)
+        {
+            int added = 0;
+            foreach (VideoFaceGroupCrop crop in ordered)
+            {
+                if (added == limit || selected.Count == MaximumSamplesPerStratum) break;
+                if (ids.Contains((crop.FrameNumber, crop.FaceNumber)) ||
+                    perFrame.GetValueOrDefault(crop.FrameNumber) >=
+                    MaximumSamplesPerFramePerStratum)
+                    continue;
+                ids.Add((crop.FrameNumber, crop.FaceNumber));
+                perFrame[crop.FrameNumber] = perFrame.GetValueOrDefault(crop.FrameNumber) + 1;
+                selected.Add(crop);
+                added++;
+            }
+        }
+
+        VideoFaceGroupCrop[] high = strongest
+            .OrderByDescending(c => c, CropQualityComparer.Instance).ToArray();
+        VideoFaceGroupCrop[] low = weakest
+            .OrderByDescending(c => c, ReverseQualityComparer.Instance).ToArray();
+        Take(high, MaximumSamplesPerStratum / 2);
+        Take(low, MaximumSamplesPerStratum / 2);
+        // If a stratum is sparse or the extremes overlap, use the remaining
+        // eligible candidates rather than leaving artificial empty slots.
+        Take(high.Concat(low), MaximumSamplesPerStratum - selected.Count);
+        return selected;
+    }
+
     public VideoFaceUnassignedAudit CreateReview(int totalUnassignedObservations)
     {
-        VideoFaceGroupCrop[] selected = _bins
-            .SelectMany(bin => bin)
+        VideoFaceGroupCrop[] selected = (_lowQualityBins is null
+                ? _bins.SelectMany(bin => bin)
+                : _bins.SelectMany((bin, i) =>
+                    SelectQualityExtremes(bin, _lowQualityBins[i])))
             .OrderBy(crop => crop.TimestampMs)
             .ThenBy(crop => crop.FrameNumber)
             .ThenBy(crop => crop.FaceNumber)
@@ -124,7 +182,10 @@ public sealed class VideoFaceUnassignedAuditSampler
             MaximumReviewSamples: MaximumSamples,
             TemporalStrata: TemporalStrata,
             StrataRepresented: _bins.Count(bin => bin.Count > 0),
-            SampledCrops: selected);
+            SampledCrops: selected)
+        {
+            SelectionPolicy = _lowQualityBins is null ? null : QualityExtremesPolicy,
+        };
     }
 
     private sealed class CropQualityComparer : IComparer<VideoFaceGroupCrop>
@@ -140,10 +201,16 @@ public sealed class VideoFaceUnassignedAuditSampler
             if (priority != 0) return priority;
             priority = left.DetectorConfidence.CompareTo(right.DetectorConfidence);
             if (priority != 0) return priority;
-            // Stable tie-breakers select earlier moments and the first
-            // face ordinal, never a catalogue match or human identity.
             priority = right.TimestampMs.CompareTo(left.TimestampMs);
             return priority != 0 ? priority : right.FaceNumber.CompareTo(left.FaceNumber);
         }
+    }
+
+    private sealed class ReverseQualityComparer : IComparer<VideoFaceGroupCrop>
+    {
+        public static ReverseQualityComparer Instance { get; } = new();
+
+        public int Compare(VideoFaceGroupCrop? left, VideoFaceGroupCrop? right) =>
+            CropQualityComparer.Instance.Compare(right, left);
     }
 }
