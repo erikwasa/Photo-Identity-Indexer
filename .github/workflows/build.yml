@@ -229,6 +229,7 @@ jobs:
         run: |
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupReview.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupRankAccuracy.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceRefinementComparison.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceResolution.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceShadowGroupReview.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceReviewPriority.ps1
