@@ -49,9 +49,10 @@ if ($PrivatePeopleMapPath) {
     }
     foreach ($rank in @($sourceClip[0].review.diagnostics.rankedFaces)) {
         $rankKey = ('{0}:{1}' -f [int]$rank.frameNumber,[int]$rank.faceNumber)
-        if (-not $rankedByFace.TryAdd($rankKey,$rank)) {
+        if ($rankedByFace.ContainsKey($rankKey)) {
             throw 'Duplicate per-face source rankings.'
         }
+        $rankedByFace[$rankKey] = $rank
     }
     if (-not [IO.Path]::IsPathFullyQualified($PrivatePeopleMapPath)) {
         throw 'An absolute original people-map path is required.'
