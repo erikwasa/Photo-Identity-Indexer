@@ -11,6 +11,7 @@ param(
   [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional',
   [ValidateRange(240,640)][int]$CropLongEdge = 512,
   [switch]$OpenGallery,
+  [string]$PrivatePeopleMapPath,
   [switch]$PresenceFirst
 )
 Set-StrictMode -Version Latest
@@ -43,6 +44,9 @@ if ($report.schemaVersion -ne 1 -or $cases.schemaVersion -ne 1 -or
   throw 'Private report and cases must contain the requested video once.'
 }
 $clip = $matches[0]
+if ($PrivatePeopleMapPath -and -not $PresenceFirst) {
+  throw 'The private people map is only used for the opt-in presence-first review.'
+}
 if ($PresenceFirst -and $GroupSource -cne 'Provisional') {
   throw 'Presence-first crop review currently supports original provisional G groups only.'
 }
