@@ -1,0 +1,25 @@
+.vfr-intro {
+    border: 1px solid var(--border-color, #b8c1c8);
+    border-radius: .8rem;
+    padding: 1.25rem;
+    margin: 1.25rem 0;
+}
+.vfr-intro h2 { margin-top: 0; }
+.vfr-import { display: grid; gap: .5rem; max-width: 34rem; font-weight: 600; }
+.vfr-import input { min-width: 0; }
+.vfr-root { margin: 1.5rem 0 3rem; }
+.vfr-summary { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; padding: 1rem; border-radius: .7rem; background: var(--surface, #e6eeee); color: var(--text-color, inherit); }
+.vfr-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+.vfr-status { padding: .35rem 0; }
+.vfr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 23rem), 1fr)); gap: 1rem; align-items: start; }
+.vfr-group { min-width: 0; border: 1px solid var(--border-color, #b8c1c8); border-radius: .75rem; padding: 1rem; }
+.vfr-group[hidden] { display: none; }
+.vfr-group h3 { margin-top: 0; }
+.vfr-suggestions { overflow-wrap: anywhere; font-size: .92rem; }
+.vfr-crop { display: grid; gap: .65rem; border-top: 1px solid var(--border-color, #b8c1c8); padding: 1rem 0; margin-top: 1rem; }
+.vfr-image { display: block; max-width: 100%; width: auto; max-height: 220px; object-fit: contain; border-radius: .4rem; background: #142027; }
+.vfr-field { display: grid; gap: .3rem; }
+.vfr-field input, .vfr-field select, .vfr-field textarea { width: 100%; min-width: 0; padding: .5rem; }
+.vfr-field textarea { min-height: 4rem; resize: vertical; }
+.vfr-check { display: flex; gap: .5rem; align-items: flex-start; }
+.vfr-check input { margin-top: .3rem; flex: none; }
