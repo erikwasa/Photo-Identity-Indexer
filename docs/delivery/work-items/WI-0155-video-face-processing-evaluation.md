@@ -3300,3 +3300,75 @@ bounded maintainer browser check with existing private evidence.
 See operations runbook checkpoint 53. Preserve the isolated branch,
 unresolved broader quality, rights, privacy, performance and integration
 gates; no main promotion.
+
+## Experimental checkpoint 54 — actual focused refinement review accepted (2026-11-18)
+
+**Maintainer local verification of merged PR #821:** synthetic PowerShell
+test PASS; private input validation PASS; comparison gallery PASS;
+browser CSV export PASS. The exported private review was inspected
+offline and contains all 13 lead rows, each with a human decision.
+The private file, pseudonyms, detailed scores, per-frame references and
+source identities stay outside Git. These findings are **human-labelled
+shortlist evidence**, not general video-person recall.
+
+| Measure | A: V04 coarse → V05 refined | B: V06 coarse → V07 refined |
+| --- | ---: | ---: |
+| Known coarse people | 2 | 7 |
+| Additional refined frames | 112 | 48 |
+| Added ranked observations | 61 | 351 |
+| Known coarse people with added-frame top-three occurrence | 2 | 5 |
+| People with crop-backed reviewable shortlist | 2 | 4 |
+| Stored target-person occurrences without crop | 0 | 13 |
+| Shortlisted / human-reviewed leads | 4 / 4 | 9 / 9 |
+| Distinct people visually confirmed in added-frame leads | 2 | 2 |
+| Distinct people with visually clearer added-frame leads | 2 | 1 |
+| Same-person clearer lead observations | 4 | 2 |
+| Same-person not-clearer observations | 0 | 3 |
+| Wrong-person suggestion observations | 0 | 3 |
+| Background / non-face observations | 0 | 1 |
+| Uncertain or unreviewed shortlisted observations | 0 | 0 |
+
+One earlier provisional note stated five V04 leads, but the generated
+aggregate and saved CSV both confirm **four**; four is authoritative
+for this bounded review.
+
+**Ranking interpretation:** Both A people had no correct coarse top-three
+suggestion but have human-confirmed rank-one suggestions on added
+refined frames. For B, two people have human-confirmed rank-one
+added-frame suggestions; the coarse G-group review had zero distinct
+known people top-one and only one known person top-three overall,
+so the added-frame review demonstrates some ranking improvement.
+The private worksheet alone cannot determine exact target-score
+improvement relative to all coarse observations, because absent
+top-three aliases have no stored target score. Do not infer person
+recall, accuracy percentages for unreviewed frames, or full-video
+coverage from this shortlist.
+
+**Learning:** Adaptive refinement can improve identity-review
+evidence on both clips, and provide visibly clearer evidence for
+3 of the 9 distinct known coarse people across the two clips.
+Video B remains much harder: 13 potentially relevant rank occurrences
+are not crop-backed, and four of nine sampled suggestions are either
+wrong-person or background. Seven B known coarse people are the human
+reference set; five have rank leads, four can be reviewed with stored
+crops, two are visually confirmed from the shortlist. These are
+**distinct denominators** and must not be conflated.
+
+**Checkpoint status:** Focused offline comparison implementation and
+its bounded local gallery/export acceptance are PASS. The broader
+`DIVERSE-VIDEOS-01`, `GROUP-QUALITY-01`,
+`CATALOGUE-TOP3-01`, `FACE-QUALITY-01`, and general
+`SINGLETON-REVIEW-01` feasibility gates remain open. Repeated
+detections and top-three hits are not distinct people; I-only
+candidates and persons outside coarse known labels remain unevaluated
+by this specific tool. Do not mandate refinement, automatically
+assign identities, filter by CenterFace corroboration, or merge
+`wi-0155` into main based on this partial evidence.
+
+Next scoped development choices should address (1) faithful
+geometry-backed review for retained rank leads, including explicit
+accounting of unsupported candidates, (2) group fragmentation and
+singleton-first review without a hard corroboration gate,
+(3) catalogue ranking failure diagnosis on genuine faces,
+(4) browser merge-chain validation, and (5) bounded processing
+cost of refinement and model rights before integration.
