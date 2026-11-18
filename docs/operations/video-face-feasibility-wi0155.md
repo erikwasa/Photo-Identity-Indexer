@@ -5238,3 +5238,69 @@ offline improvements should not require fresh inference merely
 to display existing retained evidence; consider a focused
 geometry-backed rank-lead view and explicit unknown geometry
 budget without treating absent crops as a negative label.
+
+## Checkpoint 55 — production intent: person presence, not exhaustive group completion (2026-11-18)
+
+**The maintainer clarified the intended future production user journey
+while PR #822 remained open.** This supersedes any implication above
+that *every* G/C/N/U candidate must be reviewed, dismissed or merged
+before a video can have its known people marked present. Earlier
+full-gallery reviews were **diagnostic experiments**, not proposed
+routine production review burden.
+
+### Operator example: G1–G6
+
+1. Label G1 as **person X** and G2 as **person Y**. Record one
+   deduplicated video/person presence association for each.
+2. G6 may also contain X. Merging G6 into G1 is **optional**:
+   X has already been confirmed present. Skipping redundant groups
+   saves review effort.
+3. G3 may contain **both Z and W**. Exclude the crop(s) showing W
+   from G3, mark **W directly present from the identified crop**
+   without creating or merging another group, then mark the
+   remaining Z evidence in G3 as Z. Never assign W's crop to Z
+   through an uncorrected group label. Preserve provenance for
+   crop removal and person confirmation.
+4. If the reviewer has sufficient evidence of the four
+   identifiable people of interest, G4 and G5 may remain
+   **unreviewed**. They are neither proven false faces nor proven
+   to contain no additional people. Provide a resume/reopen path
+   and an honest outstanding count.
+
+**Result:** Confirmed video-person presence is the primary durable
+output; a face group is a temporary discovery/review aid, not a
+canonical person nor the required persisted identity unit.
+Grouping may be partial, duplicated, mixed or entirely absent
+for some useful observations. One credible observation can
+confirm a person with human approval. Do not require all
+observations or groups to be processed manually, every
+duplicate group merged, or every background crop dismissed.
+
+**Autonomy and stopping:** In the future, exceptional automated
+person assignment would need separately established,
+conservative **identity** score and winner margin, calibration,
+audit and undo/correction safeguards; not detector confidence or
+CenterFace agreement. This WI-0155 branch performs no
+production auto/manual assignments. The system should still
+sample the video broadly/within declared bounds, **but human
+review can stop early** when the operator is satisfied; early
+review stopping does not certify complete people coverage.
+
+### Revised acceptance observation plan
+
+Measure (a) identifiable distinct people confirmed, (b) number
+of *necessary* review decisions to confirm them, (c) direct
+presence from singletons/ungrouped crops, (d) mixed-group crop
+exclusion and correction, (e) duplicated groups skipped,
+(f) audited correction/undo and idempotent person presence,
+(g) wrong-person suggestions/associations, (h) unresolved
+unreviewed evidence and resume affordance, and (i)
+sampling/processing cost. Report false-face/group metrics
+as supporting diagnostics rather than demanding perfect
+grouping or completion of every G/C/N/U item.
+
+These are **future production acceptance requirements**, not
+implemented local PR #821 behaviors. Preserve all confirmed
+historical WI-0155 experiment results unchanged; there is
+no need for a fresh four-pass run or exhaustive refined
+G-group labelling just to evaluate this clarification.
