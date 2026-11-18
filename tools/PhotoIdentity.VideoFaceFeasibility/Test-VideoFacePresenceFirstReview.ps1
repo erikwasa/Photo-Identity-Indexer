@@ -97,6 +97,10 @@ try {
         @($web.groups).Count -eq 3 -and
         @($web.crops).Count -eq 4 -and
         $web.crops[0].imageBase64.StartsWith('iVBORw0KGgo') -and
+        $web.crops[0].frameWidth -eq 48 -and
+        $web.crops[0].frameHeight -eq 64 -and
+        $web.crops[0].faceWidthPx -eq 15 -and
+        $web.crops[0].faceHeightPx -eq 25 -and
         -not $webJson.Contains('DO-NOT-LEAK') -and
         -not $webJson.Contains($framesDir) -and
         -not $webJson.Contains($mapPath)) 'In-app bundle contains invalid or private source evidence.'
