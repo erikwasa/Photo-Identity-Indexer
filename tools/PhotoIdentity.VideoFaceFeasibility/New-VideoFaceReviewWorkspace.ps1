@@ -158,7 +158,7 @@ $uncorroboratedLane = EvidenceLane $uncorroborated 'YuNet/CenterFace disagreemen
 $page = Get-Content -LiteralPath $groups.GalleryPath -Raw -Encoding utf8
 $styleAnchor = '</style>'
 $gridAnchor = '<div class="grid">'
-$endAnchor = '</main><script src="group-review.js"></script>'
+$endAnchor = '</main><script src="merge-validation.js"></script><script src="group-review.js"></script>'
 if (-not $page.Contains($styleAnchor) -or
     -not $page.Contains($gridAnchor) -or
     -not $page.Contains($endAnchor)) {
