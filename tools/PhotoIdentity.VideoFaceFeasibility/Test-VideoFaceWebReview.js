@@ -160,8 +160,13 @@ assert.equal(review.validatePeopleMap(namedBundle, privateMap), false);
 // upload to the web UI and no change to original alias-only CSV.
 const liveBundle = copy(namedBundle);
 liveBundle.schemaVersion = 3;
+liveBundle.groups[0].suggestions = ["P0001: 0.8000"];
 liveBundle.personBindings = privateMap.people.map(p =>
     ({alias: p.alias, personId: p.personId}));
+liveBundle.crops[0].suggestions = ["P0002: 0.8300", "P0001: 0.8000"];
+liveBundle.crops[1].suggestions = ["P0001: 0.7900"];
+liveBundle.crops[2].suggestions = ["P0003: 0.8100"];
+liveBundle.crops[3].suggestions = ["P0001: 0.7200"];
 assert.equal(review.validateBundle(liveBundle), true);
 const currentCatalogue = [
     {id: privateMap.people[0].personId, displayName: "Alice Renamed"},
@@ -182,6 +187,12 @@ assert.equal(review.csvEncode(rows).includes("Alice Renamed"), false);
 const duplicateLive = copy(currentCatalogue);
 duplicateLive[1].id = duplicateLive[0].id;
 assert.equal(review.resolveLivePeople(liveBundle, duplicateLive), null);
+const missingFaceRank = copy(liveBundle);
+delete missingFaceRank.crops[0].suggestions;
+assert.equal(review.validateBundle(missingFaceRank), false);
+const invalidFaceRank = copy(liveBundle);
+invalidFaceRank.crops[0].suggestions = ["P0999: 0.9900"];
+assert.equal(review.validateBundle(invalidFaceRank), false);
 const unknownBinding = copy(liveBundle);
 unknownBinding.personBindings[1].alias = unknownBinding.personBindings[0].alias;
 assert.equal(review.validateBundle(unknownBinding), false);
