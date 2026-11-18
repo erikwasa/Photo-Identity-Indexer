@@ -180,8 +180,7 @@ $css = @'
 .ws-merge-images img{max-width:100px;max-height:110px;object-fit:contain}
 .ws-merge-checkbox{display:block;margin:8px 0}
 .ws-merge-checkbox input{width:auto}
-.ws-merge-pair button:disabled,#ws-merge-batch-apply:disabled{opacity:.5;cursor:not-allowed}
-.ws-merge-batch{border-top:1px solid #5a7590;padding-top:10px;margin-top:12px}
+.ws-merge-pair button:disabled{opacity:.5;cursor:not-allowed}
 .ws-audit-card[hidden]{display:none}
 .evidence-lane{margin-top:22px;border:1px solid #526c82;border-radius:8px;padding:12px;background:#172a3b}
 .evidence-lane summary{cursor:pointer;padding:8px;font-size:15px;color:#e9f5ff}
@@ -198,16 +197,9 @@ $mergePanel = @'
 <section id="ws-merge-assist" class="ws-merge-assist">
   <details>
     <summary>Review possible same-person group fragments (human confirmation)</summary>
-    <p class="note">This optional shortlist only uses shared top-three catalogue aliases and explicitly reviewed person aliases, NOT reliable pairwise video-face similarity. Shared ranks can be wrong. Compare crops before any merge; crop-frame overlap blocks a lead but absence of overlap among representative crops does not prove a merge is safe. No cross-person or automatic identity assignment.</p>
+    <p class="note">This optional *pairwise* shortlist only uses shared top-three catalogue aliases and explicitly reviewed person aliases, NOT reliable pairwise video-face similarity. Shared ranks can be wrong. Compare crops before any merge; crop-frame overlap blocks a lead but absence of overlap among representative crops does not prove a merge is safe. No cross-person or automatic identity assignment.</p>
     <p id="ws-merge-summary" aria-live="polite"></p>
     <div id="ws-merge-proposals"></div>
-    <div class="ws-merge-batch">
-      <h3>Batch merge groups you already labelled as the same known person</h3>
-      <p id="ws-merge-batch-count" aria-live="polite"></p>
-      <label><input type="checkbox" id="ws-merge-batch-confirm"> I have checked every relevant group and confirmed each repeated person alias represents one person, with no conflicting simultaneous faces</label>
-      <p><button type="button" id="ws-merge-batch-apply" disabled>Apply my reviewed same-person merges</button></p>
-      <p class="note">A batch changes only local C-group decision controls. It never changes a selected identity, the N/U lanes or a database. Inspect and save once using the original combined CSV button.</p>
-    </div>
   </details>
 </section>
 '@
