@@ -28,14 +28,6 @@
         rows.length !== references.length) return false;
     const expected = new Set();
     for (const ref of references) {
-      if (ref.Clip !== clip || !groupPattern.test(ref.Group) ||
-          !/^[1-9]\d{0,2}$/.test(String(ref.Frame)) ||
-          !/^[1-9]\d?$/.test(String(ref.Face)) ||
-          Number(ref.Frame) > 180 || Number(ref.Face) > 32 ||
-          !expected.add) {
-        // Set.add is always defined; the branch above is reserved for
-        // malformed reference properties (see duplicate test below).
-      }
       const id = signature(ref);
       if (ref.Clip !== clip || !groupPattern.test(ref.Group) ||
           !/^[1-9]\d{0,2}$/.test(String(ref.Frame)) ||
