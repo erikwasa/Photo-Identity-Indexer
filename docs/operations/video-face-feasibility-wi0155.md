@@ -5062,3 +5062,118 @@ through the existing `Complete-VideoFaceCoverageRun.ps1` is allowed.
 No new video source, PostgreSQL write, production link, main
 branch integration, face suppression or OneDrive hydration is
 authorized by this acceptance procedure.
+
+## Checkpoint 53 — focused offline added-frame rank and clarity review (2026-11-18)
+
+**Local evidence:** Four-pass experiment PASS (241 canonical / 240 eligible /
+596 exemplars, 204 frames, 530 detections/embeddings, zero overflow/discards,
+9.03 minutes end-to-end). C-group counts V04/V05/V06/V07: 0/0/0/9;
+corroborated noise: 0/8/42/322. Coarse G groups were singletons.
+V04: two known people, 0/2 top-three, two false positives; V06: seven
+known people, 1/7 top-three, 24 merges, 16 false positives, two uncertain.
+Thirteen UNKNOWN observations are not thirteen distinct people.
+The single V04 I-only crop was background. Both coarse review readers
+passed; the V06 worksheet required correction of invalid merge chains.
+
+**Stop exhaustive refinement review for now.** Reuse the already labelled
+coarse singleton observations to evaluate additional-frame ranking and
+clarity. This bounded, rank-biased comparison covers only explicitly
+known coarse people. It cannot establish person recall, discover new
+people, compare unavailable below-top-three scores, or use I-only
+detections (no YuNet rank). Crop geometry is limited to what the
+existing report retained. No models, database, original video access,
+new frame extraction or production identity writes.
+
+### 53A. Synthetic regression (Windows PowerShell 7.6)
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+$tools = Join-Path (Get-Location).Path 'tools\PhotoIdentity.VideoFaceFeasibility'
+& (Join-Path $tools 'Test-VideoFaceRefinementComparison.ps1')
+```
+
+Expected: WI-0155 offline refinement comparison synthetic tests: PASS.
+The regression covers dismissed high-ranking observations, UNKNOWN,
+additional versus coarse timestamps, missing geometry, wrong-video
+isolation, invalid input/merges, output bounds and unchanged inputs.
+
+### 53B. Create the private gallery (existing inputs only)
+
+Reuse the identical four-pass report, corrected separate-folder case
+manifest, map and the two G-group review CSVs that passed validation.
+If session variables were lost, enter the absolute existing paths.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+foreach ($name in @('reportPath','casesPath','peopleMapPath')) {
+    $var = Get-Variable -Name $name -ErrorAction SilentlyContinue
+    if ($null -eq $var -or
+        [string]::IsNullOrWhiteSpace([string]$var.Value) -or
+        -not (Test-Path -LiteralPath $var.Value -PathType Leaf)) {
+        Set-Variable -Name $name -Value ((Read-Host "Existing $name").Trim('"'))
+    }
+}
+$v04Reviewed = (Read-Host 'Validated V04 G-group review CSV').Trim('"')
+$v06Reviewed = (Read-Host 'CORRECTED validated V06 G-group review CSV').Trim('"')
+$outDir = Join-Path (Split-Path -Parent $reportPath) (
+    'refinement-comparison-' + (Get-Date -Format yyyyMMdd-HHmmssfff))
+
+$params = @{
+    PrivateReportPath = $reportPath
+    PrivateCasesPath = $casesPath
+    PrivatePeopleMapPath = $peopleMapPath
+    ReviewedV04CsvPath = $v04Reviewed
+    ReviewedV06CsvPath = $v06Reviewed
+    OutputDirectory = $outDir
+    LeadsPerPerson = 3
+    OpenGallery = $true
+}
+$comparison = & (Join-Path $tools 'New-VideoFaceRefinementComparison.ps1') @params
+$comparison | Select-Object SchemaVersion,InputEvidenceValidated,
+    KnownPersonCoverageProven,ProductionAssignmentsMade | Format-List
+$comparison.Pairs | Format-Table -AutoSize
+```
+
+Expected: validated inputs, two pair rows, zero production assignments,
+person coverage not proven. V04/V05: two known coarse people; V06/V07:
+seven. At most 27 refined lead crops and 27 confirmed reference crops.
+Only newly added timestamps are selected and each person's leads use
+distinct timestamps. Every stored top-three occurrence for an anchor
+alias lacking a crop is counted. A better stored rank is separate from
+a higher comparable numeric target-person score; the latter compares
+against the maximum available score among that person's confirmed
+coarse observations. Missing top-three scores are unknown.
+
+### 53C. Review the shortlist
+
+For every displayed known coarse person, the browser shows confirmed
+coarse anchors (best rank, highest stored target score and strongest
+crop-quality proxy, deduplicated) and at most three ranked leads
+with retained YuNet crop geometry. Each lead must be confirmed as
+same person / clearer, same person / not clearer, different person,
+not a face, or cannot tell. An unreviewed candidate is not confirmed.
+A known coarse person with no candidate is still represented.
+Do not infer a coarse label from a merge target or assume a high
+score establishes the person. A lead may be shown for multiple
+suggested people and must be independently judged.
+
+Record the two automatic aggregate pair rows and the page's two
+human summary lines: leads reviewed, people with leads, confirmed
+same, clearer, better stored rank, higher comparable score, wrong
+person, background and uncertain. Report approximate review effort.
+Save the private review CSV before closing. Its report and coarse
+review SHA-256 fields bind the export to the inputs; it is not an
+assignment import, verified presence draft or cross-report identity map.
+No reload/measurement feature is included for this worksheet.
+Do not share the CSV, gallery, crops, aliases or hashes.
+
+Preserve all original case/report/map/review/frame inputs until WI-0155
+acceptance. Generated comparison files remain private and may be
+removed only with explicit operator consent. Do not extrapolate the
+rank-biased review to whole-video recall or declare refinement
+useless merely because no shortlist lead exists. The general
+singleton-first review, grouping quality, recognition quality and
+browser invalid-merge export remain separate open work.
