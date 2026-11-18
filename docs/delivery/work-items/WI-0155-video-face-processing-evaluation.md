@@ -3554,3 +3554,13 @@ a *new local gallery only* using the existing private four-pass
 report and V04/V06 cases. Local visual verification of the
 new crop controls, import/export and a partial mixed-group
 review remains necessary before considering promotion to main.
+
+**Observed merge-export defect addressed in PR #823:** The old group
+and combined C/N/U browser pages now reject invalid human merge
+chains on Save *and* Import. The original PowerShell source-bound
+measurement remains authoritative and retains its exact-source
+membership/collision veto. A synthetic Node regression covers
+cycles, missing roots/targets, stale targets, mixed G/C/D sources
+and incompatible human labels. This does **not** resurrect the
+removed batch merge path or make merging mandatory for
+video/person presence.
