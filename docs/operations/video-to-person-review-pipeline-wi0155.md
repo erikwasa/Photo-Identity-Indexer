@@ -76,7 +76,13 @@ scene composition, focus, motion and compression bound the usable face
 detail. The reviewed crop is cut from the existing extracted frame with
 about 25% bounding-box margin; `CropLongEdge=512` is an **upper bound**,
 not a target: small crops are **not upscaled**. Browser review likewise
-preserves native crop display size and labels pixel dimensions.
+preserves native crop display size and labels its pixel dimensions. The
+versioned bundle also records the **actual already-extracted frame width
+and height and the detector's raw face box width and height in pixels**.
+These values are measured directly during crop reconstruction before
+margin or scaling; no original video or model is reopened. Comparing them
+shows whether a small face is caused by a small source frame, small
+subject footprint within a large frame, or both.
 
 The experimental mode is not exactly the still-photo pipeline:
 
