@@ -1,7 +1,7 @@
-/* WI-0155 private, browser-memory-only video face review.
- * No fetch, storage, API calls, video processing or catalogue writes.
- * Two separate local imports: face evidence and the original snapshot's
- * canonical person alias/name map. Never serialize names into review CSV.
+/* Local-only video face review. Original face evidence stays in browser memory.
+ * v3 resolves canonical names via existing read-only people API; no photo/video
+ * identity writes, storage, media requests, inference or background work.
+ * Legacy v2 can still load an explicit snapshot map for CSV compatibility.
  */
 (function (environment) {
     "use strict";
@@ -38,18 +38,29 @@
     const boundedPng = base64 => pngDimensions(base64) !== null;
 
     function validateBundle(bundle) {
-        if (!bundle || ![1, 2].includes(bundle.schemaVersion) || bundle.mode !== "PresenceFirst" ||
+        if (!bundle || ![1, 2, 3].includes(bundle.schemaVersion) || bundle.mode !== "PresenceFirst" ||
             typeof bundle.clipAlias !== "string" || !clipRx.test(bundle.clipAlias) ||
             typeof bundle.reportSha256 !== "string" || !shaRx.test(bundle.reportSha256) ||
             !Number.isInteger(bundle.unassignedGroupObservations) ||
             bundle.unassignedGroupObservations < 0 ||
             bundle.unassignedGroupObservations > 5760 ||
-            (bundle.schemaVersion === 2 &&
+            (bundle.schemaVersion >= 2 &&
                 (typeof bundle.catalogueSnapshot !== "string" ||
                  !snapshotRx.test(bundle.catalogueSnapshot) ||
                  bundle.catalogueSnapshot.length > 256 ||
                  !Number.isInteger(bundle.cataloguePeopleCount) ||
                  bundle.cataloguePeopleCount < 1 || bundle.cataloguePeopleCount > 4096)) ||
+            (bundle.schemaVersion === 3 &&
+                (!Array.isArray(bundle.personBindings) ||
+                 bundle.personBindings.length !== bundle.cataloguePeopleCount ||
+                 bundle.personBindings.some(p => !p || typeof p.alias !== "string" ||
+                     !personRx.test(p.alias) || typeof p.personId !== "string" ||
+                     !uuidRx.test(p.personId) ||
+                     p.personId.toLowerCase() === "00000000-0000-0000-0000-000000000000") ||
+                 new Set(bundle.personBindings.map(p => p.alias)).size !==
+                     bundle.cataloguePeopleCount ||
+                 new Set(bundle.personBindings.map(p => p.personId.toLowerCase())).size !==
+                     bundle.cataloguePeopleCount)) ||
             !Array.isArray(bundle.groups) || bundle.groups.length < 1 ||
             bundle.groups.length > 64 ||
             !Array.isArray(bundle.crops) || bundle.crops.length < 1 ||
@@ -77,7 +88,7 @@
                 crop.imageBase64.length > 1400000 ||
                 !crop.imageBase64.startsWith(pngPrefix) ||
                 !boundedPng(crop.imageBase64) ||
-                (bundle.schemaVersion === 2 &&
+                (bundle.schemaVersion >= 2 &&
                     (!Number.isInteger(crop.frameWidth) ||
                      !Number.isInteger(crop.frameHeight) ||
                      !Number.isInteger(crop.faceWidthPx) ||
@@ -96,7 +107,10 @@
             groupMap.get(crop.group).crops++;
         }
         return [...groupMap.values()].every(g => g.crops >= 1 &&
-            g.crops <= g.observations && g.crops <= 5);
+            g.crops <= g.observations && g.crops <= 5) &&
+            (bundle.schemaVersion !== 3 || bundle.groups.every(group =>
+                group.suggestions.every(s => bundle.personBindings.some(p =>
+                    p.alias === s.split(": ")[0]))));
     }
 
     // No names/UUIDs arrive in the face package. This separate import must
@@ -127,12 +141,37 @@
             aliases.has(s.split(": ")[0])));
     }
 
+    // Resolve live current canonical people by immutable ID, not the prior
+    // snapshot's display names. We never invent aliases for people created later.
+    function resolveLivePeople(bundle, catalogue) {
+        if (!validateBundle(bundle) || bundle.schemaVersion !== 3 ||
+            !Array.isArray(catalogue) || catalogue.length > 4096) return null;
+        const byId = new Map();
+        for (const row of catalogue) {
+            if (!row || typeof row.id !== "string" || !uuidRx.test(row.id) ||
+                typeof row.displayName !== "string" || !row.displayName.trim() ||
+                row.displayName.length > 200 || byId.has(row.id.toLowerCase()))
+                return null;
+            byId.set(row.id.toLowerCase(), row);
+        }
+        const bindings = new Map(bundle.personBindings.map(p =>
+            [p.personId.toLowerCase(), p.alias]));
+        return { people: catalogue.map(p => ({
+            alias: bindings.get(p.id.toLowerCase()) || null,
+            personId: p.id.toLowerCase(),
+            displayName: p.displayName
+        })), live: true };
+    }
+    function isCompleted(row) {
+        return row.Decision !== "" &&
+            (row.Decision !== "Confirm person" || personRx.test(row.PersonAlias));
+    }
     const personName = person => person.displayName || "Unnamed person";
     function searchPeople(map, query) {
         if (!map) return [];
         const needle = query.trim().toLocaleLowerCase();
         return map.people.filter(person =>
-            (personName(person) + " " + person.alias).toLocaleLowerCase().includes(needle))
+            (personName(person) + " " + (person.alias || "")).toLocaleLowerCase().includes(needle))
             .sort((a, b) => personName(a).localeCompare(personName(b)) ||
                 a.alias.localeCompare(b.alias))
             .slice(0, 20);
@@ -175,7 +214,10 @@
                 typeof row.ReviewerNotes !== "string" ||
                 row.ReviewerNotes.length > 1000 ||
                 (row.Decision === "Confirm person" ?
-                    !personRx.test(row.PersonAlias) : row.PersonAlias !== "") ||
+                    !personRx.test(row.PersonAlias) ||
+                    (bundle.schemaVersion === 3 &&
+                        !bundle.personBindings.some(p => p.alias === row.PersonAlias))
+                    : row.PersonAlias !== "") ||
                 (row.ExcludeFromGroup === "True" && row.Decision === "")) return false;
             const signature = key(row);
             if (!expected.has(signature) || observed.has(signature)) return false;
@@ -313,6 +355,19 @@
                 "No unsaved changes. Review remains private.") :
             "Invalid decision/alias — correct before exporting.");
     }
+    function refreshVisibility() {
+        if (!active) return;
+        const root = document.getElementById("vfr-root");
+        root.querySelectorAll(".vfr-group").forEach(card => {
+            const rows = active.rows.filter(r => r.Group === card.dataset.group);
+            card.querySelectorAll(".vfr-crop").forEach(item => {
+                const row = active.rows.find(r => key(r) === item.dataset.cropKey);
+                item.hidden = !active.showReviewed && isCompleted(row);
+            });
+            card.hidden = active.manualHidden.has(card.dataset.group) ||
+                (!active.showReviewed && rows.every(isCompleted));
+        });
+    }
     function render() {
         const root = document.getElementById("vfr-root");
         root.replaceChildren();
@@ -344,12 +399,21 @@
         const importButton = dom("button", "button secondary", "Import saved review CSV");
         importButton.type = "button";
         importButton.addEventListener("click", () => document.getElementById("vfr-csv").click());
-        const reveal = dom("button", "button secondary", "Reveal hidden groups");
+        const showReviewed = dom("button", "button secondary",
+            active.showReviewed ? "Hide reviewed" : "Show reviewed");
+        showReviewed.type = "button";
+        showReviewed.addEventListener("click", () => {
+            active.showReviewed = !active.showReviewed;
+            showReviewed.textContent = active.showReviewed ? "Hide reviewed" : "Show reviewed";
+            refreshVisibility();
+        });
+        const reveal = dom("button", "button secondary", "Reveal manually hidden groups");
         reveal.type = "button";
         reveal.addEventListener("click", () => {
-            root.querySelectorAll(".vfr-group").forEach(card => { card.hidden = false; });
+            active.manualHidden.clear();
+            refreshVisibility();
         });
-        actions.append(save, importButton, reveal);
+        actions.append(save, importButton, showReviewed, reveal);
         root.append(actions);
         const status = dom("p", "vfr-status");
         status.id = "vfr-status";
@@ -358,23 +422,25 @@
         const cards = dom("div", "vfr-grid");
         for (const group of bundle.groups) {
             const card = dom("article", "vfr-group");
+            card.dataset.group = group.alias;
             card.append(dom("h3", "", group.alias));
             const groupCrops = bundle.crops.filter(c => c.group === group.alias);
             card.append(dom("p", "", groupCrops.length + " representative crops of " +
                 group.observations + " observations; " +
                 (group.observations - groupCrops.length) + " unshown"));
             card.append(dom("p", "vfr-suggestions",
-                "Exploratory group leads (not identifications): " +
-                (group.suggestions.length
-                    ? group.suggestions.map(s => describeSuggestion(s, active.people)).join(" · ")
-                    : "Not available")));
+                "Group-level leads, not verified identities. Review a face to accept one:"));
             const hide = dom("button", "button secondary", "Hide without deciding");
             hide.type = "button";
-            hide.addEventListener("click", () => { card.hidden = true; });
+            hide.addEventListener("click", () => {
+                active.manualHidden.add(group.alias);
+                refreshVisibility();
+            });
             card.append(hide);
             for (const crop of groupCrops) {
                 const row = active.rows.find(r => key(r) === key(crop));
                 const item = dom("div", "vfr-crop");
+                item.dataset.cropKey = key(row);
                 const image = dom("img", "vfr-image");
                 image.src = "data:image/png;base64," + crop.imageBase64;
                 image.alt = "Private candidate face crop; not a confirmed identity";
@@ -388,6 +454,34 @@
                             crop.frameHeight + " px · detected face " +
                             crop.faceWidthPx + " × " + crop.faceHeightPx + " px"
                         : "")));
+                const suggested = dom("ol", "vfr-suggestion-list");
+                if (group.suggestions.length && active.people) {
+                    for (const suggestion of group.suggestions) {
+                        const alias = suggestion.split(": ")[0];
+                        const candidate = active.people.people.find(p => p.alias === alias);
+                        const entry = dom("li", "");
+                        const choose = dom("button", "vfr-suggestion-button",
+                            describeSuggestion(suggestion, active.people));
+                        choose.type = "button";
+                        choose.disabled = !candidate;
+                        choose.title = candidate
+                            ? "Confirm this person for this face only"
+                            : "Suggested person is no longer in the current catalogue";
+                        choose.addEventListener("click", () => {
+                            row.Decision = "Confirm person";
+                            row.PersonAlias = alias;
+                            markDirty(true);
+                            render();
+                        });
+                        entry.append(choose);
+                        suggested.append(entry);
+                    }
+                } else if (group.suggestions.length) {
+                    suggested.append(dom("li", "", "Load current people to select a suggestion."));
+                } else {
+                    suggested.append(dom("li", "", "No available suggestions."));
+                }
+                item.append(suggested);
                 const decision = dom("select");
                 for (const value of decisions) {
                     const option = dom("option", "", value || "Not reviewed");
@@ -395,6 +489,9 @@
                     decision.append(option);
                 }
                 decision.value = row.Decision;
+                if (bundle.schemaVersion === 3 && !active.people) {
+                    [...decision.options].find(o => o.value === "Confirm person").disabled = true;
+                }
                 const person = dom("input");
                 const picker = dom("div", "vfr-person-picker");
                 const results = dom("div", "vfr-person-results");
@@ -407,7 +504,8 @@
                 person.placeholder = named ? "Search all people by name or alias" : "P0001";
                 person.autocomplete = "off";
                 person.value = named && selected ? personName(selected) : row.PersonAlias;
-                person.disabled = row.Decision !== "Confirm person";
+                person.disabled = row.Decision !== "Confirm person" ||
+                    (bundle.schemaVersion === 3 && !named);
                 picker.append(person, results);
                 function renderChoices() {
                     if (!named || person.disabled) { results.hidden = true; return; }
@@ -416,12 +514,17 @@
                         const option = dom("button", "vfr-person-option",
                             personName(candidate) + " (" + candidate.alias + ")");
                         option.type = "button";
+                        option.disabled = !candidate.alias;
+                        option.title = candidate.alias
+                            ? "Select person"
+                            : "Person was added after the source snapshot; new evidence is required";
                         option.addEventListener("click", () => {
                             row.PersonAlias = candidate.alias;
                             person.value = personName(candidate);
                             results.hidden = true;
                             markDirty(true);
                             refresh();
+                            refreshVisibility();
                         });
                         results.append(option);
                     }
@@ -460,9 +563,11 @@
                         row.PersonAlias = ""; person.value = "";
                         results.hidden = true;
                     }
-                    person.disabled = row.Decision !== "Confirm person";
+                    person.disabled = row.Decision !== "Confirm person" ||
+                        (bundle.schemaVersion === 3 && !named);
                     if (row.Decision === "") { excluded.checked = false; row.ExcludeFromGroup = "False"; }
                     markDirty(true); refresh();
+                    refreshVisibility();
                 });
                 excluded.addEventListener("change", () => {
                     row.ExcludeFromGroup = excluded.checked ? "True" : "False";
@@ -490,6 +595,7 @@
         }
         root.append(cards);
         refresh();
+        refreshVisibility();
     }
 
     function init() {
