@@ -345,6 +345,7 @@ if ($PresenceFirst) {
       -Rows @($rows.ToArray()) `
       -Crops @($cropList.ToArray()) `
       -Rankings $rankings `
+      -PrivatePeopleMapPath $PrivatePeopleMapPath `
       -UnassignedObservations $hiddenObservations `
       -OpenGallery:$OpenGallery
 }
