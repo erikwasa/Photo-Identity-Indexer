@@ -157,3 +157,36 @@ Separate sign-offs remain required for model/right-to-use
 and redistribute, private evidence retention/deletion,
 bounded runtime/storage, offline-only initial integration,
 no production source/database writes, and rollback.
+## 7. V06 presence-first real-data checkpoint — partial review accepted
+
+**2026-11-18:** The main-based candidate's V06 real gallery
+generated 53 original G groups and 53 representative crops.
+The private CSV passed strict input-source validation:
+15 confirming known-person face crops were deduplicated to
+**seven distinct proposed people**, 8 other observations
+were unknown-real-face, 7 background, 3 uncertain and
+**20 deliberately left unreviewed**. Twenty groups had
+no reviewed crop, without being marked absent, false or
+completed. The same private measurement reported zero
+group exclusions, no mixed-person groups, no unassigned
+observations, `PersonCoverageProven=False` and
+`ProductionAssignmentsMade=0`.
+
+This provides bounded proof that partial human review is
+represented honestly rather than forcing exhaustive
+G-group completion. It does **not** show all-video recall,
+validate known-person labels independently, resolve the
+unknown observations into distinct persons, or prove the
+browser's Save/Import round trip (not explicitly reported
+by the maintainer yet). An earlier V04 all-reviewed sample
+already validated 4 known crop confirmations → 2 people
+and 2 background crops.
+
+**Current CI caveat:** The previous full main-based CI
+run's fast-assembly step failed on an existing Windows
+`VideoGuardedToolExecutorTests.Photo_priority_revokes_child_and_cleans_scratch`
+shutdown safety test. WI-0155 tests, integration shards,
+launcher and package checks passed. That failure must not
+be dismissed as flaky without a successful rerun and
+source-safe shutdown confirmation. Do not weaken process
+revocation/owned-scratch cleanup merely to merge.
