@@ -10,6 +10,60 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-18 — In-app review integration after PR #824
+
+PR #824 was merged to main as an **opt-in offline experiment**, not
+production recognition. The maintainer selected the next user experience:
+**move crop-level video review into the existing Photo Identity web app,
+rather than treating exported static HTML galleries as the product UI.**
+The historical HTML/CSV tooling remains a diagnostic fallback until the new
+workflow is locally accepted; it is not removed without an exit path.
+
+This branch provides a first vertical slice at /video-face-review, linked
+from Videos and Advanced navigation. The existing validated offline
+-PresenceFirst runner additionally exports a bounded private
+presence-first-web-review.json (report SHA-256, clip/group/crop keys,
+advisory pseudonym ranks and base64 reconstructed PNGs). The operator
+explicitly selects that file in the already-running web app. Review,
+hide/reveal, one-crop known-person confirmation, unknown/background/uncertain,
+per-crop exclusion, deduplicated presence counts and CSV Save/Import run
+**in browser memory**. Nothing is uploaded or stored by the API. The
+standalone **source-bound PowerShell measurement against the private report
+and people map remains the final validator**; a browser-visible report hash
+is not independent provenance proof.
+
+Scope and safeguards:
+- No video source reads in the web app, inference, OneDrive hydration,
+  API endpoints, database migrations/writes, auto-enrolment, automatic
+  identity assignment or production person presence changes.
+- Bundle contains sensitive crops: operator-owned local files, no
+  Git/public asset or browser-storage persistence. Navigation warns on
+  unsaved edits and clears the live review session. Existing private
+  source artifacts are not silently deleted.
+- A confirmed P0001-style alias is a **private proposal**, not yet
+  an authenticated canonical person ID; human alias lookup and
+  existing-source CSV verification are required. An incomplete review
+  cannot claim full person coverage. Unknown crop counts do not represent
+  distinct unknown identities.
+- Synthetic PowerShell and Node tests must cover deterministic bundle
+  construction, schema/crop bounds, privacy redaction, original-input
+  integrity, valid/invalid cross-source imports, duplicate people and
+  explicit unreviewed groups. Current CI and a one-time approved local
+  **in-app import → selective review → export → import → strict measure**
+  smoke are pending.
+
+**WI-0155 closeout proposal, not yet completion:** This item was scoped
+as a bounded *feasibility/desired-behavior decision*, not production
+recognition rollout. Close it only after integrated CI and the one new UI
+smoke pass and the maintainer accepts the evaluation conclusions:
+existing-photo read-only rankings are helpful leads but too unreliable
+for automatic assignment; presence-first manual review is the smallest
+safe behavior. Record final resource/retention and model-rights boundaries
+explicitly. Durable video/person presence persistence, vetted
+auto-recognition, sampled-frame coverage quality and any integrated
+automatic processing require separately scoped implementation/acceptance;
+they must not become hidden WI-0155 completion requirements.
+
 
 ## 2026-11-18 — Offline main integration candidate (pending acceptance)
 

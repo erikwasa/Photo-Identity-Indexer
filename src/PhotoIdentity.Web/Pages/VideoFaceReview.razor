@@ -1,0 +1,51 @@
+@page "/video-face-review"
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<PageTitle>Video face review · Photo Identity</PageTitle>
+<NavigationLock OnBeforeInternalNavigation="ConfirmInternalNavigation" />
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Video library · experimental review</p>
+        <h1>Video face review</h1>
+        <p>Review private face candidates in the existing application. Confirm a known person from a single crop, classify unknown or false detections, or leave groups unreviewed.</p>
+    </div>
+    <a class="button secondary" href="/videos">Back to videos</a>
+</section>
+
+<section class="vfr-intro" aria-label="Private video review import">
+    <h2>Load a private evidence package</h2>
+    <p>Use the <code>presence-first-web-review.json</code> created by the explicit WI-0155 offline <code>-PresenceFirst</code> runner. This package contains personal face crops. Select it only in your trusted local Photo Identity browser; it is read in browser memory and is not sent to the server.</p>
+    <label class="vfr-import">
+        <span>Private review package (JSON)</span>
+        <input id="vfr-bundle" type="file" accept=".json,application/json" />
+    </label>
+    <input id="vfr-csv" type="file" accept=".csv,text/csv" hidden aria-label="Import saved review CSV" />
+    <p id="vfr-load-status" role="status" aria-live="polite">No private evidence loaded.</p>
+    <p>Known-person suggestions are unverified leads. Confirm only with the same private people-alias map used by the offline experiment. Export a CSV before leaving: the application does not retain decisions, enrol video faces, contact inference services, or create production video/person assignments.</p>
+</section>
+
+<div id="vfr-root" class="vfr-root"></div>
+
+@code {
+    private async Task ConfirmInternalNavigation(LocationChangingContext context)
+    {
+        if (await JS.InvokeAsync<bool>("photoIdentityVideoFaceReview.hasUnsavedChanges") &&
+            !await JS.InvokeAsync<bool>("confirm",
+                "Leave this page and discard unsaved private review decisions?"))
+            context.PreventNavigation();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("photoIdentityVideoFaceReview.dispose"); }
+        catch (JSDisconnectedException) { }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("photoIdentityVideoFaceReview.init");
+    }
+}

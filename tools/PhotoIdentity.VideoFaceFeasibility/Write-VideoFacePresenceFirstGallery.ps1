@@ -130,12 +130,78 @@ foreach($row in $Rows) {
     $html.Add('</article>')
 }
 $html.Add('</div></div><p class="note">No completed group list or inferred absence is generated. Saved CSV contains all representative observations including unreviewed rows and binds to the private report SHA-256; it is NOT the legacy group-decision CSV. Confirmed aliases are private proposals only. No database writes.</p><script src="presence-first.js"></script></main></body></html>')
+# The in-application review loads this explicitly generated, self-contained
+# private bundle in browser memory. It contains representative PNG bytes and
+# aliases, never source paths, originals, names, IDs, or database credentials.
+# This is an additional output; preserve the original HTML and CSV workflow.
+$webGroups = @($Rows | ForEach-Object {
+    $row = $_
+    $group = [string]$row.Group
+    $suggestions = @()
+    if ($Rankings.ContainsKey($group)) {
+        $suggestions = @($Rankings[$group].topCandidates | ForEach-Object {
+            [string]::Format([Globalization.CultureInfo]::InvariantCulture,
+                '{0}: {1:F4}', [string]$_.alias, [double]$_.score)
+        })
+    }
+    [pscustomobject][ordered]@{
+        alias = $group
+        observations = [int]$row.Observations
+        suggestions = @($suggestions)
+    }
+})
+$webCrops = [Collections.Generic.List[object]]::new()
+$encodedSize = 0
+foreach ($record in $records) {
+    $path = Join-Path $ReviewFolder $record.Relative
+    $info = Get-Item -LiteralPath $path -Force
+    if ($info.PSIsContainer -or
+        ($info.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+        $info.Length -lt 24 -or $info.Length -gt 1048576) {
+        throw 'Private web review crop must be a bounded real PNG file.'
+    }
+    [byte[]]$bytes = [IO.File]::ReadAllBytes($path)
+    $header = [byte[]](137,80,78,71,13,10,26,10)
+    for ($i = 0; $i -lt $header.Length; $i++) {
+        if ($bytes[$i] -ne $header[$i]) {
+            throw 'Private web review crop is not a PNG.'
+        }
+    }
+    $base64 = [Convert]::ToBase64String($bytes)
+    $encodedSize += $base64.Length
+    if ($encodedSize -gt 24MB) {
+        throw 'Private web review crop evidence exceeds the in-browser limit.'
+    }
+    $webCrops.Add([pscustomobject][ordered]@{
+        group = [string]$record.Group
+        frame = [string]$record.Frame
+        face = [string]$record.Face
+        imageBase64 = $base64
+    })
+}
+$bundle = [pscustomobject][ordered]@{
+    schemaVersion = 1
+    mode = 'PresenceFirst'
+    clipAlias = $ClipAlias
+    reportSha256 = $reportHash
+    unassignedGroupObservations = $UnassignedObservations
+    groups = @($webGroups)
+    crops = @($webCrops.ToArray())
+}
+$bundlePath = Join-Path $ReviewFolder 'presence-first-web-review.json'
+$bundleJson = $bundle | ConvertTo-Json -Depth 8 -Compress
+if ([Text.Encoding]::UTF8.GetByteCount($bundleJson) -gt 24MB) {
+    throw 'Private web review bundle exceeds the maximum import size.'
+}
+[IO.File]::WriteAllText($bundlePath,$bundleJson,
+    [Text.UTF8Encoding]::new($false))
+
 $page=Join-Path $ReviewFolder 'presence-review.html'
 [IO.File]::WriteAllLines($page,$html,[Text.UTF8Encoding]::new($false))
 if($OpenGallery) { Invoke-Item -LiteralPath $page }
 [pscustomobject][ordered]@{
     SchemaVersion=1;Mode='PresenceFirst';ClipAlias=$ClipAlias
-    GalleryPath=$page;WorksheetPath=$worksheet;ReviewFolder=$ReviewFolder
+    GalleryPath=$page;WorksheetPath=$worksheet;WebReviewBundlePath=$bundlePath;ReviewFolder=$ReviewFolder
     Groups=$Rows.Count;Crops=$records.Count
     ObservationsUnassigned=$UnassignedObservations
     UnshownGroupObservations=($Rows | Measure-Object -Property Observations -Sum).Sum-$records.Count

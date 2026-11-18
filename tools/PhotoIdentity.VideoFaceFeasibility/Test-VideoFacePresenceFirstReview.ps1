@@ -84,6 +84,20 @@ try {
         -not $html.Contains('DO-NOT-LEAK') -and
         -not $html.Contains($framesDir)) 'Gallery source binding or privacy failed.'
     Check (@(Get-ChildItem -LiteralPath (Join-Path $gallery.ReviewFolder 'crops') -File).Count -eq 4) 'Crop reconstruction mismatch.'
+    Check ((Test-Path -LiteralPath $gallery.WebReviewBundlePath -PathType Leaf) -and
+        ((Get-Item -LiteralPath $gallery.WebReviewBundlePath).Length -lt 24MB)) 'Private in-app bundle missing or oversized.'
+    $webJson = Get-Content -LiteralPath $gallery.WebReviewBundlePath -Raw
+    $web = $webJson | ConvertFrom-Json -Depth 12
+    Check ($web.schemaVersion -eq 1 -and $web.mode -ceq 'PresenceFirst' -and
+        $web.clipAlias -ceq 'V04' -and
+        $web.reportSha256 -ceq (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant() -and
+        $web.unassignedGroupObservations -eq 2 -and
+        @($web.groups).Count -eq 3 -and
+        @($web.crops).Count -eq 4 -and
+        $web.crops[0].imageBase64.StartsWith('iVBORw0KGgo') -and
+        -not $webJson.Contains('DO-NOT-LEAK') -and
+        -not $webJson.Contains($framesDir) -and
+        -not $webJson.Contains($mapPath)) 'In-app bundle contains invalid or private source evidence.'
     $records=@(Import-Csv -LiteralPath $gallery.WorksheetPath)
     Check ($records.Count -eq 4 -and
         @($records | Where-Object Decision -CNE '').Count -eq 0) 'Initial blank worksheet invalid.'

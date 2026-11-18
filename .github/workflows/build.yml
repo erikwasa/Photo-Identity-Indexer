@@ -243,6 +243,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'WI-0155 merge assistant synthetic test failed.' }
           node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceFirstReview.js
           if ($LASTEXITCODE -ne 0) { throw 'WI-0155 presence-first UI synthetic test failed.' }
+          node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceWebReview.js
+          if ($LASTEXITCODE -ne 0) { throw 'WI-0155 in-app review synthetic test failed.' }
           node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceMergeChainValidation.js
           if ($LASTEXITCODE -ne 0) { throw 'WI-0155 merge validation synthetic test failed.' }
 
