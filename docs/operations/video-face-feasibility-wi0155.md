@@ -5360,16 +5360,23 @@ template separate from all validated legacy review CSVs.
 In the new browser, confirm a known person from one source crop
 using a private P0001-style alias, then confirm that same person
 from another group **without merging**: the summary must show
-one distinct person with two confirming crops. In a group
-containing several representative crops, confirm different
-known people on distinct crops and mark the wrongly grouped
-crop with **Exclude from provisional group**. This changes
-only the sidecar review annotation and the mixed-group
-summary; it does not change the source grouper. Leave another
+one distinct person with two confirming crops. Leave another
 group unreviewed or hide it for the session; it must remain
 explicitly outstanding. Test CSV Save, reload via Import,
 then Save again. The imported data must remain bound to
 the exact source clip/report/crops.
+
+**Do not attempt the mixed-group crop test on V04/V06:** the
+reviewed coarse evidence has one representative crop per G-group,
+so no such source-bound mixed group exists there. The synthetic
+PowerShell/browser fixture instead creates two representatives
+of one group belonging to different people, marks one crop
+**Exclude from provisional group**, and verifies two distinct
+presence proposals with no group mutation. That test is sufficient
+for the mixed-group UI mechanics. A later *optional* local check
+using an approved, actually multi-crop V05/V07 group may improve
+confidence, but is **not** required and must not cause exhaustive
+refined review or invented face identities.
 
 For each video, **only** use group crops for which the
 persisted report contains representative geometry. The
