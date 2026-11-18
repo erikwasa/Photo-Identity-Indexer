@@ -1,4 +1,4 @@
-/* WI-0155 opt-in, human-confirmed merge assistance for the private C-group
+/* WI-0155 opt-in, pairwise human-confirmed merge assistance for the private C-group
  * workspace. Catalogue rank overlap is a review lead, NOT an identity or a
  * permission to merge. No automatic merging, background suppression, storage,
  * network, source or production identity writes.
@@ -10,9 +10,6 @@
   const cards = [...document.querySelectorAll(".group-card")];
   const proposals = document.getElementById("ws-merge-proposals");
   const summary = document.getElementById("ws-merge-summary");
-  const batchCount = document.getElementById("ws-merge-batch-count");
-  const batchConfirm = document.getElementById("ws-merge-batch-confirm");
-  const batchApply = document.getElementById("ws-merge-batch-apply");
   const pairLimit = 12;
   const knownAlias = /^P(?:[0-9]{2}|[0-9]{4})$/;
   const groupAlias = /^C(?!000)[0-9]{3}$/;
@@ -142,42 +139,6 @@
     dispatch(sourceTarget);
     return true;
   }
-  // Batch proposals are based ONLY on explicit reviewer-selected known
-  // person aliases. UNKNOWN and catalogue rank hints cannot cause a batch.
-  // Complete frame overlap is a veto when full membership is present.
-  // Legacy reports remain representative-only and cannot certify
-  // future merged person-presence exports.
-  function batchPlan(items) {
-    const byPerson = new Map();
-    for (const item of items) {
-      if (!knownAlias.test(item.selected) || !eligible(item)) continue;
-      if (!byPerson.has(item.selected)) byPerson.set(item.selected, []);
-      byPerson.get(item.selected).push(item);
-    }
-    const result = [];
-    let blockedSets = 0;
-    for (const grouped of byPerson.values()) {
-      if (grouped.length < 2) continue;
-      let conflict = false;
-      for (let i = 0; i < grouped.length; i++) {
-        for (let j = i + 1; j < grouped.length; j++) {
-          if (sharesSourceFrame(grouped[i], grouped[j])) {
-            conflict = true;
-          }
-        }
-      }
-      if (conflict) { blockedSets++; continue; }
-      const sorted = grouped.slice().sort((a, b) =>
-        Number(b.decision === "Keep group") -
-          Number(a.decision === "Keep group") ||
-        b.observations - a.observations || a.id.localeCompare(b.id));
-      const keeper = sorted[0];
-      for (const source of sorted.slice(1)) {
-        result.push({ keeperId: keeper.id, sourceId: source.id });
-      }
-    }
-    return { result, blockedSets };
-  }
   function showPair(pair) {
     const outer = addText("article", "", "ws-merge-pair");
     const title = pair.sameConfirmed ?
@@ -234,46 +195,10 @@
         proposals.appendChild(addText("p",
           "No safe shortlist from current evidence. Use manual review; do not infer a face is absent."));
       }
-      const batch = batchPlan(items);
-      batchCount.textContent = batch.result.length +
-        " possible merges from explicit same-person labels" +
-        (batch.blockedSets ? "; " + batch.blockedSets +
-          " label set(s) withheld due to overlapping source frames" : "") +
-        ". No automatic identities or merges.";
-      batchConfirm.checked = false;
-      batchApply.disabled = true;
     } finally {
       refreshing = false;
     }
   }
-  batchConfirm.addEventListener("change", () => {
-    const batch = batchPlan(cards.map(snapshot));
-    batchApply.disabled = !batchConfirm.checked || !batch.result.length;
-  });
-  batchApply.addEventListener("click", () => {
-    if (!batchConfirm.checked) return;
-    const plan = batchPlan(cards.map(snapshot));
-    if (!plan.result.length) { refresh(); return; }
-    // Validate the complete current plan before mutating any controls.
-    const state = cards.map(snapshot);
-    if (plan.result.some(pair => {
-      const keeper = state.find(x => x.id === pair.keeperId);
-      const source = state.find(x => x.id === pair.sourceId);
-      return !keeper || !source || !pairAllowed(keeper, source) ||
-        !knownAlias.test(keeper.selected) ||
-        keeper.selected !== source.selected;
-    })) {
-      refresh();
-      return;
-    }
-    let applied = 0;
-    for (const pair of plan.result) {
-      if (perform(pair.keeperId, pair.sourceId)) applied++;
-    }
-    refresh();
-    summary.textContent = applied + " reviewer-authorized merges entered; " +
-      "save the single combined CSV to preserve them.";
-  });
   for (const card of cards) {
     card.addEventListener("input", refresh);
     card.addEventListener("change", refresh);
