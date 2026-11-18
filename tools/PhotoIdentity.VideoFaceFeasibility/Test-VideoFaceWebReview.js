@@ -37,6 +37,16 @@ badBundle(b => b.crops[0].frame = "181");
 badBundle(b => b.crops[0].imageBase64 = "javascript:alert(1)");
 badBundle(b => b.crops[0].imageBase64 = image.repeat(20000));
 badBundle(b => b.groups[0].suggestions = ["<img src=x onerror=alert(1)>"]);
+badBundle(b => b.clipAlias = ["V04"]);
+badBundle(b => b.groups[0].alias = ["G001"]);
+badBundle(b => {
+    const bytes = Buffer.from(image, "base64");
+    bytes.writeUInt32BE(30000, 16); // Malicious PNG dimensions, not a bounded crop.
+    b.crops[0].imageBase64 = bytes.toString("base64");
+});
+const signedRank = copy(bundle);
+signedRank.groups[0].suggestions = ["P0001: -0.1234"];
+assert.equal(review.validateBundle(signedRank), true);
 badBundle(b => b.unassignedGroupObservations = -1);
 let rows = review.newRows(bundle);
 assert.equal(review.validateRows(rows, bundle), true);
