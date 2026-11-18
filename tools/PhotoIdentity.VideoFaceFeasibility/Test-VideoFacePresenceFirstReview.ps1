@@ -95,9 +95,9 @@ try {
     $reviewed=Join-Path $root 'reviewed.csv'
     $records | Export-Csv -LiteralPath $reviewed -Encoding utf8
     $measure=Join-Path $PSScriptRoot 'Measure-VideoFacePresenceFirstReview.ps1'
-    $args=@{ReviewedCsvPath=$reviewed;PrivateGroupReportPath=$reportPath;
+    $measurementParams=@{ReviewedCsvPath=$reviewed;PrivateGroupReportPath=$reportPath;
         PrivatePeopleMapPath=$mapPath;ClipAlias='V04'}
-    $m=& $measure @args
+    $m=& $measure @measurementParams
     Check ($m.InputEvidenceValidated -and
         $m.KnownPersonPresenceProposals -eq 2 -and
         $m.ConfirmedRepresentativeCrops -eq 3 -and
@@ -114,19 +114,19 @@ try {
     }
     $records[2].PersonAlias='P9999'
     $records | Export-Csv -LiteralPath $reviewed -Encoding utf8
-    Check (Refused { & $measure @args }) 'Nonexistent private person accepted.'
+    Check (Refused { & $measure @measurementParams }) 'Nonexistent private person accepted.'
     $records[2].PersonAlias='P0001'
     $records[3].Group='G999'
     $records | Export-Csv -LiteralPath $reviewed -Encoding utf8
-    Check (Refused { & $measure @args }) 'Forged group accepted.'
+    Check (Refused { & $measure @measurementParams }) 'Forged group accepted.'
     $records[3].Group='G003'
     $records[3].ExcludeFromGroup='True'
     $records | Export-Csv -LiteralPath $reviewed -Encoding utf8
-    Check (Refused { & $measure @args }) 'Silent crop exclusion accepted.'
+    Check (Refused { & $measure @measurementParams }) 'Silent crop exclusion accepted.'
     $records[3].ExcludeFromGroup='False'
     $records[3].Decision='Not a face'
     $records | Export-Csv -LiteralPath $reviewed -Encoding utf8
-    $m2=& $measure @args
+    $m2=& $measure @measurementParams
     Check ($m2.KnownPersonPresenceProposals -eq 2 -and
         $m2.BackgroundRepresentativeCrops -eq 1 -and
         $m2.GroupsWithoutReviewedCrops -eq 0) 'Reviewed status lost.'
