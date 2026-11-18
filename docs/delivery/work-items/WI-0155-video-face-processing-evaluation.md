@@ -3215,3 +3215,88 @@ CenterFace rights/distribution, retention/cleanup, safe runtime and
 source integrity, main branch reconciliation/rollback, and a
 maintainer integrate-vs-separate decision. Production video-person
 persistence is still out of this experimental branch's scope.
+
+## Experimental checkpoint 53 — singleton-heavy four-pass results and focused refinement review (2026-11-18)
+
+Maintainer completed the exact four-pass, all-eligible private catalogue
+experiment. One snapshot: 241 canonical people, 240 eligible, 596
+exemplars; 204 examined frames, 119 frames with detections, 530 retained
+YuNet observations and embeddings, zero overflow/discarded. Runtime was
+276.553 seconds reported by the experiment and 9.03 minutes end to end.
+These are candidate observations, not unique people.
+
+| Evidence | V04 A coarse | V05 A refined | V06 B coarse | V07 B refined |
+| --- | ---: | ---: | ---: | ---: |
+| Frames | 15 | 127 | 7 | 55 |
+| YuNet | 6 | 67 | 53 | 404 |
+| Corroborated at .30 | 0 | 8 | 42 | 340 |
+| Provisional G-groups | 6 | 62 | 53 | 64 |
+| Corroborated C-groups | 0 | 0 | 0 | 9 |
+| Corroborated noise | 0 | 8 | 42 | 322 |
+| Uncorroborated | 6 | 59 | 11 | 64 |
+| Independent-only I observations | 1 | 13 | 22 | 155 |
+| N/U/I samples | 0/6/1 | 8/52/13 | 12/10/11 | 87/55/78 |
+
+Across all passes only 18 of 390 corroborated observations were clustered,
+with 372 corroborated noise. The C-first combined workspace correctly
+cannot represent three of these four cases; the G-group galleries for
+V04/V06 opened successfully and presented **all** coarse observations
+as singletons. Human review and both strict G-group measurement scripts
+passed after correction of an invalid V06 merge chain.
+
+| Reviewed coarse G evidence | V04 | V06 |
+| --- | ---: | ---: |
+| Initial groups / reviewed | 6/6 | 53/53 |
+| Kept roots | 2 | 11 |
+| Merge decisions | 2 | 24 |
+| Dismissed background | 2 | 16 |
+| Cannot tell | 0 | 2 |
+| Retained known-labelled groups | 4 | 22 |
+| Retained UNKNOWN-labelled groups | 0 | 13 |
+| Distinct known people | 2 | 7 |
+| Correct initial top-one groups | 0 | 0 |
+| Correct initial top-three groups | 0 | 1 |
+| Distinct known people with correct top-three | 0/2 | 1/7 |
+
+V06's proposed final group count is unresolved (two uncertain groups);
+13 UNKNOWN observations must not be treated as 13 distinct unknown people.
+V04's single I-only crop was visually confirmed not a face. V04's four real
+YuNet faces were all uncorroborated; the second detector cannot be a hard
+suppression gate. Both coarse passes have zero unassigned observations.
+The first coarse B estimate of approximately ten visible people is not
+a validated total recall denominator.
+
+**SINGLETON-REVIEW-01 (clarified acceptance):** a useful single face
+observation must be reviewable with reference suggestions even where
+there are no repeated-observation clusters. Evaluate identity utility and
+review effort at the person level; neither group counts, nearest
+catalogue aliases, corroboration, nor sampled N/U/I evidence are proof of
+person presence. Keep unknown and uncertain candidates unresolved, with
+explicit bounds; never require a second observation to retain a face.
+The current G fallback preserves singleton ranks but produces excessive
+manual consolidation and false groups, and the C/N/U workspace rejects
+empty sources. The reported rankings are weak. V06 exposed browser
+export of invalid merge chains; browser-side validation remains a
+separate usability improvement.
+
+**Next focused experiment:** instead of exhaustively labelling the
+126 refined provisional groups, the new Windows-only offline
+`New-VideoFaceRefinementComparison.ps1` reuses the same report,
+matching cases/map and the validated V04/V06 G worksheets. Each *explicitly*
+human-labelled coarse singleton is an anchor; do not infer labels from
+merges. Search all stored *added timestamp* refined top-three ranks for
+the same pseudonym, within its own physical video only. Show at most
+three crop-backed suggestions per person with confirmed coarse references;
+count missing geometry and people without suggestions. Compare improved
+rank, comparable target scores (unknown below top three), and human
+same-person/visual-clarity decisions separately. This is a biased
+shortlist, not full refined detection review; it cannot discover persons
+absent from the coarse labels, verify unknown identities, inspect I-only
+ranks, or conclude refinement has no value when no lead exists. No
+new inference, database, original video, persisted identity or automatic
+face enrolment. Acceptance of the new tool requires synthetic CI and a
+bounded maintainer browser check with existing private evidence.
+
+See operations runbook checkpoint 53. Preserve the isolated branch,
+unresolved broader quality, rights, privacy, performance and integration
+gates; no main promotion.
