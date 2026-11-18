@@ -5177,3 +5177,64 @@ rank-biased review to whole-video recall or declare refinement
 useless merely because no shortlist lead exists. The general
 singleton-first review, grouping quality, recognition quality and
 browser invalid-merge export remain separate open work.
+
+## Checkpoint 54 — focused review completed and interpreted (2026-11-18)
+
+**Local acceptance:** PR #821 was merged to `wi-0155`; synthetic
+PowerShell test, matching four-pass input validation, private gallery
+generation and private CSV export all PASS. The operator completed
+every shortlisted decision (13/13), retaining the worksheet only in
+the approved private location. No new FFmpeg, ONNX, database or
+original-video operations were performed for this comparison.
+
+| Measure | V04→V05 (A) | V06→V07 (B) |
+| --- | ---: | ---: |
+| Coarse known people | 2 | 7 |
+| Refined added frames / ranked face observations | 112 / 61 | 48 / 351 |
+| Coarse people with any added top-three occurrence | 2 | 5 |
+| Coarse people with crop-backed leads | 2 | 4 |
+| Lead occurrences without retained crop | 0 | 13 |
+| Shortlisted and manually reviewed lead crops | 4 | 9 |
+| Distinct confirmed matching people | 2 | 2 |
+| Distinct people with clearer refined crops | 2 | 1 |
+| Matching clearer / matching not clearer crops | 4 / 0 | 2 / 3 |
+| Wrong-person / non-face crops | 0 / 0 | 3 / 1 |
+| Uncertain / unreviewed shortlist crops | 0 / 0 | 0 / 0 |
+
+The earlier operator draft saying five V04 leads was corrected:
+the saved CSV and CLI summary agree on **four**. All A confirmed
+suggestions and both B confirmed matching people's suggestions
+were rank one in the *refined* shortlist. Neither A person had a
+correct coarse top-three suggestion. B had zero known people correct
+top-one in coarse G review and only one person top-three. Do not
+claim exact per-person numeric score deltas when the coarse person
+alias was outside stored top three.
+
+**Key distinction:** B's five people with a new top-three rank,
+four people with any crop-backed shortlist, and two people
+human-confirmed from the shortlist are three different counts;
+13 missing-crop occurrences are *not* false detections or
+automatically missed people. Four out of the nine selected B
+lead observations were either wrong-person or background, but
+this rank-biased sample is not a detector false-positive-rate
+estimate. A person with no lead can still have a real face
+elsewhere in refined frames. I-only detections, unknown people
+and newly encountered people were not evaluated here.
+
+**Acceptance outcome:** The narrow read-only/offline
+refinement-comparison tool is locally verified. Refinement shows
+a possible benefit on both physical videos and clearer pictures
+for three known people across the two clips, but remains opt-in
+and uncalibrated. Broader person coverage, singleton handling,
+recognition rankings, grouping fragmentation, review UI merge
+validation, licensing, costs, deletion/retention and the
+integration-vs-separate decision remain open. No production
+write, video enrolment, automatic identification or main branch
+promotion is authorized.
+
+For subsequent development, keep original reviewed coarse CSVs,
+four-pass report/map, manifests and workspaces unchanged. Future
+offline improvements should not require fresh inference merely
+to display existing retained evidence; consider a focused
+geometry-backed rank-lead view and explicit unknown geometry
+budget without treating absent crops as a negative label.
