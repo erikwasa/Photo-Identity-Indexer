@@ -97,6 +97,12 @@
                      crop.frameHeight < 1 || crop.frameHeight > 3840 ||
                      crop.faceWidthPx < 1 || crop.faceWidthPx > crop.frameWidth + 1 ||
                      crop.faceHeightPx < 1 || crop.faceHeightPx > crop.frameHeight + 1)) ||
+                (bundle.schemaVersion === 3 &&
+                    (!Array.isArray(crop.suggestions) ||
+                     crop.suggestions.length < 1 || crop.suggestions.length > 3 ||
+                     crop.suggestions.some(s => typeof s !== "string" ||
+                         !/^P(?!0000)\d{4}: -?(?:0|1)\.\d{4}$/.test(s) ||
+                         !bundle.personBindings.some(p => p.alias === s.split(": ")[0])))) ||
                 !/^[A-Za-z0-9+/]+={0,2}$/.test(crop.imageBase64) ||
                 cropKeys.has(key(crop)) ||
                 frameFaces.has(crop.frame + ":" + crop.face)) return false;
@@ -173,7 +179,7 @@
         return map.people.filter(person =>
             (personName(person) + " " + (person.alias || "")).toLocaleLowerCase().includes(needle))
             .sort((a, b) => personName(a).localeCompare(personName(b)) ||
-                a.alias.localeCompare(b.alias))
+                (a.alias || "").localeCompare(b.alias || ""))
             .slice(0, 20);
     }
     function describeSuggestion(suggestion, map) {
@@ -429,7 +435,9 @@
                 group.observations + " observations; " +
                 (group.observations - groupCrops.length) + " unshown"));
             card.append(dom("p", "vfr-suggestions",
-                "Group-level leads, not verified identities. Review a face to accept one:"));
+                bundle.schemaVersion === 3
+                    ? "Per-face SFace leads are unverified. Choose a person for each face:"
+                    : "Group-level leads are unverified. Choose a person for each face:"));
             const hide = dom("button", "button secondary", "Hide without deciding");
             hide.type = "button";
             hide.addEventListener("click", () => {
@@ -449,14 +457,15 @@
                 item.append(image, dom("small", "", "Frame " + crop.frame +
                     " · face " + crop.face + " · crop " +
                     pixels.width + " × " + pixels.height + " px (no upscaling)" +
-                    (bundle.schemaVersion === 2
+                    (bundle.schemaVersion >= 2
                         ? " · extracted frame " + crop.frameWidth + " × " +
                             crop.frameHeight + " px · detected face " +
                             crop.faceWidthPx + " × " + crop.faceHeightPx + " px"
                         : "")));
                 const suggested = dom("ol", "vfr-suggestion-list");
-                if (group.suggestions.length && active.people) {
-                    for (const suggestion of group.suggestions) {
+                const leads = bundle.schemaVersion === 3 ? crop.suggestions : group.suggestions;
+                if (leads.length && active.people) {
+                    for (const suggestion of leads) {
                         const alias = suggestion.split(": ")[0];
                         const candidate = active.people.people.find(p => p.alias === alias);
                         const entry = dom("li", "");
@@ -476,7 +485,7 @@
                         entry.append(choose);
                         suggested.append(entry);
                     }
-                } else if (group.suggestions.length) {
+                } else if (leads.length) {
                     suggested.append(dom("li", "", "Load current people to select a suggestion."));
                 } else {
                     suggested.append(dom("li", "", "No available suggestions."));
@@ -512,7 +521,8 @@
                     results.replaceChildren();
                     for (const candidate of searchPeople(active.people, person.value)) {
                         const option = dom("button", "vfr-person-option",
-                            personName(candidate) + " (" + candidate.alias + ")");
+                            personName(candidate) +
+                            (candidate.alias ? " (" + candidate.alias + ")" : " (new since snapshot)"));
                         option.type = "button";
                         option.disabled = !candidate.alias;
                         option.title = candidate.alias
@@ -580,7 +590,9 @@
                 const personTitle = dom("label", "",
                     named ? "Known person — choose from all " +
                         active.people.people.length + " names"
-                        : "Private known-person alias (load people map for names)");
+                        :
+                        bundle.schemaVersion === 3 ? "Known person (database unavailable)" :
+                        "Private known-person alias (legacy map needed)");
                 person.id = "vfr-person-" + crop.frame + "-" + crop.face;
                 personTitle.htmlFor = person.id;
                 personField.append(personTitle, picker);
