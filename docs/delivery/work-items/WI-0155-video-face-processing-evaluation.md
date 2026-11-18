@@ -158,3 +158,47 @@ catalogue or biometric governance during exploratory work.
 
 - Status: in_progress on `wi-0155`; the first work item is still a
   feasibility/prototype decision, not production recognition acceptance.
+## 2026-11-18 — Main-candidate V04 presence-first local acceptance
+
+**Actual maintainer test on main-based draft PR #824:** The opt-in
+`-PresenceFirst` provisional G gallery generated from the existing
+approved V04 four-pass report/cases: schema 1; 6 groups; 6
+representative crops; 0 unassigned and 0 unshown group
+observations; `ProductionAssignmentsMade=0`. The maintainer saved
+a private crop-review CSV and ran
+`Measure-VideoFacePresenceFirstReview.ps1` against the
+corresponding private report and people map. It returned
+`InputEvidenceValidated=True` and the following **aggregate
+human-reviewed outcomes**:
+
+- 6/6 unique representative crop rows reviewed, no unanswered or
+  uncertain decisions; 4 known-person confirmation crops and 2
+  background/not-a-face crops.
+- **2 distinct known-person presence proposals** from 4
+  confirmations; **2 duplicate known-person confirmations**
+  correctly deduplicated without merging provisional groups.
+- 0 unknown, 0 excluded-crop annotations, 0 mixed-identity groups,
+  0 unreviewed groups, 0 unshown or unassigned group
+  observations.
+- `PersonCoverageProven=False` and
+  `ProductionAssignmentsMade=0` throughout.
+
+The uploaded private CSV was independently checked only for its
+schema, row uniqueness, decision counts and aggregate alias
+cardinality. It is **not stored in this repository**. Successful
+Save/export and source-bound CLI verification are demonstrated;
+**CSV Import/reload was not separately reported** and must not
+be represented as locally passed. The all-reviewed V04 worksheet
+also does not exercise partial/early-stop behavior or mixed-group
+crop correction; these are supported by synthetic tests and need
+a bounded real-data smoke check without exhaustive review.
+
+**Main-candidate CI:** The previously reported full Windows GitHub
+Actions run for commit `e437d0c0` succeeded on all six jobs,
+including C#, PowerShell and Node synthetics, launcher,
+package, integration shards and generated docs. No automatic
+production identification or video/person persistence is implied.
+The pending verification gates remain local Import and selective
+V06 early-stop acceptance, model/right-to-distribute and private
+output retention/rollback sign-off. Do not merge solely on the
+V04 aggregate.
