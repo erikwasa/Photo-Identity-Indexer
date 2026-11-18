@@ -1,6 +1,6 @@
-# WI-0155 — bounded offline video-face verification (main candidate)
+# WI-0155 — bounded offline video-face verification and in-app review
 
-## In-app private review (post-PR #824 development branch)
+## In-app private review (merged PR #825; named-review follow-up)
 
 The previous HTML gallery remains available for diagnostics. New crop-level
 review should happen in Photo Identity's **Video face review** workspace,
@@ -57,8 +57,8 @@ explicitly export before navigation. The original report, map, HTML/CSV
 and reconstructed crops remain under operator-controlled retention; the
 new JSON file also needs explicit local cleanup when no longer needed.
 
-This is the **supported integration runbook** for the main-based
-**draft** candidate. The longer historical experiment diary remains
+This is the **supported integration runbook** for the already-merged
+in-app review and its named-review follow-up. The longer historical experiment diary remains
 on the `wi-0155` branch; it is not required to use the offline tools.
 
 **Scope:** Windows PowerShell 7.6, operator-approved already-local video
@@ -67,6 +67,72 @@ frames, private sidecar evidence and explicit execution. Nothing in
 background inference, OneDrive hydration, still-photo face enrolment,
 production identity writes or migrations are authorized. A presence
 proposal in a private worksheet is **not** a persisted person assignment.
+
+## Named-review follow-up: real names and all-people picker
+
+See [three architecture/flow diagrams](video-to-person-review-pipeline-wi0155.md)
+for the distinction between production video ingestion, the opt-in offline
+face experiment and a proposed future production workflow.
+
+The name selector deliberately uses the **original private people map**
+(`$peopleMapPath`) produced by the same read-only PostgreSQL snapshot as
+the experiment. It contains canonical alias, person ID and display name for
+**all** current canonical people (including those without a qualifying
+SFace exemplar). There is **no** second database query, new server API,
+new person list, browser upload or persistent identity write.
+
+After merging this follow-up and pulling the updated app and tools, regenerate
+**only the private review bundle from the existing V06 evidence**:
+
+```powershell
+$tools = Join-Path (Get-Location).Path 'tools\PhotoIdentity.VideoFaceFeasibility'
+$gallery = & (Join-Path $tools 'New-VideoFaceGroupReview.ps1') `
+  -PrivateReportPath $reportPath -PrivateCasesPath $casesPath `
+  -ClipAlias V06 -GroupSource Provisional -PresenceFirst
+$gallery | Format-List Mode,Groups,Crops,WebReviewBundlePath,ProductionAssignmentsMade
+```
+
+No FFmpeg extraction, model inference, PostgreSQL evaluation or video source
+access is required. The new bundle is version 2 and includes only the
+catalogue snapshot identifier and canonical people **count**, not names or
+IDs. The same prior source-bound V06 CSV remains importable because the
+report digest and crop keys do not change.
+
+On a **trusted local** `/video-face-review` page:
+
+1. Import `$gallery.WebReviewBundlePath` as the **private face evidence**.
+2. Import `$peopleMapPath` as the **private people map**. The page should
+   report the canonical catalogue count and show real names next to the
+   exploratory top-three leads.
+3. For one crop choose **Confirm person**, search any canonical person's
+   name and click the intended result; use name or alias to narrow the
+   list. A typed name alone never records a person selection.
+4. Import the existing V06 CSV, verify all 7 deduplicated known people and
+   partial-review counts, export again and validate with the existing
+   `Measure-VideoFacePresenceFirstReview.ps1` command below.
+5. Verify the crop label reports **native PNG width × height**, the
+   **already-extracted frame width × height** and the detected face
+   bounding box width × height, all in pixels. No browser zoom, image
+   upscaling, original-video open or modified inference is introduced.
+6. Try importing a map from another snapshot (synthetic tests do this): it
+   must be refused. Do not generate or upload false private snapshots for a
+   real review.
+
+Both private files are read locally into browser memory only. Real names
+are **never written to CSV**, diagnostic output, server storage, web
+resources or version control. Existing legacy bundle version 1 stays
+usable for alias-only review, but requires regeneration to support the
+source-matched name map. Browser names reflect the recorded evaluation
+snapshot and can become stale after a later catalogue rename; this is
+**not yet live canonical people lookup**. Only a future authorized
+production integration should reconcile snapshot IDs with live catalogue
+identity and persistent audited review actions.
+
+**Image-quality evidence:** V06 native crops: 53 total, min 24 px,
+max 102 px, mean long edge 39.45 px, 49 under 64 px, all under 112 px.
+Display-only enlargement cannot recover detail. See the architecture
+document for the separate, future native-frame-quality evaluation;
+do not rerun video extraction just to validate this named picker.
 
 ## 1. Synthetic verification — no models or private files
 

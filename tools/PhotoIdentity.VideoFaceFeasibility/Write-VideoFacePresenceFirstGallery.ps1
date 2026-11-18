@@ -26,6 +26,16 @@ if ($ClipAlias -cnotmatch '^V(?!00)[0-9]{2}$' -or
     throw 'Invalid validated presence-first gallery parameters.'
 }
 $reportHash=(Get-FileHash -LiteralPath $PrivateReportPath -Algorithm SHA256).Hash.ToLowerInvariant()
+# Metadata is bound to the already-validated original catalogue report.
+# The name/UUID map itself remains a separate local-only user import.
+$sourceReport=Get-Content -LiteralPath $PrivateReportPath -Raw -Encoding utf8 | ConvertFrom-Json -Depth 16
+$snapshot=[string]$sourceReport.catalogue.pgSnapshot
+$peopleCount=[int]$sourceReport.catalogue.selectedPeople
+if ([int]$sourceReport.schemaVersion -ne 1 -or
+    $snapshot -cnotmatch '^[0-9]+:[0-9]+:(?:[0-9]+(?:,[0-9]+)*)?$' -or
+    $peopleCount -lt 1 -or $peopleCount -gt 4096) {
+    throw 'Original catalogue snapshot metadata unavailable for named review.'
+}
 $rowsById=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
 foreach($row in $Rows) {
     if ([string]$row.Clip -cne $ClipAlias -or
@@ -152,7 +162,21 @@ $webGroups = @($Rows | ForEach-Object {
 })
 $webCrops = [Collections.Generic.List[object]]::new()
 $encodedSize = 0
+$cropIndex = 0
 foreach ($record in $records) {
+    $sourceCrop = $Crops[$cropIndex]
+    $cropIndex++
+    if ([string]$sourceCrop.Group -cne [string]$record.Group -or
+        [int]$sourceCrop.Box.frameNumber -ne [int]$record.Frame -or
+        [int]$sourceCrop.Box.faceNumber -ne [int]$record.Face -or
+        [int]$sourceCrop.FrameWidth -lt 1 -or [int]$sourceCrop.FrameWidth -gt 3840 -or
+        [int]$sourceCrop.FrameHeight -lt 1 -or [int]$sourceCrop.FrameHeight -gt 3840 -or
+        [int]$sourceCrop.FaceWidth -lt 1 -or
+        [int]$sourceCrop.FaceWidth -gt [int]$sourceCrop.FrameWidth + 1 -or
+        [int]$sourceCrop.FaceHeight -lt 1 -or
+        [int]$sourceCrop.FaceHeight -gt [int]$sourceCrop.FrameHeight + 1) {
+        throw 'Native extracted-frame/face geometry is inconsistent.'
+    }
     $path = Join-Path $ReviewFolder $record.Relative
     $info = Get-Item -LiteralPath $path -Force
     if ($info.PSIsContainer -or
@@ -176,14 +200,20 @@ foreach ($record in $records) {
         group = [string]$record.Group
         frame = [string]$record.Frame
         face = [string]$record.Face
+        frameWidth = [int]$sourceCrop.FrameWidth
+        frameHeight = [int]$sourceCrop.FrameHeight
+        faceWidthPx = [int]$sourceCrop.FaceWidth
+        faceHeightPx = [int]$sourceCrop.FaceHeight
         imageBase64 = $base64
     })
 }
 $bundle = [pscustomobject][ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     mode = 'PresenceFirst'
     clipAlias = $ClipAlias
     reportSha256 = $reportHash
+    catalogueSnapshot = $snapshot
+    cataloguePeopleCount = $peopleCount
     unassignedGroupObservations = $UnassignedObservations
     groups = @($webGroups)
     crops = @($webCrops.ToArray())

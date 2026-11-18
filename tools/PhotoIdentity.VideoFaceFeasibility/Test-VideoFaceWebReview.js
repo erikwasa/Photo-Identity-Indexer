@@ -99,4 +99,61 @@ assert.throws(() => review.csvParse('"value"x,next\n'));
 assert.throws(() => review.csvParse('"unterminated'));
 const legacy = csv.replace(/\r\n/g, "\n");
 assert.deepEqual(review.importCsv(legacy, bundle), rows);
+// V2 package can resolve real names only against its exact private
+// read-only catalogue snapshot. Legacy v1 packages remain supported for
+// alias-only CSV review, but must not accept arbitrary names.
+const namedBundle = copy(bundle);
+namedBundle.schemaVersion = 2;
+namedBundle.catalogueSnapshot = "10:15:12,14";
+namedBundle.cataloguePeopleCount = 3;
+for (const crop of namedBundle.crops) {
+    crop.frameWidth = 1920;
+    crop.frameHeight = 1080;
+    crop.faceWidthPx = 35;
+    crop.faceHeightPx = 46;
+}
+const privateMap = {
+    schemaVersion: 1, pgSnapshot: "10:15:12,14",
+    people: [
+        {alias: "P0001", personId: "00000000-0000-0000-0000-000000000001", displayName: "Alice Example"},
+        {alias: "P0002", personId: "00000000-0000-0000-0000-000000000002", displayName: "Álex Sample"},
+        {alias: "P0003", personId: "00000000-0000-0000-0000-000000000003", displayName: null}
+    ]
+};
+assert.equal(review.validateBundle(namedBundle), true);
+assert.equal(review.validatePeopleMap(namedBundle, privateMap), true);
+assert.equal(review.validatePeopleMap(bundle, privateMap), false);
+assert.equal(review.pngDimensions(image).width, 1);
+assert.equal(review.pngDimensions(image).height, 1);
+assert.deepEqual(review.searchPeople(privateMap, "aLiCe").map(p => p.alias), ["P0001"]);
+assert.deepEqual(review.searchPeople(privateMap, "P0002").map(p => p.alias), ["P0002"]);
+assert.match(review.describeSuggestion("P0001: 0.8000", privateMap), /Alice Example/);
+assert.equal(review.describeSuggestion("P0001: 0.8000", null), "P0001: 0.8000");
+assert.equal(review.validateRows(rows, namedBundle), true);
+assert.equal(review.importCsv(review.csvEncode(rows), namedBundle).length, 4);
+assert.equal(review.csvEncode(rows).includes("Alice Example"), false);
+const rejectedMap = mutate => {
+    const clone = copy(privateMap);
+    mutate(clone);
+    assert.equal(review.validatePeopleMap(namedBundle, clone), false);
+};
+rejectedMap(x => x.pgSnapshot = "10:15:13");
+rejectedMap(x => x.people.pop());
+rejectedMap(x => x.people[1].alias = x.people[0].alias);
+rejectedMap(x => x.people[1].personId = x.people[0].personId.toUpperCase());
+rejectedMap(x => x.people[0].displayName = "<script>\n");
+rejectedMap(x => x.people[0].displayName = " ");
+rejectedMap(x => x.people[0].personId = "not-a-uuid");
+const invalidGeometry = copy(namedBundle);
+invalidGeometry.crops[0].faceWidthPx = 4000;
+assert.equal(review.validateBundle(invalidGeometry), false);
+const missingGeometry = copy(namedBundle);
+delete missingGeometry.crops[0].frameWidth;
+assert.equal(review.validateBundle(missingGeometry), false);
+const badNamed = copy(namedBundle);
+badNamed.cataloguePeopleCount = 0;
+assert.equal(review.validateBundle(badNamed), false);
+namedBundle.groups[0].suggestions = ["P0999: 0.9000"];
+assert.equal(review.validatePeopleMap(namedBundle, privateMap), false);
+
 console.log("WI-0155 in-app private video-face review synthetic tests: PASS");

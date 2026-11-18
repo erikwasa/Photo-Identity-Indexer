@@ -271,6 +271,7 @@ foreach ($group in $groups) {
     $relative = ('crops/{0}-{1}-{2:D2}.png' -f $ClipAlias,$alias,($i+1))
     $cropList.Add([pscustomobject]@{
       Group=$alias; Source=$source; Box=$crop; Relative=$relative
+      FrameWidth=0; FrameHeight=0; FaceWidth=0; FaceHeight=0
     })
   }
 }
@@ -298,6 +299,12 @@ foreach ($item in $cropList) {
     $y=[int][Math]::Floor([double]$box.y*$image.Height)
     $w=[Math]::Max(1,[int][Math]::Ceiling([double]$box.width*$image.Width))
     $h=[Math]::Max(1,[int][Math]::Ceiling([double]$box.height*$image.Height))
+    # Native extracted-frame and detector-box pixel size: record before
+    # 25%-margin crop or any downscale, never synthesize improved pixels.
+    $item.FrameWidth=$image.Width
+    $item.FrameHeight=$image.Height
+    $item.FaceWidth=$w
+    $item.FaceHeight=$h
     $mx=[int][Math]::Ceiling($w*.25)
     $my=[int][Math]::Ceiling($h*.25)
     $left=[Math]::Max(0,$x-$mx)

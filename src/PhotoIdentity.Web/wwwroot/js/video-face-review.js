@@ -1,6 +1,7 @@
 /* WI-0155 private, browser-memory-only video face review.
  * No fetch, storage, API calls, video processing or catalogue writes.
- * Imported JSON contains sensitive images; use only on a trusted local host.
+ * Two separate local imports: face evidence and the original snapshot's
+ * canonical person alias/name map. Never serialize names into review CSV.
  */
 (function (environment) {
     "use strict";
@@ -12,34 +13,43 @@
     const groupRx = /^G(?!000)\d{3}$/;
     const personRx = /^P(?!0000)\d{4}$/;
     const shaRx = /^[0-9a-f]{64}$/;
+    const snapshotRx = /^[0-9]+:[0-9]+:(?:[0-9]+(?:,[0-9]+)*)?$/;
+    const uuidRx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const numberRx = /^[1-9]\d{0,2}$/;
     const pngPrefix = "iVBORw0KGgo";
     const maxBundleSize = 24 * 1024 * 1024;
     const key = row => [row.group || row.Group, row.frame || row.Frame,
         row.face || row.Face].join(":");
-    function boundedPng(base64) {
+    function pngDimensions(base64) {
         try {
-            // PNG IHDR dimensions prevent a tiny malicious payload from
-            // requesting an enormous decoded bitmap in the browser.
+            // PNG IHDR supplies the native dimensions, not an enlarged preview.
             const header = atob(base64.slice(0, 44));
-            if (header.slice(12, 16) !== "IHDR") return false;
+            if (header.slice(12, 16) !== "IHDR") return null;
             const dimension = i => header.charCodeAt(i) * 16777216 +
                 header.charCodeAt(i + 1) * 65536 +
                 header.charCodeAt(i + 2) * 256 + header.charCodeAt(i + 3);
             const width = dimension(16), height = dimension(20);
-            return width >= 1 && width <= 640 && height >= 1 && height <= 640;
+            return width >= 1 && width <= 640 && height >= 1 && height <= 640
+                ? {width, height} : null;
         } catch {
-            return false;
+            return null;
         }
     }
+    const boundedPng = base64 => pngDimensions(base64) !== null;
 
     function validateBundle(bundle) {
-        if (!bundle || bundle.schemaVersion !== 1 || bundle.mode !== "PresenceFirst" ||
+        if (!bundle || ![1, 2].includes(bundle.schemaVersion) || bundle.mode !== "PresenceFirst" ||
             typeof bundle.clipAlias !== "string" || !clipRx.test(bundle.clipAlias) ||
             typeof bundle.reportSha256 !== "string" || !shaRx.test(bundle.reportSha256) ||
             !Number.isInteger(bundle.unassignedGroupObservations) ||
             bundle.unassignedGroupObservations < 0 ||
             bundle.unassignedGroupObservations > 5760 ||
+            (bundle.schemaVersion === 2 &&
+                (typeof bundle.catalogueSnapshot !== "string" ||
+                 !snapshotRx.test(bundle.catalogueSnapshot) ||
+                 bundle.catalogueSnapshot.length > 256 ||
+                 !Number.isInteger(bundle.cataloguePeopleCount) ||
+                 bundle.cataloguePeopleCount < 1 || bundle.cataloguePeopleCount > 4096)) ||
             !Array.isArray(bundle.groups) || bundle.groups.length < 1 ||
             bundle.groups.length > 64 ||
             !Array.isArray(bundle.crops) || bundle.crops.length < 1 ||
@@ -67,6 +77,15 @@
                 crop.imageBase64.length > 1400000 ||
                 !crop.imageBase64.startsWith(pngPrefix) ||
                 !boundedPng(crop.imageBase64) ||
+                (bundle.schemaVersion === 2 &&
+                    (!Number.isInteger(crop.frameWidth) ||
+                     !Number.isInteger(crop.frameHeight) ||
+                     !Number.isInteger(crop.faceWidthPx) ||
+                     !Number.isInteger(crop.faceHeightPx) ||
+                     crop.frameWidth < 1 || crop.frameWidth > 3840 ||
+                     crop.frameHeight < 1 || crop.frameHeight > 3840 ||
+                     crop.faceWidthPx < 1 || crop.faceWidthPx > crop.frameWidth + 1 ||
+                     crop.faceHeightPx < 1 || crop.faceHeightPx > crop.frameHeight + 1)) ||
                 !/^[A-Za-z0-9+/]+={0,2}$/.test(crop.imageBase64) ||
                 cropKeys.has(key(crop)) ||
                 frameFaces.has(crop.frame + ":" + crop.face)) return false;
@@ -78,6 +97,53 @@
         }
         return [...groupMap.values()].every(g => g.crops >= 1 &&
             g.crops <= g.observations && g.crops <= 5);
+    }
+
+    // No names/UUIDs arrive in the face package. This separate import must
+    // match its exact read-only catalogue snapshot; a stale map is rejected.
+    function validatePeopleMap(bundle, map) {
+        if (!validateBundle(bundle) || bundle.schemaVersion !== 2 ||
+            !map || map.schemaVersion !== 1 ||
+            map.pgSnapshot !== bundle.catalogueSnapshot ||
+            !Array.isArray(map.people) ||
+            map.people.length !== bundle.cataloguePeopleCount) return false;
+        const aliases = new Set(), ids = new Set();
+        for (const person of map.people) {
+            if (!person || !personRx.test(person.alias) ||
+                !uuidRx.test(person.personId) ||
+                person.personId.toLowerCase() === "00000000-0000-0000-0000-000000000000" ||
+                (person.displayName !== null && person.displayName !== undefined &&
+                    (typeof person.displayName !== "string" ||
+                     !person.displayName.trim() ||
+                     person.displayName.length > 200 ||
+                     [...person.displayName].some(ch =>
+                         ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127))) ||
+                aliases.has(person.alias) || ids.has(person.personId.toLowerCase()))
+                return false;
+            aliases.add(person.alias);
+            ids.add(person.personId.toLowerCase());
+        }
+        return bundle.groups.every(group => group.suggestions.every(s =>
+            aliases.has(s.split(": ")[0])));
+    }
+
+    const personName = person => person.displayName || "Unnamed person";
+    function searchPeople(map, query) {
+        if (!map) return [];
+        const needle = query.trim().toLocaleLowerCase();
+        return map.people.filter(person =>
+            (personName(person) + " " + person.alias).toLocaleLowerCase().includes(needle))
+            .sort((a, b) => personName(a).localeCompare(personName(b)) ||
+                a.alias.localeCompare(b.alias))
+            .slice(0, 20);
+    }
+    function describeSuggestion(suggestion, map) {
+        if (!map) return suggestion;
+        const alias = suggestion.split(": ")[0];
+        const person = map.people.find(p => p.alias === alias);
+        return person
+            ? personName(person) + " (" + alias + ")" + suggestion.slice(alias.length)
+            : suggestion;
     }
 
     function newRows(bundle) {
@@ -299,7 +365,9 @@
                 (group.observations - groupCrops.length) + " unshown"));
             card.append(dom("p", "vfr-suggestions",
                 "Exploratory group leads (not identifications): " +
-                (group.suggestions.length ? group.suggestions.join(" · ") : "Not available")));
+                (group.suggestions.length
+                    ? group.suggestions.map(s => describeSuggestion(s, active.people)).join(" · ")
+                    : "Not available")));
             const hide = dom("button", "button secondary", "Hide without deciding");
             hide.type = "button";
             hide.addEventListener("click", () => { card.hidden = true; });
@@ -311,8 +379,15 @@
                 image.src = "data:image/png;base64," + crop.imageBase64;
                 image.alt = "Private candidate face crop; not a confirmed identity";
                 image.loading = "lazy";
+                const pixels = pngDimensions(crop.imageBase64);
                 item.append(image, dom("small", "", "Frame " + crop.frame +
-                    " · face " + crop.face));
+                    " · face " + crop.face + " · crop " +
+                    pixels.width + " × " + pixels.height + " px (no upscaling)" +
+                    (bundle.schemaVersion === 2
+                        ? " · extracted frame " + crop.frameWidth + " × " +
+                            crop.frameHeight + " px · detected face " +
+                            crop.faceWidthPx + " × " + crop.faceHeightPx + " px"
+                        : "")));
                 const decision = dom("select");
                 for (const value of decisions) {
                     const option = dom("option", "", value || "Not reviewed");
@@ -321,12 +396,58 @@
                 }
                 decision.value = row.Decision;
                 const person = dom("input");
-                person.type = "text";
-                person.maxLength = 5;
-                person.placeholder = "P0001";
+                const picker = dom("div", "vfr-person-picker");
+                const results = dom("div", "vfr-person-results");
+                results.hidden = true;
+                const named = active.people !== null;
+                const selected = named &&
+                    active.people.people.find(p => p.alias === row.PersonAlias);
+                person.type = named ? "search" : "text";
+                person.maxLength = named ? 200 : 5;
+                person.placeholder = named ? "Search all people by name or alias" : "P0001";
                 person.autocomplete = "off";
-                person.value = row.PersonAlias;
+                person.value = named && selected ? personName(selected) : row.PersonAlias;
                 person.disabled = row.Decision !== "Confirm person";
+                picker.append(person, results);
+                function renderChoices() {
+                    if (!named || person.disabled) { results.hidden = true; return; }
+                    results.replaceChildren();
+                    for (const candidate of searchPeople(active.people, person.value)) {
+                        const option = dom("button", "vfr-person-option",
+                            personName(candidate) + " (" + candidate.alias + ")");
+                        option.type = "button";
+                        option.addEventListener("click", () => {
+                            row.PersonAlias = candidate.alias;
+                            person.value = personName(candidate);
+                            results.hidden = true;
+                            markDirty(true);
+                            refresh();
+                        });
+                        results.append(option);
+                    }
+                    if (results.childElementCount === 0)
+                        results.append(dom("small", "", "No matching people."));
+                    results.hidden = false;
+                }
+                if (named) {
+                    person.addEventListener("focus", renderChoices);
+                    person.addEventListener("input", () => {
+                        // Free text is not an identity: the person must be selected.
+                        row.PersonAlias = "";
+                        markDirty(true);
+                        refresh();
+                        renderChoices();
+                    });
+                    person.addEventListener("keydown", event => {
+                        if (event.key === "Escape") results.hidden = true;
+                    });
+                } else {
+                    person.addEventListener("input", () => {
+                        row.PersonAlias = person.value.trim().toUpperCase();
+                        markDirty(true);
+                        refresh();
+                    });
+                }
                 const excluded = dom("input");
                 excluded.type = "checkbox";
                 excluded.checked = row.ExcludeFromGroup === "True";
@@ -335,13 +456,12 @@
                 notes.value = row.ReviewerNotes;
                 decision.addEventListener("change", () => {
                     row.Decision = decision.value;
-                    if (row.Decision !== "Confirm person") { row.PersonAlias = ""; person.value = ""; }
+                    if (row.Decision !== "Confirm person") {
+                        row.PersonAlias = ""; person.value = "";
+                        results.hidden = true;
+                    }
                     person.disabled = row.Decision !== "Confirm person";
                     if (row.Decision === "") { excluded.checked = false; row.ExcludeFromGroup = "False"; }
-                    markDirty(true); refresh();
-                });
-                person.addEventListener("input", () => {
-                    row.PersonAlias = person.value.trim().toUpperCase();
                     markDirty(true); refresh();
                 });
                 excluded.addEventListener("change", () => {
@@ -351,7 +471,15 @@
                 notes.addEventListener("input", () => {
                     row.ReviewerNotes = notes.value; markDirty(true); refresh();
                 });
-                item.append(label("Human decision", decision), label("Private known-person alias", person));
+                const personField = dom("div", "vfr-field");
+                const personTitle = dom("label", "",
+                    named ? "Known person — choose from all " +
+                        active.people.people.length + " names"
+                        : "Private known-person alias (load people map for names)");
+                person.id = "vfr-person-" + crop.frame + "-" + crop.face;
+                personTitle.htmlFor = person.id;
+                personField.append(personTitle, picker);
+                item.append(label("Human decision", decision), personField);
                 const exclusionLabel = dom("label", "vfr-check");
                 exclusionLabel.append(excluded,
                     dom("span", "", "Exclude this crop from its provisional group (annotation only)"));
@@ -367,9 +495,11 @@
     function init() {
         const input = document.getElementById("vfr-bundle");
         const csvInput = document.getElementById("vfr-csv");
-        if (!input || !csvInput || input.dataset.initialized === "true") return;
+        const mapInput = document.getElementById("vfr-people-map");
+        if (!input || !csvInput || !mapInput || input.dataset.initialized === "true") return;
         input.dataset.initialized = "true";
         const status = document.getElementById("vfr-load-status");
+        const peopleStatus = document.getElementById("vfr-people-status");
         input.addEventListener("change", async () => {
             const file = input.files && input.files[0];
             const request = ++generation;
@@ -380,14 +510,43 @@
                 const bundle = JSON.parse(await file.text());
                 if (request !== generation) return;
                 if (!validateBundle(bundle)) throw new Error("Invalid or unsupported private evidence bundle.");
-                active = {bundle, rows: newRows(bundle)};
+                active = {bundle, rows: newRows(bundle), people: null};
                 markDirty(false);
                 render();
+                peopleStatus.textContent = bundle.schemaVersion === 2
+                    ? "Load the matching private people map to show all names."
+                    : "Legacy evidence package: regenerate from the same report for named review.";
                 status.textContent = "Private package loaded in browser memory. No upload or database write.";
             } catch (error) {
                 status.textContent = "Import refused: " + error.message;
             } finally {
                 input.value = "";
+            }
+        });
+        mapInput.addEventListener("change", async () => {
+            const file = mapInput.files && mapInput.files[0];
+            const request = generation;
+            if (!file) return;
+            try {
+                if (!active) throw new Error("Load the face evidence package first.");
+                if (file.size < 1 || file.size > 1024 * 1024)
+                    throw new Error("Empty or oversized people map.");
+                const map = JSON.parse(await file.text());
+                if (request !== generation || !active) return;
+                if (!validatePeopleMap(active.bundle, map))
+                    throw new Error("People map does not match this catalogue snapshot.");
+                const aliases = new Set(map.people.map(p => p.alias));
+                if (active.rows.some(row => row.Decision === "Confirm person" &&
+                    !aliases.has(row.PersonAlias)))
+                    throw new Error("Existing decisions contain people absent from this map.");
+                active.people = map;
+                render();
+                peopleStatus.textContent = map.people.length +
+                    " canonical people loaded from the matching private snapshot; names stay in browser memory.";
+            } catch (error) {
+                peopleStatus.textContent = "People map refused: " + error.message;
+            } finally {
+                mapInput.value = "";
             }
         });
         csvInput.addEventListener("change", async () => {
@@ -400,6 +559,12 @@
                 const raw = await file.text();
                 if (request !== generation || !active) return;
                 const imported = importCsv(raw, active.bundle);
+                if (active.people) {
+                    const aliases = new Set(active.people.people.map(p => p.alias));
+                    if (imported.some(row => row.Decision === "Confirm person" &&
+                        !aliases.has(row.PersonAlias)))
+                        throw new Error("CSV contains a person not in the selected private map.");
+                }
                 active.rows = imported;
                 markDirty(true);
                 render();
@@ -414,7 +579,8 @@
     if (environment.addEventListener) environment.addEventListener("beforeunload", event => {
         if (dirty) { event.preventDefault(); event.returnValue = ""; }
     });
-    const api = {validateBundle, newRows, validateRows, metrics, csvEncode,
+    const api = {validateBundle, validatePeopleMap, searchPeople, describeSuggestion,
+        pngDimensions, newRows, validateRows, metrics, csvEncode,
         csvParse, importCsv, init, dispose, hasUnsavedChanges};
     if (typeof module === "object" && module.exports) module.exports = api;
     else environment.photoIdentityVideoFaceReview = api;
