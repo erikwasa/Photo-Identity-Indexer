@@ -88,8 +88,10 @@ try {
         ((Get-Item -LiteralPath $gallery.WebReviewBundlePath).Length -lt 24MB)) 'Private in-app bundle missing or oversized.'
     $webJson = Get-Content -LiteralPath $gallery.WebReviewBundlePath -Raw
     $web = $webJson | ConvertFrom-Json -Depth 12
-    Check ($web.schemaVersion -eq 1 -and $web.mode -ceq 'PresenceFirst' -and
+    Check ($web.schemaVersion -eq 2 -and $web.mode -ceq 'PresenceFirst' -and
         $web.clipAlias -ceq 'V04' -and
+        $web.catalogueSnapshot -ceq '1:1:' -and
+        $web.cataloguePeopleCount -eq 3 -and
         $web.reportSha256 -ceq (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant() -and
         $web.unassignedGroupObservations -eq 2 -and
         @($web.groups).Count -eq 3 -and
