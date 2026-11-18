@@ -17,7 +17,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
-function H([object]$Value) { [Net.WebUtility]::HtmlEncode([string]$Value) }
+function HtmlEncode([object]$Value) { [Net.WebUtility]::HtmlEncode([string]$Value) }
 if ($ClipAlias -cnotmatch '^V(?!00)[0-9]{2}$' -or
     $Rows.Count -lt 1 -or $Rows.Count -gt 64 -or
     $Crops.Count -lt 1 -or $Crops.Count -gt 320 -or
@@ -108,7 +108,7 @@ label{display:grid;gap:5px}textarea{min-height:40px;resize:vertical}.rank{font-s
 <div class="toolbar"><button id="pf-save" type="button">Save private presence-review CSV</button><button id="pf-import" type="button">Import saved CSV</button><input id="pf-file" type="file" accept=".csv,text/csv" hidden><button id="pf-reveal" type="button">Reveal skipped groups</button><span id="pf-status" aria-live="polite"></span></div>
 '@)
 $html.Add(('<div id="pf-root" data-clip="{0}" data-report="{1}" data-unassigned="{2}" data-total-groups="{3}" data-representative-crops="{4}">' -f
-    (H $ClipAlias),(H $reportHash),$UnassignedObservations,$Rows.Count,$records.Count))
+    (HtmlEncode $ClipAlias),(HtmlEncode $reportHash),$UnassignedObservations,$Rows.Count,$records.Count))
 $html.Add('<pre id="pf-summary" aria-live="polite"></pre><div class="grid">')
 foreach($row in $Rows) {
     $group=[string]$row.Group
@@ -117,15 +117,15 @@ foreach($row in $Rows) {
     $rankBlock='No group-level catalogue suggestions available.'
     if ($Rankings.ContainsKey($group)) {
         $suggestions=@($Rankings[$group].topCandidates | ForEach-Object {
-            '{0}: {1:F4}' -f (H $_.alias),[double]$_.score
+            '{0}: {1:F4}' -f (HtmlEncode $_.alias),[double]$_.score
         })
         $rankBlock=($suggestions -join ' · ')
     }
     $html.Add(('<article class="presence-group" data-group="{0}" data-observations="{1}"><h2>{0}</h2><p class="note">{2} representative crop(s) of {1} observations; {3} unshown.</p><p class="rank">Group suggestion only (not verified): {4}</p><div class="buttons"><button type="button" class="pf-skip">Hide group without deciding</button></div>' -f
-        (H $group),$row.Observations,$items.Count,$unshown,$rankBlock))
+        (HtmlEncode $group),$row.Observations,$items.Count,$unshown,$rankBlock))
     foreach($item in $items) {
         $html.Add(('<div class="presence-crop" data-group="{0}" data-frame="{1}" data-face="{2}"><img loading="lazy" src="{3}" alt="Face candidate crop; not an identity"><small>Representative observation — classification is independent of the group.</small><label>Human decision<select class="pf-decision"><option value="">Not reviewed</option><option>Confirm person</option><option>Real face unknown</option><option>Not a face</option><option>Cannot tell</option></select></label><label>Known person alias<input class="pf-person" maxlength="5" placeholder="P0001"></label><label><input type="checkbox" class="pf-exclude"> Exclude from provisional group (annotation only)</label><label>Optional private note<textarea class="pf-notes" maxlength="1000"></textarea></label></div>' -f
-            (H $group),$item.Frame,$item.Face,(H $item.Relative)))
+            (HtmlEncode $group),$item.Frame,$item.Face,(HtmlEncode $item.Relative)))
     }
     $html.Add('</article>')
 }
