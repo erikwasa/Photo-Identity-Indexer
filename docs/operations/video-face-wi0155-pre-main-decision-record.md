@@ -128,3 +128,32 @@ for complete source-frame collision validation.
 Synthetic Node tests are required to pass in CI. No automatic
 merge or identity action is introduced. Reviewed optional pairwise
 human merges remain available only in the legacy diagnostic UI.
+## 6. Real V04 presence-first acceptance and remaining pre-main decision
+
+**2026-11-18:** The main-based draft PR #824 passed all six Windows
+CI jobs on the corrected PowerShell synthetic-test commit.
+The maintainer ran the opt-in actual V04 presence-first gallery
+and exported a private CSV which passed strict source-bound
+aggregation. Six source-derived representative crops were
+reviewed: four known-person confirmations deduplicated to two
+distinct people, two false/background faces, zero unresolved
+groups, no manual exclusions or mixed groups, and **zero
+production assignments**. The CSV's six row keys, single source
+hash and aggregate counts were checked independently without
+retaining aliases or any biometric data in Git.
+
+**Remaining targeted acceptance:** Browser CSV Import/reload
+has not been explicitly reported as passed; V04's exhaustive
+six-item classification does not independently demonstrate
+early operator stopping. Use a few V06 crop decisions and
+leave the majority unreviewed, then Save, Import and aggregate
+without additional inference or full re-review. The
+mixed-group correction and duplicate-person semantics have
+synthetic regression coverage; actual G coarse groups have
+only one representative crop each and cannot establish
+real mixed-crop behavior without inventing evidence.
+
+Separate sign-offs remain required for model/right-to-use
+and redistribute, private evidence retention/deletion,
+bounded runtime/storage, offline-only initial integration,
+no production source/database writes, and rollback.
