@@ -157,6 +157,9 @@
                 cells.push(value.replace(/\r$/, ""));
                 if (cells.some(cell => cell !== "")) records.push(cells);
                 cells = []; value = ""; closed = false;
+            } else if (ch === "\r" && text[i + 1] === "\n") {
+                // CRLF row separator after the closing quote.
+                continue;
             } else if (closed) {
                 // RFC 4180 only allows comma or row terminator after a closing quote.
                 throw new Error("Invalid CSV after quoted value.");
@@ -187,6 +190,13 @@
     let active = null;
     let dirty = false;
     function markDirty(value) { dirty = value; }
+    function hasUnsavedChanges() { return dirty; }
+    function dispose() {
+        active = null;
+        markDirty(false);
+        const root = typeof document === "object" && document.getElementById("vfr-root");
+        if (root) root.replaceChildren();
+    }
     function dom(tag, className, value) {
         const element = document.createElement(tag);
         if (className) element.className = className;
@@ -381,7 +391,7 @@
         if (dirty) { event.preventDefault(); event.returnValue = ""; }
     });
     const api = {validateBundle, newRows, validateRows, metrics, csvEncode,
-        csvParse, importCsv, init};
+        csvParse, importCsv, init, dispose, hasUnsavedChanges};
     if (typeof module === "object" && module.exports) module.exports = api;
     else environment.photoIdentityVideoFaceReview = api;
 })(typeof window === "object" ? window : {});
