@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0155-video-face-processing-evaluation.md
 started_at: 2026-11-05
 last_updated_at: 2026-11-18
-branch: wi-0155-web-video-face-review
+branch: wi-0155-named-review-and-flow
 blockers:
 - WI-0151
 - WI-0188
@@ -42,3 +42,9 @@ evidence:
   value: '2026-11-18: V06 presence-first browser CSV Import PASS explicitly confirmed by maintainer after 53-crop source-bound partial review with 20 unreviewed crops and 7 deduplicated known-person proposals. Local gallery/export/import and aggregate acceptance now complete for the bounded V04/V06 evidence; no new inference or production assignments. Rights, retention, rollback and full current CI remain main integration gates.'
 - type: implementation
   value: '2026-11-18: PR #824 merged into main with offline-only feasibility tooling. Follow-up branch wi-0155-web-video-face-review adds an in-app browser-memory-only crop review and private source-bound package import/export, without API endpoints, inference, database writes or source changes. CI and one consolidated local in-app V06 import/export/strict-measure smoke remain pending; WI-0155 is not completed.'
+- type: documentation
+  value: docs/operations/video-to-person-review-pipeline-wi0155.md
+- type: maintainer_verification
+  value: '2026-11-18: Merged PR #825 in-app V06 JSON and existing-CSV import, crop rendering, hide/reveal, export/re-import and strict source-bound validation PASS. 53 groups/crops, 15 confirmed person crops -> 7 distinct known people, 8 duplicate confirmations, 9 unknown face, 10 background, 4 uncertain, 15 unreviewed, no writes, no coverage claim. Native crop size measured 24-102 px, mean 39.45 px; 49/53 under 64 px. No upscaling requested.'
+- type: implementation
+  value: '2026-11-18: New branch wi-0155-named-review-and-flow adds snapshot-checked private person-name map import, all-canonical-people searchable picker and named exploratory leads, unchanged alias-only CSV and native crop dimensions. Three Mermaid diagrams document production video ingestion, isolated offline face experiment and future presence flow. CI and a single local names smoke pending; no inference, API or DB writes.'
