@@ -5,7 +5,7 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0155-video-face-processing-evaluation.md
 started_at: 2026-11-05
-last_updated_at: 2026-11-08
+last_updated_at: 2026-11-18
 branch: wi-0155
 blockers:
 - WI-0151
@@ -20,3 +20,23 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/760
 - type: implementation
   value: '2026-11-08: Bounded video-face feasibility work is in progress on the long-lived wi-0155 branch. Read-only catalogue exemplar evaluation and high-resolution coverage development remain isolated from main; multi-video maintainer acceptance and an explicit integration-versus-separate-component decision are still open.'
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/823
+- type: documentation
+  value: docs/operations/video-face-wi0155-pre-main-decision-record.md
+- type: documentation
+  value: docs/operations/video-face-feasibility-wi0155.md
+- type: maintainer_verification
+  value: '2026-11-18: Private four-pass A/B read-only experiment completed with 204 frames, 530 detections/embeddings, 240 eligible known people and 596 still exemplars; human coarse G review found 2 known people in A and 7 in B. Refined shortlist confirmed better visual evidence for 2 A and 1 B known person but also wrong-person/background suggestions in B. Source-data person recall and uncalibrated automatic matching remain unproven; details archived on wi-0155.'
+- type: implementation
+  value: '2026-11-18: Presence-first opt-in crop-level gallery, private CSV save/import and snapshot-bound aggregate reader built on wi-0155; batch same-person merge removed, browser invalid merge-chain export fixed. Draft main integration candidate PR #824 carries offline-only code/tests and preserves newer main CI. Local V04/V06 presence-first UX acceptance, main CI, model rights, private data retention and rollback remain pending; production background video processing and identity writes are NOT enabled.'
+- type: maintainer_verification
+  value: '2026-11-18: Main-based PR #824 source-bound actual V04 presence-first gallery accepted for rendering, private CSV export and aggregate validation: 6 G groups, 6 representative crops, 4 human-confirmed known-person crops deduplicated to 2 distinct known people, 2 background detections, 0 unreviewed/mixed/excluded, InputEvidenceValidated=True, PersonCoverageProven=False, ProductionAssignmentsMade=0. Private CSV kept outside Git. Browser CSV import not yet explicitly reported; selective V06 partial-review/stop-resume smoke is pending.'
+- type: implementation
+  value: '2026-11-18: Main integration candidate PR #824 commit e437d0c0 succeeded on all six GitHub Actions jobs after fixing the synthetic PowerShell automatic-$args splatting defect. C# and PowerShell/Node offline checks, integration shards, Windows package and launcher, docs validation/generation passed. Production automatic identification and identity writes remain disabled; separate local/import/licensing/retention/rollback gates open.'
+- type: maintainer_verification
+  value: '2026-11-18: Main candidate PR #824 real V06 presence-first partial-review acceptance: 53 groups and source-backed crops, 33 reviewed and 20 explicitly unreviewed, 15 known-person confirmation observations deduplicated to 7 distinct known-person presence proposals, 8 unknown-face crop decisions, 7 background, 3 uncertain, 20 groups without reviewed crops, 0 exclusions or production writes. InputEvidenceValidated=True; PersonCoverageProven=False. Browser import/reload not explicitly reported. Eight unknown observations are not eight distinct people.'
+- type: implementation
+  value: '2026-11-18: Main-based candidate CI caution: a Windows Core VideoGuardedToolExecutor child-shutdown safety test failed in latest run although WI-0155 and integration shards passed; targeted rerun requested. Await green CI and browser CSV import check before merge; no relaxation of shutdown safety.'
+- type: maintainer_verification
+  value: '2026-11-18: V06 presence-first browser CSV Import PASS explicitly confirmed by maintainer after 53-crop source-bound partial review with 20 unreviewed crops and 7 deduplicated known-person proposals. Local gallery/export/import and aggregate acceptance now complete for the bounded V04/V06 evidence; no new inference or production assignments. Rights, retention, rollback and full current CI remain main integration gates.'

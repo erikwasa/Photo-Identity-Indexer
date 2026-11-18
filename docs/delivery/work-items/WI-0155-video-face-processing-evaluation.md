@@ -10,6 +10,60 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+
+## 2026-11-18 — Offline main integration candidate (pending acceptance)
+
+**Proposed integration:** Only the standalone opt-in video-face feasibility
+tool, its Windows/Node/C# tests and documented private review runners
+are under consideration for `main`. Normal Photo Identity APIs,
+workers, still-image indexing, database schema, identity persistence
+and automatic video processing are **not changed**. The full
+chronological experiment diary remains on the `wi-0155` branch;
+this checkpoint is the concise integration summary.
+
+**Production workflow decision:** A video should carry a **deduplicated
+set of known people confirmed present**, not an exhaustively resolved
+set of face groups. One credible face crop may be sufficient.
+Provisional groups and top-three suggestions assist human discovery.
+Repeated groups of the same person need not merge. A mixed group may
+have an incorrectly grouped crop annotated as excluded and that
+person independently confirmed. Other groups can remain explicitly
+unreviewed. The operator may stop *manual* review when satisfied;
+automatic video sampling must still report bounded coverage honestly.
+The current standalone tool produces only **private proposals**,
+not production associations. No automatic identity assignment is approved.
+
+**Evidence from the private four-pass experiment:** The approved A/B
+coarse/refined evaluation used 204 frames, 530 YuNet detections
+and embeddings, an eligible read-only snapshot of 240 people and
+596 still-image exemplars. V04/V06 coarse human review found
+2/7 distinct known people, but only 0/2 and 1/7 known people
+were suggested correctly in the top three. The separately reviewed
+refined shortlist confirmed two known people on each video and
+clearer crops for two people on A and one on B; B also yielded
+three wrong-person suggestions, one background detection and 13
+missing-geometry ranked occurrences. These are bounded human-review
+observations, **not whole-video person recall or precision**.
+
+**Rejected or removed:** Batch merge of already-labelled groups
+has been removed, while optional pairwise diagnostic merging remains.
+No mandatory complete group classification, hard independent-detector
+suppression, requirement of multiple appearances, mandatory dense
+refinement, video-reference enrolment or uncalibrated auto-matching.
+The historical G/C/N/U counterfactuals and auditors are retained as
+**optional offline diagnostics**, not new production processing.
+
+**Current acceptance blockers:** Main-based full CI/integration
+verification, local V04/V06 crop-review Save/Import and source-bound
+aggregate validation, runtime/face-model rights and redistribution,
+private crop retention/deletion, startup/network/database no-write
+checks and a rollback plan. Persisting video/person presence in
+production remains a separate future implementation choice.
+`WI-0155` is still **in progress**.
+
+See [pre-main decision/removal record](../../operations/video-face-wi0155-pre-main-decision-record.md)
+and [bounded offline verification](../../operations/video-face-feasibility-wi0155.md).
+
 ## Current status — 2026-11-08
 
 **In progress on the long-lived `wi-0155` feature branch**, which remains
@@ -104,3 +158,116 @@ catalogue or biometric governance during exploratory work.
 
 - Status: in_progress on `wi-0155`; the first work item is still a
   feasibility/prototype decision, not production recognition acceptance.
+## 2026-11-18 — Main-candidate V04 presence-first local acceptance
+
+**Actual maintainer test on main-based draft PR #824:** The opt-in
+`-PresenceFirst` provisional G gallery generated from the existing
+approved V04 four-pass report/cases: schema 1; 6 groups; 6
+representative crops; 0 unassigned and 0 unshown group
+observations; `ProductionAssignmentsMade=0`. The maintainer saved
+a private crop-review CSV and ran
+`Measure-VideoFacePresenceFirstReview.ps1` against the
+corresponding private report and people map. It returned
+`InputEvidenceValidated=True` and the following **aggregate
+human-reviewed outcomes**:
+
+- 6/6 unique representative crop rows reviewed, no unanswered or
+  uncertain decisions; 4 known-person confirmation crops and 2
+  background/not-a-face crops.
+- **2 distinct known-person presence proposals** from 4
+  confirmations; **2 duplicate known-person confirmations**
+  correctly deduplicated without merging provisional groups.
+- 0 unknown, 0 excluded-crop annotations, 0 mixed-identity groups,
+  0 unreviewed groups, 0 unshown or unassigned group
+  observations.
+- `PersonCoverageProven=False` and
+  `ProductionAssignmentsMade=0` throughout.
+
+The uploaded private CSV was independently checked only for its
+schema, row uniqueness, decision counts and aggregate alias
+cardinality. It is **not stored in this repository**. Successful
+Save/export and source-bound CLI verification are demonstrated;
+**CSV Import/reload was not separately reported** and must not
+be represented as locally passed. The all-reviewed V04 worksheet
+also does not exercise partial/early-stop behavior or mixed-group
+crop correction; these are supported by synthetic tests and need
+a bounded real-data smoke check without exhaustive review.
+
+**Main-candidate CI:** The previously reported full Windows GitHub
+Actions run for commit `e437d0c0` succeeded on all six jobs,
+including C#, PowerShell and Node synthetics, launcher,
+package, integration shards and generated docs. No automatic
+production identification or video/person persistence is implied.
+The pending verification gates remain local Import and selective
+V06 early-stop acceptance, model/right-to-distribute and private
+output retention/rollback sign-off. Do not merge solely on the
+V04 aggregate.
+## 2026-11-18 — V06 presence-first partial-review verification
+
+The maintainer opened the opt-in **main-based candidate** `V06`
+presence-first G-group gallery. It returned mode `PresenceFirst`,
+**53 source-backed groups / 53 representative crops**, and
+`ProductionAssignmentsMade=0`. The saved private worksheet was
+validated with `Measure-VideoFacePresenceFirstReview.ps1`, returning
+`InputEvidenceValidated=True`, consistent single-crop source
+accounting, and the following aggregate reviewer decisions:
+
+| V06 source-bound presence-first result | Count |
+| --- | ---: |
+| Representative crops | 53 |
+| Known-person confirmation crops | 15 |
+| **Distinct known people proposed present** | **7** |
+| Duplicate known-person confirmations | 8 |
+| Unknown-real-face crop observations | 8 |
+| Not-a-face/background crop observations | 7 |
+| Cannot-tell crop observations | 3 |
+| **Unreviewed representative crops / groups** | **20 / 20** |
+| Mixed-person group labels / exclusion annotations | 0 / 0 |
+| Unshown group observations / unassigned observations | 0 / 0 |
+
+**Review coverage:** 33 of 53 representative crops received a
+human review decision; 20 remain explicitly unreviewed. This
+demonstrates that incomplete manual review is a valid *input
+state* and does not prevent correct deduplicated known-person
+proposal accounting. `PersonCoverageProven=False` and
+`ProductionAssignmentsMade=0` by design. Eight unknown-real-face
+**crops** are not eight distinct unknown people; seven proposed
+known people do not establish full video-person recall or the
+correctness of every identity without the underlying human review.
+
+**Acceptance granularity:** This confirms source-bound V06 gallery
+generation, real private CSV export and strict aggregate measurement,
+including partial-review preservation. The maintainer has **not
+explicitly confirmed browser CSV re-import/reload** in this result,
+so the Save → Import round trip remains a narrowly scoped local
+check. The one-representative-per-G-group source has no real
+mixed-person group to exercise per-crop correction; synthetic
+tests cover that UX. Neither source file nor private CSV is
+committed. No extra full-video inference or exhaustive G/N/U
+review is necessary for this milestone.
+
+PR #824 also reported all WI-0155 tests and both integration shards
+passed. The most recent full run on the preceding documentation
+checkpoint did **not** pass overall: an unrelated existing
+`PhotoIdentity.Core.Tests.VideoGuardedToolExecutorTests.Photo_priority_revokes_child_and_cleans_scratch`
+test failed while verifying Windows child-process shutdown.
+A targeted rerun was requested; the test is outside this
+WI-0155 offline diff. Treat the integration CI gate as open
+until the current candidate's CI is green. Do not suppress
+that test or change its fail-closed cleanup safety behavior
+without a separate investigated fix.
+
+## 2026-11-18 — V06 private CSV import accepted
+
+The maintainer explicitly reported **V06 CSV Import: PASS** in the
+presence-first browser, following the already source-validated
+partial V06 review (53 representative crops, 33 reviewed, 20
+unreviewed, 15 confirming known-person crops → 7 distinct known
+people, 0 production identity writes). This closes the remaining
+local Save → Import workflow check without another inference or
+full-group review. Import success does **not** prove complete people
+coverage, mixed-group handling on this single-crop-per-group dataset,
+production persistence, or automatic identity precision. The
+private worksheet remains outside Git. Remaining pre-main gates
+are current candidate CI, offline-only delivery scope, model/runtime
+rights, private artifact retention/deletion and rollback.

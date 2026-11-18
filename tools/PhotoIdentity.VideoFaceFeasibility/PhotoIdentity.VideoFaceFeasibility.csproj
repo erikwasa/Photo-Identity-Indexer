@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
+    <ProjectReference Include="../../src/PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
+    <ProjectReference Include="../../src/PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj" />
+  </ItemGroup>
+</Project>

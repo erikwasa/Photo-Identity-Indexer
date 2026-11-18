@@ -155,13 +155,17 @@ jobs:
           python -m unittest discover -s tools/PhotoIdentity.PhotoQualityEvaluation -p "test_*.py" -v
           exit $LASTEXITCODE
 
-      - name: Parse offline quality-evaluation PowerShell runners
+      - name: Parse offline quality-evaluation and WI-0155 coverage PowerShell runners
         shell: pwsh
         run: |
           $scripts = @(
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_collection_shadow_simulation.ps1'
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
             'tools/PhotoIdentity.PhotoQualityEvaluation/run_manual_quality_suggestions.ps1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/VideoFacePresenceResolution.psm1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/Measure-VideoFaceReviewedPresence.ps1'
+            'tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceResolution.ps1'
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -174,6 +178,12 @@ jobs:
             if ($parseErrors.Count -gt 0) {
               $parseErrors | ForEach-Object { Write-Host "$script : $($_.Message)" }
               throw "PowerShell parser rejected $script"
+            }
+          }
+          $coverageRunner = Get-Command './tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
+          foreach ($required in @('VideoPath','FfmpegPath','ApprovePrivateLocalVideo','FrameCount','WindowStartSeconds','WindowLengthSeconds','AdaptiveSampling','AdaptiveCuesPath')) {
+            if (-not $coverageRunner.Parameters.ContainsKey($required)) {
+              throw "WI-0155 coverage sampler is missing -$required"
             }
           }
           $runner = Get-Command './tools/PhotoIdentity.PhotoQualityEvaluation/run_bounded_collection_shadow.ps1'
@@ -189,6 +199,52 @@ jobs:
             }
           }
           Write-Host 'Offline and manual-review runners parse and expose expected parameters.'
+
+      - name: Verify WI-0155 adaptive timestamp CLI (no private media)
+        shell: pwsh
+        run: |
+          $project = 'tools/PhotoIdentity.VideoFaceFeasibility/PhotoIdentity.VideoFaceFeasibility.csproj'
+          $raw = & dotnet run --project $project -c Release --no-build -- --adaptive-sampling-plan --duration-ms 1350000 --window-start-ms 600000
+          if ($LASTEXITCODE -ne 0) { throw 'Adaptive timestamp CLI failed.' }
+          $plan = ($raw -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($plan.schemaVersion -ne 1 -or $plan.windowStartMs -ne 600000 -or
+              $plan.windowEndMs -ne 1200000 -or -not $plan.hasMoreWindows -or
+              @($plan.frameTimestampsMs).Count -gt 180 -or
+              @($plan.frameTimestampsMs).Count -lt 1) {
+            throw 'Adaptive continuation plan violates the bounded contract.'
+          }
+          $script = './tools/PhotoIdentity.VideoFaceFeasibility/New-VideoFaceCoverageFrames.ps1'
+          $rejected = $false
+          try {
+            & $script -VideoPath 'Z:\absent.mp4' -FfmpegPath 'Z:\absent.exe' -ApprovePrivateLocalVideo -AdaptiveSampling -FrameCount 36 | Out-Null
+          } catch {
+            $rejected = $_.Exception.Message -like '*Adaptive mode selects its own frame count*'
+          }
+          if (-not $rejected) {
+            throw 'Adaptive mode accepted the legacy explicit frame count.'
+          }
+
+      - name: Verify WI-0155 private ranked-group review (synthetic only)
+        shell: pwsh
+        run: |
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupReview.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupRankAccuracy.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceRefinementComparison.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceResolution.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceFirstReview.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceShadowGroupReview.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceReviewPriority.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceUnassignedReview.ps1
+
+      - name: Verify WI-0155 private reviewed merge assistant (synthetic Node only)
+        shell: pwsh
+        run: |
+          node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupMergeAssist.js
+          if ($LASTEXITCODE -ne 0) { throw 'WI-0155 merge assistant synthetic test failed.' }
+          node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceFirstReview.js
+          if ($LASTEXITCODE -ne 0) { throw 'WI-0155 presence-first UI synthetic test failed.' }
+          node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceMergeChainValidation.js
+          if ($LASTEXITCODE -ne 0) { throw 'WI-0155 merge validation synthetic test failed.' }
 
       - name: Verify WI-0208 restore-copy ownership guards
         shell: pwsh
