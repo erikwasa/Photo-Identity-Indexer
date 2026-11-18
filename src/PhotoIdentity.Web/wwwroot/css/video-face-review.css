@@ -23,3 +23,33 @@
 .vfr-field textarea { min-height: 4rem; resize: vertical; }
 .vfr-check { display: flex; gap: .5rem; align-items: flex-start; }
 .vfr-check input { margin-top: .3rem; flex: none; }
+
+/* Names from the separately imported private snapshot; no network or storage. */
+.vfr-person-picker { position: relative; min-width: 0; }
+.vfr-person-picker input { width: 100%; }
+.vfr-person-results {
+    display: grid;
+    gap: .2rem;
+    margin-top: .3rem;
+    max-height: 17rem;
+    overflow-y: auto;
+    border: 1px solid var(--border-color, #b8c1c8);
+    border-radius: .5rem;
+    padding: .25rem;
+}
+.vfr-person-results[hidden] { display: none; }
+.vfr-person-option {
+    display: block;
+    width: 100%;
+    padding: .5rem;
+    border: none;
+    border-radius: .3rem;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+}
+.vfr-person-option:hover, .vfr-person-option:focus-visible {
+    background: var(--surface, #e6eeee);
+}
