@@ -3491,3 +3491,66 @@ stop/resume, audited auto-assignment or production writes.
 Historical face-preservation, no-video-reference-enrolment,
 privacy, rights, runtime and integration decision gates remain.
 No additional V05/V07 exhaustive group labeling is required.
+
+## Checkpoint 56 — presence-first crop review and pre-main consolidation (2026-11-18)
+
+**Implementation PR #823 (draft, targeting `wi-0155`):** Add an
+**opt-in** `New-VideoFaceGroupReview.ps1 -GroupSource Provisional
+-PresenceFirst` mode. Reuse the already approved report/case manifests
+and validated native-frame crop reconstruction. Instead of making a
+single person decision for an entire group, the browser records the
+human decision independently on each **stored representative crop**.
+One crop may confirm an existing eligible known person, with
+automatic **deduplication of repeated presence proposals** across
+groups in the private aggregate report. Different known aliases in
+the same group remain distinct; a reviewer may annotate a crop as
+excluded from its provisional group while still proposing that
+person as present. No automatic identity, source grouping mutation,
+database access, still-photo exemplar enrolment or original video
+processing is involved. Leaving a group untouched is supported
+and counted, without claiming that its unseen people are absent.
+
+The saved worksheet is a **new, separate, source-bound private CSV**,
+not a compatible old group-decision/combined C/N/U worksheet.
+`Measure-VideoFacePresenceFirstReview.ps1` validates all crop
+group/frame/face keys, duplicate/missing rows, the report SHA-256
+and matching eligible catalogue snapshot map; it prints only
+aggregated distinct people/confirmed crops, mixed-group crops,
+excluded annotations, unreviewed groups, non-representative members,
+unassigned observations and explicit `PersonCoverageProven=False`,
+`ProductionAssignmentsMade=0`. These are *presence proposals*
+only, not production identity assignments. The gallery is bounded
+to 1–64 original G-groups and up to 320 representative crops;
+unrepresented group members and original unassigned candidates
+are not silently shown as false or accounted people.
+
+**Rejected workflow cleanup:** Remove batch merging of
+already-labelled same-person groups from the historical C/N/U
+workspace; retain pairwise, explicitly human-checked optional
+merge diagnostics. A group merge is not necessary to confirm
+video/person presence. The existing G/C/N/U diagnostics, source
+audit and historical files are retained for regression/evidence,
+**not** accepted as mandatory production group review. No
+centerface hard suppression, mandatory multi-frame grouping,
+automatic still-photo reference enrolment or dense-refinement
+requirement is added.
+
+**Pre-main decision record:** See
+[WI-0155 pre-main decision and removal review](../../operations/video-face-wi0155-pre-main-decision-record.md).
+It includes retained/rejected feature inventory, historical
+verified human evidence and a staged branch reconciliation plan.
+As inspected, `main` and `wi-0155` were divergent (565
+WI-side/415 main-side commits); this calls for a separate
+main-based selective integration candidate and regenerated
+status/CI files, not blind merging. The candidate must pass
+local Windows and full integrated regressions, rights,
+retention, performance, privacy, network/DB/source-write and
+rollout/rollback checks. This PR stays isolated until the
+maintainer chooses integration vs separate delivery.
+
+**Verification still pending:** Synthetic browser/PowerShell
+tests are wired into Windows CI; runbook checkpoint 56 documents
+a *new local gallery only* using the existing private four-pass
+report and V04/V06 cases. Local visual verification of the
+new crop controls, import/export and a partial mixed-group
+review remains necessary before considering promotion to main.
