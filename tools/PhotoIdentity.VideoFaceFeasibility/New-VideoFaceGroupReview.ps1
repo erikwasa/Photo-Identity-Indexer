@@ -337,6 +337,8 @@ if ($PresenceFirst) {
       -UnassignedObservations $hiddenObservations `
       -OpenGallery:$OpenGallery
 }
+$mergeJs=LocalFile (Join-Path $PSScriptRoot 'VideoFaceMergeChainValidation.js') (64KB)
+Copy-Item -LiteralPath $mergeJs -Destination (Join-Path $folder 'merge-validation.js')
 $js=LocalFile (Join-Path $PSScriptRoot 'VideoFaceGroupReview.js') (64KB)
 Copy-Item -LiteralPath $js -Destination (
   Join-Path $folder 'group-review.js')
@@ -445,7 +447,7 @@ foreach ($row in $rows) {
     $(if ($isCenterFace) { 'C002' } elseif ($isShadow) { 'D002' } else { 'G002' }),
     $hintAttributes))
 }
-$html.Add('</div><p class="note">These are experimental candidate groups, not confirmed people. Export your review CSV before leaving; do not mix G-prefixed baseline and D-prefixed shadow worksheets.</p></main><script src="group-review.js"></script></body></html>')
+$html.Add('</div><p class="note">These are experimental candidate groups, not confirmed people. Export your review CSV before leaving; do not mix G-prefixed baseline and D-prefixed shadow worksheets.</p></main><script src="merge-validation.js"></script><script src="group-review.js"></script></body></html>')
 $page=Join-Path $folder 'group-review.html'
 $html -join [Environment]::NewLine |
   Set-Content -LiteralPath $page -Encoding utf8
