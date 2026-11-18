@@ -616,13 +616,44 @@
                 const bundle = JSON.parse(await file.text());
                 if (request !== generation) return;
                 if (!validateBundle(bundle)) throw new Error("Invalid or unsupported private evidence bundle.");
-                active = {bundle, rows: newRows(bundle), people: null};
+                active = {
+                    bundle, rows: newRows(bundle), people: null,
+                    showReviewed: false, manualHidden: new Set()
+                };
                 markDirty(false);
+                const legacyMapLabel = document.getElementById("vfr-legacy-map-label");
+                legacyMapLabel.hidden = bundle.schemaVersion !== 2;
                 render();
-                peopleStatus.textContent = bundle.schemaVersion === 2
-                    ? "Load the matching private people map to show all names."
-                    : "Legacy evidence package: regenerate from the same report for named review.";
-                status.textContent = "Private package loaded in browser memory. No upload or database write.";
+                peopleStatus.textContent = bundle.schemaVersion === 3
+                    ? "Loading current canonical people from the Photo Identity database..."
+                    : bundle.schemaVersion === 2
+                        ? "Legacy package: import the matching people map or regenerate v3."
+                        : "Legacy alias-only package: regenerate v3 for database names.";
+                status.textContent = "Private face evidence loaded locally; no identity write.";
+                if (bundle.schemaVersion === 3) {
+                    try {
+                        const response = await environment.fetch("/api/review/people/maintenance", {
+                            cache: "no-store", credentials: "same-origin"
+                        });
+                        if (request !== generation || !active || active.bundle !== bundle) return;
+                        if (!response.ok) throw new Error("People API returned HTTP " + response.status);
+                        const catalogue = await response.json();
+                        if (request !== generation || !active || active.bundle !== bundle) return;
+                        const current = resolveLivePeople(bundle, catalogue);
+                        if (!current) throw new Error("Invalid canonical people response.");
+                        active.people = current;
+                        render();
+                        const matched = current.people.filter(p => p.alias).length;
+                        peopleStatus.textContent = current.people.length + " current canonical people" +
+                            " loaded directly from the database; " + matched +
+                            " match this evidence snapshot. Newer people require new evidence.";
+                    } catch (error) {
+                        if (request === generation && active && active.bundle === bundle) {
+                            peopleStatus.textContent = "Current people unavailable: " +
+                                error.message + ". Known-person confirmation is disabled.";
+                        }
+                    }
+                }
             } catch (error) {
                 status.textContent = "Import refused: " + error.message;
             } finally {
@@ -672,6 +703,8 @@
                         throw new Error("CSV contains a person not in the selected private map.");
                 }
                 active.rows = imported;
+                active.manualHidden.clear();
+                active.showReviewed = false;
                 markDirty(true);
                 render();
                 status.textContent = "Source-bound CSV loaded; export to preserve changes.";
@@ -685,8 +718,8 @@
     if (environment.addEventListener) environment.addEventListener("beforeunload", event => {
         if (dirty) { event.preventDefault(); event.returnValue = ""; }
     });
-    const api = {validateBundle, validatePeopleMap, searchPeople, describeSuggestion,
-        pngDimensions, newRows, validateRows, metrics, csvEncode,
+    const api = {validateBundle, validatePeopleMap, resolveLivePeople, isCompleted,
+        searchPeople, describeSuggestion, pngDimensions, newRows, validateRows, metrics, csvEncode,
         csvParse, importCsv, init, dispose, hasUnsavedChanges};
     if (typeof module === "object" && module.exports) module.exports = api;
     else environment.photoIdentityVideoFaceReview = api;
