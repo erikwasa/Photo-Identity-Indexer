@@ -40,8 +40,8 @@ ranking in the completed experiment). A versioned review bundle now
 carries only the original snapshot identifier and selected-person count;
 the user separately imports the original private map inside the local
 web application. It exposes real names for exploratory group leads,
-a searchable selector across all canonical people, and native PNG
-dimensions. The CSV remains alias-only and tied to the original
+a searchable selector across all canonical people, and native PNG,
+extracted-frame and detector-face pixel dimensions. The CSV remains alias-only and tied to the original
 report hash; existing V06 decisions can be re-imported. Both files
 remain local browser-memory data, without API queries or DB writes.
 A mismatched catalogue snapshot is rejected. Legacy v1 packages remain
