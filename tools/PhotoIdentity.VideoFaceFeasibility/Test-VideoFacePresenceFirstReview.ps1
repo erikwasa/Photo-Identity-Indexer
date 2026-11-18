@@ -71,7 +71,7 @@ try {
     $inputs=@($reportPath,$mapPath,$case,$manifest)
     $before=@($inputs | ForEach-Object {(Get-FileHash -LiteralPath $_).Hash})
     $script=Join-Path $PSScriptRoot 'New-VideoFaceGroupReview.ps1'
-    $gallery=& $script -PrivateReportPath $reportPath -PrivateCasesPath $case -ClipAlias V04 -GroupSource Provisional -PresenceFirst
+    $gallery=& $script -PrivateReportPath $reportPath -PrivateCasesPath $case -ClipAlias V04 -GroupSource Provisional -PresenceFirst -PrivatePeopleMapPath $mapPath
     Check ($gallery.Mode -ceq 'PresenceFirst' -and $gallery.Groups -eq 3 -and
         $gallery.Crops -eq 4 -and $gallery.ObservationsUnassigned -eq 2 -and
         $gallery.UnshownGroupObservations -eq 0 -and
@@ -88,10 +88,13 @@ try {
         ((Get-Item -LiteralPath $gallery.WebReviewBundlePath).Length -lt 24MB)) 'Private in-app bundle missing or oversized.'
     $webJson = Get-Content -LiteralPath $gallery.WebReviewBundlePath -Raw
     $web = $webJson | ConvertFrom-Json -Depth 12
-    Check ($web.schemaVersion -eq 2 -and $web.mode -ceq 'PresenceFirst' -and
+    Check ($web.schemaVersion -eq 3 -and $web.mode -ceq 'PresenceFirst' -and
         $web.clipAlias -ceq 'V04' -and
         $web.catalogueSnapshot -ceq '1:1:' -and
         $web.cataloguePeopleCount -eq 3 -and
+        @($web.personBindings).Count -eq 3 -and
+        $web.personBindings[0].alias -ceq 'P0001' -and
+        $web.personBindings[0].personId -ceq '00000000-0000-0000-0000-000000000001' -and
         $web.reportSha256 -ceq (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant() -and
         $web.unassignedGroupObservations -eq 2 -and
         @($web.groups).Count -eq 3 -and
