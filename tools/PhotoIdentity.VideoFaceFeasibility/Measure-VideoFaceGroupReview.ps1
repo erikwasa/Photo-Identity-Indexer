@@ -1,0 +1,263 @@
+<#
+.SYNOPSIS
+Read-only, private, aggregate measurement of WI-0155 provisional group reviews.
+.DESCRIPTION
+Reads an operator-saved offline group CSV and optionally the matching private
+--provisional-groups catalogue JSON. Emits aggregate counts ONLY. No images,
+embeddings, canonical person IDs, group aliases, notes or file paths are emitted.
+Does not connect to PostgreSQL or modify inputs.
+.EXAMPLE
+.\Measure-VideoFaceGroupReview.ps1 -ReviewedCsvPath $reviewCsv -PrivateGroupReportPath $newGroupReport
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)][string]$ReviewedCsvPath,
+    [string]$PrivateGroupReportPath,
+    [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias,
+    [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional'
+)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Test-LocalRegularFile {
+    param([string]$Path, [long]$MaxLength)
+    if (-not [IO.Path]::IsPathFullyQualified($Path)) {
+        throw 'Expected a fully qualified private file.'
+    }
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    $blocked = [long][IO.FileAttributes]::ReparsePoint -bor
+        [long][IO.FileAttributes]::Offline -bor [long]0x00040000 -bor
+        [long]0x00400000
+    if ($item.PSIsContainer -or $item.Length -lt 1 -or
+        $item.Length -gt $MaxLength -or
+        ([long]$item.Attributes -band $blocked) -ne 0 -or
+        ((Get-Item -LiteralPath $item.DirectoryName).Attributes -band
+            [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'Expected a bounded fully local private file.'
+    }
+    return $item.FullName
+}
+
+$safeStage = 'review-csv'
+try {
+    $csv = Test-LocalRegularFile $ReviewedCsvPath (256KB)
+    $rows = @(Import-Csv -LiteralPath $csv -Encoding utf8)
+    if ($rows.Count -lt 1 -or $rows.Count -gt 64) {
+        throw 'Review must contain 1 to 64 provisional groups.'
+    }
+
+    $columns = @('Clip','Group','Observations','Decision','MergeInto',
+        'SelectedPerson','ReviewerNotes')
+    if ((@($rows[0].PSObject.Properties.Name) -join '|') -cne
+        ($columns -join '|')) {
+        throw 'Unexpected review worksheet columns.'
+    }
+
+    $videoAliases = @($rows | ForEach-Object { [string]$_.Clip } |
+        Sort-Object -Unique)
+    if ($videoAliases.Count -ne 1 -or
+        $videoAliases[0] -cnotmatch '^V(?!00)[0-9]{2}$' -or
+        ($ClipAlias -and $videoAliases[0] -cne $ClipAlias)) {
+        throw 'Expected a single approved video alias.'
+    }
+
+    $allowedDecisions = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($label in @('','Keep group','Merge group',
+            'Dismiss false detection','Split required','Cannot tell')) {
+        [void]$allowedDecisions.Add($label)
+    }
+    $byAlias = [Collections.Generic.Dictionary[string,object]]::new(
+        [StringComparer]::Ordinal)
+    $observations = 0
+    $isCenterFace = $GroupSource -ceq 'CenterFaceShadow'
+    $isShadow = $GroupSource -cne 'Provisional'
+    $aliasPattern = if ($isCenterFace) { '^C(?!000)[0-9]{3}$' } elseif ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
+    foreach ($row in $rows) {
+        if ([string]$row.Group -cnotmatch $aliasPattern -or
+            -not $byAlias.TryAdd([string]$row.Group, $row) -or
+            -not $allowedDecisions.Contains([string]$row.Decision) -or
+            [string]$row.Observations -cnotmatch '^[1-9][0-9]{0,6}$') {
+            throw 'Invalid or duplicate group evidence.'
+        }
+        $observations += [int]$row.Observations
+    }
+
+    $safeStage = 'review-decisions'
+    foreach ($row in $rows) {
+        if ([string]$row.Decision -ne 'Merge group') { continue }
+        $visited = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        $current = $row
+        while ([string]$current.Decision -eq 'Merge group') {
+            if (-not $visited.Add([string]$current.Group) -or
+                -not $byAlias.ContainsKey([string]$current.MergeInto) -or
+                [string]$current.MergeInto -ceq [string]$current.Group) {
+                throw 'Invalid or circular group merge.'
+            }
+            $current = $byAlias[[string]$current.MergeInto]
+        }
+        if ([string]$current.Decision -ne 'Keep group') {
+            throw 'A merge must terminate at a kept group.'
+        }
+    }
+
+    $kept = @($rows | Where-Object Decision -CEQ 'Keep group')
+    $merged = @($rows | Where-Object Decision -CEQ 'Merge group')
+    $dismissed = @($rows | Where-Object Decision -CEQ 'Dismiss false detection')
+    $uncertain = @($rows | Where-Object Decision -CEQ 'Cannot tell')
+    $split = @($rows | Where-Object Decision -CEQ 'Split required')
+    $pending = @($rows | Where-Object Decision -CEQ '')
+    $active = @($rows | Where-Object {
+        $_.Decision -in @('Keep group','Merge group')
+    })
+    # A valid review can have zero dismissed (or zero retained) groups.
+    # Measure-Object returns no result for an empty pipeline under StrictMode.
+    $dismissedObservations = if ($dismissed.Count -eq 0) { 0 } else {
+        [int](($dismissed | Measure-Object -Property Observations -Sum).Sum)
+    }
+    $activeObservations = if ($active.Count -eq 0) { 0 } else {
+        [int](($active | Measure-Object -Property Observations -Sum).Sum)
+    }
+    $unresolved = $uncertain.Count + $split.Count + $pending.Count
+
+    $unassigned = $null
+    $atCapacity = $null
+    $noise = $null
+    $hiddenClusterMembers = $null
+    $totalClusters = $null
+    $safeStage = 'private-report'
+    if (-not [string]::IsNullOrWhiteSpace($PrivateGroupReportPath)) {
+        $jsonPath = Test-LocalRegularFile $PrivateGroupReportPath (64MB)
+        $report = Get-Content -LiteralPath $jsonPath -Raw -Encoding utf8 |
+            ConvertFrom-Json
+        $clips = @($report.clips | Where-Object {
+            $_.alias -ceq $videoAliases[0]
+        })
+        if ([int]$report.schemaVersion -ne 1 -or $clips.Count -ne 1) {
+            throw 'Expected corresponding private grouped report.'
+        }
+        $safeStage = 'counterfactual-contract'
+        $cf = if ($isCenterFace) {
+            $clips[0].review.diagnostics.centerFaceCounterfactual
+        } else { $null }
+        if ($isCenterFace -and (
+            $null -eq $cf -or [int]$cf.schemaVersion -ne 1 -or
+            [int]$cf.retainedYuNetObservations -ne
+                [int]$clips[0].review.aggregate.facesDetected -or
+            [int]$cf.corroboratedAt030 + [int]$cf.notCorroboratedAt030 -ne
+                [int]$cf.retainedYuNetObservations -or
+            [int]$cf.corroboratedAt050 -gt [int]$cf.corroboratedAt030 -or
+            [int]$cf.notCorroboratedAudit.totalUnassignedObservations -ne
+                [int]$cf.notCorroboratedAt030)) {
+            throw 'Independent detector agreement evidence is inconsistent.'
+        }
+        $review = if ($isCenterFace) {
+            $cf.corroboratedOnlyDbscan
+        } elseif ($isShadow) {
+            $clips[0].review.diagnostics.shadowDbscan
+        } else { $clips[0].review.diagnostics.provisionalGroups }
+        if ($null -eq $review) {
+            throw 'The requested group source is absent.'
+        }
+        $safeStage = 'group-evidence'
+        $reportGroups = if ($isCenterFace) {
+            @($review.groups | ForEach-Object {
+                if ([string]$_.alias -cnotmatch '^D(?!000)[0-9]{3}$') {
+                    throw 'Invalid corroborated-only cluster alias.'
+                }
+                [pscustomobject]@{
+                    alias = ([string]$_.alias -creplace '^D','C')
+                    observations = $_.observations
+                }
+            })
+        } else { @($review.groups) }
+        if ($isShadow) {
+            if ([int]$review.schemaVersion -ne 1 -or
+                [string]$review.policyVersion -cne 'wi0155-video-shadow-dbscan-e018-min2-v1' -or
+                $reportGroups.Count -ne $rows.Count -or
+                $reportGroups.Count -ne [int]$review.groupsRepresentedForReview -or
+                $reportGroups.Count -gt 64 -or
+                [int]$review.clusterCount -lt $reportGroups.Count -or
+                [int]$review.groupsNotRepresentedForReview -ne
+                    ([int]$review.clusterCount - $reportGroups.Count) -or
+                [int]$review.clusterMembers -lt $observations -or
+                [int]$review.clusterMembers - $observations -ne
+                    [int]$review.membersInUnrepresentedGroups -or
+                [int]$review.noiseObservations -lt 0 -or
+                [int]$review.clusterMembers + [int]$review.noiseObservations -ne
+                    [int]$review.observationsEvaluated -or
+                [int]$review.observationsEvaluated -ne
+                    $(if ($isCenterFace) { [int]$cf.corroboratedAt030 } else { [int]$clips[0].review.aggregate.facesDetected }) -or
+                [int]$review.sameFrameCollisions -ne 0) {
+                throw 'Shadow group accounting is inconsistent.'
+            }
+            $noise = [int]$review.noiseObservations
+            $hiddenClusterMembers = [int]$review.membersInUnrepresentedGroups
+            $totalClusters = [int]$review.clusterCount
+            $unassigned = $noise + $hiddenClusterMembers
+            $atCapacity = [int]$review.groupsNotRepresentedForReview -gt 0
+        } else {
+            if ([int]$review.schemaVersion -ne 1 -or
+                [int]$review.maximumGroups -ne 64 -or
+                $reportGroups.Count -ne $rows.Count -or
+                [int]$review.observationsAssigned -ne $observations -or
+                [int]$review.observationsConsidered -ne
+                    ([int]$review.observationsAssigned +
+                     [int]$review.observationsUnassigned) -or
+                [int]$review.observationsConsidered -ne
+                    [int]$clips[0].review.aggregate.facesDetected) {
+                throw 'Group report totals do not match the reviewed CSV.'
+            }
+            $unassigned = [int]$review.observationsUnassigned
+            $atCapacity = $reportGroups.Count -eq [int]$review.maximumGroups
+        }
+        $safeStage = 'group-row-consistency'
+        $expected = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($group in $reportGroups) {
+            $id = [string]$group.alias
+            if (-not $expected.Add($id) -or
+                -not $byAlias.ContainsKey($id) -or
+                [int]$byAlias[$id].Observations -ne
+                    [int]$group.observations) {
+                throw 'Group report and CSV identities or counts differ.'
+            }
+        }
+    }
+
+    $safeStage = 'aggregate-output'
+    # Output deliberately excludes group aliases, notes, identities,
+    # timestamp positions, private paths and any source image data.
+    [pscustomobject][ordered]@{
+        SchemaVersion = 1
+        GroupSource = $GroupSource
+        GroupsReviewed = $rows.Count - $pending.Count
+        TotalGroups = $rows.Count
+        KeptGroups = $kept.Count
+        MergeGroups = $merged.Count
+        DismissedGroups = $dismissed.Count
+        SplitRequiredGroups = $split.Count
+        CannotTellGroups = $uncertain.Count
+        UnreviewedGroups = $pending.Count
+        ProposedFinalGroups = $(if ($unresolved -eq 0) { $kept.Count } else { $null })
+        AssignedGroupObservations = $observations
+        KeptOrMergeObservations = $activeObservations
+        DismissedGroupObservations = $dismissedObservations
+        ObservationsUnassigned = $unassigned
+        ShadowNoiseObservations = $noise
+        ShadowMembersOutsideReview = $hiddenClusterMembers
+        ShadowTotalClusters = $totalClusters
+        GroupCapacityReached = $atCapacity
+        DismissedGroupPercentage = [Math]::Round(
+            100.0 * $dismissed.Count / $rows.Count, 1)
+        DismissedAssignedObservationPercentage = [Math]::Round(
+            100.0 * $dismissedObservations / $observations, 1)
+        PrivateInputValidated = $true
+    }
+}
+catch {
+    # Do not disclose private file paths, clip aliases, group IDs or
+    # review annotations in terminal output/CI logs.
+    throw ('WI-0155 private group measurement rejected inconsistent or unsafe inputs (stage: ' + $safeStage + ').')
+}
