@@ -41,7 +41,18 @@ if ([int]$sourceReport.schemaVersion -ne 1 -or
 # v3 alias -> immutable person GUID bindings. Names are deliberately omitted:
 # the web app resolves current canonical names directly from PostgreSQL.
 $reviewBindings = @()
+$rankedByFace = @{}
 if ($PrivatePeopleMapPath) {
+    $sourceClip = @($sourceReport.clips | Where-Object alias -CEQ $ClipAlias)
+    if ($sourceClip.Count -ne 1) {
+        throw 'Requested clip is missing from the source report.'
+    }
+    foreach ($rank in @($sourceClip[0].review.diagnostics.rankedFaces)) {
+        $rankKey = ('{0}:{1}' -f [int]$rank.frameNumber,[int]$rank.faceNumber)
+        if (-not $rankedByFace.TryAdd($rankKey,$rank)) {
+            throw 'Duplicate per-face source rankings.'
+        }
+    }
     if (-not [IO.Path]::IsPathFullyQualified($PrivatePeopleMapPath)) {
         throw 'An absolute original people-map path is required.'
     }
@@ -232,7 +243,30 @@ foreach ($record in $records) {
     if ($encodedSize -gt 24MB) {
         throw 'Private web review crop evidence exceeds the in-browser limit.'
     }
+    $faceSuggestions = @()
+    if ($PrivatePeopleMapPath) {
+        $rankKey = ('{0}:{1}' -f [int]$record.Frame,[int]$record.Face)
+        if (-not $rankedByFace.ContainsKey($rankKey)) {
+            throw 'Missing per-face SFace suggestion evidence.'
+        }
+        $ranks = @($rankedByFace[$rankKey].topCandidates)
+        if ($ranks.Count -lt 1 -or $ranks.Count -gt 3) {
+            throw 'Invalid per-face candidate shortlist.'
+        }
+        $faceSuggestions = @($ranks | ForEach-Object {
+            $alias = [string]$_.alias
+            $score = [double]$_.score
+            if (-not $aliases.Contains($alias) -or
+                -not [double]::IsFinite($score) -or
+                $score -lt -1 -or $score -gt 1) {
+                throw 'Per-face suggestion missing from source catalogue.'
+            }
+            [string]::Format([Globalization.CultureInfo]::InvariantCulture,
+                '{0}: {1:F4}', $alias, $score)
+        })
+    }
     $webCrops.Add([pscustomobject][ordered]@{
+        suggestions = @($faceSuggestions)
         group = [string]$record.Group
         frame = [string]$record.Frame
         face = [string]$record.Face
