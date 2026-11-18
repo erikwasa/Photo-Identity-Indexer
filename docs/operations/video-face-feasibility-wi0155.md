@@ -5177,3 +5177,130 @@ rank-biased review to whole-video recall or declare refinement
 useless merely because no shortlist lead exists. The general
 singleton-first review, grouping quality, recognition quality and
 browser invalid-merge export remain separate open work.
+
+## Checkpoint 54 — focused review completed and interpreted (2026-11-18)
+
+**Local acceptance:** PR #821 was merged to `wi-0155`; synthetic
+PowerShell test, matching four-pass input validation, private gallery
+generation and private CSV export all PASS. The operator completed
+every shortlisted decision (13/13), retaining the worksheet only in
+the approved private location. No new FFmpeg, ONNX, database or
+original-video operations were performed for this comparison.
+
+| Measure | V04→V05 (A) | V06→V07 (B) |
+| --- | ---: | ---: |
+| Coarse known people | 2 | 7 |
+| Refined added frames / ranked face observations | 112 / 61 | 48 / 351 |
+| Coarse people with any added top-three occurrence | 2 | 5 |
+| Coarse people with crop-backed leads | 2 | 4 |
+| Lead occurrences without retained crop | 0 | 13 |
+| Shortlisted and manually reviewed lead crops | 4 | 9 |
+| Distinct confirmed matching people | 2 | 2 |
+| Distinct people with clearer refined crops | 2 | 1 |
+| Matching clearer / matching not clearer crops | 4 / 0 | 2 / 3 |
+| Wrong-person / non-face crops | 0 / 0 | 3 / 1 |
+| Uncertain / unreviewed shortlist crops | 0 / 0 | 0 / 0 |
+
+The earlier operator draft saying five V04 leads was corrected:
+the saved CSV and CLI summary agree on **four**. All A confirmed
+suggestions and both B confirmed matching people's suggestions
+were rank one in the *refined* shortlist. Neither A person had a
+correct coarse top-three suggestion. B had zero known people correct
+top-one in coarse G review and only one person top-three. Do not
+claim exact per-person numeric score deltas when the coarse person
+alias was outside stored top three.
+
+**Key distinction:** B's five people with a new top-three rank,
+four people with any crop-backed shortlist, and two people
+human-confirmed from the shortlist are three different counts;
+13 missing-crop occurrences are *not* false detections or
+automatically missed people. Four out of the nine selected B
+lead observations were either wrong-person or background, but
+this rank-biased sample is not a detector false-positive-rate
+estimate. A person with no lead can still have a real face
+elsewhere in refined frames. I-only detections, unknown people
+and newly encountered people were not evaluated here.
+
+**Acceptance outcome:** The narrow read-only/offline
+refinement-comparison tool is locally verified. Refinement shows
+a possible benefit on both physical videos and clearer pictures
+for three known people across the two clips, but remains opt-in
+and uncalibrated. Broader person coverage, singleton handling,
+recognition rankings, grouping fragmentation, review UI merge
+validation, licensing, costs, deletion/retention and the
+integration-vs-separate decision remain open. No production
+write, video enrolment, automatic identification or main branch
+promotion is authorized.
+
+For subsequent development, keep original reviewed coarse CSVs,
+four-pass report/map, manifests and workspaces unchanged. Future
+offline improvements should not require fresh inference merely
+to display existing retained evidence; consider a focused
+geometry-backed rank-lead view and explicit unknown geometry
+budget without treating absent crops as a negative label.
+
+## Checkpoint 55 — production intent: person presence, not exhaustive group completion (2026-11-18)
+
+**The maintainer clarified the intended future production user journey
+while PR #822 remained open.** This supersedes any implication above
+that *every* G/C/N/U candidate must be reviewed, dismissed or merged
+before a video can have its known people marked present. Earlier
+full-gallery reviews were **diagnostic experiments**, not proposed
+routine production review burden.
+
+### Operator example: G1–G6
+
+1. Label G1 as **person X** and G2 as **person Y**. Record one
+   deduplicated video/person presence association for each.
+2. G6 may also contain X. Merging G6 into G1 is **optional**:
+   X has already been confirmed present. Skipping redundant groups
+   saves review effort.
+3. G3 may contain **both Z and W**. Exclude the crop(s) showing W
+   from G3, mark **W directly present from the identified crop**
+   without creating or merging another group, then mark the
+   remaining Z evidence in G3 as Z. Never assign W's crop to Z
+   through an uncorrected group label. Preserve provenance for
+   crop removal and person confirmation.
+4. If the reviewer has sufficient evidence of the four
+   identifiable people of interest, G4 and G5 may remain
+   **unreviewed**. They are neither proven false faces nor proven
+   to contain no additional people. Provide a resume/reopen path
+   and an honest outstanding count.
+
+**Result:** Confirmed video-person presence is the primary durable
+output; a face group is a temporary discovery/review aid, not a
+canonical person nor the required persisted identity unit.
+Grouping may be partial, duplicated, mixed or entirely absent
+for some useful observations. One credible observation can
+confirm a person with human approval. Do not require all
+observations or groups to be processed manually, every
+duplicate group merged, or every background crop dismissed.
+
+**Autonomy and stopping:** In the future, exceptional automated
+person assignment would need separately established,
+conservative **identity** score and winner margin, calibration,
+audit and undo/correction safeguards; not detector confidence or
+CenterFace agreement. This WI-0155 branch performs no
+production auto/manual assignments. The system should still
+sample the video broadly/within declared bounds, **but human
+review can stop early** when the operator is satisfied; early
+review stopping does not certify complete people coverage.
+
+### Revised acceptance observation plan
+
+Measure (a) identifiable distinct people confirmed, (b) number
+of *necessary* review decisions to confirm them, (c) direct
+presence from singletons/ungrouped crops, (d) mixed-group crop
+exclusion and correction, (e) duplicated groups skipped,
+(f) audited correction/undo and idempotent person presence,
+(g) wrong-person suggestions/associations, (h) unresolved
+unreviewed evidence and resume affordance, and (i)
+sampling/processing cost. Report false-face/group metrics
+as supporting diagnostics rather than demanding perfect
+grouping or completion of every G/C/N/U item.
+
+These are **future production acceptance requirements**, not
+implemented local PR #821 behaviors. Preserve all confirmed
+historical WI-0155 experiment results unchanged; there is
+no need for a fresh four-pass run or exhaustive refined
+G-group labelling just to evaluate this clarification.
