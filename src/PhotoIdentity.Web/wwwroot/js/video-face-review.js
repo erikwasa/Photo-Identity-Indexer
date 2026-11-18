@@ -107,8 +107,12 @@
                     (typeof person.displayName !== "string" ||
                      !person.displayName.trim() ||
                      person.displayName.length > 200 ||
-                     /[\\u0000-\\u001f\\u007f]/.test(person.displayName))) ||
-                !aliases.add(person.alias) || !ids.add(person.personId.toLowerCase())) return false;
+                     [...person.displayName].some(ch =>
+                         ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127))) ||
+                aliases.has(person.alias) || ids.has(person.personId.toLowerCase()))
+                return false;
+            aliases.add(person.alias);
+            ids.add(person.personId.toLowerCase());
         }
         return bundle.groups.every(group => group.suggestions.every(s =>
             aliases.has(s.split(": ")[0])));
@@ -378,12 +382,58 @@
                 }
                 decision.value = row.Decision;
                 const person = dom("input");
-                person.type = "text";
-                person.maxLength = 5;
-                person.placeholder = "P0001";
+                const picker = dom("div", "vfr-person-picker");
+                const results = dom("div", "vfr-person-results");
+                results.hidden = true;
+                const named = active.people !== null;
+                const selected = named &&
+                    active.people.people.find(p => p.alias === row.PersonAlias);
+                person.type = named ? "search" : "text";
+                person.maxLength = named ? 200 : 5;
+                person.placeholder = named ? "Search all people by name or alias" : "P0001";
                 person.autocomplete = "off";
-                person.value = row.PersonAlias;
+                person.value = named && selected ? personName(selected) : row.PersonAlias;
                 person.disabled = row.Decision !== "Confirm person";
+                picker.append(person, results);
+                function renderChoices() {
+                    if (!named || person.disabled) { results.hidden = true; return; }
+                    results.replaceChildren();
+                    for (const candidate of searchPeople(active.people, person.value)) {
+                        const option = dom("button", "vfr-person-option",
+                            personName(candidate) + " (" + candidate.alias + ")");
+                        option.type = "button";
+                        option.addEventListener("click", () => {
+                            row.PersonAlias = candidate.alias;
+                            person.value = personName(candidate);
+                            results.hidden = true;
+                            markDirty(true);
+                            refresh();
+                        });
+                        results.append(option);
+                    }
+                    if (results.childElementCount === 0)
+                        results.append(dom("small", "", "No matching people."));
+                    results.hidden = false;
+                }
+                if (named) {
+                    person.addEventListener("focus", renderChoices);
+                    person.addEventListener("input", () => {
+                        // Free text is not an identity: the person must be selected.
+                        row.PersonAlias = "";
+                        markDirty(true);
+                        refresh();
+                        renderChoices();
+                    });
+                    person.addEventListener("keydown", event => {
+                        if (event.key === "Escape") results.hidden = true;
+                    });
+                } else {
+                    person.addEventListener("input", () => {
+                        row.PersonAlias = person.value.trim().toUpperCase();
+                        markDirty(true);
+                        refresh();
+                    });
+                }
                 const excluded = dom("input");
                 excluded.type = "checkbox";
                 excluded.checked = row.ExcludeFromGroup === "True";
@@ -392,13 +442,12 @@
                 notes.value = row.ReviewerNotes;
                 decision.addEventListener("change", () => {
                     row.Decision = decision.value;
-                    if (row.Decision !== "Confirm person") { row.PersonAlias = ""; person.value = ""; }
+                    if (row.Decision !== "Confirm person") {
+                        row.PersonAlias = ""; person.value = "";
+                        results.hidden = true;
+                    }
                     person.disabled = row.Decision !== "Confirm person";
                     if (row.Decision === "") { excluded.checked = false; row.ExcludeFromGroup = "False"; }
-                    markDirty(true); refresh();
-                });
-                person.addEventListener("input", () => {
-                    row.PersonAlias = person.value.trim().toUpperCase();
                     markDirty(true); refresh();
                 });
                 excluded.addEventListener("change", () => {
@@ -408,7 +457,10 @@
                 notes.addEventListener("input", () => {
                     row.ReviewerNotes = notes.value; markDirty(true); refresh();
                 });
-                item.append(label("Human decision", decision), label("Private known-person alias", person));
+                item.append(label("Human decision", decision),
+                    label(named
+                        ? "Known person — choose from all " + active.people.people.length + " names"
+                        : "Private known-person alias (load people map for names)", picker));
                 const exclusionLabel = dom("label", "vfr-check");
                 exclusionLabel.append(excluded,
                     dom("span", "", "Exclude this crop from its provisional group (annotation only)"));
@@ -424,9 +476,11 @@
     function init() {
         const input = document.getElementById("vfr-bundle");
         const csvInput = document.getElementById("vfr-csv");
-        if (!input || !csvInput || input.dataset.initialized === "true") return;
+        const mapInput = document.getElementById("vfr-people-map");
+        if (!input || !csvInput || !mapInput || input.dataset.initialized === "true") return;
         input.dataset.initialized = "true";
         const status = document.getElementById("vfr-load-status");
+        const peopleStatus = document.getElementById("vfr-people-status");
         input.addEventListener("change", async () => {
             const file = input.files && input.files[0];
             const request = ++generation;
@@ -437,14 +491,43 @@
                 const bundle = JSON.parse(await file.text());
                 if (request !== generation) return;
                 if (!validateBundle(bundle)) throw new Error("Invalid or unsupported private evidence bundle.");
-                active = {bundle, rows: newRows(bundle)};
+                active = {bundle, rows: newRows(bundle), people: null};
                 markDirty(false);
                 render();
+                peopleStatus.textContent = bundle.schemaVersion === 2
+                    ? "Load the matching private people map to show all names."
+                    : "Legacy evidence package: regenerate from the same report for named review.";
                 status.textContent = "Private package loaded in browser memory. No upload or database write.";
             } catch (error) {
                 status.textContent = "Import refused: " + error.message;
             } finally {
                 input.value = "";
+            }
+        });
+        mapInput.addEventListener("change", async () => {
+            const file = mapInput.files && mapInput.files[0];
+            const request = generation;
+            if (!file) return;
+            try {
+                if (!active) throw new Error("Load the face evidence package first.");
+                if (file.size < 1 || file.size > 1024 * 1024)
+                    throw new Error("Empty or oversized people map.");
+                const map = JSON.parse(await file.text());
+                if (request !== generation || !active) return;
+                if (!validatePeopleMap(active.bundle, map))
+                    throw new Error("People map does not match this catalogue snapshot.");
+                const aliases = new Set(map.people.map(p => p.alias));
+                if (active.rows.some(row => row.Decision === "Confirm person" &&
+                    !aliases.has(row.PersonAlias)))
+                    throw new Error("Existing decisions contain people absent from this map.");
+                active.people = map;
+                render();
+                peopleStatus.textContent = map.people.length +
+                    " canonical people loaded from the matching private snapshot; names stay in browser memory.";
+            } catch (error) {
+                peopleStatus.textContent = "People map refused: " + error.message;
+            } finally {
+                mapInput.value = "";
             }
         });
         csvInput.addEventListener("change", async () => {
@@ -457,6 +540,12 @@
                 const raw = await file.text();
                 if (request !== generation || !active) return;
                 const imported = importCsv(raw, active.bundle);
+                if (active.people) {
+                    const aliases = new Set(active.people.people.map(p => p.alias));
+                    if (imported.some(row => row.Decision === "Confirm person" &&
+                        !aliases.has(row.PersonAlias)))
+                        throw new Error("CSV contains a person not in the selected private map.");
+                }
                 active.rows = imported;
                 markDirty(true);
                 render();
@@ -471,7 +560,8 @@
     if (environment.addEventListener) environment.addEventListener("beforeunload", event => {
         if (dirty) { event.preventDefault(); event.returnValue = ""; }
     });
-    const api = {validateBundle, newRows, validateRows, metrics, csvEncode,
+    const api = {validateBundle, validatePeopleMap, searchPeople, describeSuggestion,
+        pngDimensions, newRows, validateRows, metrics, csvEncode,
         csvParse, importCsv, init, dispose, hasUnsavedChanges};
     if (typeof module === "object" && module.exports) module.exports = api;
     else environment.photoIdentityVideoFaceReview = api;
