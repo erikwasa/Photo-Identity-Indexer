@@ -51,7 +51,7 @@
                 group.observations > 5760 || groupMap.has(group.alias) ||
                 !Array.isArray(group.suggestions) || group.suggestions.length > 3 ||
                 group.suggestions.some(s => typeof s !== "string" ||
-                    !/^P(?!0000)\d{4}: (?:0|1)\.\d{4}$/.test(s))) return false;
+                    !/^P(?!0000)\d{4}: -?(?:0|1)\.\d{4}$/.test(s))) return false;
             groupMap.set(group.alias, {observations: group.observations, crops: 0});
         }
         const cropKeys = new Set(), frameFaces = new Set();
