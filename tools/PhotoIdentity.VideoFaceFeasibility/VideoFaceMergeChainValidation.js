@@ -29,7 +29,6 @@
       const visited = new Set();
       let current = row;
       while (current.Decision === "Merge group") {
-        if (!visited.add) return false;
         if (visited.has(current.Group) ||
             typeof current.MergeInto !== "string" ||
             !byId.has(current.MergeInto) ||
