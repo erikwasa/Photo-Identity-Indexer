@@ -50,6 +50,12 @@ try {
             alias='V04';review=@{
                 aggregate=@{facesDetected=6;framesExamined=3}
                 diagnostics=@{
+                    rankedFaces=@(
+                        @{frameNumber=1;faceNumber=1;topCandidates=@(@{alias='P0001';score=.83},@{alias='P0002';score=.72})},
+                        @{frameNumber=2;faceNumber=1;topCandidates=@(@{alias='P0002';score=.84})},
+                        @{frameNumber=1;faceNumber=2;topCandidates=@(@{alias='P0003';score=.81})},
+                        @{frameNumber=3;faceNumber=1;topCandidates=@(@{alias='P0001';score=.88})}
+                    )
                     provisionalGroups=@{
                         schemaVersion=1;maximumGroups=64;observationsConsidered=6
                         observationsAssigned=4;observationsUnassigned=2;groups=$groups
@@ -104,6 +110,8 @@ try {
         $web.crops[0].frameHeight -eq 64 -and
         $web.crops[0].faceWidthPx -eq 15 -and
         $web.crops[0].faceHeightPx -eq 25 -and
+        @($web.crops[0].suggestions).Count -eq 2 -and
+        $web.crops[0].suggestions[0] -ceq 'P0001: 0.8300' -and
         -not $webJson.Contains('DO-NOT-LEAK') -and
         -not $webJson.Contains($framesDir) -and
         -not $webJson.Contains($mapPath)) 'In-app bundle contains invalid or private source evidence.'
