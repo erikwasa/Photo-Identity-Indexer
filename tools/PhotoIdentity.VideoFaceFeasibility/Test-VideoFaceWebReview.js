@@ -156,4 +156,44 @@ assert.equal(review.validateBundle(badNamed), false);
 namedBundle.groups[0].suggestions = ["P0999: 0.9000"];
 assert.equal(review.validatePeopleMap(namedBundle, privateMap), false);
 
+// V3: database-derived canonical names and stable UUID binding; no name map
+// upload to the web UI and no change to original alias-only CSV.
+const liveBundle = copy(namedBundle);
+liveBundle.schemaVersion = 3;
+liveBundle.personBindings = privateMap.people.map(p =>
+    ({alias: p.alias, personId: p.personId}));
+assert.equal(review.validateBundle(liveBundle), true);
+const currentCatalogue = [
+    {id: privateMap.people[0].personId, displayName: "Alice Renamed"},
+    {id: privateMap.people[1].personId, displayName: "Álex Sample"},
+    {id: privateMap.people[2].personId, displayName: "Unidentified"},
+    {id: "00000000-0000-0000-0000-000000000004", displayName: "New Person"}
+];
+const current = review.resolveLivePeople(liveBundle, currentCatalogue);
+assert.equal(current.people.length, 4);
+assert.equal(current.people[0].displayName, "Alice Renamed");
+assert.equal(current.people[0].alias, "P0001");
+assert.equal(current.people[3].alias, null);
+assert.deepEqual(review.searchPeople(current, "New Person").map(p => p.alias), [null]);
+assert.match(review.describeSuggestion("P0001: 0.8000", current), /Alice Renamed/);
+assert.equal(review.validateRows(rows, liveBundle), true);
+assert.equal(review.importCsv(csv, liveBundle).length, 4);
+assert.equal(review.csvEncode(rows).includes("Alice Renamed"), false);
+const duplicateLive = copy(currentCatalogue);
+duplicateLive[1].id = duplicateLive[0].id;
+assert.equal(review.resolveLivePeople(liveBundle, duplicateLive), null);
+const unknownBinding = copy(liveBundle);
+unknownBinding.personBindings[1].alias = unknownBinding.personBindings[0].alias;
+assert.equal(review.validateBundle(unknownBinding), false);
+const unknownLead = copy(liveBundle);
+unknownLead.groups[0].suggestions = ["P0999: 0.9000"];
+assert.equal(review.validateBundle(unknownLead), false);
+const unknownRow = copy(rows);
+unknownRow[0].PersonAlias = "P0999";
+assert.equal(review.validateRows(unknownRow, liveBundle), false);
+assert.equal(review.isCompleted({Decision: "Confirm person", PersonAlias: ""}), false);
+assert.equal(review.isCompleted({Decision: "Confirm person", PersonAlias: "P0001"}), true);
+assert.equal(review.isCompleted({Decision: "Cannot tell", PersonAlias: ""}), true);
+assert.equal(review.isCompleted({Decision: "", PersonAlias: ""}), false);
+
 console.log("WI-0155 in-app private video-face review synthetic tests: PASS");
