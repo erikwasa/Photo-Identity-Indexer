@@ -10,13 +10,74 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## Current production intent — presence-first, group-assisted video review (maintainer, 2026-11-18)
+
+**Authoritative clarification, superseding older group-completion goals where
+they conflict:** The durable production outcome is a **deduplicated set of
+people confirmed present in a video** (video ↔ person associations), **not**
+a fully reconciled or labelled partition of every detected face into
+groups. Automatic provisional groups and ranked catalogue suggestions
+are review aids. A person needs **only one credible, operator-confirmed
+observation**; repeated appearances need not be tracked, merged or
+labelled once presence is established. Presence is independent of the
+group/crop providing initial evidence, and appearance timestamps are
+not required. Never enroll video face crops/embeddings as still-image
+reference exemplars.
+
+**Example (G1–G6):** G1 is confirmed as person X and G2 as Y. G6 may
+also show X but merging G6 into G1 is optional because X is already
+confirmed present. G3 contains Z and W: the operator should be able
+to exclude W's crop(s) from G3, **confirm W directly from that crop
+without creating another group**, and confirm the remaining evidence
+as Z. Do not incorrectly label W's crop as Z. If the operator has
+accounted for the four identifiable people of interest, reviewing G4
+and G5 is **not necessary**; they remain explicitly unreviewed, not
+classified as background or proof no other people exist. Allow
+deduplication and skip/hide of redundant groups. A direct person
+presence action is not a group merge and can originate from a
+single ungrouped crop.
+
+**Production identification:** Very high-confidence automatic
+person-presence assignment is a *rare*, separately calibrated and
+authorized path requiring identity-score and top-versus-runner-up
+margin safeguards, audit and correction/undo. High detector
+confidence or CenterFace corroboration alone does not satisfy
+identity confidence. Exact cutoff, persistence rules and false-match
+acceptance remain undecided; WI-0155 presently performs **no**
+production automatic or manual identity writes. Otherwise show
+ranked suggestions for confirmation or allow manual identification
+even without a group or successful rank. Video/person presence
+must be idempotent across groups.
+
+**Two different stopping rules:** Keep bounded, source-wide
+automatic video scanning (or explicitly report incomplete coverage)
+to avoid silently missing later faces. But the operator may stop
+*manual group review* when satisfied that the relevant
+human-identifiable people have been confirmed. Show unresolved and
+unreviewed group/observation counts and allow resuming; do not
+represent the operator's stopping decision as proven complete
+person recall. Production success is **minimal human effort to
+reach adequate distinct-person presence**, not mandatory
+consolidation, dismissal or labelling of all groups.
+
+**Acceptance priorities updated:** Assess at least one usable face
+per distinct identifiable person, singleton and crop-only
+identification, direct video/person presence without grouping,
+safe correction of mixed groups, duplicate-presence prevention,
+review skipping/resuming, wrong-person protection, sampled
+false-face burden, model/runtime cost and reported evidence gaps.
+Historical full-G/C/N/U exhaustive human reviews remain
+experimental evidence and should not become a production
+requirement to resolve all provisional groups.
+
 ## Current maintainer direction — after V01/V02 human review (2026-11-15)
 
 **Prioritize a usable production review over perfect recognition scores or more
-V03-only experiments.** The practical goal is to show *as few groups per
-actual person as reasonable* (ideally one), avoid repeatedly asking the user
-to dismiss background objects, and provide a reviewable path for every face
-that a human could identify, including brief/single-frame appearances.
+V03-only experiments.** The practical goal is to identify **distinct people
+present**, using provisional groups only where they save operator work.
+Avoid demanding merges of redundant groups or repeated background dismissals;
+provide a reviewable path for every useful face, including single-frame
+appearances and direct crop identification without grouping.
 Manual merges/splits and false-group dismissals also count toward review
 burden; reducing cluster count by hiding genuine faces is not progress.
 A correct existing-person suggestion anywhere in the top three is excellent
@@ -73,10 +134,11 @@ checkpoint below for completed V01/V02 results and the next decision.
 The review output is a small set of **provisional face/person groups per
 video**, each showing several of its best crops plus top 2–3
 suggested identities from **all eligible people in the production
-catalogue**, not a preselected five-person shortlist. V03 ideally
-produces three groups (one for each actual person), but additional
-groups due to angle, uncertain merges or false detections are expected
-and must be manageable. Human identification produces a unique
+catalogue**, not a preselected five-person shortlist. For the historical V03 grouping experiment,
+three groups (one per actual person) were an *efficiency ideal*;
+additional groups due to angle, uncertain merges or false detections
+are acceptable when the human can establish the actual people without
+resolving them all. Human identification produces a unique
 **video ↔ person association** without an exposed appearance
 timestamp. Video-derived crops and embeddings may be used temporarily
 to detect, group and review faces but **must never be inserted into
@@ -126,12 +188,14 @@ historical production requirement as a condition for merging
 `wi-0155` into `main`.
 
 **Product proof before merge:** Demonstrate that an explicitly approved
-video can yield **as few reviewable candidate-person groups as practical
-while representing every person whose face is human-identifiable in
-the chosen evaluation footage**, and that eligible existing people can
-be retrieved as useful **top-three suggestions from the entire
-eligible production people catalogue**, not a hand-selected five-person
-cohort. Unknown/unidentifiable outcomes must remain possible. A correct
+video offers **efficient candidate/group-assisted review that permits
+confirming at least one usable face for every human-identifiable person
+in the selected evaluation footage** without needing to label or merge
+every provisional group. The reviewer can confirm a person directly
+from a singleton or cropped face, correct a mixed group, deduplicate
+existing presences and explicitly leave irrelevant groups unreviewed.
+Evaluate useful **top-three suggestions from the entire eligible
+production people catalogue**, not a hand-selected five-person cohort. Unknown/unidentifiable outcomes must remain possible. A correct
 top-three suggestion on a difficult distant face is valuable even if
 automatic assignment would be unsafe. Do not infer universal recall
 from a small reviewed test suite.
@@ -162,11 +226,14 @@ from a small reviewed test suite.
   correlated evidence. Never merge reliably simultaneous different
   faces. Keep genuine uncertain/ungrouped evidence visible instead of
   silently discarding it at a fixed 64-group ceiling. Prefer fewer
-  review groups but prioritize person coverage and zero known
-  wrong-person merges over perfect compression. Count the operator's
-  required manual merges/splits as workload; aim for one coherent
-  review group per person wherever achievable without hiding a
-  genuine singleton or incorrectly joining different people.
+  distracting groups, but prioritize usable evidence for distinct
+  person-presence decisions and zero wrong-person associations over
+  perfect compression. Count **necessary** actions to establish each
+  person, not merges of groups showing an already-confirmed person.
+  Allow direct confirmation from an ungrouped singleton, crop
+  exclusion/split from a mixed group and optional merge only when
+  useful. Preserve genuinely unseen people and explicit unreviewed
+  groups instead of treating them as background or an absence claim.
 - [ ] **SAMPLING-01 — Content- and duration-adaptive frames.**
   The count of **frames sampled per video** (not frames per image)
   is decided from the duration and observed content, rather than
@@ -218,9 +285,11 @@ from a small reviewed test suite.
   meaningful information gain. Annotate by a human who is
   actually visually identifiable and which intervals/persons
   may be missed; a body without a recognizable face does not count.
-  Record per-video recognizable-person coverage, false/background
-  groups, human merges/splits, surviving noise/singletons, optional
-  top-three successes/uncertainty, review effort and processing cost.
+  Record per-video identifiable-person presence found, necessary
+  actions to reach that outcome, direct singleton/crop decisions,
+  corrections of mixed groups, skipped duplicate groups, explicit
+  unreviewed evidence, optional top-three successes/uncertainty,
+  sampled false-face burden and processing cost.
   Stop once the evidence supports a bounded decision about a safe
   useful next slice; avoid tuning solely to V03.
 - [ ] **MERGE-01 — Safety, integration and operator sign-off.**
@@ -3372,3 +3441,53 @@ singleton-first review without a hard corroboration gate,
 (3) catalogue ranking failure diagnosis on genuine faces,
 (4) browser merge-chain validation, and (5) bounded processing
 cost of refinement and model rights before integration.
+
+## Checkpoint 55 — production review goal clarified: confirmed presence, not finished groups (2026-11-18)
+
+This is a **design/acceptance clarification after the local
+PR #821 review and while PR #822 is pending**. It does not change
+any previous detector, group, rank or human-worksheet measurements.
+
+**Representative workflow:** G1→person X and G2→Y establish two
+unique video/person presence associations. G6 may also depict X:
+merging with G1 is optional. G3 may contain both Z and W; exclude
+W's crop from G3, establish W's presence **directly from its single
+observation** (without requiring another group), then confirm G3's
+remaining valid Z evidence as Z. If the operator believes the four
+identifiable people of interest have been accounted for, they may
+stop and leave G4/G5 unreviewed. Skipped groups retain an honest
+outstanding state; no absence, background or all-person
+completeness is inferred.
+
+**Revised production acceptance:** The operator can record
+one confirmed presence per distinct person, independently of
+how many groups or individual crops that person appears in;
+identify directly from a singleton/ungrouped face; remove a
+misgrouped crop without losing the observation; avoid unnecessary
+merging/review of already-found people; correct and undo mistaken
+associations; and stop/resume human review without losing
+remaining evidence. Auto-assignment of video/person presence is
+allowed *only* in a future separately approved high-confidence
+identity+margin tier with audit/correction; not in this prototype.
+This is about human-confirmed presence outcomes, not a
+full tracking or automatic multi-face classification requirement.
+
+**Evaluation adjustment:** Optimize number of distinct
+identifiable people recovered per necessary human action and
+risk of wrong-person association, rather than demanding all
+G/C/N/U groups be labelled, dismissed or merged. Existing
+exhaustive review results stay useful as *diagnostic* evidence
+for false groups, misses and identity ranking; they are no
+longer a proposed routine production workflow. The automatic
+sampling requirement to cover the whole source (or explicitly
+declare incomplete coverage) remains separate from early
+human-review stopping. Do not equate "operator finished
+reviewing relevant faces" with "verified no other people".
+
+**Scope boundary:** This is a future production design requirement;
+current isolated WI-0155 scripts do not implement general
+group-crop exclusion, free-standing person presence editing,
+stop/resume, audited auto-assignment or production writes.
+Historical face-preservation, no-video-reference-enrolment,
+privacy, rights, runtime and integration decision gates remain.
+No additional V05/V07 exhaustive group labeling is required.
