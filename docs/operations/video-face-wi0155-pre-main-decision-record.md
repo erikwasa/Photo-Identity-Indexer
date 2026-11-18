@@ -111,3 +111,20 @@ representative geometry, catalogue rank reliability, branch
 reconciliation, licensing and perf/retention remain unresolved.
 No broad main merge or production activation is authorized by this
 record alone.
+
+## 5. Additional pre-main corrective fix — browser merge validation
+
+The actual V06 provisional review once exported invalid merge chains
+that the PowerShell aggregation later rejected. This PR adds a
+shared, **fail-closed** browser merge validator for standalone
+G/C/D group worksheets and the legacy combined C/N/U workspace,
+on both Save and Import. It rejects unknown/self/circular targets,
+cross-source merges, merges ending in anything other than a kept
+group, stale targets and conflicting explicitly reviewed identities.
+The existing source-bound PowerShell validators remain authoritative;
+browser validation is an early usability/safety check, not a substitute
+for complete source-frame collision validation.
+
+Synthetic Node tests are required to pass in CI. No automatic
+merge or identity action is introduced. Reviewed optional pairwise
+human merges remain available only in the legacy diagnostic UI.
