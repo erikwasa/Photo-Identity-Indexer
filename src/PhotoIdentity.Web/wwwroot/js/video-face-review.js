@@ -479,8 +479,12 @@
                         choose.addEventListener("click", () => {
                             row.Decision = "Confirm person";
                             row.PersonAlias = alias;
+                            decision.value = row.Decision;
+                            person.value = personName(candidate);
+                            person.disabled = false;
                             markDirty(true);
-                            render();
+                            refresh();
+                            refreshVisibility();
                         });
                         entry.append(choose);
                         suggested.append(entry);
