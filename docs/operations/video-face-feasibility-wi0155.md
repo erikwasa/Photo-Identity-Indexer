@@ -154,3 +154,37 @@ evaluation.
 **The V04 private CSV itself is not part of this PR.** Report
 only the safe aggregated counters and whether the V06 Import
 round-trip worked. Existing private evidence remains untouched.
+## V06 partial-review acceptance checkpoint — 2026-11-18
+
+The maintainer's **real V06** presence-first gallery returned
+53 groups, 53 representative crops and no production writes.
+The private CSV passed source-bound validation. Of 53 crops,
+**33 were reviewed, 20 remained unreviewed**. Human review
+included 15 known-person confirmations deduplicated to **7**
+distinct known people (8 duplicate crop confirmations),
+8 unknown-face observations, 7 background objects and 3
+uncertain observations. There were 20 groups with no reviewed
+crop, zero mixed-group annotations and exclusions, and zero
+unshown/unassigned G observations. Coverage remains unproven.
+
+Do **not** infer eight distinct unknown people from the eight
+unknown *crop* decisions or assume the 20 unreviewed groups
+contain no additional known people. This is evidence that
+group completion is optional, not proof of full recognition.
+There are no source/media or production identity writes.
+
+**One remaining browser-only check:** Use `Import saved CSV`
+in the existing V06 gallery. Confirm decisions previously
+saved on one reviewed crop and one still-unreviewed group
+reappear, and that the view continues to show 7 distinct
+known-person proposals, 20 unreviewed crops and 20 groups
+with no reviewed crop. Do not rerun any inference or re-label
+all groups to check the import. The existing saved CSV has
+already been accepted by the PowerShell source validator.
+
+Current CI caveat: a subsequent CI run for the documentation
+checkpoint had a failure in an unchanged Windows
+VideoGuardedToolExecutor photo-priority process-shutdown test;
+all video-face unit tests and both integration shards passed.
+Do not promote to main until CI clears and any intermittent
+shutdown defect is understood.
