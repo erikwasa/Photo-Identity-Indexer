@@ -10,6 +10,56 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-18 — V06 in-app acceptance and named-review quality follow-up
+
+The maintainer completed the **merged PR #825 local web review**, using
+53 V06 provisional groups and 53 source-backed native-resolution crops.
+JSON import, image rendering, prior CSV import, hide/reveal, CSV
+export/re-import and strict source-bound measurement passed. The
+independent aggregate confirms correct deduplication:
+**15 known-person crop confirmations → 7 distinct known people,
+8 duplicate confirmations**. Additional review decisions in the new CSV:
+9 unknown-face crops, 10 false/background crops, 4 uncertain,
+**15 unreviewed**, 0 mixed/excluded, `InputEvidenceValidated=True`,
+`PersonCoverageProven=False`, `ProductionAssignmentsMade=0`.
+No further reclassification is requested.
+
+The operator measured native PNG crop long edges: **53 measured,
+minimum 24 px, maximum 102 px, mean 39.45 px; 49/53 under 64 px,
+53/53 under 112 px**. This is a material usability/feasibility
+constraint; no upscaling or cosmetic enlargement should be pursued
+as a substitute for actual video evidence. Native video-frame
+quality, pixel-scale face geometry and better genuine temporal
+representatives remain questions for a separately gated trial.
+See [source-to-video/person diagrams and explicit stage comparison]
+(../../operations/video-to-person-review-pipeline-wi0155.md).
+
+**Follow-up product-facing review slice (this branch):** The source
+snapshot already includes a private `P0001 → canonical UUID/name` map
+for **all** current people (241 canonical, 240 eligible for SFace
+ranking in the completed experiment). A versioned review bundle now
+carries only the original snapshot identifier and selected-person count;
+the user separately imports the original private map inside the local
+web application. It exposes real names for exploratory group leads,
+a searchable selector across all canonical people, and native PNG
+dimensions. The CSV remains alias-only and tied to the original
+report hash; existing V06 decisions can be re-imported. Both files
+remain local browser-memory data, without API queries or DB writes.
+A mismatched catalogue snapshot is rejected. Legacy v1 packages remain
+alias-only; regenerate a v2 review bundle from already approved V06
+evidence without repeating inference.
+
+**Unchanged scope boundary:** The production video ingestion path
+still publishes metadata/proxies/posters and supports manual video-person
+tags; it does not ingest face suggestions. Native-frame quality
+selection, a live catalogue-backed named picker and persisted,
+auditable presence review are desired future product features, not
+authorised WI-0155 production changes. This review slice needs CI
+and one local native-names/CSV smoke before acceptance. The WI-0155
+feasibility closeout still requires explicit maintainer agreement
+on observed limitations, model rights, private retention/cleanup
+and rollback. No automatic identity assignment is accepted.
+
 ## 2026-11-18 — In-app review integration after PR #824
 
 PR #824 was merged to main as an **opt-in offline experiment**, not
