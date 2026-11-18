@@ -88,7 +88,7 @@ function AssertBox($Crop,$Pass) {
     if ($Pass.Boxes.ContainsKey($key)) {
         $old = $Pass.Boxes[$key]
         foreach ($field in @('x','y','width','height')) {
-            if ([Math]::Abs([double]$old.$field-[double]$Crop.$field) -gt 0.000001) {
+            if ([Math]::Abs([double]$old.$field - [double]$Crop.$field) -gt 0.000001) {
                 throw 'Conflicting stored YuNet boxes.'
             }
         }
@@ -131,6 +131,10 @@ try {
         V04=(LocalFile $ReviewedV04CsvPath (256KB))
         V06=(LocalFile $ReviewedV06CsvPath (256KB))
     }
+    $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    foreach ($privateFile in @($reportFile,$caseFile,$mapFile,$reviews.V04,$reviews.V06)) {
+        if (Within $repo $privateFile) { throw 'Private evidence may not reside in the repository.' }
+    }
     $report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
     $cases = Get-Content -LiteralPath $caseFile -Raw | ConvertFrom-Json
     $map = Get-Content -LiteralPath $mapFile -Raw | ConvertFrom-Json
@@ -162,7 +166,7 @@ try {
         $cc = @($cases.clips | Where-Object alias -CEQ $alias)
         if ($rc.Count -ne 1 -or $cc.Count -ne 1) { throw 'Expected unique paired aliases.' }
         $manifestFile = LocalFile ([string]$cc[0].manifest) (16KB)
-        if (-not $manifestPaths.Add($manifestFile)) { throw 'Duplicate manifest.' }
+        if (-not $manifestPaths.Add($manifestFile) -or (Within $repo $manifestFile)) { throw 'Duplicate or repository-resident manifest.' }
         $folder = Split-Path -Parent $manifestFile
         $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
         $meta = Get-Content -LiteralPath (LocalFile (Join-Path $folder 'extraction-metadata.json') (16KB)) -Raw | ConvertFrom-Json
@@ -262,6 +266,7 @@ try {
         $anchors=@{}
         $anchorKeys=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($row in $rows) {
+            if ([string]$row.Decision -ceq '') { throw 'Coarse decisions must all be reviewed.' }
             $box=$groups[[string]$row.Group]
             $key=Key $box
             if (-not $anchorKeys.Add($key)) { throw 'Duplicate coarse singleton observation.' }
@@ -284,6 +289,11 @@ try {
             # anchor. No identity label is inherited from a merge-chain destination.
             $a=@($anchors[$person] | Sort-Object @{Expression={if($null -ne $_.Hit){$_.Hit.Rank}else{4}}},@{Expression={if($null -ne $_.Hit){$_.Hit.Score}else{-2}};Descending=$true},@{Expression={$_.Box.quality};Descending=$true},@{Expression={$_.Box.frameNumber}},@{Expression={$_.Box.faceNumber}})
             $best=$a[0]
+            $highestScore = @($a | Where-Object {$null -ne $_.Hit} |
+                Sort-Object @{Expression={$_.Hit.Score};Descending=$true},
+                    @{Expression={$_.Hit.Rank}},@{Expression={$_.Box.frameNumber}},
+                    @{Expression={$_.Box.faceNumber}} | Select-Object -First 1)
+            $scoreAnchor = if ($highestScore.Count -gt 0) { $highestScore[0] } else { $null }
             $clear=@($a | Sort-Object @{Expression={$_.Box.quality};Descending=$true},@{Expression={$_.Box.frameNumber}},@{Expression={$_.Box.faceNumber}})[0]
             $hits=@(foreach ($rank in $newRanks) {
                 $hit=TargetRank $rank $person
@@ -307,7 +317,7 @@ try {
             $leadCount+=$selected.Count
             $cards.Add([pscustomobject]@{
                 CoarseAlias=$pair[0];RefinedAlias=$pair[1];Person=$person
-                Coarse=$coarse;Refined=$refined;Best=$best;Clear=$clear
+                Coarse=$coarse;Refined=$refined;Best=$best;Clear=$clear;ScoreAnchor=$scoreAnchor
                 AnchorCount=$a.Count;TotalHits=$hits.Count;MissingBoxes=$missing
                 Leads=@($selected.ToArray())
             })
@@ -330,7 +340,6 @@ try {
     $output=[IO.Path]::GetFullPath($OutputDirectory)
     $parent=Split-Path -Parent $output
     LocalDirectory $parent
-    $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     if ((Test-Path -LiteralPath $output) -or (Within $repo $output) -or
         (Within (Split-Path -Parent $caseFile) $output)) { throw 'Output must be new and outside repository and cases.' }
     foreach ($pass in $passes.Values) {
@@ -354,7 +363,7 @@ img{display:block;max-width:240px;max-height:230px;object-fit:contain;background
 small{color:#b9cbd8}.note{color:#c9d9e3}#summary{white-space:pre-wrap}
 </style></head><body><main><h1>Private coarse / added-frame comparison</h1>
 <p class="note">Only explicitly human-labelled coarse singletons anchor this comparison. Added-frame top-three aliases are suggestions, NOT identifications. No stored score exists for an alias outside the top three. Missing crops, no leads and limited review cannot establish absence or recall. I-only candidates have no YuNet rank and are not included. A lead can appear for different suggested people; assess identity independently. No automatic associations or merges.</p>
-<p>Compare the added crops against both confirmed coarse anchors when shown. Select whether the lead is the same person and visually clearer; do not equate a higher score with better identification.</p>
+<p>Compare the added crops against all confirmed coarse anchors shown (best rank, highest stored target score and strongest crop-quality proxy; duplicates omitted). Select whether the lead is the same person and visually clearer; do not equate a higher score with better identification.</p>
 <button id="save" type="button">Save private review CSV</button><pre id="summary" aria-live="polite"></pre>
 '@)
     $cardNo=0
@@ -365,6 +374,11 @@ small{color:#b9cbd8}.note{color:#c9d9e3}#summary{white-space:pre-wrap}
             $card.AnchorCount,$card.TotalHits,$card.MissingBoxes,$card.Leads.Count))
         $anchorsToShow=@($card.Best)
         if ((Key $card.Best.Box) -cne (Key $card.Clear.Box)) { $anchorsToShow+=@($card.Clear) }
+        if ($null -ne $card.ScoreAnchor -and
+            (Key $card.ScoreAnchor.Box) -cne (Key $card.Best.Box) -and
+            (Key $card.ScoreAnchor.Box) -cne (Key $card.Clear.Box)) {
+            $anchorsToShow+=@($card.ScoreAnchor)
+        }
         $j=0
         foreach ($anchor in $anchorsToShow) {
             $j++; $name=('a-{0:D3}-{1}.png' -f $cardNo,$j)
@@ -376,7 +390,7 @@ small{color:#b9cbd8}.note{color:#c9d9e3}#summary{white-space:pre-wrap}
             $j++;$name=('r-{0:D3}-{1}.png' -f $cardNo,$j)
             SaveCrop $card.Refined $lead.Box (Join-Path $output ('crops/'+$name))
             $rankImproved=$null -eq $card.Best.Hit -or $lead.Hit.Rank -lt $card.Best.Hit.Rank
-            $scoreImproved=$null -ne $card.Best.Hit -and $lead.Hit.Score -gt $card.Best.Hit.Score
+            $scoreImproved=$null -ne $card.ScoreAnchor -and $lead.Hit.Score -gt $card.ScoreAnchor.Hit.Score
             $lines.Add(('<div class="crop lead" data-refined="{0}" data-frame="{1}" data-face="{2}" data-rank="{3}" data-score="{4}" data-rank-improved="{5}" data-score-improved="{6}"><strong>Added frame — unverified</strong><img src="crops/{7}" alt="Refined candidate"><small>{8}</small><p><label>Human decision <select><option value="">Not reviewed</option><option>Same person - clearer</option><option>Same person - not clearer</option><option>Different person</option><option>Not a face</option><option>Cannot tell</option></select></label></p></div>' -f
                 (Html $card.RefinedAlias),$lead.Observation.frameNumber,$lead.Observation.faceNumber,$lead.Hit.Rank,
                 $lead.Hit.Score.ToString('R',[Globalization.CultureInfo]::InvariantCulture),
@@ -424,7 +438,7 @@ document.querySelector("#save").addEventListener("click",()=>{
     out.push([h("report-sha256"),h(p.toLowerCase()+"-review-sha256"),p,d.refined,c.dataset.person,d.frame,d.face,d.rank,d.score,e.querySelector("select").value].map(q).join(","));
   }
   const url=URL.createObjectURL(new Blob(["\uFEFF"+out.join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"}));
-  const a=document.createElement("a");a.href=url;a.download="wi0155-refinement-review-"+new Date().toISOString().replaceAll(":","-")+".csv";a.click();URL.revokeObjectURL(url);
+  const a=document.createElement("a");a.href=url;a.download="wi0155-refinement-review-"+new Date().toISOString().replaceAll(":","-")+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
 </script></main></body></html>
 '@)
