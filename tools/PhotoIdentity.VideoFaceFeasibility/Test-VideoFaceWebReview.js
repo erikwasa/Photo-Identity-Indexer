@@ -106,6 +106,12 @@ const namedBundle = copy(bundle);
 namedBundle.schemaVersion = 2;
 namedBundle.catalogueSnapshot = "10:15:12,14";
 namedBundle.cataloguePeopleCount = 3;
+for (const crop of namedBundle.crops) {
+    crop.frameWidth = 1920;
+    crop.frameHeight = 1080;
+    crop.faceWidthPx = 35;
+    crop.faceHeightPx = 46;
+}
 const privateMap = {
     schemaVersion: 1, pgSnapshot: "10:15:12,14",
     people: [
@@ -138,6 +144,12 @@ rejectedMap(x => x.people[1].personId = x.people[0].personId.toUpperCase());
 rejectedMap(x => x.people[0].displayName = "<script>\n");
 rejectedMap(x => x.people[0].displayName = " ");
 rejectedMap(x => x.people[0].personId = "not-a-uuid");
+const invalidGeometry = copy(namedBundle);
+invalidGeometry.crops[0].faceWidthPx = 4000;
+assert.equal(review.validateBundle(invalidGeometry), false);
+const missingGeometry = copy(namedBundle);
+delete missingGeometry.crops[0].frameWidth;
+assert.equal(review.validateBundle(missingGeometry), false);
 const badNamed = copy(namedBundle);
 badNamed.cataloguePeopleCount = 0;
 assert.equal(review.validateBundle(badNamed), false);
