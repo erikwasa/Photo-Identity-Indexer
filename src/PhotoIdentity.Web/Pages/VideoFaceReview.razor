@@ -21,9 +21,14 @@
         <span>Private review package (JSON)</span>
         <input id="vfr-bundle" type="file" accept=".json,application/json" />
     </label>
+    <label class="vfr-import">
+        <span>Private people map (JSON) — same catalogue snapshot</span>
+        <input id="vfr-people-map" type="file" accept=".json,application/json" />
+    </label>
+    <p id="vfr-people-status" role="status" aria-live="polite">No private names loaded.</p>
     <input id="vfr-csv" type="file" accept=".csv,text/csv" hidden aria-label="Import saved review CSV" />
     <p id="vfr-load-status" role="status" aria-live="polite">No private evidence loaded.</p>
-    <p>Known-person suggestions are unverified leads. Confirm only with the same private people-alias map used by the offline experiment. Export a CSV before leaving: the application does not retain decisions, enrol video faces, contact inference services, or create production video/person assignments.</p>
+    <p>Known-person suggestions are unverified leads. Load the original private people map to see real catalogue names and search all canonical people; a free-text name is never accepted as a selection. The two private files must match the exact catalogue snapshot. Native crop dimensions are shown unchanged, without artificial upscaling. Export a CSV before leaving: the application does not retain decisions or names, enrol video faces, contact inference services, or create production video/person assignments.</p>
 </section>
 
 <div id="vfr-root" class="vfr-root"></div>
