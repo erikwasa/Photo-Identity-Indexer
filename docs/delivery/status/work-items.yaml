@@ -44,8 +44,8 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0155-video-face-processing-evaluation.md
   started_at: 2026-11-05
-  last_updated_at: 2026-11-18
-  branch: wi-0155-named-review-and-flow
+  last_updated_at: 2026-11-19
+  branch: wi-0155-live-catalogue-review
   blockers:
   - WI-0151
   - WI-0188
@@ -87,6 +87,10 @@ work_items:
     value: '2026-11-18: Merged PR #825 in-app V06 JSON and existing-CSV import, crop rendering, hide/reveal, export/re-import and strict source-bound validation PASS. 53 groups/crops, 15 confirmed person crops -> 7 distinct known people, 8 duplicate confirmations, 9 unknown face, 10 background, 4 uncertain, 15 unreviewed, no writes, no coverage claim. Native crop size measured 24-102 px, mean 39.45 px; 49/53 under 64 px. No upscaling requested.'
   - type: implementation
     value: '2026-11-18: New branch wi-0155-named-review-and-flow adds snapshot-checked private person-name map import, all-canonical-people searchable picker and named exploratory leads, unchanged alias-only CSV and native crop dimensions. Three Mermaid diagrams document production video ingestion, isolated offline face experiment and future presence flow. CI and a single local names smoke pending; no inference, API or DB writes.'
+  - type: maintainer_verification
+    value: '2026-11-19: PR #826 merged and maintainer accepted 12/12 local checks: v2 V06 bundle, 53 groups/crops, matching 241-person snapshot, named leads and selector, native crop/frame/face dimensions, existing V06 CSV restoration and export, source-bound aggregate validation and zero production writes. No rerun requested.'
+  - type: implementation
+    value: '2026-11-19: PR #827 in development moves private V06 face review toward integrated workflow: v3 alias-ID evidence bridge, live canonical names from existing PostgreSQL GET people endpoint, face-specific rank lists, one-click confirmed-person selection, completed card auto-hide/reopen, alias-only CSV preserved. Production SFace parity audit found video''s max-three-photo references and group-score averaging differ from production all-confirmed exemplar per-face max similarity. No production writes or automatic face processing enabled.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
