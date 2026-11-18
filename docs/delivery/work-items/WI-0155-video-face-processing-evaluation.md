@@ -256,3 +256,18 @@ WI-0155 offline diff. Treat the integration CI gate as open
 until the current candidate's CI is green. Do not suppress
 that test or change its fail-closed cleanup safety behavior
 without a separate investigated fix.
+
+## 2026-11-18 — V06 private CSV import accepted
+
+The maintainer explicitly reported **V06 CSV Import: PASS** in the
+presence-first browser, following the already source-validated
+partial V06 review (53 representative crops, 33 reviewed, 20
+unreviewed, 15 confirming known-person crops → 7 distinct known
+people, 0 production identity writes). This closes the remaining
+local Save → Import workflow check without another inference or
+full-group review. Import success does **not** prove complete people
+coverage, mixed-group handling on this single-crop-per-group dataset,
+production persistence, or automatic identity precision. The
+private worksheet remains outside Git. Remaining pre-main gates
+are current candidate CI, offline-only delivery scope, model/runtime
+rights, private artifact retention/deletion and rollback.

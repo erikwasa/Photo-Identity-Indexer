@@ -190,3 +190,20 @@ launcher and package checks passed. That failure must not
 be dismissed as flaky without a successful rerun and
 source-safe shutdown confirmation. Do not weaken process
 revocation/owned-scratch cleanup merely to merge.
+
+## 8. V06 browser round-trip locally accepted (2026-11-18)
+
+The maintainer confirmed **V06 CSV Import: PASS** after the
+previously validated partial V06 review. Together with the
+strict source-bound CSV metrics, V04 acceptance and synthetic
+regressions, this completes the scoped presence-first gallery
+verification: review, skip, deduplicate, save, import and retain
+explicit unresolved states. The underlying identities and private
+CSV have not been checked into the repository.
+
+Still open for an offline main merge: all current candidate CI
+checks must pass, runtime/model licensing and distribution must
+be reviewed, and an explicit private crop/worksheet retention,
+safe deletion and rollback policy must be accepted. Production
+persistence, automatic recognition and the full-video-recognition
+quality criteria are not covered by this approval.

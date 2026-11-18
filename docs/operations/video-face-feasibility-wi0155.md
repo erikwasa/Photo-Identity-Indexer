@@ -188,3 +188,16 @@ VideoGuardedToolExecutor photo-priority process-shutdown test;
 all video-face unit tests and both integration shards passed.
 Do not promote to main until CI clears and any intermittent
 shutdown defect is understood.
+
+## Local V06 import checkpoint — PASS (2026-11-18)
+
+The maintainer confirmed **V06 CSV Import: PASS** in the private
+presence-first browser, after generating the 53-crop V06 gallery
+and validating its exported CSV with the source-bound local
+PowerShell verifier. The original review intentionally left
+20 of 53 representative crops/groups unreviewed and deduplicated
+15 known confirmation crops to 7 distinct known people.
+The saved review and source evidence remain private. No further
+V06 group review, video extraction or inference is required for
+this acceptance. Source completeness and production identity
+assignment are **not** established by this check.

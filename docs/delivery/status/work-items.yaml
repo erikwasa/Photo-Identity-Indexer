@@ -77,6 +77,8 @@ work_items:
     value: '2026-11-18: Main candidate PR #824 real V06 presence-first partial-review acceptance: 53 groups and source-backed crops, 33 reviewed and 20 explicitly unreviewed, 15 known-person confirmation observations deduplicated to 7 distinct known-person presence proposals, 8 unknown-face crop decisions, 7 background, 3 uncertain, 20 groups without reviewed crops, 0 exclusions or production writes. InputEvidenceValidated=True; PersonCoverageProven=False. Browser import/reload not explicitly reported. Eight unknown observations are not eight distinct people.'
   - type: implementation
     value: '2026-11-18: Main-based candidate CI caution: a Windows Core VideoGuardedToolExecutor child-shutdown safety test failed in latest run although WI-0155 and integration shards passed; targeted rerun requested. Await green CI and browser CSV import check before merge; no relaxation of shutdown safety.'
+  - type: maintainer_verification
+    value: '2026-11-18: V06 presence-first browser CSV Import PASS explicitly confirmed by maintainer after 53-crop source-bound partial review with 20 unreviewed crops and 7 deduplicated known-person proposals. Local gallery/export/import and aggregate acceptance now complete for the bounded V04/V06 evidence; no new inference or production assignments. Rights, retention, rollback and full current CI remain main integration gates.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
