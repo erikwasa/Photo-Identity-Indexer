@@ -457,10 +457,15 @@
                 notes.addEventListener("input", () => {
                     row.ReviewerNotes = notes.value; markDirty(true); refresh();
                 });
-                item.append(label("Human decision", decision),
-                    label(named
-                        ? "Known person — choose from all " + active.people.people.length + " names"
-                        : "Private known-person alias (load people map for names)", picker));
+                const personField = dom("div", "vfr-field");
+                const personTitle = dom("label", "",
+                    named ? "Known person — choose from all " +
+                        active.people.people.length + " names"
+                        : "Private known-person alias (load people map for names)");
+                person.id = "vfr-person-" + crop.frame + "-" + crop.face;
+                personTitle.htmlFor = person.id;
+                personField.append(personTitle, picker);
+                item.append(label("Human decision", decision), personField);
                 const exclusionLabel = dom("label", "vfr-check");
                 exclusionLabel.append(excluded,
                     dom("span", "", "Exclude this crop from its provisional group (annotation only)"));
