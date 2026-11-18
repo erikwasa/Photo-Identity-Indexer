@@ -1,5 +1,62 @@
 # WI-0155 — bounded offline video-face verification (main candidate)
 
+## In-app private review (post-PR #824 development branch)
+
+The previous HTML gallery remains available for diagnostics. New crop-level
+review should happen in Photo Identity's **Video face review** workspace,
+reachable from the **Videos** page or **Advanced → Archive operations**.
+
+The existing source-validation runner now also generates a self-contained
+private JSON package with the same G-group crop keys and report digest. This
+uses only the already-approved extracted local frame evidence and creates a
+new private derived output; it does **not** open original videos or contact
+the catalogue. Do not distribute this JSON: it contains face images.
+
+After this PR merges and local main has been updated, with the approved
+private paths and the existing tool directory variable from above:
+
+```powershell
+$alias = 'V06'
+$gallery = & (Join-Path $tools 'New-VideoFaceGroupReview.ps1') `
+  -PrivateReportPath $reportPath -PrivateCasesPath $casesPath `
+  -ClipAlias $alias -GroupSource Provisional -PresenceFirst
+
+$gallery | Format-List Mode,Groups,Crops,WebReviewBundlePath,ProductionAssignmentsMade
+if ($gallery.ProductionAssignmentsMade -ne 0 -or
+    -not (Test-Path -LiteralPath $gallery.WebReviewBundlePath -PathType Leaf)) {
+  throw 'Private web review bundle missing or unexpected assignment'
+}
+```
+
+Open **Video face review** in the *local* web app and choose the displayed
+WebReviewBundlePath file. Review a known person from one crop, leave other
+groups unreviewed, try hide/reveal, export CSV, and import the CSV back.
+Check that distinct-person counts and deliberately unreviewed decisions
+survive, then validate the exported review with the same authoritative
+source-bound PowerShell script:
+
+```powershell
+$reviewed = (Read-Host 'Exported private in-app CSV path').Trim('"')
+$metrics = & (Join-Path $tools 'Measure-VideoFacePresenceFirstReview.ps1') `
+  -ReviewedCsvPath $reviewed -PrivateGroupReportPath $reportPath `
+  -PrivatePeopleMapPath $peopleMapPath -ClipAlias $alias
+$metrics | Format-List InputEvidenceValidated,KnownPersonPresenceProposals,UnreviewedRepresentativeCrops,PersonCoverageProven,ProductionAssignmentsMade
+if (-not $metrics.InputEvidenceValidated -or
+    $metrics.PersonCoverageProven -or
+    $metrics.ProductionAssignmentsMade -ne 0) {
+  throw 'In-app review did not retain safe source-bound decisions'
+}
+```
+
+This is **one** local post-merge smoke test, not a request to reclassify all
+53 V06 groups or rerun face inference. New in-app review decisions are
+private *proposals* and are not applied to production video/person tags.
+Browser file selection happens entirely client-side; do not open the private
+package through a public deployment. The browser keeps no saved session:
+explicitly export before navigation. The original report, map, HTML/CSV
+and reconstructed crops remain under operator-controlled retention; the
+new JSON file also needs explicit local cleanup when no longer needed.
+
 This is the **supported integration runbook** for the main-based
 **draft** candidate. The longer historical experiment diary remains
 on the `wi-0155` branch; it is not required to use the offline tools.
