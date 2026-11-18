@@ -5415,3 +5415,15 @@ See [pre-main decision record](video-face-wi0155-pre-main-decision-record.md)
 for rejected/retained feature cleanup, delivered evidence,
 staged clean integration from current main, licensing and
 rollback gates.
+
+**Legacy merge-export regression:** The once-observed V06
+merge-chain save/import inconsistency is addressed by the
+shared browser guard. After the new PR is available locally,
+run `node (Join-Path $tools 'Test-VideoFaceMergeChainValidation.js')`;
+expected PASS. Try a deliberately invalid merge in an
+*experimental* legacy G gallery: its Save button should refuse
+the chain, while a valid human-checked merge can still be
+exported and validated by the original PowerShell reader.
+Do **not** modify the approved V04/V06 reviewed CSVs to test
+this behavior. The synthetic case is the primary acceptance
+gate; real-data re-review is not needed for this fix.
