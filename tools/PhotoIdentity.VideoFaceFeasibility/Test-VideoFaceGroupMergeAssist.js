@@ -73,9 +73,6 @@ function prepare(groups) {
     ["ws-merge-assist",new Element("section")],
     ["ws-merge-proposals",new Element("div")],
     ["ws-merge-summary",new Element("p")],
-    ["ws-merge-batch-count",new Element("p")],
-    ["ws-merge-batch-confirm",new Element("input")],
-    ["ws-merge-batch-apply",new Element("button")]
   ]);
   const fakeDocument = {
     getElementById: id => byId[id],
@@ -85,125 +82,72 @@ function prepare(groups) {
   };
   vm.runInNewContext(script, { document: fakeDocument, Event });
   return { ...byId, groups, proposals: byId["ws-merge-proposals"],
-    batch: byId["ws-merge-batch-apply"],
-    tick: byId["ws-merge-batch-confirm"] };
+ };
 }
 function pairs(state) {
-  return descendants(state.proposals, x => x.className === "ws-merge-pair");
+  return descendants(state.proposals, node => node.className === "ws-merge-pair");
 }
-function clickConfirmedPair(pair) {
-  const tick = descendants(pair, x => x.tag === "input")[0];
-  const button = descendants(pair, x => x.tag === "button")[0];
-  assert(button.disabled);
-  tick.checked = true; tick.dispatchEvent(new Event("change"));
-  assert(!button.disabled);
-  button.dispatchEvent(new Event("click"));
+function confirmPair(pair) {
+  const inputs = descendants(pair, x => x.tag === "input");
+  const buttons = descendants(pair, x => x.tag === "button");
+  assert.equal(inputs.length, 1);
+  assert.equal(buttons.length, 1);
+  assert(buttons[0].disabled, "Explicit human confirmation required");
+  inputs[0].checked = true;
+  inputs[0].dispatchEvent(new Event("change"));
+  assert(!buttons[0].disabled);
+  buttons[0].dispatchEvent(new Event("click"));
 }
-function input(card, selector, value) {
-  const element = card.querySelector(selector);
-  element.value = value;
-  element.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 {
-  const a = group("C001", 4, ["P0001","P0002"], ["1"], "P0001");
-  const b = group("C002", 2, ["P0001","P0003"], ["2"], "P0002");
+  const a = group("C001", 2, ["P0001"], ["1"], "P0001");
+  const b = group("C002", 2, ["P0001"], ["2"], "P0002");
   const state = prepare([a,b]);
-  assert.equal(pairs(state).length, 0, "Never suggest conflicting selected people");
-  assert.equal(b.querySelector(".decision").value, "");
+  assert.equal(pairs(state).length,0,"Different selected people never merge");
+  assert.equal(b.querySelector(".decision").value,"");
 }
 {
-  const a = group("C001", 4, ["P0001"], ["1"], "P0001");
-  const b = group("C002", 2, ["P0001"], ["1"], "P0001");
+  const a = group("C001", 2, ["P0001"], ["1"]);
+  const b = group("C002", 2, ["P0001"], ["1"]);
   const state = prepare([a,b]);
-  assert.equal(pairs(state).length, 0, "Representative same-frame collision must block leads");
-  assert.match(state["ws-merge-batch-count"].textContent, /1 label set/);
-  assert.equal(state.batch.disabled, true);
+  assert.equal(pairs(state).length,0,"Same-frame overlap vetoes even a suggested pair");
 }
 {
-  const a = group("C001", 4, ["P0001","P0002"], ["1"]);
-  const b = group("C002", 2, ["P0001","P0003"], ["2"]);
-  const state = prepare([a,b]);
-  assert.equal(pairs(state).length, 1);
-  assert.equal(b.querySelector(".decision").value, "", "No inference-based merge allowed");
-  clickConfirmedPair(pairs(state)[0]);
-  assert.equal(a.querySelector(".decision").value, "Keep group");
-  assert.equal(b.querySelector(".decision").value, "Merge group");
-  assert.equal(b.querySelector(".merge-target").value, "C001");
-  assert.equal(a.querySelector(".person").value, "", "No automatic identity assignment");
-  assert.equal(b.querySelector(".person").value, "");
-  assert.equal(pairs(state).length, 0, "Applied pair disappears");
-}
-{
-  const a = group("C001", 5, ["P0001"], ["1"], "P0001", "Keep group");
-  const b = group("C002", 2, ["P0003"], ["2"], "P0001", "Keep group");
-  const c = group("C003", 3, ["P0004"], ["3"], "P0001");
-  const d = group("C004", 4, ["P0001"], ["4"], "P0002");
-  const e = group("C005", 1, [], ["5"], "UNKNOWN");
-  const state = prepare([a,b,c,d,e]);
-  assert.match(state["ws-merge-batch-count"].textContent, /2 possible merges/);
-  assert(state.batch.disabled, "Batch needs an explicit human acknowledgement");
-  state.tick.checked = true;
-  state.tick.dispatchEvent(new Event("change"));
-  assert(!state.batch.disabled);
-  state.batch.dispatchEvent(new Event("click"));
-  assert.equal(b.querySelector(".merge-target").value, "C001");
-  assert.equal(c.querySelector(".merge-target").value, "C001");
-  assert.equal(b.querySelector(".decision").value, "Merge group");
-  assert.equal(c.querySelector(".decision").value, "Merge group");
-  assert.equal(d.querySelector(".decision").value, "");
-  assert.equal(e.querySelector(".decision").value, "");
-  assert.equal(b.querySelector(".person").value, "P0001");
-  assert.equal(c.querySelector(".person").value, "P0001");
-  assert(state.batch.disabled, "Batch acknowledgement does not persist");
-  assert.equal(state.tick.checked, false);
-}
-{
-  const a = group("C001", 4, ["P0001"], ["1"], "P0001");
-  const b = group("C002", 3, ["P0001"], ["2"], "P0001");
-  const state = prepare([a,b]);
-  state.tick.checked = true;
-  state.tick.dispatchEvent(new Event("change"));
-  assert(!state.batch.disabled);
-  input(b, ".person", "P0002");
-  assert(state.batch.disabled, "Editing a person alias invalidates acknowledgement");
-  assert.equal(state.tick.checked, false);
-  assert.equal(pairs(state).length, 0, "Different reviewed people cannot be merged");
-}
-{
-  // Representative subsets do not collide, but a hidden full member does.
-  const a = group("C001", 2, ["P0001"], ["1"], "P0001", "", ["1","9"]);
-  const b = group("C002", 2, ["P0001"], ["2"], "P0001", "", ["2","9"]);
-  const state = prepare([a, b]);
-  assert.equal(pairs(state).length, 0, "Hidden same-frame overlap must block suggested merges");
-  assert.match(state["ws-merge-batch-count"].textContent, /withheld due to overlapping source frames/);
-  assert.equal(state.batch.disabled, true);
-}
-{
-  // All true members are disjoint and a human still must confirm.
-  const a = group("C001", 2, ["P0001"], ["1"], "P0001", "", ["1","9"]);
-  const b = group("C002", 2, ["P0001"], ["2"], "P0001", "", ["2","10"]);
-  const state = prepare([a, b]);
-  assert.match(state["ws-merge-summary"].textContent, /Full member-frame evidence available/);
-  assert.equal(pairs(state).length, 1);
-  clickConfirmedPair(pairs(state)[0]);
-  assert.equal(b.querySelector(".merge-target").value, "C001");
-}
-{
-  // Malformed or incomplete membership must never pass through an
-  // apparently safe data attribute, even when representative crops differ.
-  const a = group("C001", 2, ["P0001"], ["1"], "P0001", "", ["1"]);
-  const b = group("C002", 2, ["P0001"], ["2"], "P0001", "", ["2","10"]);
-  const state = prepare([a, b]);
-  assert.equal(pairs(state).length, 0, "Incomplete full membership must block UI proposals");
-  assert.equal(state.batch.disabled, true);
-}
-{
-  // Historic report remains usable for human review, but it cannot claim
-  // the stronger full-membership safety proof.
   const a = group("C001", 2, ["P0001"], ["1"]);
   const b = group("C002", 2, ["P0001"], ["2"]);
-  const state = prepare([a, b]);
-  assert.match(state["ws-merge-summary"].textContent, /Legacy report/);
+  const state = prepare([a,b]);
+  assert.equal(pairs(state).length,1,"Shared rank yields only a human review lead");
+  assert.equal(b.querySelector(".decision").value,"","No automatic merge");
+  confirmPair(pairs(state)[0]);
+  assert.equal(a.querySelector(".decision").value,"Keep group");
+  assert.equal(b.querySelector(".decision").value,"Merge group");
+  assert.equal(b.querySelector(".merge-target").value,"C001");
+  assert.equal(a.querySelector(".person").value,"","No automatic identity assignment");
+  assert.equal(pairs(state).length,0,"Completed pair no longer proposed");
 }
-console.log("WI-0155 synthetic reviewed merge assistant: PASS");
+{
+  const a = group("C001", 2, ["P0001"], ["1"]);
+  const b = group("C002", 2, ["P0002"], ["2"]);
+  const state = prepare([a,b]);
+  assert.equal(pairs(state).length,0,"No rank/label overlap means no speculative lead");
+}
+{
+  const a = group("C001", 2, ["P0001"], ["1"],"P0001","",["1","9"]);
+  const b = group("C002", 2, ["P0001"], ["2"],"P0001","",["2","9"]);
+  const state = prepare([a,b]);
+  assert.equal(pairs(state).length,0,"Full-member collision blocks pairwise merge");
+}
+{
+  const a = group("C001", 2, ["P0001"], ["1"],"P0001","",["1"]);
+  const b = group("C002", 2, ["P0001"], ["2"],"P0001","",["2","10"]);
+  const state = prepare([a,b]);
+  assert.equal(pairs(state).length,0,"Malformed full membership is not trusted");
+}
+{
+  const a = group("C001", 2, ["P0001"], ["1"]);
+  const b = group("C002", 2, ["P0001"], ["2"]);
+  const state = prepare([a,b]);
+  assert.match(state["ws-merge-summary"].textContent,/Legacy report/);
+  assert.equal(state["ws-merge-batch-apply"],undefined,
+    "Rejected batch merge controls must remain absent");
+}
+console.log("WI-0155 synthetic optional pairwise merge assistant: PASS");

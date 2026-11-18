@@ -5304,3 +5304,133 @@ implemented local PR #821 behaviors. Preserve all confirmed
 historical WI-0155 experiment results unchanged; there is
 no need for a fresh four-pass run or exhaustive refined
 G-group labelling just to evaluate this clarification.
+
+## Checkpoint 56 — presence-first crop review and pre-main consolidation (2026-11-18)
+
+New opt-in mode (draft PR #823, still isolated from `main`):
+`New-VideoFaceGroupReview.ps1 -GroupSource Provisional -PresenceFirst`.
+Use **existing** private four-pass `$reportPath`, `$casesPath` and
+their approved frame workspaces. No PostgreSQL credentials,
+original video, extraction or inference are required for this test.
+
+### 56A. Synthetic validation
+
+Run in Windows PowerShell 7.6 after PR #823 reaches the long-lived
+`wi-0155` integration branch:
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer-WI0155'
+git fetch origin
+git switch wi-0155
+git pull --ff-only origin wi-0155
+$ErrorActionPreference = 'Stop'
+$tools = Join-Path (Get-Location).Path 'tools\PhotoIdentity.VideoFaceFeasibility'
+& (Join-Path $tools 'Test-VideoFacePresenceFirstReview.ps1')
+node (Join-Path $tools 'Test-VideoFacePresenceFirstReview.js')
+node (Join-Path $tools 'Test-VideoFaceGroupMergeAssist.js')
+if ($LASTEXITCODE -ne 0) { throw 'Presence-first browser checks failed.' }
+```
+
+Expected: **PASS** for the private presence-first gallery/aggregate
+and browser logic tests, and the pairwise merge assistant regression.
+A synthetic test must never access real private evidence.
+
+### 56B. Create a new crop-level private gallery (maintainer visual check)
+
+Reuse the already completed four-pass `$reportPath` and
+`$casesPath`; do not rerun models, the existing review CSVs or
+source extraction. For example, inspect V04 and then V06:
+
+```powershell
+$alias = 'V04'
+$pfGallery = & (Join-Path $tools 'New-VideoFaceGroupReview.ps1') `
+    -PrivateReportPath $reportPath `
+    -PrivateCasesPath $casesPath `
+    -ClipAlias $alias -GroupSource Provisional -PresenceFirst -OpenGallery
+$pfGallery | Format-List Mode,Groups,Crops,ObservationsUnassigned,
+    UnshownGroupObservations,ProductionAssignmentsMade,GalleryPath,WorksheetPath
+```
+
+Expected: `Mode=PresenceFirst`, V04 6 groups and 6
+representative crops, zero production assignments; V06 has
+53 original groups and 53 representative crops. The
+`presence-first-worksheet.csv` is an initially **blank** private
+template separate from all validated legacy review CSVs.
+
+In the new browser, confirm a known person from one source crop
+using a private P0001-style alias, then confirm that same person
+from another group **without merging**: the summary must show
+one distinct person with two confirming crops. Leave another
+group unreviewed or hide it for the session; it must remain
+explicitly outstanding. Test CSV Save, reload via Import,
+then Save again. The imported data must remain bound to
+the exact source clip/report/crops.
+
+**Do not attempt the mixed-group crop test on V04/V06:** the
+reviewed coarse evidence has one representative crop per G-group,
+so no such source-bound mixed group exists there. The synthetic
+PowerShell/browser fixture instead creates two representatives
+of one group belonging to different people, marks one crop
+**Exclude from provisional group**, and verifies two distinct
+presence proposals with no group mutation. That test is sufficient
+for the mixed-group UI mechanics. A later *optional* local check
+using an approved, actually multi-crop V05/V07 group may improve
+confidence, but is **not** required and must not cause exhaustive
+refined review or invented face identities.
+
+For each video, **only** use group crops for which the
+persisted report contains representative geometry. The
+interface cannot display every non-representative group
+member, original unassigned candidate or independent-only
+I observation. The source count of these gaps is retained.
+This is deliberate: no fabricated crop or absent-person claim.
+
+### 56C. Validate the saved private CSV without production writes
+
+```powershell
+$presenceCsv = (Read-Host 'Saved presence-first CSV full path').Trim('"')
+$pfMetrics = & (Join-Path $tools 'Measure-VideoFacePresenceFirstReview.ps1') `
+    -ReviewedCsvPath $presenceCsv `
+    -PrivateGroupReportPath $reportPath `
+    -PrivatePeopleMapPath $peopleMapPath `
+    -ClipAlias $alias
+$pfMetrics | Format-List
+if (-not $pfMetrics.InputEvidenceValidated -or
+    $pfMetrics.ProductionAssignmentsMade -ne 0 -or
+    $pfMetrics.PersonCoverageProven) {
+    throw 'Presence-first source or write/coverage guard failed.'
+}
+```
+
+Expected source validation `True`, zero production
+assignments, incomplete coverage status `False`, person
+proposal count deduplicated across confirmed crops, and
+explicit `GroupsWithoutReviewedCrops` / unshown / unassigned
+counts. The script prints aggregate metrics only. Never
+post the private CSV, people aliases, crop HTML or source
+frame workspaces.
+
+**No need to repeat the 204-frame inference run or
+exhaustively classify V05/V07.** Keep the original case/map,
+approved frames and prior reviewed worksheets until the
+pre-main retention decision. This acceptance validates the
+new UX mechanics; it does not validate future production
+persistence, exceptional automated identity assignment or
+general whole-video recall.
+
+See [pre-main decision record](video-face-wi0155-pre-main-decision-record.md)
+for rejected/retained feature cleanup, delivered evidence,
+staged clean integration from current main, licensing and
+rollback gates.
+
+**Legacy merge-export regression:** The once-observed V06
+merge-chain save/import inconsistency is addressed by the
+shared browser guard. After the new PR is available locally,
+run `node (Join-Path $tools 'Test-VideoFaceMergeChainValidation.js')`;
+expected PASS. Try a deliberately invalid merge in an
+*experimental* legacy G gallery: its Save button should refuse
+the chain, while a valid human-checked merge can still be
+exported and validated by the original PowerShell reader.
+Do **not** modify the approved V04/V06 reviewed CSVs to test
+this behavior. The synthetic case is the primary acceptance
+gate; real-data re-review is not needed for this fix.

@@ -120,7 +120,10 @@
   };
   document.getElementById("ws-save").addEventListener("click", async () => {
     const rows = snapshot();
-    if (!rows.every(rowValid)) {
+    if (!rows.every(rowValid) ||
+        !window.WI0155MergeChainValidation ||
+        !window.WI0155MergeChainValidation.valid(
+          rows.filter(row => row.Source === "CenterFaceShadow"))) {
       status.textContent = "Save refused: check merge targets and person aliases";
       return;
     }
@@ -211,6 +214,11 @@
           }
         }
         if (!rowValid(after)) throw new Error("Invalid reviewed decision");
+      }
+      if (!window.WI0155MergeChainValidation ||
+          !window.WI0155MergeChainValidation.valid(
+            proposed.filter(row => row.Source === "CenterFaceShadow"))) {
+        throw new Error("Invalid imported merge chains");
       }
       // All-or-nothing import: do not change any UI control until validated.
       for (let i = 0; i < groups.length; i++) {

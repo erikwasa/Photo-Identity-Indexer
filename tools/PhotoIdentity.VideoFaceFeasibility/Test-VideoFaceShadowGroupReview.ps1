@@ -300,13 +300,13 @@ try {
         $hub.Contains('id="ws-import"') -and
         $hub.Contains('review-workspace.js') -and
         $hub.Contains('id="ws-merge-assist"') -and
-        $hub.Contains('id="ws-merge-batch-apply"') -and
-        $hub.Contains('id="ws-merge-batch-confirm"') -and
+        $hub.Contains('merge-validation.js') -and
         $hub.Contains('merge-assist.js') -and
         $hub.Contains('class="ws-audit-card"') -and
         $hub.Contains('Face classification')) 'Incomplete group-first workspace.'
     Check ((Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'merge-assist.js') -PathType Leaf) -and
-        (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'merge-assist.js') -Raw).Contains('batchPlan(')) 'Private merge assistant script missing.'
+        (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'merge-assist.js') -Raw).Contains('function showPair(') -and
+        -not $hub.Contains('ws-merge-batch-apply')) 'Legacy pairwise merge assistant or batch removal contract failed.'
     Check ((Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\N001.png') -PathType Leaf) -and
         (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $workspace.GalleryPath) 'audit-previews\U001.png') -PathType Leaf) -and
         $hub.Contains('audit-previews/N001.png') -and

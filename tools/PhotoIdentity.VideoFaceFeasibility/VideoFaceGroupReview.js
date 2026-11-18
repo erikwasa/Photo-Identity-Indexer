@@ -75,6 +75,11 @@
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
   saveButton.addEventListener("click", async () => {
+    if (!window.WI0155MergeChainValidation ||
+        !window.WI0155MergeChainValidation.valid(cards.map(fields))) {
+      status.textContent = "Save refused: a merge must finish at a kept group without cycles or conflicting labels";
+      return;
+    }
     try {
       if ("showSaveFilePicker" in window) {
         if (!fileHandle) {
@@ -148,6 +153,10 @@
         indexed.set(id, item);
       }
       if (indexed.size !== cards.length) throw new Error("Missing groups");
+      if (!window.WI0155MergeChainValidation ||
+          !window.WI0155MergeChainValidation.valid([...indexed.values()])) {
+        throw new Error("Invalid imported merge chain");
+      }
       for (const card of cards) {
         const item = indexed.get(card.dataset.clip + ":" + card.dataset.group);
         if (item.Observations !== card.dataset.observations) {

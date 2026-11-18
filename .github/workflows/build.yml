@@ -231,6 +231,7 @@ jobs:
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupRankAccuracy.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceRefinementComparison.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceResolution.ps1
+          ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceFirstReview.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceShadowGroupReview.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceReviewPriority.ps1
           ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceUnassignedReview.ps1
@@ -240,6 +241,10 @@ jobs:
         run: |
           node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceGroupMergeAssist.js
           if ($LASTEXITCODE -ne 0) { throw 'WI-0155 merge assistant synthetic test failed.' }
+          node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFacePresenceFirstReview.js
+          if ($LASTEXITCODE -ne 0) { throw 'WI-0155 presence-first UI synthetic test failed.' }
+          node ./tools/PhotoIdentity.VideoFaceFeasibility/Test-VideoFaceMergeChainValidation.js
+          if ($LASTEXITCODE -ne 0) { throw 'WI-0155 merge validation synthetic test failed.' }
 
       - name: Verify WI-0208 restore-copy ownership guards
         shell: pwsh
