@@ -21,7 +21,7 @@ function Ranks([string]$a,[string]$b,[string]$c,[double]$score=.7) {
 function Ranked([int]$frame,[long]$time,[int]$face,$top) {
     return @{frameNumber=$frame;timestampMs=$time;faceNumber=$face;topCandidates=@($top)}
 }
-function Group([string]$alias,$box) {
+function MakeGroup([string]$alias,$box) {
     return @{alias=$alias;observations=1;representativeCrops=@($box)}
 }
 $root=Join-Path $env:TEMP ('wi0155-refinement-test-'+[Guid]::NewGuid().ToString('N'))
@@ -57,21 +57,21 @@ try {
     $passData=@(
         @{alias='V04';times=@(1000);descriptor=('a'*64);
             ranks=@((Ranked 1 1000 1 $topA),(Ranked 1 1000 2 $addedTop),(Ranked 1 1000 3 $topA));
-            groups=@((Group G001 (Crop 1 1000 1)),(Group G002 (Crop 1 1000 2)),(Group G003 (Crop 1 1000 3)));
+            groups=@((MakeGroup G001 (Crop 1 1000 1)),(MakeGroup G002 (Crop 1 1000 2)),(MakeGroup G003 (Crop 1 1000 3)));
             audit=@()},
         @{alias='V05';times=@(1000,1500,2000,2500,3000);descriptor=('a'*64);
             ranks=@((Ranked 1 1000 1 $addedTop),(Ranked 2 1500 1 $addedTop),
                 (Ranked 3 2000 1 $addedTop),(Ranked 4 2500 1 $addedSecond),
                 (Ranked 5 3000 1 $topA));
-            groups=@((Group G001 (Crop 1 1000)),(Group G002 (Crop 2 1500)));
+            groups=@((MakeGroup G001 (Crop 1 1000)),(MakeGroup G002 (Crop 2 1500)));
             audit=@((Crop 4 2500))},
         @{alias='V06';times=@(1000);descriptor=('b'*64);
             ranks=@((Ranked 1 1000 1 $topB));
-            groups=@((Group G001 (Crop 1 1000)));
+            groups=@((MakeGroup G001 (Crop 1 1000)));
             audit=@()},
         @{alias='V07';times=@(1000,1500);descriptor=('b'*64);
             ranks=@((Ranked 1 1000 1 $topB),(Ranked 2 1500 1 (Ranks P0001 P0003 P0004)));
-            groups=@((Group G001 (Crop 1 1000)),(Group G002 (Crop 2 1500)));
+            groups=@((MakeGroup G001 (Crop 1 1000)),(MakeGroup G002 (Crop 2 1500)));
             audit=@()}
     )
     $caseClips=@(); $reportClips=@()
@@ -146,7 +146,7 @@ try {
     Assert ($limited.Pairs[0].ShortlistedLeads -eq 1 -and $limited.Pairs[0].PersonLeadOccurrencesWithoutCrop -eq 1) 'Bound not enforced.'
     $argsForTest.OutputDirectory=Join-Path $root 'reject'
     $metaPath=Join-Path $root 'V05/extraction-metadata.json'
-    JsonWrite @{schemaVersion=1;samplingMode='Adaptive';sourceDescriptorSha256=('z'*64);samplingCoarseFrameCount=1} $metaPath
+    JsonWrite @{schemaVersion=1;samplingMode='Adaptive';sourceDescriptorSha256=('c'*64);samplingCoarseFrameCount=1} $metaPath
     Assert (Refused { & $script @argsForTest }) 'Wrong source accepted.'
     Assert (-not (Test-Path -LiteralPath $argsForTest.OutputDirectory)) 'Rejected input wrote output.'
     JsonWrite @{schemaVersion=1;samplingMode='Adaptive';sourceDescriptorSha256=('a'*64);samplingCoarseFrameCount=1} $metaPath
