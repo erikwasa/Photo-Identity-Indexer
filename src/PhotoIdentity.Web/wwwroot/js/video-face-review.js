@@ -77,6 +77,15 @@
                 crop.imageBase64.length > 1400000 ||
                 !crop.imageBase64.startsWith(pngPrefix) ||
                 !boundedPng(crop.imageBase64) ||
+                (bundle.schemaVersion === 2 &&
+                    (!Number.isInteger(crop.frameWidth) ||
+                     !Number.isInteger(crop.frameHeight) ||
+                     !Number.isInteger(crop.faceWidthPx) ||
+                     !Number.isInteger(crop.faceHeightPx) ||
+                     crop.frameWidth < 1 || crop.frameWidth > 3840 ||
+                     crop.frameHeight < 1 || crop.frameHeight > 3840 ||
+                     crop.faceWidthPx < 1 || crop.faceWidthPx > crop.frameWidth + 1 ||
+                     crop.faceHeightPx < 1 || crop.faceHeightPx > crop.frameHeight + 1)) ||
                 !/^[A-Za-z0-9+/]+={0,2}$/.test(crop.imageBase64) ||
                 cropKeys.has(key(crop)) ||
                 frameFaces.has(crop.frame + ":" + crop.face)) return false;
@@ -372,8 +381,13 @@
                 image.loading = "lazy";
                 const pixels = pngDimensions(crop.imageBase64);
                 item.append(image, dom("small", "", "Frame " + crop.frame +
-                    " · face " + crop.face + " · native crop " +
-                    pixels.width + " × " + pixels.height + " px (no upscaling)"));
+                    " · face " + crop.face + " · crop " +
+                    pixels.width + " × " + pixels.height + " px (no upscaling)" +
+                    (bundle.schemaVersion === 2
+                        ? " · extracted frame " + crop.frameWidth + " × " +
+                            crop.frameHeight + " px · detected face " +
+                            crop.faceWidthPx + " × " + crop.faceHeightPx + " px"
+                        : "")));
                 const decision = dom("select");
                 for (const value of decisions) {
                     const option = dom("option", "", value || "Not reviewed");
