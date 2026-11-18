@@ -1,7 +1,9 @@
 @page "/video-face-review"
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <PageTitle>Video face review · Photo Identity</PageTitle>
+<NavigationLock OnBeforeInternalNavigation="ConfirmInternalNavigation" />
 
 <section class="hero">
     <div>
@@ -27,6 +29,20 @@
 <div id="vfr-root" class="vfr-root"></div>
 
 @code {
+    private async Task ConfirmInternalNavigation(LocationChangingContext context)
+    {
+        if (await JS.InvokeAsync<bool>("photoIdentityVideoFaceReview.hasUnsavedChanges") &&
+            !await JS.InvokeAsync<bool>("confirm",
+                "Leave this page and discard unsaved private review decisions?"))
+            context.PreventNavigation();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("photoIdentityVideoFaceReview.dispose"); }
+        catch (JSDisconnectedException) { }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
