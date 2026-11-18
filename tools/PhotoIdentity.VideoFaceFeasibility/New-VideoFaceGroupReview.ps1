@@ -10,7 +10,8 @@ param(
   [ValidatePattern('^V(?!00)[0-9]{2}$')][string]$ClipAlias = 'V03',
   [ValidateSet('Provisional','ShadowDbscan','CenterFaceShadow')][string]$GroupSource = 'Provisional',
   [ValidateRange(240,640)][int]$CropLongEdge = 512,
-  [switch]$OpenGallery
+  [switch]$OpenGallery,
+  [switch]$PresenceFirst
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -42,6 +43,9 @@ if ($report.schemaVersion -ne 1 -or $cases.schemaVersion -ne 1 -or
   throw 'Private report and cases must contain the requested video once.'
 }
 $clip = $matches[0]
+if ($PresenceFirst -and $GroupSource -cne 'Provisional') {
+  throw 'Presence-first crop review currently supports original provisional G groups only.'
+}
 $isCenterFace = $GroupSource -ceq 'CenterFaceShadow'
 $isShadow = $GroupSource -cne 'Provisional'
 $aliasPattern = if ($isCenterFace) { '^C(?!000)[0-9]{3}$' } elseif ($isShadow) { '^D(?!000)[0-9]{3}$' } else { '^G(?!000)[0-9]{3}$' }
@@ -318,6 +322,20 @@ foreach ($item in $cropList) {
     if ($null -ne $bitmap) { $bitmap.Dispose() }
     $image.Dispose()
   }
+}
+# Opt-in alternative writer: all crop validation, manifests, boxes and crop
+# reconstruction above remain unchanged. This never interprets a whole G
+# group as one person and never changes the legacy worksheet contract.
+if ($PresenceFirst) {
+  return & (Join-Path $PSScriptRoot 'Write-VideoFacePresenceFirstGallery.ps1') `
+      -ClipAlias $ClipAlias `
+      -PrivateReportPath $PrivateReportPath `
+      -ReviewFolder $folder `
+      -Rows @($rows.ToArray()) `
+      -Crops @($cropList.ToArray()) `
+      -Rankings $rankings `
+      -UnassignedObservations $hiddenObservations `
+      -OpenGallery:$OpenGallery
 }
 $js=LocalFile (Join-Path $PSScriptRoot 'VideoFaceGroupReview.js') (64KB)
 Copy-Item -LiteralPath $js -Destination (
