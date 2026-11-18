@@ -44,7 +44,7 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0155-video-face-processing-evaluation.md
   started_at: 2026-11-05
-  last_updated_at: 2026-11-08
+  last_updated_at: 2026-11-18
   branch: wi-0155
   blockers:
   - WI-0151
@@ -59,6 +59,16 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/760
   - type: implementation
     value: '2026-11-08: Bounded video-face feasibility work is in progress on the long-lived wi-0155 branch. Read-only catalogue exemplar evaluation and high-resolution coverage development remain isolated from main; multi-video maintainer acceptance and an explicit integration-versus-separate-component decision are still open.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/823
+  - type: documentation
+    value: docs/operations/video-face-wi0155-pre-main-decision-record.md
+  - type: documentation
+    value: docs/operations/video-face-feasibility-wi0155.md
+  - type: maintainer_verification
+    value: '2026-11-18: Private four-pass A/B read-only experiment completed with 204 frames, 530 detections/embeddings, 240 eligible known people and 596 still exemplars; human coarse G review found 2 known people in A and 7 in B. Refined shortlist confirmed better visual evidence for 2 A and 1 B known person but also wrong-person/background suggestions in B. Source-data person recall and uncalibrated automatic matching remain unproven; details archived on wi-0155.'
+  - type: implementation
+    value: '2026-11-18: Presence-first opt-in crop-level gallery, private CSV save/import and snapshot-bound aggregate reader built on wi-0155; batch same-person merge removed, browser invalid merge-chain export fixed. Draft main integration candidate PR #824 carries offline-only code/tests and preserves newer main CI. Local V04/V06 presence-first UX acceptance, main CI, model rights, private data retention and rollback remain pending; production background video processing and identity writes are NOT enabled.'
 - id: WI-0186
   title: Scope visual and caption search with Smart Collection criteria
   milestone: M36
