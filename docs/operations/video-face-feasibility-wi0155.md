@@ -123,3 +123,34 @@ suggestions, source filenames or approval-specific media.
   stopping. Unreviewed groups/observations never imply no other people.
 
 See [decisions, historical evidence and removal inventory](video-face-wi0155-pre-main-decision-record.md).
+## Local acceptance checkpoint — V04 complete; limited V06 smoke still needed
+
+The maintainer completed a real **V04** presence-first gallery on
+the main-based candidate. Six groups / six source-bound crops were
+generated; the private exported CSV passed the strict aggregate
+measurement with **4 confirming crops → 2 distinct known people**,
+2 background crops, zero unknown/unreviewed/mixed/excluded and
+**zero production identity writes**. Browser rendering, export
+and validation are supported by this evidence. We do **not** yet
+have a distinct maintainer report that re-import of the CSV
+worked. V04 is all-reviewed, so it does not test stopping early.
+
+**Minimal outstanding local check, not another exhaustive review:**
+Open V06 in the same opt-in gallery, review **just a few**
+representative crops, leave most G groups untouched and optionally
+hide/reveal one. Save and **Import the saved CSV in the browser**,
+verify that reviewed and unreviewed decisions are restored, then
+measure it with `-ClipAlias V06`. Expect 53 provisional
+groups / 53 representative crops, nonzero
+`GroupsWithoutReviewedCrops` and
+`UnreviewedRepresentativeCrops`, source validity True,
+`PersonCoverageProven=False`, zero production writes. Use
+correctly identified private aliases only where a human actually
+recognizes the crop; otherwise choose Cannot tell/Not a face or
+leave unreviewed. Do not force any merge, inspect all 53
+groups, invent identities or rerun the 204-frame catalogue
+evaluation.
+
+**The V04 private CSV itself is not part of this PR.** Report
+only the safe aggregated counters and whether the V06 Import
+round-trip worked. Existing private evidence remains untouched.
