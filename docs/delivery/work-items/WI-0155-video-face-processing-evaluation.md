@@ -202,3 +202,57 @@ The pending verification gates remain local Import and selective
 V06 early-stop acceptance, model/right-to-distribute and private
 output retention/rollback sign-off. Do not merge solely on the
 V04 aggregate.
+## 2026-11-18 — V06 presence-first partial-review verification
+
+The maintainer opened the opt-in **main-based candidate** `V06`
+presence-first G-group gallery. It returned mode `PresenceFirst`,
+**53 source-backed groups / 53 representative crops**, and
+`ProductionAssignmentsMade=0`. The saved private worksheet was
+validated with `Measure-VideoFacePresenceFirstReview.ps1`, returning
+`InputEvidenceValidated=True`, consistent single-crop source
+accounting, and the following aggregate reviewer decisions:
+
+| V06 source-bound presence-first result | Count |
+| --- | ---: |
+| Representative crops | 53 |
+| Known-person confirmation crops | 15 |
+| **Distinct known people proposed present** | **7** |
+| Duplicate known-person confirmations | 8 |
+| Unknown-real-face crop observations | 8 |
+| Not-a-face/background crop observations | 7 |
+| Cannot-tell crop observations | 3 |
+| **Unreviewed representative crops / groups** | **20 / 20** |
+| Mixed-person group labels / exclusion annotations | 0 / 0 |
+| Unshown group observations / unassigned observations | 0 / 0 |
+
+**Review coverage:** 33 of 53 representative crops received a
+human review decision; 20 remain explicitly unreviewed. This
+demonstrates that incomplete manual review is a valid *input
+state* and does not prevent correct deduplicated known-person
+proposal accounting. `PersonCoverageProven=False` and
+`ProductionAssignmentsMade=0` by design. Eight unknown-real-face
+**crops** are not eight distinct unknown people; seven proposed
+known people do not establish full video-person recall or the
+correctness of every identity without the underlying human review.
+
+**Acceptance granularity:** This confirms source-bound V06 gallery
+generation, real private CSV export and strict aggregate measurement,
+including partial-review preservation. The maintainer has **not
+explicitly confirmed browser CSV re-import/reload** in this result,
+so the Save → Import round trip remains a narrowly scoped local
+check. The one-representative-per-G-group source has no real
+mixed-person group to exercise per-crop correction; synthetic
+tests cover that UX. Neither source file nor private CSV is
+committed. No extra full-video inference or exhaustive G/N/U
+review is necessary for this milestone.
+
+PR #824 also reported all WI-0155 tests and both integration shards
+passed. The most recent full run on the preceding documentation
+checkpoint did **not** pass overall: an unrelated existing
+`PhotoIdentity.Core.Tests.VideoGuardedToolExecutorTests.Photo_priority_revokes_child_and_cleans_scratch`
+test failed while verifying Windows child-process shutdown.
+A targeted rerun was requested; the test is outside this
+WI-0155 offline diff. Treat the integration CI gate as open
+until the current candidate's CI is green. Do not suppress
+that test or change its fail-closed cleanup safety behavior
+without a separate investigated fix.
