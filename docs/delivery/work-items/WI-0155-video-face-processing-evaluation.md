@@ -31,8 +31,7 @@ constraint; no upscaling or cosmetic enlargement should be pursued
 as a substitute for actual video evidence. Native video-frame
 quality, pixel-scale face geometry and better genuine temporal
 representatives remain questions for a separately gated trial.
-See [source-to-video/person diagrams and explicit stage comparison]
-(../../operations/video-to-person-review-pipeline-wi0155.md).
+See [source-to-video/person diagrams and explicit stage comparison](../../operations/video-to-person-review-pipeline-wi0155.md).
 
 **Follow-up product-facing review slice (this branch):** The source
 snapshot already includes a private `P0001 → canonical UUID/name` map
