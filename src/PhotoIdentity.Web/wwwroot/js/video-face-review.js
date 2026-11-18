@@ -1,6 +1,7 @@
 /* WI-0155 private, browser-memory-only video face review.
  * No fetch, storage, API calls, video processing or catalogue writes.
- * Imported JSON contains sensitive images; use only on a trusted local host.
+ * Two separate local imports: face evidence and the original snapshot's
+ * canonical person alias/name map. Never serialize names into review CSV.
  */
 (function (environment) {
     "use strict";
@@ -12,34 +13,43 @@
     const groupRx = /^G(?!000)\d{3}$/;
     const personRx = /^P(?!0000)\d{4}$/;
     const shaRx = /^[0-9a-f]{64}$/;
+    const snapshotRx = /^[0-9]+:[0-9]+:(?:[0-9]+(?:,[0-9]+)*)?$/;
+    const uuidRx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const numberRx = /^[1-9]\d{0,2}$/;
     const pngPrefix = "iVBORw0KGgo";
     const maxBundleSize = 24 * 1024 * 1024;
     const key = row => [row.group || row.Group, row.frame || row.Frame,
         row.face || row.Face].join(":");
-    function boundedPng(base64) {
+    function pngDimensions(base64) {
         try {
-            // PNG IHDR dimensions prevent a tiny malicious payload from
-            // requesting an enormous decoded bitmap in the browser.
+            // PNG IHDR supplies the native dimensions, not an enlarged preview.
             const header = atob(base64.slice(0, 44));
-            if (header.slice(12, 16) !== "IHDR") return false;
+            if (header.slice(12, 16) !== "IHDR") return null;
             const dimension = i => header.charCodeAt(i) * 16777216 +
                 header.charCodeAt(i + 1) * 65536 +
                 header.charCodeAt(i + 2) * 256 + header.charCodeAt(i + 3);
             const width = dimension(16), height = dimension(20);
-            return width >= 1 && width <= 640 && height >= 1 && height <= 640;
+            return width >= 1 && width <= 640 && height >= 1 && height <= 640
+                ? {width, height} : null;
         } catch {
-            return false;
+            return null;
         }
     }
+    const boundedPng = base64 => pngDimensions(base64) !== null;
 
     function validateBundle(bundle) {
-        if (!bundle || bundle.schemaVersion !== 1 || bundle.mode !== "PresenceFirst" ||
+        if (!bundle || ![1, 2].includes(bundle.schemaVersion) || bundle.mode !== "PresenceFirst" ||
             typeof bundle.clipAlias !== "string" || !clipRx.test(bundle.clipAlias) ||
             typeof bundle.reportSha256 !== "string" || !shaRx.test(bundle.reportSha256) ||
             !Number.isInteger(bundle.unassignedGroupObservations) ||
             bundle.unassignedGroupObservations < 0 ||
             bundle.unassignedGroupObservations > 5760 ||
+            (bundle.schemaVersion === 2 &&
+                (typeof bundle.catalogueSnapshot !== "string" ||
+                 !snapshotRx.test(bundle.catalogueSnapshot) ||
+                 bundle.catalogueSnapshot.length > 256 ||
+                 !Number.isInteger(bundle.cataloguePeopleCount) ||
+                 bundle.cataloguePeopleCount < 1 || bundle.cataloguePeopleCount > 4096)) ||
             !Array.isArray(bundle.groups) || bundle.groups.length < 1 ||
             bundle.groups.length > 64 ||
             !Array.isArray(bundle.crops) || bundle.crops.length < 1 ||
@@ -78,6 +88,49 @@
         }
         return [...groupMap.values()].every(g => g.crops >= 1 &&
             g.crops <= g.observations && g.crops <= 5);
+    }
+
+    // No names/UUIDs arrive in the face package. This separate import must
+    // match its exact read-only catalogue snapshot; a stale map is rejected.
+    function validatePeopleMap(bundle, map) {
+        if (!validateBundle(bundle) || bundle.schemaVersion !== 2 ||
+            !map || map.schemaVersion !== 1 ||
+            map.pgSnapshot !== bundle.catalogueSnapshot ||
+            !Array.isArray(map.people) ||
+            map.people.length !== bundle.cataloguePeopleCount) return false;
+        const aliases = new Set(), ids = new Set();
+        for (const person of map.people) {
+            if (!person || !personRx.test(person.alias) ||
+                !uuidRx.test(person.personId) ||
+                person.personId.toLowerCase() === "00000000-0000-0000-0000-000000000000" ||
+                (person.displayName !== null && person.displayName !== undefined &&
+                    (typeof person.displayName !== "string" ||
+                     !person.displayName.trim() ||
+                     person.displayName.length > 200 ||
+                     /[\\u0000-\\u001f\\u007f]/.test(person.displayName))) ||
+                !aliases.add(person.alias) || !ids.add(person.personId.toLowerCase())) return false;
+        }
+        return bundle.groups.every(group => group.suggestions.every(s =>
+            aliases.has(s.split(": ")[0])));
+    }
+
+    const personName = person => person.displayName || "Unnamed person";
+    function searchPeople(map, query) {
+        if (!map) return [];
+        const needle = query.trim().toLocaleLowerCase();
+        return map.people.filter(person =>
+            (personName(person) + " " + person.alias).toLocaleLowerCase().includes(needle))
+            .sort((a, b) => personName(a).localeCompare(personName(b)) ||
+                a.alias.localeCompare(b.alias))
+            .slice(0, 20);
+    }
+    function describeSuggestion(suggestion, map) {
+        if (!map) return suggestion;
+        const alias = suggestion.split(": ")[0];
+        const person = map.people.find(p => p.alias === alias);
+        return person
+            ? personName(person) + " (" + alias + ")" + suggestion.slice(alias.length)
+            : suggestion;
     }
 
     function newRows(bundle) {
@@ -299,7 +352,9 @@
                 (group.observations - groupCrops.length) + " unshown"));
             card.append(dom("p", "vfr-suggestions",
                 "Exploratory group leads (not identifications): " +
-                (group.suggestions.length ? group.suggestions.join(" · ") : "Not available")));
+                (group.suggestions.length
+                    ? group.suggestions.map(s => describeSuggestion(s, active.people)).join(" · ")
+                    : "Not available")));
             const hide = dom("button", "button secondary", "Hide without deciding");
             hide.type = "button";
             hide.addEventListener("click", () => { card.hidden = true; });
@@ -311,8 +366,10 @@
                 image.src = "data:image/png;base64," + crop.imageBase64;
                 image.alt = "Private candidate face crop; not a confirmed identity";
                 image.loading = "lazy";
+                const pixels = pngDimensions(crop.imageBase64);
                 item.append(image, dom("small", "", "Frame " + crop.frame +
-                    " · face " + crop.face));
+                    " · face " + crop.face + " · native crop " +
+                    pixels.width + " × " + pixels.height + " px (no upscaling)"));
                 const decision = dom("select");
                 for (const value of decisions) {
                     const option = dom("option", "", value || "Not reviewed");
