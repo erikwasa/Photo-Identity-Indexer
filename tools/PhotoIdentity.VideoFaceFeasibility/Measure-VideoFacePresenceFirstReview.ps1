@@ -135,7 +135,7 @@ try {
             $frame -gt 180 -or $face -gt 32 -or
             [string]$row.Decision -cnotin @('','Confirm person','Real face unknown','Not a face','Cannot tell') -or
             [string]$row.ExcludeFromGroup -cnotin @('True','False') -or
-            [string]$row.ReviewerNotes.Length -gt 1000) {
+            ([string]$row.ReviewerNotes).Length -gt 1000) {
             throw 'Invalid crop-level decision or source key.'
         }
         $key=Ref ([string]$row.Group) $frame $face
