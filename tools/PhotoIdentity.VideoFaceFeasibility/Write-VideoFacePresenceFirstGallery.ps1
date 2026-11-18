@@ -159,7 +159,21 @@ $webGroups = @($Rows | ForEach-Object {
 })
 $webCrops = [Collections.Generic.List[object]]::new()
 $encodedSize = 0
+$cropIndex = 0
 foreach ($record in $records) {
+    $sourceCrop = $Crops[$cropIndex]
+    $cropIndex++
+    if ([string]$sourceCrop.Group -cne [string]$record.Group -or
+        [int]$sourceCrop.Box.frameNumber -ne [int]$record.Frame -or
+        [int]$sourceCrop.Box.faceNumber -ne [int]$record.Face -or
+        [int]$sourceCrop.FrameWidth -lt 1 -or [int]$sourceCrop.FrameWidth -gt 3840 -or
+        [int]$sourceCrop.FrameHeight -lt 1 -or [int]$sourceCrop.FrameHeight -gt 3840 -or
+        [int]$sourceCrop.FaceWidth -lt 1 -or
+        [int]$sourceCrop.FaceWidth -gt [int]$sourceCrop.FrameWidth + 1 -or
+        [int]$sourceCrop.FaceHeight -lt 1 -or
+        [int]$sourceCrop.FaceHeight -gt [int]$sourceCrop.FrameHeight + 1) {
+        throw 'Native extracted-frame/face geometry is inconsistent.'
+    }
     $path = Join-Path $ReviewFolder $record.Relative
     $info = Get-Item -LiteralPath $path -Force
     if ($info.PSIsContainer -or
@@ -183,6 +197,10 @@ foreach ($record in $records) {
         group = [string]$record.Group
         frame = [string]$record.Frame
         face = [string]$record.Face
+        frameWidth = [int]$sourceCrop.FrameWidth
+        frameHeight = [int]$sourceCrop.FrameHeight
+        faceWidthPx = [int]$sourceCrop.FaceWidth
+        faceHeightPx = [int]$sourceCrop.FaceHeight
         imageBase64 = $base64
     })
 }
