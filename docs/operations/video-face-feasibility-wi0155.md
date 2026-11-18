@@ -110,8 +110,10 @@ On a **trusted local** `/video-face-review` page:
 4. Import the existing V06 CSV, verify all 7 deduplicated known people and
    partial-review counts, export again and validate with the existing
    `Measure-VideoFacePresenceFirstReview.ps1` command below.
-5. Verify the crop label reports the **native PNG width × height** in pixels.
-   No browser zoom, image upscaling or modified inference is introduced.
+5. Verify the crop label reports **native PNG width × height**, the
+   **already-extracted frame width × height** and the detected face
+   bounding box width × height, all in pixels. No browser zoom, image
+   upscaling, original-video open or modified inference is introduced.
 6. Try importing a map from another snapshot (synthetic tests do this): it
    must be refused. Do not generate or upload false private snapshots for a
    real review.
