@@ -17,10 +17,26 @@
     const maxBundleSize = 24 * 1024 * 1024;
     const key = row => [row.group || row.Group, row.frame || row.Frame,
         row.face || row.Face].join(":");
+    function boundedPng(base64) {
+        try {
+            // PNG IHDR dimensions prevent a tiny malicious payload from
+            // requesting an enormous decoded bitmap in the browser.
+            const header = atob(base64.slice(0, 44));
+            if (header.slice(12, 16) !== "IHDR") return false;
+            const dimension = i => header.charCodeAt(i) * 16777216 +
+                header.charCodeAt(i + 1) * 65536 +
+                header.charCodeAt(i + 2) * 256 + header.charCodeAt(i + 3);
+            const width = dimension(16), height = dimension(20);
+            return width >= 1 && width <= 640 && height >= 1 && height <= 640;
+        } catch {
+            return false;
+        }
+    }
 
     function validateBundle(bundle) {
         if (!bundle || bundle.schemaVersion !== 1 || bundle.mode !== "PresenceFirst" ||
-            !clipRx.test(bundle.clipAlias) || !shaRx.test(bundle.reportSha256) ||
+            typeof bundle.clipAlias !== "string" || !clipRx.test(bundle.clipAlias) ||
+            typeof bundle.reportSha256 !== "string" || !shaRx.test(bundle.reportSha256) ||
             !Number.isInteger(bundle.unassignedGroupObservations) ||
             bundle.unassignedGroupObservations < 0 ||
             bundle.unassignedGroupObservations > 5760 ||
@@ -30,7 +46,7 @@
             bundle.crops.length > 320) return false;
         const groupMap = new Map();
         for (const group of bundle.groups) {
-            if (!group || !groupRx.test(group.alias) ||
+            if (!group || typeof group.alias !== "string" || !groupRx.test(group.alias) ||
                 !Number.isInteger(group.observations) || group.observations < 1 ||
                 group.observations > 5760 || groupMap.has(group.alias) ||
                 !Array.isArray(group.suggestions) || group.suggestions.length > 3 ||
@@ -41,7 +57,7 @@
         const cropKeys = new Set(), frameFaces = new Set();
         let encodedBytes = 0;
         for (const crop of bundle.crops) {
-            if (!crop || !groupMap.has(crop.group) ||
+            if (!crop || typeof crop.group !== "string" || !groupMap.has(crop.group) ||
                 typeof crop.frame !== "string" ||
                 typeof crop.face !== "string" ||
                 !numberRx.test(crop.frame) || Number(crop.frame) > 180 ||
@@ -50,6 +66,7 @@
                 crop.imageBase64.length < 40 ||
                 crop.imageBase64.length > 1400000 ||
                 !crop.imageBase64.startsWith(pngPrefix) ||
+                !boundedPng(crop.imageBase64) ||
                 !/^[A-Za-z0-9+/]+={0,2}$/.test(crop.imageBase64) ||
                 cropKeys.has(key(crop)) ||
                 frameFaces.has(crop.frame + ":" + crop.face)) return false;
@@ -189,9 +206,11 @@
 
     let active = null;
     let dirty = false;
+    let generation = 0;
     function markDirty(value) { dirty = value; }
     function hasUnsavedChanges() { return dirty; }
     function dispose() {
+        generation++;
         active = null;
         markDirty(false);
         const root = typeof document === "object" && document.getElementById("vfr-root");
@@ -353,11 +372,13 @@
         const status = document.getElementById("vfr-load-status");
         input.addEventListener("change", async () => {
             const file = input.files && input.files[0];
+            const request = ++generation;
             if (!file) return;
             try {
                 if (dirty && !environment.confirm("Discard unsaved review changes?")) return;
                 if (file.size < 1 || file.size > maxBundleSize) throw new Error("File too large or empty.");
                 const bundle = JSON.parse(await file.text());
+                if (request !== generation) return;
                 if (!validateBundle(bundle)) throw new Error("Invalid or unsupported private evidence bundle.");
                 active = {bundle, rows: newRows(bundle)};
                 markDirty(false);
@@ -371,11 +392,14 @@
         });
         csvInput.addEventListener("change", async () => {
             const file = csvInput.files && csvInput.files[0];
+            const request = generation;
             if (!file || !active) return;
             try {
                 if (file.size < 1 || file.size > 256 * 1024)
                     throw new Error("Missing or oversized CSV.");
-                const imported = importCsv(await file.text(), active.bundle);
+                const raw = await file.text();
+                if (request !== generation || !active) return;
+                const imported = importCsv(raw, active.bundle);
                 active.rows = imported;
                 markDirty(true);
                 render();
