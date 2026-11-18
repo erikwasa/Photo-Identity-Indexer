@@ -10,6 +10,63 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-19 — Accepted review UX and productionization direction
+
+PR #826 was merged and **all 12 maintainer local acceptance checks PASS**:
+source-bound V06 v2 JSON (53 groups and 53 crops), native/frame/face
+geometry, 241 canonical snapshot names, search and human selection,
+CSV restoration and export, original V06 aggregate counts, no identity
+writes. This evidence is accepted; do not ask the maintainer to repeat it.
+
+**Maintainer product direction:** stop investing in standalone
+experimental gallery variants; develop the integrated video review
+experience and production-grade ingestion/presence path. Explicit UX
+requirements: show top suggestions as individual actionable options,
+clicking one confirms that specific face and automatically hides the
+completed crop; reviewed crops are hidden by default with a way to
+reopen them. Source of current names must be the application's
+PostgreSQL catalogue, not a separately imported browser file.
+
+**Draft PR #827 (this branch):** use the existing read-only
+`/api/review/people/maintenance` endpoint for current canonical
+names; historical v3 review bundles contain source-matched
+alias→person-UUID bindings (but never names), generated using the
+existing private source map only at package creation. A selected
+suggestion confirms one crop, and hides it without scrolling back
+to the beginning; importing reviewed CSV hides completed crops,
+while unreviewed or incomplete known-person decisions remain open.
+Already-generated per-face `rankedFaces` suggestions replace
+group-averaged leads in new review packages. v1/v2 bundle and
+source-hash/alias-only CSV support remain for legacy recovery.
+DB outage or a person absent from the historical alias map must
+fail closed for confirmation. No new inference or production writes.
+
+**SFace production-parity audit:** same YuNet, OpenCV face aligner,
+exact SFace embedder/protocol are used in photo and video, but
+the photo regeneration scorer uses **all confirmed face exemplars
+per canonical person and a per-face maximum cosine score**. The
+offline video experiment limits the set to **three distinct
+still photos per person**, then may combine two observations
+per provisional group. Additionally, compressed sampled video
+frames and tiny native face regions carry substantially different
+input evidence. PR #827 corrects the *UI's group-ranking attribution*;
+it does **not** claim to repair reference-set selection or improve
+recognition accuracy. Those need a production-parity before/after
+identity benchmark using unchanged reviewed V06 labels,
+differentiating per-face rank from temporal grouping.
+
+**Next production vertical slice (not authorized in this PR):**
+source-revision-bound frame discovery and bounded native-quality
+evidence in the existing guarded video worker; versioned face
+observations and read-only candidate scores; auditable reviewed
+video/person presence with deduplication and correction/undo;
+shared canonical person eligibility/merged-person fencing; privacy,
+retention, source deletion, model licensing, performance and
+failure rollback. Automatic assignment remains disabled until
+false-positive risk is explicitly measured and accepted. This
+is product implementation work, not another independent
+shadow-experiment acceptance loop.
+
 ## 2026-11-18 — V06 in-app acceptance and named-review quality follow-up
 
 The maintainer completed the **merged PR #825 local web review**, using
