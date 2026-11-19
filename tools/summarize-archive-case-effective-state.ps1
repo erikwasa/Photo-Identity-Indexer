@@ -11,6 +11,9 @@ $ErrorActionPreference = 'Stop'
 
 function Read-PostgresBoolean {
     param([AllowNull()][string]$Value, [string]$Field)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "Invalid Boolean in '$Field'."
+    }
     switch ($Value.Trim().ToLowerInvariant()) {
         't' { return $true }
         'true' { return $true }
@@ -65,14 +68,10 @@ Require-Columns $states @(
 
 # Use explicit nested maps to avoid collisions between the delimiter and
 # private source keys. StringComparer.Ordinal preserves source ID boundaries.
-$groupsBySource = [System.Collections.Generic.Dictionary[string,
-    System.Collections.Generic.Dictionary[string,object]]]::new(
-    [System.StringComparer]::Ordinal)
+$groupsBySource = @{}
 foreach ($row in $audit) {
     if (-not $groupsBySource.ContainsKey($row.source_id)) {
-        $groupsBySource[$row.source_id] =
-            [System.Collections.Generic.Dictionary[string,object]]::new(
-                [System.StringComparer]::Ordinal)
+        $groupsBySource[$row.source_id] = @{}
     }
     $byKey = $groupsBySource[$row.source_id]
     $key = $row.normalized_source_key
@@ -111,7 +110,7 @@ $decisions = @(
         }
         $members = $groupsBySource[$source][$key]
         $originalIds = @($members | ForEach-Object { $_.asset_id } | Sort-Object)
-        $incomingIds = @($state.first_asset_id, $state.second_asset_id | Sort-Object)
+        $incomingIds = @(@($state.first_asset_id, $state.second_asset_id) | Sort-Object)
         if ($originalIds.Count -ne 2 -or
             -not (($originalIds -join '|') -ceq ($incomingIds -join '|'))) {
             throw 'Effective-state comparison asset IDs do not match the history audit.'
