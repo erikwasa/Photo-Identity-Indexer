@@ -213,7 +213,7 @@ The next isolated native path comprises:
 **Non-activation rule:** `FaceEvidence` already exists in the v34
 queue enum and database constraint, but PR #833 did not add an
 operator grant or worker connection for it. Merely deploying that
-producer has no inference effect. PR #834 adds the separate selected
+producer has no inference effect. PR #835 adds the separate selected
 grant and lease-fenced commit, still without a CLI, runtime
 registration, hosted worker or scheduler. A CLIP `FrameEvidence`
 lease cannot authorize face inference. Native face crop rendering,
@@ -235,7 +235,7 @@ tests is not evidence of real video detection quality or model rights.
 
 ## 2026-11-20 — Dedicated face lease, atomic receipt, and selected-job adapter
 
-**Draft PR #834, migration v43.** `FaceEvidence` was already declared
+**Draft PR #835, migration v43.** `FaceEvidence` was already declared
 by the original v34 queue/schema, but previously could not be granted
 through `PostgresVideoScopedAttemptControl` and had no publication
 transaction or coordinator receipt. This PR connects the existing
