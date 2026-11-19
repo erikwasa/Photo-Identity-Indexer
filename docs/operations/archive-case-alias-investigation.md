@@ -197,3 +197,59 @@ overwritten or discarded.
 
 This is a preferred staging direction; no production database cleanup is
 authorized by the first eligibility gate.
+
+
+## Reversible-retirement storage and rescan integration (development rehearsal)
+
+A subsequent, separately reviewed development slice introduces a **dormant**
+v43 schema, archive_case_alias_retirements. It stores the selected survivor
+asset ID, secondary asset ID, exact source locators, common content hash,
+retirement timestamp, actor, and nullable restore timestamp/actor.
+
+**No production data is retired by applying the schema.** There is no API,
+CLI or operator-facing apply/restore command in this slice. A disposable
+PostgreSQL integration test creates a synthetic pair, soft-marks the later
+asset as missing and inserts a mapping in one controlled fixture. The
+existing asset, revision, tag and face review IDs are never deleted.
+
+With an active mapping, the PostgreSQL scan batch maps the second asset's
+source-key spelling to the original asset ID *before* the batch upsert. It
+fails closed if the source mapping or deletion state is inconsistent, and
+uses the original source path only for opening the physical original.
+Missing reconciliation recognizes the observed secondary spelling as an
+observation of the survivor. This avoids reactivating the secondary asset
+or marking the survivor missing on the next rescan. Exact-duplicate inventory
+omits active retired aliases but continues to report genuine distinct-path
+copies even when their SHA-256 matches.
+
+After a mapping's restore timestamp is populated and the secondary asset
+is made present, its exact source key is processed independently again.
+The disposable test checks this rollback behavior and verifies the original
+annotation and automatic face review history remain intact.
+
+### Verification (disposable database only)
+
+~~~powershell
+.\verify-postgres.ps1 -SkipContainerStart
+~~~
+
+Or, with PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING configured to a
+disposable PostgreSQL service:
+
+~~~powershell
+dotnet test .\tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj --filter FullyQualifiedName~PostgresArchiveCaseAliasRetirementMappingTests
+~~~
+
+**Not yet a production apply mechanism.** Before enabling any automated
+retirement, implement a transactionally guarded command which revalidates
+candidate evidence *inside the write transaction*, creates the mapping,
+soft-retires the secondary row, logs every action, supports idempotent
+replay and rollback, and refuses any missing/ambiguous evidence.
+
+The active face review queues and all photo library/search/collection
+queries must also be verified to ignore retired aliases; not all existing
+query surfaces use the same active-asset filter. Rollback and rescan must be
+tested end-to-end with production-like synthetic face/Place metadata. Until
+that work is complete, do not manually insert mapping rows or set asset
+deleted_at_utc in photoidentity_main. The production backup must be
+restore-tested before the first approved apply.
