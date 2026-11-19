@@ -130,10 +130,10 @@ public sealed class PostgresArchiveCaseAliasRetirementMappingTests
             ArchiveCatalogueSource catalogueSource = new(
                 source, "local-folder", "archive-root", t0);
 
-            ArchiveSourceScanWrite MakeWrite() => new(
+            ArchiveSourceScanWrite MakeWrite(string key = "fideli/portrait.jpg") => new(
                 new SourceAsset(
-                    new SourceAssetReference(source, "fideli/portrait.jpg"),
-                    "fideli/portrait.jpg",
+                    new SourceAssetReference(source, key),
+                    key,
                     "image/jpeg",
                     100, t0, AssetAvailability.Local),
                 new Sha256Digest(hash));
@@ -147,6 +147,17 @@ public sealed class PostgresArchiveCaseAliasRetirementMappingTests
 
             _ = await scan.MarkMissingAssetsAsync(
                 source, null, ["fideli/portrait.jpg"], t3);
+
+            // A third capitalization cannot insert another asset or mark
+            // the original as missing on a Windows case-insensitive source.
+            IReadOnlyList<ArchiveSourceObservationPersistenceResult> thirdCase =
+                await scan.RecordBatchAsync(
+                    catalogueSource, [MakeWrite("FIDELI/portrait.jpg")],
+                    new Dictionary<string, ArchiveSourceScanBaseline>(StringComparer.Ordinal),
+                    t3.AddMinutes(1));
+            Assert.Equal(AssetId.From(oldAsset), Assert.Single(thirdCase).AssetId);
+            _ = await scan.MarkMissingAssetsAsync(
+                source, null, ["FIDELI/portrait.jpg"], t3.AddMinutes(1));
 
             await using (NpgsqlConnection verify = new(builder.ConnectionString))
             {
