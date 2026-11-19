@@ -339,6 +339,7 @@ public partial class Program
         app.MapArchiveStorageEndpoints();
         app.MapVideoLibraryEndpoints();
         app.MapVideoDetailsEndpoints();
+        app.MapVideoFaceReviewEndpoints();
         app.MapVideoProcessingEndpoints();
         app.MapFallbackToFile("index.html");
 
