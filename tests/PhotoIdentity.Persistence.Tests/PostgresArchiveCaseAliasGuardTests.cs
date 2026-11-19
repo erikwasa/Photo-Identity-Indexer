@@ -136,6 +136,9 @@ public sealed class PostgresArchiveCaseAliasGuardTests
             // A tombstone at the original casing must not be evaded by another casing.
             PostgresSourceCopyExclusionRepository exclusions = new(database);
             await exclusions.ExcludeAsync(sourceId, "Private/hidden.jpg", t1);
+            IReadOnlySet<string> blockedIncoming = await exclusions.RecordObservedAndGetExcludedAsync(
+                sourceId, ["private/hidden.jpg"], t1);
+            Assert.Contains("private/hidden.jpg", blockedIncoming);
             InvalidOperationException privateAlias = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => repository.RecordBatchAsync(archive, [Write("private/hidden.jpg")], baselines, t1));
             Assert.Contains("excluded source path", privateAlias.Message, StringComparison.Ordinal);
