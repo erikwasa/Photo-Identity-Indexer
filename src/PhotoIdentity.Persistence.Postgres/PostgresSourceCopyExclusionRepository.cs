@@ -163,12 +163,27 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
             .ToArray();
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using NpgsqlCommand command = connection.CreateCommand();
+        // Source paths are case-insensitive on the supported Windows archive.
+        // Return the *incoming* spelling to the scanner, so it refuses to open
+        // or hash the original before later persistence-level alias safeguards.
+        // Preserve the stored spelling of each durable exclusion tombstone.
         command.CommandText = """
-            UPDATE source_copy_exclusions
-            SET last_seen_at_utc = @observed_at_utc
-            WHERE source_id = @source_id
-              AND source_key = ANY(@source_keys)
-            RETURNING source_key;
+            WITH incoming AS (
+                SELECT DISTINCT unnest(@source_keys::text[]) AS source_key
+            ), updated AS (
+                UPDATE source_copy_exclusions AS exclusion
+                SET last_seen_at_utc = @observed_at_utc
+                WHERE exclusion.source_id = @source_id
+                  AND EXISTS (
+                      SELECT 1 FROM incoming
+                      WHERE lower(incoming.source_key) = lower(exclusion.source_key)
+                  )
+                RETURNING exclusion.source_key
+            )
+            SELECT incoming.source_key
+            FROM incoming
+            INNER JOIN updated
+                ON lower(updated.source_key) = lower(incoming.source_key);
             """;
         command.Parameters.AddWithValue("source_id", sourceId.Value);
         command.Parameters.AddWithValue(
