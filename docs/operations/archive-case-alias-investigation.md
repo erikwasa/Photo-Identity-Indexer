@@ -213,9 +213,11 @@ asset as missing and inserts a mapping in one controlled fixture. The
 existing asset, revision, tag and face review IDs are never deleted.
 
 With an active mapping, the PostgreSQL scan batch maps the second asset's
-source-key spelling to the original asset ID *before* the batch upsert. It
+case-insensitively normalized Windows source locator (including a third
+capitalization) to the original asset ID *before* the batch upsert. It
 fails closed if the source mapping or deletion state is inconsistent, and
-uses the original source path only for opening the physical original.
+uses the originally enumerated source path only for opening the physical
+original. Online-only observations are remapped without reading media.
 Missing reconciliation recognizes the observed secondary spelling as an
 observation of the survivor. This avoids reactivating the secondary asset
 or marking the survivor missing on the next rescan. Source-move reconciliation
