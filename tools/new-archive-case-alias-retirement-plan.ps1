@@ -172,9 +172,20 @@ $plan = @(
             $older.verified_content_sha256 -ceq $later.verified_content_sha256 -and
             $older.verified_revision_id -and $later.verified_revision_id
 
-        $olderSize = Read-Count $older.verified_size_bytes 'verified_size_bytes'
-        $laterSize = Read-Count $later.verified_size_bytes 'verified_size_bytes'
-        $sameSize = $olderSize -eq $laterSize
+        $olderSize = if ([string]::IsNullOrWhiteSpace($older.verified_size_bytes)) {
+            $null
+        } else {
+            Read-Count $older.verified_size_bytes 'verified_size_bytes'
+        }
+        $laterSize = if ([string]::IsNullOrWhiteSpace($later.verified_size_bytes)) {
+            $null
+        } else {
+            Read-Count $later.verified_size_bytes 'verified_size_bytes'
+        }
+        # Unverified observations legitimately have no verified size. That
+        # blocks retirement rather than making the entire audit unusable.
+        $sameSize = $null -ne $olderSize -and $null -ne $laterSize -and
+            $olderSize -eq $laterSize
         $anyMissing = (Read-Bool $older.marked_missing 'marked_missing') -or
             (Read-Bool $later.marked_missing 'marked_missing')
         $anyExcluded = (Read-Bool $older.has_source_exclusion 'has_source_exclusion') -or
