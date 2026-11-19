@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 
 namespace PhotoIdentity.Persistence.Postgres;
 
@@ -114,9 +115,43 @@ public sealed class PostgresVideoFaceReviewRepository(
         return await command.ExecuteScalarAsync(token) as string;
     }
 
-    /// <summary>Called only by a future guarded video worker, never from HTTP.</summary>
+    /// <summary>
+    /// Legacy internal v42 publication contract retained for controlled
+    /// already-derived evidence. It cannot create a durable job receipt.
+    /// FaceEvidence workers MUST call the lease-bound method instead.
+    /// </summary>
     public async Task<Guid> PublishAsync(
-        VideoFaceEvidencePublication proposal, CancellationToken token = default)
+        VideoFaceEvidencePublication proposal, CancellationToken token = default) =>
+        (await PublishCoreAsync(proposal, null, token))
+            ?? throw new InvalidOperationException("Unleased face publication unavailable.");
+
+    /// <summary>
+    /// All-or-nothing evidence and job success. Never called from an HTTP
+    /// endpoint or hosted service; the separately selected producer/adapter
+    /// must hold a live operator lease across extraction and matching.
+    /// </summary>
+    public Task<Guid?> TryPublishLeasedAsync(
+        VideoProcessingJobLease lease, VideoFaceEvidencePublication proposal,
+        CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(lease);
+        ValidatePublication(proposal);
+        if (!VideoFaceEvidenceLeaseIdentity.Matches(
+                lease.DerivativeKind, lease.PolicyVersion,
+                lease.PresetVersion, lease.RequestedFrames) ||
+            lease.Id == Guid.Empty || lease.LeaseToken == Guid.Empty ||
+            lease.RevisionId != proposal.RevisionId ||
+            !Sha(lease.ToolSha256) ||
+            lease.SourceBytes <= 0 || lease.TemporaryBytes < lease.SourceBytes ||
+            lease.ControlGeneration < 0 ||
+            proposal.Observations.Any(face => face.FrameOrdinal >= lease.RequestedFrames))
+            throw new ArgumentException("Exact active FaceEvidence job lease and frame scope required.");
+        return PublishCoreAsync(proposal, lease, token);
+    }
+
+    private async Task<Guid?> PublishCoreAsync(
+        VideoFaceEvidencePublication proposal, VideoProcessingJobLease? lease,
+        CancellationToken token)
     {
         ValidatePublication(proposal);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
@@ -127,6 +162,28 @@ public sealed class PostgresVideoFaceReviewRepository(
             throw new KeyNotFoundException("Current included supported video revision unavailable.");
         if (!string.Equals(actualSha, proposal.SourceSha256, StringComparison.Ordinal))
             throw new InvalidOperationException("The source revision digest does not match.");
+
+        if (lease is not null)
+        {
+            // Required lock order: source -> operator control -> job.
+            // No broad video enable switch may authorize face inference:
+            // a nonexpired specifically selected FaceEvidence job is mandatory.
+            await using NpgsqlCommand scope = connection.CreateCommand();
+            scope.Transaction = tx;
+            scope.CommandText = """
+                SELECT generation FROM video_processing_control
+                WHERE singleton_id=1 AND enabled AND NOT paused
+                  AND generation=@generation AND selected_job_id=@job
+                  AND authorization_expires_at_utc>clock_timestamp()
+                FOR UPDATE;
+                """;
+            scope.Parameters.AddWithValue("generation", lease.ControlGeneration);
+            scope.Parameters.AddWithValue("job", lease.Id);
+            if (await scope.ExecuteScalarAsync(token) is not long ||
+                (await PostgresVideoPhotoPriorityProbe.ReadAsync(
+                    connection, tx, token)).PhotoWorkActive)
+                return null;
+        }
 
         // Retrying identical evidence after an unknown commit result is safe.
         // A different publication cannot replace reviewed observation IDs.
@@ -144,11 +201,12 @@ public sealed class PostgresVideoFaceReviewRepository(
         {
             existing.Transaction = tx;
             existing.CommandText = """
-                SELECT id, payload_sha256 FROM video_face_evidence_batches
+                SELECT id, payload_sha256, publishing_job_id FROM video_face_evidence_batches
                 WHERE asset_revision_id=@revision;
                 """;
             existing.Parameters.AddWithValue("revision", proposal.RevisionId.Value);
             Guid? oldBatch = null;
+            Guid? oldJob = null;
             string? oldHash = null;
             await using (NpgsqlDataReader reader = await existing.ExecuteReaderAsync(token))
             {
@@ -156,6 +214,7 @@ public sealed class PostgresVideoFaceReviewRepository(
                 {
                     oldBatch = reader.GetGuid(0);
                     oldHash = reader.GetString(1);
+                    oldJob = reader.IsDBNull(2) ? null : reader.GetGuid(2);
                 }
             }
             if (oldBatch.HasValue)
@@ -163,6 +222,15 @@ public sealed class PostgresVideoFaceReviewRepository(
                 if (!string.Equals(oldHash, payloadSha256, StringComparison.Ordinal))
                     throw new InvalidOperationException(
                         "Conflicting face evidence already exists for this video revision.");
+                if (lease is not null)
+                {
+                    // An older unleased or other-job batch cannot authorize
+                    // this job. Even identical payloads must not claim it.
+                    if (oldJob != lease.Id ||
+                        !await TryCompleteLeasedJobAsync(connection, tx, lease,
+                            proposal.SourceSha256, token))
+                        return null;
+                }
                 await tx.CommitAsync(token);
                 return oldBatch.Value;
             }
@@ -175,9 +243,10 @@ public sealed class PostgresVideoFaceReviewRepository(
                 INSERT INTO video_face_evidence_batches
                   (id, asset_revision_id, source_sha256, payload_sha256, producer_version,
                    detector_model_id, detector_model_hash, sface_model_id,
-                   sface_model_hash, alignment_protocol, observation_count, created_at_utc)
+                   sface_model_hash, alignment_protocol, observation_count, created_at_utc,
+                   publishing_job_id)
                 VALUES (@id, @revision, @source, @payload, @producer, @detector, @detector_hash,
-                        @sface, @sface_hash, @alignment, @count, @at);
+                        @sface, @sface_hash, @alignment, @count, @at, @job);
                 """;
             batch.Parameters.AddWithValue("id", batchId);
             batch.Parameters.AddWithValue("revision", proposal.RevisionId.Value);
@@ -191,6 +260,9 @@ public sealed class PostgresVideoFaceReviewRepository(
             batch.Parameters.AddWithValue("alignment", proposal.AlignmentProtocol);
             batch.Parameters.AddWithValue("count", proposal.Observations.Count);
             batch.Parameters.AddWithValue("at", timeProvider.GetUtcNow());
+            batch.Parameters.Add(new Npgsql.NpgsqlParameter("job",
+                NpgsqlTypes.NpgsqlDbType.Uuid)
+            { Value = lease is null ? DBNull.Value : lease.Id });
             await batch.ExecuteNonQueryAsync(token);
         }
 
@@ -238,8 +310,119 @@ public sealed class PostgresVideoFaceReviewRepository(
                     throw new InvalidOperationException("Suggested canonical person has changed.");
             }
         }
+        if (lease is not null &&
+            !await TryCompleteLeasedJobAsync(connection, tx, lease,
+                proposal.SourceSha256, token))
+            return null; // Dispose transaction => roll back all observations.
         await tx.CommitAsync(token);
         return batchId;
+    }
+
+    /// <summary>
+    /// Must execute in the SAME transaction as the batch and after the
+    /// source/control locks. A failed update rolls back the entire batch.
+    /// PostgreSQL wall-clock checks are intentionally not transaction-start
+    /// now(): grants and leases must still be live at the final commit gate.
+    /// </summary>
+    private static async Task<bool> TryCompleteLeasedJobAsync(
+        NpgsqlConnection connection, NpgsqlTransaction tx,
+        VideoProcessingJobLease lease, string sourceSha, CancellationToken token)
+    {
+        if ((await PostgresVideoPhotoPriorityProbe.ReadAsync(
+                connection, tx, token)).PhotoWorkActive)
+            return false;
+
+        await using NpgsqlCommand finish = connection.CreateCommand();
+        finish.Transaction = tx;
+        finish.CommandText = """
+            UPDATE video_processing_jobs job
+            SET status='succeeded', progress_percent=100,
+                completed_at_utc=clock_timestamp(), updated_at_utc=clock_timestamp(),
+                lease_token=NULL, leased_until_utc=NULL, failure_code=NULL
+            WHERE job.id=@job AND job.lease_token=@lease
+              AND job.asset_revision_id=@revision
+              AND job.derivative_kind='FaceEvidence'
+              AND job.policy_version=@policy AND job.preset_version=@preset
+              AND job.tool_sha256=@tool AND job.source_bytes=@source_bytes
+              AND job.reserved_temporary_bytes=@temporary_bytes
+              AND job.requested_frames=@frames
+              AND job.control_generation=@generation
+              AND job.status='running' AND job.leased_until_utc>clock_timestamp()
+              AND job.cancellation_requested_at_utc IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM video_processing_control control
+                  WHERE control.singleton_id=1 AND control.enabled AND NOT control.paused
+                    AND control.generation=@generation
+                    AND control.selected_job_id=@job
+                    AND control.authorization_expires_at_utc>clock_timestamp())
+              AND EXISTS (
+                  SELECT 1 FROM asset_revisions revision
+                  JOIN assets asset ON asset.id=revision.asset_id
+                  JOIN sources source ON source.id=asset.source_id
+                  JOIN video_revision_metadata metadata ON metadata.asset_revision_id=revision.id
+                  WHERE revision.id=job.asset_revision_id
+                    AND revision.content_sha256=@sha
+                    AND revision.size_bytes=job.source_bytes
+                    AND revision.media_kind='video' AND asset.media_kind='video'
+                    AND asset.deleted_at_utc IS NULL AND source.kind='local-folder'
+                    AND metadata.inspection_status='supported'
+                    AND metadata.color_transfer='bt709'
+                    AND revision.id=(
+                        SELECT latest.id FROM asset_revisions latest
+                        WHERE latest.asset_id=asset.id AND latest.media_kind='video'
+                        ORDER BY latest.observed_at_utc DESC, latest.id DESC LIMIT 1)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM source_copy_exclusions excluded
+                        WHERE excluded.source_id=asset.source_id
+                          AND excluded.source_key=asset.source_key))
+            RETURNING job.id;
+            """;
+        finish.Parameters.AddWithValue("job", lease.Id);
+        finish.Parameters.AddWithValue("lease", lease.LeaseToken);
+        finish.Parameters.AddWithValue("revision", lease.RevisionId.Value);
+        finish.Parameters.AddWithValue("policy", lease.PolicyVersion);
+        finish.Parameters.AddWithValue("preset", lease.PresetVersion);
+        finish.Parameters.AddWithValue("tool", lease.ToolSha256);
+        finish.Parameters.AddWithValue("source_bytes", lease.SourceBytes);
+        finish.Parameters.AddWithValue("temporary_bytes", lease.TemporaryBytes);
+        finish.Parameters.AddWithValue("frames", lease.RequestedFrames);
+        finish.Parameters.AddWithValue("generation", lease.ControlGeneration);
+        finish.Parameters.AddWithValue("sha", sourceSha);
+        return await finish.ExecuteScalarAsync(token) is Guid;
+    }
+
+    /// <summary>
+    /// A durable, current receipt of exactly this job, not merely a
+    /// matching video revision or an unleased legacy face batch.
+    /// </summary>
+    public async Task<bool> HasCurrentJobReceiptAsync(
+        Guid jobId, AssetRevisionId revisionId,
+        CancellationToken token = default)
+    {
+        if (jobId == Guid.Empty || revisionId.IsEmpty) return false;
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
+        await using NpgsqlCommand receipt = connection.CreateCommand();
+        receipt.CommandText = $"""
+            SELECT EXISTS(
+                SELECT 1 FROM video_face_evidence_batches b
+                JOIN video_processing_jobs job ON job.id=b.publishing_job_id
+                JOIN asset_revisions r ON r.id=b.asset_revision_id
+                JOIN assets a ON a.id=r.asset_id
+                JOIN sources s ON s.id=a.source_id
+                JOIN video_revision_metadata metadata ON metadata.asset_revision_id=r.id
+                WHERE b.publishing_job_id=@job AND b.asset_revision_id=@revision
+                  AND job.asset_revision_id=r.id
+                  AND job.derivative_kind='FaceEvidence' AND job.status='succeeded'
+                  AND b.source_sha256=r.content_sha256
+                  AND metadata.color_transfer='bt709' AND {CurrentVideo}
+                  AND b.observation_count=(
+                      SELECT COUNT(*) FROM video_face_observations face
+                      WHERE face.batch_id=b.id)
+            );
+            """;
+        receipt.Parameters.AddWithValue("job", jobId);
+        receipt.Parameters.AddWithValue("revision", revisionId.Value);
+        return await receipt.ExecuteScalarAsync(token) is true;
     }
 
     public async Task<VideoFaceReviewBatch?> GetCurrentAsync(
