@@ -112,6 +112,11 @@ public sealed class VideoFaceReviewProductionPersistenceTests
 
             Guid batchId = await repository.PublishAsync(evidence);
             Assert.NotEqual(Guid.Empty, batchId);
+            Assert.Equal(batchId, await repository.PublishAsync(evidence)); // Safe retry.
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.PublishAsync(evidence with {
+                    Observations = [evidence.Observations[0]]
+                })); // Conflicting evidence must not replace reviewed faces.
             VideoFaceReviewBatch batch = Assert.IsType<VideoFaceReviewBatch>(
                 await repository.GetCurrentAsync(revision));
             Assert.Equal(batchId.ToString("D"), batch.BatchId);
