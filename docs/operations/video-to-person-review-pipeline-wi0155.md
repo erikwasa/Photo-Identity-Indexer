@@ -121,6 +121,49 @@ human-recognition value and ranking quality without silently modifying
 the original model protocol or requiring repeated detections of a
 person who is already credibly confirmed.
 
+## 2a. Product-facing reviewer transition (PR #827, draft)
+
+The diagram in §2 describes the **legacy v2** read-only gallery:
+it imported a separate name map into browser memory and showed
+group-averaged advisory rankings. PR #827 replaces that workflow
+for new **v3** packages:
+
+```mermaid
+flowchart TD
+    A["Historical approved report with per-face SFace ranks"] --> B["Source-bound v3 crop and alias-to-UUID package"]
+    H["Original read-only people snapshot map (offline compatibility bridge only)"] --> B
+    B --> C["Local Video face review workspace"]
+    D["Current canonical people in PostgreSQL"] --> E["Existing GET /api/review/people/maintenance"]
+    E --> F["Resolve immutable source UUIDs to current names"]
+    F --> C
+    C --> G["Per-face ordered suggestion buttons and searchable names"]
+    G --> I["Human confirms one face / unknown / not face / uncertain"]
+    I --> J["Hide completed face; allow reopening"]
+    J --> K["Source-bound alias-only CSV"]
+    K --> L["Offline integrity/deduplication audit; no production identity write"]
+```
+
+This supports real people names and normal review UX without a
+second in-browser people-file import. It is **not** yet a complete
+production video-person association workflow: the V06 report still
+requires explicitly generated local evidence, the historical alias
+bridge exists only for snapshot compatibility and decisions are
+still private CSV proposals. New canonical people not present in
+that snapshot are displayed from the database but cannot be
+assigned an invented old alias.
+
+**SFace parity finding:** the model code and five-point alignment
+match production, but the experiment's max-three-distinct-photo
+reference set and possible group averaging are **not** production
+scorer parity. The v3 UI uses the report's existing **per-face**
+rankings so a group suggestion is never misrepresented as
+this specific face's score. This does not recompute ranks
+against all production exemplars or repair low-resolution
+input evidence. The subsequent production integration must
+benchmark exact reference-set and sampling decisions against
+human-corroborated video people using false-positive risk,
+not top-1 score alone.
+
 ## 3. Desired production direction — not implemented
 
 ```mermaid

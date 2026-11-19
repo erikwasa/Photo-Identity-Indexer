@@ -50,6 +50,12 @@ try {
             alias='V04';review=@{
                 aggregate=@{facesDetected=6;framesExamined=3}
                 diagnostics=@{
+                    rankedFaces=@(
+                        @{frameNumber=1;faceNumber=1;topCandidates=@(@{alias='P0001';score=.83},@{alias='P0002';score=.72})},
+                        @{frameNumber=2;faceNumber=1;topCandidates=@(@{alias='P0002';score=.84})},
+                        @{frameNumber=1;faceNumber=2;topCandidates=@(@{alias='P0003';score=.81})},
+                        @{frameNumber=3;faceNumber=1;topCandidates=@(@{alias='P0001';score=.88})}
+                    )
                     provisionalGroups=@{
                         schemaVersion=1;maximumGroups=64;observationsConsidered=6
                         observationsAssigned=4;observationsUnassigned=2;groups=$groups
@@ -71,7 +77,7 @@ try {
     $inputs=@($reportPath,$mapPath,$case,$manifest)
     $before=@($inputs | ForEach-Object {(Get-FileHash -LiteralPath $_).Hash})
     $script=Join-Path $PSScriptRoot 'New-VideoFaceGroupReview.ps1'
-    $gallery=& $script -PrivateReportPath $reportPath -PrivateCasesPath $case -ClipAlias V04 -GroupSource Provisional -PresenceFirst
+    $gallery=& $script -PrivateReportPath $reportPath -PrivateCasesPath $case -ClipAlias V04 -GroupSource Provisional -PresenceFirst -PrivatePeopleMapPath $mapPath
     Check ($gallery.Mode -ceq 'PresenceFirst' -and $gallery.Groups -eq 3 -and
         $gallery.Crops -eq 4 -and $gallery.ObservationsUnassigned -eq 2 -and
         $gallery.UnshownGroupObservations -eq 0 -and
@@ -88,10 +94,13 @@ try {
         ((Get-Item -LiteralPath $gallery.WebReviewBundlePath).Length -lt 24MB)) 'Private in-app bundle missing or oversized.'
     $webJson = Get-Content -LiteralPath $gallery.WebReviewBundlePath -Raw
     $web = $webJson | ConvertFrom-Json -Depth 12
-    Check ($web.schemaVersion -eq 2 -and $web.mode -ceq 'PresenceFirst' -and
+    Check ($web.schemaVersion -eq 3 -and $web.mode -ceq 'PresenceFirst' -and
         $web.clipAlias -ceq 'V04' -and
         $web.catalogueSnapshot -ceq '1:1:' -and
         $web.cataloguePeopleCount -eq 3 -and
+        @($web.personBindings).Count -eq 3 -and
+        $web.personBindings[0].alias -ceq 'P0001' -and
+        $web.personBindings[0].personId -ceq '00000000-0000-0000-0000-000000000001' -and
         $web.reportSha256 -ceq (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant() -and
         $web.unassignedGroupObservations -eq 2 -and
         @($web.groups).Count -eq 3 -and
@@ -101,6 +110,8 @@ try {
         $web.crops[0].frameHeight -eq 64 -and
         $web.crops[0].faceWidthPx -eq 15 -and
         $web.crops[0].faceHeightPx -eq 25 -and
+        @($web.crops[0].suggestions).Count -eq 2 -and
+        $web.crops[0].suggestions[0] -ceq 'P0001: 0.8300' -and
         -not $webJson.Contains('DO-NOT-LEAK') -and
         -not $webJson.Contains($framesDir) -and
         -not $webJson.Contains($mapPath)) 'In-app bundle contains invalid or private source evidence.'

@@ -12,6 +12,7 @@ param(
     [Parameter(Mandatory)][object[]]$Rows,
     [Parameter(Mandatory)][object[]]$Crops,
     [Parameter(Mandatory)][hashtable]$Rankings,
+    [string]$PrivatePeopleMapPath,
     [ValidateRange(0,5760)][int]$UnassignedObservations = 0,
     [switch]$OpenGallery
 )
@@ -35,6 +36,53 @@ if ([int]$sourceReport.schemaVersion -ne 1 -or
     $snapshot -cnotmatch '^[0-9]+:[0-9]+:(?:[0-9]+(?:,[0-9]+)*)?$' -or
     $peopleCount -lt 1 -or $peopleCount -gt 4096) {
     throw 'Original catalogue snapshot metadata unavailable for named review.'
+}
+# Legacy v2 packages still work. A supplied original snapshot map produces
+# v3 alias -> immutable person GUID bindings. Names are deliberately omitted:
+# the web app resolves current canonical names directly from PostgreSQL.
+$reviewBindings = @()
+$rankedByFace = @{}
+if ($PrivatePeopleMapPath) {
+    $sourceClip = @($sourceReport.clips | Where-Object alias -CEQ $ClipAlias)
+    if ($sourceClip.Count -ne 1) {
+        throw 'Requested clip is missing from the source report.'
+    }
+    foreach ($rank in @($sourceClip[0].review.diagnostics.rankedFaces)) {
+        $rankKey = ('{0}:{1}' -f [int]$rank.frameNumber,[int]$rank.faceNumber)
+        if ($rankedByFace.ContainsKey($rankKey)) {
+            throw 'Duplicate per-face source rankings.'
+        }
+        $rankedByFace[$rankKey] = $rank
+    }
+    if (-not [IO.Path]::IsPathFullyQualified($PrivatePeopleMapPath)) {
+        throw 'An absolute original people-map path is required.'
+    }
+    $sourceMap = Get-Item -LiteralPath $PrivatePeopleMapPath -Force
+    $blocked = [long][IO.FileAttributes]::ReparsePoint -bor
+        [long][IO.FileAttributes]::Offline -bor [long]0x00040000 -bor [long]0x00400000
+    if ($sourceMap.PSIsContainer -or $sourceMap.Length -lt 1 -or $sourceMap.Length -gt 4MB -or
+        ([long]$sourceMap.Attributes -band $blocked) -ne 0) {
+        throw 'Original people map must be a real bounded local file.'
+    }
+    $map = Get-Content -LiteralPath $sourceMap.FullName -Raw -Encoding utf8 | ConvertFrom-Json -Depth 12
+    if ([int]$map.schemaVersion -ne 1 -or
+        [string]$map.pgSnapshot -cne $snapshot -or
+        @($map.people).Count -ne $peopleCount) {
+        throw 'Private people map does not match the original catalogue snapshot.'
+    }
+    $aliases = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $ids = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $reviewBindings = @($map.people | ForEach-Object {
+        $alias = [string]$_.alias
+        $id = [Guid]::Empty
+        if ($alias -cnotmatch '^P(?!0000)[0-9]{4}$' -or
+            -not [Guid]::TryParseExact([string]$_.personId,'D',[ref]$id) -or
+            $id -eq [Guid]::Empty -or
+            -not $aliases.Add($alias) -or -not $ids.Add($id.ToString('D'))) {
+            throw 'Invalid or duplicate canonical alias binding.'
+        }
+        [pscustomobject][ordered]@{ alias = $alias; personId = $id.ToString('D') }
+    })
 }
 $rowsById=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
 foreach($row in $Rows) {
@@ -196,7 +244,30 @@ foreach ($record in $records) {
     if ($encodedSize -gt 24MB) {
         throw 'Private web review crop evidence exceeds the in-browser limit.'
     }
+    $faceSuggestions = @()
+    if ($PrivatePeopleMapPath) {
+        $rankKey = ('{0}:{1}' -f [int]$record.Frame,[int]$record.Face)
+        if (-not $rankedByFace.ContainsKey($rankKey)) {
+            throw 'Missing per-face SFace suggestion evidence.'
+        }
+        $ranks = @($rankedByFace[$rankKey].topCandidates)
+        if ($ranks.Count -lt 1 -or $ranks.Count -gt 3) {
+            throw 'Invalid per-face candidate shortlist.'
+        }
+        $faceSuggestions = @($ranks | ForEach-Object {
+            $alias = [string]$_.alias
+            $score = [double]$_.score
+            if (-not $aliases.Contains($alias) -or
+                -not [double]::IsFinite($score) -or
+                $score -lt -1 -or $score -gt 1) {
+                throw 'Per-face suggestion missing from source catalogue.'
+            }
+            [string]::Format([Globalization.CultureInfo]::InvariantCulture,
+                '{0}: {1:F4}', $alias, $score)
+        })
+    }
     $webCrops.Add([pscustomobject][ordered]@{
+        suggestions = @($faceSuggestions)
         group = [string]$record.Group
         frame = [string]$record.Frame
         face = [string]$record.Face
@@ -208,12 +279,13 @@ foreach ($record in $records) {
     })
 }
 $bundle = [pscustomobject][ordered]@{
-    schemaVersion = 2
+    schemaVersion = $(if ($PrivatePeopleMapPath) { 3 } else { 2 })
     mode = 'PresenceFirst'
     clipAlias = $ClipAlias
     reportSha256 = $reportHash
     catalogueSnapshot = $snapshot
     cataloguePeopleCount = $peopleCount
+    personBindings = @($reviewBindings)
     unassignedGroupObservations = $UnassignedObservations
     groups = @($webGroups)
     crops = @($webCrops.ToArray())

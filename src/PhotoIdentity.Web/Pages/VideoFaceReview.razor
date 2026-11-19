@@ -7,9 +7,9 @@
 
 <section class="hero">
     <div>
-        <p class="eyebrow">Video library · experimental review</p>
+        <p class="eyebrow">Video library · people review</p>
         <h1>Video face review</h1>
-        <p>Review private face candidates in the existing application. Confirm a known person from a single crop, classify unknown or false detections, or leave groups unreviewed.</p>
+        <p>Review detected faces to identify people in a video. Choose a named suggestion, search your people catalogue, or mark a face unknown or incorrect. Reviewed faces are hidden by default and can be reopened.</p>
     </div>
     <a class="button secondary" href="/videos">Back to videos</a>
 </section>
@@ -21,14 +21,14 @@
         <span>Private review package (JSON)</span>
         <input id="vfr-bundle" type="file" accept=".json,application/json" />
     </label>
-    <label class="vfr-import">
-        <span>Private people map (JSON) — same catalogue snapshot</span>
+    <label id="vfr-legacy-map-label" class="vfr-import" hidden>
+        <span>Legacy v2 only: private people map (JSON)</span>
         <input id="vfr-people-map" type="file" accept=".json,application/json" />
     </label>
     <p id="vfr-people-status" role="status" aria-live="polite">No private names loaded.</p>
     <input id="vfr-csv" type="file" accept=".csv,text/csv" hidden aria-label="Import saved review CSV" />
     <p id="vfr-load-status" role="status" aria-live="polite">No private evidence loaded.</p>
-    <p>Known-person suggestions are unverified leads. Load the original private people map to see real catalogue names and search all canonical people; a free-text name is never accepted as a selection. The two private files must match the exact catalogue snapshot. Native crop dimensions are shown unchanged, without artificial upscaling. Export a CSV before leaving: the application does not retain decisions or names, enrol video faces, contact inference services, or create production video/person assignments.</p>
+    <p>For a version 3 review package, names are read from the current Photo Identity database; no separate people-list file is imported in the browser. Each suggested person is a human review lead, never an automatic identification. Click a suggestion to confirm it for one face, or search the current catalogue. Historical aliases are bound to canonical IDs in the package; people added after that snapshot require refreshed evidence before confirmation. Crops remain native size with no upscaling. Export your review CSV before leaving. Identity decisions are not yet written to the production database.</p>
 </section>
 
 <div id="vfr-root" class="vfr-root"></div>

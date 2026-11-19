@@ -1,5 +1,87 @@
 # WI-0155 — bounded offline video-face verification and in-app review
 
+## Production-oriented video review: live people and per-face suggestions
+
+**PR #826 accepted locally (12/12, 2026-11-19):** Version 2 packages
+and source-bound CSV import/export passed. This follow-up brings the review
+UI closer to the application's existing photo/video people-review workflow.
+
+The **new version 3** offline evidence bundle embeds only source-snapshot
+alias-to-immutable-person-UUID bindings (not real names). Generate it with
+the previously approved V06 report, case manifests and original people map:
+
+```powershell
+$tools = Join-Path (Get-Location).Path 'tools\PhotoIdentity.VideoFaceFeasibility'
+$gallery = & (Join-Path $tools 'New-VideoFaceGroupReview.ps1') `
+  -PrivateReportPath $reportPath `
+  -PrivateCasesPath $casesPath `
+  -PrivatePeopleMapPath $peopleMapPath `
+  -ClipAlias V06 -GroupSource Provisional -PresenceFirst
+$gallery | Format-List Mode,Groups,Crops,WebReviewBundlePath,ProductionAssignmentsMade
+```
+
+The private map is **only** a one-time bridge while converting historical
+alias-based evidence. The browser does **not** ask to import that file:
+it GETs `/api/review/people/maintenance` using the already-running
+Photo Identity application's existing read-only canonical people endpoint.
+Current display names (including renames) are authoritative in the UI.
+The request must fail closed: if the database endpoint is unavailable,
+no clickable suggestion or v3 known-person selection is offered.
+A new person who did not exist in the historical snapshot is visible
+by name but intentionally unavailable for confirmation until evidence is
+regenerated with current canonical identity bindings. Deleted/merged
+old identities cannot be silently assigned. No new API endpoints or
+POST/PUT/DELETE calls are introduced.
+
+Each **face crop** displays its own report-supplied `rankedFaces`
+shortlist, **not** the blended provisional-group suggestion. Click one
+named lead to set that crop's `Confirm person` decision and alias, then
+hide the completed crop immediately. Other group members remain
+visible until separately reviewed. Completed cards are hidden by
+default after import; `Show reviewed` reopens them for editing and
+`Hide reviewed` restores the default. `Hide without deciding`
+remains separate and non-destructive. A bare `Confirm person` choice
+without a person is **incomplete**, so it must not disappear.
+
+**Legacy support:** Bundles v1 (alias only) and v2 (snapshot map imported
+by user) continue to work; passing the original map during generation
+selects v3, and there is no repeat of face detection, ranking or frame
+extraction. Exported CSV stays source-bound and alias-only, so existing
+V06 decisions still import into v3. The final independent PowerShell
+measure must still run before accepting results. Neither UI review
+nor the CSV persist video/person associations.
+
+**SFace difference audit, directly from current code:** photo
+`PortableRecognitionProcessor` and video `VideoFaceExperiment` use the
+same YuNet detector implementation, OpenCV five-point aligner, and
+manifest-bound SFace embedder, including the same aligned input.
+The key differences are **before and after** SFace:
+- Video source frames are separately FFmpeg-extracted JPEGs, potentially
+  with very small real face areas. Reprocessing a small crop at 112x112
+  for the SFace aligned input cannot create missing face detail.
+- Production `PostgresIdentityMatchRegenerationScorer` compares each
+  target face against **all confirmed face exemplars** for a canonical
+  person and retains that person's **best cosine similarity**.
+- WI-0155's `VideoFaceCatalogueEvidenceReader` uses **at most three
+  distinct-photo exemplars per person** from a stricter current-photo
+  snapshot. `VideoFaceCataloguePersonMatcher` also averages up to
+  two representative-observation scores for a **group**. Both changes
+  can alter ranked people, even with identical video SFace embeddings.
+- v3 **fixes presentation**, not inference: its selectable leads are
+  the already-computed per-face ranks. A production-quality matcher
+  change must be benchmarked against the production reference set,
+  with target-face ranking, and independently reviewed for false-person
+  suggestions. Never equate similarity or rank with identity proof.
+
+**Productization gates still open:** current-revision video source
+admission and native-quality bounded frame selection; production
+provenance, retention and deletion; durable review action + auditable
+video-person association; undo/merged-person handling; calibrated
+recognition risk and model-rights acceptance. Those are actual
+production requirements, **not** follow-up exploratory shadow
+experiments. Keep automatic video identity assignments disabled
+until those gates are implemented and verified.
+
 ## In-app private review (merged PR #825; named-review follow-up)
 
 The previous HTML gallery remains available for diagnostics. New crop-level

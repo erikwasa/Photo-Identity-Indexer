@@ -53,3 +53,25 @@
 .vfr-person-option:hover, .vfr-person-option:focus-visible {
     background: var(--surface, #e6eeee);
 }
+
+/* A completed face disappears from normal review; the user can reopen it. */
+.vfr-crop[hidden], #vfr-legacy-map-label[hidden] { display: none; }
+.vfr-suggestion-list { padding-left: 1.25rem; margin: .15rem 0 .6rem; }
+.vfr-suggestion-list li { margin: .35rem 0; }
+.vfr-suggestion-button {
+    display: block;
+    width: 100%;
+    padding: .6rem .75rem;
+    border: 1px solid var(--border-color, #b8c1c8);
+    border-radius: .45rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.vfr-suggestion-button:disabled { opacity: .6; cursor: not-allowed; }
+.vfr-suggestion-button:not(:disabled):hover,
+.vfr-suggestion-button:not(:disabled):focus-visible {
+    background: var(--surface, #e6eeee);
+}
