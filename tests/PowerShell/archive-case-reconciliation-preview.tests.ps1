@@ -27,13 +27,15 @@ function New-Row {
         [string]$Verification = 'verified',
         [bool]$Missing = $false
     )
+    # Mirror PostgreSQL COPY CSV encoding, not PowerShell's True/False text.
+    $missingAsPostgresCsv = if ($Missing) { 't' } else { 'f' }
     return [pscustomobject]@{
         source_id = 'test-source'
         normalized_source_key = $Key.Replace('\','/').ToLowerInvariant()
         asset_id = $Asset
         source_key = $Key
         asset_created_at_utc = '2026-11-19T10:00:00Z'
-        marked_missing = "$Missing"
+        marked_missing = $missingAsPostgresCsv
         verification_state = $Verification
         verified_revision_id = "$Asset-revision"
         verified_content_sha256 = $Hash
@@ -93,6 +95,31 @@ try {
     Assert ($unverified.Decision -eq 'hold-incomplete-verification') 'Unverified pair not blocked.'
     $missing = @($report | Where-Object { $_.NormalizedSourceKey -eq 'fideli/missing.jpg' })[0]
     Assert ($missing.Decision -eq 'hold-missing-catalogue-record') 'Missing pair not blocked.'
+
+    Assert ($rows[0].marked_missing -eq 'f') 'Fixture must use PostgreSQL f notation.'
+    Assert ($rows[10].marked_missing -eq 't') 'Fixture must use PostgreSQL t notation.'
+
+    # Also accept legacy PowerShell CSV Boolean spellings without changing the
+    # substantive outcome, while refusing unknown values rather than guessing.
+    $legacyCsv = Join-Path $root 'legacy-bools.csv'
+    $rows[0].marked_missing = 'False'
+    $rows[10].marked_missing = 'True'
+    $rows | Export-Csv -LiteralPath $legacyCsv -Encoding utf8
+    $legacy = & $scriptPath -AuditCsv $legacyCsv -OutputDirectory (Join-Path $root 'legacy-output')
+    Assert ($legacy.CollisionGroups -eq 6) 'Legacy True/False Boolean spelling was rejected.'
+    Assert ($legacy.GroupsWithOneManualHistory -eq 3) 'Legacy Boolean spelling changed the pair classification.'
+
+    $badBoolCsv = Join-Path $root 'invalid-bool.csv'
+    $rows[0].marked_missing = 'not-a-boolean'
+    $rows | Export-Csv -LiteralPath $badBoolCsv -Encoding utf8
+    $rejectedBadBoolean = $false
+    try {
+        $null = & $scriptPath -AuditCsv $badBoolCsv -OutputDirectory (Join-Path $root 'invalid-output')
+    }
+    catch {
+        $rejectedBadBoolean = $true
+    }
+    Assert $rejectedBadBoolean 'Unexpected Boolean value was silently accepted.'
 
     $before = Get-Content -LiteralPath $reportPath -Raw
     $null = & $scriptPath -AuditCsv $inputCsv -OutputDirectory $outputDir
