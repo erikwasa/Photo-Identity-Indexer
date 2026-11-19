@@ -179,3 +179,58 @@ first three do not match, that different faces have independent rankings,
 the matching model is exact, idempotent publication preserves evidence,
 a stale video revision is refused, and no person identity/tag table is
 written. It uses only synthetic vectors and synthetic catalogue rows.
+
+## 2026-11-20 — Native-resolution face producer foundation
+
+**PR #831 is merged.** The existing photo matcher now supplies full
+confirmed-exemplar rankings for production video observations.
+
+The next isolated native path comprises:
+- `VideoFaceNativeFrameProfile`: fixed FFmpeg arguments against an
+  already SHA-verified **staged video copy**; frame timing is
+  presentation-based, `-autorotate` is enabled, and **no scale, crop,
+  pad, upsample or 640-pixel CLIP resize is performed**. JPEGs are
+  capped at 12 MiB, decoded BGR24 frames at 3840 pixels per edge.
+  Oversized native frames fail closed rather than being silently shrunk.
+- `VideoFaceNativeFrameAnalyzer`: the same approved YuNet detector,
+  5-point SFace aligner and SFace embedder used by the photo tooling.
+  Enforces the exact pinned model digests, 128D vectors, at most
+  32 detected faces per frame, native frame geometry and independent
+  per-face embeddings; it returns **no person verdicts**.
+- `VideoFaceNativeEvidenceProducer`: an **unregistered, explicit-call**
+  producer requiring a hypothetical future `FaceEvidence` lease.
+  It checks the existing PostgreSQL video control and photo priority,
+  stages the current hash-verified local original without recalling
+  online-only media, validates supported Rec.709 geometry and duration,
+  loads pinned model manifests and validates their files, runs FFmpeg
+  in a single-process Windows Job Object, heartbeats the lease, and
+  rechecks permission before each frame. It processes 1–4 bounded
+  frames and returns an ephemeral proposal with source SHA-256.
+  Owned scratch media are cleaned up by the source and process
+  supervisors. **No evidence database writes, job completion or
+  identity assignments occur from this component.**
+
+**Non-activation rule:** the existing video job queue has no admitted
+`FaceEvidence` derivative kind yet. This PR intentionally does not add
+one, does not register the producer in the runtime, and adds no CLI,
+endpoint, worker or scheduler. Merely deploying it has no face
+inference effect. The next integration PR must introduce explicit
+face-derivative admission with lease-fenced transaction publication
+(the existing v42 publisher only checks source revision/exclusion),
+review native crop evidence retention/deletion and model rights, and
+bind the persisted review UI. This prevents treating a CLIP
+`FrameEvidence` lease as face-recognition authorization.
+
+**Verification:** no originals, model files or production database are
+needed for synthetic acceptance:
+```powershell
+git fetch origin
+git switch wi-0155-native-face-frame-foundation
+git pull --ff-only
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceNativeFrameTests'
+if ($LASTEXITCODE -ne 0) { throw 'Native face frame contract failed.' }
+```
+The test asserts no scaling, native geometry, independent observations,
+model digest refusal and candidate overflow failure. Passing synthetic
+tests is not evidence of real video detection quality or model rights.
