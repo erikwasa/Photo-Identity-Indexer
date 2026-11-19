@@ -140,7 +140,7 @@ public sealed class VideoFaceReviewProductionPersistenceTests
             Assert.True(await repository.RecordDecisionAsync(
                 revision, faceId, "clear", null, "test-reviewer"));
             Assert.Null(Assert.Single((await repository.GetCurrentAsync(revision))!
-                .Observations.Where(x => x.Id == first.Id)).ReviewedPersonId);
+                .Observations, x => x.Id == first.Id).ReviewedPersonId);
             Assert.Equal("clear", (await repository.GetCurrentAsync(revision))!
                 .Observations[0].Decision);
             await Assert.ThrowsAsync<ArgumentException>(() =>
