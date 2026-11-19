@@ -59,8 +59,10 @@ public sealed class PostgresVideoFaceReviewRepository(
         ArgumentNullException.ThrowIfNull(proposal);
         if (proposal.RevisionId.IsEmpty || !Sha(proposal.SourceSha256) ||
             !Sha(proposal.DetectorModelHash) || !Sha(proposal.SFaceModelHash) ||
-            !Bounded(proposal.ProducerVersion) || !Bounded(proposal.DetectorModelId) ||
-            !Bounded(proposal.SFaceModelId) || !Bounded(proposal.AlignmentProtocol) ||
+            !Bounded(proposal.ProducerVersion) ||
+            proposal.DetectorModelId != "yunet-2023mar-fp32" ||
+            proposal.SFaceModelId != "sface-2021dec-fp32" ||
+            proposal.AlignmentProtocol != "sface-five-point-v1" ||
             proposal.Observations is not { Count: >= 1 and <= 256 })
             throw new ArgumentException("Invalid bounded video-face publication provenance.");
 
