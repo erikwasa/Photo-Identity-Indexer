@@ -89,6 +89,10 @@ public sealed class VideoFaceReviewProductionPersistenceTests
             AssetRevisionId revision = AssetRevisionId.From(video);
             var evidence = Batch(revision, alice, bob);
             Assert.Null(await repository.GetCurrentAsync(revision));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                repository.PublishAsync(evidence with { SFaceModelId = "unapproved-model" }));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                repository.PublishAsync(evidence with { AlignmentProtocol = "wrong-alignment" }));
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 repository.PublishAsync(evidence with { SourceSha256 = new string('d', 64) }));
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
