@@ -144,7 +144,15 @@ public sealed class PostgresVideoFaceReviewRepository(
             !Sha(lease.ToolSha256) ||
             lease.SourceBytes <= 0 || lease.TemporaryBytes < lease.SourceBytes ||
             lease.ControlGeneration < 0 ||
-            proposal.Observations.Any(face => face.FrameOrdinal >= lease.RequestedFrames))
+            proposal.ProducerVersion != "wi0155-native-face-evidence-v1" ||
+            proposal.DetectorModelId != VideoFaceEvidenceLeaseIdentity.DetectorModelId ||
+            proposal.DetectorModelHash != VideoFaceEvidenceLeaseIdentity.DetectorSha256 ||
+            proposal.SFaceModelId != VideoFaceEvidenceLeaseIdentity.EmbedderModelId ||
+            proposal.SFaceModelHash != VideoFaceEvidenceLeaseIdentity.EmbedderSha256 ||
+            proposal.AlignmentProtocol != VideoFaceEvidenceLeaseIdentity.AlignmentProtocol ||
+            proposal.Observations.Count > lease.RequestedFrames * 32 ||
+            proposal.Observations.Any(face => face.FrameOrdinal >= lease.RequestedFrames ||
+                face.TimestampMs > 3_600_000))
             throw new ArgumentException("Exact active FaceEvidence job lease and frame scope required.");
         return PublishCoreAsync(proposal, lease, token);
     }
@@ -262,7 +270,7 @@ public sealed class PostgresVideoFaceReviewRepository(
             batch.Parameters.AddWithValue("at", timeProvider.GetUtcNow());
             batch.Parameters.Add(new Npgsql.NpgsqlParameter("job",
                 NpgsqlTypes.NpgsqlDbType.Uuid)
-            { Value = lease is null ? DBNull.Value : lease.Id });
+            { Value = (object?)lease?.Id ?? DBNull.Value });
             await batch.ExecuteNonQueryAsync(token);
         }
 
