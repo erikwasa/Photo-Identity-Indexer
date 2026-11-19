@@ -160,3 +160,64 @@ present flag does not prove current filesystem existence.
 
 The audit and preview CSV files are private and belong in the ignored
 artifacts/ directory. Never attach them to public PRs.
+
+
+## Effective-annotation comparison (read-only, follow-on)
+
+After the private preview confirmed that all 1,088 current case-alias pairs
+share a verified content hash, investigate whether the two different revision
+IDs carry the same **effective** annotations. Matching SHA-256 is not
+sufficient to delete either asset or its manual history.
+
+The new tools/archive-case-alias-effective-state-audit.sql mirrors the
+application's current-revision read semantics:
+- photo tags and manual photo-person assignments: latest action per tag/person
+  ID wins; only final add actions count as effective;
+- Place: latest action per revision determines current Place and provenance;
+- confirmed face people: latest non-reversed assign/unknown/reject action per
+  face occurrence; compare the set of confirmed person IDs, not face IDs.
+
+The SQL exports **counts and equality flags**, not names, label lists,
+image pixels or tag text. The file still contains private source keys and
+asset/revision IDs. It runs in a PostgreSQL READ ONLY transaction and
+does not hydrate any source media.
+
+Run from the existing repository root in PowerShell 7.6 after confirming
+the same Podman $containerId is still available:
+
+~~~powershell
+$sql = Get-Content '.\tools\archive-case-alias-effective-state-audit.sql' -Raw
+$result = $sql | & podman exec -i $containerId sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d photoidentity_main -X -q -v ON_ERROR_STOP=1'
+if ($LASTEXITCODE -ne 0) { throw 'Read-only effective-state audit failed.' }
+$result | Set-Content '.\artifacts\archive-case-effective-state.csv' -Encoding utf8
+
+pwsh -NoProfile -File '.\tests\PowerShell\archive-case-effective-state.tests.ps1'
+.\tools\summarize-archive-case-effective-state.ps1 -AuditCsv '.\artifacts\archive-case-alias-audit.csv' -EffectiveStateCsv '.\artifacts\archive-case-effective-state.csv' -OutputDirectory '.\artifacts\archive-case-effective-state'
+~~~
+
+The summarizer validates that the two independent audit exports contain
+exactly the same source-key groups and asset IDs. It refuses malformed
+Boolean/count fields, unknown groups, and missing members. All output
+decisions remain non-destructive: SafeToDelete=False and
+RequiresOperatorReview=True.
+
+Review the aggregate output:
+- GroupsWithAnyEffectiveDifference identifies pairs whose current effective
+  state is not obviously equivalent.
+- GroupsWithDifferentTags / ManualPeople / Place / PlaceProvenance /
+  ConfirmedFacePeople are separate overlapping differences.
+- GroupsWithDifferentReviewedFaceCounts also prevents treating two
+  face-analysis histories as equivalent merely because their confirmed
+  person sets match.
+- BothAnnotatedWithDifferences focuses on both-annotated pairs with
+  divergent current state.
+
+**Important limits:** the effective comparison evaluates the currently
+verified revisions only. It does not prove that historical actions on
+older revisions, labels on individual face occurrences, merged people,
+metadata preferences or derived face records can be automatically
+transferred. Equal effective sets do not mean identical history or
+automatic repair eligibility. No destructive apply function is included.
+
+Keep the exported CSVs in the ignored artifacts/ folder. Share aggregate
+summaries only, not private photo paths or identities.

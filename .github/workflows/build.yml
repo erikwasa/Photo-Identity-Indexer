@@ -288,6 +288,23 @@ jobs:
           }
           ./tests/PowerShell/archive-case-reconciliation-preview.tests.ps1
 
+      - name: Verify read-only case-alias effective-state comparison
+        shell: pwsh
+        run: |
+          $scripts = @(
+            'tools/summarize-archive-case-effective-state.ps1',
+            'tests/PowerShell/archive-case-effective-state.tests.ps1'
+          )
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path -LiteralPath $script).Path, [ref]$tokens, [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) { throw "PowerShell parser rejected $script : $($errors -join '; ')" }
+          }
+          ./tests/PowerShell/archive-case-effective-state.tests.ps1
+
       - name: Verify WI-0209 PostgreSQL backup retention
         shell: pwsh
         run: |
