@@ -54,7 +54,11 @@ New-Item -ItemType Directory -Path '.\artifacts' -Force | Out-Null
 psql -X -q -v ON_ERROR_STOP=1 -d photoidentity_main -f '.\tools\archive-case-alias-audit.sql' > '.\artifacts\archive-case-alias-audit.csv'
 
 $review = @(Import-Csv '.\artifacts\archive-case-alias-audit.csv')
-$review | Group-Object review_classification | Select-Object Name, Count | Format-Table
+$collisionGroups = @(
+    $review | Group-Object -Property { "$($_.source_id)|$($_.normalized_source_key)" }
+)
+$collisionGroups | ForEach-Object { $_.Group[0] } | Group-Object review_classification |
+    Select-Object Name, Count | Format-Table
 ~~~
 
 The output CSV contains **private** paths, identifiers, and manual history
