@@ -201,6 +201,38 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
             await stage.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // A retired secondary locator may be the spelling that the Windows
+        // source enumerates on the next scan. Retarget the observation to the
+        // authoritative (earlier) asset *inside the same write transaction*.
+        // Keep the source read/hashing path unchanged: stage.source_key is the
+        // database identity, not the filename opened by the scanner.
+        // A stage containing BOTH spellings is rejected by its UNIQUE constraint.
+        // Retirement is deliberately not applicable until a separate guarded
+        // apply operation has created the durable mapping and soft-retired the
+        // secondary asset. No existing sources are altered by this code alone.
+        using (NpgsqlCommand mapRetired = connection.CreateCommand())
+        {
+            mapRetired.Transaction = transaction;
+            mapRetired.CommandText = """
+                UPDATE archive_source_scan_stage AS stage
+                SET source_key = survivor.source_key
+                FROM archive_case_alias_retirements AS retirement
+                INNER JOIN assets AS secondary
+                    ON secondary.id = retirement.secondary_asset_id
+                INNER JOIN assets AS survivor
+                    ON survivor.id = retirement.survivor_asset_id
+                WHERE retirement.restored_at_utc IS NULL
+                  AND retirement.source_id = @source_id
+                  AND secondary.source_id = @source_id
+                  AND survivor.source_id = @source_id
+                  AND secondary.deleted_at_utc IS NOT NULL
+                  AND survivor.deleted_at_utc IS NULL
+                  AND stage.source_key = secondary.source_key;
+                """;
+            mapRetired.Parameters.AddWithValue("source_id", source.SourceId.Value);
+            await mapRetired.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         // The photo scanner may not observe, update, or reclassify a source key
         // already owned by the explicit video lane. Fail the entire batch before
         // touching asset availability or revision state.
@@ -635,7 +667,17 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
               WHERE source_id = @source_id
                 AND media_kind = 'photo'
-                AND NOT (source_key = ANY(@observed_source_keys))
+                AND NOT (
+                    source_key = ANY(@observed_source_keys)
+                    OR EXISTS (
+                        SELECT 1
+                        FROM archive_case_alias_retirements AS retirement
+                        INNER JOIN assets AS secondary
+                            ON secondary.id = retirement.secondary_asset_id
+                        WHERE retirement.survivor_asset_id = assets.id
+                          AND retirement.restored_at_utc IS NULL
+                          AND secondary.source_key = ANY(@observed_source_keys)
+                    ))
                 AND deleted_at_utc IS NULL;
               """
             : """
@@ -644,7 +686,17 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
               WHERE source_id = @source_id
                 AND media_kind = 'photo'
                 AND substr(source_key, 1, length(@scope_prefix)) = @scope_prefix
-                AND NOT (source_key = ANY(@observed_source_keys))
+                AND NOT (
+                    source_key = ANY(@observed_source_keys)
+                    OR EXISTS (
+                        SELECT 1
+                        FROM archive_case_alias_retirements AS retirement
+                        INNER JOIN assets AS secondary
+                            ON secondary.id = retirement.secondary_asset_id
+                        WHERE retirement.survivor_asset_id = assets.id
+                          AND retirement.restored_at_utc IS NULL
+                          AND secondary.source_key = ANY(@observed_source_keys)
+                    ))
                 AND deleted_at_utc IS NULL;
               """;
         command.Parameters.AddWithValue("@source_id", Guid.Parse(sourceId.ToString()));
