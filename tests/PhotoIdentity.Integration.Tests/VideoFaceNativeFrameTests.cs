@@ -74,6 +74,37 @@ public sealed class VideoFaceNativeFrameTests
     }
 
     [Fact]
+    public void JPEG_dimensions_are_checked_before_decoding_and_oversized_faces_are_never_resized()
+    {
+        byte[] header = new byte[24];
+        header[0] = 0xff;
+        header[1] = 0xd8;
+        header[2] = 0xff;
+        header[3] = 0xc0; // Baseline JPEG SOF.
+        header[4] = 0;
+        header[5] = 17; // Marker segment length.
+        header[6] = 8; // 8-bit precision.
+        header[7] = 3;
+        header[8] = 132; // Native height = 900.
+        header[9] = 6;
+        header[10] = 64; // Native width = 1600.
+        Assert.Equal(new ImageSize(1600, 900),
+            VideoFaceNativeFrameProfile.ReadBoundedJpegSize(header));
+        header[9] = 15;
+        header[10] = 1; // Width 3841, never rescale.
+        Assert.Throws<InvalidDataException>(() =>
+            VideoFaceNativeFrameProfile.ReadBoundedJpegSize(header));
+        header[9] = 6;
+        header[10] = 64;
+        header[4] = 0;
+        header[5] = 1; // Invalid segment length.
+        Assert.Throws<InvalidDataException>(() =>
+            VideoFaceNativeFrameProfile.ReadBoundedJpegSize(header));
+        Assert.Throws<InvalidDataException>(() =>
+            VideoFaceNativeFrameProfile.ReadBoundedJpegSize(new byte[25]));
+    }
+
+    [Fact]
     public async Task Native_YuNet_SFace_observation_uses_original_dimensions_and_independent_faces()
     {
         var detector = new FakeDetector([Face(), Face()]);
