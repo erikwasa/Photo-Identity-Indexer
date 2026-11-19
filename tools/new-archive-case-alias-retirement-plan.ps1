@@ -126,7 +126,7 @@ $plan = @(
         if (-not $rowsByKey.ContainsKey($groupId) -or -not $usedGroups.Add($groupId)) {
             throw 'Effective-state export has an unknown or duplicate case-collision group.'
         }
-        $members = @($rowsByKey[$groupId])
+        $members = @($rowsByKey[$groupId].ToArray())
         if ($members.Count -ne 2 -or $members[0].asset_id -ceq $members[1].asset_id) {
             throw 'Automation requires exactly two distinct assets per case-only path.'
         }
@@ -139,9 +139,10 @@ $plan = @(
             throw 'Effective-state asset IDs do not agree with retirement evidence.'
         }
 
-        $ordered = @($members | Sort-Object -Property {
-            Read-When $_.created_at_utc
-        }, asset_id)
+        $ordered = @($members | Sort-Object -Property @(
+            @{ Expression = { Read-When $_.created_at_utc }; Ascending = $true },
+            @{ Expression = 'asset_id'; Ascending = $true }
+        ))
         $older = $ordered[0]
         $later = $ordered[1]
         $timestampTie = (Read-When $older.created_at_utc) -eq (Read-When $later.created_at_utc)
