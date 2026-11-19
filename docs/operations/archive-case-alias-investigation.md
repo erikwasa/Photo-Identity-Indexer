@@ -124,7 +124,10 @@ This audit is broader than the earlier exact-duplicate view (825 pairs): the
 hash evidence. They must not be treated as exact byte duplicates.
 
 A separately reviewed, read-only preview consumes the private CSV generated
-by the audit; it does not connect to PostgreSQL:
+by the audit; it does not connect to PostgreSQL. PostgreSQL COPY CSV uses
+`t` and `f` for Boolean values (including `marked_missing`); the
+preview accepts those values as well as `True` and `False` from synthetic
+PowerShell CSV fixtures:
 
 ~~~powershell
 pwsh -NoProfile -File .\tests\PowerShell\archive-case-reconciliation-preview.tests.ps1
