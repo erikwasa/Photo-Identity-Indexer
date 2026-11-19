@@ -221,6 +221,73 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                     "Photo scan cannot update a source locator already owned by a video.");
         }
 
+        // Windows archive paths are case-insensitive, but the PostgreSQL source-key
+        // uniqueness constraint is case-sensitive. Never silently create another asset
+        // for an unseen case-only alias: it may strand manual photo annotations on
+        // the original asset. This guard runs before any catalogue writes commit.
+        using (NpgsqlCommand caseAliasGuard = connection.CreateCommand())
+        {
+            caseAliasGuard.Transaction = transaction;
+            caseAliasGuard.CommandText = """
+                WITH unseen_source_keys AS (
+                    SELECT stage.source_key
+                    FROM archive_source_scan_stage AS stage
+                    LEFT JOIN assets AS exact
+                      ON exact.source_id = @source_id
+                     AND exact.source_key = stage.source_key
+                    WHERE exact.id IS NULL
+                )
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM unseen_source_keys AS incoming
+                    INNER JOIN assets AS existing
+                      ON existing.source_id = @source_id
+                     AND lower(existing.source_key) = lower(incoming.source_key)
+                );
+                """;
+            caseAliasGuard.Parameters.AddWithValue("source_id", source.SourceId.Value);
+            if (await caseAliasGuard.ExecuteScalarAsync(cancellationToken) is true)
+            {
+                throw new InvalidOperationException(
+                    "Archive synchronization found a case-only source-path alias. " +
+                    "No catalogue changes were committed; reconcile the existing " +
+                    "source-copy identities before re-running synchronization.");
+            }
+        }
+
+        // Exclusions are durable per source locator. Do not let differently
+        // capitalized scan keys bypass an existing privacy tombstone. This table
+        // is lazily initialized, so a scanner without the exclusion service
+        // must remain compatible with a newly initialized catalogue.
+        using (NpgsqlCommand exclusionTableCheck = connection.CreateCommand())
+        {
+            exclusionTableCheck.Transaction = transaction;
+            exclusionTableCheck.CommandText =
+                "SELECT to_regclass('source_copy_exclusions') IS NOT NULL;";
+            if (await exclusionTableCheck.ExecuteScalarAsync(cancellationToken) is true)
+            {
+                using NpgsqlCommand excludedAliasGuard = connection.CreateCommand();
+                excludedAliasGuard.Transaction = transaction;
+                excludedAliasGuard.CommandText = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM archive_source_scan_stage AS stage
+                        INNER JOIN source_copy_exclusions AS excluded
+                          ON excluded.source_id = @source_id
+                         AND lower(excluded.source_key) = lower(stage.source_key)
+                         AND excluded.source_key <> stage.source_key
+                    );
+                    """;
+                excludedAliasGuard.Parameters.AddWithValue("source_id", source.SourceId.Value);
+                if (await excludedAliasGuard.ExecuteScalarAsync(cancellationToken) is true)
+                {
+                    throw new InvalidOperationException(
+                        "Archive synchronization found a case-only alias of an " +
+                        "excluded source path. No catalogue changes were committed.");
+                }
+            }
+        }
+
         // Snapshot the authoritative state before clearing deletion markers. This refreshes the
         // scanner's earlier baseline read inside the serializable write transaction.
         using (NpgsqlCommand capture = connection.CreateCommand())
