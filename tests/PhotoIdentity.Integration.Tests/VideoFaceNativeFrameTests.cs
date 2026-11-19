@@ -1,4 +1,5 @@
 using PhotoIdentity.Cli;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
@@ -124,6 +125,26 @@ public sealed class VideoFaceNativeFrameTests
         Assert.Empty(await normal.AnalyzeAsync(Frame(64, 64), 0, 1000));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             normal.AnalyzeAsync(Frame(64, 64), 4, 1000));
+    }
+
+    [Fact]
+    public async Task CLIP_frame_evidence_lease_cannot_authorize_native_face_processing()
+    {
+        // Refusal occurs before opening a real DB, original or model file.
+        await using PostgresCatalogueDatabase database = new(
+            "Host=localhost;Database=unreachable_synthetic;Username=synthetic;Password=synthetic");
+        string root = Path.GetFullPath(Path.GetTempPath());
+        var producer = new VideoFaceNativeEvidenceProducer(database,
+            new VideoFaceNativeProducerOptions(
+                root, Path.Combine(root, "not-ffmpeg.exe"),
+                new string('a', 64), root, root));
+        var leased = new VideoProcessingJobLease(
+            Guid.NewGuid(), AssetRevisionId.New(), Guid.NewGuid(),
+            "FrameEvidence", VideoFrameSamplingPlanner.PolicyVersion,
+            VideoFaceNativeFrameProfile.Version, new string('a', 64),
+            1000, 100000000, 2, 0);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            producer.ProduceAsync(leased));
     }
 
     private sealed class FakeDetector(IReadOnlyList<DetectedFaceCandidate> faces)
