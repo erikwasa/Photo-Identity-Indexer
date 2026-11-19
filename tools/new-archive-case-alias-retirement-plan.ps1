@@ -236,6 +236,16 @@ $plan = @(
     }
 )
 
+# The candidate set may legitimately be empty. Enumerate counts directly:
+# an empty PowerShell pipeline does not always produce a Measure-Object
+# result with a Sum property under StrictMode.
+[long]$candidateAutomaticReviewActions = 0
+foreach ($candidate in $plan) {
+    if ($candidate.ProposedAction -eq 'review-for-reversible-alias-retirement') {
+        $candidateAutomaticReviewActions += [long]$candidate.SecondaryAutomaticReviewActions
+    }
+}
+
 # This is a candidate manifest, not executable SQL, a deletion list, or an
 # application of an archive-retirement mapping.
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
@@ -249,10 +259,7 @@ $plan | Sort-Object SourceId, NormalizedSourceKey | Export-Csv -LiteralPath $pat
     HeldForProtectedSecondaryHistory = @($plan | Where-Object { $_.Blockers -like '*later-asset-has-protected-history-or-references*' }).Count
     HeldForEffectiveAnnotationDifferences = @($plan | Where-Object { $_.Blockers -like '*effective-annotation-difference*' }).Count
     HeldForAmbiguousIngestionOrder = @($plan | Where-Object { $_.Blockers -like '*ambiguous-ingestion-order*' }).Count
-    SecondaryAutomaticReviewActionsInCandidates = (
-        $plan | Where-Object { $_.ProposedAction -eq 'review-for-reversible-alias-retirement' } |
-        Measure-Object SecondaryAutomaticReviewActions -Sum
-    ).Sum
+    SecondaryAutomaticReviewActionsInCandidates = $candidateAutomaticReviewActions
     AutomaticallyExecuted = 0
     OriginalFilesDeleted = 0
     AssetRowsDeleted = 0
