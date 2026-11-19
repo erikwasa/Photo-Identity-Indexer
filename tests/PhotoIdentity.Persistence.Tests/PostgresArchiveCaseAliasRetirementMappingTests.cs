@@ -208,6 +208,20 @@ public sealed class PostgresArchiveCaseAliasRetirementMappingTests
                     new Dictionary<string, ArchiveSourceScanBaseline>(StringComparer.Ordinal), t3));
             Assert.Contains("inconsistent", invalid.Message);
 
+            // Restore the synthetic active retirement state after the
+            // deliberate corruption. Verify that visibility is still hidden.
+            await using (NpgsqlConnection con = new(builder.ConnectionString))
+            {
+                await con.OpenAsync();
+                using NpgsqlCommand repairFixture = con.CreateCommand();
+                repairFixture.CommandText =
+                    "UPDATE assets SET deleted_at_utc = @time WHERE id = @asset;";
+                repairFixture.Parameters.AddWithValue("time", t2);
+                repairFixture.Parameters.AddWithValue("asset", newAsset);
+                await repairFixture.ExecuteNonQueryAsync();
+            }
+            Assert.Empty(await duplicateInventory.GetGroupsAsync(source));
+
             // A rollback restores visibility and exact source-key routing.
             await using (NpgsqlConnection con = new(builder.ConnectionString))
             {
@@ -217,6 +231,9 @@ public sealed class PostgresArchiveCaseAliasRetirementMappingTests
                     UPDATE archive_case_alias_retirements
                     SET restored_at_utc = @time, restored_by = 'disposable-test'
                     WHERE secondary_asset_id = @asset;
+                    UPDATE assets
+                    SET deleted_at_utc = NULL
+                    WHERE id = @asset;
                     """;
                 restore.Parameters.AddWithValue("time", t4);
                 restore.Parameters.AddWithValue("asset", newAsset);
