@@ -90,8 +90,9 @@ COPY (
         ) AS place ON true
         LEFT JOIN LATERAL (
             SELECT
-                array_agg(DISTINCT latest.person_id ORDER BY latest.person_id)
-                    FILTER (WHERE latest.action_kind = 'assign') AS confirmed_person_ids,
+                array_agg(DISTINCT canonical_person.id ORDER BY canonical_person.id)
+                    FILTER (WHERE latest.action_kind = 'assign'
+                            AND canonical_person.id IS NOT NULL) AS confirmed_person_ids,
                 count(*) AS reviewed_face_count
             FROM (
                 SELECT DISTINCT ON (face.id)
@@ -106,6 +107,9 @@ COPY (
                   AND action.action_kind IN ('assign', 'unknown', 'reject')
                 ORDER BY face.id, action.id DESC
             ) AS latest
+            LEFT JOIN people AS canonical_person
+              ON canonical_person.id = latest.person_id
+             AND canonical_person.merged_into_person_id IS NULL
         ) AS faces ON true
     )
     SELECT
