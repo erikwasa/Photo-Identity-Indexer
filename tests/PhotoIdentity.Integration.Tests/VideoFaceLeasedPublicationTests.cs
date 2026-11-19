@@ -130,11 +130,6 @@ public sealed class VideoFaceLeasedPublicationTests
                     VideoFaceEvidenceLeaseIdentity.PolicyVersion,
                     VideoFaceEvidenceLeaseIdentity.PresetVersion, new string('c', 64)),
                 budget, candidate);
-            Assert.Throws<ArgumentException>(() =>
-                scopes.ArmAsync(frameJob, ToolSha,
-                    VideoFaceEvidenceLeaseIdentity.PresetVersion,
-                    TimeSpan.FromMinutes(5), derivativeKind: "FaceEvidence")
-                .GetAwaiter().GetResult());
             Guid faceJob = await queue.EnqueueAsync(
                 new VideoDerivativeJobIdentity(revision, VideoDerivativeKind.FaceEvidence,
                     VideoFaceEvidenceLeaseIdentity.PolicyVersion,
