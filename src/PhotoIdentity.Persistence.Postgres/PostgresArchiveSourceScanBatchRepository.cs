@@ -219,7 +219,8 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                     FROM archive_source_scan_stage AS stage
                     INNER JOIN assets AS secondary
                       ON secondary.source_id = @source_id
-                     AND secondary.source_key = stage.source_key
+                     AND lower(replace(secondary.source_key, chr(92), '/')) =
+                          lower(replace(stage.source_key, chr(92), '/'))
                     INNER JOIN archive_case_alias_retirements AS retirement
                       ON retirement.secondary_asset_id = secondary.id
                      AND retirement.restored_at_utc IS NULL
@@ -259,7 +260,8 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                   AND survivor.source_id = @source_id
                   AND secondary.deleted_at_utc IS NOT NULL
                   AND survivor.deleted_at_utc IS NULL
-                  AND stage.source_key = secondary.source_key;
+                  AND lower(replace(stage.source_key, chr(92), '/')) =
+                      lower(replace(secondary.source_key, chr(92), '/'));
                 """;
             mapRetired.Parameters.AddWithValue("source_id", source.SourceId.Value);
             await mapRetired.ExecuteNonQueryAsync(cancellationToken);
@@ -708,7 +710,12 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                             ON secondary.id = retirement.secondary_asset_id
                         WHERE retirement.survivor_asset_id = assets.id
                           AND retirement.restored_at_utc IS NULL
-                          AND secondary.source_key = ANY(@observed_source_keys)
+                          AND EXISTS (
+                              SELECT 1
+                              FROM unnest(@observed_source_keys::text[]) AS observed(source_key)
+                              WHERE lower(replace(observed.source_key, chr(92), '/')) =
+                                    lower(replace(secondary.source_key, chr(92), '/'))
+                          )
                     ))
                 AND deleted_at_utc IS NULL;
               """
@@ -727,7 +734,12 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                             ON secondary.id = retirement.secondary_asset_id
                         WHERE retirement.survivor_asset_id = assets.id
                           AND retirement.restored_at_utc IS NULL
-                          AND secondary.source_key = ANY(@observed_source_keys)
+                          AND EXISTS (
+                              SELECT 1
+                              FROM unnest(@observed_source_keys::text[]) AS observed(source_key)
+                              WHERE lower(replace(observed.source_key, chr(92), '/')) =
+                                    lower(replace(secondary.source_key, chr(92), '/'))
+                          )
                     ))
                 AND deleted_at_utc IS NULL;
               """;
