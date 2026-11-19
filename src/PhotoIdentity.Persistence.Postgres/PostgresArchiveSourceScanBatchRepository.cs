@@ -210,6 +210,38 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
         // Retirement is deliberately not applicable until a separate guarded
         // apply operation has created the durable mapping and soft-retired the
         // secondary asset. No existing sources are altered by this code alone.
+        using (NpgsqlCommand retiredAliasIntegrity = connection.CreateCommand())
+        {
+            retiredAliasIntegrity.Transaction = transaction;
+            retiredAliasIntegrity.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM archive_source_scan_stage AS stage
+                    INNER JOIN assets AS secondary
+                      ON secondary.source_id = @source_id
+                     AND secondary.source_key = stage.source_key
+                    INNER JOIN archive_case_alias_retirements AS retirement
+                      ON retirement.secondary_asset_id = secondary.id
+                     AND retirement.restored_at_utc IS NULL
+                    INNER JOIN assets AS survivor
+                      ON survivor.id = retirement.survivor_asset_id
+                    WHERE retirement.source_id <> @source_id
+                       OR survivor.source_id <> @source_id
+                       OR secondary.deleted_at_utc IS NULL
+                       OR survivor.deleted_at_utc IS NOT NULL
+                       OR retirement.secondary_source_key <> secondary.source_key
+                       OR retirement.survivor_source_key <> survivor.source_key
+                );
+                """;
+            retiredAliasIntegrity.Parameters.AddWithValue("source_id", source.SourceId.Value);
+            if (await retiredAliasIntegrity.ExecuteScalarAsync(cancellationToken) is true)
+            {
+                throw new InvalidOperationException(
+                    "Active archive alias retirement is inconsistent. " +
+                    "Scan transaction aborted before modifying catalogue records.");
+            }
+        }
+
         using (NpgsqlCommand mapRetired = connection.CreateCommand())
         {
             mapRetired.Transaction = transaction;
