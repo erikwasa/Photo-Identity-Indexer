@@ -130,13 +130,17 @@ public sealed class PostgresArchiveCaseAliasRetirementMappingTests
             ArchiveCatalogueSource catalogueSource = new(
                 source, "local-folder", "archive-root", t0);
 
-            ArchiveSourceScanWrite MakeWrite(string key = "fideli/portrait.jpg") => new(
+            ArchiveSourceScanWrite MakeWrite(
+                string key = "fideli/portrait.jpg",
+                AssetAvailability availability = AssetAvailability.Local) => new(
                 new SourceAsset(
                     new SourceAssetReference(source, key),
                     key,
                     "image/jpeg",
-                    100, t0, AssetAvailability.Local),
-                new Sha256Digest(hash));
+                    100, t0, availability),
+                availability == AssetAvailability.Local
+                    ? new Sha256Digest(hash)
+                    : null);
 
             // The second-spelling file is still what Windows enumerates.
             // Persist to the original asset, never to the soft-retired one.
@@ -158,6 +162,16 @@ public sealed class PostgresArchiveCaseAliasRetirementMappingTests
             Assert.Equal(AssetId.From(oldAsset), Assert.Single(thirdCase).AssetId);
             _ = await scan.MarkMissingAssetsAsync(
                 source, null, ["FIDELI/portrait.jpg"], t3.AddMinutes(1));
+
+            // An online-only OneDrive observation must route to the same
+            // survivor without requiring a new content hash or hydration.
+            IReadOnlyList<ArchiveSourceObservationPersistenceResult> onlineOnly =
+                await scan.RecordBatchAsync(
+                    catalogueSource,
+                    [MakeWrite("fideli/portrait.jpg", AssetAvailability.OnlineOnly)],
+                    new Dictionary<string, ArchiveSourceScanBaseline>(StringComparer.Ordinal),
+                    t3.AddMinutes(2));
+            Assert.Equal(AssetId.From(oldAsset), Assert.Single(onlineOnly).AssetId);
 
             await using (NpgsqlConnection verify = new(builder.ConnectionString))
             {
