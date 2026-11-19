@@ -9,6 +9,12 @@ using PhotoIdentity.Core.Review;
 namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
+/// A read-only person lead, using the exact same all-confirmed-exemplar
+/// best-cosine scorer as production photo identity regeneration.
+/// </summary>
+public sealed record VideoFaceIdentityScore(Guid PersonId, double Similarity);
+
+/// <summary>
 /// Scores snapshotted regeneration targets per PostgreSQL transaction while preserving the
 /// accepted candidate, rejection, ranking and stale-derived-suggestion semantics.
 /// Confirmed exemplar evidence can be prepared once per durable run, while rejected identities
@@ -32,6 +38,70 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _timeProvider = timeProvider ?? TimeProvider.System;
+    }
+
+
+    /// <summary>
+    /// Production SFace per-observation ranking. Reuses the *exact* photo
+    /// regeneration exemplar query and best-per-person cosine scorer, with
+    /// no experimental three-exemplars-per-person cap or group averaging.
+    ///
+    /// Returns review leads, never identity assignments or write actions.
+    /// The complete reference corpus is read in one REPEATABLE READ, READ ONLY
+    /// snapshot. Model revision and vector dimensions must be exact.
+    /// </summary>
+    public async Task<IReadOnlyList<IReadOnlyList<VideoFaceIdentityScore>>> RankVideoFaceVectorsAsync(
+        ModelId modelId, Sha256Digest modelHash,
+        IReadOnlyList<EmbeddingVector> faceVectors,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(faceVectors);
+        if (faceVectors.Count is < 1 or > 256 ||
+            faceVectors.Any(vector => vector is null || vector.Dimensions != 128))
+            throw new ArgumentException(
+                "Between one and 256 finite 128-dimensional SFace vectors are required.",
+                nameof(faceVectors));
+
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead, cancellationToken);
+        await using (NpgsqlCommand readOnly = connection.CreateCommand())
+        {
+            readOnly.Transaction = transaction;
+            readOnly.CommandText = "SET TRANSACTION READ ONLY;";
+            await readOnly.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        IReadOnlyList<Exemplar> exemplars = await ReadExemplarsAsync(
+            connection, transaction, modelId, modelHash, cancellationToken);
+        if (exemplars.Count == 0)
+            throw new InvalidOperationException(
+                "There are no confirmed photo exemplars for this exact SFace model revision.");
+
+        // Fail closed if a contaminated reference corpus contains embeddings
+        // with incompatible dimensions; never rank only a convenient subset.
+        if (exemplars.Any(reference => reference.Vector.Dimensions != 128))
+            throw new DataException(
+                "Confirmed SFace photo exemplars have incompatible dimensions.");
+
+        IReadOnlySet<PersonId> noPhotoTargetRejections = new HashSet<PersonId>();
+        List<IReadOnlyList<VideoFaceIdentityScore>> ranked = [];
+        foreach (EmbeddingVector vector in faceVectors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            VideoFaceIdentityScore[] topThree = ScoreCandidates(
+                    vector, exemplars, noPhotoTargetRejections)
+                .OrderByDescending(candidate => candidate.Score)
+                .ThenBy(candidate => candidate.PersonId.ToString(), StringComparer.Ordinal)
+                .Take(3)
+                .Select(candidate => new VideoFaceIdentityScore(
+                    Guid.Parse(candidate.PersonId.ToString()), candidate.Score))
+                .ToArray();
+            ranked.Add(topThree);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return ranked;
     }
 
     public async Task PrepareRunAsync(
@@ -139,7 +209,7 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
             transaction,
             faceOccurrenceId,
             cancellationToken);
-        Candidate[] candidates = ScoreCandidates(target, exemplars, rejectedPersonIds)
+        Candidate[] candidates = ScoreCandidates(target.Vector, exemplars, rejectedPersonIds)
             .OrderByDescending(candidate => candidate.Score)
             .ThenBy(candidate => candidate.PersonId.ToString(), StringComparer.Ordinal)
             .Take(2)
@@ -426,7 +496,7 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
     }
 
     private static IEnumerable<Candidate> ScoreCandidates(
-        StoredEmbedding target,
+        EmbeddingVector target,
         IReadOnlyList<Exemplar> exemplars,
         IReadOnlySet<PersonId> rejectedPersonIds)
     {
@@ -441,7 +511,7 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
             double score;
             try
             {
-                score = target.Vector.CosineSimilarity(exemplar.Vector);
+                score = target.CosineSimilarity(exemplar.Vector);
             }
             catch (ArgumentException exception)
             {
