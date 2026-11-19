@@ -91,11 +91,16 @@ public sealed class VideoFaceNativeEvidenceProducer(
                     lease.RevisionId, work.Token);
             if (inspection is null || inspection.InspectionStatus != "supported" ||
                 inspection.ColorTransfer != "bt709" ||
-                inspection.DurationSeconds is not decimal duration or < 0.2m or > 3600m ||
-                inspection.CodedWidth is not int width or < 1 or > VideoFaceNativeFrameProfile.MaximumEdge ||
-                inspection.CodedHeight is not int height or < 1 or > VideoFaceNativeFrameProfile.MaximumEdge)
+                inspection.DurationSeconds is null ||
+                inspection.DurationSeconds.Value is < 0.2m or > 3600m ||
+                inspection.CodedWidth is null ||
+                inspection.CodedWidth.Value is < 1 or > VideoFaceNativeFrameProfile.MaximumEdge ||
+                inspection.CodedHeight is null ||
+                inspection.CodedHeight.Value is < 1 or > VideoFaceNativeFrameProfile.MaximumEdge)
                 throw new InvalidOperationException(
                     "Native face processing requires inspected bounded Rec.709 source geometry.");
+
+            decimal duration = inspection.DurationSeconds.Value;
 
             // Resolve SHA evidence from the registered catalogue, never
             // from an operator-supplied source filename or manifest.
