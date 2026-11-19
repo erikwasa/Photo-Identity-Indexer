@@ -21,6 +21,22 @@ function Read-NonnegativeCount {
     return $parsed
 }
 
+function Read-PostgresBoolean {
+    param([AllowNull()][string]$Value, [string]$Field)
+    # PostgreSQL COPY (FORMAT csv) emits t/f; PowerShell-generated CSV
+    # fixtures commonly use True/False. Never coerce an unexpected value.
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "Audit CSV has an invalid '$Field' value."
+    }
+    switch ($Value.Trim().ToLowerInvariant()) {
+        't' { return $true }
+        'true' { return $true }
+        'f' { return $false }
+        'false' { return $false }
+        default { throw "Audit CSV has an invalid '$Field' value." }
+    }
+}
+
 function Normalize-SourceKey {
     param([string]$SourceKey)
     if ([string]::IsNullOrWhiteSpace($SourceKey)) {
@@ -73,10 +89,7 @@ $evaluated = @(
         if ($manual -ne ($tag + $person + $place + $review + $label)) {
             throw 'Audit CSV has an inconsistent manual_history_actions total.'
         }
-        [bool]$missing = $false
-        if (-not [bool]::TryParse($row.marked_missing, [ref]$missing)) {
-            throw 'Audit CSV has an invalid marked_missing value.'
-        }
+        $missing = Read-PostgresBoolean $row.marked_missing 'marked_missing'
         [pscustomobject]@{
             SourceId = $row.source_id
             NormalizedKey = $normalized
