@@ -149,6 +149,12 @@ public sealed class PostgresArchiveSourceMoveReconciler : IArchiveSourceMoveReco
                 ON revision.id = observation.verified_revision_id
                AND revision.asset_id = asset.id
             WHERE asset.source_id = @source_id
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM archive_case_alias_retirements AS retirement
+                  WHERE retirement.secondary_asset_id = asset.id
+                    AND retirement.restored_at_utc IS NULL
+              )
               AND observation.verification_state = 'verified'
               AND observation.verified_revision_id IS NOT NULL;
             """;
