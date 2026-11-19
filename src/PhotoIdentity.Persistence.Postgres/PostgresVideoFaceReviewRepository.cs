@@ -54,7 +54,7 @@ public sealed class PostgresVideoFaceReviewRepository(
     private static bool Sha(string? value) =>
         value is { Length: 64 } && value.All(ch => ch is >= '0' and <= '9' or >= 'a' and <= 'f');
 
-    private static void Validate(VideoFaceEvidencePublication proposal)
+    internal static void ValidatePublication(VideoFaceEvidencePublication proposal)
     {
         ArgumentNullException.ThrowIfNull(proposal);
         if (proposal.RevisionId.IsEmpty || !Sha(proposal.SourceSha256) ||
@@ -118,7 +118,7 @@ public sealed class PostgresVideoFaceReviewRepository(
     public async Task<Guid> PublishAsync(
         VideoFaceEvidencePublication proposal, CancellationToken token = default)
     {
-        Validate(proposal);
+        ValidatePublication(proposal);
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlTransaction tx = await connection.BeginTransactionAsync(token);
         string? actualSha = await LockCurrentVideoAsync(
