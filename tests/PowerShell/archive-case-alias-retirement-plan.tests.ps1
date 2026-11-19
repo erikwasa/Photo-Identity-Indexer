@@ -81,7 +81,7 @@ function New-Effective {
 }
 
 try {
-    New-Item -ItemType Directory -LiteralPath $root -Force | Out-Null
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
 
     # Keep the original identified copy; automatic face decisions on a later
     # duplicate do not count as human history. No metadata or bytes are deleted.
