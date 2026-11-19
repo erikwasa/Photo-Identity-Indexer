@@ -210,16 +210,14 @@ The next isolated native path comprises:
   supervisors. **No evidence database writes, job completion or
   identity assignments occur from this component.**
 
-**Non-activation rule:** the existing video job queue has no admitted
-`FaceEvidence` derivative kind yet. This PR intentionally does not add
-one, does not register the producer in the runtime, and adds no CLI,
-endpoint, worker or scheduler. Merely deploying it has no face
-inference effect. The next integration PR must introduce explicit
-face-derivative admission with lease-fenced transaction publication
-(the existing v42 publisher only checks source revision/exclusion),
-review native crop evidence retention/deletion and model rights, and
-bind the persisted review UI. This prevents treating a CLIP
-`FrameEvidence` lease as face-recognition authorization.
+**Non-activation rule:** `FaceEvidence` already exists in the v34
+queue enum and database constraint, but PR #833 did not add an
+operator grant or worker connection for it. Merely deploying that
+producer has no inference effect. PR #834 adds the separate selected
+grant and lease-fenced commit, still without a CLI, runtime
+registration, hosted worker or scheduler. A CLIP `FrameEvidence`
+lease cannot authorize face inference. Native face crop rendering,
+retention/deletion, model rights and persisted UI remain pending.
 
 **Verification:** no originals, model files or production database are
 needed for synthetic acceptance:
@@ -234,3 +232,75 @@ if ($LASTEXITCODE -ne 0) { throw 'Native face frame contract failed.' }
 The test asserts no scaling, native geometry, independent observations,
 model digest refusal and candidate overflow failure. Passing synthetic
 tests is not evidence of real video detection quality or model rights.
+
+## 2026-11-20 — Dedicated face lease, atomic receipt, and selected-job adapter
+
+**Draft PR #834, migration v43.** `FaceEvidence` was already declared
+by the original v34 queue/schema, but previously could not be granted
+through `PostgresVideoScopedAttemptControl` and had no publication
+transaction or coordinator receipt. This PR connects the existing
+components without adding an automatic job scheduler:
+
+1. `VideoFaceEvidenceLeaseIdentity` defines the exact dedicated kind,
+   sampling policy, 1–4 frame native extraction preset and pinned
+   YuNet/SFace model hashes. A CLIP `FrameEvidence` job cannot use
+   the face adapter.
+2. The selected-job grant accepts FaceEvidence **only** for the exact
+   native preset, one named queued job, an approved FFmpeg SHA-256,
+   an accepted frame count and a bounded authorization expiry. No
+   generic enable switch authorizes face execution.
+3. `VideoFaceEvidenceWorkerAdapter` is **not registered**. If called
+   by a separately authorized future command, it monitors heartbeat
+   and photo-first interruption through native production, complete
+   all-exemplar scoring and the final database commit.
+4. `TryPublishLeasedAsync` atomically checks the current unexcluded
+   source and source SHA-256, selected control generation/expiry,
+   matching live lease token, job identity/bytes/frame count, Rec.709
+   inspection, cancellation and photo priority. If any final check
+   fails, the batch and any attempted job-success mutation are both
+   rolled back. `clock_timestamp()` catches leases/grants that
+   expire *during* a longer transaction.
+5. Migration **v43** adds nullable `publishing_job_id` to v42 batches.
+   Earlier unleased batches retain NULL and **cannot** satisfy a
+   different job's durable success receipt. The existing one-job
+   coordinator now requires the face batch's exact job ID, current
+   source and complete count before accepting a claimed success.
+   No SFace vectors, raw frames or paths are stored in PostgreSQL.
+
+**No production activation:** no FaceEvidence endpoint, CLI verb,
+enqueue scan, automatic worker registration or background schedule
+is provided by this PR. Deploying the code/schema alone cannot start
+recognition or mark a person present. The existing video-face review
+API stays off by default. The previous unleased internal publication
+method remains for compatibility with prior tests and operator
+experiments, but it does not produce a job-bound receipt.
+
+**Migration caution:** unlike PR #831/#833, this PR changes the
+schema from v42 to v43, and applications may initialize/migrate on
+startup. Take and verify a fresh production PostgreSQL backup before
+deploying any merged build, inspect migrations first, and keep
+face recognition OFF. No V06 CSV import or real video inference
+is required to test this PR.
+
+**PowerShell 7.6 acceptance (disposable PostgreSQL ONLY):**
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer'
+git fetch origin
+git switch wi-0155-face-evidence-lease-fenced-publication
+git pull --ff-only
+if (-not $env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING) {
+    throw 'Configure ONLY a disposable PostgreSQL admin instance (not production).'
+}
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceLeasedPublicationTests'
+if ($LASTEXITCODE -ne 0) { throw 'FaceEvidence lease publication acceptance failed.' }
+```
+The test creates and drops its own synthetic database and uses fake
+128D vectors instead of video files or ONNX inference. It exercises
+selected scope, forged lease rejection, complete atomic publication,
+job-specific current receipt and **zero** identity/person assignments.
+
+Remaining pre-activation gates: implement an explicit one-video
+operator command with local/rights and source/lease inspection,
+review private native face-crop display and retention, connect the
+persisted in-app human review, and require manual presence decisions.
