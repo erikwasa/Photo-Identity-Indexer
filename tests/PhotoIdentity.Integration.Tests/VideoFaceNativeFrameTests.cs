@@ -110,7 +110,12 @@ public sealed class VideoFaceNativeFrameTests
         var wrong = new VideoFaceNativeFrameAnalyzer(
             new FakeDetector([Face()]),
             new FakeAligner(), new FakeEmbedder(
-                EmbedderDescriptor with { ModelHash = new Sha256Digest(new string('a', 64)) }));
+                new ModelDescriptor(new ModelId("sface-2021dec-fp32"),
+                    ModelRole.FaceEmbedding, ModelFormat.Onnx,
+                    new Sha256Digest(new string('a', 64)),
+                    new ImageSize(112, 112), "onnxruntime", "Apache-2.0", "synthetic",
+                    outputDimensions: 128, distanceMetric: DistanceMetric.Cosine,
+                    alignmentProtocol: new AlignmentProtocolId("sface-five-point-v1"))));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             wrong.AnalyzeAsync(Frame(64, 64), 0, 1000));
 
