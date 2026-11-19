@@ -393,6 +393,7 @@ public sealed class PostgresVideoFaceReviewRepository(
                 throw new InvalidOperationException("The person is no longer canonical.");
         }
 
+        bool unchanged = false;
         await using (NpgsqlCommand previous = connection.CreateCommand())
         {
             previous.Transaction = tx;
@@ -401,13 +402,18 @@ public sealed class PostgresVideoFaceReviewRepository(
                 WHERE observation_id=@face ORDER BY id DESC LIMIT 1;
                 """;
             previous.Parameters.AddWithValue("face", observationId);
-            await using NpgsqlDataReader reader = await previous.ExecuteReaderAsync(token);
-            if (await reader.ReadAsync(token) && reader.GetString(0) == decision &&
-                (reader.IsDBNull(1) ? null : reader.GetGuid(1)) == personId)
+            // Npgsql requires the reader to be disposed before committing.
+            await using (NpgsqlDataReader reader = await previous.ExecuteReaderAsync(token))
             {
-                await tx.CommitAsync(token);
-                return false;
+                unchanged = await reader.ReadAsync(token) &&
+                    reader.GetString(0) == decision &&
+                    (reader.IsDBNull(1) ? null : reader.GetGuid(1)) == personId;
             }
+        }
+        if (unchanged)
+        {
+            await tx.CommitAsync(token);
+            return false;
         }
         await using (NpgsqlCommand action = connection.CreateCommand())
         {
