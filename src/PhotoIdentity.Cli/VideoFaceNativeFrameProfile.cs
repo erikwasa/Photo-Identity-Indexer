@@ -67,18 +67,72 @@ public static class VideoFaceNativeFrameProfile
             info.Length is < 100 or > MaximumJpegBytes)
             throw new InvalidDataException("Native video frame is missing, linked or oversized.");
 
-        await using FileStream input = new(outputPath, FileMode.Open,
-            FileAccess.Read, FileShare.Read, 65536,
-            FileOptions.Asynchronous | FileOptions.SequentialScan);
-        byte[] header = new byte[3];
-        if (await input.ReadAsync(header, token) != 3 ||
-            header[0] != 0xff || header[1] != 0xd8 || header[2] != 0xff)
-            throw new InvalidDataException("Native video frame must be JPEG.");
-        input.Position = 0;
+        byte[] jpeg = await File.ReadAllBytesAsync(outputPath, token);
+        if (jpeg.LongLength is < 100 or > MaximumJpegBytes)
+            throw new InvalidDataException("Native video JPEG changed during reading.");
+        ImageSize declared = ReadBoundedJpegSize(jpeg);
+        // IMPORTANT: DecodeOptions.MaximumSize causes automatic downscaling
+        // in the shared OpenCV decoder. Never supply it for native faces.
+        // The JPEG SOF preflight bounds pixel allocation BEFORE decoding.
+        using MemoryStream input = new(jpeg, writable: false);
         ImageFrame image = await new OpenCvImageDecoder().DecodeAsync(
-            input, new DecodeOptions(new ImageSize(MaximumEdge, MaximumEdge)), token);
+            input, new DecodeOptions(), token);
         ValidateDecodedImage(image);
+        if (image.Size != declared)
+            throw new InvalidDataException(
+                "Native video JPEG dimensions changed during decoding.");
         return image;
+    }
+
+    /// <summary>
+    /// Reject huge JPEG dimensions BEFORE OpenCV allocates a bitmap. Do not
+    /// downscale an oversized frame as the ordinary photo decoder would.
+    /// Inspect only JPEG structure, not a user-supplied path or other media.
+    /// </summary>
+    public static ImageSize ReadBoundedJpegSize(ReadOnlySpan<byte> jpeg)
+    {
+        if (jpeg.Length < 10 || jpeg[0] != 0xff || jpeg[1] != 0xd8)
+            throw new InvalidDataException("Native frame lacks a JPEG start marker.");
+
+        int offset = 2;
+        while (offset + 3 < jpeg.Length)
+        {
+            if (jpeg[offset++] != 0xff)
+                throw new InvalidDataException("Invalid JPEG segment boundary.");
+            while (offset < jpeg.Length && jpeg[offset] == 0xff)
+                offset++;
+            if (offset >= jpeg.Length)
+                break;
+            int marker = jpeg[offset++];
+            if (marker == 0xda || marker == 0xd9)
+                break; // No SOF before scan or end.
+            if (marker == 0x01 || marker is >= 0xd0 and <= 0xd7)
+                continue;
+            if (offset + 1 >= jpeg.Length)
+                break;
+            int length = jpeg[offset] * 256 + jpeg[offset + 1];
+            if (length < 2 || length > jpeg.Length - offset)
+                throw new InvalidDataException("Invalid JPEG segment length.");
+            bool startOfFrame =
+                marker is >= 0xc0 and <= 0xc3 or
+                    >= 0xc5 and <= 0xc7 or
+                    >= 0xc9 and <= 0xcb or
+                    >= 0xcd and <= 0xcf;
+            if (startOfFrame)
+            {
+                if (length < 7)
+                    throw new InvalidDataException("Invalid JPEG frame header.");
+                int height = jpeg[offset + 3] * 256 + jpeg[offset + 4];
+                int width = jpeg[offset + 5] * 256 + jpeg[offset + 6];
+                if (width is < 1 or > MaximumEdge ||
+                    height is < 1 or > MaximumEdge)
+                    throw new InvalidDataException(
+                        "Native video frame exceeds maximum pixel geometry; no resizing permitted.");
+                return new ImageSize(width, height);
+            }
+            offset += length;
+        }
+        throw new InvalidDataException("Native video JPEG is missing dimensions.");
     }
 
     public static void ValidateDecodedImage(ImageFrame image)
