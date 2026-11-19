@@ -87,10 +87,7 @@ COPY (
                     + face_review_actions + person_labels > 0
             ) OVER (
                 PARTITION BY source_id, normalized_source_key
-            ) AS members_with_manual_history,
-            count(DISTINCT verified_content_sha256) OVER (
-                PARTITION BY source_id, normalized_source_key
-            ) AS distinct_verified_hashes
+            ) AS members_with_manual_history
         FROM candidates
     )
     SELECT
