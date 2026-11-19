@@ -1,4 +1,7 @@
 using System.Data;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 
@@ -123,21 +126,61 @@ public sealed class PostgresVideoFaceReviewRepository(
         if (!string.Equals(actualSha, proposal.SourceSha256, StringComparison.Ordinal))
             throw new InvalidOperationException("The source revision digest does not match.");
 
+        // Retrying identical evidence after an unknown commit result is safe.
+        // A different publication cannot replace reviewed observation IDs.
+        string payloadSha256 = Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+            {
+                revision = proposal.RevisionId.Value,
+                proposal.SourceSha256, proposal.ProducerVersion,
+                proposal.DetectorModelId, proposal.DetectorModelHash,
+                proposal.SFaceModelId, proposal.SFaceModelHash,
+                proposal.AlignmentProtocol,
+                observations = proposal.Observations
+            })))).ToLowerInvariant();
+        await using (NpgsqlCommand existing = connection.CreateCommand())
+        {
+            existing.Transaction = tx;
+            existing.CommandText = """
+                SELECT id, payload_sha256 FROM video_face_evidence_batches
+                WHERE asset_revision_id=@revision;
+                """;
+            existing.Parameters.AddWithValue("revision", proposal.RevisionId.Value);
+            Guid? oldBatch = null;
+            string? oldHash = null;
+            await using (NpgsqlDataReader reader = await existing.ExecuteReaderAsync(token))
+            {
+                if (await reader.ReadAsync(token))
+                {
+                    oldBatch = reader.GetGuid(0);
+                    oldHash = reader.GetString(1);
+                }
+            }
+            if (oldBatch.HasValue)
+            {
+                if (!string.Equals(oldHash, payloadSha256, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        "Conflicting face evidence already exists for this video revision.");
+                await tx.CommitAsync(token);
+                return oldBatch.Value;
+            }
+        }
         Guid batchId = Guid.NewGuid();
         await using (NpgsqlCommand batch = connection.CreateCommand())
         {
             batch.Transaction = tx;
             batch.CommandText = """
                 INSERT INTO video_face_evidence_batches
-                  (id, asset_revision_id, source_sha256, producer_version,
+                  (id, asset_revision_id, source_sha256, payload_sha256, producer_version,
                    detector_model_id, detector_model_hash, sface_model_id,
                    sface_model_hash, alignment_protocol, observation_count, created_at_utc)
-                VALUES (@id, @revision, @source, @producer, @detector, @detector_hash,
+                VALUES (@id, @revision, @source, @payload, @producer, @detector, @detector_hash,
                         @sface, @sface_hash, @alignment, @count, @at);
                 """;
             batch.Parameters.AddWithValue("id", batchId);
             batch.Parameters.AddWithValue("revision", proposal.RevisionId.Value);
             batch.Parameters.AddWithValue("source", proposal.SourceSha256);
+            batch.Parameters.AddWithValue("payload", payloadSha256);
             batch.Parameters.AddWithValue("producer", proposal.ProducerVersion);
             batch.Parameters.AddWithValue("detector", proposal.DetectorModelId);
             batch.Parameters.AddWithValue("detector_hash", proposal.DetectorModelHash);
