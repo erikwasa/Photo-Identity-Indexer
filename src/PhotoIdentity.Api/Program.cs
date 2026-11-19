@@ -116,6 +116,7 @@ public partial class Program
         builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
         builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
         builder.Services.AddSingleton<PostgresVideoDetailsRepository>();
+        builder.Services.AddSingleton<PostgresVideoFaceReviewRepository>();
         builder.Services.AddSingleton<PostgresVideoPlaybackRepository>();
         builder.Services.AddSingleton<PostgresVideoSearchRepository>();
         builder.Services.AddSingleton<VideoProcessingPreferencesStore>();
@@ -338,6 +339,7 @@ public partial class Program
         app.MapArchiveStorageEndpoints();
         app.MapVideoLibraryEndpoints();
         app.MapVideoDetailsEndpoints();
+        app.MapVideoFaceReviewEndpoints();
         app.MapVideoProcessingEndpoints();
         app.MapFallbackToFile("index.html");
 

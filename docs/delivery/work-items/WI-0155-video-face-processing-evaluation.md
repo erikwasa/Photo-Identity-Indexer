@@ -10,6 +10,63 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-19 — PR #828 production face-review persistence foundation
+
+**Previously accepted:** PR #827 merged and the maintainer verified all
+11/11 local V06 checks: v3 review package (53 groups and crops),
+names loaded directly from PostgreSQL, individual clickable per-face
+suggestions, auto-hide/reopen, incomplete decision visibility, prior CSV
+restoration (38 reviewed / 15 unreviewed), source-bound export audit,
+and no production writes. Post-merge main CI passed.
+
+**New product integration (draft PR #828):** PostgreSQL catalogue
+migration **v42** introduces real, video-only, current-revision-bound
+face evidence batches, individual face observations, top-three ranked
+canonical people and an append-only human review history. The
+`PostgresVideoFaceReviewRepository` now has a *producer-only* atomic
+`PublishAsync` intake, requiring an included latest local-video
+revision, exact catalogue content digest and supported inspection;
+bounded frame/face geometry, sorted finite cosine scores, immutable
+source/model/alignment metadata and stable idempotent retries.
+Conflicting evidence cannot replace a reviewed batch. No arbitrary
+media source, crop, SFace embedding or user-supplied path is accepted
+over HTTP.
+
+An explicit, **default-off** `PhotoIdentity:VideoFaceReviewEnabled=true`
+setting gates two production API routes: GET current face evidence by
+video revision and POST one human decision by face observation UUID.
+Decisions are `known`, `unknown`, `not-face`, `cannot-tell` or
+`clear`; a known person must be a currently canonical unmerged
+catalogue person. Identical repeat requests are idempotent, changes
+append history, and a `clear` action reverses the current verdict
+without deleting earlier audit rows. All reads and writes are
+source-revision/currentness gated. Source exclusion purges every
+derived face batch, suggestion and review action transactionally via
+FK cascades. Disposable PostgreSQL tests exercise the complete
+boundary and prove there are zero writes to `video_person_actions`
+or photo identity tables.
+
+**No production face processing is switched on.** There is
+intentionally no public evidence-publication route, automatic video
+source opener, face extraction or SFace inference in this PR. No
+face crop serving, UI linkage from Video Details or promotion of
+face decisions to video-person presence has been implemented yet.
+The offline V06 JSON/alias CSV remains separate: historical
+pseudonym reports are **not** authoritative proof of a current
+production asset revision. The current production database must not
+be seeded from them by guesswork.
+
+**Next integration gates:** connect the existing guarded video worker
+to native-quality bounded YuNet/SFace evidence publication with
+production all-confirmed-exemplar reference scoring; bind private
+crop provenance safely to revision and observation; display the
+persisted review in Video Details; add explicit operator-controlled
+presence promotion with deduplication and undo; verify model rights,
+retention and false-person rate. These are now concrete product
+engineering steps, not additional isolated gallery experiments.
+
+
+
 ## 2026-11-19 — Accepted review UX and productionization direction
 
 PR #826 was merged and **all 12 maintainer local acceptance checks PASS**:
