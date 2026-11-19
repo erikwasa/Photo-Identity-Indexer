@@ -126,6 +126,7 @@ try {
     $summary = & $planner -EvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -OutputDirectory $outputDirectory
     Assert ($summary.CollisionGroups -eq 8) 'Wrong collision count.'
     Assert ($summary.ReversibleRetirementCandidates -eq 1) 'Unexpected automated candidate count.'
+    Assert ($summary.SecondaryAutomaticReviewActionsInCandidates -eq 3) 'Automatic actions in candidate summary were not counted.'
     Assert ($summary.HeldForReview -eq 7) 'Unreviewed cases were not held.'
     Assert ($summary.HeldForEffectiveAnnotationDifferences -eq 1) 'Effective Place mismatch not held.'
     Assert ($summary.HeldForAmbiguousIngestionOrder -eq 1) 'Equal creation timestamps were accepted.'
@@ -151,12 +152,14 @@ try {
     $rows | Export-Csv -LiteralPath $evidenceCsv -Encoding utf8
     $nowHeld = & $planner -EvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -OutputDirectory $outputDirectory
     Assert ($nowHeld.ReversibleRetirementCandidates -eq 0) 'Human/unknown label was ignored.'
+    Assert ($nowHeld.SecondaryAutomaticReviewActionsInCandidates -eq 0) 'Zero-candidate summary must report zero automatic actions.'
 
     $rows[1].human_or_unknown_person_labels = '0'
     $rows[1].verified_content_sha256 = 'wrong'
     $rows | Export-Csv -LiteralPath $evidenceCsv -Encoding utf8
     $nowHeld = & $planner -EvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -OutputDirectory $outputDirectory
     Assert ($nowHeld.ReversibleRetirementCandidates -eq 0) 'Invalid content evidence was ignored.'
+    Assert ($nowHeld.SecondaryAutomaticReviewActionsInCandidates -eq 0) 'Invalid-content zero-candidate summary must be zero.'
 
     Write-Host 'Archive case-alias automatic retirement plan synthetic tests: PASS'
 }
