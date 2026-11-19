@@ -100,7 +100,15 @@ try {
         (New-Evidence 'fideli/excluded.jpg' 'newer-excluded' $true -Excluded $true)
         (New-Evidence 'Fideli/tagged.jpg' 'older-tagged' $false)
         (New-Evidence 'fideli/tagged.jpg' 'newer-tagged' $true -ManualTagActions 1)
+        (New-Evidence 'Fideli/unverified.jpg' 'older-unverified' $false)
+        (New-Evidence 'fideli/unverified.jpg' 'newer-unverified' $true)
     )
+    # Verification evidence may be absent on an online-only / unverified
+    # observation. It must block, not abort a complete read-only plan.
+    $rows[-1].verification_state = 'unverified'
+    $rows[-1].verified_revision_id = ''
+    $rows[-1].verified_content_sha256 = ''
+    $rows[-1].verified_size_bytes = ''
     $states = @(
         (New-Effective 'Fideli/auto.jpg' 'older-auto' 'newer-auto')
         (New-Effective 'Fideli/human.jpg' 'older-human' 'newer-human')
@@ -109,13 +117,16 @@ try {
         (New-Effective 'Fideli/hash.jpg' 'older-hash' 'newer-hash')
         (New-Effective 'Fideli/excluded.jpg' 'older-excluded' 'newer-excluded')
         (New-Effective 'Fideli/tagged.jpg' 'older-tagged' 'newer-tagged')
+        (New-Effective 'Fideli/unverified.jpg' 'older-unverified' 'newer-unverified')
     )
+    $states[-1].both_verified = 'f'
+    $states[-1].matching_stored_hash = 'f'
     $rows | Export-Csv -LiteralPath $evidenceCsv -Encoding utf8
     $states | Export-Csv -LiteralPath $effectiveCsv -Encoding utf8
     $summary = & $planner -EvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -OutputDirectory $outputDirectory
-    Assert ($summary.CollisionGroups -eq 7) 'Wrong collision count.'
+    Assert ($summary.CollisionGroups -eq 8) 'Wrong collision count.'
     Assert ($summary.ReversibleRetirementCandidates -eq 1) 'Unexpected automated candidate count.'
-    Assert ($summary.HeldForReview -eq 6) 'Unreviewed cases were not held.'
+    Assert ($summary.HeldForReview -eq 7) 'Unreviewed cases were not held.'
     Assert ($summary.HeldForEffectiveAnnotationDifferences -eq 1) 'Effective Place mismatch not held.'
     Assert ($summary.HeldForAmbiguousIngestionOrder -eq 1) 'Equal creation timestamps were accepted.'
     Assert ($summary.AutomaticallyExecuted -eq 0) 'Planner executed changes.'
@@ -123,7 +134,7 @@ try {
 
     $planPath = Join-Path $outputDirectory 'retirement-candidates-private.csv'
     $items = @(Import-Csv -LiteralPath $planPath)
-    Assert ($items.Count -eq 7) 'Not exactly one proposed action per collision.'
+    Assert ($items.Count -eq 8) 'Not exactly one proposed action per collision.'
     $auto = @($items | Where-Object { $_.NormalizedSourceKey -eq 'fideli/auto.jpg' })[0]
     Assert ($auto.ProposedAction -eq 'review-for-reversible-alias-retirement') 'Safe automatic-only duplicate not proposed.'
     Assert ($auto.SurvivorAssetId -eq 'older-auto') 'Original survivor not retained.'
