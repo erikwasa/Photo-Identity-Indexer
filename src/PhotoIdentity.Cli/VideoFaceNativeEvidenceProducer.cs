@@ -67,9 +67,9 @@ public sealed class VideoFaceNativeEvidenceProducer(
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
         if (!OperatingSystem.IsWindows() ||
-            lease.DerivativeKind != "FaceEvidence" ||
-            lease.PolicyVersion != VideoFrameSamplingPlanner.PolicyVersion ||
-            lease.PresetVersion != VideoFaceNativeFrameProfile.Version ||
+            !VideoFaceEvidenceLeaseIdentity.Matches(
+                lease.DerivativeKind, lease.PolicyVersion,
+                lease.PresetVersion, lease.RequestedFrames) ||
             lease.ToolSha256 != options.FfmpegSha256 ||
             lease.RequestedFrames is < 1 or > VideoFaceNativeFrameAnalyzer.MaximumFramesPerAttempt ||
             lease.SourceBytes is < 1 or > 1024L * 1024 * 1024 ||
