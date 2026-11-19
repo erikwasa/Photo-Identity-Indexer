@@ -106,3 +106,54 @@ The test checks exact-path preservation, prevention of a new case-only alias,
 retention of manual tag/person history and recognition of case-only
 aliases of durable exclusion tombstones. Live PostgreSQL verification and
 the private production audit are still outstanding.
+
+
+## Follow-up audit result and read-only reconciliation preview
+
+The production read-only audit returned 2,176 asset records grouped into 1,088
+case-normalized pairs:
+
+| Annotation history per pair | Pairs |
+| --- | ---: |
+| Both members have captured manual history | 458 |
+| Exactly one has captured manual history | 409 |
+| Neither has captured manual history | 221 |
+
+This audit is broader than the earlier exact-duplicate view (825 pairs): the
+263 additional pairs may have unverified, missing, excluded, or differing
+hash evidence. They must not be treated as exact byte duplicates.
+
+A separately reviewed, read-only preview consumes the private CSV generated
+by the audit; it does not connect to PostgreSQL:
+
+~~~powershell
+pwsh -NoProfile -File .\tests\PowerShell\archive-case-reconciliation-preview.tests.ps1
+.\tools\preview-archive-case-reconciliation.ps1 -AuditCsv '.\artifacts\archive-case-alias-audit.csv' -OutputDirectory '.\artifacts\archive-case-reconciliation'
+~~~
+
+It writes a private CSV with one row per case-collision group and prints a
+privacy-safe aggregate summary. The preview calculates:
+
+- whether both current source revisions are verified and report matching,
+  different, or incomplete SHA-256 evidence;
+- whether a member is marked missing;
+- the number of members with manual annotation history;
+- a non-binding keeper candidate ID only if exactly one member has captured
+  manual annotation history;
+- a conservative decision for manual review.
+
+Every row has SafeToDelete=false and RequiresOperatorReview=true.
+The script has no Apply mode. Same-hash evidence is not interpreted as a
+license to delete an archive-relative source locator. Face occurrences and
+other processing-derived metadata may exist on either asset even when the
+captured manual action counts are zero.
+
+A later design must inspect effective annotation values, revision-linked
+processing history, identity assignments and derived references before
+creating any destructive reconciliation transaction. Existing source IDs,
+asset IDs and revision IDs must remain stable for the authoritative records.
+Case-only paths may be aliases of the same Windows file, but the database's
+present flag does not prove current filesystem existence.
+
+The audit and preview CSV files are private and belong in the ignored
+artifacts/ directory. Never attach them to public PRs.
