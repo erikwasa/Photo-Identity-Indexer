@@ -218,7 +218,9 @@ fails closed if the source mapping or deletion state is inconsistent, and
 uses the original source path only for opening the physical original.
 Missing reconciliation recognizes the observed secondary spelling as an
 observation of the survivor. This avoids reactivating the secondary asset
-or marking the survivor missing on the next rescan. Exact-duplicate inventory
+or marking the survivor missing on the next rescan. Source-move reconciliation
+also ignores retired aliases so it cannot mistake a deliberately retired
+secondary for a recently moved source copy. Exact-duplicate inventory
 omits active retired aliases but continues to report genuine distinct-path
 copies even when their SHA-256 matches.
 
