@@ -35,10 +35,10 @@ public sealed partial class PostgresCatalogueDatabase
             face_ordinal integer NOT NULL CHECK (face_ordinal BETWEEN 0 AND 31),
             frame_width integer NOT NULL CHECK (frame_width BETWEEN 1 AND 3840),
             frame_height integer NOT NULL CHECK (frame_height BETWEEN 1 AND 3840),
-            face_x double precision NOT NULL CHECK (isfinite(face_x) AND face_x >= 0 AND face_x <= 1),
-            face_y double precision NOT NULL CHECK (isfinite(face_y) AND face_y >= 0 AND face_y <= 1),
-            face_width double precision NOT NULL CHECK (isfinite(face_width) AND face_width > 0 AND face_width <= 1),
-            face_height double precision NOT NULL CHECK (isfinite(face_height) AND face_height > 0 AND face_height <= 1),
+            face_x double precision NOT NULL CHECK (face_x >= 0 AND face_x <= 1),
+            face_y double precision NOT NULL CHECK (face_y >= 0 AND face_y <= 1),
+            face_width double precision NOT NULL CHECK (face_width > 0 AND face_width <= 1),
+            face_height double precision NOT NULL CHECK (face_height > 0 AND face_height <= 1),
             CONSTRAINT ck_video_face_box_in_frame CHECK (face_x + face_width <= 1.00001 AND face_y + face_height <= 1.00001),
             CONSTRAINT ux_video_face_observation UNIQUE (batch_id, frame_ordinal, face_ordinal)
         );
@@ -48,7 +48,7 @@ public sealed partial class PostgresCatalogueDatabase
             observation_id uuid NOT NULL REFERENCES video_face_observations (id) ON DELETE CASCADE,
             rank integer NOT NULL CHECK (rank BETWEEN 1 AND 3),
             person_id uuid NOT NULL REFERENCES people (id) ON DELETE RESTRICT,
-            similarity double precision NOT NULL CHECK (isfinite(similarity) AND similarity BETWEEN -1 AND 1),
+            similarity double precision NOT NULL CHECK (similarity BETWEEN -1 AND 1),
             PRIMARY KEY (observation_id, rank),
             UNIQUE (observation_id, person_id)
         );
