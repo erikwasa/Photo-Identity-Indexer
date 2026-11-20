@@ -25,7 +25,7 @@ public sealed class PostgresVideoFacePresenceRepository(
 
         await using NpgsqlConnection connection = await database.OpenConnectionAsync(token);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(token);
-        Guid reviewAction = await LockReviewedKnownFaceAsync(
+        long reviewAction = await LockReviewedKnownFaceAsync(
             connection, transaction, revision, observation, person, token);
 
         // Person merges and display-name retirement cannot turn a stale
@@ -182,7 +182,7 @@ public sealed class PostgresVideoFacePresenceRepository(
 
         // Preserve both link and unlink in the audit trail. A successful
         // unlink does not rewrite the reviewed face identity.
-        Guid reviewAction = await ReadKnownReviewActionAsync(
+        long reviewAction = await ReadKnownReviewActionAsync(
             connection, transaction, observation, person.Value, token);
         await WriteLinkAsync(connection, transaction, revision, observation,
             person.Value, reviewAction, addAction.Value, removed, "unlink", actor, token);
@@ -197,7 +197,7 @@ public sealed class PostgresVideoFacePresenceRepository(
             throw new ArgumentException("Invalid human video presence action.");
     }
 
-    private static async Task<Guid> LockReviewedKnownFaceAsync(
+    private static async Task<long> LockReviewedKnownFaceAsync(
         NpgsqlConnection connection, NpgsqlTransaction tx,
         AssetRevisionId revision, Guid observation, Guid person, CancellationToken token)
     {
@@ -315,7 +315,7 @@ public sealed class PostgresVideoFacePresenceRepository(
         return reader.GetGuid(1);
     }
 
-    private static async Task<Guid> ReadKnownReviewActionAsync(
+    private static async Task<long> ReadKnownReviewActionAsync(
         NpgsqlConnection connection, NpgsqlTransaction tx,
         Guid observation, Guid person, CancellationToken token)
     {
@@ -331,13 +331,8 @@ public sealed class PostgresVideoFacePresenceRepository(
         review.Parameters.AddWithValue("person", person);
         if (await review.ExecuteScalarAsync(token) is not long id)
             throw new InvalidOperationException("The human face confirmation is stale.");
-        return GuidFromActionId(id);
+        return id;
     }
-
-    // The reference to the immutable review action uses its bigint PK, not
-    // a second synthetic UUID. Keep all identity comparisons server side.
-    private static Guid GuidFromActionId(long id) =>
-        new Guid(0, 0, 0, BitConverter.GetBytes(id));
 
     private static async Task<(string? Kind, Guid? Person, long? Added)> ReadLatestLinkAsync(
         NpgsqlConnection connection, NpgsqlTransaction tx,
@@ -360,7 +355,7 @@ public sealed class PostgresVideoFacePresenceRepository(
     private async Task WriteLinkAsync(
         NpgsqlConnection connection, NpgsqlTransaction tx,
         AssetRevisionId revision, Guid observation, Guid person,
-        Guid reviewAction, long addAction, long? removeAction,
+        long reviewAction, long addAction, long? removeAction,
         string kind, string actor, CancellationToken token)
     {
         await using NpgsqlCommand write = connection.CreateCommand();
@@ -375,7 +370,7 @@ public sealed class PostgresVideoFacePresenceRepository(
         write.Parameters.AddWithValue("revision", revision.Value);
         write.Parameters.AddWithValue("face", observation);
         write.Parameters.AddWithValue("person", person);
-        write.Parameters.AddWithValue("review", ActionIdFromGuid(reviewAction));
+        write.Parameters.AddWithValue("review", reviewAction);
         write.Parameters.AddWithValue("add", addAction);
         write.Parameters.Add(new Npgsql.NpgsqlParameter("remove", NpgsqlTypes.NpgsqlDbType.Bigint)
             { Value = removeAction.HasValue ? removeAction.Value : DBNull.Value });
@@ -385,6 +380,4 @@ public sealed class PostgresVideoFacePresenceRepository(
         await write.ExecuteNonQueryAsync(token);
     }
 
-    private static long ActionIdFromGuid(Guid review) =>
-        BitConverter.ToInt64(review.ToByteArray(), 8);
 }
