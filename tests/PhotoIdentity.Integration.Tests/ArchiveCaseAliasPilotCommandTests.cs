@@ -186,6 +186,8 @@ public sealed class ArchiveCaseAliasPilotCommandTests
             {
                 passed = true, sourceDatabase = dbName, cleanupStatus = "removed",
                 cleanupRequired = false, backupPath,
+                sourceEvidence = new { schemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion },
+                restoredEvidence = new { schemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion },
                 backupSha256 = new string('b', 64), capturedAtUtc = DateTimeOffset.UtcNow
             }));
 
