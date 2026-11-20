@@ -1,4 +1,6 @@
 using Npgsql;
+using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
@@ -204,8 +206,37 @@ public sealed class PostgresArchiveCaseAliasRetirementServiceTests
                 Assert.Equal(1, await clearHuman.ExecuteNonQueryAsync());
             }
 
+            // Before/after state is intentionally tested through the real
+            // active gallery repositories, not only the missing marker.
+            FaceOccurrenceId faceId = FaceOccurrenceId.From(face);
+            PostgresReviewQueryRepository reviewGallery = new(database);
+            PostgresSuggestionGalleryRepository suggestionGallery = new(database);
+            ModelId modelId = new("alias-retirement-gallery-test");
+            Sha256Digest modelHash = new(new string('c', 64));
+
+            Assert.Single((await reviewGallery.GetFacesAsync(state: "all")).Items);
+            Assert.Single((await suggestionGallery.GetFacesAsync(
+                modelId, modelHash, 0, 40, "all", null,
+                "created-desc", "all", null)).Items);
+
             Assert.Equal(ArchiveAliasRetirementOutcome.Retired, await service.RetireAsync(request));
             Assert.Equal(ArchiveAliasRetirementOutcome.AlreadyRetired, await service.RetireAsync(request));
+
+            // The history still exists (checked below), but is no longer
+            // an active review/identity-suggestion gallery candidate.
+            Assert.Empty((await reviewGallery.GetFacesAsync(state: "all")).Items);
+            Assert.Null(await reviewGallery.GetFaceAsync(faceId));
+            var retiredGallery = await suggestionGallery.GetFacesAsync(
+                modelId, modelHash, 0, 40, "all", null,
+                "created-desc", "all", null);
+            Assert.Empty(retiredGallery.Items);
+            Assert.Equal(0, retiredGallery.Total);
+            Assert.Null(await suggestionGallery.GetNavigationAsync(
+                faceId, modelId, modelHash, "all", null,
+                "created-desc", "all", null));
+            await Assert.ThrowsAsync<KeyNotFoundException>(
+                () => new PostgresReviewActionRepository(database).MarkUnknownAsync(
+                    faceId, "manual-test", t1));
 
             await using (NpgsqlConnection verify = new(builder.ConnectionString))
             {
@@ -247,6 +278,11 @@ public sealed class PostgresArchiveCaseAliasRetirementServiceTests
 
             Assert.Equal(ArchiveAliasRetirementOutcome.Restored, await service.RestoreAsync(request));
             Assert.Equal(ArchiveAliasRetirementOutcome.AlreadyRestored, await service.RestoreAsync(request));
+            Assert.Single((await reviewGallery.GetFacesAsync(state: "all")).Items);
+            Assert.NotNull(await reviewGallery.GetFaceAsync(faceId));
+            Assert.Single((await suggestionGallery.GetFacesAsync(
+                modelId, modelHash, 0, 40, "all", null,
+                "created-desc", "all", null)).Items);
 
             await using (NpgsqlConnection verify = new(builder.ConnectionString))
             {
