@@ -1,0 +1,27 @@
+.vfpr-summary, .vfpr-preview, .vfpr-face {
+    background: var(--surface, white);
+    border: 1px solid var(--line, #d6dcd8);
+    border-radius: 0.95rem;
+    padding: 1rem 1.15rem;
+    margin: 0 0 1rem;
+}
+.vfpr-summary p, .vfpr-preview p { max-width: 75ch; }
+.vfpr-toggle { display: flex; align-items: center; gap: 0.55rem; margin: 0.65rem 0; }
+.vfpr-preview video { display: block; width: 100%; max-width: 720px; max-height: 420px; background: #111; border-radius: 0.5rem; }
+.vfpr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 0.85rem; }
+.vfpr-face { margin: 0; min-width: 0; }
+.vfpr-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.4rem; }
+.vfpr-heading h2 { font-size: 1.05rem; margin: 0.25rem 0; }
+.vfpr-heading span, .vfpr-geometry { color: var(--muted, #556); font-size: 0.88rem; }
+.vfpr-geometry { overflow-wrap: anywhere; }
+.vfpr-decision { font-weight: 700; }
+.vfpr-face h3 { font-size: 0.94rem; margin: 1rem 0 0.5rem; }
+.vfpr-options, .vfpr-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.65rem 0 0; }
+.vfpr-options .button { display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 0.2rem; }
+.vfpr-options .button small { font-weight: 400; }
+.vfpr-person-search { display: block; margin-top: 0.95rem; }
+.vfpr-person-search input { display: block; width: 100%; margin-top: 0.3rem; }
+@media (max-width: 600px) {
+    .vfpr-summary, .vfpr-preview, .vfpr-face { padding: 0.8rem; }
+    .vfpr-options .button, .vfpr-actions .button { flex-grow: 1; }
+}

@@ -465,3 +465,70 @@ Keep recognition and review routes disabled by default. There is no new
 scheduler, source recall, private crop renderer, manual presence promotion,
 model-rights approval or retention sign-off. Do not run real-media
 `--apply` without the separately documented maintainer permissions.
+
+## 2026-11-20 — Current-revision face review UI (separate opt-in PR)
+
+The in-app `/videos/{revisionId}/faces` page now consumes the **existing**
+production `GET /api/videos/{revisionId}/face-review` and per-observation
+`POST .../decision` endpoints. Video Details offers the link only after
+a current evidence GET succeeds; the whole feature remains hidden when either
+`PhotoIdentity:VideoLibraryEnabled` or
+`PhotoIdentity:VideoFaceReviewEnabled` is false. No new schema migration,
+scheduled worker, inference endpoint, automatic identity assignment, or
+photo identity writer is introduced.
+
+The page shows each detector observation's frame timestamp and native face
+geometry, ranked canonical suggestions as individual confirmation buttons,
+a search across current canonical people, and unknown/not-face/cannot-tell/
+clear decisions. Decisions are sent to the existing append-only, source-
+revision-locked repository and reloaded from the server. Reviewed observations
+are hidden by default and can be revealed for correction. The visible summary
+deduplicates confirmed *people* across repeated observations, not faces,
+and explicitly distinguishes a zero-detection sample from video-wide
+absence. Conflicts, stale revisions, exclusions and disabled routes withdraw
+all actionable observations pending a fresh GET.
+
+**Visual evidence limitation:** This slice uses the already registered,
+local, revision-gated **playable proxy**, not a retained source-original
+frame or private full-resolution face crop. The proxy opens only when the
+operator clicks a sampled observation, and the browser seeks near its
+timestamp without autoplay. A reviewer must acknowledge actually inspecting
+the visual context before a decision button is enabled. Playback errors
+disable decisions. Proxy timestamps and rotation/resolution may differ from
+native YuNet/SFace sampling; do **not** treat this as source-verified crop
+parity or an acceptance test of recognition quality. The browser does not
+capture, export, upload or persist pixels, and no original is opened by
+this page. An exact source-attested private crop route remains a separate
+required step before treating face review as fully production-ready.
+
+**UI scope:** Existing review decisions still do **not** create or remove
+`video_person_actions`. Manual video presence is managed separately in
+Video Details; explicit human-approved evidence-to-presence promotion,
+deduplication and undo remain future work. Existing imported V06 gallery
+and CSV workflows remain available but are not silently imported into
+the production batch. The safe default is to keep video face review disabled
+until real-media model rights, visual quality and retention have been approved.
+
+**PowerShell 7.6 verification, no real media or database required:**
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer'
+git fetch origin
+gh pr checkout <this PR number>
+dotnet build .\src\PhotoIdentity.Web\PhotoIdentity.Web.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Face review UI build failed.' }
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFacePersistedReviewWebContractTests'
+if ($LASTEXITCODE -ne 0) { throw 'Face review UI contract test failed.' }
+```
+
+Optional interactive acceptance requires a **previously authorized** current
+leased FaceEvidence batch, its exact revision with a playable proxy, and
+both settings enabled on a private local host. In Video Details, follow
+"Review sampled faces"; select an observation, inspect/seek the proxy,
+acknowledge context, choose one suggested/canonical person or an uncertain
+decision, confirm it hides, reopen it, and clear it. Verify a stale/excluded
+revision no longer loads decisions. Check that the video person's manual tags
+and photo identities are unchanged. Do not run new real-media inference
+solely to populate the UI; source-backed native crop and rights approval
+remain outstanding.

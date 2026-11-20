@@ -1,0 +1,362 @@
+@page "/videos/{RevisionId}/faces"
+@using System.Net
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Review video faces · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Video library · opt-in human review</p>
+        <h1>Review sampled video faces</h1>
+        <p>Current, revision-bound detector observations and ranked suggestions. Nothing here automatically identifies anyone or adds a video-person tag.</p>
+    </div>
+    <a class="button secondary" href="@($"/videos/{RevisionId}")">Back to video details</a>
+</section>
+
+@if (Loading)
+{
+    <section class="empty-state compact"><p>Loading current face evidence…</p></section>
+}
+else if (Batch is null)
+{
+    <section class="empty-state compact" role="status">
+        <p>@(Error ?? "No current published face evidence is available for this video, or video face review is disabled.")</p>
+        <button class="button secondary" @onclick="RefreshAsync">Refresh</button>
+    </section>
+}
+else
+{
+    <section class="vfpr-summary" aria-label="Sampled face review summary">
+        <p><strong>@Batch.Observations.Count</strong> sampled face observations ·
+           <strong>@Batch.Observations.Count(VideoFaceReviewPresentation.IsReviewed)</strong> reviewed ·
+           <strong>@VideoFaceReviewPresentation.DistinctConfirmedPeople(Batch.Observations)</strong> distinct confirmed people</p>
+        <p>This is not whole-video coverage. One credible face may support a manual presence decision later; these face decisions never create a video-person association.</p>
+        @if (Batch.Observations.Count == 0)
+        {
+            <p role="status">The bounded sampled frames contained no detected faces. This does not establish that the whole video contains no people.</p>
+        }
+        else
+        {
+            <label class="vfpr-toggle">
+                <input type="checkbox" @bind="ShowReviewed" />
+                Show already reviewed faces
+            </label>
+        }
+    </section>
+
+    @if (SelectedFace is not null)
+    {
+        <section class="vfpr-preview" aria-label="Manually opened video frame context">
+            <h2>Visual context · @VideoFaceReviewPresentation.Moment(SelectedFace.TimestampMs)</h2>
+            <p>The existing local <strong>playable proxy</strong> is opened only after you select an observation.
+               Seeking may land near, rather than exactly on, the native sampled frame. No native crop or face-box overlay is available yet.
+               Do not confirm a person unless the visible evidence is clear.</p>
+            @if (PreviewOpen)
+            {
+                <video @ref="PreviewPlayer" controls playsinline preload="none"
+                       src="@($"/api/videos/{Uri.EscapeDataString(RevisionId)}/play")"
+                       @onloadeddata="OnLoadedData" @onseeked="OnSeeked"
+                       @onerror="OnPlaybackError" aria-label="Selected video frame context">
+                    Your browser cannot play this video proxy.
+                </video>
+            }
+            @if (PlaybackUnavailable)
+            {
+                <p role="alert">The playable proxy is unavailable. No original video was opened and review decisions remain disabled.</p>
+            }
+            else if (!FrameReady)
+            {
+                <p role="status">Seeking to the sampled moment. Review actions become available only after a frame loads.</p>
+            }
+            else
+            {
+                <label class="vfpr-toggle">
+                    <input type="checkbox" @bind="VisualConfirmed" />
+                    I inspected the video moment and can judge this face.
+                </label>
+            }
+        </section>
+    }
+
+    @if (Batch.Observations.Count > 0 && VisibleFaces.Count == 0)
+    {
+        <section class="empty-state compact">
+            <p>All sampled faces have review decisions. Turn on “Show already reviewed faces” to reopen or correct one.</p>
+        </section>
+    }
+
+    <section class="vfpr-grid" aria-label="Face observations">
+        @foreach (PersistedVideoFaceObservation face in VisibleFaces)
+        {
+            bool selected = SelectedFace?.Id == face.Id;
+            <article class="vfpr-face" @key="face.Id">
+                <div class="vfpr-heading">
+                    <h2>Frame @(face.FrameOrdinal + 1) · Face @(face.FaceOrdinal + 1)</h2>
+                    <span>@VideoFaceReviewPresentation.Moment(face.TimestampMs)</span>
+                </div>
+                <p class="vfpr-geometry">Detector box: @((face.X * 100).ToString("F1"))% left,
+                    @((face.Y * 100).ToString("F1"))% top,
+                    @((face.Width * 100).ToString("F1"))% ×
+                    @((face.Height * 100).ToString("F1"))% ·
+                    @face.FrameWidth × @face.FrameHeight native frame</p>
+
+                @if (VideoFaceReviewPresentation.IsReviewed(face))
+                {
+                    <p class="vfpr-decision">Reviewed: @DecisionLabel(face)</p>
+                }
+                else
+                {
+                    <p class="vfpr-decision">Not reviewed</p>
+                }
+                <button class="button secondary" disabled="@Busy" @onclick="() => Inspect(face)">
+                    @(selected ? "Reinspect sampled moment" : "Inspect sampled moment")
+                </button>
+
+                @if (face.Suggestions.Count > 0)
+                {
+                    <h3>Possible people · suggestions only</h3>
+                    <div class="vfpr-options">
+                        @foreach (PersistedVideoFaceSuggestion suggestion in face.Suggestions)
+                        {
+                            <button @key="suggestion.PersonId" class="button secondary"
+                                    disabled="@(!CanDecide(face) || !suggestion.Selectable)"
+                                    title="Human confirmation; never automatic"
+                                    @onclick='() => DecideAsync(face, "known", suggestion.PersonId)'>
+                                Confirm @suggestion.DisplayName
+                                <small>Rank @suggestion.Rank · @suggestion.Similarity.ToString("F3")</small>
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p>No suggested known person. You can still search the catalogue.</p>
+                }
+
+                @if (selected)
+                {
+                    <label class="vfpr-person-search">
+                        Search any current canonical person
+                        <input type="search" @bind="PersonSearch" @bind:event="oninput"
+                               maxlength="100" placeholder="Person name"
+                               disabled="@(!CanDecide(face) || PeopleError is not null)" />
+                    </label>
+                    @if (PeopleError is not null)
+                    {
+                        <p role="status">@PeopleError</p>
+                    }
+                    else if (CanDecide(face))
+                    {
+                        <div class="vfpr-options" aria-label="Other known people">
+                            @foreach (VideoDetailsPersonPickerEntry person in MatchingPeople)
+                            {
+                                <button class="button secondary" @key="person.Id" disabled="@Busy"
+                                        @onclick='() => DecideAsync(face, "known", person.Id)'>
+                                    Confirm @person.DisplayName
+                                </button>
+                            }
+                        </div>
+                    }
+                }
+
+                <div class="vfpr-actions">
+                    <button class="button secondary" disabled="@(!CanDecide(face))"
+                            @onclick='() => DecideAsync(face, "unknown", null)'>Unknown face</button>
+                    <button class="button secondary" disabled="@(!CanDecide(face))"
+                            @onclick='() => DecideAsync(face, "not-face", null)'>Not a face</button>
+                    <button class="button secondary" disabled="@(!CanDecide(face))"
+                            @onclick='() => DecideAsync(face, "cannot-tell", null)'>Cannot tell</button>
+                    @if (VideoFaceReviewPresentation.IsReviewed(face))
+                    {
+                        <button class="button secondary" disabled="@(!CanDecide(face))"
+                                @onclick='() => DecideAsync(face, "clear", null)'>Clear decision</button>
+                    }
+                </div>
+            </article>
+        }
+    </section>
+    <button class="button secondary" @onclick="RefreshAsync" disabled="@Busy">Refresh current evidence</button>
+}
+@if (Notice is not null)
+{
+    <p role="status" class="notice">@Notice</p>
+}
+@if (Error is not null && Batch is not null)
+{
+    <p role="alert" class="notice error">@Error</p>
+}
+
+@code {
+    [Parameter] public string RevisionId { get; set; } = string.Empty;
+
+    private PersistedVideoFaceBatch? Batch;
+    private IReadOnlyList<VideoDetailsPersonPickerEntry> People = [];
+    private PersistedVideoFaceObservation? SelectedFace;
+    private ElementReference PreviewPlayer;
+    private long? PendingSeekMs;
+    private string PersonSearch = "";
+    private string? PeopleError;
+    private string? Notice;
+    private string? Error;
+    private bool Loading = true;
+    private bool Busy;
+    private bool ShowReviewed;
+    private bool PreviewOpen;
+    private bool FrameReady;
+    private bool VisualConfirmed;
+    private bool PlaybackUnavailable;
+
+    private string ApiUrl => $"/api/videos/{Uri.EscapeDataString(RevisionId)}/face-review";
+    private IReadOnlyList<PersistedVideoFaceObservation> VisibleFaces =>
+        VideoFaceReviewPresentation.Visible(Batch?.Observations ?? [], ShowReviewed);
+    private IEnumerable<VideoDetailsPersonPickerEntry> MatchingPeople =>
+        People.Where(person => PersonSearch.Trim().Length > 0 &&
+                               person.DisplayName.Contains(PersonSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+              .Take(12);
+
+    protected override async Task OnParametersSetAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        Loading = true;
+        Notice = null;
+        Error = null;
+        Batch = null;
+        People = [];
+        ResetPreview();
+        try
+        {
+            using HttpResponseMessage response = await Http.GetAsync(ApiUrl);
+            if (response.StatusCode == HttpStatusCode.NotFound) return;
+            response.EnsureSuccessStatusCode();
+            PersistedVideoFaceBatch? current =
+                await response.Content.ReadFromJsonAsync<PersistedVideoFaceBatch>();
+            if (current is null ||
+                !string.Equals(current.RevisionId, RevisionId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Video-face review returned a different revision.");
+            Batch = current;
+            try
+            {
+                People = await Http.GetFromJsonAsync<VideoDetailsPersonPickerEntry[]>(
+                    "/api/review/people/maintenance") ?? [];
+            }
+            catch (Exception e) when (e is HttpRequestException or System.Text.Json.JsonException)
+            {
+                PeopleError = "The current people list is unavailable; known-person search is disabled.";
+            }
+        }
+        catch (Exception e) when (e is HttpRequestException or InvalidDataException or
+                                     System.Text.Json.JsonException)
+        {
+            Batch = null;
+            Error = "Current video face evidence could not be loaded. No original or model was opened.";
+        }
+        finally { Loading = false; }
+    }
+
+    private void ResetPreview()
+    {
+        SelectedFace = null;
+        PendingSeekMs = null;
+        PreviewOpen = false;
+        FrameReady = false;
+        VisualConfirmed = false;
+        PlaybackUnavailable = false;
+        PersonSearch = "";
+        PeopleError = null;
+    }
+
+    private void Inspect(PersistedVideoFaceObservation face)
+    {
+        SelectedFace = face;
+        PendingSeekMs = face.TimestampMs;
+        PreviewOpen = true;
+        FrameReady = false;
+        VisualConfirmed = false;
+        PlaybackUnavailable = false;
+        PersonSearch = "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!PreviewOpen || PendingSeekMs is not long timestamp) return;
+        PendingSeekMs = null;
+        try
+        {
+            await JS.InvokeVoidAsync("photoIdentityPersistedFaceReview.seek",
+                PreviewPlayer, timestamp / 1000d);
+        }
+        catch (Exception error) when (error is JSException or JSDisconnectedException)
+        {
+            PlaybackUnavailable = true;
+            FrameReady = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnLoadedData()
+    {
+        // Seeking to zero may not emit seeked; loadeddata is enough for t=0.
+        if (SelectedFace?.TimestampMs == 0) FrameReady = true;
+    }
+
+    private void OnSeeked() => FrameReady = !PlaybackUnavailable;
+
+    private void OnPlaybackError()
+    {
+        PlaybackUnavailable = true;
+        FrameReady = false;
+        VisualConfirmed = false;
+    }
+
+    private bool CanDecide(PersistedVideoFaceObservation face) =>
+        !Busy && Batch is not null && !PlaybackUnavailable && FrameReady &&
+        VisualConfirmed && SelectedFace?.Id == face.Id;
+
+    private static string DecisionLabel(PersistedVideoFaceObservation face) =>
+        face.Decision == "known" ? face.ReviewedPersonName ?? "Known person" :
+        face.Decision switch
+        {
+            "unknown" => "Unknown face",
+            "not-face" => "Not a face",
+            "cannot-tell" => "Cannot tell",
+            _ => "Not reviewed"
+        };
+
+    private async Task DecideAsync(PersistedVideoFaceObservation face, string decision, string? personId)
+    {
+        if (!CanDecide(face) || Batch is null) return;
+        Busy = true;
+        Notice = null;
+        Error = null;
+        try
+        {
+            string address = ApiUrl + "/" + Uri.EscapeDataString(face.Id) + "/decision";
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                address, new PersistedVideoFaceDecisionRequest(decision, personId));
+            if (!response.IsSuccessStatusCode)
+            {
+                // Any stale revision, exclusion, merge or lost gate closes the
+                // review until an explicit reload. Never keep actionable IDs.
+                Batch = null;
+                ResetPreview();
+                Error = $"Review was not saved (HTTP {(int)response.StatusCode}). Refresh the current revision.";
+                return;
+            }
+            await RefreshAsync();
+            ShowReviewed = false; // Completed crops disappear by default.
+            if (Batch is not null)
+                Notice = decision == "clear" ? "Review decision cleared." :
+                         "Human review saved. No video-person tag was added.";
+        }
+        catch (Exception e) when (e is HttpRequestException or System.Text.Json.JsonException or
+                                     InvalidDataException)
+        {
+            Batch = null;
+            ResetPreview();
+            Error = "The review could not be saved or reloaded. Refresh before reviewing another face.";
+        }
+        finally { Busy = false; }
+    }
+}

@@ -65,6 +65,10 @@ else
                 }
             </dd>
         </dl>
+        @if (FaceReviewAvailable)
+        {
+            <p><a class="button secondary" href="@($"/videos/{RevisionId}/faces")">Review sampled faces · manual decisions</a></p>
+        }
     </section>
 
     <section class="video-details-editors" aria-label="Video catalogue edits">
@@ -191,6 +195,7 @@ else
     private string? PeopleError;
     private bool Loading;
     private bool Busy;
+    private bool FaceReviewAvailable;
 
     private string Url => $"/api/videos/{Uri.EscapeDataString(RevisionId)}";
     private IReadOnlyList<VideoDetailsPersonPickerEntry> MatchingPeople => People
@@ -207,11 +212,22 @@ else
         Error = null;
         Notice = null;
         Details = null;
+        FaceReviewAvailable = false;
         try
         {
             Details = await Http.GetFromJsonAsync<VideoDetailsResponse>(Url + "/details");
             CaptureInput = VideoDetailsPresentation.FormatLocalRecordingTimeInput(Details?.EffectiveCaptureAtUtc);
             PlaceInput = Details?.Place?.Value ?? "";
+            // The default-off face API returns 404 until explicitly enabled
+            // and current revision evidence exists. This metadata check never
+            // opens original media or starts inference.
+            try
+            {
+                using HttpResponseMessage evidence = await Http.GetAsync(
+                    Url + "/face-review", HttpCompletionOption.ResponseHeadersRead);
+                FaceReviewAvailable = evidence.IsSuccessStatusCode;
+            }
+            catch (HttpRequestException) { FaceReviewAvailable = false; }
             try
             {
                 People = await Http.GetFromJsonAsync<VideoDetailsPersonPickerEntry[]>(

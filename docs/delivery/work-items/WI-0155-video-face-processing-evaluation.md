@@ -10,6 +10,36 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-20 — Production persisted face-review UI vertical slice (separate PR)
+
+After merged #845 and #847, explicit one-video native face sampling can
+publish a lease-fenced current face batch, including a durable zero-face
+sample receipt. Local disposable PostgreSQL acceptance and GitHub Actions
+passed for the zero-face case.
+
+The next independent UI branch connects **current production** video-face
+observations to Video Details and a dedicated per-revision review page.
+Current canonical person suggestions become individual human actions;
+search, known/unknown/not-face/cannot-tell/clear, reviewed-item hiding,
+reopening, and deduplicated confirmed-person counts are supported. The
+browser opens the already registered **playable proxy only on explicit
+inspection** and asks the reviewer to acknowledge visual context before
+saving via the existing source-fenced review API. No scheduled recognition,
+video-person presence assignment, original-media opening, migration or
+new pixel persistence is introduced.
+
+**Acceptance boundary:** a proxy frame seek does not attest an exact native
+face crop, and very small faces may remain unidentifiable. The source-
+validated private native crop/view and retention policy remain open.
+Production review should remain off by default until model rights, private
+media and visual-quality sign-off. Human-confirmed face observations are
+still distinct from durable video-person presence; explicit promotion and
+undo are subsequent engineering work. This PR requires CI and the synthetic
+UI-contract test; an interactive smoke is conditional on an already
+authorized retained proxy + current video face receipt. Do not perform
+new real-media inference just to test the web page.
+
+
 ## 2026-11-19 — PR #828 production face-review persistence foundation
 
 **Previously accepted:** PR #827 merged and the maintainer verified all
