@@ -1,5 +1,6 @@
 using PhotoIdentity.Cli;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
