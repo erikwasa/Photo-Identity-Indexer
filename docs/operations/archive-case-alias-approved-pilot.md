@@ -8,14 +8,13 @@ rows, revision rows, face observations or review history.
 ## First: disposable verification (PowerShell 7.6 / Windows)
 
 ~~~powershell
-dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj --filter FullyQualifiedName~ArchiveCaseAliasPilotCommandTests
 .\verify-postgres.ps1 -SkipContainerStart
 ~~~
 
-Set PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING to your
-disposable PostgreSQL administrator connection, or the database
-integration test will not execute. The test verifies a synthetic
-single-pair apply/restore with no lost automatic face review actions,
+This verifier supplies a disposable PostgreSQL administrator
+connection to its child integration tests, so the new CLI test
+genuinely executes. It verifies synthetic single-pair apply/restore
+with no lost automatic face review actions,
 wrong approval refusal and refusal while another client is connected.
 
 ## Prerequisites for the FIRST production Apply
