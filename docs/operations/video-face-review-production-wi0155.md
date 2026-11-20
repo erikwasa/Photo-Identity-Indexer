@@ -304,3 +304,111 @@ Remaining pre-activation gates: implement an explicit one-video
 operator command with local/rights and source/lease inspection,
 review private native face-crop display and retention, connect the
 persisted in-app human review, and require manual presence decisions.
+
+## 2026-11-20 — Explicit single-video native face execution (separate PR)
+
+This increment adds the opt-in `video faces selected-one-shot` CLI path.
+It operates on **one exact registered video revision UUID**, not an
+operator-supplied original filename. It does not create a hosted service,
+general enqueue scan, web inference endpoint or automatic person assignments.
+
+**Default is a metadata-only dry run**: requires a current v43 database,
+approved FFmpeg file/hash, a newly created empty owned scratch directory,
+one supported local-source-authority Rec.709 video inspection at at most
+3840 pixels per coded edge and 256 MiB, a reproducible 1–4 frame plan,
+no pre-existing face batch for that revision, idle photo work, no
+running video jobs, and the global video control disabled/paused.
+It does **not** open original video bytes, inspect OneDrive availability,
+load local ONNX weights, enqueue, arm control or persist observations.
+Output is private-identifier-free JSON with a fixed result code.
+
+`--apply` also requires **both**
+`--acknowledge-private-face-processing` and
+`--acknowledge-model-rights`. The acknowledgements represent an
+operator's *independent* private-media and model-rights review; they
+are not technical proof of legal permission. Apply checks local-only
+OneDrive availability without hydration or recall, refuses link
+paths and scratch/source overlap, enqueues only the chosen exact
+revision's `FaceEvidence` identity, arms the existing short-lived
+selected grant, runs one bounded `VideoFaceEvidenceWorkerAdapter`
+cycle and always attempts to disarm even after cancellation.
+The source is staged with SHA-256 verification under the lease;
+YuNet/SFace model manifests and model files are SHA-verified inside
+the producer; the publisher atomically commits a batch and
+job-specific receipt only while the selected grant is live.
+
+**The --apply mode is not yet locally accepted against a genuine
+maintainer video.** Until the maintainer has explicitly approved model
+rights, the scratch/source-retention policy and one selected local
+video, **run only the default dry-run and synthetic tests**. A dry-run
+PASS establishes configuration/preflight, *not* recognition quality.
+A video containing zero detected faces currently returns
+`no-faces-found` without inventing a batch; empty-result treatment
+and privacy-safe crop review remain separate work.
+
+### Offline and disposable PostgreSQL verification
+
+```powershell
+Set-Location 'C:\Kod\codex\Photo Identity Indexer'
+git switch wi-0155-selected-native-face-one-shot-20261120
+git pull --ff-only
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceSelectedOneShotTests'
+if ($LASTEXITCODE -ne 0) { throw 'Selected-face CLI tests failed.' }
+```
+
+The parser test needs no PostgreSQL. The second test uses a disposable
+PostgreSQL instance supplied by
+`PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING`; without this
+environment variable it returns without exercising the database path.
+That test checks metadata-only preview, no queue/grant/face writes,
+`--apply` denial for an unavailable original, and source-exclusion
+denial. Never configure this integration-test admin variable to point
+to `photoidentity_main`.
+
+### Maintainer-selected dry-run (NO source opening)
+
+Only after a controlled trial candidate, tool path and empty scratch
+root are selected, create the exact marker required by the existing
+scratch ownership guard. The root must be a *new direct child* of OS temp
+and must not overlap the source archive:
+
+```powershell
+$scratch = Join-Path ([IO.Path]::GetFullPath([IO.Path]::GetTempPath())) `
+  ('photoidentity-frame-evidence-wi0155-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $scratch | Out-Null
+Set-Content -LiteralPath (Join-Path $scratch '.photoidentity-frame-evidence-root') `
+  -Value 'wi0190-registered-proxy-frames-v1' -NoNewline
+
+# Supply privately verified values; do NOT share source paths or credentials.
+$revisionId = '<CURRENT_REGISTERED_VIDEO_REVISION_UUID>'
+$ffmpeg = '<APPROVED_LOCAL_FFMPEG_EXE_ABSOLUTE_PATH>'
+$ffmpegSha256 = '<PREVIOUSLY_APPROVED_FFMPEG_SHA256>'
+$connectionEnv = '<LAUNCHER_POSTGRES_ENVIRONMENT_VARIABLE_NAME>'
+
+$arguments = @(
+  'video','faces','selected-one-shot',
+  '--postgres-connection-env',$connectionEnv,
+  '--database','photoidentity_main',
+  '--revision-id',$revisionId,
+  '--scratch-root',$scratch,
+  '--ffmpeg',$ffmpeg,'--ffmpeg-sha256',$ffmpegSha256,
+  '--manifest-directory',(Join-Path (Get-Location) 'models\manifests'),
+  '--model-directory',(Join-Path (Get-Location) 'models\files'),
+  '--max-frames','2'
+)
+dotnet run --project .\src\PhotoIdentity.Cli -c Release -- @arguments
+if ($LASTEXITCODE -ne 0) { throw 'Selected face dry-run refused; inspect fixed reasonCode.' }
+```
+
+Expected `dryRun=true`, `admitted=true`,
+`reasonCode="preflight-only"`, `published=false`,
+`oneDriveHydrationRequested=false`, and
+`identityAssignmentsMade=0`. The preview deliberately does not
+confirm that originals are present locally or that native models
+are legally approved; actual execution requires separate gates.
+
+**No migration is introduced by this increment.** The established
+v43 production schema remains the prerequisite; no database
+initialization is invoked by this CLI command. The normal
+photo-archive experience is unchanged.
