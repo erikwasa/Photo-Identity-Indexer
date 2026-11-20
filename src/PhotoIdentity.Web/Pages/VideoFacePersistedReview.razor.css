@@ -30,3 +30,8 @@
 .vfpr-native-crop { margin: 0.8rem 0; }
 .vfpr-native-crop img { display: block; width: auto; height: auto; max-width: 100%; image-rendering: auto; }
 .vfpr-native-crop p { color: var(--muted, #556); font-size: 0.87rem; }
+
+/* Separate, deliberate approval for changing the video's people catalogue. */
+.vfpr-presence { margin: 1rem 0; padding: 0.85rem; border: 1px solid var(--border, #8894a0); border-radius: 0.6rem; }
+.vfpr-presence .vfpr-toggle { display: block; margin: 0.65rem 0; }
+.vfpr-presence button { margin-top: 0.4rem; }

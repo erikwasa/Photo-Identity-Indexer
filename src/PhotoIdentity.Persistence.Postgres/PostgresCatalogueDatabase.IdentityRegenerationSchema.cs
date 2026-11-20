@@ -83,7 +83,8 @@ public sealed partial class PostgresCatalogueDatabase
             new Migration(42, "revision-bound-video-face-review-evidence", VideoFaceReviewSchemaMigration),
             new Migration(43, "lease-bound-video-face-publication-receipt", VideoFaceLeaseSchemaMigration),
             new Migration(44, "reversible-archive-case-alias-retirement-map", ArchiveCaseAliasRetirementSchemaMigration),
-            new Migration(45, "lease-attested-empty-video-face-result", VideoFaceEmptyResultSchemaMigration)];
+            new Migration(45, "lease-attested-empty-video-face-result", VideoFaceEmptyResultSchemaMigration),
+            new Migration(46, "human-approved-video-face-presence", VideoFacePresenceSchemaMigration)];
 
         // Keep historical runtime-owned extension DDL attached to the exact
         // v33 migration which originally introduced it; v34 is queue-only.
