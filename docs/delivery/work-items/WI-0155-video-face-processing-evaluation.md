@@ -10,6 +10,34 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+
+## 2026-11-21 — Harden per-observation visual inspection before production enablement
+
+PR #852 has been merged and the explicit, reviewed, source-bound
+face-to-video-person presence path is now implemented behind a separate,
+default-off approval gate. This **does not** mean WI-0155 real-media
+interactive acceptance, model rights or operator production enablement
+has occurred. Migration v46 and its deployment/backup obligations remain.
+
+Safety audit found that changing the selected face in the persisted
+reviewer did not clear the preceding native crop readiness. Late image
+load/seek events could enable a human decision for a different observation.
+This new isolated PR introduces an observation-ID + generation-bound
+visual inspection gate, remounts each preview per inspection, invalidates
+prior crop/proxy readiness and both approval checkboxes on every
+switch/reopen, and ignores stale media/JS callbacks. It keeps crop-only
+and proxy-only review and explicit source-independent **undo** available.
+Tests use synthetic state transitions only, without source media,
+PostgreSQL, FFmpeg, models or real identities.
+
+**Consolidated local acceptance remains deferred, not failed:** When
+independently authorized FaceEvidence exists, combine the #849 review,
+#850 source crop, #852 explicit presence/undo, and this rapid-switch/
+stale-load scenario in one interactive session. The production gate still
+requires rights, retention, false-person-risk and operational acceptance.
+No additional video sampling is requested merely for this PR.
+
+
 ## 2026-11-20 — Human-approved video presence: deduplication and undo (v46, separate PR)
 
 After PRs #849 and #850 merged, persisted face review and exact
