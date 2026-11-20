@@ -429,6 +429,9 @@ public static class ArchiveCaseAliasPilotCommandRunner
     {
         await receipt.WriteLineAsync(JsonSerializer.Serialize(result));
         await receipt.FlushAsync();
-        receipt.BaseStream.Flush(flushToDisk: true);
+        if (receipt.BaseStream is FileStream file)
+            file.Flush(flushToDisk: true);
+        else
+            receipt.BaseStream.Flush();
     }
 }
