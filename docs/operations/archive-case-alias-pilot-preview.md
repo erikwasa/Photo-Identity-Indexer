@@ -80,9 +80,10 @@ size for a later *transactional recheck*. File hashes detect changes
 to the proposed preview; they do **not** prove that the database has
 not changed.
 
-The preview tool refuses CSVs older than four hours by default (file
-timestamps are only a freshness hint, not an authority), and it
-never accepts a prior candidate CSV as an input. It has NO Apply option.
+The preview tool refuses CSVs older than four hours by default and
+requires both exports to have been written within 15 minutes of each
+other (file timestamps are only freshness hints, not authority).
+It never accepts a prior candidate CSV as an input. It has NO Apply option.
 Every selected row is tagged ApplyEnabled=false, ApprovalRequired=true,
 DeleteSourceOriginal=false, DeleteDatabaseRows=false.
 
