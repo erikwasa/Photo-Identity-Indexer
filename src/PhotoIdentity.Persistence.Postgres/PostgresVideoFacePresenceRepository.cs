@@ -247,7 +247,9 @@ public sealed class PostgresVideoFacePresenceRepository(
         {
             face.Transaction = tx;
             face.CommandText = """
-                SELECT f.id FROM video_face_observations f
+                SELECT metadata.duration_seconds, f.frame_ordinal,
+                       f.timestamp_ms, job.requested_frames
+                FROM video_face_observations f
                 JOIN video_face_evidence_batches b ON b.id=f.batch_id
                 JOIN video_processing_jobs job ON job.id=b.publishing_job_id
                 JOIN asset_revisions revision ON revision.id=b.asset_revision_id
@@ -270,6 +272,9 @@ public sealed class PostgresVideoFacePresenceRepository(
                   AND job.status='succeeded' AND job.derivative_kind=@kind
                   AND job.policy_version=@policy AND job.preset_version=@preset
                   AND job.source_bytes=revision.size_bytes
+                  AND job.requested_frames BETWEEN 1 AND 4
+                  AND metadata.duration_seconds BETWEEN 0.2 AND 3600
+                  AND revision.size_bytes BETWEEN 1 AND 268435456
                   AND f.frame_ordinal BETWEEN 0 AND 3
                   AND f.frame_ordinal < job.requested_frames
                   AND revision.media_kind='video' AND asset.media_kind='video'
@@ -294,8 +299,22 @@ public sealed class PostgresVideoFacePresenceRepository(
             face.Parameters.AddWithValue("kind", VideoFaceEvidenceLeaseIdentity.Kind);
             face.Parameters.AddWithValue("policy", VideoFaceEvidenceLeaseIdentity.PolicyVersion);
             face.Parameters.AddWithValue("preset", VideoFaceEvidenceLeaseIdentity.PresetVersion);
-            if (await face.ExecuteScalarAsync(token) is not Guid)
+            await using NpgsqlDataReader reader = await face.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token))
                 throw new KeyNotFoundException("Current leased face evidence is not available.");
+            int ordinal = reader.GetInt32(1);
+            long timestamp = reader.GetInt64(2);
+            int requested = reader.GetInt32(3);
+            VideoFrameSamplingPlan plan = VideoFrameSamplingPlanner.Plan(
+                new VideoFrameSamplingRequest(reader.GetDecimal(0),
+                    MaximumFrames: requested,
+                    MaximumReservedDecodeMilliseconds: 12000,
+                    ReservedDecodeMillisecondsPerFrame: 3000));
+            if (plan.Samples.Count != requested || ordinal < 0 ||
+                ordinal >= plan.Samples.Count ||
+                plan.Samples[ordinal].TimestampMilliseconds != timestamp)
+                throw new KeyNotFoundException(
+                    "The face observation does not match its attested sampling position.");
         }
 
         // Source lock held: changes to current review, person tags, or
