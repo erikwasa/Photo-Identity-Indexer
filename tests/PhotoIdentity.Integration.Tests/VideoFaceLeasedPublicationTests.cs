@@ -93,8 +93,10 @@ public sealed class VideoFaceLeasedPublicationTests
                            (@photo,@photo_asset,'photo',repeat('e',64),3000,now(),'image/jpeg');
                     INSERT INTO video_revision_metadata
                       (asset_revision_id,inspection_status,duration_seconds,
-                       color_transfer,inspected_at_utc,tool_sha256,inspection_profile_id)
-                    VALUES (@video,'supported',8,'bt709',now(),repeat('b',64),'synthetic');
+                       color_transfer,coded_width,coded_height,
+                       inspected_at_utc,tool_sha256,inspection_profile_id)
+                    VALUES (@video,'supported',8,'bt709',1600,900,
+                            now(),repeat('b',64),'synthetic');
                     INSERT INTO people(id,display_name,created_at_utc)
                     VALUES (@person,'Test person',now());
                     INSERT INTO face_occurrences(id,asset_revision_id,ordinal,created_at_utc)
