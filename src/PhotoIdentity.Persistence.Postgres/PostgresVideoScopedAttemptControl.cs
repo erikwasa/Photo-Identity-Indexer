@@ -1,4 +1,5 @@
 using Npgsql;
+using PhotoIdentity.Core.Processing;
 
 namespace PhotoIdentity.Persistence.Postgres;
 
@@ -18,7 +19,9 @@ public sealed class PostgresVideoScopedAttemptControl(PostgresCatalogueDatabase 
         TimeSpan authorizationWindow, CancellationToken token = default,
         string derivativeKind = "PlayableProxy")
     {
-        if (derivativeKind is not ("PlayableProxy" or "FrameEvidence") ||
+        if (derivativeKind is not ("PlayableProxy" or "FrameEvidence" or "FaceEvidence") ||
+            (derivativeKind == "FaceEvidence" &&
+             expectedPreset != VideoFaceEvidenceLeaseIdentity.PresetVersion) ||
             jobId == Guid.Empty || !VideoDerivativeArtifactPath.IsHash(expectedToolSha256) ||
             string.IsNullOrWhiteSpace(expectedPreset) ||
             authorizationWindow < TimeSpan.FromMinutes(1) ||
@@ -84,6 +87,9 @@ public sealed class PostgresVideoScopedAttemptControl(PostgresCatalogueDatabase 
                   WHERE job.id=@job AND job.status='queued'
                     AND job.derivative_kind=@kind
                     AND job.tool_sha256=@tool AND job.preset_version=@preset
+                    AND (@kind <> 'FaceEvidence' OR
+                         (job.policy_version=@face_policy
+                          AND job.requested_frames BETWEEN 1 AND @face_frames))
                     AND job.attempt_count < 3
                     AND job.available_at_utc<=now()
                     AND job.cancellation_requested_at_utc IS NULL
@@ -106,6 +112,10 @@ public sealed class PostgresVideoScopedAttemptControl(PostgresCatalogueDatabase 
             selected.Parameters.AddWithValue("kind", derivativeKind);
             selected.Parameters.AddWithValue("tool", expectedToolSha256);
             selected.Parameters.AddWithValue("preset", expectedPreset);
+            selected.Parameters.AddWithValue(
+                "face_policy", VideoFaceEvidenceLeaseIdentity.PolicyVersion);
+            selected.Parameters.AddWithValue(
+                "face_frames", VideoFaceEvidenceLeaseIdentity.MaximumFrames);
             if (await selected.ExecuteScalarAsync(token) is not true)
                 return null;
         }

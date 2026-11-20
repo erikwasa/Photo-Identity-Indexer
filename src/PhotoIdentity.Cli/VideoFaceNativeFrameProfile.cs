@@ -17,7 +17,7 @@ namespace PhotoIdentity.Cli;
 /// </summary>
 public static class VideoFaceNativeFrameProfile
 {
-    public const string Version = "wi0155-native-sdr-face-jpeg-v1";
+    public const string Version = VideoFaceEvidenceLeaseIdentity.PresetVersion;
     public const int MaximumEdge = 3840;
     public const long MaximumJpegBytes = 12L * 1024 * 1024;
     public const string OutputName = "native-face-frame.jpg";

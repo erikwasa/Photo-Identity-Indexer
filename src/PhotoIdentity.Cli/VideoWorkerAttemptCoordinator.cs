@@ -169,6 +169,9 @@ public sealed class VideoWorkerAttemptCoordinator(PostgresCatalogueDatabase data
                     .GetCurrentAsync(lease.Id, token)) is { } evidence &&
                     evidence.Provenance.RevisionId == lease.RevisionId &&
                     evidence.Items.Count == lease.RequestedFrames,
+                "FaceEvidence" => await new PostgresVideoFaceReviewRepository(
+                    database, TimeProvider.System).HasCurrentJobReceiptAsync(
+                    lease.Id, lease.RevisionId, token),
                 _ => false
             };
         }

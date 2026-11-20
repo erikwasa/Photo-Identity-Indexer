@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Postgres;
@@ -38,7 +39,38 @@ public sealed class PostgresVideoFaceMatchPublisher(
     PostgresVideoFaceReviewRepository repository)
 {
     public async Task<Guid> PublishAsync(
-        VideoFaceEmbeddingPublication proposal, CancellationToken token = default)
+        VideoFaceEmbeddingPublication proposal, CancellationToken token = default) =>
+        await repository.PublishAsync(await RankAsync(proposal, token), token);
+
+    /// <summary>
+    /// Exact-model, selected FaceEvidence authorization is checked BEFORE
+    /// inference, and the repository atomically consumes the still-live lease
+    /// together with the evidence insertion AFTER scoring.
+    /// </summary>
+    public async Task<Guid?> TryPublishLeasedAsync(
+        VideoProcessingJobLease lease, VideoFaceEmbeddingPublication proposal,
+        CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(lease);
+        ArgumentNullException.ThrowIfNull(proposal);
+        if (!VideoFaceEvidenceLeaseIdentity.Matches(
+                lease.DerivativeKind, lease.PolicyVersion,
+                lease.PresetVersion, lease.RequestedFrames) ||
+            lease.RevisionId != proposal.RevisionId ||
+            proposal.DetectorModelId != VideoFaceEvidenceLeaseIdentity.DetectorModelId ||
+            proposal.DetectorModelHash != VideoFaceEvidenceLeaseIdentity.DetectorSha256 ||
+            proposal.SFaceModelId != VideoFaceEvidenceLeaseIdentity.EmbedderModelId ||
+            proposal.SFaceModelHash != VideoFaceEvidenceLeaseIdentity.EmbedderSha256 ||
+            proposal.AlignmentProtocol != VideoFaceEvidenceLeaseIdentity.AlignmentProtocol ||
+            proposal.Observations.Any(face => face.FrameOrdinal >= lease.RequestedFrames))
+            throw new ArgumentException(
+                "FaceEvidence requires exact selected lease, approved models and frame bounds.");
+        return await repository.TryPublishLeasedAsync(
+            lease, await RankAsync(proposal, token), token);
+    }
+
+    private async Task<VideoFaceEvidencePublication> RankAsync(
+        VideoFaceEmbeddingPublication proposal, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(proposal);
         if (proposal.RevisionId.IsEmpty ||
@@ -73,7 +105,7 @@ public sealed class PostgresVideoFaceMatchPublisher(
         // The repository is the only transaction/commit boundary. The
         // approved source hash, current revision, active people and immutable
         // payload fingerprint are revalidated there after scoring.
-        return await repository.PublishAsync(ranked, token);
+        return ranked;
     }
 
     private static VideoFaceEvidencePublication ToEvidence(
