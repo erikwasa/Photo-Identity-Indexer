@@ -159,7 +159,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
             throw new InvalidOperationException("Explicit SHA-256 approval does not match the private pilot manifest.");
         if (options.Operation == "apply")
             RequireRecentRestoreVerification(options.RestoreVerificationReportPath!,
-                options.DatabaseName, manifest.GeneratedAtUtc);
+                options.DatabaseName);
 
         if (!Directory.Exists(options.ReceiptDirectory))
             throw new InvalidOperationException(
@@ -377,12 +377,17 @@ public static class ArchiveCaseAliasPilotCommandRunner
     }
 
     private static void RequireRecentRestoreVerification(
-        string reportPath, string database, DateTimeOffset previewGeneratedAtUtc)
+        string reportPath, string database)
     {
         if (!File.Exists(reportPath))
             throw new InvalidOperationException("The isolated backup-restore verification report is missing.");
         using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(reportPath));
         JsonElement root = doc.RootElement;
+        string? backupPath = root.GetProperty("backupPath").GetString();
+        if (string.IsNullOrWhiteSpace(backupPath) || !Path.IsPathFullyQualified(backupPath)
+            || !File.Exists(backupPath))
+            throw new InvalidOperationException(
+                "The restore-tested production backup file is missing. Refusing Apply.");
         if (!root.GetProperty("passed").GetBoolean() ||
             root.GetProperty("sourceDatabase").GetString() != database ||
             root.GetProperty("cleanupStatus").GetString() != "removed" ||
@@ -397,12 +402,6 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 "The isolated backup restore must have passed for this database within 24 hours, " +
                 "with completed cleanup. Refresh the backup and verify its restore before Apply.");
 
-        // The freshly captured backup must predate the pilot's proposed writes;
-        // no requirement to be newer than the preview's read-only evidence.
-        if (root.GetProperty("capturedAtUtc").GetDateTimeOffset()
-            > DateTimeOffset.UtcNow.AddMinutes(5))
-            throw new InvalidOperationException("Invalid future backup-restore receipt.");
-        _ = previewGeneratedAtUtc;
     }
 
     private static async Task AppendReceiptAsync(StreamWriter receipt, object result)
