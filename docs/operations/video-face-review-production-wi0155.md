@@ -770,3 +770,66 @@ Details, undo, re-review/correct, repeat without duplicating tags,
 test existing manual tag preservation, stale/excluded revision refusal,
 zero-face behavior and verify photo identities unchanged. Run the
 approved privacy/rights/retention checks before enabling production use.
+
+## 2026-11-21 — Browser visual-evidence session fencing (no schema or inference change)
+
+**Problem closed:** PRs #849, #850 and #852 introduced optional private
+source crops, proxy fallback, reviewed-face decisions and a separate
+human-approved video-person presence action. In the browser an explicit
+switch to another observation reset the proxy readiness and checkbox,
+**but did not reset `NativeCropReady`**. A delayed crop-load or
+video-seek event from an earlier inspection could therefore incorrectly
+enable a review decision while the new face's actual visual context was
+still loading. Reinspecting the same observation had a similar
+asynchronous-event risk. The server continued to validate source and
+identity; this fix closes the *human visual-evidence association* gap.
+
+The review page now uses a temporary, inspection-specific
+`VideoFaceReviewVisualGate` with a monotonically changing session
+generation and the selected observation ID:
+
+- Switching, refreshing or reinspecting **always** revokes crop readiness,
+  proxy readiness, visual confirmation and presence approval. Reinspecting
+  even the same face creates a new inspection generation.
+- Image `load` / `error`, video `loadeddata` / `seeked` / `error`,
+  and asynchronous JS seek failures can update readiness **only** for
+  the exact generation **and** observation they belong to. The keyed
+  preview DOM is remounted for a new inspection.
+- A delayed old response can no longer enable confirmation for a different
+  or re-opened face. If a *new* visual arrives after checkboxes have been
+  ticked, both acknowledgements are revoked, requiring a fresh inspection.
+- Proxy-only fallback still works if the native crop is unavailable.
+  The native crop can independently support review if the proxy fails.
+  An explicit **undo** still does not require the source video to be
+  replayed; it remains independently human-approved and protected by the
+  source- and action-bound server transaction.
+- The gate is **client-side hygiene only**: it cannot prove that a person
+  was visually identified, nor does it substitute for source attestation,
+  operator review, original-media rights or privacy/retention sign-off.
+
+**Verification with no real media or database** (PowerShell 7.6):
+
+```powershell
+dotnet build .\src\PhotoIdentity.Web\PhotoIdentity.Web.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Face-review browser build failed' }
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceReviewVisualGateTests'
+if ($LASTEXITCODE -ne 0) { throw 'Inspection-session safety tests failed' }
+```
+
+The deterministic tests cover cross-face switches, same-face reinspections,
+wrong observation IDs, out-of-order crop/seek callbacks, proxy-only and
+crop-only fallback, independent acknowledgement invalidation and refresh.
+No migration is introduced on top of v46; no worker, media, FFmpeg, model,
+photo identity or video-person data is touched by this change.
+
+**Consolidated interactive acceptance remains deferred:** On the first
+independently authorized live FaceEvidence batch, exercise #849/#850/#852
+together, *including rapid face switching and same-face reinspection before
+native crop / proxy completion*. Confirm no decision or presence button
+becomes actionable until the **newly selected** visual actually loads and
+the reviewer explicitly acknowledges it. Exercise delayed crop failure and
+proxy fallback, presence dedup/undo, zero-face evidence, stale revision,
+source exclusion and photo-identity invariants. No additional experiment
+is requested solely for this browser fix; the production enablement gate
+continues to require the private-media and model-rights decisions.
