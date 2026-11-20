@@ -82,8 +82,13 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                 Database = dbName, Pooling = false
             };
             Environment.SetEnvironmentVariable(environment, builder.ConnectionString);
-            await using PostgresCatalogueDatabase database = new(builder.ConnectionString);
-            await database.InitializeAsync();
+            // Dispose migration connection pool before the operator write
+            // rehearsal. A pooled idle connection must count as another
+            // client and block Apply on the selected database.
+            await using (PostgresCatalogueDatabase database = new(builder.ConnectionString))
+            {
+                await database.InitializeAsync();
+            }
 
             Guid source = Guid.NewGuid(), older = Guid.NewGuid(), later = Guid.NewGuid();
             Guid oldRevision = Guid.NewGuid(), laterRevision = Guid.NewGuid();
