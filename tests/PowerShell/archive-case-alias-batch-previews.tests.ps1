@@ -96,7 +96,7 @@ try {
     $session = & $generator -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $stateCsv -MaxBatches 4 -PairsPerBatch 5 -ExpectedDatabaseSchemaVersion 45 -OutputDirectory $output
     Assert ($session.CollisionGroupsRevalidated -eq 14) 'All groups were not revalidated.'
     Assert ($session.EligibleUnretiredCandidates -eq 12) 'Already retired/protected group leaked into eligibility.'
-    Assert ($session.HeldForReview -eq 2) 'Held groups were not counted correctly.'
+    Assert ($session.NotEligibleIncludingRetired -eq 2) 'Retired and protected groups were not counted correctly.'
     Assert ($session.PairsStaged -eq 12) 'Incorrect total selected.'
     Assert ($session.BatchesStaged -eq 3) 'Expected three independent batches.'
     Assert ($session.AutomaticallyExecuted -eq 0) 'Unexpected Apply.'
