@@ -310,8 +310,8 @@ public static class Program
                                   --metadata ABS_PRIVATE_JSON
                                   --postgres-connection-env NAME
                                   --database DB [--max-pairs 1..5]
-                                  [--operation preview|apply|restore]
-                                  (preview is read-only; apply/restore require
+                                  [--operation preview|apply|restore|verify-retired|verify-restored]
+                                  (preview/verify-* are read-only; apply/restore require
                                    --approve-manifest-sha256 EXACT_HASH
                                    --receipt-directory EXISTING_PRIVATE_DIRECTORY
                                    --actor OPERATOR_ID

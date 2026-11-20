@@ -33,6 +33,21 @@ restart/photo-access verification on schema v45.
 - Retained source originals, asset rows, face review, annotations and
   previously held 755 groups remain out of deletion scope.
 
+## Schema-version pinning
+
+This runbook's example uses schema 45, the last production schema verified
+during the first pilot. Current main also supports schema 46 because of
+independent video-face work. Before generating a **new** session, inspect the
+running database's actual schema version (for example through the API
+/health response if the app is running). Both archive preview generators
+accept schema 44, 45 or 46; supply the exact value through
+-ExpectedDatabaseSchemaVersion. The CLI rejects a mismatch with the live
+database and NEVER migrates it.
+
+A previously approved schema-45 manifest can still be examined against a
+schema-45 database with the new code. Do not silently stamp an old manifest
+with schema 46 or rerun Apply against a migrated catalogue.
+
 ## 1. Verify the new offline staging tool
 
 Windows PowerShell 7.6, from the repository root:
@@ -105,6 +120,43 @@ if ($LASTEXITCODE -ne 0) { throw 'Batch CLI preview failed.' }
 
 This step only checks the manifest and does not alter production.
 
+## Manifest-scoped database verification (READ ONLY)
+
+After any approved batch Apply, verify the **specific private manifest**
+instead of relying solely on global aggregate counts. This operation
+cannot retire/restore assets, accepts no write approvals, and does not
+open source originals.
+
+~~~powershell
+$batch = $session.Batches[0]
+$manifest = (Resolve-Path -LiteralPath $batch.PrivateManifestPath).Path
+$metadata = (Resolve-Path -LiteralPath $batch.PrivateMetadataPath).Path
+
+dotnet run --project '.\src\PhotoIdentity.Cli\PhotoIdentity.Cli.csproj' --configuration Release -- `
+    archive alias-pilot --operation verify-retired `
+    --manifest $manifest --metadata $metadata `
+    --postgres-connection-env PHOTOIDENTITY_POSTGRES_CONNECTION_STRING `
+    --database photoidentity_main --max-pairs 5
+if ($LASTEXITCODE -ne 0) { throw 'Scoped verification failed; keep app stopped.' }
+~~~
+
+Every batch pair must have its exact source identity and keys, a visible
+survivor, hidden secondary, active and correctly pinned mapping, both
+original verified revisions/hash/size and its expected automatic face
+review history. The verifier also reports total active mappings.
+Failure is read-only and rejects the batch postcheck.
+
+After a deliberate Restore, run the same command with
+`--operation verify-restored`. This checks both assets are visible and
+no active mapping remains for the selected pairs. Never-applied pairs
+from a partial Apply are accepted in this rollback state. A partially
+retired batch fails verify-retired until separately addressed.
+
+These commands do not require a new backup only to inspect old batch
+outcomes, and may be run after the app restarts. The existing global
+`tools/archive-case-alias-retirement-postcheck.sql` remains required
+immediately after production Apply to check unrelated mappings too.
+
 ## Future approved production Apply — one batch at a time
 
 Only after reviewing the PR, merging, and approving each specific
@@ -124,7 +176,7 @@ docs/operations/archive-case-alias-approved-pilot.md:
    --receipt-directory, --actor, --application-stopped and
    --acknowledge-reversible-retirement. Each invocation requires
    explicit operator confirmation and produces its own durable receipt.
-4. Immediately run the existing read-only
+4. Run the scoped verify-retired command above, then immediately run the existing read-only
    tools/archive-case-alias-retirement-postcheck.sql and verify that
    active mappings increased by exactly the newly retired count;
    no survivor/source/path conflict; all secondary revision and

@@ -6,7 +6,7 @@ param(
     [Parameter(Mandatory)][string]$EffectiveStateCsv,
     [ValidateRange(1, 5)][int]$MaxPairs = 5,
     [ValidateRange(1, 24)][int]$MaximumEvidenceAgeHours = 4,
-    [ValidateSet(44, 45)][int]$ExpectedDatabaseSchemaVersion = 44,
+    [ValidateSet(44, 45, 46)][int]$ExpectedDatabaseSchemaVersion = 44,
     [string]$OutputDirectory = (Join-Path (Get-Location).Path 'artifacts\archive-case-pilot')
 )
 Set-StrictMode -Version Latest
