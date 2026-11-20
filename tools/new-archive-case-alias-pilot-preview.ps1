@@ -6,6 +6,7 @@ param(
     [Parameter(Mandatory)][string]$EffectiveStateCsv,
     [ValidateRange(1, 5)][int]$MaxPairs = 5,
     [ValidateRange(1, 24)][int]$MaximumEvidenceAgeHours = 4,
+    [ValidateSet(44, 45)][int]$ExpectedDatabaseSchemaVersion = 44,
     [string]$OutputDirectory = (Join-Path (Get-Location).Path 'artifacts\archive-case-pilot')
 )
 Set-StrictMode -Version Latest
@@ -143,7 +144,7 @@ $metadataPath = Join-Path $OutputDirectory 'pilot-preview-metadata.json'
 [ordered]@{
     schemaVersion = 1
     status = 'preview-only'
-    expectedDatabaseSchemaVersion = 44
+    expectedDatabaseSchemaVersion = $ExpectedDatabaseSchemaVersion
     generatedAtUtc = [datetime]::UtcNow.ToString('O')
     collisionGroupsRevalidated = $summary.CollisionGroups
     retirementCandidatesRevalidated = $summary.ReversibleRetirementCandidates

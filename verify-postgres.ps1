@@ -182,8 +182,8 @@ function Invoke-LivePostgresTest {
             return [int]$LASTEXITCODE
         }
 
-        Write-Host "Running PostgreSQL runtime/composition acceptance..."
-        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj") --configuration Release --no-build --filter "FullyQualifiedName~PostgresRuntimeApplicationTests|FullyQualifiedName~CataloguePersistenceCompositionTests|FullyQualifiedName~DetectorRolloutCommandTests.Status_and_apply_use_only_selected_postgres_catalogue_when_live_postgres_is_configured" | Out-Host
+        Write-Host "Running PostgreSQL runtime/composition and archive alias pilot acceptance..."
+        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj") --configuration Release --no-build --filter "FullyQualifiedName~PostgresRuntimeApplicationTests|FullyQualifiedName~CataloguePersistenceCompositionTests|FullyQualifiedName~DetectorRolloutCommandTests.Status_and_apply_use_only_selected_postgres_catalogue_when_live_postgres_is_configured|FullyQualifiedName~ArchiveCaseAliasPilotCommandTests" | Out-Host
         return [int]$LASTEXITCODE
     }
     finally {
