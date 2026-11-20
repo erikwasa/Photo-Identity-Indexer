@@ -120,7 +120,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
 {
     private sealed record PilotManifest(
         IReadOnlyList<ArchiveCaseAliasRetirementRequest> Pairs,
-        string Sha256, DateTimeOffset GeneratedAtUtc);
+        string Sha256, int ExpectedDatabaseSchemaVersion, DateTimeOffset GeneratedAtUtc);
 
     public static async Task<int> RunAsync(
         ArchiveCaseAliasPilotOptions options, TextWriter output,
@@ -150,7 +150,8 @@ public static class ArchiveCaseAliasPilotCommandRunner
         // A preview never initializes/migrates the catalogue or modifies rows.
         await using PostgresCatalogueDatabase catalogue = new(settings.ConnectionString);
         await VerifyDatabaseAsync(catalogue, options.DatabaseName, writing,
-            operatorApplicationName, cancellationToken);
+            operatorApplicationName, manifest.ExpectedDatabaseSchemaVersion,
+            cancellationToken);
 
         if (options.Operation == "preview")
         {
@@ -195,7 +196,8 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 cancellationToken.ThrowIfCancellationRequested();
                 // Guard against a process starting between sequential pair writes.
                 await VerifyDatabaseAsync(catalogue, options.DatabaseName, true,
-                    operatorApplicationName, cancellationToken);
+                    operatorApplicationName, manifest.ExpectedDatabaseSchemaVersion,
+                    cancellationToken);
                 ArchiveAliasRetirementOutcome outcome;
                 try
                 {
@@ -256,9 +258,11 @@ public static class ArchiveCaseAliasPilotCommandRunner
         string sha256 = Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant();
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(options.MetadataPath));
         JsonElement meta = document.RootElement;
+        int expectedSchema = meta.GetProperty("expectedDatabaseSchemaVersion").GetInt32();
         if (meta.GetProperty("schemaVersion").GetInt32() != 1 ||
             meta.GetProperty("status").GetString() != "preview-only" ||
-            meta.GetProperty("expectedDatabaseSchemaVersion").GetInt32() != 44 ||
+            expectedSchema < 44 ||
+            expectedSchema > PostgresCatalogueDatabase.CurrentSchemaVersion ||
             meta.GetProperty("applyEnabled").GetBoolean() ||
             !meta.GetProperty("approvalRequired").GetBoolean() ||
             meta.GetProperty("sourceFilesToDelete").GetInt32() != 0 ||
@@ -354,12 +358,12 @@ public static class ArchiveCaseAliasPilotCommandRunner
             || requests.Count != meta.GetProperty("pilotPairs").GetInt32())
             throw new InvalidOperationException("Pilot manifest exceeds the approved bounded pair count.");
 
-        return new PilotManifest(requests, sha256, generatedAt);
+        return new PilotManifest(requests, sha256, expectedSchema, generatedAt);
     }
 
     private static async Task VerifyDatabaseAsync(
         PostgresCatalogueDatabase catalogue, string expectedDatabase, bool requireStopped,
-        string operatorApplicationName, CancellationToken token)
+        string operatorApplicationName, int expectedSchemaVersion, CancellationToken token)
     {
         await using NpgsqlConnection connection = await catalogue.OpenConnectionAsync(token);
         using NpgsqlCommand command = connection.CreateCommand();
@@ -377,9 +381,9 @@ public static class ArchiveCaseAliasPilotCommandRunner
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token) ||
             reader.GetString(0) != expectedDatabase ||
-            reader.GetInt32(1) != 44)
+            reader.GetInt32(1) != expectedSchemaVersion)
             throw new InvalidOperationException(
-                "Selected catalogue is not the named schema-v44 database.");
+                "Selected catalogue schema does not match the explicitly approved private preview.");
         if (requireStopped && reader.GetInt64(2) != 0)
             throw new InvalidOperationException(
                 "Other clients are connected to this database. Stop the app and retry.");
