@@ -89,7 +89,7 @@ public static class VideoFaceReviewEndpoints
         }
     }
 
-    public sealed record PresenceRequest(string PersonId);
+    public sealed record PresenceRequest(string PersonId, bool ExplicitlyApproved);
 
     private static async Task<IResult> PromotePresenceAsync(
         string revisionId, string observationId, PresenceRequest request,
@@ -100,7 +100,8 @@ public static class VideoFaceReviewEndpoints
         if (!PresenceEnabled(settings)) return Results.NotFound();
         if (!TryGuid(revisionId, out Guid revision) ||
             !TryGuid(observationId, out Guid observation) ||
-            request is null || !TryGuid(request.PersonId, out Guid person))
+            request is null || !request.ExplicitlyApproved ||
+            !TryGuid(request.PersonId, out Guid person))
             return Results.BadRequest(new { error = "Invalid explicit face-presence request." });
         try
         {
