@@ -688,7 +688,7 @@ The corresponding undo is **Undo this face-based presence**.
   source-backed image; it is not a prerequisite for operating the
   already-persisted human review. Do not enable any of these on a public host.
 - The write routes are `POST /api/videos/{revisionId}/face-review/{observationId}/presence`
-  with `{"personId":"<canonical-person-uuid>"}`, and `DELETE` of that same
+  with `{"personId":"<canonical-person-uuid>","explicitlyApproved":true}`, and `DELETE` of that same
   route for undo. 404 when disabled or no longer current; 409 on conflicts
   and changed review/person state. JSON responses contain only fixed
   statuses and whether video presence changed, not private media or paths.
