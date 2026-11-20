@@ -124,6 +124,7 @@ public sealed class PostgresVideoFaceNativeCropRepository(PostgresCatalogueDatab
                   AND job.derivative_kind=@kind
                   AND job.policy_version=@policy AND job.preset_version=@preset
                   AND job.tool_sha256=@tool
+                  AND job.source_bytes=r.size_bytes
                   AND job.requested_frames BETWEEN 1 AND 4
                   AND f.frame_ordinal < job.requested_frames
                   AND r.media_kind='video' AND asset.media_kind='video'
