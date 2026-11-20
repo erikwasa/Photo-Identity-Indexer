@@ -115,6 +115,10 @@ public sealed class VideoFaceNativeCropService(
             try
             {
                 VideoFaceNativeCropSource entry = lease.Source;
+                if (!Path.IsPathFullyQualified(entry.RootLocator) ||
+                    entry.RootLocator.StartsWith(@"\\", StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        "The registered private video source root is not an absolute local path.");
                 // Fail early rather than recalling online-only video or
                 // allocating an unbounded temporary file.
                 VideoScratchCapacityGuard.EnsureCapacity(
