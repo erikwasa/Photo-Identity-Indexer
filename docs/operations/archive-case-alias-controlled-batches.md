@@ -33,6 +33,21 @@ restart/photo-access verification on schema v45.
 - Retained source originals, asset rows, face review, annotations and
   previously held 755 groups remain out of deletion scope.
 
+## Schema-version pinning
+
+This runbook's example uses schema 45, the last production schema verified
+during the first pilot. Current main also supports schema 46 because of
+independent video-face work. Before generating a **new** session, inspect the
+running database's actual schema version (for example through the API
+/health response if the app is running). Both archive preview generators
+accept schema 44, 45 or 46; supply the exact value through
+-ExpectedDatabaseSchemaVersion. The CLI rejects a mismatch with the live
+database and NEVER migrates it.
+
+A previously approved schema-45 manifest can still be examined against a
+schema-45 database with the new code. Do not silently stamp an old manifest
+with schema 46 or rerun Apply against a migrated catalogue.
+
 ## 1. Verify the new offline staging tool
 
 Windows PowerShell 7.6, from the repository root:
