@@ -24,7 +24,7 @@ public sealed record PersistedVideoFaceBatch(
     bool PresencePromotionEnabled = false);
 
 public sealed record PersistedVideoFaceDecisionRequest(string Decision, string? PersonId);
-public sealed record PersistedVideoFacePresenceRequest(string PersonId);
+public sealed record PersistedVideoFacePresenceRequest(string PersonId, bool ExplicitlyApproved);
 public sealed record PersistedVideoFacePresenceOutcome(string Status, bool VideoPersonTagChanged);
 
 /// <summary>
