@@ -173,7 +173,8 @@ public sealed class ArchiveCaseAliasPilotCommandTests
             File.WriteAllText(metadataPath, JsonSerializer.Serialize(new
             {
                 schemaVersion = 1, status = "preview-only",
-                expectedDatabaseSchemaVersion = 44, generatedAtUtc = DateTimeOffset.UtcNow,
+                expectedDatabaseSchemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion,
+                generatedAtUtc = DateTimeOffset.UtcNow,
                 pilotPairs = 1, privatePilotManifestSha256 = digest,
                 applyEnabled = false, approvalRequired = true,
                 sourceFilesToDelete = 0, databaseRowsToDelete = 0
