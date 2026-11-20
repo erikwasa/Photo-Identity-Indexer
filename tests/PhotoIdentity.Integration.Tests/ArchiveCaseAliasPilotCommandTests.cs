@@ -30,6 +30,18 @@ public sealed class ArchiveCaseAliasPilotCommandTests
             ArchiveCaseAliasPilotOptions parsed = ArchiveCaseAliasPilotOptions.Parse(preview);
             Assert.Equal("preview", parsed.Operation);
             Assert.Equal(5, parsed.MaximumPairs);
+            Assert.Equal("verify-retired", ArchiveCaseAliasPilotOptions.Parse(
+                [.. preview, "--operation", "verify-retired"]).Operation);
+            Assert.Equal("verify-restored", ArchiveCaseAliasPilotOptions.Parse(
+                [.. preview, "--operation", "verify-restored"]).Operation);
+            Assert.Throws<ArgumentException>(() =>
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. preview, "--operation", "verify-retired",
+                    "--application-stopped"]));
+            Assert.Throws<ArgumentException>(() =>
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. preview, "--operation", "verify-restored",
+                    "--approve-manifest-sha256", new string('a', 64)]));
 
             Assert.Throws<ArgumentException>(() =>
                 ArchiveCaseAliasPilotOptions.Parse([.. preview, "--max-pairs", "6"]));
@@ -201,6 +213,18 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                 ArchiveCaseAliasPilotOptions.Parse(common), output));
             Assert.Contains("PILOT PREVIEW", output.ToString());
 
+            string[] verifyRetired = [.. common, "--operation", "verify-retired"];
+            string[] verifyRestored = [.. common, "--operation", "verify-restored"];
+            // A never-applied batch is visibly unretired; its "retired"
+            // postcheck must fail without any write permissions.
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                    ArchiveCaseAliasPilotOptions.Parse(verifyRetired), new StringWriter()));
+            StringWriter preApplyVerification = new();
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse(verifyRestored), preApplyVerification));
+            Assert.Contains("1 never retired", preApplyVerification.ToString());
+
             string[] writeOptions = [
                 "--approve-manifest-sha256", digest,
                 "--receipt-directory", receiptDir, "--actor", "disposable-test",
@@ -248,6 +272,15 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                 "SELECT count(*) FROM assets WHERE source_key='family/portrait.jpg' AND deleted_at_utc IS NOT NULL;"));
             Assert.Equal(1, await CountAsync("SELECT count(*) FROM review_actions;"));
 
+            StringWriter retiredVerification = new();
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse(verifyRetired), retiredVerification));
+            Assert.Contains("1 retired", retiredVerification.ToString());
+            Assert.Contains("1 global active mappings", retiredVerification.ToString());
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                    ArchiveCaseAliasPilotOptions.Parse(verifyRestored), new StringWriter()));
+
             Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
                 ArchiveCaseAliasPilotOptions.Parse([
                     .. common, "--operation", "restore", .. writeOptions]), new StringWriter()));
@@ -256,6 +289,15 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                 "SELECT count(*) FROM archive_case_alias_retirements WHERE restored_at_utc IS NULL;"));
             Assert.Equal(2, await CountAsync("SELECT count(*) FROM assets WHERE deleted_at_utc IS NULL;"));
             Assert.Equal(1, await CountAsync("SELECT count(*) FROM review_actions;"));
+            StringWriter restoredVerification = new();
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse(verifyRestored), restoredVerification));
+            Assert.Contains("1 restored", restoredVerification.ToString());
+            Assert.Contains("0 global active mappings", restoredVerification.ToString());
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                    ArchiveCaseAliasPilotOptions.Parse(verifyRetired), new StringWriter()));
+            // Verify operations must not create extra write receipts.
             Assert.Equal(2, Directory.GetFiles(receiptDir, "*.jsonl").Length);
         }
         finally
