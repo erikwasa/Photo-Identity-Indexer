@@ -122,7 +122,7 @@ else
                             <button @key="suggestion.PersonId" class="button secondary"
                                     disabled="@(!CanDecide(face) || !suggestion.Selectable)"
                                     title="Human confirmation; never automatic"
-                                    @onclick="() => DecideAsync(face, "known", suggestion.PersonId)">
+                                    @onclick='() => DecideAsync(face, "known", suggestion.PersonId)'>
                                 Confirm @suggestion.DisplayName
                                 <small>Rank @suggestion.Rank · @suggestion.Similarity.ToString("F3")</small>
                             </button>
@@ -152,7 +152,7 @@ else
                             @foreach (VideoDetailsPersonPickerEntry person in MatchingPeople)
                             {
                                 <button class="button secondary" @key="person.Id" disabled="@Busy"
-                                        @onclick="() => DecideAsync(face, "known", person.Id)">
+                                        @onclick='() => DecideAsync(face, "known", person.Id)'>
                                     Confirm @person.DisplayName
                                 </button>
                             }
@@ -162,15 +162,15 @@ else
 
                 <div class="vfpr-actions">
                     <button class="button secondary" disabled="@(!CanDecide(face))"
-                            @onclick="() => DecideAsync(face, "unknown", null)">Unknown face</button>
+                            @onclick='() => DecideAsync(face, "unknown", null)'>Unknown face</button>
                     <button class="button secondary" disabled="@(!CanDecide(face))"
-                            @onclick="() => DecideAsync(face, "not-face", null)">Not a face</button>
+                            @onclick='() => DecideAsync(face, "not-face", null)'>Not a face</button>
                     <button class="button secondary" disabled="@(!CanDecide(face))"
-                            @onclick="() => DecideAsync(face, "cannot-tell", null)">Cannot tell</button>
+                            @onclick='() => DecideAsync(face, "cannot-tell", null)'>Cannot tell</button>
                     @if (VideoFaceReviewPresentation.IsReviewed(face))
                     {
                         <button class="button secondary" disabled="@(!CanDecide(face))"
-                                @onclick="() => DecideAsync(face, "clear", null)">Clear decision</button>
+                                @onclick='() => DecideAsync(face, "clear", null)'>Clear decision</button>
                     }
                 </div>
             </article>
@@ -346,8 +346,9 @@ else
             }
             await RefreshAsync();
             ShowReviewed = false; // Completed crops disappear by default.
-            Notice = decision == "clear" ? "Review decision cleared." :
-                     "Human review saved. No video-person tag was added.";
+            if (Batch is not null)
+                Notice = decision == "clear" ? "Review decision cleared." :
+                         "Human review saved. No video-person tag was added.";
         }
         catch (Exception e) when (e is HttpRequestException or System.Text.Json.JsonException or
                                      InvalidDataException)
