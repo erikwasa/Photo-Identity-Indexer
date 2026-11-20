@@ -184,7 +184,7 @@ $sessionPath = Join-Path $OutputDirectory 'batch-session-private.json'
     expectedDatabaseSchemaVersion = $ExpectedDatabaseSchemaVersion
     revalidatedCollisionGroups = $summary.CollisionGroups
     eligibleUnretiredCandidates = $summary.ReversibleRetirementCandidates
-    heldForReview = $summary.HeldForReview
+    notEligibleIncludingRetired = $summary.HeldForReview
     selectedPairs = $selected.Count
     batches = @($batchReports.ToArray())
     automaticallyExecuted = 0
@@ -195,7 +195,7 @@ $sessionPath = Join-Path $OutputDirectory 'batch-session-private.json'
 [pscustomobject]@{
     CollisionGroupsRevalidated = $summary.CollisionGroups
     EligibleUnretiredCandidates = $summary.ReversibleRetirementCandidates
-    HeldForReview = $summary.HeldForReview
+    NotEligibleIncludingRetired = $summary.HeldForReview
     PairsStaged = $selected.Count
     BatchesStaged = $batchReports.Count
     BatchSizeLimit = $PairsPerBatch
