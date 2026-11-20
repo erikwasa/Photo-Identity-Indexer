@@ -152,6 +152,16 @@ try {
     }
     Assert $rejectedStale 'Outdated private audit was accepted.'
 
+    (Get-Item -LiteralPath $evidenceCsv).LastWriteTimeUtc = [datetime]::UtcNow
+    (Get-Item -LiteralPath $effectiveCsv).LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-20)
+    $rejectedUnpaired = $false
+    try {
+        $null = & $previewScript -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -OutputDirectory $outputDirectory
+    } catch {
+        $rejectedUnpaired = $true
+    }
+    Assert $rejectedUnpaired 'Audits captured more than 15 minutes apart were accepted.'
+
     Write-Host 'Archive case-alias bounded pilot preview synthetic tests: PASS'
 }
 finally {
