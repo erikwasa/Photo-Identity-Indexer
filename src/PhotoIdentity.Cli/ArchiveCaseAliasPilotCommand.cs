@@ -133,6 +133,17 @@ public static class ArchiveCaseAliasPilotCommandRunner
         bool writing = options.Operation is "apply" or "restore";
         string? originalConnection = Environment.GetEnvironmentVariable(
             options.ConnectionEnvironmentVariable);
+        // Match Start-PhotoIdentity.ps1's Windows launcher lookup so a
+        // private user-scoped connection secret need not be copied into
+        // the operator's process command line or console history.
+        if (string.IsNullOrWhiteSpace(originalConnection) && OperatingSystem.IsWindows())
+        {
+            originalConnection = Environment.GetEnvironmentVariable(
+                options.ConnectionEnvironmentVariable, EnvironmentVariableTarget.User);
+            if (string.IsNullOrWhiteSpace(originalConnection))
+                originalConnection = Environment.GetEnvironmentVariable(
+                    options.ConnectionEnvironmentVariable, EnvironmentVariableTarget.Machine);
+        }
         if (string.IsNullOrWhiteSpace(originalConnection))
             throw new InvalidOperationException("The selected PostgreSQL environment variable is not set.");
 
