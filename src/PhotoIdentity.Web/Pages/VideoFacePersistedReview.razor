@@ -416,7 +416,7 @@ else
             string address = ApiUrl + "/" + Uri.EscapeDataString(face.Id) + "/presence";
             using HttpResponseMessage response = link
                 ? await Http.PostAsJsonAsync(address,
-                    new PersistedVideoFacePresenceRequest(face.ReviewedPersonId!))
+                    new PersistedVideoFacePresenceRequest(face.ReviewedPersonId!, true))
                 : await Http.DeleteAsync(address);
             if (!response.IsSuccessStatusCode)
             {
