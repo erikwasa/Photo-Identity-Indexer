@@ -18,6 +18,8 @@ public static class VideoFaceReviewEndpoints
         routes.MapGet("/api/videos/{revisionId}/face-review", GetAsync);
         routes.MapPost("/api/videos/{revisionId}/face-review/{observationId}/decision",
             DecideAsync);
+        routes.MapGet("/api/videos/{revisionId}/face-review/{observationId}/native-crop",
+            NativeCropAsync);
         return routes;
     }
 
@@ -28,6 +30,53 @@ public static class VideoFaceReviewEndpoints
             StringComparison.OrdinalIgnoreCase) &&
         string.Equals(settings["PhotoIdentity:VideoFaceReviewEnabled"], "true",
             StringComparison.OrdinalIgnoreCase);
+
+    private static bool NativeCropEnabled(IConfiguration settings) =>
+        Enabled(settings) &&
+        string.Equals(settings["PhotoIdentity:VideoFaceNativeCropEnabled"], "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<IResult> NativeCropAsync(
+        string revisionId, string observationId,
+        VideoFaceNativeCropService crops, IConfiguration settings,
+        HttpContext context, CancellationToken token)
+    {
+        NoStore(context);
+        if (!NativeCropEnabled(settings) ||
+            !TryGuid(revisionId, out Guid revision) ||
+            !TryGuid(observationId, out Guid observation))
+            return Results.NotFound();
+
+        try
+        {
+            VideoFaceNativeCropResponse? crop = await crops.OpenAsync(
+                AssetRevisionId.From(revision), observation, settings, token);
+            return crop is null ? Results.NotFound() : new NativeCropResult(crop);
+        }
+        catch (Exception error) when (error is IOException or
+                                      UnauthorizedAccessException or
+                                      InvalidOperationException or
+                                      ArgumentException or TimeoutException)
+        {
+            // Private paths, source names, tool output and decoder errors
+            // must never escape through an API diagnostic.
+            return Results.NotFound();
+        }
+    }
+
+    private sealed class NativeCropResult(VideoFaceNativeCropResponse crop) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext context)
+        {
+            // Keep source/asset locks until the private JPEG response ends.
+            // No range processing or public caching of identity evidence.
+            await using (crop)
+            {
+                await Results.File(crop.Crop.Bytes, "image/jpeg",
+                    enableRangeProcessing: false).ExecuteAsync(context);
+            }
+        }
+    }
 
     private static void NoStore(HttpContext context)
     {
