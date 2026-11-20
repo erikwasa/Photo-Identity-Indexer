@@ -16,7 +16,7 @@ restart/photo-access verification on schema v45.
   eligibility decision from fresh paired PostgreSQL audits. A retired
   secondary has marked_missing=true and is therefore NOT eligible again.
 - If nothing else changes, the initial 333 eligible, 755 held becomes
-  approximately **328 remaining eligible, 760 held**, while all 1,088
+  approximately **328 remaining eligible, 760 not-eligible including the 5 retired**, while all 1,088
   historic case-only pairs remain discoverable. Actual counts are
   determined by the fresh audit, not hardcoded.
 - Up to **four independent manifests** are staged, each 1–5 eligible
@@ -77,7 +77,7 @@ $session = .\tools\new-archive-case-alias-batch-previews.ps1 `
     -ExpectedDatabaseSchemaVersion 45 `
     -MaxBatches 4 -PairsPerBatch 5
 
-$session | Select-Object CollisionGroupsRevalidated, EligibleUnretiredCandidates, HeldForReview, PairsStaged, BatchesStaged, AutomaticallyExecuted
+$session | Select-Object CollisionGroupsRevalidated, EligibleUnretiredCandidates, NotEligibleIncludingRetired, PairsStaged, BatchesStaged, AutomaticallyExecuted
 $session.Batches | Select-Object Batch, Pairs, WithAutomaticReviewHistory, ManifestSha256
 ~~~
 
@@ -137,5 +137,5 @@ docs/operations/archive-case-alias-approved-pilot.md:
    Do NOT chain all four Apply operations unattended. The four-batch
    generator never calls the CLI's Apply mode.
 
-The 760 held groups (expected after the first five) require separate
+The 760 not-eligible including the 5 retired groups (expected after the first five) require separate
 handling; this work does not assert they can be safely retired.
