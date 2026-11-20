@@ -7,7 +7,7 @@ param(
     [ValidateRange(1, 4)][int]$MaxBatches = 4,
     [ValidateRange(1, 5)][int]$PairsPerBatch = 5,
     [ValidateRange(1, 24)][int]$MaximumEvidenceAgeHours = 4,
-    [ValidateSet(44, 45)][int]$ExpectedDatabaseSchemaVersion = 45,
+    [ValidateSet(44, 45, 46)][int]$ExpectedDatabaseSchemaVersion = 45,
     [string]$OutputDirectory = (Join-Path (Get-Location).Path (
         'artifacts\archive-case-batch-session-' + [datetime]::UtcNow.ToString('yyyyMMddTHHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6)))
 )
