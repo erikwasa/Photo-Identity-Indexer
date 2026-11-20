@@ -194,6 +194,11 @@ public static class Program
                     await VideoFrameSelectedOneShotCommandRunner.RunAsync(
                         VideoFrameSelectedOneShotOptions.Parse(args.Skip(3).ToArray()),
                         output, cancellationToken),
+                "video" when args.Length > 2 && args[1] == "faces" && args[2] == "selected-one-shot" =>
+                    await VideoFaceSelectedOneShotCommandRunner.RunAsync(
+                        VideoFaceSelectedOneShotOptions.Parse(args.Skip(3).ToArray()),
+                        output, cancellationToken),
+
                 "video" when args.Length > 2 && args[1] == "frames" && args[2] == "registered-proxy-pilot" =>
                     await VideoRegisteredFramePilotCommandRunner.RunAsync(
                         VideoRegisteredFramePilotOptions.Parse(args.Skip(3).ToArray()),
