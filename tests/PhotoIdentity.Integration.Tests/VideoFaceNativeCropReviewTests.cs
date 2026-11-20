@@ -117,6 +117,8 @@ public sealed class VideoFaceNativeCropReviewTests
         Assert.Contains("Plan(", access);
         Assert.Contains("OneDriveVideoLocalStager", service);
         Assert.Contains("VideoToolProcessSupervisor", service);
+        Assert.Contains("VideoGuardedToolExecutor", service);
+        Assert.Contains("PostgresVideoPhotoPriorityProbe", service);
         Assert.Contains("ReadValidatedFrameAsync", service);
         Assert.Contains("NativeCropUrl", page);
         Assert.Contains("NativeCropReady", page);
