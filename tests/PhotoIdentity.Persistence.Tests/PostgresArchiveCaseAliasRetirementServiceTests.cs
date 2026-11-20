@@ -117,6 +117,62 @@ public sealed class PostgresArchiveCaseAliasRetirementServiceTests
             await Assert.ThrowsAsync<InvalidOperationException>(
                 () => service.RetireAsync(request with { SurvivorCreatedAtUtc = t0.AddDays(-1) }));
 
+            // A third capitalization makes the normalized path ambiguous.
+            Guid thirdAlias = Guid.NewGuid();
+            await using (NpgsqlConnection connection = new(builder.ConnectionString))
+            {
+                await connection.OpenAsync();
+                using NpgsqlCommand addThird = connection.CreateCommand();
+                addThird.CommandText = """
+                    INSERT INTO assets(
+                        id, source_id, source_key, created_at_utc, last_seen_at_utc)
+                    VALUES (@asset, @source, 'FIDELI/photo.jpg', @t1, @t1);
+                    """;
+                addThird.Parameters.AddWithValue("asset", thirdAlias);
+                addThird.Parameters.AddWithValue("source", source);
+                addThird.Parameters.AddWithValue("t1", t1);
+                await addThird.ExecuteNonQueryAsync();
+            }
+            InvalidOperationException thirdBlocked = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => service.RetireAsync(request));
+            Assert.Contains("exact pair", thirdBlocked.Message, StringComparison.Ordinal);
+
+            // A different effective current tag on the keeper also blocks
+            // retirement, even though the later asset has no protected edits.
+            await using (NpgsqlConnection connection = new(builder.ConnectionString))
+            {
+                await connection.OpenAsync();
+                using NpgsqlCommand cleanupAndTag = connection.CreateCommand();
+                cleanupAndTag.CommandText = """
+                    DELETE FROM assets WHERE id = @third;
+                    INSERT INTO photo_tag_actions(
+                        asset_revision_id, tag_id, action_kind, actor, created_at_utc)
+                    SELECT @revision, id, 'add', 'manual-test', @time
+                    FROM photo_tags WHERE normalized_name = 'preserve-history';
+                    """;
+                cleanupAndTag.Parameters.AddWithValue("third", thirdAlias);
+                cleanupAndTag.Parameters.AddWithValue("revision", survivorCurrentRevision);
+                cleanupAndTag.Parameters.AddWithValue("time", t1);
+                await cleanupAndTag.ExecuteNonQueryAsync();
+            }
+            InvalidOperationException unequal = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => service.RetireAsync(request));
+            Assert.Contains("effective", unequal.Message, StringComparison.Ordinal);
+
+            // Remove only the disposable fixture's current tag test action.
+            // The keeper's historical manual tag action remains intact.
+            await using (NpgsqlConnection connection = new(builder.ConnectionString))
+            {
+                await connection.OpenAsync();
+                using NpgsqlCommand cleanup = connection.CreateCommand();
+                cleanup.CommandText = """
+                    DELETE FROM photo_tag_actions
+                    WHERE asset_revision_id = @revision AND actor='manual-test';
+                    """;
+                cleanup.Parameters.AddWithValue("revision", survivorCurrentRevision);
+                Assert.Equal(1, await cleanup.ExecuteNonQueryAsync());
+            }
+
             // An unrecognized reviewer is treated as human, not disposable.
             await using (NpgsqlConnection connection = new(builder.ConnectionString))
             {
