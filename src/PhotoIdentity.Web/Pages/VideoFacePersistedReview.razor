@@ -47,17 +47,21 @@ else
 
     @if (SelectedFace is not null)
     {
-        <section class="vfpr-preview" aria-label="Manually opened video frame context">
+        // Pin all DOM callbacks to this exact inspection generation.
+        // Reinspecting the same observation is a *new* session.
+        PersistedVideoFaceObservation inspectedFace = SelectedFace;
+        long inspectionToken = VisualGate.Generation;
+        <section class="vfpr-preview" @key="inspectionToken" aria-label="Manually opened video frame context">
             <h2>Visual context · @VideoFaceReviewPresentation.Moment(SelectedFace.TimestampMs)</h2>
             <p>An explicitly enabled, source-verified native crop is shown below when available.
                Its native decoded pixel dimensions are preserved without upscaling, although JPEG encoding can lose fine detail. The playable proxy
                provides optional wider context, but a proxy seek may not precisely match the native sampled frame.
                Do not confirm a person unless the visible face is clear.</p>
             <div class="vfpr-native-crop">
-                <img @key="SelectedFace.Id"
-                     src="@NativeCropUrl(SelectedFace)"
-                     @onload="OnNativeCropLoaded"
-                     @onerror="OnNativeCropUnavailable"
+                <img @key="inspectionToken"
+                     src="@NativeCropUrl(inspectedFace)"
+                     @onload="() => OnNativeCropLoaded(inspectionToken, inspectedFace.Id)"
+                     @onerror="() => OnNativeCropUnavailable(inspectionToken, inspectedFace.Id)"
                      alt="Native-pixel crop of the selected sampled face, if locally authorized" />
                 @if (NativeCropReady)
                 {
@@ -70,10 +74,12 @@ else
             </div>
             @if (PreviewOpen)
             {
-                <video @ref="PreviewPlayer" controls playsinline preload="none"
+                <video @ref="PreviewPlayer" @key="inspectionToken" controls playsinline preload="none"
                        src="@($"/api/videos/{Uri.EscapeDataString(RevisionId)}/play")"
-                       @onloadeddata="OnLoadedData" @onseeked="OnSeeked"
-                       @onerror="OnPlaybackError" aria-label="Selected video frame context">
+                       @onloadeddata="() => OnLoadedData(inspectionToken, inspectedFace.Id, inspectedFace.TimestampMs)"
+                       @onseeked="() => OnSeeked(inspectionToken, inspectedFace.Id)"
+                       @onerror="() => OnPlaybackError(inspectionToken, inspectedFace.Id)"
+                       aria-label="Selected video frame context">
                     Your browser cannot play this video proxy.
                 </video>
             }
@@ -259,28 +265,32 @@ else
     private bool Busy;
     private bool ShowReviewed;
     private bool PreviewOpen;
-    private bool FrameReady;
-    private bool VisualConfirmed;
-    private bool PlaybackUnavailable;
-    private bool NativeCropReady;
-    private bool NativeCropUnavailable;
-    private bool PresenceApproved;
+    // The review gate contains only ephemeral browser state. Neither images
+    // nor pixels nor recognition candidates are copied into it.
+    private readonly VideoFaceReviewVisualGate VisualGate = new();
+    private bool FrameReady => VisualGate.ProxyReady;
+    private bool PlaybackUnavailable => VisualGate.ProxyUnavailable;
+    private bool NativeCropReady => VisualGate.CropReady;
+    private bool NativeCropUnavailable => VisualGate.CropUnavailable;
+    private bool VisualConfirmed
+    {
+        get => VisualGate.VisualConfirmed;
+        set => VisualGate.VisualConfirmed = value;
+    }
+    private bool PresenceApproved
+    {
+        get => VisualGate.PresenceApproved;
+        set => VisualGate.PresenceApproved = value;
+    }
 
     private string NativeCropUrl(PersistedVideoFaceObservation face) =>
         ApiUrl + "/" + Uri.EscapeDataString(face.Id) + "/native-crop";
 
-    private void OnNativeCropLoaded()
-    {
-        NativeCropReady = true;
-        NativeCropUnavailable = false;
-        VisualConfirmed = false;
-    }
+    private void OnNativeCropLoaded(long generation, string observationId) =>
+        VisualGate.CropLoaded(generation, observationId);
 
-    private void OnNativeCropUnavailable()
-    {
-        NativeCropReady = false;
-        NativeCropUnavailable = true;
-    }
+    private void OnNativeCropUnavailable(long generation, string observationId) =>
+        VisualGate.CropFailed(generation, observationId);
 
 
     private string ApiUrl => $"/api/videos/{Uri.EscapeDataString(RevisionId)}/face-review";
@@ -336,32 +346,27 @@ else
         SelectedFace = null;
         PendingSeekMs = null;
         PreviewOpen = false;
-        FrameReady = false;
-        VisualConfirmed = false;
-        PlaybackUnavailable = false;
-        NativeCropReady = false;
-        NativeCropUnavailable = false;
+        VisualGate.Reset();
         PersonSearch = "";
         PeopleError = null;
-        PresenceApproved = false;
     }
 
     private void Inspect(PersistedVideoFaceObservation face)
     {
         SelectedFace = face;
+        VisualGate.Begin(face.Id);
         PendingSeekMs = face.TimestampMs;
         PreviewOpen = true;
-        FrameReady = false;
-        VisualConfirmed = false;
-        PlaybackUnavailable = false;
         PersonSearch = "";
-        PresenceApproved = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!PreviewOpen || PendingSeekMs is not long timestamp) return;
         PendingSeekMs = null;
+        long generation = VisualGate.Generation;
+        string? observationId = VisualGate.ObservationId;
+        if (observationId is null) return;
         try
         {
             await JS.InvokeVoidAsync("photoIdentityPersistedFaceReview.seek",
@@ -369,30 +374,30 @@ else
         }
         catch (Exception error) when (error is JSException or JSDisconnectedException)
         {
-            PlaybackUnavailable = true;
-            FrameReady = false;
-            StateHasChanged();
+            // Async JS errors for a previous face must not revoke or
+            // bless the visual evidence for a different inspection.
+            if (VisualGate.ProxyFailed(generation, observationId))
+                StateHasChanged();
         }
     }
 
-    private void OnLoadedData()
+    private void OnLoadedData(long generation, string observationId, long timestampMs)
     {
-        // Seeking to zero may not emit seeked; loadeddata is enough for t=0.
-        if (SelectedFace?.TimestampMs == 0) FrameReady = true;
+        // Seeking to zero may not emit seeked. This event is valid only for
+        // the newly mounted player belonging to this exact inspection.
+        if (timestampMs == 0)
+            VisualGate.ProxyFrameReady(generation, observationId);
     }
 
-    private void OnSeeked() => FrameReady = !PlaybackUnavailable;
+    private void OnSeeked(long generation, string observationId) =>
+        VisualGate.ProxyFrameReady(generation, observationId);
 
-    private void OnPlaybackError()
-    {
-        PlaybackUnavailable = true;
-        FrameReady = false;
-        VisualConfirmed = false;
-    }
+    private void OnPlaybackError(long generation, string observationId) =>
+        VisualGate.ProxyFailed(generation, observationId);
 
     private bool CanDecide(PersistedVideoFaceObservation face) =>
-        !Busy && Batch is not null && (NativeCropReady || (FrameReady && !PlaybackUnavailable)) &&
-        VisualConfirmed && SelectedFace?.Id == face.Id;
+        !Busy && Batch is not null && VisualGate.CanReview(face.Id) &&
+        SelectedFace?.Id == face.Id;
 
     private bool CanPromote(PersistedVideoFaceObservation face) =>
         Batch?.PresencePromotionEnabled == true && PresenceApproved &&
