@@ -349,6 +349,105 @@ public sealed class VideoFaceLeasedPublicationTests
             Assert.Null(await review.GetCurrentAsync(emptyRevision));
             Assert.False(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
             Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
+
+            // v46: human review alone never creates video-person tags. Only a
+            // separately approved, revision/source/lease-fenced operation
+            // can write one owned add, and undo cannot touch other edits.
+            var presence = new PostgresVideoFacePresenceRepository(
+                database, TimeProvider.System);
+            var details = new PostgresVideoDetailsRepository(database, TimeProvider.System);
+            Guid observationId = Guid.Parse(observation.Id);
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                presence.PromoteAsync(revision, observationId, person, "synthetic"));
+            Assert.Empty((await details.GetAsync(revision))!.People);
+            Assert.True(await review.RecordDecisionAsync(
+                revision, observationId, "known", person, "synthetic"));
+            Assert.Empty((await details.GetAsync(revision))!.People);
+
+            VideoFacePresenceOutcome added = await presence.PromoteAsync(
+                revision, observationId, person, "synthetic");
+            Assert.Equal("linked", added.Status);
+            Assert.True(added.VideoPersonTagChanged);
+            Assert.Single((await details.GetAsync(revision))!.People);
+            VideoFacePresenceLink link = Assert.IsType<VideoFacePresenceLink>(
+                Assert.Single((await review.GetCurrentAsync(revision))!.Observations).Presence);
+            Assert.Equal(person.ToString("D"), link.PersonId);
+            Assert.True(link.VideoTagStillCurrent);
+
+            VideoFacePresenceOutcome retry = await presence.PromoteAsync(
+                revision, observationId, person, "synthetic");
+            Assert.Equal("already-linked", retry.Status);
+            Assert.False(retry.VideoPersonTagChanged);
+            Assert.False(await review.RecordDecisionAsync(
+                revision, observationId, "known", person, "synthetic"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                review.RecordDecisionAsync(
+                    revision, observationId, "unknown", null, "synthetic"));
+
+            VideoFacePresenceOutcome undone = await presence.UndoAsync(
+                revision, observationId, "synthetic");
+            Assert.Equal("unlinked", undone.Status);
+            Assert.True(undone.VideoPersonTagChanged);
+            Assert.Empty((await details.GetAsync(revision))!.People);
+            Assert.Null(Assert.Single((await review.GetCurrentAsync(revision))!.Observations).Presence);
+            Assert.Equal("already-unlinked",
+                (await presence.UndoAsync(revision, observationId, "synthetic")).Status);
+            Assert.True(await review.RecordDecisionAsync(
+                revision, observationId, "unknown", null, "synthetic"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                presence.PromoteAsync(revision, observationId, person, "synthetic"));
+
+            // Existing manual presence is never claimed as promotion-owned;
+            // a no-op promote must not make that manual tag undoable.
+            Assert.True(await review.RecordDecisionAsync(
+                revision, observationId, "known", person, "synthetic"));
+            await details.SetPersonAsync(revision, person, true, "manual-test");
+            VideoFacePresenceOutcome existing = await presence.PromoteAsync(
+                revision, observationId, person, "synthetic");
+            Assert.Equal("already-present", existing.Status);
+            Assert.False(existing.VideoPersonTagChanged);
+            Assert.Equal("already-unlinked",
+                (await presence.UndoAsync(revision, observationId, "synthetic")).Status);
+            Assert.Single((await details.GetAsync(revision))!.People);
+            await details.SetPersonAsync(revision, person, false, "manual-test");
+
+            // A subsequent manual removal takes precedence over the original
+            // face-owned add. Undo only records unlink, not a second removal.
+            Assert.Equal("linked",
+                (await presence.PromoteAsync(revision, observationId, person, "synthetic")).Status);
+            await details.SetPersonAsync(revision, person, false, "manual-test");
+            Assert.False(Assert.IsType<VideoFacePresenceLink>(
+                Assert.Single((await review.GetCurrentAsync(revision))!.Observations).Presence)
+                .VideoTagStillCurrent);
+            VideoFacePresenceOutcome afterManual = await presence.UndoAsync(
+                revision, observationId, "synthetic");
+            Assert.Equal("unlinked", afterManual.Status);
+            Assert.False(afterManual.VideoPersonTagChanged);
+            Assert.Empty((await details.GetAsync(revision))!.People);
+
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                presence.PromoteAsync(emptyRevision, observationId, person, "synthetic"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                presence.UndoAsync(AssetRevisionId.From(photoId),
+                    observationId, "synthetic"));
+
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand trace = connection.CreateCommand())
+            {
+                trace.CommandText = """
+                    SELECT (SELECT count(*) FROM video_face_presence_actions
+                            WHERE asset_revision_id=@revision),
+                           (SELECT count(*) FROM photo_person_actions),
+                           (SELECT count(*) FROM video_person_actions
+                            WHERE asset_revision_id=@revision);
+                    """;
+                trace.Parameters.AddWithValue("revision", videoId);
+                await using NpgsqlDataReader reader = await trace.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(4L, reader.GetInt64(0)); // link, unlink, link, unlink
+                Assert.Equal(0L, reader.GetInt64(1));
+                Assert.Equal(6L, reader.GetInt64(2)); // two linked cycles + manual add/remove
+            }
         }
         finally
         {
