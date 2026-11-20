@@ -277,6 +277,31 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                 ArchiveCaseAliasPilotOptions.Parse(verifyRetired), retiredVerification));
             Assert.Contains("1 retired", retiredVerification.ToString());
             Assert.Contains("1 global active mappings", retiredVerification.ToString());
+
+            // A lost/misclassified automatic action must be detected by the
+            // read-only postcheck. This intentional corruption is confined to
+            // a disposable test DB, then repaired before rollback.
+            async Task SetReviewActorAsync(string actor)
+            {
+                await using NpgsqlConnection con = new(builder.ConnectionString);
+                await con.OpenAsync();
+                using NpgsqlCommand update = con.CreateCommand();
+                update.CommandText =
+                    "UPDATE review_actions SET actor = @actor WHERE face_occurrence_id = @face;";
+                update.Parameters.AddWithValue("actor", actor);
+                update.Parameters.AddWithValue("face", face);
+                Assert.Equal(1, await update.ExecuteNonQueryAsync());
+            }
+            await SetReviewActorAsync("synthetic-unknown-actor");
+            InvalidOperationException lostReview =
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                        ArchiveCaseAliasPilotOptions.Parse(verifyRetired),
+                        new StringWriter()));
+            Assert.Contains("preserved review history", lostReview.Message);
+            await SetReviewActorAsync("identity-matcher:auto");
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse(verifyRetired), new StringWriter()));
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 ArchiveCaseAliasPilotCommandRunner.RunAsync(
                     ArchiveCaseAliasPilotOptions.Parse(verifyRestored), new StringWriter()));
