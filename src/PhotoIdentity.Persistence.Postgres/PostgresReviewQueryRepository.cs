@@ -67,6 +67,10 @@ public sealed class PostgresReviewQueryRepository : IReviewFilterRepository, IRe
         INNER JOIN assets
             ON assets.id = asset_revisions.asset_id
            AND assets.media_kind = 'photo'
+           AND NOT EXISTS (
+               SELECT 1 FROM archive_case_alias_retirements AS retired
+               WHERE retired.secondary_asset_id = assets.id
+                 AND retired.restored_at_utc IS NULL)
         LEFT JOIN latest_crop
             ON latest_crop.face_occurrence_id = face_occurrences.id
            AND latest_crop.row_number = 1
@@ -224,6 +228,14 @@ public sealed class PostgresReviewQueryRepository : IReviewFilterRepository, IRe
                     ON processing_jobs.processing_run_id = processing_runs.id
                 INNER JOIN face_occurrences
                     ON face_occurrences.asset_revision_id = processing_jobs.asset_revision_id
+                INNER JOIN asset_revisions AS option_revision
+                    ON option_revision.id = face_occurrences.asset_revision_id
+                INNER JOIN assets AS option_asset
+                    ON option_asset.id = option_revision.asset_id
+                   AND NOT EXISTS (
+                       SELECT 1 FROM archive_case_alias_retirements AS retired
+                       WHERE retired.secondary_asset_id = option_asset.id
+                         AND retired.restored_at_utc IS NULL)
                 GROUP BY
                     processing_runs.id,
                     processing_runs.status,
@@ -253,6 +265,16 @@ public sealed class PostgresReviewQueryRepository : IReviewFilterRepository, IRe
                     MAX(generated_at_utc),
                     COUNT(DISTINCT face_occurrence_id)
                 FROM identity_suggestion_rankings
+                INNER JOIN face_occurrences AS option_face
+                    ON option_face.id = identity_suggestion_rankings.face_occurrence_id
+                INNER JOIN asset_revisions AS option_revision
+                    ON option_revision.id = option_face.asset_revision_id
+                INNER JOIN assets AS option_asset
+                    ON option_asset.id = option_revision.asset_id
+                   AND NOT EXISTS (
+                       SELECT 1 FROM archive_case_alias_retirements AS retired
+                       WHERE retired.secondary_asset_id = option_asset.id
+                         AND retired.restored_at_utc IS NULL)
                 GROUP BY model_id, model_hash
                 ORDER BY MAX(generated_at_utc) DESC, model_id, model_hash;
                 """;
