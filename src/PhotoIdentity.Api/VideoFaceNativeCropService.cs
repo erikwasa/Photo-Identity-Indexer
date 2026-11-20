@@ -69,7 +69,8 @@ public sealed class VideoFaceNativeCropResponse(
 /// identity choice or video/person association. One bounded request at a time.
 /// </summary>
 public sealed class VideoFaceNativeCropService(
-    PostgresVideoFaceNativeCropRepository repository)
+    PostgresVideoFaceNativeCropRepository repository,
+    PostgresCatalogueDatabase database)
 {
     private readonly SemaphoreSlim _singleCrop = new(1, 1);
     private static VideoToolExecutionBudget FrameBudget => new(
@@ -118,35 +119,52 @@ public sealed class VideoFaceNativeCropService(
                 // allocating an unbounded temporary file.
                 VideoScratchCapacityGuard.EnsureCapacity(
                     root, checked(entry.SourceBytes + FrameBudget.MaximumTemporaryBytes));
+                var priority = new PostgresVideoPhotoPriorityProbe(database);
+                async Task<VideoExecutionPermit> InspectAsync(CancellationToken ct)
+                {
+                    VideoPhotoPrioritySnapshot current = await priority.GetAsync(ct);
+                    return current.PhotoWorkActive
+                        ? VideoExecutionPermit.Deny("photo-priority")
+                        : VideoExecutionPermit.Ready;
+                }
+                if (!(await InspectAsync(token)).Allowed)
+                    throw new InvalidOperationException(
+                        "Photo processing takes priority over private native crop review.");
+
                 OneDriveVideoAssetSource source = new(
                     SourceId.From(entry.SourceId), entry.RootLocator);
                 OneDriveVideoLocalStager stager = new(source);
                 await using VideoStagedLocalCopy staged = await stager.StageAsync(
                     new SourceAssetReference(source.SourceId, entry.SourceKey),
                     entry.SourceBytes, entry.SourceSha256, root,
-                    ct => Task.FromResult(!ct.IsCancellationRequested), token);
+                    async ct => (await InspectAsync(ct)).Allowed, token);
 
                 ImageFrame? nativeFrame = null;
-                VideoToolExecutionResult execution = await new VideoToolProcessSupervisor().RunAsync(
-                    executable, expectedHash, root,
-                    workspace => VideoFaceNativeFrameProfile.BuildArguments(
-                        staged.FilePath, workspace,
-                        new VideoFrameSample(entry.TimestampMs, null),
-                        entry.DurationMilliseconds),
-                    FrameBudget, token,
-                    afterSuccessfulExit: async (workspace, ct) =>
-                    {
-                        nativeFrame = await VideoFaceNativeFrameProfile.ReadValidatedFrameAsync(
-                            Path.Combine(workspace, VideoFaceNativeFrameProfile.OutputName), ct);
-                    });
+                VideoGuardedToolExecutionResult execution =
+                    await new VideoGuardedToolExecutor(new VideoToolProcessSupervisor()).RunAsync(
+                        executable, expectedHash, root,
+                        workspace => VideoFaceNativeFrameProfile.BuildArguments(
+                            staged.FilePath, workspace,
+                            new VideoFrameSample(entry.TimestampMs, null),
+                            entry.DurationMilliseconds),
+                        FrameBudget, InspectAsync,
+                        TimeSpan.FromMilliseconds(250), token,
+                        onValidatedSuccessfulExit: async (workspace, ct) =>
+                        {
+                            nativeFrame = await VideoFaceNativeFrameProfile.ReadValidatedFrameAsync(
+                                Path.Combine(workspace, VideoFaceNativeFrameProfile.OutputName), ct);
+                        });
 
-                if (execution.ExitCode != 0 || nativeFrame is null)
+                if (!execution.Completed || nativeFrame is null)
                     throw new InvalidDataException(
                         "The native video face review frame could not be verified.");
 
                 VideoFaceNativeCropJpeg crop = VideoFaceNativeCropRenderer.Render(
                     nativeFrame, entry.FrameWidth, entry.FrameHeight,
                     entry.X, entry.Y, entry.Width, entry.Height, token);
+                if (!(await InspectAsync(token)).Allowed)
+                    throw new InvalidOperationException(
+                        "Photo processing resumed before private native crop response.");
                 // The source and asset locks remain held until the JPEG bytes
                 // have finished their HTTP response or the client aborts.
                 return new VideoFaceNativeCropResponse(crop, lease);
