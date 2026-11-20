@@ -341,23 +341,6 @@ public sealed class VideoFaceLeasedPublicationTests
             }
             Assert.True(await scopes.DisarmAsync(emptyGrant));
 
-            // Source exclusion revokes even an empty job receipt, without
-            // affecting the distinct source key's positive evidence.
-            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
-            await using (NpgsqlCommand exclude = connection.CreateCommand())
-            {
-                exclude.CommandText = """
-                    INSERT INTO source_copy_exclusions(
-                      source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
-                    VALUES (@source,'empty-sampled.mp4',now(),'pending',now());
-                    """;
-                exclude.Parameters.AddWithValue("source", source);
-                await exclude.ExecuteNonQueryAsync();
-            }
-            Assert.Null(await review.GetCurrentAsync(emptyRevision));
-            Assert.False(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
-            Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
-
             // v46: human review alone never creates video-person tags. Only a
             // separately approved, revision/source/lease-fenced operation
             // can write one owned add, and undo cannot touch other edits.
@@ -463,6 +446,23 @@ public sealed class VideoFaceLeasedPublicationTests
             await VerifyFaceReviewHttpAsync(
                 database, review, presence, details, revision,
                 emptyRevision, observationId, person);
+
+            // Source exclusion revokes even an empty job receipt, without
+            // affecting the distinct source key's positive evidence.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand exclude = connection.CreateCommand())
+            {
+                exclude.CommandText = """
+                    INSERT INTO source_copy_exclusions(
+                      source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+                    VALUES (@source,'empty-sampled.mp4',now(),'pending',now());
+                    """;
+                exclude.Parameters.AddWithValue("source", source);
+                await exclude.ExecuteNonQueryAsync();
+            }
+            Assert.Null(await review.GetCurrentAsync(emptyRevision));
+            Assert.False(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
+            Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
 
             // Excluding the current source must cascade both audited face
             // links and ordinary video-person action history. It must not
@@ -586,13 +586,30 @@ public sealed class VideoFaceLeasedPublicationTests
             Assert.False(json.RootElement.GetProperty("presencePromotionEnabled").GetBoolean());
             Assert.Single(json.RootElement.GetProperty("observations").EnumerateArray());
         }
+        // A legitimate zero-detected-face leased receipt must be a 200
+        // with an empty sampled set, not a 404 implying no persisted batch.
         using (HttpResponseMessage get = await client.GetAsync(missing))
-            Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+        {
+            Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+            AssertNoStore(get);
+            using JsonDocument json = JsonDocument.Parse(
+                await get.Content.ReadAsStringAsync());
+            Assert.Empty(json.RootElement.GetProperty("observations").EnumerateArray());
+            Assert.False(json.RootElement.GetProperty("presencePromotionEnabled").GetBoolean());
+        }
         using (HttpResponseMessage get = await client.GetAsync(
             "/api/videos/not-a-guid/face-review"))
             Assert.Equal(HttpStatusCode.BadRequest, get.StatusCode);
         using (HttpResponseMessage crop = await client.GetAsync(cropUrl))
             Assert.Equal(HttpStatusCode.NotFound, crop.StatusCode);
+        using (HttpResponseMessage unknownFace = await client.PostAsJsonAsync(
+            root + "/" + Guid.NewGuid().ToString("D") + "/decision",
+            new { decision = "unknown", personId = (string?)null }))
+            Assert.Equal(HttpStatusCode.NotFound, unknownFace.StatusCode);
+        using (HttpResponseMessage noFaces = await client.PostAsJsonAsync(
+            missing + "/" + faceId.ToString("D") + "/decision",
+            new { decision = "unknown", personId = (string?)null }))
+            Assert.Equal(HttpStatusCode.NotFound, noFaces.StatusCode);
         using (HttpResponseMessage add = await Promote(true))
             Assert.Equal(HttpStatusCode.NotFound, add.StatusCode);
         using (HttpResponseMessage undo = await client.DeleteAsync(presenceUrl))
