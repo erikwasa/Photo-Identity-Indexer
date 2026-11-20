@@ -54,7 +54,22 @@ public sealed class VideoFaceLeasedPublicationTests
                 new NpgsqlConnectionStringBuilder(admin)
                 { Database = name, Pooling = false }.ConnectionString);
             await database.InitializeAsync();
-            Assert.Equal(43, PostgresCatalogueDatabase.CurrentSchemaVersion);
+            // The v43 video-face lease migration remains required even when
+            // later, unrelated catalogue migrations advance the schema.
+            Assert.True(PostgresCatalogueDatabase.CurrentSchemaVersion >= 43);
+            await using (NpgsqlConnection schemaProbe = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand schemaProbeCommand = schemaProbe.CreateCommand())
+            {
+                schemaProbeCommand.CommandText = """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'video_face_evidence_batches'
+                          AND column_name = 'publishing_job_id');
+                    """;
+                Assert.True((bool)(await schemaProbeCommand.ExecuteScalarAsync())!);
+            }
             Guid source = Guid.NewGuid(), videoAsset = Guid.NewGuid(),
                 photoAsset = Guid.NewGuid(), videoId = Guid.NewGuid(),
                 photoId = Guid.NewGuid(), person = Guid.NewGuid(),
