@@ -40,6 +40,10 @@ public static class Program
         {
             return args[0] switch
             {
+                "archive" when args.Length > 1 && args[1] == "alias-pilot" =>
+                    await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                        ArchiveCaseAliasPilotOptions.Parse(args.Skip(2).ToArray()),
+                        output, cancellationToken),
                 "catalogue" when args.Length > 1 && args[1] == "rehearse-v33" =>
                     await VideoSchemaRehearsalCommandRunner.RunAsync(
                         VideoSchemaRehearsalOptions.Parse(args.Skip(2).ToArray()),
@@ -301,6 +305,23 @@ public static class Program
     {
         output.WriteLine("""
             Photo Identity Indexer CLI
+
+              archive alias-pilot --manifest ABS_PRIVATE_CSV
+                                  --metadata ABS_PRIVATE_JSON
+                                  --postgres-connection-env NAME
+                                  --database DB [--max-pairs 1..5]
+                                  [--operation preview|apply|restore]
+                                  (preview is read-only; apply/restore require
+                                   --approve-manifest-sha256 EXACT_HASH
+                                   --receipt-directory EXISTING_PRIVATE_DIRECTORY
+                                   --actor OPERATOR_ID
+                                   --application-stopped
+                                   --acknowledge-reversible-retirement
+                                   and apply additionally requires
+                                   --restore-report VERIFIED_JSON)
+                                  (never deletes source files or database rows;
+                                   approval uses full SHA-256; aborts on first
+                                   stale DB conflict; keeps private JSONL receipts)
 
               catalogue rehearse-v33 --postgres-connection-env NAME
                                      --restore-report PATH
