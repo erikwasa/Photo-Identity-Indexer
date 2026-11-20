@@ -11,6 +11,33 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 # WI-0155: Evaluate face discovery and identity processing inside video
 
 
+## 2026-11-21 — Complete synthetic face-review HTTP acceptance before real-media sign-off
+
+PR #854 is merged and the maintainer reports local test success.
+The production review UI, source-backed native crop, explicit
+human-approved video-person presence, safe undo and visual-session
+fencing are all implemented behind default-off gates.
+
+The next gap was **end-to-end HTTP contract assurance**, not another
+native face-recognition run. A separate test-only PR extends the
+disposable PostgreSQL leased FaceEvidence fixture to start a real
+ASP.NET Core TestServer with the deployed face-review routes. It
+asserts fail-closed configuration gates, private no-cache headers,
+valid **zero-face 200** receipts versus missing-evidence 404, review
+save without tagging, explicit approval and idempotent presence,
+409 correction fences while linked, reversible undo, final clear,
+and exclusion purge. It tests HTTP handlers and database together
+with synthetic observation/identity data and **no source media**.
+
+**Outstanding:** the consolidated interactive human-quality check of
+actual native face crops and source rights/retention/false-positive
+risk acceptance. This remains deliberately deferred until a separately
+approved current real FaceEvidence batch is available, not another
+experiment solely for this PR. Do not enable automatic tagging or
+declare WI-0155 complete based on synthetic HTTP verification alone.
+
+
+
 ## 2026-11-21 — Harden per-observation visual inspection before production enablement
 
 PR #852 has been merged and the explicit, reviewed, source-bound
