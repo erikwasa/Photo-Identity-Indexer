@@ -61,6 +61,13 @@ public sealed class PostgresCollectionQueryRepository : ICollectionQueryReposito
                 0 AS suggested_evidence,
                 NULL::double precision AS suggestion_score
             FROM asset_revisions
+            INNER JOIN assets AS collection_asset
+                ON collection_asset.id = asset_revisions.asset_id
+               AND collection_asset.deleted_at_utc IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM archive_case_alias_retirements AS retired
+                   WHERE retired.secondary_asset_id = collection_asset.id
+                     AND retired.restored_at_utc IS NULL)
             INNER JOIN face_occurrences
                 ON face_occurrences.asset_revision_id = asset_revisions.id
             INNER JOIN latest_action
@@ -96,6 +103,13 @@ public sealed class PostgresCollectionQueryRepository : ICollectionQueryReposito
                 1 AS suggested_evidence,
                 top_suggestion.score AS suggestion_score
             FROM asset_revisions
+            INNER JOIN assets AS collection_asset
+                ON collection_asset.id = asset_revisions.asset_id
+               AND collection_asset.deleted_at_utc IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM archive_case_alias_retirements AS retired
+                   WHERE retired.secondary_asset_id = collection_asset.id
+                     AND retired.restored_at_utc IS NULL)
             INNER JOIN face_occurrences
                 ON face_occurrences.asset_revision_id = asset_revisions.id
             LEFT JOIN latest_action
