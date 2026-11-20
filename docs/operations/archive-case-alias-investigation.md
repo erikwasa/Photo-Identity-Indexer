@@ -106,3 +106,94 @@ The test checks exact-path preservation, prevention of a new case-only alias,
 retention of manual tag/person history and recognition of case-only
 aliases of durable exclusion tombstones. Live PostgreSQL verification and
 the private production audit are still outstanding.
+
+
+## Controlled automated retirement: first eligibility gate
+
+The private effective-state audit reported 1,088 case-only pairs with matching
+verified hashes and no incomplete current verification. It also found 762
+pairs with effective differences (373 manual people; 735 Place/provenance;
+27 reviewed-face-count differences; overlapping categories). **These are
+not 1,088 safe deletions.**
+
+The application's PostgresIdentityAutoAssignmentService writes decisions
+with the exact actors identity-matcher:auto and
+identity-matcher:auto-multi-evidence. That provides evidence for classifying
+automatically generated actions separately from human or unknown actors.
+An automatic action does not justify deleting a different path or revision.
+
+New script tools/archive-case-alias-retirement-evidence.sql examines both
+assets in each case-only pair and counts human/unknown versus automatic face
+reviews and person labels, manually applied tags, manually linked people,
+manual Place edits, capture-date overrides, presentation preferences, manual
+list-collection references, and featured-person face references across
+**all asset revisions**. It also reports verified file size, current hash,
+and durable source-exclusion matches. It is a PostgreSQL READ ONLY audit.
+
+The offline PowerShell planner uses that evidence and the existing private
+effective-state comparison. A pair can be marked for a proposed **reversible
+logical retirement** only if all the following hold:
+
+1. Exactly two different assets share the same normalized case-insensitive
+   path under the same source; their exact stored key spellings are distinct.
+2. Both current observations are verified, with identical valid SHA-256
+   digests AND byte sizes; neither asset is marked missing or excluded.
+3. The proposed survivor has a **strictly earlier creation timestamp**.
+   A tie is blocked rather than guessing from GUID sorting.
+4. The later asset has **zero** human/unknown face-review actions and
+   labels; zero manual tag/person/Place actions, capture-date or
+   presentation preference actions; and no manual collection items
+   or featured-person face references.
+5. Both current revisions agree on the effective tags, manual people,
+   Place value and provenance, and confirmed face-person IDs.
+   Differences in automatic face-review counts are not independently
+   treated as human edits, but their data is not deleted either.
+
+Unrecognized actor values are always classified human/unknown and block
+the proposal. A proposed survivor is never selected from SHA-256 alone.
+The earlier asset is preferred **only within the same case-normalized path**.
+
+An important safety boundary: this outputs an **unapproved CANDIDATE
+MANIFEST**, not an executable cleanup operation. ApplyEnabled is False
+for every row, AssetRowsToDelete=0, and OriginalFilesToDelete=0.
+The manifest is deliberately a review stage for a future reversible
+database-backed alias retirement, not a SQL DELETE list.
+
+### Run the eligibility gate on the Windows host
+
+After checking out the branch, retain the previous private
+artifacts/archive-case-effective-state.csv file, and reuse the same
+validated local Podman $containerId as before.
+
+~~~powershell
+pwsh -NoProfile -File .\tests\PowerShell\archive-case-alias-retirement-plan.tests.ps1
+
+$sql = Get-Content '.\tools\archive-case-alias-retirement-evidence.sql' -Raw
+$result = $sql | & podman exec -i $containerId sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d photoidentity_main -X -q -v ON_ERROR_STOP=1'
+if ($LASTEXITCODE -ne 0) { throw 'Read-only retirement evidence audit failed.' }
+$result | Set-Content '.\artifacts\archive-case-retirement-evidence.csv' -Encoding utf8
+
+.\tools\new-archive-case-alias-retirement-plan.ps1 -EvidenceCsv '.\artifacts\archive-case-retirement-evidence.csv' -EffectiveStateCsv '.\artifacts\archive-case-effective-state.csv' -OutputDirectory '.\artifacts\archive-case-retirement'
+~~~
+
+Share only the aggregate summary, never the private CSV files. They contain
+source paths, original asset IDs and hash values.
+
+### What the later apply stage must implement
+
+Before any production writes, develop a **reversible logical retirement**
+that keeps the secondary asset, its revision identities, all face
+observations, automatic suggestions, human review history and metadata
+in PostgreSQL. Use an explicit mapping from a retired alias to the
+surviving asset; do not use source-copy exclusion or purging.
+
+Integrate this mapping with scan/verification (or a later scan will recreate
+or reactivate the alias), the library search, Smart Collections, exact
+duplicates, face review, and other active-photo views. Require an isolated
+restore test, transactional preconditions, idempotency, operator approval
+for a bounded batch, audit logging, rollback, and post-repair checks.
+Conflicting annotations must be addressed separately rather than silently
+overwritten or discarded.
+
+This is a preferred staging direction; no production database cleanup is
+authorized by the first eligibility gate.
