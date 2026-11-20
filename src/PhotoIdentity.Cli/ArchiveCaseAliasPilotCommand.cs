@@ -142,9 +142,15 @@ public static class ArchiveCaseAliasPilotCommandRunner
             throw new InvalidOperationException(
                 "Database connection must explicitly target the named localhost catalogue.");
 
+        // Ignore only this command's own pooled client sessions. Other
+        // applications and manually opened database clients block Apply.
+        string operatorApplicationName = $"photoidentity-alias-pilot-{Guid.NewGuid():N}";
+        settings.ApplicationName = operatorApplicationName;
+
         // A preview never initializes/migrates the catalogue or modifies rows.
         await using PostgresCatalogueDatabase catalogue = new(settings.ConnectionString);
-        await VerifyDatabaseAsync(catalogue, options.DatabaseName, writing, cancellationToken);
+        await VerifyDatabaseAsync(catalogue, options.DatabaseName, writing,
+            operatorApplicationName, cancellationToken);
 
         if (options.Operation == "preview")
         {
@@ -188,7 +194,8 @@ public static class ArchiveCaseAliasPilotCommandRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // Guard against a process starting between sequential pair writes.
-                await VerifyDatabaseAsync(catalogue, options.DatabaseName, true, cancellationToken);
+                await VerifyDatabaseAsync(catalogue, options.DatabaseName, true,
+                    operatorApplicationName, cancellationToken);
                 ArchiveAliasRetirementOutcome outcome;
                 try
                 {
@@ -352,7 +359,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
 
     private static async Task VerifyDatabaseAsync(
         PostgresCatalogueDatabase catalogue, string expectedDatabase, bool requireStopped,
-        CancellationToken token)
+        string operatorApplicationName, CancellationToken token)
     {
         await using NpgsqlConnection connection = await catalogue.OpenConnectionAsync(token);
         using NpgsqlCommand command = connection.CreateCommand();
@@ -363,8 +370,10 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 (SELECT count(*) FROM pg_stat_activity
                  WHERE datname = current_database()
                    AND backend_type = 'client backend'
-                   AND pid <> pg_backend_pid());
+                   AND pid <> pg_backend_pid()
+                   AND application_name <> @operator_app);
             """;
+        command.Parameters.AddWithValue("operator_app", operatorApplicationName);
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token) ||
             reader.GetString(0) != expectedDatabase ||
