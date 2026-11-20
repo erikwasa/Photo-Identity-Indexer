@@ -713,6 +713,24 @@ public sealed class VideoFaceLeasedPublicationTests
                     .GetProperty("presence").ValueKind);
         }
         Assert.Empty((await details.GetAsync(revision))!.People);
+
+        // Leave a *real active*, evidence-owned person tag immediately
+        // before source exclusion. Previous regressions checked for zero
+        // tags only after undo had already removed them; that did not
+        // prove exclusion actually purged an approved current presence.
+        using (HttpResponseMessage confirmed = await Decision("known", personId))
+            Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        using (HttpResponseMessage active = await Promote(true))
+        {
+            Assert.Equal(HttpStatusCode.OK, active.StatusCode);
+            using JsonDocument json = JsonDocument.Parse(
+                await active.Content.ReadAsStringAsync());
+            Assert.Equal("linked", json.RootElement.GetProperty("status").GetString());
+        }
+        Assert.Single((await details.GetAsync(revision))!.People);
+        Assert.NotNull(Assert.Single((await review.GetCurrentAsync(revision))!.Observations).Presence);
+        // The enclosing test immediately inserts the source exclusion.
+        // Its final assertions require both linked evidence and tags = 0.
     }
 
     private sealed class SyntheticProducer(
