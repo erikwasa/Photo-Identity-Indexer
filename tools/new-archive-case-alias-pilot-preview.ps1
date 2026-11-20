@@ -43,6 +43,11 @@ $effectivePath = Require-FreshSource $EffectiveStateCsv 'effective-state' $now
 if ($evidencePath -ceq $effectivePath) {
     throw 'The retirement and effective-state audit CSVs must be distinct.'
 }
+$evidenceWritten = (Get-Item -LiteralPath $evidencePath).LastWriteTimeUtc
+$effectiveWritten = (Get-Item -LiteralPath $effectivePath).LastWriteTimeUtc
+if ([math]::Abs(($evidenceWritten - $effectiveWritten).TotalMinutes) -gt 15) {
+    throw 'The two private audit exports were captured too far apart. Re-export both within 15 minutes.'
+}
 
 $planner = Join-Path $PSScriptRoot 'new-archive-case-alias-retirement-plan.ps1'
 if (-not (Test-Path -LiteralPath $planner -PathType Leaf)) {
