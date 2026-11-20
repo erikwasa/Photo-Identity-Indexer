@@ -50,7 +50,7 @@ else
         <section class="vfpr-preview" aria-label="Manually opened video frame context">
             <h2>Visual context · @VideoFaceReviewPresentation.Moment(SelectedFace.TimestampMs)</h2>
             <p>An explicitly enabled, source-verified native crop is shown below when available.
-               Its original pixel size is preserved without upscaling. The playable proxy
+               Its native decoded pixel dimensions are preserved without upscaling, although JPEG encoding can lose fine detail. The playable proxy
                provides optional wider context, but a proxy seek may not precisely match the native sampled frame.
                Do not confirm a person unless the visible face is clear.</p>
             <div class="vfpr-native-crop">
@@ -61,7 +61,7 @@ else
                      alt="Native-pixel crop of the selected sampled face, if locally authorized" />
                 @if (NativeCropReady)
                 {
-                    <p role="status">Source-verified native face crop loaded. Original pixels only; no upscaling.</p>
+                    <p role="status">Source-verified native-size JPEG crop loaded without upscaling. JPEG compression can lose fine detail.</p>
                 }
                 else if (NativeCropUnavailable)
                 {
