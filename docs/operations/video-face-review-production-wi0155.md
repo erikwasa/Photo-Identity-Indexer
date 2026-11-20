@@ -667,3 +667,106 @@ a reason to create fake face evidence now. Exact source-back crop fidelity
 must be observed on one authorized video; human approval, model and runtime
 rights, privacy/retention, false-positive limitations and presence
 promotion/undo are separate outstanding decisions.
+
+## 2026-11-20 — Explicit, reversible human face-to-video presence (v46; separate PR)
+
+This stage adds a **separate human approval** step after a reviewer has
+identified one face from a current, successful, leased FaceEvidence batch.
+It deliberately does not turn the existing `known` review decision into
+an automatic video-person tag. The face-review page now offers an
+additional opt-in operator choice: **Add confirmed person to video**.
+The corresponding undo is **Undo this face-based presence**.
+
+### Behavior and authority
+
+- **Four default-off gates:** the existing
+  `PhotoIdentity:VideoLibraryEnabled=true` and
+  `PhotoIdentity:VideoFaceReviewEnabled=true` remain required. Only
+  explicit presence mutations additionally require
+  `PhotoIdentity:VideoFacePresencePromotionEnabled=true`. The
+  `VideoFaceNativeCropEnabled` setting independently gates the original
+  source-backed image; it is not a prerequisite for operating the
+  already-persisted human review. Do not enable any of these on a public host.
+- The write routes are `POST /api/videos/{revisionId}/face-review/{observationId}/presence`
+  with `{"personId":"<canonical-person-uuid>"}`, and `DELETE` of that same
+  route for undo. 404 when disabled or no longer current; 409 on conflicts
+  and changed review/person state. JSON responses contain only fixed
+  statuses and whether video presence changed, not private media or paths.
+- The server checks the exact currently included local video revision,
+  source SHA, non-excluded supported Rec.709 metadata, a **successful
+  leased FaceEvidence job** with pinned YuNet/SFace/alignment provenance,
+  and matching deterministic sampled face ordinal/timestamp. It then
+  locks the source, asset, face observation and canonical person in one
+  transaction, reads the **latest** append-only human face-review action,
+  and requires it to be `known` for the same person as the explicit request.
+  No inference, media reading or OneDrive hydration occurs during tagging.
+- If that person is already effectively tagged, including through a
+  merged-person alias, the operation returns `already-present` and
+  does **not** create a second tag or claim ownership of the existing one.
+  Repeat approval returns `already-linked`, without duplicate actions.
+- A successful approval appends a normal `video_person_actions/add` and
+  a provenance `video_face_presence_actions/link` referencing the exact
+  immutable face-review action and video-person add ID. A distinct
+  `video_face_presence_actions/unlink` records undo. **Only** when the
+  tagged person's latest action is still that same face-owned add (and the
+  person has not since been merged) may undo append a
+  `video_person_actions/remove`. If a person was independently tagged,
+  subsequently manually changed, or merged, undo releases the evidence
+  link **without overriding unrelated person history**.
+- To correct a face that has an active presence link, the reviewer must
+  first explicitly undo that link. `clear`, `unknown`, `not-face` or
+  change to another person are refused while an active link remains.
+  Once undone, normal face corrections are possible. This prevents an
+  incorrect identity review from leaving an unnoticed active video tag.
+- Review and presence links remain append-only and source-revision scoped;
+  source exclusion and revision deletion purge linked actions under
+  PostgreSQL foreign keys and the existing exclusion triggers. Existing
+  photo identities and photo person actions are not touched.
+
+### Migration and production safety
+
+**Migration v46** adds one provenance/action table and indexes, and
+increments `CurrentSchemaVersion` to 46. It is applied by the normal
+catalogue initializer on API/CLI start. Do not deploy to
+`photoidentity_main` without a verified streaming backup, restore
+rehearsal and your standard production schema rollout procedure.
+This is not a zero-schema-change PR. Keep presence promotion disabled
+in production until combined interactive acceptance, model/tool/source
+rights review, privacy/retention review and false-person risk approval.
+No worker/scheduler or automatic assignment has been added.
+
+### Verification without another real-video experiment
+
+1. Check out the PR branch and compile:
+   ```powershell
+   dotnet build .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj -c Release
+   if ($LASTEXITCODE -ne 0) { throw 'Human-presence API build failed.' }
+   dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+      -c Release --filter 'FullyQualifiedName~VideoFacePresenceReviewContractTests'
+   if ($LASTEXITCODE -ne 0) { throw 'Face presence contract tests failed.' }
+   ```
+   This synthetic check uses no database, source video or models.
+2. CI's disposable PostgreSQL `VideoFaceLeasedPublicationTests`
+   extends the existing selected, successful FaceEvidence receipt test
+   with missing-review refusal, explicit known-person approval,
+   duplicate suppression, undo, correction fencing, already-manual-tagged
+   and independently changed manual tag safeguards, and confirmation that
+   photo-person writes remain zero. Local execution is optional *only*
+   with `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` pointing
+   at an isolated disposable PostgreSQL administrator instance. Otherwise
+   this test **skips its body even if the runner displays success**.
+3. With all face/presence gates off, ordinary Video Details editing
+   remains unaffected; the new mutation routes are 404. No real source
+   should be opened for this test.
+
+**Deferred consolidated acceptance (PRs #849, #850 and this PR):**
+There is still no existing authorized face-evidence batch in the
+maintainer's live catalogue. No new real-media face-detection experiment
+is required now. On the first independently authorized current batch,
+run one browser session to inspect the exact native crop and fallback proxy,
+confirm the correct canonical person, hide/reveal/correct, explicitly
+approve video-person presence, confirm deduplicated appearance in Video
+Details, undo, re-review/correct, repeat without duplicating tags,
+test existing manual tag preservation, stale/excluded revision refusal,
+zero-face behavior and verify photo identities unchanged. Run the
+approved privacy/rights/retention checks before enabling production use.
