@@ -67,6 +67,10 @@ public sealed class PostgresReviewQueryRepository : IReviewFilterRepository, IRe
         INNER JOIN assets
             ON assets.id = asset_revisions.asset_id
            AND assets.media_kind = 'photo'
+           AND NOT EXISTS (
+               SELECT 1 FROM archive_case_alias_retirements AS retired
+               WHERE retired.secondary_asset_id = assets.id
+                 AND retired.restored_at_utc IS NULL)
         LEFT JOIN latest_crop
             ON latest_crop.face_occurrence_id = face_occurrences.id
            AND latest_crop.row_number = 1
