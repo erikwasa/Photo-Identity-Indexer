@@ -9,7 +9,7 @@
     <div>
         <p class="eyebrow">Video library · opt-in human review</p>
         <h1>Review sampled video faces</h1>
-        <p>Current, revision-bound detector observations and ranked suggestions. Nothing here automatically identifies anyone or adds a video-person tag.</p>
+        <p>Current, revision-bound detector observations and ranked suggestions. A review does not tag the video: only a separate, explicitly approved promotion can add a person.</p>
     </div>
     <a class="button secondary" href="@($"/videos/{RevisionId}")">Back to video details</a>
 </section>
@@ -31,7 +31,7 @@ else
         <p><strong>@Batch.Observations.Count</strong> sampled face observations ·
            <strong>@Batch.Observations.Count(VideoFaceReviewPresentation.IsReviewed)</strong> reviewed ·
            <strong>@VideoFaceReviewPresentation.DistinctConfirmedPeople(Batch.Observations)</strong> distinct confirmed people</p>
-        <p>This is not whole-video coverage. One credible face may support a manual presence decision later; these face decisions never create a video-person association.</p>
+        <p>This is not whole-video coverage. A confirmed face can support a separate, explicit human-approved video-person presence decision when that feature is enabled. Face review alone never tags a video.</p>
         @if (Batch.Observations.Count == 0)
         {
             <p role="status">The bounded sampled frames contained no detected faces. This does not establish that the whole video contains no people.</p>
@@ -176,6 +176,46 @@ else
                     }
                 }
 
+                @if (selected && face.Decision == "known" &&
+                     !string.IsNullOrWhiteSpace(face.ReviewedPersonId))
+                {
+                    <section class="vfpr-presence" aria-label="Explicit video-person presence">
+                        @if (face.Presence is not null)
+                        {
+                            <p>Video-person presence was explicitly linked from this face.
+                               @(face.Presence.VideoTagStillCurrent
+                                 ? "The original tag is still current."
+                                 : "The video tag has since changed independently; undo will not overwrite that edit.")</p>
+                            @if (Batch.PresencePromotionEnabled)
+                            {
+                                <label class="vfpr-toggle">
+                                    <input type="checkbox" @bind="PresenceApproved" />
+                                    I explicitly approve unlinking this evidence from video-person presence.
+                                </label>
+                                <button class="button secondary"
+                                        disabled="@(!CanUndo(face))"
+                                        @onclick="() => ChangePresenceAsync(face, false)">
+                                    Undo this face-based presence
+                                </button>
+                            }
+                        }
+                        else if (Batch.PresencePromotionEnabled)
+                        {
+                            <p>Separate approval required. This adds a person as present somewhere in
+                               the video, not as an automatically identified face or a timestamped tag.
+                               An already manually tagged person will not be duplicated.</p>
+                            <label class="vfpr-toggle">
+                                <input type="checkbox" @bind="PresenceApproved" />
+                                I explicitly approve adding @face.ReviewedPersonName to this video's people.
+                            </label>
+                            <button class="button primary" disabled="@(!CanPromote(face))"
+                                    @onclick="() => ChangePresenceAsync(face, true)">
+                                Add confirmed person to video
+                            </button>
+                        }
+                    </section>
+                }
+
                 <div class="vfpr-actions">
                     <button class="button secondary" disabled="@(!CanDecide(face))"
                             @onclick='() => DecideAsync(face, "unknown", null)'>Unknown face</button>
@@ -224,6 +264,7 @@ else
     private bool PlaybackUnavailable;
     private bool NativeCropReady;
     private bool NativeCropUnavailable;
+    private bool PresenceApproved;
 
     private string NativeCropUrl(PersistedVideoFaceObservation face) =>
         ApiUrl + "/" + Uri.EscapeDataString(face.Id) + "/native-crop";
@@ -302,6 +343,7 @@ else
         NativeCropUnavailable = false;
         PersonSearch = "";
         PeopleError = null;
+        PresenceApproved = false;
     }
 
     private void Inspect(PersistedVideoFaceObservation face)
@@ -313,6 +355,7 @@ else
         VisualConfirmed = false;
         PlaybackUnavailable = false;
         PersonSearch = "";
+        PresenceApproved = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -350,6 +393,64 @@ else
     private bool CanDecide(PersistedVideoFaceObservation face) =>
         !Busy && Batch is not null && (NativeCropReady || (FrameReady && !PlaybackUnavailable)) &&
         VisualConfirmed && SelectedFace?.Id == face.Id;
+
+    private bool CanPromote(PersistedVideoFaceObservation face) =>
+        Batch?.PresencePromotionEnabled == true && PresenceApproved &&
+        CanDecide(face) && face.Decision == "known" &&
+        !string.IsNullOrWhiteSpace(face.ReviewedPersonId);
+
+    // Undo is a risk-reducing correction: do not require the original
+    // media or playable proxy to still be available for an explicit unlink.
+    private bool CanUndo(PersistedVideoFaceObservation face) =>
+        !Busy && Batch?.PresencePromotionEnabled == true && PresenceApproved &&
+        SelectedFace?.Id == face.Id && face.Presence is not null;
+
+    private async Task ChangePresenceAsync(PersistedVideoFaceObservation face, bool link)
+    {
+        if (link ? !CanPromote(face) : !CanUndo(face)) return;
+        Busy = true;
+        Notice = null;
+        Error = null;
+        try
+        {
+            string address = ApiUrl + "/" + Uri.EscapeDataString(face.Id) + "/presence";
+            using HttpResponseMessage response = link
+                ? await Http.PostAsJsonAsync(address,
+                    new PersistedVideoFacePresenceRequest(face.ReviewedPersonId!, true))
+                : await Http.DeleteAsync(address);
+            if (!response.IsSuccessStatusCode)
+            {
+                Batch = null;
+                ResetPreview();
+                Error = $"Presence change was refused (HTTP {(int)response.StatusCode}). Refresh the current review.";
+                return;
+            }
+            PersistedVideoFacePresenceOutcome? outcome =
+                await response.Content.ReadFromJsonAsync<PersistedVideoFacePresenceOutcome>();
+            await RefreshAsync();
+            ShowReviewed = true;
+            if (Batch is not null)
+                Notice = outcome?.Status switch
+                {
+                    "linked" => "Person explicitly tagged in video. This face owns a reversible link.",
+                    "already-present" => "Person is already tagged in this video; no duplicate or new undo ownership was created.",
+                    "already-linked" => "This face was already linked; no additional tag was created.",
+                    "unlinked" => outcome.VideoPersonTagChanged
+                        ? "Face-based presence undone; the owned video tag was removed."
+                        : "Face link undone without changing an independently edited video tag.",
+                    "already-unlinked" => "This face has no current presence link.",
+                    _ => "Presence state reloaded."
+                };
+        }
+        catch (Exception error) when (error is HttpRequestException or System.Text.Json.JsonException
+                                             or InvalidDataException)
+        {
+            Batch = null;
+            ResetPreview();
+            Error = "The presence result could not be verified. Refresh before performing another action.";
+        }
+        finally { Busy = false; }
+    }
 
     private static string DecisionLabel(PersistedVideoFaceObservation face) =>
         face.Decision == "known" ? face.ReviewedPersonName ?? "Known person" :

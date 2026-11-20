@@ -20,6 +20,10 @@ public static class VideoFaceReviewEndpoints
             DecideAsync);
         routes.MapGet("/api/videos/{revisionId}/face-review/{observationId}/native-crop",
             NativeCropAsync);
+        routes.MapPost("/api/videos/{revisionId}/face-review/{observationId}/presence",
+            PromotePresenceAsync);
+        routes.MapDelete("/api/videos/{revisionId}/face-review/{observationId}/presence",
+            UndoPresenceAsync);
         return routes;
     }
 
@@ -29,6 +33,13 @@ public static class VideoFaceReviewEndpoints
         string.Equals(settings["PhotoIdentity:VideoLibraryEnabled"], "true",
             StringComparison.OrdinalIgnoreCase) &&
         string.Equals(settings["PhotoIdentity:VideoFaceReviewEnabled"], "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    // Separate operator approval from review or native crop access.
+    // A known-face review decision alone never changes video-person presence.
+    private static bool PresenceEnabled(IConfiguration settings) =>
+        Enabled(settings) &&
+        string.Equals(settings["PhotoIdentity:VideoFacePresencePromotionEnabled"], "true",
             StringComparison.OrdinalIgnoreCase);
 
     private static bool NativeCropEnabled(IConfiguration settings) =>
@@ -78,6 +89,60 @@ public static class VideoFaceReviewEndpoints
         }
     }
 
+    public sealed record PresenceRequest(string PersonId, bool ExplicitlyApproved);
+
+    private static async Task<IResult> PromotePresenceAsync(
+        string revisionId, string observationId, PresenceRequest request,
+        PostgresVideoFacePresenceRepository presence,
+        IConfiguration settings, HttpContext context, CancellationToken token)
+    {
+        NoStore(context);
+        if (!PresenceEnabled(settings)) return Results.NotFound();
+        if (!TryGuid(revisionId, out Guid revision) ||
+            !TryGuid(observationId, out Guid observation) ||
+            request is null || !request.ExplicitlyApproved ||
+            !TryGuid(request.PersonId, out Guid person))
+            return Results.BadRequest(new { error = "Invalid explicit face-presence request." });
+        try
+        {
+            VideoFacePresenceOutcome outcome = await presence.PromoteAsync(
+                AssetRevisionId.From(revision), observation, person, Actor, token);
+            return Results.Ok(outcome);
+        }
+        catch (KeyNotFoundException) { return Results.NotFound(); }
+        catch (ArgumentException) { return Results.BadRequest(); }
+        catch (InvalidOperationException)
+        {
+            return Results.Conflict(new { error =
+                "The face, person or video presence changed. Refresh before approving." });
+        }
+    }
+
+    private static async Task<IResult> UndoPresenceAsync(
+        string revisionId, string observationId,
+        PostgresVideoFacePresenceRepository presence,
+        IConfiguration settings, HttpContext context, CancellationToken token)
+    {
+        NoStore(context);
+        if (!PresenceEnabled(settings)) return Results.NotFound();
+        if (!TryGuid(revisionId, out Guid revision) ||
+            !TryGuid(observationId, out Guid observation))
+            return Results.BadRequest(new { error = "Invalid explicit face-presence request." });
+        try
+        {
+            VideoFacePresenceOutcome outcome = await presence.UndoAsync(
+                AssetRevisionId.From(revision), observation, Actor, token);
+            return Results.Ok(outcome);
+        }
+        catch (KeyNotFoundException) { return Results.NotFound(); }
+        catch (ArgumentException) { return Results.BadRequest(); }
+        catch (InvalidOperationException)
+        {
+            return Results.Conflict(new { error =
+                "The face-to-presence link changed. Refresh before undo." });
+        }
+    }
+
     private static void NoStore(HttpContext context)
     {
         context.Response.Headers.CacheControl = "private, no-store, max-age=0";
@@ -98,7 +163,8 @@ public static class VideoFaceReviewEndpoints
             return Results.BadRequest(new { error = "Invalid video revision." });
         VideoFaceReviewBatch? current = await repository.GetCurrentAsync(
             AssetRevisionId.From(id), token);
-        return current is null ? Results.NotFound() : Results.Ok(current);
+        return current is null ? Results.NotFound() :
+            Results.Ok(current with { PresencePromotionEnabled = PresenceEnabled(settings) });
     }
 
     private static async Task<IResult> DecideAsync(

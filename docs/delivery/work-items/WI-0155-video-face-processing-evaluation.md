@@ -10,6 +10,36 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-20 — Human-approved video presence: deduplication and undo (v46, separate PR)
+
+After PRs #849 and #850 merged, persisted face review and exact
+native-size on-demand crops were implemented behind default-off gates;
+local synthetic acceptance and GitHub CI passed, but the user has no
+existing authorized real FaceEvidence batch and therefore appropriately
+deferred interactive review. This development stage does not require
+another real-video experiment.
+
+**New capability:** A reviewer must explicitly confirm a current sampled
+face as a canonical known person **and separately approve** tagging that
+person as present somewhere in the video. This is an opt-in UI and
+two-route HTTP interaction, not an inference side effect. PostgreSQL v46
+adds immutable face-to-video-action provenance for audit and undo; all
+writes are source/revision/leased-FaceEvidence fenced. Duplicate current
+tags (including merged aliases) remain untouched. An undo removes a
+video tag only if its original face-owned add is still authoritative;
+otherwise it unlinks without overriding independent manual decisions.
+Identity review correction requires unlink first. Existing photo identity
+and collection processing is unaffected.
+
+**Acceptance:** disposable PostgreSQL and synthetic contract/build tests
+are the development gate; the combined end-to-end check of #849, #850 and
+this stage is explicitly deferred until the first independently authorized
+current face batch. Migration v46 requires backed-up production restore
+rehearsal before live deployment. Presence promotion remains **default-off**
+until source-media/model rights, retention and false-person-risk sign-off.
+Automatic video identity tagging remains prohibited.
+
+
 ## 2026-11-20 — Native-source face crop display and combined review acceptance (separate PR)
 
 After PR #849 was merged, its automatic integration checks were green,

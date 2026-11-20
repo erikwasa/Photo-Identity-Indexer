@@ -23,15 +23,19 @@ public sealed record VideoFaceEvidencePublication(
 
 public sealed record VideoFaceReviewSuggestion(
     string PersonId, string DisplayName, int Rank, double Similarity, bool Selectable);
+public sealed record VideoFacePresenceLink(
+    string PersonId, bool VideoTagStillCurrent);
 public sealed record VideoFaceReviewObservation(
     string Id, int FrameOrdinal, long TimestampMs, int FaceOrdinal,
     int FrameWidth, int FrameHeight, double X, double Y, double Width, double Height,
     IReadOnlyList<VideoFaceReviewSuggestion> Suggestions,
-    string? Decision, string? ReviewedPersonId, string? ReviewedPersonName);
+    string? Decision, string? ReviewedPersonId, string? ReviewedPersonName,
+    VideoFacePresenceLink? Presence = null);
 public sealed record VideoFaceReviewBatch(
     string RevisionId, string BatchId, string ProducerVersion,
     string DetectorModelId, string SFaceModelId, string AlignmentProtocol,
-    IReadOnlyList<VideoFaceReviewObservation> Observations);
+    IReadOnlyList<VideoFaceReviewObservation> Observations,
+    bool PresencePromotionEnabled = false);
 
 /// <summary>
 /// Revision-fenced video-face evidence and human review actions.
@@ -484,16 +488,27 @@ public sealed class PostgresVideoFaceReviewRepository(
                 SELECT f.id, f.frame_ordinal, f.timestamp_ms, f.face_ordinal,
                        f.frame_width, f.frame_height, f.face_x, f.face_y,
                        f.face_width, f.face_height,
-                       action.decision, action.person_id, reviewed.display_name
+                       action.decision, action.person_id, reviewed.display_name,
+                       presence.action_kind, presence.person_id, presence.add_action_id,
+                       (SELECT latest.id FROM video_person_actions latest
+                        WHERE latest.asset_revision_id=@revision
+                          AND latest.person_id=presence.person_id
+                        ORDER BY latest.id DESC LIMIT 1)
                 FROM video_face_observations f
                 LEFT JOIN LATERAL (
                     SELECT decision, person_id FROM video_face_review_actions
                     WHERE observation_id=f.id ORDER BY id DESC LIMIT 1
                 ) action ON TRUE
                 LEFT JOIN people reviewed ON reviewed.id=action.person_id
+                LEFT JOIN LATERAL (
+                    SELECT action_kind, person_id, add_action_id
+                    FROM video_face_presence_actions WHERE observation_id=f.id
+                    ORDER BY id DESC LIMIT 1
+                ) presence ON TRUE
                 WHERE f.batch_id=@batch ORDER BY f.frame_ordinal, f.face_ordinal;
                 """;
             query.Parameters.AddWithValue("batch", batchId);
+            query.Parameters.AddWithValue("revision", revision.Value);
             await using NpgsqlDataReader reader = await query.ExecuteReaderAsync(token);
             while (await reader.ReadAsync(token))
                 faces.Add(new VideoFaceReviewObservation(
@@ -503,7 +518,11 @@ public sealed class PostgresVideoFaceReviewRepository(
                     reader.GetDouble(8), reader.GetDouble(9), [],
                     reader.IsDBNull(10) ? null : reader.GetString(10),
                     reader.IsDBNull(11) ? null : reader.GetGuid(11).ToString("D"),
-                    reader.IsDBNull(12) ? null : reader.GetString(12)));
+                    reader.IsDBNull(12) ? null : reader.GetString(12),
+                    !reader.IsDBNull(13) && reader.GetString(13) == "link"
+                        ? new VideoFacePresenceLink(reader.GetGuid(14).ToString("D"),
+                            !reader.IsDBNull(16) && reader.GetInt64(16) == reader.GetInt64(15))
+                        : null));
         }
 
         var suggestions = new Dictionary<string, List<VideoFaceReviewSuggestion>>(StringComparer.Ordinal);
@@ -613,6 +632,21 @@ public sealed class PostgresVideoFaceReviewRepository(
         {
             await tx.CommitAsync(token);
             return false;
+        }
+        // An already-promoted identity must first be explicitly unlinked.
+        // Do not silently leave a stale video-person tag when the reviewer
+        // corrects a confirmed face to unknown, not-face or another person.
+        await using (NpgsqlCommand linked = connection.CreateCommand())
+        {
+            linked.Transaction = tx;
+            linked.CommandText = """
+                SELECT action_kind FROM video_face_presence_actions
+                WHERE observation_id=@face ORDER BY id DESC LIMIT 1;
+                """;
+            linked.Parameters.AddWithValue("face", observationId);
+            if (await linked.ExecuteScalarAsync(token) is string kind && kind == "link")
+                throw new InvalidOperationException(
+                    "Undo the linked video-person presence before changing face identity.");
         }
         await using (NpgsqlCommand action = connection.CreateCommand())
         {
