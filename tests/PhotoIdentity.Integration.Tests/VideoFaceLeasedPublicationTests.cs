@@ -448,6 +448,38 @@ public sealed class VideoFaceLeasedPublicationTests
                 Assert.Equal(0L, reader.GetInt64(1));
                 Assert.Equal(6L, reader.GetInt64(2)); // two linked cycles + manual add/remove
             }
+
+            // Excluding the current source must cascade both audited face
+            // links and ordinary video-person action history. It must not
+            // retain private presence provenance or touch photo assignments.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand excludePositive = connection.CreateCommand())
+            {
+                excludePositive.CommandText = """
+                    INSERT INTO source_copy_exclusions(
+                        source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+                    VALUES (@source,'synthetic.mp4',now(),'pending',now());
+                    """;
+                excludePositive.Parameters.AddWithValue("source", source);
+                await excludePositive.ExecuteNonQueryAsync();
+            }
+            Assert.Null(await review.GetCurrentAsync(revision));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                presence.PromoteAsync(revision, observationId, person, "synthetic"));
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand purged = connection.CreateCommand())
+            {
+                purged.CommandText = """
+                    SELECT (SELECT count(*) FROM video_face_presence_actions),
+                           (SELECT count(*) FROM video_person_actions),
+                           (SELECT count(*) FROM photo_person_actions);
+                    """;
+                await using NpgsqlDataReader reader = await purged.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(0L, reader.GetInt64(0));
+                Assert.Equal(0L, reader.GetInt64(1));
+                Assert.Equal(0L, reader.GetInt64(2));
+            }
         }
         finally
         {
