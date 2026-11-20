@@ -510,6 +510,19 @@ public static class Program
                                  (read-only currentness/completeness and numeric storage
                                   audit; no captions, embeddings, original or model access)
 
+              video faces selected-one-shot
+                  --postgres-connection-env NAME --database DB --revision-id GUID
+                  --scratch-root OWNED_EMPTY_FRAME_TEMP
+                  --ffmpeg ABSOLUTE_EXE --ffmpeg-sha256 SHA256
+                  --manifest-directory ABSOLUTE_LOCAL_DIR
+                  --model-directory ABSOLUTE_LOCAL_DIR --max-frames 1..4
+                  [--apply --acknowledge-private-face-processing
+                           --acknowledge-model-rights]
+                  (default metadata-only preview; --apply allows exactly one
+                   locally available Rec.709 video revision, pinned local
+                   YuNet/SFace and bounded lease; never auto-assigns a person,
+                   uploads frames or starts a hosted video worker)
+
               video frames selected-one-shot
                   --postgres-connection-env NAME --database DB --proxy-job-id GUID
                   --cache-root REGISTERED_CACHE --scratch-root OWNED_EMPTY_FRAME_TEMP
