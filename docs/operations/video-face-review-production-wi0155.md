@@ -571,7 +571,7 @@ on. The imported V06 package remains a separate, offline workflow.
    context, JPEG-encodes at most 2 MiB, and sends bytes with
    `Cache-Control: private, no-store, max-age=0` and no range support.
    Pixels are never written to the application catalogue, a retained crop
-   cache or browser storage. Staged media and FFmpeg scratch are discarded
+   cache or browser storage. The FFmpeg native-size frame intermediate\n   and resulting crop both use **lossy JPEG encoding**: no resizing is\n   performed, but source pixels are not losslessly reproduced. Staged\n   media and FFmpeg scratch are discarded
    after each request. A failed deletion preserves the owned workspace
    for controlled cleanup rather than deleting arbitrary files. The UI
    displays the crop at natural dimensions **without upscaling**.
