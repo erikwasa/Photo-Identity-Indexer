@@ -14,7 +14,7 @@ public sealed record VideoFaceNativeCropSource(
     Guid SourceId, string RootLocator, string SourceKey,
     string SourceSha256, long SourceBytes, Guid BatchId,
     int FrameOrdinal, long TimestampMs, int FrameWidth, int FrameHeight,
-    double X, double Y, double Width, double Height);
+    double X, double Y, double Width, double Height, long DurationMilliseconds);
 
 public sealed class VideoFaceNativeCropSourceLease(
     VideoFaceNativeCropSource source, NpgsqlTransaction transaction,
@@ -169,7 +169,7 @@ public sealed class PostgresVideoFaceNativeCropRepository(PostgresCatalogueDatab
                         reader.GetInt32(5), reader.GetInt64(6),
                         reader.GetInt32(7), reader.GetInt32(8),
                         reader.GetDouble(9), reader.GetDouble(10),
-                        reader.GetDouble(11), reader.GetDouble(12));
+                        reader.GetDouble(11), reader.GetDouble(12), 0);
                     duration = reader.GetDecimal(13);
                     requestedFrames = reader.GetInt32(14);
                 }
@@ -191,6 +191,10 @@ public sealed class PostgresVideoFaceNativeCropRepository(PostgresCatalogueDatab
                     plan.Samples[sourceRow.FrameOrdinal].TimestampMilliseconds !=
                         sourceRow.TimestampMs)
                     sourceRow = null;
+                else
+                    sourceRow = sourceRow with {
+                        DurationMilliseconds = plan.DurationMilliseconds
+                    };
             }
 
             if (sourceRow is null)
