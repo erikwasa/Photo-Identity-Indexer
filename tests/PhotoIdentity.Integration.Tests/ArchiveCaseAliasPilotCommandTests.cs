@@ -212,6 +212,19 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                         "--application-stopped", "--acknowledge-reversible-retirement"
                     ]), new StringWriter()));
 
+            // A second live client connection must prevent the pilot.
+            // This tests the operator's stopped-application safety boundary.
+            await using (NpgsqlConnection unexpectedClient = new(builder.ConnectionString))
+            {
+                await unexpectedClient.OpenAsync();
+                InvalidOperationException busy = await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                        ArchiveCaseAliasPilotOptions.Parse([
+                            .. common, "--operation", "apply", "--restore-report", reportPath,
+                            .. writeOptions]), new StringWriter()));
+                Assert.Contains("Other clients", busy.Message, StringComparison.Ordinal);
+            }
+
             Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
                 ArchiveCaseAliasPilotOptions.Parse([
                     .. common, "--operation", "apply", "--restore-report", reportPath,
