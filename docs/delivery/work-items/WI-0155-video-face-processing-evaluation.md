@@ -10,6 +10,41 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 
 # WI-0155: Evaluate face discovery and identity processing inside video
 
+## 2026-11-20 — Native-source face crop display and combined review acceptance (separate PR)
+
+After PR #849 was merged, its automatic integration checks were green,
+and local default-off browser behavior returned HTTP 404 as expected.
+The maintainer has **no existing persisted FaceEvidence batch**; manual
+per-observation review, hide/reopen/clear and unchanged video-person tagging
+were deliberately **deferred**, not failed. Do not create another face
+recognition experiment just to demonstrate the UI.
+
+This new PR makes a significant production integration step without
+activating inference: an additional default-off native-crop endpoint allows
+the review page to show the *original detector-box pixels*, only after an
+operator explicitly selects a persisted, **current, successfully leased**
+FaceEvidence observation. A trusted staging path SHA-attests an already-local
+source, refuses recall and links, reruns the exact pinned FFmpeg native-frame
+preset at the recorded sample timestamp, checks native frame geometry, and
+JPEG-encodes a bounded **unscaled, ephemeral** crop. PostgreSQL source/asset
+locks extend through the HTTP response to fence source exclusion or revision
+changes. Private image bytes are not persisted. It adds no migrations,
+workers, inference triggers, auto-identifications or video-person actions.
+
+**Acceptance status:** synthetic source-boundary, rendering and PostgreSQL
+receipt tests are the present gate. Interactive review and source crop fidelity
+must be tested **together** at the first independently authorized real
+source/face batch, without a redundant real-video experiment now. See
+`docs/operations/video-face-review-production-wi0155.md` for the combined
+checklist and privacy/offline constraints.
+
+**Still open:** explicit human-confirmed face→video-person presence promotion
+with correction/undo; original-source retention and rights sign-off;
+reviewed production-quality recognition limitations, model/tool licensing,
+false-person risk and operator enablement. No automatic identity assignments
+are accepted.
+
+
 ## 2026-11-20 — Production persisted face-review UI vertical slice (separate PR)
 
 After merged #845 and #847, explicit one-video native face sampling can

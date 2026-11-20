@@ -49,9 +49,25 @@ else
     {
         <section class="vfpr-preview" aria-label="Manually opened video frame context">
             <h2>Visual context · @VideoFaceReviewPresentation.Moment(SelectedFace.TimestampMs)</h2>
-            <p>The existing local <strong>playable proxy</strong> is opened only after you select an observation.
-               Seeking may land near, rather than exactly on, the native sampled frame. No native crop or face-box overlay is available yet.
-               Do not confirm a person unless the visible evidence is clear.</p>
+            <p>An explicitly enabled, source-verified native crop is shown below when available.
+               Its native decoded pixel dimensions are preserved without upscaling, although JPEG encoding can lose fine detail. The playable proxy
+               provides optional wider context, but a proxy seek may not precisely match the native sampled frame.
+               Do not confirm a person unless the visible face is clear.</p>
+            <div class="vfpr-native-crop">
+                <img @key="SelectedFace.Id"
+                     src="@NativeCropUrl(SelectedFace)"
+                     @onload="OnNativeCropLoaded"
+                     @onerror="OnNativeCropUnavailable"
+                     alt="Native-pixel crop of the selected sampled face, if locally authorized" />
+                @if (NativeCropReady)
+                {
+                    <p role="status">Source-verified native-size JPEG crop loaded without upscaling. JPEG compression can lose fine detail.</p>
+                }
+                else if (NativeCropUnavailable)
+                {
+                    <p role="status">Native crop unavailable or disabled. Use the proxy only when its visual context is sufficient.</p>
+                }
+            </div>
             @if (PreviewOpen)
             {
                 <video @ref="PreviewPlayer" controls playsinline preload="none"
@@ -61,19 +77,19 @@ else
                     Your browser cannot play this video proxy.
                 </video>
             }
-            @if (PlaybackUnavailable)
+            @if (PlaybackUnavailable && !NativeCropReady)
             {
-                <p role="alert">The playable proxy is unavailable. No original video was opened and review decisions remain disabled.</p>
+                <p role="alert">Neither native crop nor playable proxy can currently establish visual context. Decisions remain disabled.</p>
             }
-            else if (!FrameReady)
+            else if (!FrameReady && !NativeCropReady)
             {
-                <p role="status">Seeking to the sampled moment. Review actions become available only after a frame loads.</p>
+                <p role="status">Loading the sampled face crop or seeking the proxy. Decisions remain disabled until visual context loads.</p>
             }
             else
             {
                 <label class="vfpr-toggle">
                     <input type="checkbox" @bind="VisualConfirmed" />
-                    I inspected the video moment and can judge this face.
+                    I inspected the displayed face crop or video moment and can judge this face.
                 </label>
             }
         </section>
@@ -206,6 +222,25 @@ else
     private bool FrameReady;
     private bool VisualConfirmed;
     private bool PlaybackUnavailable;
+    private bool NativeCropReady;
+    private bool NativeCropUnavailable;
+
+    private string NativeCropUrl(PersistedVideoFaceObservation face) =>
+        ApiUrl + "/" + Uri.EscapeDataString(face.Id) + "/native-crop";
+
+    private void OnNativeCropLoaded()
+    {
+        NativeCropReady = true;
+        NativeCropUnavailable = false;
+        VisualConfirmed = false;
+    }
+
+    private void OnNativeCropUnavailable()
+    {
+        NativeCropReady = false;
+        NativeCropUnavailable = true;
+    }
+
 
     private string ApiUrl => $"/api/videos/{Uri.EscapeDataString(RevisionId)}/face-review";
     private IReadOnlyList<PersistedVideoFaceObservation> VisibleFaces =>
@@ -263,6 +298,8 @@ else
         FrameReady = false;
         VisualConfirmed = false;
         PlaybackUnavailable = false;
+        NativeCropReady = false;
+        NativeCropUnavailable = false;
         PersonSearch = "";
         PeopleError = null;
     }
@@ -311,7 +348,7 @@ else
     }
 
     private bool CanDecide(PersistedVideoFaceObservation face) =>
-        !Busy && Batch is not null && !PlaybackUnavailable && FrameReady &&
+        !Busy && Batch is not null && (NativeCropReady || (FrameReady && !PlaybackUnavailable)) &&
         VisualConfirmed && SelectedFace?.Id == face.Id;
 
     private static string DecisionLabel(PersistedVideoFaceObservation face) =>

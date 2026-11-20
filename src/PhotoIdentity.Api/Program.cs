@@ -117,6 +117,8 @@ public partial class Program
         builder.Services.AddSingleton<PostgresVideoLibraryRepository>();
         builder.Services.AddSingleton<PostgresVideoDetailsRepository>();
         builder.Services.AddSingleton<PostgresVideoFaceReviewRepository>();
+        builder.Services.AddSingleton<PostgresVideoFaceNativeCropRepository>();
+        builder.Services.AddSingleton<VideoFaceNativeCropService>();
         builder.Services.AddSingleton<PostgresVideoFaceMatchPublisher>();
         builder.Services.AddSingleton<PostgresVideoPlaybackRepository>();
         builder.Services.AddSingleton<PostgresVideoSearchRepository>();

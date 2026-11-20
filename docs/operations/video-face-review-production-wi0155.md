@@ -532,3 +532,138 @@ revision no longer loads decisions. Check that the video person's manual tags
 and photo identities are unchanged. Do not run new real-media inference
 solely to populate the UI; source-backed native crop and rights approval
 remain outstanding.
+
+## 2026-11-20 — Source-attested native face crop delivery (separate opt-in PR)
+
+**Purpose:** remove the #849 persisted-review UI's reliance on a proxy-only
+visual cue without re-running a face-discovery experiment, storing images,
+or linking reviewed identities to video-person presence. Source-backed crops
+are produced **only** when a human explicitly opens a current persisted
+FaceEvidence observation and an additional operator configuration gate is
+on. The imported V06 package remains a separate, offline workflow.
+
+### Authority, scope and privacy
+
+1. The extra gate `PhotoIdentity:VideoFaceNativeCropEnabled=true` is required
+   **in addition** to `VideoLibraryEnabled` and `VideoFaceReviewEnabled`.
+   All default to off. The new read-only
+   `GET /api/videos/{revisionId}/face-review/{observationId}/native-crop`
+   returns 404 if a gate, observation, source proof, model version, tool
+   digest or local source requirement is absent. No arbitrary paths,
+   coordinates, video timestamps or media data are accepted from the client.
+2. The PostgreSQL reader locks the source **and asset** before querying current
+   eligibility. It requires the newest included Rec.709 local video revision,
+   a SHA-matching v45 face batch, an exact successful **leased** FaceEvidence
+   job (not legacy unleased evidence), the pinned detector/SFace/alignment
+   metadata, and the same approved FFmpeg SHA as the publishing job.
+   Frame ordinal and millisecond timestamp must match the deterministic
+   original 1–4-frame interval plan. These checks are read-only and run
+   against current canonical catalogue evidence. Source/asset locks are
+   held until the response is sent, fencing exclusions and newer revisions.
+3. A local-only, no-recall source reader refuses unavailable/online-only
+   originals and link paths. It SHA-256-verifies at most 256 MiB while staging
+   into a dedicated owner-marked scratch directory, never allowing FFmpeg
+   to open an original directly. FFmpeg runs in a bounded Windows Job Object
+   with the same autorotated, native-size, no-resize frame profile used
+   by the producer. The decoded frame dimensions **must equal** the original
+   observation's geometry.
+4. The server crops only the immutable detector box with modest native-pixel
+   context, JPEG-encodes at most 2 MiB, and sends bytes with
+   `Cache-Control: private, no-store, max-age=0` and no range support.
+   Pixels are never written to the application catalogue, a retained crop
+   cache or browser storage. The FFmpeg native-size frame intermediate\n   and resulting crop both use **lossy JPEG encoding**: no resizing is\n   performed, but source pixels are not losslessly reproduced. Staged\n   media and FFmpeg scratch are discarded
+   after each request. A failed deletion preserves the owned workspace
+   for controlled cleanup rather than deleting arbitrary files. The UI
+   displays the crop at natural dimensions **without upscaling**.
+5. In the #849 review page, an explicitly inspected crop can unlock the
+   existing human-decision buttons after the reviewer checks the visual
+   acknowledgement. If native crop is disabled or unavailable, the
+   previously available proxy remains a clearly labelled fallback. The
+   proxy may represent a nearby frame, so its presence does not establish
+   native sampling fidelity.
+
+**No activation:** No new worker, scheduler, selected-face job grant,
+ONNX inference, hydration, database migration, automatic identity
+assignment, video-person action or photo identity edit is provided.
+The native crop pathway uses original bytes on explicit request; keep it
+disabled until the original-media handling, model/tool usage rights and
+local scratch policy have been independently accepted.
+
+### Synthetic acceptance (safe now)
+
+From PowerShell 7.6, on this PR branch:
+
+```powershell
+dotnet build .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 native crop API build failed.' }
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceNativeCropReviewTests'
+if ($LASTEXITCODE -ne 0) { throw 'Native crop/guard tests failed.' }
+```
+
+The synthetic contract tests check box arithmetic, native-size JPEG dimensions,
+scratch ownership and web gating without any media, model, database or FFmpeg.
+CI also runs the existing disposable PostgreSQL
+`VideoFaceLeasedPublicationTests`, extended to prove crop access is available
+only for the exact current successfully leased job, approved digest and
+review observation. A local run of that PostgreSQL test requires
+`PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` pointing exclusively
+to a disposable administrator instance; without it, the test returns early
+and an apparent green result is **not** an integration acceptance.
+
+### Consolidated deferred interactive acceptance — **not required to merge**
+
+PR #849 was accepted with default-off/local HTTP 404 PASS, complete CI PASS,
+and **no existing real FaceEvidence batch**, so its interactive review and
+video-person tag regression were deferred, not failed.
+
+Do not create another artificial/private-media face recognition experiment
+only to demonstrate this PR. At the first **separately authorized** current,
+locally present video FaceEvidence batch with a playable proxy, verify both
+PRs in one session:
+
+1. With all review/crop gates off: no Video Details review link and the
+   crop endpoint returns 404. Keep ordinary video details/playback working.
+2. In a private test launch, explicitly enable the three gates and supply the
+   previously approved FFmpeg executable/digest and an **empty, owner-marked
+   scratch directly under OS temp**. Example root creation:
+   ```powershell
+   $cropScratch = Join-Path ([IO.Path]::GetTempPath()) `
+     ('photoidentity-native-face-review-' + [guid]::NewGuid().ToString('N'))
+   New-Item -ItemType Directory -Path $cropScratch | Out-Null
+   [IO.File]::WriteAllText(
+     (Join-Path $cropScratch '.photoidentity-native-face-crop-root'),
+     'wi0155-native-face-crop-read-v1')
+   $env:PhotoIdentity__VideoFaceNativeCrop__ScratchRoot = $cropScratch
+   # Set the executable path/digest to the SAME previously approved tool
+   # used by the successful FaceEvidence publishing job:
+   # $env:PhotoIdentity__VideoFaceNativeCrop__FfmpegPath = ...
+   # $env:PhotoIdentity__VideoFaceNativeCrop__FfmpegSha256 = ...
+   $env:PhotoIdentity__VideoLibraryEnabled = 'true'
+   $env:PhotoIdentity__VideoFaceReviewEnabled = 'true'
+   $env:PhotoIdentity__VideoFaceNativeCropEnabled = 'true'
+   ```
+   Restart the normal local launcher under these settings. Do not set the
+   environment variables in a production service or shared network host.
+3. Open Video Details → Review sampled faces → Inspect one observation.
+   A current source-backed native crop should load at native pixel size,
+   alongside the optional proxy. Confirm a person only when recognizable;
+   otherwise choose unknown/not-face/cannot-tell. Check ranked suggestions,
+   searchable people, hide/reveal, persisted correction/clear and page refresh.
+4. Check output headers (`private, no-store`, `image/jpeg`), that no crop
+   or raw frame is retained, no new ONNX inference starts, no OneDrive
+   hydration occurs, and that original pixels were **not enlarged**.
+5. Confirm the video's manually tagged people and all photo identities are
+   unchanged by face review. Check 404 on a stale/excluded revision, a wrong
+   observation UUID, a wrong tool digest, or an unleased legacy batch.
+   With no observed faces, confirm the valid zero-observation view displays
+   a non-coverage warning and exposes no crop.
+6. Stop the test host, disable review/crop gates and clean **only** the
+   deliberately created, verified and empty marked scratch root. Do not
+   delete unknown or orphaned files without controlled recovery.
+
+The above remains an acceptance **gate before production enablement**, not
+a reason to create fake face evidence now. Exact source-back crop fidelity
+must be observed on one authorized video; human approval, model and runtime
+rights, privacy/retention, false-positive limitations and presence
+promotion/undo are separate outstanding decisions.
