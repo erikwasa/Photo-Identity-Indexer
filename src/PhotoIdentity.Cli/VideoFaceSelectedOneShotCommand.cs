@@ -344,9 +344,14 @@ public static class VideoFaceSelectedOneShotCommandRunner
         }
 
         bool published = cycle?.Published == true;
+        // A fully processed video may contain no detected faces. This remains
+        // an unsuccessful, uncommitted job, but report the fixed diagnostic
+        // explicitly rather than a misleading generic failed reason.
+        string reason = published ? "published" :
+            cycle?.Failure?.FailureClass == "no-faces-found" ? "no-faces-found" :
+            cycle?.ReasonCode ?? "execution-unavailable";
         Write(output, false, cycle?.Claimed == true, published,
-            published ? "published" : cycle?.ReasonCode ?? "execution-unavailable",
-            (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            reason, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         return published ? 0 : 1;
     }
 
