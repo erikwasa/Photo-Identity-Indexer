@@ -93,8 +93,8 @@ $ordered = @($eligible | Sort-Object -Property @(
 ))
 $toStage = [Math]::Min($ordered.Count, $MaxBatches * $PairsPerBatch)
 $selected = @($ordered | Select-Object -First $toStage)
-$secondaries = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-$paths = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$secondaries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+$paths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($candidate in $selected) {
     if (-not $secondaries.Add([string]$candidate.SecondaryAssetId) -or
         -not $paths.Add("$($candidate.SourceId)|$($candidate.NormalizedSourceKey)")) {
