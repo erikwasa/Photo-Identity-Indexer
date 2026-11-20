@@ -27,7 +27,7 @@ public sealed class VideoFaceLeasedPublicationTests
             VideoFaceEvidenceLeaseIdentity.EmbedderModelId,
             VideoFaceEvidenceLeaseIdentity.EmbedderSha256,
             VideoFaceEvidenceLeaseIdentity.AlignmentProtocol,
-            [new(0, 1000, 0, 1600, 900, .2, .1, .05, .1,
+            [new(0, 4000, 0, 1600, 900, .2, .1, .05, .1,
                 new EmbeddingVector(vector))]);
     }
 
@@ -197,6 +197,26 @@ public sealed class VideoFaceLeasedPublicationTests
             Assert.Equal(person.ToString("D"), lead.PersonId);
             Assert.InRange(lead.Similarity, .999, 1.001);
             Assert.Null(observation.Decision);
+
+            // Synthetic PostgreSQL proves exact leased-job native crop
+            // authorization without opening a real source or invoking FFmpeg.
+            var cropAccess = new PostgresVideoFaceNativeCropRepository(database);
+            await using (VideoFaceNativeCropSourceLease? nativeCrop =
+                await cropAccess.OpenAsync(revision, Guid.Parse(observation.Id), ToolSha))
+            {
+                Assert.NotNull(nativeCrop);
+                Assert.Equal(SourceSha, nativeCrop!.Source.SourceSha256);
+                Assert.Equal(4000L, nativeCrop.Source.TimestampMs);
+                Assert.Equal(8000L, nativeCrop.Source.DurationMilliseconds);
+                Assert.Equal(1600, nativeCrop.Source.FrameWidth);
+                Assert.Equal(900, nativeCrop.Source.FrameHeight);
+            }
+            Assert.Null(await cropAccess.OpenAsync(revision,
+                Guid.Parse(observation.Id), new string('d', 64)));
+            Assert.Null(await cropAccess.OpenAsync(revision, Guid.NewGuid(), ToolSha));
+            Assert.Null(await cropAccess.OpenAsync(
+                AssetRevisionId.From(photoId), Guid.Parse(observation.Id), ToolSha));
+
             // The first lease was consumed; retry cannot publish or
             // re-mark the already succeeded job.
             Assert.NotNull(captured);
