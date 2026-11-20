@@ -161,6 +161,9 @@ public static class ArchiveCaseAliasPilotCommandRunner
             return 0;
         }
 
+        if (!options.ApplicationStopped || !options.AcknowledgeReversibleRetirement)
+            throw new InvalidOperationException(
+                "The application must be stopped and the write explicitly acknowledged.");
         if (!string.Equals(options.ApprovedManifestSha256, manifest.Sha256,
             StringComparison.Ordinal))
             throw new InvalidOperationException("Explicit SHA-256 approval does not match the private pilot manifest.");
@@ -285,6 +288,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
         parser.TextFieldType = FieldType.Delimited;
         parser.SetDelimiters(",");
         parser.HasFieldsEnclosedInQuotes = true;
+        parser.TrimWhiteSpace = false; // Source keys are exact archive identities.
         string[] columns = parser.ReadFields()
             ?? throw new InvalidOperationException("Pilot manifest has no header.");
         string[] expected = [
