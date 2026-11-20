@@ -139,6 +139,11 @@ try {
     $one = & $generator -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $stateCsv -MaxBatches 1 -PairsPerBatch 3 -OutputDirectory (Join-Path $root 'small-session')
     Assert ($one.PairsStaged -eq 3 -and $one.BatchesStaged -eq 1) 'Single-batch bound ignored.'
 
+    $v46 = & $generator -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $stateCsv -MaxBatches 1 -PairsPerBatch 2 -ExpectedDatabaseSchemaVersion 46 -OutputDirectory (Join-Path $root 'schema46-session')
+    $v46Meta = Get-Content -LiteralPath $v46.Batches[0].PrivateMetadataPath -Raw | ConvertFrom-Json
+    Assert ($v46Meta.expectedDatabaseSchemaVersion -eq 46) 'Schema 46 batch metadata was not pinned.'
+    Assert ($v46.PairsStaged -eq 2) 'Schema 46 preview selection failed.'
+
     (Get-Item -LiteralPath $evidenceCsv).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-8)
     $staleRejected = $false
     try {
