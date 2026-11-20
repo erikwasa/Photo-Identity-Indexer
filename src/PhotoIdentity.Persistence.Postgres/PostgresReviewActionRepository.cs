@@ -407,7 +407,20 @@ public sealed class PostgresReviewActionRepository :
         await using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText =
-            "SELECT 1 FROM face_occurrences WHERE id = @id;";
+            """
+            SELECT 1
+            FROM face_occurrences AS face
+            JOIN asset_revisions AS revision
+                ON revision.id = face.asset_revision_id
+            JOIN assets AS asset
+                ON asset.id = revision.asset_id
+            WHERE face.id = @id
+              AND NOT EXISTS (
+                  SELECT 1 FROM archive_case_alias_retirements AS retired
+                  WHERE retired.secondary_asset_id = asset.id
+                    AND retired.restored_at_utc IS NULL)
+            FOR UPDATE OF face, asset;
+            """;
         command.Parameters.AddWithValue(
             "id",
             Guid.Parse(id.ToString()));

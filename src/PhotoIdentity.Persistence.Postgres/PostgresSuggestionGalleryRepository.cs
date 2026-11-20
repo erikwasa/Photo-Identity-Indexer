@@ -61,6 +61,24 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
             ON top_suggestion.face_occurrence_id = face_occurrences.id
         """;
 
+    // Keep the gallery page, navigation, and count queries in agreement.
+    // Historical suggestions remain stored for possible restoration.
+    private const string ActiveFacePredicate = """
+        EXISTS (
+            SELECT 1
+            FROM asset_revisions AS active_revision
+            INNER JOIN assets AS active_asset
+                ON active_asset.id = active_revision.asset_id
+            WHERE active_revision.id = face_occurrences.asset_revision_id
+              AND active_revision.media_kind = 'photo'
+              AND active_asset.media_kind = 'photo'
+              AND NOT EXISTS (
+                  SELECT 1 FROM archive_case_alias_retirements AS retired
+                  WHERE retired.secondary_asset_id = active_asset.id
+                    AND retired.restored_at_utc IS NULL)
+        )
+        """;
+
     private const string Columns = """
         face_occurrences.id,
         face_occurrences.ordinal,
@@ -288,7 +306,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         string confidenceGroup,
         PersonId? suggestedPersonId)
     {
-        List<string> predicates = [StateCountPredicate(state), ConfidencePredicate(confidenceGroup)];
+        List<string> predicates = [ActiveFacePredicate, StateCountPredicate(state), ConfidencePredicate(confidenceGroup)];
         if (processingRunId is not null)
         {
             predicates.Add("""
@@ -348,7 +366,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         string confidenceGroup,
         PersonId? suggestedPersonId)
     {
-        List<string> predicates = [StateCountPredicate(state), ConfidencePredicate(confidenceGroup)];
+        List<string> predicates = [ActiveFacePredicate, StateCountPredicate(state), ConfidencePredicate(confidenceGroup)];
         if (processingRunId is not null)
         {
             predicates.Add("""

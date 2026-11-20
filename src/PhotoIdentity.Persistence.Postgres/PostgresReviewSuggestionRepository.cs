@@ -194,9 +194,17 @@ public sealed class PostgresReviewSuggestionRepository :
         command.CommandText =
             """
             SELECT 1
-            FROM face_occurrences
-            WHERE id = @face_occurrence_id
-            FOR UPDATE;
+            FROM face_occurrences AS face
+            JOIN asset_revisions AS revision
+                ON revision.id = face.asset_revision_id
+            JOIN assets AS asset
+                ON asset.id = revision.asset_id
+            WHERE face.id = @face_occurrence_id
+              AND NOT EXISTS (
+                  SELECT 1 FROM archive_case_alias_retirements AS retired
+                  WHERE retired.secondary_asset_id = asset.id
+                    AND retired.restored_at_utc IS NULL)
+            FOR UPDATE OF face, asset;
             """;
         command.Parameters.AddWithValue(
             "face_occurrence_id",

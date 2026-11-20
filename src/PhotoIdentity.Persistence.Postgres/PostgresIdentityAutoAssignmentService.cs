@@ -176,6 +176,17 @@ public sealed class PostgresIdentityAutoAssignmentService :
             FROM identity_suggestion_rankings AS ranking
             INNER JOIN identity_suggestions AS suggestion
                 ON suggestion.id = ranking.suggestion_id
+            INNER JOIN face_occurrences AS face
+                ON face.id = ranking.face_occurrence_id
+            INNER JOIN asset_revisions AS revision
+                ON revision.id = face.asset_revision_id
+            INNER JOIN assets AS active_asset
+                ON active_asset.id = revision.asset_id
+               AND active_asset.deleted_at_utc IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM archive_case_alias_retirements AS retired
+                   WHERE retired.secondary_asset_id = active_asset.id
+                     AND retired.restored_at_utc IS NULL)
             WHERE ranking.model_id = @model_id
               AND ranking.model_hash = @model_hash
               AND ranking.rank = 1
@@ -398,6 +409,13 @@ public sealed class PostgresIdentityAutoAssignmentService :
                 ON face.id = ranking.face_occurrence_id
             INNER JOIN asset_revisions AS asset_revision
                 ON asset_revision.id = face.asset_revision_id
+            INNER JOIN assets AS active_asset
+                ON active_asset.id = asset_revision.asset_id
+               AND active_asset.deleted_at_utc IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM archive_case_alias_retirements AS retired
+                   WHERE retired.secondary_asset_id = active_asset.id
+                     AND retired.restored_at_utc IS NULL)
             INNER JOIN matching_embeddings AS matching
                 ON matching.face_occurrence_id = ranking.face_occurrence_id
                AND matching.row_number = 1
@@ -474,6 +492,13 @@ public sealed class PostgresIdentityAutoAssignmentService :
                 ON face.id = member.face_occurrence_id
             INNER JOIN asset_revisions AS asset_revision
                 ON asset_revision.id = face.asset_revision_id
+            INNER JOIN assets AS active_asset
+                ON active_asset.id = asset_revision.asset_id
+               AND active_asset.deleted_at_utc IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM archive_case_alias_retirements AS retired
+                   WHERE retired.secondary_asset_id = active_asset.id
+                     AND retired.restored_at_utc IS NULL)
             LEFT JOIN identity_suggestion_rankings AS ranking
                 ON ranking.face_occurrence_id = member.face_occurrence_id
                AND ranking.model_id = @model_id
@@ -632,6 +657,13 @@ public sealed class PostgresIdentityAutoAssignmentService :
                 ON face.id = confirmed.face_occurrence_id
             INNER JOIN asset_revisions AS asset_revision
                 ON asset_revision.id = face.asset_revision_id
+            INNER JOIN assets AS active_asset
+                ON active_asset.id = asset_revision.asset_id
+               AND active_asset.deleted_at_utc IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM archive_case_alias_retirements AS retired
+                   WHERE retired.secondary_asset_id = active_asset.id
+                     AND retired.restored_at_utc IS NULL)
             INNER JOIN people AS person
                 ON person.id = confirmed.person_id
             WHERE person.merged_into_person_id IS NULL
