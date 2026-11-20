@@ -204,18 +204,6 @@ public sealed class PostgresArchiveCaseAliasRetirementService
         using (NpgsqlCommand restore = connection.CreateCommand())
         {
             restore.Transaction = transaction;
-            restore.CommandText = """
-                UPDATE archive_case_alias_retirements
-                SET restored_at_utc = @restored_at, restored_by = @actor
-                WHERE secondary_asset_id = @secondary
-                  AND survivor_asset_id = @survivor
-                  AND restored_at_utc IS NULL;
-
-                UPDATE assets SET deleted_at_utc = NULL
-                WHERE id = @secondary
-                  AND source_id = @source
-                  AND deleted_at_utc IS NOT NULL;
-                """;
             restore.Parameters.AddWithValue("restored_at", DateTimeOffset.UtcNow);
             restore.Parameters.AddWithValue("actor", request.Actor);
             restore.Parameters.AddWithValue("secondary", request.SecondaryAssetId);
