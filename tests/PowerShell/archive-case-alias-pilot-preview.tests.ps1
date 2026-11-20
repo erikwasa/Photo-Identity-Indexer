@@ -128,6 +128,9 @@ try {
     $v45 = & $previewScript -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -MaxPairs 2 -ExpectedDatabaseSchemaVersion 45 -OutputDirectory $outputDirectory
     $v45Meta = Get-Content -LiteralPath $v45.PrivateMetadataPath -Raw | ConvertFrom-Json
     Assert ($v45Meta.expectedDatabaseSchemaVersion -eq 45) 'Explicit schema 45 metadata was not pinned.'
+    $v46 = & $previewScript -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -MaxPairs 2 -ExpectedDatabaseSchemaVersion 46 -OutputDirectory $outputDirectory
+    $v46Meta = Get-Content -LiteralPath $v46.PrivateMetadataPath -Raw | ConvertFrom-Json
+    Assert ($v46Meta.expectedDatabaseSchemaVersion -eq 46) 'Explicit schema 46 metadata was not pinned.'
     Assert ($meta.applyEnabled -eq $false) 'Metadata claims apply is enabled.'
     Assert ($meta.privatePilotManifestSha256 -eq $summary.PilotManifestSha256) 'Digest mismatch.'
     Assert ($meta.retirementEvidenceSha256 -eq (Get-FileHash $evidenceCsv -Algorithm SHA256).Hash.ToLowerInvariant()) 'Evidence digest mismatch.'
