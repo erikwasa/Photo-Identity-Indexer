@@ -412,3 +412,56 @@ are legally approved; actual execution requires separate gates.
 v43 production schema remains the prerequisite; no database
 initialization is invoked by this CLI command. The normal
 photo-archive experience is unchanged.
+
+## 2026-11-20 — Bounded zero-detection receipts (v45, separate PR)
+
+A completed, authorized 1–4-frame native sample with **zero** YuNet face
+detections is a legitimate result, not an extraction failure. Previously the
+selected worker returned `no-faces-found` without a batch or job receipt,
+leaving that revision eligible for another expensive run.
+
+This increment creates **migration v45**, changing only the face-batch
+`observation_count` constraint from 1–256 to 0–256. The producer now
+returns an empty, source-SHA-attested proposal *only after* all sampled
+frames were decoded and analyzed with approved local models while the
+selected lease remained valid. The selected publisher skips scoring an
+empty vector set and atomically commits a zero-observation batch and the
+exact job-success receipt under the existing source, exclusion, lease,
+operator-grant and photo-priority locks. The unleased publication API
+still rejects an empty result; malformed or incomplete extraction does
+not become an empty success.
+
+The CLI reports `no-faces-in-sampled-frames` and
+`sampledFaceObservations: 0` only when the current persisted batch confirms
+zero rows. This does **not** establish that a video contains no people or
+that every face was detected. No video-person presence, photo identity,
+face crops, frames, model embeddings, paths or automatic identity choices
+are stored. The GET face-review endpoint returns an empty observation list
+for the successful sample; it must not be interpreted as full coverage.
+
+**Local verification (PowerShell 7.6, disposable PostgreSQL only):**
+
+```powershell
+git fetch origin
+gh pr checkout <PR number>
+if (-not $env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING) {
+    throw 'Configure only a disposable PostgreSQL administrator connection.'
+}
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceLeasedPublicationTests'
+if ($LASTEXITCODE -ne 0) { throw 'WI-0155 empty-receipt test failed.' }
+```
+
+The synthetic test exercises empty and nonempty selected jobs, forged-lease
+rejection, unleased-empty refusal, durable success, no person assignments,
+and source exclusion purging the zero-result receipt. It reads no
+real videos or model files and needs no private data. A green test without
+the disposable administrator environment variable **is a skip**, not a pass.
+
+**Production migration gate:** v45 runs during API/CLI catalogue
+initialization. Back up and verify `photoidentity_main` before deploying
+any build carrying v45; first rehearse the upgrade on a disposable restore.
+Keep recognition and review routes disabled by default. There is no new
+scheduler, source recall, private crop renderer, manual presence promotion,
+model-rights approval or retention sign-off. Do not run real-media
+`--apply` without the separately documented maintainer permissions.

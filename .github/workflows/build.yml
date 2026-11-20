@@ -610,6 +610,16 @@ jobs:
           dotnet test tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj --configuration Release --filter "FullyQualifiedName~Postgres|FullyQualifiedName~VideoRegisteredDerivativeMaintenanceTests|FullyQualifiedName~VideoDerivativeRecoveryJanitorTests|FullyQualifiedName~VideoScopedOneShotControlTests|FullyQualifiedName~VideoDerivativePublicationTests"
           exit $LASTEXITCODE
 
+      - name: Verify WI-0155 leased zero-face receipt on disposable PostgreSQL
+        shell: pwsh
+        env:
+          PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=root
+        run: |
+          # This test otherwise skips when no disposable admin URL is set.
+          # It creates/drops a unique synthetic database and never reads real video.
+          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --configuration Release --filter "FullyQualifiedName~VideoFaceLeasedPublicationTests"
+          exit $LASTEXITCODE
+
       - name: Verify archive alias pilot CLI on disposable PostgreSQL
         shell: pwsh
         env:
