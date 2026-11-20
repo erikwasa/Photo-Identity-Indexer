@@ -257,3 +257,52 @@ tested end-to-end with production-like synthetic face/Place metadata. Until
 that work is complete, do not manually insert mapping rows or set asset
 deleted_at_utc in photoidentity_main. The production backup must be
 restore-tested before the first approved apply.
+
+
+## Transactional single-pair rehearsal (not exposed to operators)
+
+The follow-up service PostgresArchiveCaseAliasRetirementService is a
+single-pair PostgreSQL retire/restore implementation. It is **not registered
+in the API, CLI, background jobs or UI**, and there is no production
+operator command in this development slice.
+
+Retirement revalidates the exact source ID, two asset IDs, source-key
+spellings, creation timestamps, current verified revision IDs, SHA-256,
+byte size, and absence of additional aliases inside a SERIALIZABLE
+transaction. It locks the source and both assets. The earlier asset must
+be strictly older and both must be present. Any source exclusion, human
+or unknown face/label actor, manual tag/person/Place action, capture-date
+override, presentation preference, manual list reference or featured
+face reference on the later asset blocks retirement. The currently
+effective tag, manual person, Place/provenance and confirmed face-person
+sets must match on both assets. This duplicates the crucial eligibility
+checks *in the transaction*, rather than trusting an older CSV alone.
+
+On success, only the later asset's deleted_at_utc changes and a durable
+mapping is inserted; both asset and revision IDs, face observations,
+automatic review decisions, manual history and derived metadata remain
+stored. A repeated identical retirement is idempotent. Restoration
+removes the logical hiding and stamps a restore actor/time in the same
+transaction. A second retirement after restoration requires a new
+separately reviewed plan; historical retirement information is not
+overwritten.
+
+The disposable PostgreSQL test exercises a stale hash/size request,
+an injected human review blocker, successful auto-only retirement,
+idempotent replay, preservation of old-revision tag history and new
+automatic face decisions, full restoration, and refusal to silently
+reuse an already restored mapping.
+
+~~~powershell
+.\verify-postgres.ps1 -SkipContainerStart
+~~~
+
+**This is not yet the production apply stage.** Even with a valid
+transaction, active search/library and face review/recognition queries
+must first be verified to filter retired assets consistently. Only
+then can an explicit bounded operator approval mechanism, restore-tested
+backup, manifest freshness check, and post-apply verification be added.
+
+Never update archive_case_alias_retirements or assets directly on
+photoidentity_main. Do not use exclusion, purge or source file deletion
+to perform logical retirement.
