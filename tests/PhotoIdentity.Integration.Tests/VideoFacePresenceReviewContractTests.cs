@@ -43,6 +43,7 @@ public sealed class VideoFacePresenceReviewContractTests
 
         Assert.Contains("PhotoIdentity:VideoFacePresencePromotionEnabled", api);
         Assert.Contains("PresenceEnabled(settings)", api);
+        Assert.Contains("request.ExplicitlyApproved", api);
         Assert.Contains("NoStore(context)", api);
         Assert.Contains("MapPost", api);
         Assert.Contains("MapDelete", api);
