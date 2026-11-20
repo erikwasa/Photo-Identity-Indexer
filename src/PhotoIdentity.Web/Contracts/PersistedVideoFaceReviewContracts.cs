@@ -8,18 +8,24 @@ namespace PhotoIdentity.Web.Contracts;
 public sealed record PersistedVideoFaceSuggestion(
     string PersonId, string DisplayName, int Rank, double Similarity, bool Selectable);
 
+public sealed record PersistedVideoFacePresence(string PersonId, bool VideoTagStillCurrent);
+
 public sealed record PersistedVideoFaceObservation(
     string Id, int FrameOrdinal, long TimestampMs, int FaceOrdinal,
     int FrameWidth, int FrameHeight, double X, double Y, double Width, double Height,
     IReadOnlyList<PersistedVideoFaceSuggestion> Suggestions,
-    string? Decision, string? ReviewedPersonId, string? ReviewedPersonName);
+    string? Decision, string? ReviewedPersonId, string? ReviewedPersonName,
+    PersistedVideoFacePresence? Presence = null);
 
 public sealed record PersistedVideoFaceBatch(
     string RevisionId, string BatchId, string ProducerVersion,
     string DetectorModelId, string SFaceModelId, string AlignmentProtocol,
-    IReadOnlyList<PersistedVideoFaceObservation> Observations);
+    IReadOnlyList<PersistedVideoFaceObservation> Observations,
+    bool PresencePromotionEnabled = false);
 
 public sealed record PersistedVideoFaceDecisionRequest(string Decision, string? PersonId);
+public sealed record PersistedVideoFacePresenceRequest(string PersonId);
+public sealed record PersistedVideoFacePresenceOutcome(string Status, bool VideoPersonTagChanged);
 
 /// <summary>
 /// Pure, deterministic presence-first presentation. A confirmed identity may
