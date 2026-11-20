@@ -166,7 +166,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
             throw new InvalidOperationException("Explicit SHA-256 approval does not match the private pilot manifest.");
         if (options.Operation == "apply")
             RequireRecentRestoreVerification(options.RestoreVerificationReportPath!,
-                options.DatabaseName);
+                options.DatabaseName, manifest.ExpectedDatabaseSchemaVersion);
 
         if (!Directory.Exists(options.ReceiptDirectory))
             throw new InvalidOperationException(
@@ -390,7 +390,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
     }
 
     private static void RequireRecentRestoreVerification(
-        string reportPath, string database)
+        string reportPath, string database, int expectedSchemaVersion)
     {
         if (!File.Exists(reportPath))
             throw new InvalidOperationException("The isolated backup-restore verification report is missing.");
@@ -403,6 +403,10 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 "The restore-tested production backup file is missing. Refusing Apply.");
         if (!root.GetProperty("passed").GetBoolean() ||
             root.GetProperty("sourceDatabase").GetString() != database ||
+            root.GetProperty("sourceEvidence").GetProperty("schemaVersion").GetInt32()
+                != expectedSchemaVersion ||
+            root.GetProperty("restoredEvidence").GetProperty("schemaVersion").GetInt32()
+                != expectedSchemaVersion ||
             root.GetProperty("cleanupStatus").GetString() != "removed" ||
             root.GetProperty("cleanupRequired").GetBoolean() ||
             !Regex.IsMatch(root.GetProperty("backupSha256").GetString() ?? "",
