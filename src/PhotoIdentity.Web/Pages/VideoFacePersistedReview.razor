@@ -193,7 +193,7 @@ else
                                     I explicitly approve unlinking this evidence from video-person presence.
                                 </label>
                                 <button class="button secondary"
-                                        disabled="@(!CanPromote(face))"
+                                        disabled="@(!CanUndo(face))"
                                         @onclick="() => ChangePresenceAsync(face, false)">
                                     Undo this face-based presence
                                 </button>
@@ -399,9 +399,15 @@ else
         CanDecide(face) && face.Decision == "known" &&
         !string.IsNullOrWhiteSpace(face.ReviewedPersonId);
 
+    // Undo is a risk-reducing correction: do not require the original
+    // media or playable proxy to still be available for an explicit unlink.
+    private bool CanUndo(PersistedVideoFaceObservation face) =>
+        !Busy && Batch?.PresencePromotionEnabled == true && PresenceApproved &&
+        SelectedFace?.Id == face.Id && face.Presence is not null;
+
     private async Task ChangePresenceAsync(PersistedVideoFaceObservation face, bool link)
     {
-        if (!CanPromote(face)) return;
+        if (link ? !CanPromote(face) : !CanUndo(face)) return;
         Busy = true;
         Notice = null;
         Error = null;
