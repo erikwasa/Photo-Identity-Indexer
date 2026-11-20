@@ -68,8 +68,10 @@ public sealed record ArchiveCaseAliasPilotOptions(
 
         string operation = values.TryGetValue("--operation", out string? requested)
             ? requested : "preview";
-        if (operation is not ("preview" or "apply" or "restore"))
-            throw new ArgumentException("Operation must be preview, apply or restore.");
+        if (operation is not ("preview" or "apply" or "restore"
+            or "verify-retired" or "verify-restored"))
+            throw new ArgumentException(
+                "Operation must be preview, apply, restore, verify-retired or verify-restored.");
 
         int maximum = values.TryGetValue("--max-pairs", out string? rawLimit)
             ? int.TryParse(rawLimit, NumberStyles.None, CultureInfo.InvariantCulture, out int n)
@@ -120,6 +122,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
 {
     private sealed record PilotManifest(
         IReadOnlyList<ArchiveCaseAliasRetirementRequest> Pairs,
+        IReadOnlyDictionary<Guid, long> ExpectedAutomaticReviews,
         string Sha256, int ExpectedDatabaseSchemaVersion, DateTimeOffset GeneratedAtUtc);
 
     public static async Task<int> RunAsync(
@@ -169,6 +172,23 @@ public static class ArchiveCaseAliasPilotCommandRunner
             await output.WriteLineAsync(
                 $"PILOT PREVIEW: {manifest.Pairs.Count} pinned pairs; SHA-256 {manifest.Sha256}; " +
                 "no database writes; no originals opened; no rows deleted.");
+            return 0;
+        }
+
+        if (options.Operation is "verify-retired" or "verify-restored")
+        {
+            bool expectRetired = options.Operation == "verify-retired";
+            ArchiveCaseAliasManifestVerifier.Result verified =
+                await ArchiveCaseAliasManifestVerifier.VerifyAsync(
+                    catalogue, manifest.Pairs, manifest.ExpectedAutomaticReviews,
+                    expectRetired, cancellationToken);
+            await output.WriteLineAsync(
+                $"ALIAS MANIFEST VERIFY {(expectRetired ? "RETIRED" : "RESTORED")}: " +
+                $"{verified.Examined} pinned pairs inspected; " +
+                $"{verified.Retired} retired; {verified.Restored} restored; " +
+                $"{verified.NeverRetired} never retired; " +
+                $"{verified.GlobalActiveRetirements} global active mappings; " +
+                "review history and pinned revisions preserved; no database writes.");
             return 0;
         }
 
@@ -293,6 +313,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 "Pilot preview is older than four hours. Refresh the two read-only audits and preview.");
 
         List<ArchiveCaseAliasRetirementRequest> requests = [];
+        Dictionary<Guid, long> minimumReviews = [];
         HashSet<Guid> uniqueSecondaries = [];
         HashSet<string> uniquePaths = new(StringComparer.Ordinal);
         using TextFieldParser parser = new(options.ManifestPath);
@@ -354,6 +375,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
 
             Guid source = ReadId("SourceId");
             Guid secondary = ReadId("SecondaryAssetId");
+            minimumReviews.Add(secondary, actions);
             if (!uniqueSecondaries.Add(secondary) ||
                 !uniquePaths.Add($"{source:D}:{normalized}"))
                 throw new InvalidOperationException("Pilot contains duplicate or overlapping assets.");
@@ -373,7 +395,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
             || requests.Count != meta.GetProperty("pilotPairs").GetInt32())
             throw new InvalidOperationException("Pilot manifest exceeds the approved bounded pair count.");
 
-        return new PilotManifest(requests, sha256, expectedSchema, generatedAt);
+        return new PilotManifest(requests, minimumReviews, sha256, expectedSchema, generatedAt);
     }
 
     private static async Task VerifyDatabaseAsync(
