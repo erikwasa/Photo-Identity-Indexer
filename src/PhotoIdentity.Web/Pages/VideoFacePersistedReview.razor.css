@@ -25,3 +25,8 @@
     .vfpr-summary, .vfpr-preview, .vfpr-face { padding: 0.8rem; }
     .vfpr-options .button, .vfpr-actions .button { flex-grow: 1; }
 }
+
+/* Never cosmetically enlarge a tiny native face into invented detail. */
+.vfpr-native-crop { margin: 0.8rem 0; }
+.vfpr-native-crop img { display: block; width: auto; height: auto; max-width: 100%; image-rendering: auto; }
+.vfpr-native-crop p { color: var(--muted, #556); font-size: 0.87rem; }
