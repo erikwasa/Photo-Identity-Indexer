@@ -11,9 +11,9 @@ using PhotoIdentity.Source.OneDriveSync;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
-/// Operator-authorized inputs only. This is intentionally NOT registered,
-/// exposed via CLI, scheduled or reachable from a production API. The
-/// future FaceEvidence queue admission is a separate reviewed change.
+/// Operator-authorized inputs only. Invoked only by the explicit selected
+/// video faces one-shot CLI after a time-limited FaceEvidence lease is claimed.
+/// Never registered as a hosted worker or available through a public API.
 /// </summary>
 public sealed record VideoFaceNativeProducerOptions(
     string ScratchRoot, string FfmpegPath, string FfmpegSha256,
@@ -44,8 +44,8 @@ public sealed record VideoFaceNativeProducerOptions(
 ///
 /// Deliberately returns ONLY an ephemeral embedding proposal. It cannot
 /// publish evidence, complete jobs, create identity assignments, or
-/// independently authorize a new derivative kind. A future reviewed
-/// FaceEvidence lease adapter must monitor the lease through the *scoring
+/// independently authorize a new derivative kind. The selected
+/// VideoFaceEvidenceWorkerAdapter monitors the lease through the *scoring
 /// and database commit* stage before invoking PostgresVideoFaceMatchPublisher.
 /// </summary>
 public sealed class VideoFaceNativeEvidenceProducer(

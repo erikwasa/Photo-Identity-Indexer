@@ -4,7 +4,7 @@ using PhotoIdentity.Persistence.Postgres;
 namespace PhotoIdentity.Cli;
 
 /// <summary>
-/// A testable, deliberately unregistered native face producer contract.
+/// A testable, explicitly selected (not hosted) native face producer contract.
 /// Unlike FrameEvidence, FaceEvidence requires local YuNet/SFace models and
 /// never invokes CLIP or caption inference.
 /// </summary>
@@ -18,7 +18,8 @@ public interface IVideoFaceEmbeddingProducer
 /// Explicitly selected one-lease FaceEvidence adapter. Keeps the video lease
 /// heartbeat and photo-priority safety probe active across BOTH native source
 /// analysis and the full all-photo-exemplar scorer-to-PostgreSQL transaction.
-/// No hosted registration, HTTP route, CLI command or unattended processing.
+/// No hosted registration, HTTP inference route or unattended processing.
+/// The only invocation is the explicit selected one-video CLI command.
 /// No photo identity or video-person assignments are made.
 /// </summary>
 public sealed class VideoFaceEvidenceWorkerAdapter(
