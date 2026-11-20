@@ -177,9 +177,9 @@ public sealed class VideoFaceNativeEvidenceProducer(
             }
 
             await RequirePermit(work.Token);
-            if (observations.Count == 0)
-                return null; // No faces; never publish an invented identity.
-
+            // Even a complete, all-empty sampling pass must produce a
+            // source-attested receipt under the live lease. Zero observations
+            // never imply that the entire video contains no people.
             // The eventual guarded adapter must recheck this source/lease
             // through score+commit; this producer itself writes NOTHING.
             return new VideoFaceEmbeddingPublication(

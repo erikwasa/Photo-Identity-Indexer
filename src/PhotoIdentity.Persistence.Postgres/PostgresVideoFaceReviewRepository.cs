@@ -64,7 +64,7 @@ public sealed class PostgresVideoFaceReviewRepository(
             proposal.DetectorModelId != "yunet-2023mar-fp32" ||
             proposal.SFaceModelId != "sface-2021dec-fp32" ||
             proposal.AlignmentProtocol != "sface-five-point-v1" ||
-            proposal.Observations is not { Count: >= 1 and <= 256 })
+            proposal.Observations is not { Count: >= 0 and <= 256 })
             throw new ArgumentException("Invalid bounded video-face publication provenance.");
 
         var observed = new HashSet<(int, int)>();
@@ -121,9 +121,17 @@ public sealed class PostgresVideoFaceReviewRepository(
     /// FaceEvidence workers MUST call the lease-bound method instead.
     /// </summary>
     public async Task<Guid> PublishAsync(
-        VideoFaceEvidencePublication proposal, CancellationToken token = default) =>
-        (await PublishCoreAsync(proposal, null, token))
+        VideoFaceEvidencePublication proposal, CancellationToken token = default)
+    {
+        // A zero-observation receipt is permitted ONLY inside a selected
+        // job's lease-fenced, source-attested success transaction.
+        ArgumentNullException.ThrowIfNull(proposal);
+        if (proposal.Observations is { Count: 0 })
+            throw new ArgumentException(
+                "An empty video-face outcome requires a selected FaceEvidence job lease.");
+        return (await PublishCoreAsync(proposal, null, token))
             ?? throw new InvalidOperationException("Unleased face publication unavailable.");
+    }
 
     /// <summary>
     /// All-or-nothing evidence and job success. Never called from an HTTP

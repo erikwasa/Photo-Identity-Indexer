@@ -66,18 +66,20 @@ public sealed class PostgresVideoFaceMatchPublisher(
             throw new ArgumentException(
                 "FaceEvidence requires exact selected lease, approved models and frame bounds.");
         return await repository.TryPublishLeasedAsync(
-            lease, await RankAsync(proposal, token), token);
+            lease, await RankAsync(proposal, token, allowEmpty: true), token);
     }
 
     private async Task<VideoFaceEvidencePublication> RankAsync(
-        VideoFaceEmbeddingPublication proposal, CancellationToken token)
+        VideoFaceEmbeddingPublication proposal, CancellationToken token,
+        bool allowEmpty = false)
     {
         ArgumentNullException.ThrowIfNull(proposal);
         if (proposal.RevisionId.IsEmpty ||
             proposal.DetectorModelId != "yunet-2023mar-fp32" ||
             proposal.SFaceModelId != "sface-2021dec-fp32" ||
             proposal.AlignmentProtocol != "sface-five-point-v1" ||
-            proposal.Observations is not { Count: >= 1 and <= 256 } ||
+            proposal.Observations is not { Count: >= 0 and <= 256 } ||
+            (!allowEmpty && proposal.Observations.Count == 0) ||
             proposal.Observations.Any(face =>
                 face is null || face.Embedding is null ||
                 face.Embedding.Dimensions != 128))
@@ -92,6 +94,11 @@ public sealed class PostgresVideoFaceMatchPublisher(
             proposal.Observations.Select(_ =>
                 (IReadOnlyList<VideoFaceIdentityScore>)Array.Empty<VideoFaceIdentityScore>()).ToArray());
         PostgresVideoFaceReviewRepository.ValidatePublication(unscored);
+        // All selected native frames have already been extracted and checked
+        // by the lease-bound producer. No face vectors exist to rank in a
+        // genuine empty result; do not create synthetic detections or people.
+        if (proposal.Observations.Count == 0)
+            return unscored;
 
         var modelId = new ModelId(proposal.SFaceModelId);
         var modelHash = new Sha256Digest(proposal.SFaceModelHash);

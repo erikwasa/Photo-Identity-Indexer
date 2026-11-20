@@ -223,6 +223,110 @@ public sealed class VideoFaceLeasedPublicationTests
 
             Assert.True(await scopes.DisarmAsync(grant));
             Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
+
+            // A separately selected revision with ZERO detected faces still
+            // needs an immutable, current, job-bound receipt. It is never a
+            // claim that no person appears elsewhere in the full video.
+            Guid emptyAsset = Guid.NewGuid(), emptyVideo = Guid.NewGuid();
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand seedEmpty = connection.CreateCommand())
+            {
+                seedEmpty.CommandText = """
+                    INSERT INTO assets(id,source_id,source_key,created_at_utc,media_kind)
+                    VALUES (@asset,@source,'empty-sampled.mp4',now(),'video');
+                    INSERT INTO asset_revisions
+                      (id,asset_id,media_kind,content_sha256,size_bytes,observed_at_utc,media_type)
+                    VALUES (@video,@asset,'video',repeat('a',64),4000,now(),'video/mp4');
+                    INSERT INTO video_revision_metadata
+                      (asset_revision_id,inspection_status,duration_seconds,
+                       color_transfer,inspected_at_utc,tool_sha256,inspection_profile_id)
+                    VALUES (@video,'supported',8,'bt709',now(),repeat('b',64),'synthetic');
+                    """;
+                seedEmpty.Parameters.AddWithValue("asset", emptyAsset);
+                seedEmpty.Parameters.AddWithValue("source", source);
+                seedEmpty.Parameters.AddWithValue("video", emptyVideo);
+                await seedEmpty.ExecuteNonQueryAsync();
+            }
+
+            AssetRevisionId emptyRevision = AssetRevisionId.From(emptyVideo);
+            VideoFaceEmbeddingPublication emptyEvidence = Evidence(emptyRevision)
+                with { Observations = [] };
+            // An unleased caller must never mint a zero-face receipt.
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                publisher.PublishAsync(emptyEvidence));
+            Assert.Null(await review.GetCurrentAsync(emptyRevision));
+
+            Guid emptyJob = await queue.EnqueueAsync(
+                new VideoDerivativeJobIdentity(emptyRevision, VideoDerivativeKind.FaceEvidence,
+                    VideoFaceEvidenceLeaseIdentity.PolicyVersion,
+                    VideoFaceEvidenceLeaseIdentity.PresetVersion, ToolSha),
+                budget, candidate);
+            VideoScopedAttemptGrant emptyGrant = Assert.IsType<VideoScopedAttemptGrant>(
+                await scopes.ArmAsync(emptyJob, ToolSha,
+                    VideoFaceEvidenceLeaseIdentity.PresetVersion,
+                    TimeSpan.FromMinutes(5), derivativeKind: "FaceEvidence"));
+
+            var forgedEmpty = new VideoProcessingJobLease(
+                emptyJob, emptyRevision, Guid.NewGuid(), "FaceEvidence",
+                VideoFaceEvidenceLeaseIdentity.PolicyVersion,
+                VideoFaceEvidenceLeaseIdentity.PresetVersion, ToolSha,
+                4000, 16000, 1, emptyGrant.Generation);
+            Assert.Null(await publisher.TryPublishLeasedAsync(forgedEmpty, emptyEvidence));
+            Assert.Null(await review.GetCurrentAsync(emptyRevision));
+
+            var zeroDetector = new SyntheticProducer((_, _) =>
+                Task.FromResult<VideoFaceEmbeddingPublication?>(emptyEvidence));
+            var zeroAdapter = new VideoFaceEvidenceWorkerAdapter(database, zeroDetector);
+            VideoWorkerCycleResult emptyCycle = await new VideoWorkerAttemptCoordinator(database)
+                .RunOneAsync(budget, zeroAdapter, selectedJobId: emptyJob);
+            Assert.True(emptyCycle.Claimed);
+            Assert.True(emptyCycle.Published);
+            Assert.Equal("published", emptyCycle.ReasonCode);
+            Assert.Equal("succeeded", (await queue.GetAsync(emptyJob))?.Status);
+            Assert.True(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
+            VideoFaceReviewBatch emptyBatch = Assert.IsType<VideoFaceReviewBatch>(
+                await review.GetCurrentAsync(emptyRevision));
+            Assert.Empty(emptyBatch.Observations);
+            Assert.NotEqual(stored.BatchId, emptyBatch.BatchId);
+
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand counts = connection.CreateCommand())
+            {
+                counts.CommandText = """
+                    SELECT (SELECT COUNT(*) FROM video_face_evidence_batches
+                            WHERE asset_revision_id=@revision AND observation_count=0),
+                           (SELECT COUNT(*) FROM video_face_observations
+                            WHERE batch_id=@batch),
+                           (SELECT COUNT(*) FROM video_person_actions),
+                           (SELECT COUNT(*) FROM photo_person_actions);
+                    """;
+                counts.Parameters.AddWithValue("revision", emptyVideo);
+                counts.Parameters.AddWithValue("batch", Guid.Parse(emptyBatch.BatchId));
+                await using NpgsqlDataReader reader = await counts.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(1L, reader.GetInt64(0));
+                Assert.Equal(0L, reader.GetInt64(1));
+                Assert.Equal(0L, reader.GetInt64(2));
+                Assert.Equal(0L, reader.GetInt64(3));
+            }
+            Assert.True(await scopes.DisarmAsync(emptyGrant));
+
+            // Source exclusion revokes even an empty job receipt, without
+            // affecting the distinct source key's positive evidence.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand exclude = connection.CreateCommand())
+            {
+                exclude.CommandText = """
+                    INSERT INTO source_copy_exclusions(
+                      source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+                    VALUES (@source,'empty-sampled.mp4',now(),'pending',now());
+                    """;
+                exclude.Parameters.AddWithValue("source", source);
+                await exclude.ExecuteNonQueryAsync();
+            }
+            Assert.Null(await review.GetCurrentAsync(emptyRevision));
+            Assert.False(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
+            Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
         }
         finally
         {

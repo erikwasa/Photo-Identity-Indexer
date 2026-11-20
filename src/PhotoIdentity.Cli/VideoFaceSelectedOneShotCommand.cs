@@ -344,24 +344,34 @@ public static class VideoFaceSelectedOneShotCommandRunner
         }
 
         bool published = cycle?.Published == true;
-        // A fully processed video may contain no detected faces. This remains
-        // an unsuccessful, uncommitted job, but report the fixed diagnostic
-        // explicitly rather than a misleading generic failed reason.
-        string reason = published ? "published" :
-            cycle?.Failure?.FailureClass == "no-faces-found" ? "no-faces-found" :
-            cycle?.ReasonCode ?? "execution-unavailable";
+        int? detectedFaces = null;
+        if (published)
+        {
+            // Read the durable, current batch after disarming. A zero count
+            // means only that no faces were detected in the sampled frames.
+            var receipt = await new PostgresVideoFaceReviewRepository(db, TimeProvider.System)
+                .GetCurrentAsync(AssetRevisionId.From(options.RevisionId), token);
+            detectedFaces = receipt?.Observations.Count;
+        }
+        string reason = published
+            ? detectedFaces == 0 ? "no-faces-in-sampled-frames" : "published"
+            : cycle?.Failure?.FailureClass == "no-faces-found" ? "no-faces-found"
+            : cycle?.ReasonCode ?? "execution-unavailable";
         Write(output, false, cycle?.Claimed == true, published,
-            reason, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            reason, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+            detectedFaces);
         return published ? 0 : 1;
     }
 
     private static void Write(
         TextWriter output, bool dryRun, bool admitted,
-        bool published, string reasonCode, long? wallMilliseconds = null) =>
+        bool published, string reasonCode, long? wallMilliseconds = null,
+        int? sampledFaceObservations = null) =>
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = Protocol,
             dryRun, admitted, published, reasonCode,
+            sampledFaceObservations,
             maximumFrames = VideoFaceEvidenceLeaseIdentity.MaximumFrames,
             maximumConcurrentJobs = 1,
             originalsMayHaveBeenOpened = !dryRun && admitted,
