@@ -299,14 +299,14 @@ public sealed class PostgresVideoFacePresenceRepository(
             face.Parameters.AddWithValue("kind", VideoFaceEvidenceLeaseIdentity.Kind);
             face.Parameters.AddWithValue("policy", VideoFaceEvidenceLeaseIdentity.PolicyVersion);
             face.Parameters.AddWithValue("preset", VideoFaceEvidenceLeaseIdentity.PresetVersion);
-            await using NpgsqlDataReader reader = await face.ExecuteReaderAsync(token);
-            if (!await reader.ReadAsync(token))
+            await using NpgsqlDataReader frameReader = await face.ExecuteReaderAsync(token);
+            if (!await frameReader.ReadAsync(token))
                 throw new KeyNotFoundException("Current leased face evidence is not available.");
-            int ordinal = reader.GetInt32(1);
-            long timestamp = reader.GetInt64(2);
-            int requested = reader.GetInt32(3);
+            int ordinal = frameReader.GetInt32(1);
+            long timestamp = frameReader.GetInt64(2);
+            int requested = frameReader.GetInt32(3);
             VideoFrameSamplingPlan plan = VideoFrameSamplingPlanner.Plan(
-                new VideoFrameSamplingRequest(reader.GetDecimal(0),
+                new VideoFrameSamplingRequest(frameReader.GetDecimal(0),
                     MaximumFrames: requested,
                     MaximumReservedDecodeMilliseconds: 12000,
                     ReservedDecodeMillisecondsPerFrame: 3000));
