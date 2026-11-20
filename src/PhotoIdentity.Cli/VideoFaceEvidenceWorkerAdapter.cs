@@ -66,7 +66,7 @@ public sealed class VideoFaceEvidenceWorkerAdapter(
                 return new(false, false,
                     new("output-validation", "no-faces-found"));
             if (evidence.RevisionId != lease.RevisionId ||
-                evidence.Observations is not { Count: >= 1 and <= 128 } ||
+                evidence.Observations is not { Count: >= 0 and <= 128 } ||
                 evidence.Observations.Any(face =>
                     face.FrameOrdinal < 0 || face.FrameOrdinal >= lease.RequestedFrames))
                 return new(false, false,
