@@ -118,6 +118,20 @@ try {
         $_.ApplyEnabled -ceq 'false' -and $_.DeleteDatabaseRows -ceq 'false'
     }).Count -eq 2) 'Canonical batch identity/del safety flags failed.'
     Assert ($session.DatabaseRowsDeleted -eq 0 -and $session.OriginalsDeleted -eq 0) 'Unexpected destructive operation.'
+    $bulkSession = & $batchGenerator -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv `
+        -ExpectedDatabaseSchemaVersion 46 -AllEligible `
+        -OutputDirectory (Join-Path $root 'canonical-full-set')
+    Assert ($bulkSession.AllEligible -and $bulkSession.BatchesStaged -eq 1) 'Full-set manifest was not staged.'
+    Assert ($bulkSession.PairsStaged -eq $bulkSession.CanonicalEligibleUnretired) 'Full-set lost eligible pairs.'
+    Assert ($bulkSession.UppercaseExplicitHistoryHeld -eq 1) 'Full-set included protected exception.'
+    $bulk = $bulkSession.Batches[0]
+    $bulkRows = @(Import-Csv -LiteralPath $bulk.PrivateManifestPath)
+    $bulkMetadata = Get-Content -LiteralPath $bulk.PrivateMetadataPath -Raw | ConvertFrom-Json
+    Assert ($bulkRows.Count -eq 2 -and $bulkMetadata.pilotPairs -eq 2) 'Full-set manifest count is incorrect.'
+    Assert ($bulkMetadata.bulkAllEligible -eq $true) 'Full-set intent is not sealed.'
+    Assert ($bulkMetadata.expectedDatabaseSchemaVersion -eq 46) 'Full-set schema pin is incorrect.'
+    Assert ($bulk.ManifestSha256 -ceq (Get-FileHash -LiteralPath $bulk.PrivateManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Full-set SHA pin is incorrect.'
+    Write-Host 'Fideli canonical full-set synthetic acceptance: PASS'
     Write-Host 'Fideli canonical batch staging synthetic acceptance: PASS'
     Write-Host 'Fideli lowercase canonical preview synthetic acceptance: PASS'
 }

@@ -40,6 +40,10 @@ public static class Program
         {
             return args[0] switch
             {
+                "archive" when args.Length > 1 && args[1] == "alias-bulk" =>
+                    await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                        ArchiveCaseAliasPilotOptions.Parse(args.Skip(2).ToArray(), bulkAtomic: true),
+                        output, cancellationToken),
                 "archive" when args.Length > 1 && args[1] == "alias-pilot" =>
                     await ArchiveCaseAliasPilotCommandRunner.RunAsync(
                         ArchiveCaseAliasPilotOptions.Parse(args.Skip(2).ToArray()),
@@ -305,6 +309,18 @@ public static class Program
     {
         output.WriteLine("""
             Photo Identity Indexer CLI
+
+              archive alias-bulk --manifest SEALED_FULL_CSV --metadata SEALED_JSON
+                                 --retirement-policy fideli-lowercase-canonical-v1
+                                 --postgres-connection-env NAME --database DB
+                                 [--max-pairs 1..5000]
+                                 [--operation preview|apply|verify-retired|verify-restored]
+                                 (apply requires exact --approve-manifest-sha256,
+                                  --restore-report VERIFIED_JSON, --receipt-directory,
+                                  --actor, --application-stopped and
+                                  --acknowledge-reversible-retirement)
+                                 (one serializable transaction; entire selected set
+                                  validated before commit; no originals deleted)
 
               archive alias-pilot --manifest ABS_PRIVATE_CSV
                                   --metadata ABS_PRIVATE_JSON

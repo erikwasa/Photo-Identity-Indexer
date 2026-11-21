@@ -30,6 +30,22 @@ public sealed class ArchiveCaseAliasPilotCommandTests
             ArchiveCaseAliasPilotOptions parsed = ArchiveCaseAliasPilotOptions.Parse(preview);
             Assert.Equal("preview", parsed.Operation);
             Assert.Equal(5, parsed.MaximumPairs);
+            Assert.Throws<ArgumentException>(() =>
+                ArchiveCaseAliasPilotOptions.Parse(preview, bulkAtomic: true));
+            string[] bulk = [
+                .. preview,
+                "--retirement-policy", "fideli-lowercase-canonical-v1",
+                "--max-pairs", "1082"
+            ];
+            ArchiveCaseAliasPilotOptions full = ArchiveCaseAliasPilotOptions.Parse(
+                bulk, bulkAtomic: true);
+            Assert.True(full.BulkAtomic);
+            Assert.Equal(1082, full.MaximumPairs);
+            Assert.Throws<ArgumentException>(() =>
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. bulk, "--operation", "restore"
+                ], bulkAtomic: true));
+
             Assert.Equal("verify-retired", ArchiveCaseAliasPilotOptions.Parse(
                 [.. preview, "--operation", "verify-retired"]).Operation);
             Assert.Equal("verify-restored", ArchiveCaseAliasPilotOptions.Parse(
