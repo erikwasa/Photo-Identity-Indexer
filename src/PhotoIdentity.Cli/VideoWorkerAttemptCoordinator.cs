@@ -292,7 +292,11 @@ public static class VideoAttemptFailureDiagnostics
         "post-exit-validation", "scratch-entry-limit",
         "scratch-linked-entry", "scratch-byte-limit",
         "process-shutdown-unverified", "io-accounting-unavailable",
-        "io-budget-exceeded"
+        "io-budget-exceeded",
+        "native-frame-extraction", "native-frame-validation",
+        "face-detector", "face-detection-overflow",
+        "face-alignment", "face-embedding",
+        "face-observation-validation"
     ];
 
     public static VideoAttemptFailureDiagnostic Sanitize(
@@ -339,7 +343,9 @@ public static class VideoAttemptFailureDiagnostics
             OperationCanceledException => "cancelled",
             _ => "unexpected-failure"
         };
-        return new(stage, failureClass, VideoToolFailureEvidence.Read(error),
-            error is VideoProxyValidationException probe ? probe.ToolExitCode : null);
+        return new(stage, failureClass,
+            VideoToolFailureEvidence.Read(error) ?? VideoFaceFailureEvidence.Read(error),
+            error is VideoProxyValidationException probe
+                ? probe.ToolExitCode : VideoFaceFailureEvidence.ReadExitCode(error));
     }
 }
