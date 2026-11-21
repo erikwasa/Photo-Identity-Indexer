@@ -134,6 +134,31 @@ public sealed class VideoFaceSelectedOneShotTests
     }
 
     [Fact]
+    public void Native_frame_failure_checkpoint_reaches_one_shot_without_private_details()
+    {
+        InvalidDataException error = VideoFaceFailureEvidence.Mark(
+            new InvalidDataException(@"C:\private\family.mp4 FFmpeg output is missing"),
+            "native-frame-extraction", toolExitCode: 1);
+        VideoAttemptFailureDiagnostic sanitized =
+            VideoAttemptFailureDiagnostics.FromException(error);
+        using StringWriter writer = new();
+        VideoFaceSelectedOneShotCommandRunner.Write(writer,
+            dryRun: false, admitted: true, published: false,
+            reasonCode: "retry-pending", failure: sanitized);
+
+        using JsonDocument json = JsonDocument.Parse(writer.ToString());
+        JsonElement row = json.RootElement;
+        Assert.Equal("native-frame-extraction",
+            row.GetProperty("failureCheckpoint").GetString());
+        Assert.Equal("invalid-media-evidence",
+            row.GetProperty("failureClass").GetString());
+        Assert.Equal(1, row.GetProperty("toolExitCode").GetInt32());
+        Assert.DoesNotContain("family.mp4", writer.ToString());
+        Assert.DoesNotContain("private", writer.ToString());
+        Assert.Equal(0, row.GetProperty("identityAssignmentsMade").GetInt32());
+    }
+
+    [Fact]
     public async Task Metadata_preview_never_enqueues_or_arms_and_unavailable_source_apply_fails_closed()
     {
         string? admin = Environment.GetEnvironmentVariable(
