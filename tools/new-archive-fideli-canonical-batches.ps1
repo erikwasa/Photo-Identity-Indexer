@@ -36,6 +36,10 @@ if ($eligible.Count -eq 0) {
 }
 
 $evidence = @(Import-Csv -LiteralPath $RetirementEvidenceCsv)
+if ($evidence.Count -eq 0 -or
+    'automatic_face_review_actions' -cnotin @($evidence[0].PSObject.Properties.Name)) {
+    throw 'The canonical batch evidence lacks automatic face-review action counts.'
+}
 $recordsByAsset = @{}
 foreach ($record in $evidence) {
     $identity = "$($record.source_id)|$($record.asset_id)"
