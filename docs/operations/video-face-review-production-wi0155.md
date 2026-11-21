@@ -957,3 +957,54 @@ The existing FaceEvidence database schema remains **v46**. This
 observability-only change does not enable video workers, introduce a
 retry operation, change source handling, or revisit the postponed
 long-term retention policy.
+
+## 2026-11-21 — Second maintained-host failure: frame/analysis checkpoint refinement
+
+A single retry of the first new native original (same registered revision,
+same model/FFmpeg hashes and empty owned scratch, v46) returned
+`reasonCode=retry-pending`, `failureStage=tool-execution`,
+`failureClass=invalid-media-evidence` in about 25 seconds; neither run
+published FaceEvidence. The job had previously been requeued with one
+attempt and no durable receipt. The second execution consumes another
+attempt from the existing bounded three-attempt job. **Do not consume the
+third attempt or start the second selected video merely to probe this
+same undifferentiated failure.** Neither the ONNX initializer warnings
+nor the generic `invalid-media-evidence` code identifies the culprit.
+
+Before trying further real media, this focused follow-up adds
+source-free, fixed-vocabulary `failureCheckpoint` codes, without
+altering source handling, job scheduling or publication:
+
+| Checkpoint | Meaning |
+| --- | --- |
+| `native-frame-extraction` | FFmpeg returned a nonzero exit status or did not produce one expected frame; numeric `toolExitCode` can accompany this |
+| `native-frame-validation` | the bounded, native-size JPEG read/decode/header or frame-shape validation failed |
+| `face-detector` | the YuNet detection call rejected the decoded frame |
+| `face-detection-overflow` | a frame exceeded the approved maximum of 32 detector candidates |
+| `face-alignment` | an observed face could not be aligned |
+| `face-embedding` | a detected face could not be embedded |
+| `face-observation-validation` | an observation failed deterministic structural validation |
+
+The checkpoint is written only to the already supported sanitized
+one-shot CLI result through `VideoFaceFailureEvidence` and the existing
+`VideoAttemptFailureDiagnostics.Sanitize` allowlist. It cannot include
+source paths, messages, media, people, raw tool output or vectors.
+It does not change `failureStage`, `failureClass`, queue retries,
+attempt limits, FaceEvidence, schema v46 or previously failed job rows.
+Historical failures cannot be reconstructed.
+
+**Next acceptance gate:** first inspect the second failed job's
+read-only queue state and scratch contents. Consider an independently
+approved, read-only original-frame diagnosis before a last selected
+one-shot attempt; do not change pinned ONNX models or fabricate/import
+experimental evidence. Any later real-media invocation must be a
+separately authorized, selected action that preserves photo priority
+and confirms a fresh empty, owned scratch directory.
+
+**Synthetic verification** (no personal source media or PostgreSQL):
+
+```powershell
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+  -c Release --filter 'FullyQualifiedName~VideoFaceNativeFrameTests|FullyQualifiedName~VideoFaceSelectedOneShotTests'
+if ($LASTEXITCODE -ne 0) { throw 'Native-face checkpoint regression failed.' }
+```
