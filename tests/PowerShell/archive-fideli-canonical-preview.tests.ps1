@@ -33,6 +33,7 @@ function Evidence([int]$Number, [bool]$Upper, [string]$Id, [string]$Revision,
         verified_content_sha256 = if ($WrongHash) { 'b' * 64 } else { $hash }
         verified_size_bytes = '100'
         has_source_exclusion = 'f'
+        automatic_face_review_actions = '0'
         human_or_unknown_face_review_actions = '0'
         human_or_unknown_person_labels = '0'
         photo_tag_actions = [string]$ExplicitTags
@@ -96,6 +97,28 @@ try {
         $null = & $script -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv -OutputDirectory $output
     } catch { $overwriteRejected = $true }
     Assert $overwriteRejected 'Existing private preview was overwritten.'
+    $batchGenerator = Join-Path $repo 'tools\new-archive-fideli-canonical-batches.ps1'
+    $session = & $batchGenerator -RetirementEvidenceCsv $evidenceCsv -EffectiveStateCsv $effectiveCsv `
+        -MaxBatches 1 -PairsPerBatch 2 -ExpectedDatabaseSchemaVersion 45 `
+        -OutputDirectory (Join-Path $root 'canonical-batches')
+    Assert ($session.CanonicalEligibleUnretired -eq 2) 'Canonical batch planner lost candidates.'
+    Assert ($session.UppercaseExplicitHistoryHeld -eq 1) 'Protected upper edit leaked into batches.'
+    Assert ($session.PairsStaged -eq 2 -and $session.BatchesStaged -eq 1) 'Canonical batch limit ignored.'
+    Assert ($session.AutomaticallyApplied -eq 0) 'Generator performed unexpected Apply.'
+    $batch = $session.Batches[0]
+    $members = @(Import-Csv -LiteralPath $batch.PrivateManifestPath)
+    $meta = Get-Content -LiteralPath $batch.PrivateMetadataPath -Raw | ConvertFrom-Json
+    Assert ($members.Count -eq 2) 'Canonical batch size incorrect.'
+    Assert ($meta.retirementPolicy -eq 'fideli-lowercase-canonical-v1') 'Missing explicit policy seal.'
+    Assert ($meta.privatePilotManifestSha256 -eq (Get-FileHash -LiteralPath $batch.PrivateManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Canonical batch hash not pinned.'
+    Assert ($meta.pilotPairs -eq 2 -and $meta.expectedDatabaseSchemaVersion -eq 45) 'Canonical batch metadata count or schema incorrect.'
+    Assert (@($members | Where-Object {
+        $_.SurvivorSourceKey.StartsWith('fideli/', [StringComparison]::Ordinal) -and
+        $_.SecondarySourceKey -ceq ('F' + $_.SurvivorSourceKey.Substring(1)) -and
+        $_.ApplyEnabled -ceq 'false' -and $_.DeleteDatabaseRows -ceq 'false'
+    }).Count -eq 2) 'Canonical batch identity/del safety flags failed.'
+    Assert ($session.DatabaseRowsDeleted -eq 0 -and $session.OriginalsDeleted -eq 0) 'Unexpected destructive operation.'
+    Write-Host 'Fideli canonical batch staging synthetic acceptance: PASS'
     Write-Host 'Fideli lowercase canonical preview synthetic acceptance: PASS'
 }
 finally {

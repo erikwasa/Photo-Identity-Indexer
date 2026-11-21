@@ -9,6 +9,175 @@ namespace PhotoIdentity.Persistence.Tests;
 public sealed class PostgresArchiveCaseAliasRetirementServiceTests
 {
     [Fact]
+    public async Task Explicit_Fideli_lowercase_keeper_overrides_age_and_effective_differences_but_not_protected_history()
+    {
+        string? adminString = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(adminString)) return;
+
+        string dbName = "photoidentity_fideli_policy_" + Guid.NewGuid().ToString("N");
+        string quotedName = '"' + dbName + '"';
+        NpgsqlConnectionStringBuilder adminBuilder = new(adminString) { Pooling = false };
+        await using NpgsqlConnection admin = new(adminBuilder.ConnectionString);
+        await admin.OpenAsync();
+        using (NpgsqlCommand create = admin.CreateCommand())
+        {
+            create.CommandText = $"CREATE DATABASE {quotedName};";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            NpgsqlConnectionStringBuilder builder = new(adminString)
+            {
+                Database = dbName, Pooling = false
+            };
+            await using PostgresCatalogueDatabase database = new(builder.ConnectionString);
+            await database.InitializeAsync();
+
+            Guid source = Guid.NewGuid(), lower = Guid.NewGuid(), upper = Guid.NewGuid();
+            Guid lowerRevision = Guid.NewGuid(), upperRevision = Guid.NewGuid();
+            Guid upperFace = Guid.NewGuid();
+            DateTimeOffset earlier = new(2026, 11, 18, 10, 0, 0, TimeSpan.Zero);
+            DateTimeOffset later = earlier.AddDays(2);
+            string hash = new('a', 64);
+
+            await using (NpgsqlConnection con = new(builder.ConnectionString))
+            {
+                await con.OpenAsync();
+                using NpgsqlCommand seed = con.CreateCommand();
+                seed.CommandText = """
+                    INSERT INTO sources (id, kind, root_locator, created_at_utc)
+                    VALUES (@source, 'local-folder', 'root', @earlier);
+                    INSERT INTO assets
+                        (id, source_id, source_key, media_kind, created_at_utc)
+                    VALUES (@lower, @source, 'fideli/photo.jpg', 'photo', @later),
+                           (@upper, @source, 'Fideli/photo.jpg', 'photo', @earlier);
+                    INSERT INTO asset_revisions
+                        (id, asset_id, content_sha256, size_bytes, observed_at_utc, media_type)
+                    VALUES (@lowerrev, @lower, @hash, 100, @later, 'image/jpeg'),
+                           (@upperrev, @upper, @hash, 100, @later, 'image/jpeg');
+                    INSERT INTO archive_source_observations
+                        (asset_id, observed_size_bytes, observed_last_write_utc,
+                         observed_media_type, observed_at_utc, verification_state,
+                         verified_revision_id, verified_size_bytes,
+                         verified_last_write_utc, verified_media_type, verified_at_utc)
+                    VALUES
+                        (@lower, 100, @later, 'image/jpeg', @later, 'verified',
+                         @lowerrev, 100, @later, 'image/jpeg', @later),
+                        (@upper, 100, @later, 'image/jpeg', @later, 'verified',
+                         @upperrev, 100, @later, 'image/jpeg', @later);
+                    INSERT INTO photo_tags
+                        (normalized_name, display_name, created_by, created_at_utc)
+                    VALUES ('reviewed', 'Reviewed', 'test', @later);
+                    INSERT INTO photo_tag_actions
+                        (asset_revision_id, tag_id, action_kind, actor, created_at_utc)
+                    SELECT @lowerrev, id, 'add', 'manual', @later
+                    FROM photo_tags WHERE normalized_name='reviewed';
+                    INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
+                    VALUES (@upperface, @upperrev, 0, @later);
+                    INSERT INTO review_actions
+                        (face_occurrence_id, action_kind, actor, created_at_utc)
+                    VALUES (@upperface, 'unknown', 'identity-matcher:auto', @later);
+                    """;
+                seed.Parameters.AddWithValue("source", source);
+                seed.Parameters.AddWithValue("lower", lower);
+                seed.Parameters.AddWithValue("upper", upper);
+                seed.Parameters.AddWithValue("lowerrev", lowerRevision);
+                seed.Parameters.AddWithValue("upperrev", upperRevision);
+                seed.Parameters.AddWithValue("upperface", upperFace);
+                seed.Parameters.AddWithValue("hash", hash);
+                seed.Parameters.AddWithValue("earlier", earlier);
+                seed.Parameters.AddWithValue("later", later);
+                await seed.ExecuteNonQueryAsync();
+            }
+
+            ArchiveCaseAliasRetirementRequest request = new(
+                source, lower, upper, "fideli/photo.jpg", "Fideli/photo.jpg",
+                lowerRevision, upperRevision, later, earlier, hash, 100, "disposable-test");
+            PostgresArchiveCaseAliasRetirementService service = new(database);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.RetireAsync(request));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.RetireFideliLowercaseCanonicalAsync(request with
+                {
+                    SurvivorSourceKey = "other/photo.jpg",
+                    SecondarySourceKey = "Other/photo.jpg"
+                }));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.RetireFideliLowercaseCanonicalAsync(request with
+                {
+                    ExpectedSha256 = new string('b', 64)
+                }));
+
+            // An explicit upper human action always blocks the canonical policy.
+            await using (NpgsqlConnection con = new(builder.ConnectionString))
+            {
+                await con.OpenAsync();
+                using NpgsqlCommand action = con.CreateCommand();
+                action.CommandText = """
+                    INSERT INTO review_actions
+                        (face_occurrence_id, action_kind, actor, created_at_utc)
+                    VALUES (@face, 'unknown', 'human-operator', @time);
+                    """;
+                action.Parameters.AddWithValue("face", upperFace);
+                action.Parameters.AddWithValue("time", later);
+                Assert.Equal(1, await action.ExecuteNonQueryAsync());
+            }
+            InvalidOperationException protectedHistory = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => service.RetireFideliLowercaseCanonicalAsync(request));
+            Assert.Contains("protected", protectedHistory.Message, StringComparison.Ordinal);
+
+            await using (NpgsqlConnection con = new(builder.ConnectionString))
+            {
+                await con.OpenAsync();
+                using NpgsqlCommand cleanup = con.CreateCommand();
+                cleanup.CommandText = """
+                    DELETE FROM review_actions
+                    WHERE face_occurrence_id = @face AND actor = 'human-operator';
+                    """;
+                cleanup.Parameters.AddWithValue("face", upperFace);
+                Assert.Equal(1, await cleanup.ExecuteNonQueryAsync());
+            }
+
+            Assert.Equal(ArchiveAliasRetirementOutcome.Retired,
+                await service.RetireFideliLowercaseCanonicalAsync(request));
+            Assert.Equal(ArchiveAliasRetirementOutcome.AlreadyRetired,
+                await service.RetireFideliLowercaseCanonicalAsync(request));
+
+            await using (NpgsqlConnection con = new(builder.ConnectionString))
+            {
+                await con.OpenAsync();
+                using NpgsqlCommand inspect = con.CreateCommand();
+                inspect.CommandText = """
+                    SELECT
+                        (SELECT count(*) FROM assets WHERE id = @lower AND deleted_at_utc IS NULL),
+                        (SELECT count(*) FROM assets WHERE id = @upper AND deleted_at_utc IS NOT NULL),
+                        (SELECT count(*) FROM asset_revisions WHERE asset_id IN (@lower, @upper)),
+                        (SELECT count(*) FROM photo_tag_actions WHERE asset_revision_id=@lowerrev),
+                        (SELECT count(*) FROM review_actions WHERE face_occurrence_id=@upperface),
+                        (SELECT count(*) FROM archive_case_alias_retirements
+                         WHERE secondary_asset_id=@upper AND restored_at_utc IS NULL);
+                    """;
+                inspect.Parameters.AddWithValue("lower", lower);
+                inspect.Parameters.AddWithValue("upper", upper);
+                inspect.Parameters.AddWithValue("lowerrev", lowerRevision);
+                inspect.Parameters.AddWithValue("upperface", upperFace);
+                await using NpgsqlDataReader reader = await inspect.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                for (int i = 0; i < 6; i++) Assert.Equal(i == 2 ? 2L : 1L, reader.GetInt64(i));
+            }
+
+            Assert.Equal(ArchiveAliasRetirementOutcome.Restored, await service.RestoreAsync(request));
+        }
+        finally
+        {
+            using NpgsqlCommand drop = admin.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS {quotedName} WITH (FORCE);";
+            await drop.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task Retire_and_restore_preserve_original_and_secondary_history_and_reject_stale_or_human_evidence()
     {
         string? adminString = Environment.GetEnvironmentVariable(
