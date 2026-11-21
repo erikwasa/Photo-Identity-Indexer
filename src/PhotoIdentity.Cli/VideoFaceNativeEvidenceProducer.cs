@@ -170,14 +170,16 @@ public sealed class VideoFaceNativeEvidenceProducer(
                             }
                             catch (InvalidDataException error)
                             {
-                                throw VideoFaceFailureEvidence.Mark(error, "native-frame-validation");
+                                VideoFaceFailureEvidence.Mark(error, "native-frame-validation");
+                                throw;
                             }
                         });
                 }
                 catch (InvalidDataException error)
                 {
                     // Respect any more specific checkpoint added in the callback.
-                    throw VideoFaceFailureEvidence.Mark(error, "native-frame-extraction");
+                    VideoFaceFailureEvidence.Mark(error, "native-frame-extraction");
+                    throw;
                 }
                 if (result.ExitCode != 0 || frame is null)
                     throw VideoFaceFailureEvidence.Mark(
