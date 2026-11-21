@@ -39,9 +39,10 @@ $evidence = @(Import-Csv -LiteralPath $RetirementEvidenceCsv)
 $recordsByAsset = @{}
 foreach ($record in $evidence) {
     $identity = "$($record.source_id)|$($record.asset_id)"
-    if (-not $recordsByAsset.TryAdd($identity, $record)) {
+    if ($recordsByAsset.ContainsKey($identity)) {
         throw 'Duplicate asset identity in the authoritative audit.'
     }
+    $recordsByAsset.Add($identity, $record)
 }
 $selected = @($eligible | Select-Object -First ($MaxBatches * $PairsPerBatch))
 $secondaries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
