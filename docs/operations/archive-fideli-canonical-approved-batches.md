@@ -101,7 +101,119 @@ dotnet run --project '.\src\PhotoIdentity.Cli\PhotoIdentity.Cli.csproj' `
 if ($LASTEXITCODE -ne 0) { throw 'Read-only canonical preview failed.' }
 ```
 
-## 3. Future approved production batches
+## 3. New: single all-eligible atomic operation (preferred)
+
+This is the requested ONE bulk-retirement operation. It does NOT change
+production merely by merging the PR. Perform a separate local acceptance
+and explicit operator authorization. No original OneDrive files, photo
+revisions, or review rows are deleted; uppercase assets are soft-retired.
+
+### A. Prepare the full manifest, read-only
+
+After refreshing both evidence CSVs (the existing `Export-ArchiveAudit`
+commands above), use the **current** installed schema version, currently 46:
+
+```powershell
+$session = .\tools\new-archive-fideli-canonical-batches.ps1 `
+    -RetirementEvidenceCsv '.\artifacts\archive-case-retirement-evidence-fresh.csv' `
+    -EffectiveStateCsv '.\artifacts\archive-case-effective-state-fresh.csv' `
+    -ExpectedDatabaseSchemaVersion 46 -AllEligible
+
+if ($session.BatchesStaged -ne 1 -or
+    $session.PairsStaged -ne $session.CanonicalEligibleUnretired -or
+    $session.UppercaseExplicitHistoryHeld -lt 1) {
+    throw 'Full-set inventory is incomplete or missing its known protected exception'
+}
+$b = $session.Batches[0]
+$manifest = (Resolve-Path $b.PrivateManifestPath).Path
+$metadata = (Resolve-Path $b.PrivateMetadataPath).Path
+$hash = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($hash -cne $b.ManifestSha256) { throw 'Pinned manifest has changed' }
+
+$cli = '.\src\PhotoIdentity.Cli\PhotoIdentity.Cli.csproj'
+$common = @('archive','alias-bulk',
+    '--retirement-policy','fideli-lowercase-canonical-v1',
+    '--manifest',$manifest,'--metadata',$metadata,
+    '--postgres-connection-env','PHOTOIDENTITY_POSTGRES_CONNECTION_STRING',
+    '--database','photoidentity_main','--max-pairs','5000')
+
+dotnet run --project $cli --configuration Release -- @common --operation preview
+if ($LASTEXITCODE -ne 0) { throw 'Bulk preview failed' }
+dotnet run --project $cli --configuration Release -- @common --operation verify-restored
+if ($LASTEXITCODE -ne 0) { throw 'Expected all selected assets to be initially active' }
+```
+
+Inspect `$session.PairsStaged` and the policy assessment classifications.
+The known single protected upper-history exception remains active and OUT
+of the approved manifest. Other non-eligible collisions must be counted
+and reported, not silently included in an eligible count. The number
+1,082 is an *earlier* observation, not an immutable target.
+
+### B. Approve and execute only after verifying a fresh backup
+
+Stop Photo Identity and all other database clients; leave PostgreSQL up.
+Create and verify a fresh backup of `photoidentity_main` with the procedures
+in `docs/operations/postgresql-operations.md`. Keep the app stopped.
+The report must be successful, be within 24h, match the database/schema
+and verify cleanup of its isolated restore.
+
+Because the APPLY manifest must be under four hours old, refresh the two
+read-only audits and repeat section A **after** the backup if necessary.
+
+```powershell
+$restoreReport = '<EXACT_NEW_BACKUP.dump>.restore-verification.json'
+$receipts = Join-Path (Split-Path $manifest -Parent) 'receipts'
+New-Item -ItemType Directory -Path $receipts -Force | Out-Null
+$approval = Read-Host "Type APPLY ALL Fideli pairs after confirming stopped app and restore-tested backup"
+if ($approval -cne 'APPLY ALL Fideli pairs') { throw 'Not authorized' }
+
+dotnet run --project $cli --configuration Release -- @common `
+    --operation apply `
+    --approve-manifest-sha256 $hash `
+    --restore-report $restoreReport `
+    --receipt-directory $receipts `
+    --actor 'archive-alias-operator:bulk-approved' `
+    --application-stopped --acknowledge-reversible-retirement
+if ($LASTEXITCODE -ne 0) {
+    throw 'Apply failed or status uncertain. Inspect receipt and verify-retired before any retry.'
+}
+```
+
+The service checks every selected pair against live PostgreSQL state
+(hash, size, revisions, exact two-record group and protected-history
+safeguards), marks upper records retired, then checks **every selected
+pair** for one remaining active lowercase asset, zero active uppercase
+assets, correct mappings, and preserved revision/automatic review
+history **before a single transaction commit**. A failure before commit
+rolls back the entire set. Neither the generator nor preview writes.
+
+### C. Verify the committed result
+
+```powershell
+dotnet run --project $cli --configuration Release -- @common --operation verify-retired
+if ($LASTEXITCODE -ne 0) { throw 'Pinned post-commit verification failed' }
+```
+
+Also run `tools/archive-case-alias-retirement-postcheck.sql` and
+re-export the paired read-only inventory. Confirm that the active mapping
+count increased by **exactly the approved pair count** and all selected
+secondaries are hidden. The legacy SQL field `incorrect_survivor_order`
+is *not* a conflict for canonical Fideli: the lowercase keeper can be
+newer. Inspect the count of remaining active exact `fideli/` /
+`Fideli/` groups: the known protected exception may remain, but no
+selected eligible group should remain active twice. Restart the *same*
+known-good application package only after postchecks pass, and inspect
+representative images.
+
+A rejected transaction may safely be retried after correcting its
+cause and preparing **fresh** audit/manifest approval. If the process
+fails *after commit* or application-level checks fail, do NOT assume
+rollback: read the private receipt and run read-only `verify-retired`.
+This command intentionally does not implement bulk post-commit restore;
+retain the verified whole-database backup for disaster recovery.
+Avoid running a partial retry against an uncertain full-set result.
+
+## 4. Previous bounded-batch fallback (not needed for full-set run)
 
 Do NOT Apply from this development stage alone. Once merged and
 approved, stop Photo Identity, keep PostgreSQL online, make ONE fresh
