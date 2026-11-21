@@ -350,6 +350,15 @@ public static class ArchiveCaseAliasPilotCommandRunner
             meta.GetProperty("privatePilotManifestSha256").GetString() != sha256)
             throw new InvalidOperationException("Pilot metadata safety values or manifest fingerprint differ.");
 
+        if (options.BulkAtomic &&
+            (!meta.TryGetProperty("bulkAllEligible", out JsonElement whole) ||
+             whole.ValueKind != JsonValueKind.True ||
+             !meta.TryGetProperty("retirementCandidatesRevalidated",
+                 out JsonElement candidateCount) ||
+             candidateCount.GetInt32() != meta.GetProperty("pilotPairs").GetInt32()))
+            throw new InvalidOperationException(
+                "Bulk Apply requires one complete all-eligible sealed manifest, not a subset.");
+
         string? metaPolicy = meta.TryGetProperty("retirementPolicy", out JsonElement policyProperty)
             ? policyProperty.GetString() : null;
         if (options.RetirementPolicy == "legacy"
