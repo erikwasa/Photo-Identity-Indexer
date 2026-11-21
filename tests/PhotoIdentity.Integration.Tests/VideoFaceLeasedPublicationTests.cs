@@ -1,3 +1,11 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using PhotoIdentity.Api;
 using Npgsql;
 using PhotoIdentity.Cli;
 using PhotoIdentity.Core.Identifiers;
@@ -333,23 +341,6 @@ public sealed class VideoFaceLeasedPublicationTests
             }
             Assert.True(await scopes.DisarmAsync(emptyGrant));
 
-            // Source exclusion revokes even an empty job receipt, without
-            // affecting the distinct source key's positive evidence.
-            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
-            await using (NpgsqlCommand exclude = connection.CreateCommand())
-            {
-                exclude.CommandText = """
-                    INSERT INTO source_copy_exclusions(
-                      source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
-                    VALUES (@source,'empty-sampled.mp4',now(),'pending',now());
-                    """;
-                exclude.Parameters.AddWithValue("source", source);
-                await exclude.ExecuteNonQueryAsync();
-            }
-            Assert.Null(await review.GetCurrentAsync(emptyRevision));
-            Assert.False(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
-            Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
-
             // v46: human review alone never creates video-person tags. Only a
             // separately approved, revision/source/lease-fenced operation
             // can write one owned add, and undo cannot touch other edits.
@@ -449,6 +440,30 @@ public sealed class VideoFaceLeasedPublicationTests
                 Assert.Equal(6L, reader.GetInt64(2)); // two linked cycles + manual add/remove
             }
 
+            // HTTP vertical slice: exercise the *actual* default-off
+            // endpoint handlers with this same synthetic lease-attested
+            // PostgreSQL fixture; no original media or inference.
+            await VerifyFaceReviewHttpAsync(
+                database, review, presence, details, revision,
+                emptyRevision, observationId, person);
+
+            // Source exclusion revokes even an empty job receipt, without
+            // affecting the distinct source key's positive evidence.
+            await using (NpgsqlConnection connection = await database.OpenConnectionAsync())
+            await using (NpgsqlCommand exclude = connection.CreateCommand())
+            {
+                exclude.CommandText = """
+                    INSERT INTO source_copy_exclusions(
+                      source_id,source_key,excluded_at_utc,purge_state,purge_updated_at_utc)
+                    VALUES (@source,'empty-sampled.mp4',now(),'pending',now());
+                    """;
+                exclude.Parameters.AddWithValue("source", source);
+                await exclude.ExecuteNonQueryAsync();
+            }
+            Assert.Null(await review.GetCurrentAsync(emptyRevision));
+            Assert.False(await review.HasCurrentJobReceiptAsync(emptyJob, emptyRevision));
+            Assert.True(await review.HasCurrentJobReceiptAsync(faceJob, revision));
+
             // Excluding the current source must cascade both audited face
             // links and ordinary video-person action history. It must not
             // retain private presence provenance or touch photo assignments.
@@ -487,6 +502,235 @@ public sealed class VideoFaceLeasedPublicationTests
             drop.CommandText = $"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE);";
             await drop.ExecuteNonQueryAsync();
         }
+    }
+
+    /// <summary>
+    /// HTTP-level acceptance on an isolated TestServer sharing the disposable
+    /// PostgreSQL FaceEvidence receipt above. This intentionally excludes
+    /// browser playback and real native crop decoding: those need a
+    /// separately approved real source for consolidated interactive review.
+    /// </summary>
+    private static async Task VerifyFaceReviewHttpAsync(
+        PostgresCatalogueDatabase database,
+        PostgresVideoFaceReviewRepository review,
+        PostgresVideoFacePresenceRepository presence,
+        PostgresVideoDetailsRepository details,
+        AssetRevisionId revision, AssetRevisionId excludedRevision,
+        Guid faceId, Guid personId)
+    {
+        WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
+        builder.WebHost.UseTestServer();
+        builder.Configuration["PhotoIdentity:VideoLibraryEnabled"] = "false";
+        builder.Configuration["PhotoIdentity:VideoFaceReviewEnabled"] = "false";
+        builder.Configuration["PhotoIdentity:VideoFaceNativeCropEnabled"] = "false";
+        builder.Configuration["PhotoIdentity:VideoFacePresencePromotionEnabled"] = "false";
+        builder.Services.AddSingleton(database);
+        builder.Services.AddSingleton(review);
+        builder.Services.AddSingleton(presence);
+        builder.Services.AddSingleton(new PostgresVideoFaceNativeCropRepository(database));
+        builder.Services.AddSingleton<VideoFaceNativeCropService>();
+
+        await using WebApplication app = builder.Build();
+        app.MapVideoFaceReviewEndpoints();
+        await app.StartAsync();
+        using HttpClient client = app.GetTestClient();
+        string root = $"/api/videos/{revision.Value:D}/face-review";
+        string face = root + $"/{faceId:D}";
+        string presenceUrl = face + "/presence";
+        string decisionUrl = face + "/decision";
+        string cropUrl = face + "/native-crop";
+        string missing = $"/api/videos/{excludedRevision.Value:D}/face-review";
+
+        static void AssertNoStore(HttpResponseMessage result)
+        {
+            Assert.Contains("no-store",
+                result.Headers.CacheControl?.ToString() ?? string.Empty);
+            Assert.Contains("nosniff", result.Headers.GetValues(
+                "X-Content-Type-Options"));
+        }
+
+        async Task<HttpResponseMessage> Decision(string kind, Guid? personChoice = null) =>
+            await client.PostAsJsonAsync(decisionUrl,
+                new { decision = kind, personId = personChoice?.ToString("D") });
+
+        async Task<HttpResponseMessage> Promote(bool approved, string? personChoice = null) =>
+            await client.PostAsJsonAsync(presenceUrl,
+                new { personId = personChoice ?? personId.ToString("D"),
+                      explicitlyApproved = approved });
+
+        // Before any opt-in, all five review/crop/mutation paths must fail
+        // closed, regardless of persisted FaceEvidence in PostgreSQL.
+        using (HttpResponseMessage get = await client.GetAsync(root))
+        using (HttpResponseMessage choose = await Decision("unknown"))
+        using (HttpResponseMessage add = await Promote(true))
+        using (HttpResponseMessage undo = await client.DeleteAsync(presenceUrl))
+        using (HttpResponseMessage crop = await client.GetAsync(cropUrl))
+        {
+            foreach (HttpResponseMessage result in new[] { get, choose, add, undo, crop })
+            {
+                Assert.Equal(HttpStatusCode.NotFound, result.StatusCode);
+                AssertNoStore(result);
+            }
+        }
+
+        // Opening review alone may not activate the promotion or
+        // original-media native-crop path.
+        builder.Configuration["PhotoIdentity:VideoLibraryEnabled"] = "true";
+        builder.Configuration["PhotoIdentity:VideoFaceReviewEnabled"] = "true";
+        using (HttpResponseMessage get = await client.GetAsync(root))
+        {
+            Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+            AssertNoStore(get);
+            using JsonDocument json = JsonDocument.Parse(
+                await get.Content.ReadAsStringAsync());
+            Assert.False(json.RootElement.GetProperty("presencePromotionEnabled").GetBoolean());
+            Assert.Single(json.RootElement.GetProperty("observations").EnumerateArray());
+        }
+        // A legitimate zero-detected-face leased receipt must be a 200
+        // with an empty sampled set, not a 404 implying no persisted batch.
+        using (HttpResponseMessage get = await client.GetAsync(missing))
+        {
+            Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+            AssertNoStore(get);
+            using JsonDocument json = JsonDocument.Parse(
+                await get.Content.ReadAsStringAsync());
+            Assert.Empty(json.RootElement.GetProperty("observations").EnumerateArray());
+            Assert.False(json.RootElement.GetProperty("presencePromotionEnabled").GetBoolean());
+        }
+        using (HttpResponseMessage get = await client.GetAsync(
+            "/api/videos/not-a-guid/face-review"))
+            Assert.Equal(HttpStatusCode.BadRequest, get.StatusCode);
+        using (HttpResponseMessage crop = await client.GetAsync(cropUrl))
+            Assert.Equal(HttpStatusCode.NotFound, crop.StatusCode);
+        using (HttpResponseMessage unknownFace = await client.PostAsJsonAsync(
+            root + "/" + Guid.NewGuid().ToString("D") + "/decision",
+            new { decision = "unknown", personId = (string?)null }))
+            Assert.Equal(HttpStatusCode.NotFound, unknownFace.StatusCode);
+        using (HttpResponseMessage noFaces = await client.PostAsJsonAsync(
+            missing + "/" + faceId.ToString("D") + "/decision",
+            new { decision = "unknown", personId = (string?)null }))
+            Assert.Equal(HttpStatusCode.NotFound, noFaces.StatusCode);
+        using (HttpResponseMessage add = await Promote(true))
+            Assert.Equal(HttpStatusCode.NotFound, add.StatusCode);
+        using (HttpResponseMessage undo = await client.DeleteAsync(presenceUrl))
+            Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
+
+        // A review decision can be saved through HTTP without creating
+        // a tag. Explicit promotion remains a *separate* action.
+        using (HttpResponseMessage unknown = await Decision("unknown"))
+        {
+            Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
+            AssertNoStore(unknown);
+        }
+        Assert.Empty((await details.GetAsync(revision))!.People);
+        using (HttpResponseMessage invalid = await Decision("known"))
+            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using (HttpResponseMessage chosen = await Decision("known", personId))
+            Assert.Equal(HttpStatusCode.OK, chosen.StatusCode);
+        Assert.Empty((await details.GetAsync(revision))!.People);
+
+        builder.Configuration["PhotoIdentity:VideoFacePresencePromotionEnabled"] = "true";
+        using (HttpResponseMessage current = await client.GetAsync(root))
+        {
+            Assert.Equal(HttpStatusCode.OK, current.StatusCode);
+            using JsonDocument json = JsonDocument.Parse(
+                await current.Content.ReadAsStringAsync());
+            Assert.True(json.RootElement.GetProperty("presencePromotionEnabled").GetBoolean());
+            Assert.Equal("known",
+                json.RootElement.GetProperty("observations")[0]
+                    .GetProperty("decision").GetString());
+        }
+        using (HttpResponseMessage notApproved = await Promote(false))
+            Assert.Equal(HttpStatusCode.BadRequest, notApproved.StatusCode);
+        using (HttpResponseMessage wrong = await Promote(true, Guid.NewGuid().ToString("D")))
+            Assert.Equal(HttpStatusCode.Conflict, wrong.StatusCode);
+        Assert.Empty((await details.GetAsync(revision))!.People);
+
+        using (HttpResponseMessage linked = await Promote(true))
+        {
+            Assert.Equal(HttpStatusCode.OK, linked.StatusCode);
+            AssertNoStore(linked);
+            using JsonDocument json = JsonDocument.Parse(
+                await linked.Content.ReadAsStringAsync());
+            Assert.Equal("linked", json.RootElement.GetProperty("status").GetString());
+            Assert.True(json.RootElement.GetProperty("videoPersonTagChanged").GetBoolean());
+        }
+        Assert.Single((await details.GetAsync(revision))!.People);
+        using (HttpResponseMessage repeat = await Promote(true))
+        {
+            Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
+            using JsonDocument json = JsonDocument.Parse(
+                await repeat.Content.ReadAsStringAsync());
+            Assert.Equal("already-linked",
+                json.RootElement.GetProperty("status").GetString());
+            Assert.False(json.RootElement.GetProperty("videoPersonTagChanged").GetBoolean());
+        }
+        Assert.Single((await details.GetAsync(revision))!.People);
+        using (HttpResponseMessage linkedView = await client.GetAsync(root))
+        {
+            using JsonDocument json = JsonDocument.Parse(
+                await linkedView.Content.ReadAsStringAsync());
+            Assert.Equal(personId.ToString("D"),
+                json.RootElement.GetProperty("observations")[0]
+                    .GetProperty("presence").GetProperty("personId").GetString());
+        }
+        using (HttpResponseMessage correction = await Decision("not-face"))
+            Assert.Equal(HttpStatusCode.Conflict, correction.StatusCode);
+
+        using (HttpResponseMessage undo = await client.DeleteAsync(presenceUrl))
+        {
+            Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+            AssertNoStore(undo);
+            using JsonDocument json = JsonDocument.Parse(
+                await undo.Content.ReadAsStringAsync());
+            Assert.Equal("unlinked", json.RootElement.GetProperty("status").GetString());
+            Assert.True(json.RootElement.GetProperty("videoPersonTagChanged").GetBoolean());
+        }
+        Assert.Empty((await details.GetAsync(revision))!.People);
+        using (HttpResponseMessage repeatUndo = await client.DeleteAsync(presenceUrl))
+        {
+            Assert.Equal(HttpStatusCode.OK, repeatUndo.StatusCode);
+            using JsonDocument json = JsonDocument.Parse(
+                await repeatUndo.Content.ReadAsStringAsync());
+            Assert.Equal("already-unlinked",
+                json.RootElement.GetProperty("status").GetString());
+        }
+        using (HttpResponseMessage corrected = await Decision("not-face"))
+            Assert.Equal(HttpStatusCode.OK, corrected.StatusCode);
+        using (HttpResponseMessage promoteNoKnown = await Promote(true))
+            Assert.Equal(HttpStatusCode.Conflict, promoteNoKnown.StatusCode);
+        using (HttpResponseMessage cleared = await Decision("clear"))
+            Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        using (HttpResponseMessage final = await client.GetAsync(root))
+        {
+            using JsonDocument json = JsonDocument.Parse(
+                await final.Content.ReadAsStringAsync());
+            Assert.Equal("clear",
+                json.RootElement.GetProperty("observations")[0]
+                    .GetProperty("decision").GetString());
+            Assert.Equal(JsonValueKind.Null,
+                json.RootElement.GetProperty("observations")[0]
+                    .GetProperty("presence").ValueKind);
+        }
+        Assert.Empty((await details.GetAsync(revision))!.People);
+
+        // Leave a *real active*, evidence-owned person tag immediately
+        // before source exclusion. Previous regressions checked for zero
+        // tags only after undo had already removed them; that did not
+        // prove exclusion actually purged an approved current presence.
+        using (HttpResponseMessage confirmed = await Decision("known", personId))
+            Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        using (HttpResponseMessage active = await Promote(true))
+        {
+            Assert.Equal(HttpStatusCode.OK, active.StatusCode);
+            using JsonDocument json = JsonDocument.Parse(
+                await active.Content.ReadAsStringAsync());
+            Assert.Equal("linked", json.RootElement.GetProperty("status").GetString());
+        }
+        Assert.Single((await details.GetAsync(revision))!.People);
+        Assert.NotNull(Assert.Single((await review.GetCurrentAsync(revision))!.Observations).Presence);
+        // The enclosing test immediately inserts the source exclusion.
+        // Its final assertions require both linked evidence and tags = 0.
     }
 
     private sealed class SyntheticProducer(

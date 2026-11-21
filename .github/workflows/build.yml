@@ -60,6 +60,10 @@ jobs:
               // FrameEvidence search/privacy checks need the disposable PostgreSQL
               // lane even when only their persistence test file changes.
               exact.has('tests/PhotoIdentity.Persistence.Tests/VideoFrameEvidencePublicationTests.cs') ||
+              // WI-0155's synthetic leased FaceEvidence HTTP acceptance must
+              // execute against disposable PostgreSQL, not pass via the
+              // integration shards' no-admin early-return path.
+              exact.has('tests/PhotoIdentity.Integration.Tests/VideoFaceLeasedPublicationTests.cs') ||
               // Photo/video coexistence regression needs real disposable PostgreSQL,
               // even when no production assembly changes in the PR.
               exact.has('tests/PhotoIdentity.Persistence.Tests/PostgresPhotoSearchRepositoryTests.cs') ||

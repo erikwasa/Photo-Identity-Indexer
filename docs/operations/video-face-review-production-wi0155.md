@@ -833,3 +833,78 @@ proxy fallback, presence dedup/undo, zero-face evidence, stale revision,
 source exclusion and photo-identity invariants. No additional experiment
 is requested solely for this browser fix; the production enablement gate
 continues to require the private-media and model-rights decisions.
+
+## 2026-11-21 — HTTP acceptance using synthetic leased evidence (no new real-video experiment)
+
+This follow-up hardens the **integration proof** across the actual
+`VideoFaceReviewEndpoints` routes and the v42–v46 PostgreSQL evidence/
+person-action repositories. Earlier acceptance covered source/revision
+locks and audited review/presence through repository calls, plus synthetic
+UI visual-session state. HTTP status codes, privacy headers and gate
+combinations had only been contract-checked; they now receive a
+disposable end-to-end TestServer acceptance.
+
+The already existing disposable `VideoFaceLeasedPublicationTests`
+synthetically publishes a successful selected FaceEvidence job into a
+disposable PostgreSQL catalogue with one canonical exemplar and a
+separate **zero-face** selected job. This test stage now starts an
+in-memory ASP.NET Core TestServer using the real production endpoint
+handlers and those same synthetic receipts. It proves:
+
+- **Default-off**: GET batch, POST decision, POST explicit presence,
+  DELETE undo and GET native crop all return **404**, each with
+  private `no-store` and `nosniff` headers.
+- **Review-only**: enabling only video library + video-face review
+  exposes **200** with one known-length synthetic observation, while
+  separate person promotion and crop access remain inaccessible.
+- **Zero-face distinction**: an existing, valid lease-attested
+  zero-observation batch returns **200 and an empty observation list**,
+  not a missing-evidence 404. Wrong face IDs and invalid revision IDs
+  are rejected; exclusion subsequently destroys the zero-face receipt.
+- **Human review alone**: HTTP decision saves `known` without adding
+  any video person. Malformed known-person requests return **400**.
+- **Separate operator approval**: only after the independent
+  presence switch is enabled does the response expose promotion
+  capability; the HTTP request must additionally carry
+  `explicitlyApproved=true`. False/missing approvals are rejected,
+  mismatched person IDs conflict, and a valid approval adds exactly
+  one video-person action. Repeats are idempotent.
+- **Corrections and undo**: changing the face to `not-face` while
+  linked returns **409**; explicit undo returns `unlinked`, removes
+  only its own still-current video-person tag, and repeat undo is
+  idempotent. After undo, the face can be marked `not-face`, then
+  cleared; no video tag or face presence remains.
+- **Privacy and deletion**: the test checks cache-resistant response
+  headers, no photo-person writes, and that source exclusion purges
+  the resulting review/presence evidence and video-person history.
+
+**No video, bytes, image, FFmpeg, ONNX, OneDrive hydration or private
+production database is opened.** TestServer communicates only with
+the disposable PostgreSQL fixture created under
+`PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING`.
+
+### Run the full synthetic HTTP acceptance locally (PowerShell 7.6)
+
+The environment variable must point to a **disposable PostgreSQL
+administrator instance, never `photoidentity_main`**. The test creates
+and destroys its own uniquely named database. Without this variable
+the test body intentionally returns early, so a green test result
+does **not** demonstrate the PostgreSQL/HTTP acceptance.
+
+```powershell
+# Only after configuring an approved disposable PostgreSQL admin instance:
+if (-not $env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING) {
+    throw 'Disposable PostgreSQL admin connection not configured; refusing silent skip.'
+}
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+    -c Release --filter 'FullyQualifiedName~VideoFaceLeasedPublicationTests'
+if ($LASTEXITCODE -ne 0) { throw 'Synthetic HTTP/PostgreSQL acceptance failed.' }
+```
+
+This reduces the remaining live acceptance to **human visual judgments
+and operational source rights/fidelity** rather than merely exercising
+HTTP buttons. Keep one consolidated, separately authorized review
+session covering PRs #849, #850, #852 and #854, including native crop
+fidelity, rapid switching, correction/undo and no unintended photos/
+people writes. No redundant real-video recognition experiment is needed
+for this synthetic acceptance PR. All features remain default-off.
