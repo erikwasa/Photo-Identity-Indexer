@@ -908,3 +908,52 @@ session covering PRs #849, #850, #852 and #854, including native crop
 fidelity, rapid switching, correction/undo and no unintended photos/
 people writes. No redundant real-video recognition experiment is needed
 for this synthetic acceptance PR. All features remain default-off.
+
+## 2026-11-21 — First maintained-host one-shot diagnostic and retry safety
+
+The first authorized four-frame run against one of two new, always-local
+OneDrive originals returned `published=false,reasonCode=retry-pending`
+after source admission and model initialization. Both revision preflights
+passed and a fresh v46 PostgreSQL backup **and isolated restore** passed
+before `--apply`. The ONNX Runtime warnings about graph initializers
+being listed as graph inputs are optimization warnings, **not** a
+diagnosis of this failed attempt.
+
+The generic worker's retryable branch records an unsuccessful attempt
+and requeues the same idempotent `FaceEvidence` job. Its fixed-vocabulary
+`VideoAttemptFailureDiagnostic` previously remained in memory:
+`video jobs status` shows queued/attempts but its persisted failure
+code is null for retryable work. The one-shot CLI used to print only
+`retry-pending` and silently discard that fixed-category diagnostic.
+This focused change adds **nullable** `failureStage`,
+`failureClass`, `failureCheckpoint` and `toolExitCode` fields to
+the existing one-shot result. All fields pass the established
+`VideoAttemptFailureDiagnostics.Sanitize` allowlist; no exception
+messages, paths, face images, person IDs or source metadata are emitted.
+A previously failed attempt cannot be reconstructed retroactively.
+
+**Safest next step:** do not apply another job or process the second
+video until checking the read-only queue status and the existing
+source-bound FaceEvidence receipt, and inspecting the owned scratch
+root for unexpectedly retained staged data. A later, expressly
+controlled single retry must use the same registered revision,
+unchanged model/tool SHA-256, owned scratch, and the confirmed
+backup. A second failure should be diagnosed by the newly available
+sanitized stage/class rather than escalating to automatic retries.
+Do not alter ONNX model bytes to eliminate optimization warnings.
+
+**Local synthetic verification** (no originals, inference, PostgreSQL
+or migration required):
+
+```powershell
+dotnet build .\src\PhotoIdentity.Cli\PhotoIdentity.Cli.csproj -c Release
+if ($LASTEXITCODE -ne 0) { throw 'CLI build failed.' }
+dotnet test .\tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj `
+  -c Release --filter 'FullyQualifiedName~VideoFaceSelectedOneShotTests'
+if ($LASTEXITCODE -ne 0) { throw 'One-shot diagnostic tests failed.' }
+```
+
+The existing FaceEvidence database schema remains **v46**. This
+observability-only change does not enable video workers, introduce a
+retry operation, change source handling, or revisit the postponed
+long-term retention policy.
