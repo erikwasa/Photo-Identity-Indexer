@@ -152,19 +152,38 @@ public sealed class VideoFaceNativeEvidenceProducer(
                 await RequirePermit(work.Token);
                 ImageFrame? frame = null;
                 VideoFrameSample sample = plan.Samples[i];
-                VideoToolExecutionResult result = await supervisor.RunAsync(
-                    options.FfmpegPath, options.FfmpegSha256, root,
-                    workspace => VideoFaceNativeFrameProfile.BuildArguments(
-                        staged.FilePath, workspace, sample,
-                        plan.DurationMilliseconds),
-                    FrameBudget, work.Token,
-                    afterSuccessfulExit: async (workspace, ct) =>
-                    {
-                        frame = await VideoFaceNativeFrameProfile.ReadValidatedFrameAsync(
-                            Path.Combine(workspace, VideoFaceNativeFrameProfile.OutputName), ct);
-                    });
+                VideoToolExecutionResult result;
+                try
+                {
+                    result = await supervisor.RunAsync(
+                        options.FfmpegPath, options.FfmpegSha256, root,
+                        workspace => VideoFaceNativeFrameProfile.BuildArguments(
+                            staged.FilePath, workspace, sample,
+                            plan.DurationMilliseconds),
+                        FrameBudget, work.Token,
+                        afterSuccessfulExit: async (workspace, ct) =>
+                        {
+                            try
+                            {
+                                frame = await VideoFaceNativeFrameProfile.ReadValidatedFrameAsync(
+                                    Path.Combine(workspace, VideoFaceNativeFrameProfile.OutputName), ct);
+                            }
+                            catch (InvalidDataException error)
+                            {
+                                throw VideoFaceFailureEvidence.Mark(error, "native-frame-validation");
+                            }
+                        });
+                }
+                catch (InvalidDataException error)
+                {
+                    // Respect any more specific checkpoint added in the callback.
+                    throw VideoFaceFailureEvidence.Mark(error, "native-frame-extraction");
+                }
                 if (result.ExitCode != 0 || frame is null)
-                    throw new InvalidDataException("Native video face frame extraction was incomplete.");
+                    throw VideoFaceFailureEvidence.Mark(
+                        new InvalidDataException("Native video face frame extraction was incomplete."),
+                        "native-frame-extraction",
+                        result.ExitCode);
 
                 await RequirePermit(work.Token);
                 using CancellationTokenSource boundedInference =
