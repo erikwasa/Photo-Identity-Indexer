@@ -63,6 +63,28 @@ public sealed class PostgresArchiveCaseAliasRetirementService
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction =
             await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        ArchiveAliasRetirementOutcome result = await RetireInTransactionAsync(
+            request, fideliLowercaseCanonical, connection, transaction, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    // Shared by the existing bounded pilot and the atomic full-set operation.
+    // This helper NEVER commits; the caller owns the transaction.
+    private static async Task<ArchiveAliasRetirementOutcome> RetireInTransactionAsync(
+        ArchiveCaseAliasRetirementRequest request,
+        bool fideliLowercaseCanonical,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        ValidateRequest(request);
+        if (fideliLowercaseCanonical &&
+            (!request.SurvivorSourceKey.StartsWith("fideli/", StringComparison.Ordinal) ||
+             !string.Equals(request.SecondarySourceKey,
+                "F" + request.SurvivorSourceKey[1..], StringComparison.Ordinal)))
+            throw new InvalidOperationException(
+                "Lowercase canonical retirement requires exactly fideli/ keeper and Fideli/ secondary.");
 
         await LockSourceAsync(connection, transaction, request.SourceId, cancellationToken);
         AssetSnapshot[] assets = await ReadAndLockAssetsAsync(
@@ -87,7 +109,6 @@ public sealed class PostgresArchiveCaseAliasRetirementService
                 throw new InvalidOperationException("Existing retirement mapping is inconsistent.");
             }
 
-            await transaction.CommitAsync(cancellationToken);
             return ArchiveAliasRetirementOutcome.AlreadyRetired;
         }
 
@@ -180,8 +201,102 @@ public sealed class PostgresArchiveCaseAliasRetirementService
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await transaction.CommitAsync(cancellationToken);
         return ArchiveAliasRetirementOutcome.Retired;
+    }
+
+
+    /// <summary>
+    /// Retire a complete sealed Fideli manifest as ONE PostgreSQL transaction.
+    /// Any stale/blocked pair or postcondition failure rolls the entire set back.
+    /// The caller must enforce stopped-app, backup and manifest approval guards.
+    /// </summary>
+    public async Task<int> RetireFideliLowercaseCanonicalBulkAsync(
+        IReadOnlyList<ArchiveCaseAliasRetirementRequest> pairs,
+        IReadOnlyDictionary<Guid, long> expectedAutomaticReviews,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pairs);
+        ArgumentNullException.ThrowIfNull(expectedAutomaticReviews);
+        if (pairs.Count is < 1 or > 5000)
+            throw new ArgumentException("Bulk retirement requires 1..5000 pinned pairs.");
+        HashSet<Guid> secondaries = [];
+        HashSet<string> paths = new(StringComparer.Ordinal);
+        foreach (ArchiveCaseAliasRetirementRequest pair in pairs)
+        {
+            ValidateRequest(pair);
+            if (!secondaries.Add(pair.SecondaryAssetId) ||
+                !paths.Add($"{pair.SourceId:D}|{NormalizeKey(pair.SurvivorSourceKey)}"))
+                throw new ArgumentException("Repeated secondary or normalized path in bulk manifest.");
+            if (!expectedAutomaticReviews.TryGetValue(pair.SecondaryAssetId, out long n) || n < 0)
+                throw new ArgumentException("Missing pinned automatic review count.");
+        }
+
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction =
+            await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+        foreach (ArchiveCaseAliasRetirementRequest pair in pairs)
+        {
+            ArchiveAliasRetirementOutcome result = await RetireInTransactionAsync(
+                pair, true, connection, transaction, cancellationToken);
+            if (result != ArchiveAliasRetirementOutcome.Retired)
+                throw new InvalidOperationException(
+                    "Bulk manifest contains a previously retired pair; no changes committed.");
+        }
+
+        // Verify the entire selected set in the same transaction, BEFORE COMMIT.
+        // Exactly one active lowercase asset, zero active uppercase assets,
+        // a pinned active mapping and all revisions/automatic review actions.
+        for (int i = 0; i < pairs.Count; i++)
+        {
+            ArchiveCaseAliasRetirementRequest pair = pairs[i];
+            using NpgsqlCommand check = connection.CreateCommand();
+            check.Transaction = transaction;
+            check.CommandText = """
+                SELECT
+                    (SELECT count(*) FROM assets
+                     WHERE source_id = @source
+                       AND lower(replace(source_key, chr(92), '/')) = @normalized
+                       AND deleted_at_utc IS NULL),
+                    (SELECT count(*) FROM assets
+                     WHERE id = @keeper AND source_id = @source
+                       AND source_key = @keeper_key AND deleted_at_utc IS NULL),
+                    (SELECT count(*) FROM assets
+                     WHERE id = @upper AND source_id = @source
+                       AND source_key = @upper_key AND deleted_at_utc IS NOT NULL),
+                    (SELECT count(*) FROM archive_case_alias_retirements
+                     WHERE secondary_asset_id = @upper AND survivor_asset_id = @keeper
+                       AND source_id = @source AND expected_sha256 = @hash
+                       AND restored_at_utc IS NULL),
+                    (SELECT count(*) FROM asset_revisions
+                     WHERE asset_id = @upper),
+                    (SELECT count(*) FROM review_actions AS action
+                     JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                     JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                     WHERE revision.asset_id = @upper
+                       AND action.actor IN ('identity-matcher:auto',
+                                            'identity-matcher:auto-multi-evidence'));
+                """;
+            check.Parameters.AddWithValue("source", pair.SourceId);
+            check.Parameters.AddWithValue("normalized", NormalizeKey(pair.SurvivorSourceKey));
+            check.Parameters.AddWithValue("keeper", pair.SurvivorAssetId);
+            check.Parameters.AddWithValue("keeper_key", pair.SurvivorSourceKey);
+            check.Parameters.AddWithValue("upper", pair.SecondaryAssetId);
+            check.Parameters.AddWithValue("upper_key", pair.SecondarySourceKey);
+            check.Parameters.AddWithValue("hash", pair.ExpectedSha256);
+            await using NpgsqlDataReader reader = await check.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken) ||
+                reader.GetInt64(0) != 1 || reader.GetInt64(1) != 1 ||
+                reader.GetInt64(2) != 1 || reader.GetInt64(3) != 1 ||
+                reader.GetInt64(4) < 1 ||
+                reader.GetInt64(5) < expectedAutomaticReviews[pair.SecondaryAssetId])
+                throw new InvalidOperationException(
+                    $"Bulk pair {i + 1} failed pre-commit state/history verification; rolling back.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return pairs.Count;
     }
 
     /// <summary>
