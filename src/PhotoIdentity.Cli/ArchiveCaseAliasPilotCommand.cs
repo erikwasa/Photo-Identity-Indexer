@@ -26,14 +26,15 @@ public sealed record ArchiveCaseAliasPilotOptions(
     string? ReceiptDirectory,
     string? Actor,
     bool ApplicationStopped,
-    bool AcknowledgeReversibleRetirement)
+    bool AcknowledgeReversibleRetirement,
+    bool BulkAtomic)
 {
     private static readonly Regex EnvironmentName = new(
         "^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
     private static readonly Regex DatabaseNamePattern = new(
         "^[a-z][a-z0-9_]{0,62}$", RegexOptions.CultureInvariant);
 
-    public static ArchiveCaseAliasPilotOptions Parse(string[] arguments)
+    public static ArchiveCaseAliasPilotOptions Parse(string[] arguments, bool bulkAtomic = false)
     {
         Dictionary<string, string> values = new(StringComparer.Ordinal);
         bool applicationStopped = false, acknowledged = false;
@@ -79,11 +80,17 @@ public sealed record ArchiveCaseAliasPilotOptions(
             throw new ArgumentException(
                 "Retirement policy must be legacy or fideli-lowercase-canonical-v1.");
 
+        if (bulkAtomic && policy != "fideli-lowercase-canonical-v1")
+            throw new ArgumentException("Bulk retirement requires explicit fideli-lowercase-canonical-v1 policy.");
+        if (bulkAtomic && operation == "restore")
+            throw new ArgumentException("Bulk restore is not part of this operation; use the verified database backup.");
+
+        int limit = bulkAtomic ? 5000 : 5;
         int maximum = values.TryGetValue("--max-pairs", out string? rawLimit)
             ? int.TryParse(rawLimit, NumberStyles.None, CultureInfo.InvariantCulture, out int n)
-                && n is >= 1 and <= 5 ? n
-                : throw new ArgumentException("--max-pairs must be 1..5.")
-            : 5;
+                && n >= 1 && n <= limit ? n
+                : throw new ArgumentException($"--max-pairs must be 1..{limit}.")
+            : limit;
 
         string environment = Required("--postgres-connection-env");
         string database = Required("--database");
@@ -120,7 +127,7 @@ public sealed record ArchiveCaseAliasPilotOptions(
         return new(manifest, metadata, environment, database, operation,
             policy, maximum, approval, restoreReport is null ? null : Path.GetFullPath(restoreReport),
             receiptDirectory is null ? null : Path.GetFullPath(receiptDirectory),
-            actor, applicationStopped, acknowledged);
+            actor, applicationStopped, acknowledged, bulkAtomic);
     }
 }
 
@@ -230,6 +237,34 @@ public static class ArchiveCaseAliasPilotCommandRunner
         });
 
         PostgresArchiveCaseAliasRetirementService service = new(catalogue);
+        if (options.BulkAtomic)
+        {
+            try
+            {
+                int retired = await service.RetireFideliLowercaseCanonicalBulkAsync(
+                    manifest.Pairs, manifest.ExpectedAutomaticReviews, cancellationToken);
+                await AppendReceiptAsync(receipt, new
+                {
+                    status = "completed", succeeded = retired, alreadyCompleted = 0,
+                    atomic = true, completedAtUtc = DateTimeOffset.UtcNow
+                });
+                await output.WriteLineAsync(
+                    $"BULK APPLY: {retired} pairs committed atomically; " +
+                    "one lowercase keeper active per selected pair; no source files deleted.");
+                await output.WriteLineAsync($"Private receipt: {receiptPath}");
+                return 0;
+            }
+            catch (Exception e)
+            {
+                await AppendReceiptAsync(receipt, new
+                {
+                    status = "failed-or-unconfirmed", atomic = true,
+                    errorType = e.GetType().Name, completedAtUtc = DateTimeOffset.UtcNow
+                });
+                throw; // Transaction disposal rolls back unless commit already succeeded.
+            }
+        }
+
         int succeeded = 0, alreadyCompleted = 0;
         try
         {
@@ -416,8 +451,10 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 options.Actor ?? "archive-alias:preview-only"));
         }
 
-        if (requests.Count is < 1 or > 5 || requests.Count > options.MaximumPairs
-            || requests.Count != meta.GetProperty("pilotPairs").GetInt32())
+        if (requests.Count < 1 ||
+            requests.Count > (options.BulkAtomic ? 5000 : 5) ||
+            requests.Count > options.MaximumPairs ||
+            requests.Count != meta.GetProperty("pilotPairs").GetInt32())
             throw new InvalidOperationException("Pilot manifest exceeds the approved bounded pair count.");
 
         return new PilotManifest(requests, minimumReviews, sha256, expectedSchema, generatedAt);
