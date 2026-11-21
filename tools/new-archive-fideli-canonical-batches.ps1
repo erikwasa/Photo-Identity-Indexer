@@ -139,6 +139,7 @@ for ($offset = 0; $offset -lt $rows.Count; $offset += $batchSize) {
         generatedAtUtc = $generatedUtc
         collisionGroupsRevalidated = $assessment.PathCollisionGroupsRevalidated
         retirementCandidatesRevalidated = $eligible.Count
+        bulkAllEligible = [bool]$AllEligible
         pilotPairs = $members.Count
         pilotPairsWithAutomaticReviewHistory = @($members |
             Where-Object { [long]$_.SecondaryAutomaticReviewActions -gt 0 }).Count
