@@ -79,6 +79,61 @@ public sealed class VideoFaceSelectedOneShotTests
     }
 
     [Fact]
+    public void One_shot_failure_output_reports_only_sanitized_diagnostics()
+    {
+        using StringWriter response = new();
+        VideoFaceSelectedOneShotCommandRunner.Write(
+            response, dryRun: false, admitted: true, published: false,
+            reasonCode: "retry-pending", wallMilliseconds: 19561,
+            failure: new VideoAttemptFailureDiagnostic(
+                "tool-execution", "invalid-media-evidence",
+                "scratch-byte-limit", 13));
+
+        using JsonDocument json = JsonDocument.Parse(response.ToString());
+        JsonElement root = json.RootElement;
+        Assert.Equal("retry-pending", root.GetProperty("reasonCode").GetString());
+        Assert.Equal("tool-execution", root.GetProperty("failureStage").GetString());
+        Assert.Equal("invalid-media-evidence", root.GetProperty("failureClass").GetString());
+        Assert.Equal("scratch-byte-limit", root.GetProperty("failureCheckpoint").GetString());
+        Assert.Equal(13, root.GetProperty("toolExitCode").GetInt32());
+        Assert.False(root.GetProperty("published").GetBoolean());
+        Assert.Equal(0, root.GetProperty("identityAssignmentsMade").GetInt32());
+
+        // Unexpected diagnostics must not echo arbitrary paths, identity
+        // names or exception text: the fixed-vocabulary sanitizer wins.
+        using StringWriter sensitive = new();
+        VideoFaceSelectedOneShotCommandRunner.Write(
+            sensitive, dryRun: false, admitted: true, published: false,
+            reasonCode: "retry-pending",
+            failure: new VideoAttemptFailureDiagnostic(
+                @"C:\private\family.mp4",
+                "person Alice from original file", @"C:\originals\face.jpg"));
+        Assert.DoesNotContain("private", sensitive.ToString());
+        Assert.DoesNotContain("Alice", sensitive.ToString());
+        Assert.DoesNotContain("originals", sensitive.ToString());
+        using JsonDocument invalid = JsonDocument.Parse(sensitive.ToString());
+        Assert.Equal("unclassified",
+            invalid.RootElement.GetProperty("failureStage").GetString());
+        Assert.Equal("unexpected-failure",
+            invalid.RootElement.GetProperty("failureClass").GetString());
+        Assert.Equal(JsonValueKind.Null,
+            invalid.RootElement.GetProperty("failureCheckpoint").ValueKind);
+        Assert.Equal(JsonValueKind.Null,
+            invalid.RootElement.GetProperty("toolExitCode").ValueKind);
+
+        using StringWriter preview = new();
+        VideoFaceSelectedOneShotCommandRunner.Write(
+            preview, dryRun: true, admitted: true, published: false,
+            reasonCode: "preflight-only");
+        using JsonDocument clean = JsonDocument.Parse(preview.ToString());
+        Assert.Equal(JsonValueKind.Null,
+            clean.RootElement.GetProperty("failureStage").ValueKind);
+        Assert.Equal(JsonValueKind.Null,
+            clean.RootElement.GetProperty("failureClass").ValueKind);
+        Assert.False(clean.RootElement.GetProperty("originalsMayHaveBeenOpened").GetBoolean());
+    }
+
+    [Fact]
     public async Task Metadata_preview_never_enqueues_or_arms_and_unavailable_source_apply_fails_closed()
     {
         string? admin = Environment.GetEnvironmentVariable(
