@@ -6,6 +6,7 @@ param(
     [Parameter(Mandatory)][string]$EffectiveStateCsv,
     [ValidateRange(1, 4)][int]$MaxBatches = 4,
     [ValidateRange(1, 5)][int]$PairsPerBatch = 5,
+    [switch]$AllEligible,
     [ValidateSet(44, 45, 46)][int]$ExpectedDatabaseSchemaVersion = 45,
     [string]$OutputDirectory = (Join-Path (Get-Location).Path (
         'artifacts\fideli-canonical-batch-session-' +
@@ -48,7 +49,11 @@ foreach ($record in $evidence) {
     }
     $recordsByAsset.Add($identity, $record)
 }
-$selected = @($eligible | Select-Object -First ($MaxBatches * $PairsPerBatch))
+# The opt-in all-eligible form produces ONE sealed manifest, not hundreds of pilots.
+$batchLimit = if ($AllEligible) { 1 } else { $MaxBatches }
+$batchSize = if ($AllEligible) { $eligible.Count } else { $PairsPerBatch }
+if ($batchSize -gt 5000) { throw 'Bulk manifest safety limit is 5000 pairs.' }
+$selected = @($eligible | Select-Object -First ($batchLimit * $batchSize))
 $secondaries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 $paths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 $rows = @(
@@ -117,11 +122,11 @@ $evidenceHash = (Get-FileHash -LiteralPath $RetirementEvidenceCsv -Algorithm SHA
 $effectiveHash = (Get-FileHash -LiteralPath $EffectiveStateCsv -Algorithm SHA256).Hash.ToLowerInvariant()
 $generatedUtc = [datetime]::UtcNow.ToString('O')
 $batches = [System.Collections.Generic.List[object]]::new()
-for ($offset = 0; $offset -lt $rows.Count; $offset += $PairsPerBatch) {
-    $name = 'batch-{0:d2}' -f ($batches.Count + 1)
+for ($offset = 0; $offset -lt $rows.Count; $offset += $batchSize) {
+    $name = if ($AllEligible) { 'bulk-01' } else { 'batch-{0:d2}' -f ($batches.Count + 1) }
     $dir = Join-Path $OutputDirectory $name
     New-Item -ItemType Directory -Path $dir | Out-Null
-    $members = @($rows | Select-Object -Skip $offset -First $PairsPerBatch)
+    $members = @($rows | Select-Object -Skip $offset -First $batchSize)
     $manifestPath = Join-Path $dir 'pilot-preview-private.csv'
     $metadataPath = Join-Path $dir 'pilot-preview-metadata.json'
     $members | Export-Csv -LiteralPath $manifestPath -Encoding utf8
@@ -177,9 +182,10 @@ $sessionPath = Join-Path $OutputDirectory 'canonical-session-private.json'
     UppercaseExplicitHistoryHeld = $assessment.RequiresExplicitUpperHistoryReconciliation
     PairsStaged = $rows.Count
     BatchesStaged = $batches.Count
-    BatchSizeLimit = $PairsPerBatch
+    BatchSizeLimit = $batchSize
     RetirementPolicy = 'fideli-lowercase-canonical-v1'
     AutomaticallyApplied = 0
+    AllEligible = [bool]$AllEligible
     OriginalsDeleted = 0
     DatabaseRowsDeleted = 0
     PrivateSessionReportPath = $sessionPath
