@@ -108,7 +108,7 @@ $preview = @(
         $state = $states[$group.Name]
         $members = @($group.Group)
         $matchedIds = @($members | ForEach-Object { $_.asset_id } | Sort-Object)
-        $stateIds = @($state.first_asset_id, $state.second_asset_id | Sort-Object)
+        $stateIds = @(@($state.first_asset_id, $state.second_asset_id) | Sort-Object)
         if (($matchedIds -join '|') -cne ($stateIds -join '|')) {
             throw 'Effective-state IDs differ from source evidence.'
         }
@@ -154,13 +154,13 @@ $preview = @(
         $stateDifferences = @($comparison | Where-Object {
             -not (Is-True $state.$_ $_)
         })
-        $lowerIsOlder = [datetimeoffset]::Parse(
+$lowerIsOlder = ([datetimeoffset]::Parse(
             $survivor.created_at_utc,
             [System.Globalization.CultureInfo]::InvariantCulture
-        ) -lt [datetimeoffset]::Parse(
+        )) -lt ([datetimeoffset]::Parse(
             $secondary.created_at_utc,
             [System.Globalization.CultureInfo]::InvariantCulture
-        )
+        ))
 
         $classification = if ($anyMissing) {
             'already-inactive-or-missing'
