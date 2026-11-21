@@ -81,6 +81,30 @@ public sealed class PostgresVideoAssetRepository(PostgresCatalogueDatabase datab
                 throw new InvalidOperationException("The source copy is excluded and must not be indexed.");
         }
 
+        // Video uses a different ingestion lane from the archive photo scanner,
+        // but it must share the Windows case-folded source identity invariant.
+        // The source-row FOR UPDATE lock above serializes registrations with
+        // other source-locked writers before this lookup and asset upsert.
+        await using (NpgsqlCommand caseAlias = connection.CreateCommand())
+        {
+            caseAlias.Transaction = transaction;
+            caseAlias.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM assets AS existing
+                    WHERE existing.source_id = @source
+                      AND existing.source_key <> @key
+                      AND lower(replace(existing.source_key, chr(92), '/')) =
+                          lower(replace(@key, chr(92), '/'))
+                );
+                """;
+            caseAlias.Parameters.AddWithValue("source", sourceId.Value);
+            caseAlias.Parameters.AddWithValue("key", sourceKey);
+            if (await caseAlias.ExecuteScalarAsync(cancellationToken) is true)
+                throw new InvalidOperationException(
+                    "Video registration found a case-only source-path alias. " +
+                    "The existing catalogue identity must be reconciled first.");
+        }
+
         // First-time online-only inspection has an app-managed SOURCE lease
         // until a verified revision exists. Never race a pending +u release
         // by registering and processing this source as if it were user-local.
