@@ -50,11 +50,19 @@ public sealed class VideoFaceNativeFrameAnalyzer(
             timestampMs is < 0 or > 3_600_000)
             throw new ArgumentOutOfRangeException(nameof(frameOrdinal));
 
-        IReadOnlyList<DetectedFaceCandidate> faces =
-            await detector.DetectAsync(nativeFrame, token);
+        IReadOnlyList<DetectedFaceCandidate> faces;
+        try
+        {
+            faces = await detector.DetectAsync(nativeFrame, token);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw VideoFaceFailureEvidence.Mark(error, "face-detector");
+        }
         if (faces is null || faces.Count > MaximumFacesPerFrame)
-            throw new InvalidDataException(
-                "Native video frame exceeded the approved 32-face observation limit.");
+            throw VideoFaceFailureEvidence.Mark(new InvalidDataException(
+                "Native video frame exceeded the approved 32-face observation limit."),
+                "face-detection-overflow");
 
         List<VideoFaceEmbeddingObservation> observations = [];
         for (int ordinal = 0; ordinal < faces.Count; ordinal++)
@@ -62,12 +70,32 @@ public sealed class VideoFaceNativeFrameAnalyzer(
             token.ThrowIfCancellationRequested();
             DetectedFaceCandidate face = faces[ordinal];
             if (face is null)
-                throw new InvalidDataException("Detector returned a null face.");
-            AlignedFace aligned = await aligner.AlignAsync(
-                nativeFrame, face, embedder.Descriptor.AlignmentProtocol!.Value, token);
-            EmbeddingVector vector = await embedder.EmbedAsync(aligned, token);
+                throw VideoFaceFailureEvidence.Mark(
+                    new InvalidDataException("Detector returned a null face."),
+                    "face-observation-validation");
+            AlignedFace aligned;
+            try
+            {
+                aligned = await aligner.AlignAsync(
+                    nativeFrame, face, embedder.Descriptor.AlignmentProtocol!.Value, token);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw VideoFaceFailureEvidence.Mark(error, "face-alignment");
+            }
+            EmbeddingVector vector;
+            try
+            {
+                vector = await embedder.EmbedAsync(aligned, token);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw VideoFaceFailureEvidence.Mark(error, "face-embedding");
+            }
             if (vector.Dimensions != 128)
-                throw new InvalidDataException("SFace vector dimensions are not 128.");
+                throw VideoFaceFailureEvidence.Mark(
+                    new InvalidDataException("SFace vector dimensions are not 128."),
+                    "face-observation-validation");
             var box = face.BoundingBox;
             observations.Add(new VideoFaceEmbeddingObservation(
                 frameOrdinal, timestampMs, ordinal,
