@@ -247,6 +247,7 @@ manifest, metadata, hash and private receipt directory. After Apply:
 5. Re-run the read-only `Fideli` path inventory to confirm the number
    of active casefolded path duplicates declined.
 
-No file deletion, schema migration, batch-size increase, or automatic
-multi-hundred-image retirement is part of this PR. The one uppercase
-explicit-history exception remains held for separate reconciliation.
+This previous five-pair procedure has no unattended Apply and does not
+supersede the all-eligible atomic command in section 3. Neither path
+deletes original files, changes schema, nor reconciles the protected
+uppercase explicit-history exception.
