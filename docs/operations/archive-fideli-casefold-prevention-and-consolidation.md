@@ -13,11 +13,13 @@ no PostgreSQL migration, no deletions or automatic cleanup.
   fresh audit, 328 more passed the guarded eligibility check; 760 did
   not, including the five already retired (thus approximately 755
   unresolved cases).
-- A later `Fideli/` spelling can be retired in favor of the earlier
-  `fideli/` asset ONLY after its source key, verified SHA-256 and size,
-  all annotations, protected history and survivor identity pass the
-  already implemented transactional guards. Capitalization alone is
-  not proof that the later row is safe to hide.
+- User-selected canonical identity: `fideli/` is ALWAYS the keeper
+  when its partner has the identical relative path under `Fideli/`.
+  Creation order and automatically generated tags/captions/places
+  are not priorities. The two copies must still have the same source
+  identity, verified SHA-256 and byte size. Manual edits on the
+  capitalized asset require preservation/reconciliation before
+  changing production, not leaving both images visible permanently.
 - Existing archive photo batch scans already reject case-only aliases
   against persisted assets and remap active, explicitly retired aliases
   to the surviving asset. The new prevention change also rejects two
@@ -75,6 +77,60 @@ $inventory[0] | Format-List
 No original photo is opened by the audit and no rows are modified.
 It does not require a fresh production backup.
 
+## NEW: lowercase-canonical policy preview (read-only, source-specific)
+
+The existing 328-candidate planner and 5-pair Apply service enforce
+**older survivor, zero upper explicit history and identical effective
+annotations**. Those restrictions are NOT the requested final policy,
+because a second ingestion may have produced different automatic
+metadata. Do not use the old plan to estimate the final number of
+casing duplicates that can be consolidated.
+
+Instead, after exporting the two read-only audit CSVs, run the new
+policy assessment:
+
+~~~powershell
+$canonical = .\tools\new-archive-fideli-canonical-preview.ps1 `
+    -RetirementEvidenceCsv '.\artifacts\archive-case-retirement-evidence-fresh.csv' `
+    -EffectiveStateCsv '.\artifacts\archive-case-effective-state-fresh.csv'
+
+$canonical | Select-Object PathCollisionGroupsRevalidated,
+    ExactFideliSpellingPairs, CandidateLowercaseCanonical,
+    OfCandidatesWithEffectiveMetadataDifferences,
+    OfCandidatesNotCompatibleWithCurrentRunner,
+    RequiresExplicitUpperHistoryReconciliation,
+    BlockedContentProof, ExcludedOrInactive
+
+$canonical.Classifications | Format-Table -AutoSize
+~~~
+
+- The **canonical keeper** is always the lowercase folder spelling
+  (regardless of created_at_utc or which copy has more automatic data).
+- The assessment only includes a two-asset, same-source normalized
+  path where the literal path string differs in its FIRST character
+  (fideli/ versus Fideli/); unrelated same-SHA photos are excluded.
+- It requires verified hashes and byte sizes for both copies, no
+  source exclusion and both still active. Differences in effective
+  auto-derived metadata are reported but don't disqualify the keeper.
+- All uppercase photo-tag/person edits, manual Place/capture date and
+  preference changes, human/unknown face actions and labels, manual
+  collection references and featured faces are flagged for explicit
+  history reconciliation. Unknown actors are NOT presumed automatic.
+- It marks when the current five-pair service cannot yet apply the
+  requested policy due to the age or effective-state gate.
+- The private output is **not a CLI manifest**; no production command
+  accepts it as an Apply authorization.
+- All historical rows, even on the uppercase image, remain preserved
+  until an independently reviewed reconciliation mechanism exists.
+  The lowercase copy's manual decisions take precedence; do not
+  silently union automatic labels or override manual decisions.
+
+The synthetic policy test is independent of PostgreSQL:
+
+~~~powershell
+pwsh -NoProfile -File '.\tests\PowerShell\archive-fideli-canonical-preview.tests.ps1'
+~~~
+
 ## Offline readiness breakdown (private plan; no DB writes)
 
 From the existing staged session, read the authoritative revalidated
@@ -131,7 +187,13 @@ again to confirm the active-casefold count declined.
 
 ## Still blocked
 
-The originally held ~755 groups can contain human/unknown reviews,
+The originally held ~755 groups are a conservative count under the
+old older-survivor-and-equal-annotations policy, not evidence that
+all of them need manual review. The new lowercase-canonical preview
+splits them into proof failures, explicit upper-history reconciliation
+and otherwise safe candidates awaiting a revised transaction service.
+
+Those groups can contain human/unknown reviews,
 manual tags, places, people, capture dates, list collections, featured
 face references, ambiguous order, absent hash proof or differing
 effective annotations. A later separate change must reclassify them
