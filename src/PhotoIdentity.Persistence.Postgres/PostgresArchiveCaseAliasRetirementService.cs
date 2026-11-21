@@ -20,11 +20,45 @@ public sealed class PostgresArchiveCaseAliasRetirementService
         _database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    public async Task<ArchiveAliasRetirementOutcome> RetireAsync(
+    public Task<ArchiveAliasRetirementOutcome> RetireAsync(
         ArchiveCaseAliasRetirementRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        RetireCoreAsync(request, fideliLowercaseCanonical: false, cancellationToken);
+
+    /// <summary>
+    /// Explicitly scoped alternative for a verified exact Fideli/ versus
+    /// fideli/ same-source pair. The lowercase identity is authoritative
+    /// independently of creation order or effective automatic annotations.
+    /// Protected history on the uppercase asset remains a hard refusal.
+    /// This method is not wired to the legacy alias pilot or API.
+    /// </summary>
+    public Task<ArchiveAliasRetirementOutcome> RetireFideliLowercaseCanonicalAsync(
+        ArchiveCaseAliasRetirementRequest request,
+        CancellationToken cancellationToken = default) =>
+        RetireCoreAsync(request, fideliLowercaseCanonical: true, cancellationToken);
+
+    private async Task<ArchiveAliasRetirementOutcome> RetireCoreAsync(
+        ArchiveCaseAliasRetirementRequest request,
+        bool fideliLowercaseCanonical,
+        CancellationToken cancellationToken)
     {
         ValidateRequest(request);
+        if (fideliLowercaseCanonical)
+        {
+            // The only relaxed age/annotations decision is for the precise
+            // user-approved folder spelling direction. Not generalized to
+            // other case aliases, paths, or source identities.
+            if (!request.SurvivorSourceKey.StartsWith("fideli/", StringComparison.Ordinal) ||
+                !string.Equals(
+                    request.SecondarySourceKey,
+                    "F" + request.SurvivorSourceKey[1..],
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Lowercase canonical retirement requires exactly fideli/ as the " +
+                    "survivor and Fideli/ as the uppercase secondary.");
+            }
+        }
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction =
@@ -61,7 +95,8 @@ public sealed class PostgresArchiveCaseAliasRetirementService
         {
             throw new InvalidOperationException("Both candidate assets must currently be present.");
         }
-        if (survivor.CreatedAtUtc >= secondary.CreatedAtUtc)
+        if (!fideliLowercaseCanonical &&
+            survivor.CreatedAtUtc >= secondary.CreatedAtUtc)
         {
             throw new InvalidOperationException("The survivor must be strictly older than the secondary.");
         }
@@ -95,8 +130,9 @@ public sealed class PostgresArchiveCaseAliasRetirementService
             throw new InvalidOperationException(
                 "The secondary asset has human/unknown review or protected revision-linked history.");
         }
-        if (!await EffectiveCurrentAnnotationsMatchAsync(
-            connection, transaction, request, cancellationToken))
+        if (!fideliLowercaseCanonical &&
+            !await EffectiveCurrentAnnotationsMatchAsync(
+                connection, transaction, request, cancellationToken))
         {
             throw new InvalidOperationException(
                 "Current effective tags, manual people, Place or confirmed face identities differ.");

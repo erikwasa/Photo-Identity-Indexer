@@ -367,6 +367,7 @@ jobs:
             'tools/get-archive-fideli-retirement-readiness.ps1',
             'tests/PowerShell/archive-fideli-retirement-readiness.tests.ps1',
             'tools/new-archive-fideli-canonical-preview.ps1',
+            'tools/new-archive-fideli-canonical-batches.ps1',
             'tests/PowerShell/archive-fideli-canonical-preview.tests.ps1'
           )
           foreach ($script in $scripts) {
