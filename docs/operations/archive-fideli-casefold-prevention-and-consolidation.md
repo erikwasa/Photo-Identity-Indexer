@@ -75,6 +75,35 @@ $inventory[0] | Format-List
 No original photo is opened by the audit and no rows are modified.
 It does not require a fresh production backup.
 
+## Offline readiness breakdown (private plan; no DB writes)
+
+From the existing staged session, read the authoritative revalidated
+candidate CSV. Report only counts, never paths or asset IDs:
+
+~~~powershell
+$sessionDir = Split-Path -Parent $session.PrivateSessionReportPath
+$planCsv = Join-Path $sessionDir 'revalidated-input\retirement-candidates-private.csv'
+
+$readiness = .\tools\get-archive-fideli-retirement-readiness.ps1 `
+    -PrivatePlanCsv $planCsv
+
+$readiness | Select-Object TotalCollisionGroups, ScopedCollisionGroups,
+    EligibleUnretired, EligibleWithLowercaseSurvivorAndUppercaseSecondary,
+    EligibleOtherCaseDirection, HeldOrAlreadyRetired
+$readiness.HeldReasons | Format-Table -AutoSize
+~~~
+
+This distinguishes how many eligible pairs actually have the requested
+older lowercase `fideli/` keeper and newer `Fideli/` secondary, and
+summarizes the different blocker types in the other pairs. One group
+may have multiple blockers, so reason counts are not additive.
+
+The synthetic script test needs no PostgreSQL:
+
+~~~powershell
+pwsh -NoProfile -File '.\tests\PowerShell\archive-fideli-retirement-readiness.tests.ps1'
+~~~
+
 ## Backup policy — one restore-tested checkpoint per cleanup session
 
 We do NOT need another 19 GiB restore after every five retirements.
