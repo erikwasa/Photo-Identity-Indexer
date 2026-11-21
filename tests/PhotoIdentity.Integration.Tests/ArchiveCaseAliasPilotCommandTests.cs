@@ -117,8 +117,8 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                     VALUES (@source, 'local-folder', 'test-root', @first);
                     INSERT INTO assets
                         (id, source_id, source_key, media_kind, created_at_utc, last_seen_at_utc)
-                    VALUES (@older, @source, 'Family/portrait.jpg', 'photo', @first, @second),
-                           (@later, @source, 'family/portrait.jpg', 'photo', @second, @second);
+                    VALUES (@older, @source, 'Fideli/portrait.jpg', 'photo', @first, @second),
+                           (@later, @source, 'fideli/portrait.jpg', 'photo', @second, @second);
                     INSERT INTO asset_revisions
                         (id, asset_id, media_kind, content_sha256, size_bytes,
                          observed_at_utc, media_type)
@@ -169,9 +169,9 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                 "ApprovalRequired", "ApplyEnabled", "DeleteSourceOriginal", "DeleteDatabaseRows"
             ];
             string[] values = [
-                source.ToString("D"), "family/portrait.jpg", older.ToString("D"),
-                "Family/portrait.jpg", first.ToString("O"), oldRevision.ToString("D"),
-                later.ToString("D"), "family/portrait.jpg", second.ToString("O"),
+                source.ToString("D"), "fideli/portrait.jpg", older.ToString("D"),
+                "Fideli/portrait.jpg", first.ToString("O"), oldRevision.ToString("D"),
+                later.ToString("D"), "fideli/portrait.jpg", second.ToString("O"),
                 laterRevision.ToString("D"), hash, "1000", "1",
                 "proposed-reversible-retirement", "true", "false", "false", "false"
             ];
@@ -269,7 +269,7 @@ public sealed class ArchiveCaseAliasPilotCommandTests
             Assert.Equal(1, await CountAsync(
                 "SELECT count(*) FROM archive_case_alias_retirements WHERE restored_at_utc IS NULL;"));
             Assert.Equal(1, await CountAsync(
-                "SELECT count(*) FROM assets WHERE source_key='family/portrait.jpg' AND deleted_at_utc IS NOT NULL;"));
+                "SELECT count(*) FROM assets WHERE source_key='fideli/portrait.jpg' AND deleted_at_utc IS NOT NULL;"));
             Assert.Equal(1, await CountAsync("SELECT count(*) FROM review_actions;"));
 
             StringWriter retiredVerification = new();
@@ -337,6 +337,109 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                     ArchiveCaseAliasPilotOptions.Parse([
                         .. common, "--retirement-policy", "fideli-lowercase-canonical-v1"
                     ]), new StringWriter()));
+
+            // The previously older Fideli asset is now the uppercase
+            // secondary, while the newer fideli identity is ALWAYS the
+            // canonical survivor. The earlier restrictive policy would
+            // reject this reversed age and differing manual keeper tags.
+            await using (NpgsqlConnection con = new(builder.ConnectionString))
+            {
+                await con.OpenAsync();
+                using NpgsqlCommand keeperTag = con.CreateCommand();
+                keeperTag.CommandText = """
+                    INSERT INTO photo_tags(normalized_name, display_name, created_by, created_at_utc)
+                    VALUES ('canonical-keeper', 'Canonical Keeper', 'test', @when);
+                    INSERT INTO photo_tag_actions(asset_revision_id, tag_id, action_kind, actor, created_at_utc)
+                    SELECT @revision, id, 'add', 'local-maintainer', @when
+                    FROM photo_tags WHERE normalized_name='canonical-keeper';
+                    """;
+                keeperTag.Parameters.AddWithValue("revision", laterRevision);
+                keeperTag.Parameters.AddWithValue("when", second);
+                await keeperTag.ExecuteNonQueryAsync();
+            }
+
+            string canonicalPath = Path.Combine(temp, "canonical-private.csv");
+            string canonicalMetadata = Path.Combine(temp, "canonical-metadata.json");
+            string[] canonicalValues = [
+                source.ToString("D"), "fideli/portrait.jpg", later.ToString("D"),
+                "fideli/portrait.jpg", second.ToString("O"), laterRevision.ToString("D"),
+                older.ToString("D"), "Fideli/portrait.jpg", first.ToString("O"),
+                oldRevision.ToString("D"), hash, "1000", "0",
+                "proposed-reversible-retirement", "true", "false", "false", "false"
+            ];
+            File.WriteAllText(canonicalPath,
+                string.Join(",", headings.Select(Csv)) + "\r\n" +
+                string.Join(",", canonicalValues.Select(Csv)) + "\r\n",
+                new UTF8Encoding(false));
+            string canonicalDigest = Convert.ToHexString(
+                SHA256.HashData(File.ReadAllBytes(canonicalPath))).ToLowerInvariant();
+            File.WriteAllText(canonicalMetadata, JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                status = "preview-only",
+                retirementPolicy = "fideli-lowercase-canonical-v1",
+                expectedDatabaseSchemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion,
+                generatedAtUtc = DateTimeOffset.UtcNow,
+                pilotPairs = 1, privatePilotManifestSha256 = canonicalDigest,
+                applyEnabled = false, approvalRequired = true,
+                sourceFilesToDelete = 0, databaseRowsToDelete = 0
+            }));
+            string[] canonicalCommon = [
+                "--manifest", canonicalPath, "--metadata", canonicalMetadata,
+                "--postgres-connection-env", environment, "--database", dbName,
+                "--max-pairs", "1",
+                "--retirement-policy", "fideli-lowercase-canonical-v1"
+            ];
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                    ArchiveCaseAliasPilotOptions.Parse([
+                        "--manifest", canonicalPath, "--metadata", canonicalMetadata,
+                        "--postgres-connection-env", environment,
+                        "--database", dbName, "--max-pairs", "1"
+                    ]), new StringWriter()));
+
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse(canonicalCommon), new StringWriter()));
+            string[] canonicalApproval = [
+                "--approve-manifest-sha256", canonicalDigest,
+                "--receipt-directory", receiptDir, "--actor", "canonical-disposable-test",
+                "--application-stopped", "--acknowledge-reversible-retirement"
+            ];
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. canonicalCommon, "--operation", "apply",
+                    "--restore-report", reportPath, .. canonicalApproval
+                ]), new StringWriter()));
+            Assert.Equal(1, await CountAsync(
+                "SELECT count(*) FROM archive_case_alias_retirements " +
+                "WHERE restored_at_utc IS NULL;"));
+            Assert.Equal(1, await CountAsync(
+                "SELECT count(*) FROM assets " +
+                "WHERE source_key='Fideli/portrait.jpg' AND deleted_at_utc IS NOT NULL;"));
+            Assert.Equal(1, await CountAsync(
+                "SELECT count(*) FROM photo_tag_actions " +
+                "WHERE actor='local-maintainer';"));
+            Assert.Equal(1, await CountAsync("SELECT count(*) FROM review_actions;"));
+            StringWriter canonicalVerify = new();
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. canonicalCommon, "--operation", "verify-retired"
+                ]), canonicalVerify));
+            Assert.Contains("1 retired", canonicalVerify.ToString());
+
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. canonicalCommon, "--operation", "restore", .. canonicalApproval
+                ]), new StringWriter()));
+            Assert.Equal(0, await ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. canonicalCommon, "--operation", "verify-restored"
+                ]), new StringWriter()));
+            Assert.Equal(0, await CountAsync(
+                "SELECT count(*) FROM archive_case_alias_retirements " +
+                "WHERE restored_at_utc IS NULL;"));
+            Assert.Equal(4, Directory.GetFiles(receiptDir, "*.jsonl").Length);
+
 
         }
         finally
