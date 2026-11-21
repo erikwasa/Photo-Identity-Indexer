@@ -324,6 +324,20 @@ public sealed class ArchiveCaseAliasPilotCommandTests
                     ArchiveCaseAliasPilotOptions.Parse(verifyRetired), new StringWriter()));
             // Verify operations must not create extra write receipts.
             Assert.Equal(2, Directory.GetFiles(receiptDir, "*.jsonl").Length);
+            Assert.Equal("fideli-lowercase-canonical-v1",
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. common, "--retirement-policy", "fideli-lowercase-canonical-v1"
+                ]).RetirementPolicy);
+            Assert.Throws<ArgumentException>(() =>
+                ArchiveCaseAliasPilotOptions.Parse([
+                    .. common, "--retirement-policy", "unsafe-general-case-insensitive"
+                ]));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                ArchiveCaseAliasPilotCommandRunner.RunAsync(
+                    ArchiveCaseAliasPilotOptions.Parse([
+                        .. common, "--retirement-policy", "fideli-lowercase-canonical-v1"
+                    ]), new StringWriter()));
+
         }
         finally
         {
