@@ -359,14 +359,23 @@ public static class VideoFaceSelectedOneShotCommandRunner
             : cycle?.ReasonCode ?? "execution-unavailable";
         Write(output, false, cycle?.Claimed == true, published,
             reason, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds,
-            detectedFaces);
+            detectedFaces, cycle?.Failure);
         return published ? 0 : 1;
     }
 
-    private static void Write(
+    // Exposed to synthetic tests through InternalsVisibleTo; production
+    // callers only receive the same privacy-preserving one-shot JSON response.
+    internal static void Write(
         TextWriter output, bool dryRun, bool admitted,
         bool published, string reasonCode, long? wallMilliseconds = null,
-        int? sampledFaceObservations = null) =>
+        int? sampledFaceObservations = null,
+        VideoAttemptFailureDiagnostic? failure = null)
+    {
+        // The generic worker already has a fixed-vocabulary diagnostic.
+        // Do not print an exception message, original filename, paths,
+        // model inputs, person IDs or native tool stderr to the operator.
+        VideoAttemptFailureDiagnostic? safe = failure is null
+            ? null : VideoAttemptFailureDiagnostics.Sanitize(failure);
         output.WriteLine(JsonSerializer.Serialize(new
         {
             protocol = Protocol,
@@ -379,6 +388,11 @@ public static class VideoFaceSelectedOneShotCommandRunner
             cloudInferenceRequested = false,
             automaticVideoWorkersEnabled = false,
             identityAssignmentsMade = 0,
-            executionWallMilliseconds = wallMilliseconds
+            executionWallMilliseconds = wallMilliseconds,
+            failureStage = safe?.Stage,
+            failureClass = safe?.FailureClass,
+            failureCheckpoint = safe?.SupervisorCheckpoint,
+            toolExitCode = safe?.ToolExitCode
         }));
+    }
 }
