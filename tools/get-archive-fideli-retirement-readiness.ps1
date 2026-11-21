@@ -35,11 +35,11 @@ if ($eligible.Count + $held.Count -ne $inScope.Count) {
     throw 'Private plan has unknown action classification.'
 }
 # Prioritize only the exact intended direction; do not infer from GUID or hash.
+$capitalPrefix = $prefix.Substring(0, 1).ToUpperInvariant() + $prefix.Substring(1)
 $lowercaseSurvivors = @($eligible | Where-Object {
     $_.SurvivorSourceKey.StartsWith($prefix, [StringComparison]::Ordinal) -and
     $_.SecondarySourceKey.StartsWith(
-        $NormalizedPrefix.Substring(0, 1).ToUpperInvariant() +
-            $NormalizedPrefix.Substring(1).Replace('\', '/'),
+        $capitalPrefix,
         [StringComparison]::Ordinal)
 })
 $blockerCounts = @(
@@ -50,7 +50,10 @@ $blockerCounts = @(
             }
         }
     }
-) | Group-Object | Sort-Object Count -Descending, Name |
+) | Group-Object | Sort-Object -Property @(
+    @{ Expression = 'Count'; Descending = $true },
+    @{ Expression = 'Name'; Descending = $false }
+) |
     ForEach-Object { [pscustomobject]@{ Reason = $_.Name; Groups = $_.Count } }
 
 [pscustomobject]@{
