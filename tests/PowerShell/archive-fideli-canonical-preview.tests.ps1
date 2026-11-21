@@ -128,6 +128,7 @@ try {
     $bulkRows = @(Import-Csv -LiteralPath $bulk.PrivateManifestPath)
     $bulkMetadata = Get-Content -LiteralPath $bulk.PrivateMetadataPath -Raw | ConvertFrom-Json
     Assert ($bulkRows.Count -eq 2 -and $bulkMetadata.pilotPairs -eq 2) 'Full-set manifest count is incorrect.'
+    Assert ($bulkMetadata.bulkAllEligible -eq $true) 'Full-set intent is not sealed.'
     Assert ($bulkMetadata.expectedDatabaseSchemaVersion -eq 46) 'Full-set schema pin is incorrect.'
     Assert ($bulk.ManifestSha256 -ceq (Get-FileHash -LiteralPath $bulk.PrivateManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()) 'Full-set SHA pin is incorrect.'
     Write-Host 'Fideli canonical full-set synthetic acceptance: PASS'
