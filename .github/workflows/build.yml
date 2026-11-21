@@ -365,7 +365,9 @@ jobs:
         run: |
           $scripts = @(
             'tools/get-archive-fideli-retirement-readiness.ps1',
-            'tests/PowerShell/archive-fideli-retirement-readiness.tests.ps1'
+            'tests/PowerShell/archive-fideli-retirement-readiness.tests.ps1',
+            'tools/new-archive-fideli-canonical-preview.ps1',
+            'tests/PowerShell/archive-fideli-canonical-preview.tests.ps1'
           )
           foreach ($script in $scripts) {
             $tokens = $null
@@ -376,6 +378,7 @@ jobs:
             if ($errors.Count -gt 0) { throw "PowerShell parser rejected $script : $($errors -join '; ')" }
           }
           ./tests/PowerShell/archive-fideli-retirement-readiness.tests.ps1
+          ./tests/PowerShell/archive-fideli-canonical-preview.tests.ps1
 
       - name: Verify WI-0209 PostgreSQL backup retention
         shell: pwsh
