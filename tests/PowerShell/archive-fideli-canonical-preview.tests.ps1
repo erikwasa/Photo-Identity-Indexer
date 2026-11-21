@@ -33,6 +33,7 @@ function Evidence([int]$Number, [bool]$Upper, [string]$Id, [string]$Revision,
         verified_content_sha256 = if ($WrongHash) { 'b' * 64 } else { $hash }
         verified_size_bytes = '100'
         has_source_exclusion = 'f'
+        automatic_face_review_actions = '0'
         human_or_unknown_face_review_actions = '0'
         human_or_unknown_person_labels = '0'
         photo_tag_actions = [string]$ExplicitTags
