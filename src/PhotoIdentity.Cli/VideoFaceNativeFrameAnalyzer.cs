@@ -57,7 +57,8 @@ public sealed class VideoFaceNativeFrameAnalyzer(
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            throw VideoFaceFailureEvidence.Mark(error, "face-detector");
+            VideoFaceFailureEvidence.Mark(error, "face-detector");
+            throw;
         }
         if (faces is null || faces.Count > MaximumFacesPerFrame)
             throw VideoFaceFailureEvidence.Mark(new InvalidDataException(
@@ -81,7 +82,8 @@ public sealed class VideoFaceNativeFrameAnalyzer(
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
-                throw VideoFaceFailureEvidence.Mark(error, "face-alignment");
+                VideoFaceFailureEvidence.Mark(error, "face-alignment");
+                throw;
             }
             EmbeddingVector vector;
             try
@@ -90,7 +92,8 @@ public sealed class VideoFaceNativeFrameAnalyzer(
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
-                throw VideoFaceFailureEvidence.Mark(error, "face-embedding");
+                VideoFaceFailureEvidence.Mark(error, "face-embedding");
+                throw;
             }
             if (vector.Dimensions != 128)
                 throw VideoFaceFailureEvidence.Mark(
