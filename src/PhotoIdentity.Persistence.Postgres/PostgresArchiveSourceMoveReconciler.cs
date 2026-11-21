@@ -287,7 +287,8 @@ public sealed class PostgresArchiveSourceMoveReconciler : IArchiveSourceMoveReco
                   SELECT 1
                   FROM assets AS other
                   WHERE other.source_id = @source_id
-                    AND other.source_key = @new_source_key
+                    AND lower(replace(other.source_key, chr(92), '/')) =
+                        lower(replace(@new_source_key, chr(92), '/'))
                     AND other.id <> @asset_id);
             """;
         command.Parameters.AddWithValue("asset_id", oldCopy.AssetId.Value);

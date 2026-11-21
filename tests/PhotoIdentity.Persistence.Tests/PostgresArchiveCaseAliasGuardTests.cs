@@ -107,6 +107,23 @@ public sealed class PostgresArchiveCaseAliasGuardTests
                 () => repository.RecordBatchAsync(archive, [Write("fideli/portrait.jpg")], baselines, t1));
             Assert.Contains("case-only", exception.Message, StringComparison.Ordinal);
 
+            // Two previously unseen paths differing only in case are not
+            // compared by the old database lookup. Reject within one staged
+            // scan batch before either asset/revision can be inserted.
+            InvalidOperationException staged = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => repository.RecordBatchAsync(
+                    archive,
+                    [Write("Family/together.jpg"), Write("family/together.jpg")],
+                    baselines, t1));
+            Assert.Contains("two incoming source keys", staged.Message,
+                StringComparison.Ordinal);
+
+            // The same cross-platform invariant applies to slash spelling.
+            InvalidOperationException slash = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => repository.RecordBatchAsync(
+                    archive, [Write(@"fideli\portrait.jpg")], baselines, t1));
+            Assert.Contains("case-only", slash.Message, StringComparison.Ordinal);
+
             await using (NpgsqlConnection verify = new(builder.ConnectionString))
             {
                 await verify.OpenAsync();

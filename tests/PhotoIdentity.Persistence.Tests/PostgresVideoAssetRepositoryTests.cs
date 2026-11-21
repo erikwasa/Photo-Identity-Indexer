@@ -70,6 +70,24 @@ public sealed class PostgresVideoAssetRepositoryTests
             Assert.Equal(initial.AssetId, duplicate.AssetId);
             Assert.Equal(initial.RevisionId, duplicate.RevisionId);
 
+            // The separate video registration path must also reject a case-
+            // insensitive alias of an existing source key.
+            SourceAsset differentlyCased = new(
+                new SourceAssetReference(source.SourceId, "HOLIDAY/clip.mov"),
+                "HOLIDAY/clip.mov", "video/quicktime", 5000, now,
+                AssetAvailability.Local);
+            InvalidOperationException videoAlias =
+                await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    videos.RegisterVerifiedAsync(first with
+                    {
+                        Asset = differentlyCased,
+                        VerifiedAtUtc = now.AddSeconds(2)
+                    }));
+            Assert.Contains("case-only", videoAlias.Message,
+                StringComparison.Ordinal);
+            Assert.Null(await videos.GetLatestVisibleRevisionAsync(
+                source.SourceId, "HOLIDAY/clip.mov"));
+
             RegisteredVideoRevision edited = await videos.RegisterVerifiedAsync(
                 first with
                 {
