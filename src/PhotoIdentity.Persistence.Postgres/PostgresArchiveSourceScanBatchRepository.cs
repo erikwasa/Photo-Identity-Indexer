@@ -201,6 +201,31 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
             await stage.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // Guard the *incoming batch itself* before inspecting old catalogue
+        // rows. The stage UNIQUE constraint is case-sensitive, so two previously
+        // unseen spellings could otherwise both be inserted in one scan batch.
+        // Normalization deliberately matches the archive alias retirement map.
+        using (NpgsqlCommand incomingAliases = connection.CreateCommand())
+        {
+            incomingAliases.Transaction = transaction;
+            incomingAliases.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM archive_source_scan_stage AS first
+                    INNER JOIN archive_source_scan_stage AS second
+                      ON first.ordinal < second.ordinal
+                     AND lower(replace(first.source_key, chr(92), '/')) =
+                         lower(replace(second.source_key, chr(92), '/'))
+                );
+                """;
+            if (await incomingAliases.ExecuteScalarAsync(cancellationToken) is true)
+            {
+                throw new InvalidOperationException(
+                    "Archive synchronization discovered two incoming source keys " +
+                    "that differ only by path case or separator. No catalogue changes were committed.");
+            }
+        }
+
         // A retired secondary locator may be the spelling that the Windows
         // source enumerates on the next scan. Retarget the observation to the
         // authoritative (earlier) asset *inside the same write transaction*.
@@ -308,7 +333,8 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                     FROM unseen_source_keys AS incoming
                     INNER JOIN assets AS existing
                       ON existing.source_id = @source_id
-                     AND lower(existing.source_key) = lower(incoming.source_key)
+                     AND lower(replace(existing.source_key, chr(92), '/')) =
+                          lower(replace(incoming.source_key, chr(92), '/'))
                 );
                 """;
             caseAliasGuard.Parameters.AddWithValue("source_id", source.SourceId.Value);
@@ -340,7 +366,8 @@ public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceSca
                         FROM archive_source_scan_stage AS stage
                         INNER JOIN source_copy_exclusions AS excluded
                           ON excluded.source_id = @source_id
-                         AND lower(excluded.source_key) = lower(stage.source_key)
+                         AND lower(replace(excluded.source_key, chr(92), '/')) =
+                              lower(replace(stage.source_key, chr(92), '/'))
                          AND excluded.source_key <> stage.source_key
                     );
                     """;
