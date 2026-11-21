@@ -19,6 +19,7 @@ public sealed record ArchiveCaseAliasPilotOptions(
     string ConnectionEnvironmentVariable,
     string DatabaseName,
     string Operation,
+    string RetirementPolicy,
     int MaximumPairs,
     string? ApprovedManifestSha256,
     string? RestoreVerificationReportPath,
@@ -52,7 +53,7 @@ public sealed record ArchiveCaseAliasPilotOptions(
             if (arg is not ("--manifest" or "--metadata" or "--postgres-connection-env"
                 or "--database" or "--operation" or "--max-pairs"
                 or "--approve-manifest-sha256" or "--restore-report"
-                or "--receipt-directory" or "--actor")
+                or "--receipt-directory" or "--actor" or "--retirement-policy")
                 || i + 1 == arguments.Length
                 || arguments[i + 1].StartsWith("--", StringComparison.Ordinal)
                 || !values.TryAdd(arg, arguments[++i]))
@@ -72,6 +73,11 @@ public sealed record ArchiveCaseAliasPilotOptions(
             or "verify-retired" or "verify-restored"))
             throw new ArgumentException(
                 "Operation must be preview, apply, restore, verify-retired or verify-restored.");
+
+        string policy = values.GetValueOrDefault("--retirement-policy") ?? "legacy";
+        if (policy is not ("legacy" or "fideli-lowercase-canonical-v1"))
+            throw new ArgumentException(
+                "Retirement policy must be legacy or fideli-lowercase-canonical-v1.");
 
         int maximum = values.TryGetValue("--max-pairs", out string? rawLimit)
             ? int.TryParse(rawLimit, NumberStyles.None, CultureInfo.InvariantCulture, out int n)
@@ -112,7 +118,7 @@ public sealed record ArchiveCaseAliasPilotOptions(
             throw new ArgumentException("Write approval, actor or receipt-directory value is invalid.");
 
         return new(manifest, metadata, environment, database, operation,
-            maximum, approval, restoreReport is null ? null : Path.GetFullPath(restoreReport),
+            policy, maximum, approval, restoreReport is null ? null : Path.GetFullPath(restoreReport),
             receiptDirectory is null ? null : Path.GetFullPath(receiptDirectory),
             actor, applicationStopped, acknowledged);
     }
@@ -171,6 +177,7 @@ public static class ArchiveCaseAliasPilotCommandRunner
         {
             await output.WriteLineAsync(
                 $"PILOT PREVIEW: {manifest.Pairs.Count} pinned pairs; SHA-256 {manifest.Sha256}; " +
+                $"policy {options.RetirementPolicy}; " +
                 "no database writes; no originals opened; no rows deleted.");
             return 0;
         }
@@ -218,7 +225,8 @@ public static class ArchiveCaseAliasPilotCommandRunner
         {
             schemaVersion = 1, status = "started", operation = options.Operation,
             sourceDatabase = options.DatabaseName, manifestSha256 = manifest.Sha256,
-            pairCount = manifest.Pairs.Count, createdAtUtc = DateTimeOffset.UtcNow
+            pairCount = manifest.Pairs.Count, retirementPolicy = options.RetirementPolicy,
+            createdAtUtc = DateTimeOffset.UtcNow
         });
 
         PostgresArchiveCaseAliasRetirementService service = new(catalogue);
@@ -236,7 +244,10 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 try
                 {
                     outcome = options.Operation == "apply"
-                        ? await service.RetireAsync(request, cancellationToken)
+                        ? options.RetirementPolicy == "fideli-lowercase-canonical-v1"
+                            ? await service.RetireFideliLowercaseCanonicalAsync(
+                                request, cancellationToken)
+                            : await service.RetireAsync(request, cancellationToken)
                         : await service.RestoreAsync(request, cancellationToken);
                 }
                 catch (InvalidOperationException e) when (
@@ -304,6 +315,14 @@ public static class ArchiveCaseAliasPilotCommandRunner
             meta.GetProperty("privatePilotManifestSha256").GetString() != sha256)
             throw new InvalidOperationException("Pilot metadata safety values or manifest fingerprint differ.");
 
+        string? metaPolicy = meta.TryGetProperty("retirementPolicy", out JsonElement policyProperty)
+            ? policyProperty.GetString() : null;
+        if (options.RetirementPolicy == "legacy"
+            ? metaPolicy is not null
+            : metaPolicy != options.RetirementPolicy)
+            throw new InvalidOperationException(
+                "The explicit CLI retirement policy does not match the sealed metadata.");
+
         DateTimeOffset generatedAt = meta.GetProperty("generatedAtUtc")
             .GetDateTimeOffset().ToUniversalTime();
         if (options.Operation == "apply" &&
@@ -365,6 +384,12 @@ public static class ArchiveCaseAliasPilotCommandRunner
                 Normalize(secondaryKey) != normalized ||
                 survivorKey == secondaryKey)
                 throw new InvalidOperationException("Pilot row does not represent an exact case-alias pair.");
+            if (options.RetirementPolicy == "fideli-lowercase-canonical-v1" &&
+                (!survivorKey.StartsWith("fideli/", StringComparison.Ordinal) ||
+                 !string.Equals(secondaryKey,
+                     "F" + survivorKey[1..], StringComparison.Ordinal)))
+                throw new InvalidOperationException(
+                    "Canonical policy requires exact fideli/ survivor and Fideli/ secondary.");
 
             if (!long.TryParse(Field("ExpectedSizeBytes"), NumberStyles.None,
                 CultureInfo.InvariantCulture, out long size) || size <= 0 ||
