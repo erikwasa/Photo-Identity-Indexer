@@ -160,6 +160,6 @@ No confidence-0.6 multi-scale candidate was processed. Lowering confidence furth
 
 ## Final decision
 
-WI-0036 is complete and no YuNet multi-scale configuration is approved for rollout. Preserve the private experiment evidence and continue to [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md).
+WI-0036 is complete and no YuNet multi-scale configuration is approved for rollout. Preserve the private experiment evidence and continue to [WI-0037](../archive/delivery/work-items/WI-0037-detector-candidate.md).
 
 The opt-in multi-scale implementation remains available for reproducibility and future research, but it must not become the canonical detector without a new governed decision.

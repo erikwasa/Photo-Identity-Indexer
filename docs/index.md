@@ -65,17 +65,18 @@ Work items and their status live in GitHub Issues. The delivery documents linked
 
 The retired Azure VM/checkpoint strategy remains historical. [ADR-0013](decisions/ADR-0013-optional-operator-controlled-remote-compute.md) keeps normal processing local while allowing deliberate inference in operator-controlled Azure apps, not unvetted third-party black-box services. [ADR-0011](decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) is the existing photo-caption bridge; video offload requires its own implementation.
 
-## Delivery
+## Delivery (historical, not maintained)
 
-- [Local production strategy](delivery/local-first-plan.md)
-- [Roadmap](delivery/roadmap.md)
-- [Milestones](delivery/milestones/)
-- [Work items](delivery/work-items/)
-- [Historical GitHub issue retirement audit and canonical work-item map](delivery/retired-github-issues-2026-10-22.md)
-- [Canonical work-item registry](delivery/status/work-items.yaml)
-- [Canonical milestone registry](delivery/status/milestones.yaml)
-- [Risks](delivery/risks.md)
-- [Templates](delivery/templates/)
+- [About this archive](archive/delivery/README.md)
+- [Local production strategy](archive/delivery/local-first-plan.md)
+- [Roadmap](archive/delivery/roadmap.md)
+- [Milestones](archive/delivery/milestones/)
+- [Work items](archive/delivery/work-items/)
+- [Historical GitHub issue retirement audit and canonical work-item map](archive/delivery/retired-github-issues-2026-10-22.md)
+- [Canonical work-item registry](archive/delivery/status/work-items.yaml)
+- [Canonical milestone registry](archive/delivery/status/milestones.yaml)
+- [Risks](archive/delivery/risks.md)
+- [Templates](archive/delivery/templates/)
 
 ## Decisions
 

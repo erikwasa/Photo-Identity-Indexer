@@ -97,7 +97,7 @@ Only after live side-by-side review should optional *automatic
 collection-only* omission be considered, with its own precision,
 fallback and operator acceptance gate.
 
-A distinct [quality rating WI-0205](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
+A distinct [quality rating WI-0205](../archive/delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
 will define a continuous rating with model/proxy provenance,
 uncertainty and licensing/normalization constraints. The existing
 technical suggestion priority is NOT a calibrated 0–100 quality score.
@@ -246,4 +246,4 @@ one safe automatic omission decision.
 
 ## Repository ownership after 2026-10-22 migration
 
-The original review PRs use the historical label `WI-0638` derived from a GitHub issue number. This was **not** a registered repository work item. The canonical item now is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md) under [M39](../delivery/milestones/M39-creative-collection-curation.md); all operator observations and PR acceptance evidence were migrated there. [WI-0204](../delivery/work-items/WI-0204-reversible-collection-scoped-alternative-omission.md) separately owns any future reversible, default-off collection-only omit/restore feature. GitHub issues are not the planning/status authority.
+The original review PRs use the historical label `WI-0638` derived from a GitHub issue number. This was **not** a registered repository work item. The canonical item now is [WI-0203](../archive/delivery/work-items/WI-0203-creative-collection-similarity-review.md) under [M39](../archive/delivery/milestones/M39-creative-collection-curation.md); all operator observations and PR acceptance evidence were migrated there. [WI-0204](../archive/delivery/work-items/WI-0204-reversible-collection-scoped-alternative-omission.md) separately owns any future reversible, default-off collection-only omit/restore feature. GitHub issues are not the planning/status authority.

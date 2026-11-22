@@ -3,7 +3,7 @@
 Status: **draft for maintainer sign-off, 2026-11-18**. Scope:
 the isolated `wi-0155` video-face feasibility tool and its tests. This is
 not a production activation plan or an authorization to persist identities.
-See [WI-0155](../delivery/work-items/WI-0155-video-face-processing-evaluation.md)
+See [WI-0155](../archive/delivery/work-items/WI-0155-video-face-processing-evaluation.md)
 and [the feasibility runbook](video-face-feasibility-wi0155.md) for full
 chronological experiment evidence. Never commit the private human-review CSVs,
 people map, snapshots, extracted frames, source paths or original media.

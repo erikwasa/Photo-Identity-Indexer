@@ -10,7 +10,7 @@ preserve existing photos/catalogue/originals and recover interrupted work.
 **WI-0188 scope (accepted 2026-10-30):** locally available
 videos only. Existing optional online-only setting is independently
 default-off; testing its transfer/release behavior is deferred to
-[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+[WI-0207](../archive/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
 No online-only originals were hydrated in WI-0188 acceptance.
 
 
@@ -286,7 +286,7 @@ scratch overage, 2 staging integrity/cleanup, and 1 fail-closed
 synthetic tool test. These verify disposable-fixture guards and
 cleanup; they did not access original family media or cloud data.
 An actual online-only hydration and safe online-only release was
-**not exercised** and is now [WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+**not exercised** and is now [WI-0207](../archive/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
 
 ## Controlled rejection and temporary-cleanup verification — Windows
 
@@ -435,6 +435,6 @@ local-first/exclusion behavior, photo regressions and all
 17/17 isolated invalid-media and owned-scratch tests passed.
 The remote-only OneDrive hydration/release path was **not exercised**,
 and its opt-in lifecycle is a separately proposed M30 workitem,
-[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
+[WI-0207](../archive/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md).
 The seven historical attempt-limit job rows are untouched.
 M30 remains in progress.

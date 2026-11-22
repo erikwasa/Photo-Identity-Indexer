@@ -83,7 +83,7 @@ collections or repeating unchanged A/B review.
 
 The next development batch supplies a **one-shot, bounded local score-coverage
 bridge** and an auditable end-of-milestone decision ledger
-(`docs/delivery/milestones/M37-decision-ledger.md`).
+(`docs/archive/delivery/milestones/M37-decision-ledger.md`).
 
 ### Boundaries
 

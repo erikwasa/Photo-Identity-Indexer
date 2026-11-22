@@ -48,7 +48,7 @@ measured cost/quality evidence. The main catalogue must not be used for
 the destructive interrupt/recovery scenario. Keep any private examples,
 frame content, annotations, captions and paths outside the repository.
 
-See the [workitem's detailed deferral matrix](../delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01).
+See the [workitem's detailed deferral matrix](../archive/delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-decision--postponed-representative-video-coverage-2026-11-01).
 
 ## Maintained-host verified baseline — 2026-11-02
 
@@ -326,7 +326,7 @@ existing automated safety tests are sufficient; no actual kill,
 full CPU/GPU/Azure accounting, new scene sample or extra real-video
 generation is required for this work item. Those remain
 **optional diagnostics**, with explicit triggers in the
-[work item](../delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-closeout-decision--pragmatic-scope-2026-11-02).
+[work item](../archive/delivery/work-items/WI-0190-video-frame-caption-embedding.md#maintainer-closeout-decision--pragmatic-scope-2026-11-02).
 If future failures or newly admitted formats warrant a deeper
 study, preserve all the existing disposable-database, private
 scratch and no-original-access gates. An unavailable or unsupported

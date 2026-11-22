@@ -5,7 +5,7 @@
 **WI-0189 completed.** PRs #665–#671 are merged; the maintainer
 reported successful local end-to-end checks and PostgreSQL safety tests.
 All four scoped acceptance criteria are checked in the canonical
-[work item](../delivery/work-items/WI-0189-video-local-low-resolution-proxies.md).
+[work item](../archive/delivery/work-items/WI-0189-video-local-low-resolution-proxies.md).
 This runbook's earlier checkpoint text, including statements that
 acceptance is pending, is retained as **history** and superseded here.
 
