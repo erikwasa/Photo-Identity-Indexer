@@ -37,6 +37,23 @@ The maintainer is the only user. Photos are irreplaceable. Privacy > features > 
 - One PR per issue. Keep diffs small (aim < 400 changed lines excluding pure moves). Do moves in their own PR.
 - If you change behavior described in README or docs/, update that doc in the same PR.
 
+## Delivering a feature
+
+- Aim for one coherent, user-visible outcome per issue. A probe, metadata query, synthetic run or SHA check is
+  evidence toward a feature, not the feature. If production processing isn't enabled yet, say
+  "evaluation checkpoint accepted; feature not delivered".
+- Don't split work into prep-only PRs (one more helper CLI, a PR just to record that the last one merged).
+  If an extra PR or checkpoint is needed, say why.
+- Put reproducible proof in CI, including negative cases (stale/excluded revision, online-only source, digest
+  mismatch, timeouts, partial output, cleanup). Red CI is yours to fix on the branch. Never ask me to test an
+  unmerged branch.
+- Manual checks only for real private media or visual judgment: after merge to main, one short copyable procedure
+  that says which commands read originals, change the DB, hydrate OneDrive or publish derivatives.
+- Never auto-hydrate OneDrive or process online-only/unknown-availability originals. A synthetic or metadata match
+  never authorizes reading real originals. Never claim production-ready on synthetic evidence alone.
+- Choose and report expansions by additional usable assets at a named stage. Keep candidate counts (upper bound)
+  separate from verified working outputs.
+
 ## Code conventions that aren't obvious from the code
 
 - Keep the solution a modular monolith until an accepted ADR says otherwise.

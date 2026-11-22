@@ -1,6 +1,6 @@
 # Testing and CI strategy
 
-This document defines how Photo Identity should balance regression confidence, pull-request feedback time and test reliability. It is the detailed companion to the concise rules in `AGENTS.md`.
+This document defines how Photo Identity should balance regression confidence, pull-request feedback time and test reliability. It is the detailed companion to the concise rules in `CLAUDE.md`.
 
 ## Goals
 
@@ -129,7 +129,7 @@ WI-0070 changes the pipeline in measured slices rather than all at once:
 2. diagnose known transient HTTP 500 tests and isolate the explicitly tracked cases in a visible, non-retried diagnostic lane while WI-0071 stabilizes them;
 3. partition deterministic integration tests into timing-balanced isolated runner jobs while keeping exact per-shard coverage checks;
 4. reduce duplicate published-runtime coverage and make launcher/package checks appropriately path-aware while retaining comprehensive `main` validation;
-5. keep this document and `AGENTS.md` aligned with the resulting steady-state gate.
+5. keep this document and `CLAUDE.md` aligned with the resulting steady-state gate.
 
 Slice 3 implements the gate split described above: pull requests retain the minimum uniquely valuable published-app smoke, launcher/package jobs are path-aware, and `main` remains comprehensive.
 
