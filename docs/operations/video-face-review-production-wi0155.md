@@ -1,11 +1,8 @@
 # WI-0155 production video-face review storage and admission
 
-**Status:** PR #828 merged (schema v42); next PR adds production photo-scorer
-parity and an internal video score-and-publish bridge. Neither PR enables
-a video-face extraction worker or production recognition. Automatic identity
-assignment is not authorized. The historical V06 package/CSV remains
-private source-bound *experimental* review and is not imported into the
-new tables by this PR.
+**Current checkpoint (2026-11-22):** Read the [single WI-0155 handover](video-face-wi0155-handover.md) first. PRs through #862 have merged: the v46, explicitly selected native FaceEvidence producer and source-fenced persisted review/presence flows exist, **default-off**. The first authorized real video has failed two selected attempts without publishing a batch; production readiness and automatic assignment are **not** accepted.
+
+**Historical v42 design introduction (2026-11-19):** The architecture sketch and early "next" tasks below are retained as an implementation record. Later dated sections describe what was actually delivered. The historical V06 package/CSV remains private experimental review, never an authoritative production batch.
 
 ## Data flow and authority
 
