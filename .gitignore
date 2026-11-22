@@ -78,6 +78,10 @@ staging/
 # Private operator bootstrap configuration
 PhotoIdentity.launcher.json
 
+# Local Claude Code settings (private paths)
+.claude/settings.local.json
+CLAUDE.local.md
+
 # Model binaries (manifests and download scripts remain tracked)
 models/**/*.onnx
 models/**/*.pt

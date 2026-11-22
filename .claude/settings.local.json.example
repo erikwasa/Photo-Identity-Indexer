@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(//c/Users/<you>/OneDrive/**)",
+      "Edit(//c/Users/<you>/OneDrive/**)",
+      "Write(//c/Users/<you>/OneDrive/**)"
+    ]
+  }
+}
