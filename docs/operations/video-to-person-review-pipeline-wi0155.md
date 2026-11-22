@@ -1,11 +1,6 @@
 # Video to people: present architecture and production direction (WI-0155)
 
-**Status:** descriptive architecture and intended direction, 2026-11-18. This
-document distinguishes Photo Identity's **current production video ingestion**
-from the **explicit, offline video-face feasibility evaluation** and the
-**future product design**. Arrows between these paths do not exist in the
-production application. Nothing here authorizes new original reads, model
-execution, identity writes, hydration, jobs or retention changes.
+**Historical design snapshot (2026-11-18):** This document captures the original offline-versus-production design boundary. For the **current implementation and remaining gates as of 2026-11-22**, read the [WI-0155 handover](video-face-wi0155-handover.md). Selected, default-off native FaceEvidence execution and guarded persisted human review/presence are now implemented; the original "future/not implemented" labels below are historical and must not be used to determine current functionality. There is still no automatic video identity assignment or unattended recognition approval.
 
 ## 1. Production video ingestion today — no automatic face recognition
 
