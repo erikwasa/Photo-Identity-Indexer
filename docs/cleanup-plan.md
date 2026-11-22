@@ -16,10 +16,10 @@
 | Item | Status |
 |---|---|
 | Ruleset on `main` (PR required, status checks, no force push, no deletion, empty bypass) | ✅ Done. A direct push was rejected. |
-| Required status checks: `build-and-test`, `integration-shard-1`, `integration-shard-2` | ⚠️ Added, not yet verified against the workflow (task 1.6) |
+| Required status checks: `build-and-test`, `integration-shard-1`, `integration-shard-2` | ❌ Checked in session 1b: neither active ruleset (`OnlyPr`, `protect-branch`) has a required-status-checks rule. The three names match real check runs that start on every PR. The maintainer adds the rule. |
 | Claude Code (VS Code + PowerShell 7), GitHub CLI | ✅ Installed |
-| `.claude/settings.json` | ⚠️ Added, to be reviewed and completed in session 1 |
-| `CLAUDE.md`, hooks, skills, subagents | ❌ Not yet |
+| `.claude/settings.json`, `CLAUDE.md`, hooks | ✅ Done in session 1 (PR #865) |
+| Skills, subagents, baseline, issue-list corrections | ✅ Session 1b (PR `chore/claude-skills`) |
 | WI-0155 (people in videos) | ⏸ Stopped. The code needed is in `main`. Handover: `docs/operations/video-face-wi0155-handover.md`. Branch `wi-0155` is kept as an archive only: never merge, rebase or delete it. |
 
 ---
@@ -244,9 +244,9 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 - **Acceptance:**
   - [ ] `docs/delivery/` is moved to `docs/archive/delivery/`, with a README that says it is historical and not maintained;
   - [ ] `BUILD_CONTEXT.md` is deleted;
-  - [ ] the docs-validation job is removed from `build.yml`;
-  - [ ] `tools/PhotoIdentity.Docs` and its tests are deleted or moved to the archive, and the solution builds;
-  - [ ] references in README and scripts are updated;
+  - [ ] the two docs steps ("Validate living documentation", "Check generated documentation") are removed from the `build-and-test` job in `build.yml` (they are steps, not a separate job, so the required check names don't change);
+  - [ ] `tools/PhotoIdentity.Docs` and `tests/PhotoIdentity.Docs.Tests` are deleted or moved to the archive, and the solution builds;
+  - [ ] references in README and scripts are updated, including `verify-local.ps1`'s documentation step and `-SkipDocumentation` switch;
   - [ ] CI is green, and the required status checks still pass.
 - **Note:** editing `.github/workflows/**` is allowed for this issue.
 
@@ -260,7 +260,7 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 - **Acceptance:**
   - [ ] the files C-01 marked "archive" are moved to `docs/archive/`, and those marked "delete" are deleted;
   - [ ] `docs/index.md` has about 10 links;
-  - [ ] every link in README and in `docs/index.md` resolves (Claude checks with a script);
+  - [ ] every link in README and in `docs/index.md` resolves (Claude checks with a script; the relative-link check in `tools/PhotoIdentity.Docs/DocumentationValidator.cs` can be lifted into it before C-03 removes the tool);
   - [ ] the README describes the real runtime: Podman/WSL2 PostgreSQL, no SQLite;
   - [ ] `docs/cleanup-plan.md` is deleted.
 
@@ -274,8 +274,8 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 
 **S-01 · Clean the repo root: move scripts into `scripts/`** · `cleanup` · Budget: 1–2
 - **Acceptance:**
-  - [ ] only `build.ps1`, `test.ps1` and the launcher remain at the root;
-  - [ ] the other scripts are moved to `scripts/{db,ops,measure,video,install}/` and all references (CI, docs, launcher, packaging) are updated;
+  - [ ] only `build.ps1`, `test.ps1` and the launcher (`Start-PhotoIdentity.ps1` and `Start-PhotoIdentity.cmd`) remain at the root;
+  - [ ] the other ~30 root scripts are moved to `scripts/{db,ops,measure,video,install}/` and all references (CI, docs, launcher, packaging) are updated. `build.yml` hard-codes many root script paths in the PR classifier and in steps, so editing `.github/workflows/**` is allowed for this issue. The backup scripts locate `deploy\postgres` through `$PSScriptRoot`, so fix that path (and coordinate with S-03);
   - [ ] the two backup scripts are merged into one, with the old name kept as a 3-line wrapper or removed;
   - [ ] `verify-wi0091.ps1` is deleted;
   - [ ] `scripts/README.md` has a table of each script, what it does, and whether it is safe to run (read-only / writes DB / touches originals);
@@ -293,7 +293,7 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 
 **S-03 · Infrastructure folder** · `cleanup` · Budget: 1
 - **Acceptance:**
-  - [ ] `deploy/postgres` is moved to `infra/postgres` with references updated;
+  - [ ] `deploy/postgres` (only `compose.yaml`, image `postgres:18`) is moved to `infra/postgres` with references updated, including the backup/restore scripts, docs and `.claude/hooks/guard-paths.ps1`;
   - [ ] `infra/azure/` holds the caption Container App definition, with parameters and no secrets;
   - [ ] the app starts against the DB;
   - [ ] the maintainer deploys the caption app from the definition once.
@@ -309,14 +309,14 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 
 **Q-01 · Hotspot report** · `cleanup` · Budget: 1
 - **Acceptance:**
-  - [ ] an issue comment ranks: the largest files and classes, the most-changed files, warnings per project, SQLite references, CLI commands and flags with no callers, unused NuGet packages, and anything in `src/` that references experiment or feasibility code;
+  - [ ] an issue comment ranks: the largest files and classes, the most-changed files, SQLite references in code and docs, CLI commands and flags with no callers, unused NuGet packages, and anything in `src/` that references experiment or feasibility code. There is no `experiments/` folder yet; the feasibility code is `tools/PhotoIdentity.{VideoFaceFeasibility,PhotoQualityEvaluation,ClusterEvaluation}`. No `src/` project references a `tools/` project, so check source-level copies and shared contracts too;
   - [ ] no edits are made;
   - [ ] a proposed follow-up issue list is included, which the maintainer picks from.
 
 **Q-02 · Testcontainers fixture for PostgreSQL tests** · `build` · Budget: 2
 - **Acceptance:**
-  - [ ] a shared `Testcontainers.PostgreSql` fixture is added, with the version pinned in `Directory.Packages.props` and the image matching the production major version;
-  - [ ] it works with Podman locally and in CI;
+  - [ ] a shared `Testcontainers.PostgreSql` fixture is added in the existing `tests/PhotoIdentity.TestSupport.Postgres` project, with the version pinned in `Directory.Packages.props` and the image `postgres:18` (matching `deploy/postgres/compose.yaml`);
+  - [ ] it works with Podman locally. In CI: GitHub's `windows-latest` runners can't run Linux containers, and the PostgreSQL jobs use the runner's Windows PostgreSQL service today. Either run the converted class in an `ubuntu-latest` job, or keep the env-var path on the Windows runners. Decide in the PR;
   - [ ] at least one env-var-gated test class is converted;
   - [ ] `dotnet test` runs it locally without the environment variable;
   - [ ] follow-up issue(s) are created for the remaining classes.
@@ -324,15 +324,14 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 
 **Q-03 · Analyzer baseline** · `cleanup` · Budget: 1
 - **Acceptance:**
-  - [ ] `EnforceCodeStyleInBuild=true` and `AnalysisLevel=latest-recommended` are set in `Directory.Build.props`, with warnings still allowed;
-  - [ ] warning counts per project are recorded in the PR;
+  - [ ] `EnforceCodeStyleInBuild=true` and `AnalysisLevel=latest-recommended` are set in `Directory.Build.props`. `TreatWarningsAsErrors=true` is already set there and stays on, so the new analyzer diagnostics are kept non-breaking (for example via `WarningsNotAsErrors` or `.editorconfig` severities), not by turning `TreatWarningsAsErrors` off;
+  - [ ] the new analyzer diagnostic counts per project are recorded in the PR;
   - [ ] the build and CI stay green;
-  - [ ] follow-up issues are created, one per project, to reach zero warnings and then turn on `TreatWarningsAsErrors`.
+  - [ ] follow-up issues are created, one per project, to fix the new diagnostics and then promote them to errors.
 
 **Q-04 · Remove SQLite remnants** · `cleanup` · Budget: 1 · Depends on: Q-01
 - **Acceptance:**
   - [ ] every SQLite reference from the Q-01 report is removed or explicitly justified;
-  - [ ] the SQLite packages are removed from `Directory.Packages.props` if they're unused;
   - [ ] all tests are green;
   - [ ] the diff is mostly deletions.
 
@@ -348,7 +347,7 @@ The IDs (C-01 and so on) are only for this file; GitHub assigns the real numbers
 - **Goal:** decide how to continue with people in videos, with clear boundaries.
 - **Inputs:**
   - `docs/operations/video-face-wi0155-handover.md`;
-  - the video-face code in `main`;
+  - the video-face code in `main`, including `tools/PhotoIdentity.VideoFaceFeasibility` and the WI-0155 steps in `build.yml`;
   - the earlier product goal: at least one useful detection per visible person, with automatic, semi-automatic and manual tiers.
 - **Acceptance:**
   - [ ] a findings note (issue comment) covering:
