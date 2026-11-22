@@ -11,6 +11,18 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Recognition.Onnx, PhotoIden
 # WI-0155: Evaluate face discovery and identity processing inside video
 
 
+## Current handover — 2026-11-22
+
+**Authoritative concise checkpoint:** [WI-0155 status, decisions and handover](../../operations/video-face-wi0155-handover.md).
+It separates completed offline experiments and merged production infrastructure
+from **the two failed real FaceEvidence one-shot attempts**, unverified
+real-media browser acceptance, operational rights/retention and the explicit
+maintainer decision required before closure. As of PR #862, all guarded
+components are on `main`, automatic identification remains disabled,
+and no current real FaceEvidence batch has been successfully published.
+The dated entries below are historical checkpoints; do not interpret their
+older "next" tasks or branch descriptions as current status.
+
 ## 2026-11-21 — Complete synthetic face-review HTTP acceptance before real-media sign-off
 
 PR #854 is merged and the maintainer reports local test success.
@@ -431,7 +443,7 @@ production remains a separate future implementation choice.
 See [pre-main decision/removal record](../../operations/video-face-wi0155-pre-main-decision-record.md)
 and [bounded offline verification](../../operations/video-face-feasibility-wi0155.md).
 
-## Current status — 2026-11-08
+## Historical status — 2026-11-08 (superseded by handover)
 
 **In progress on the long-lived `wi-0155` feature branch**, which remains
 separate from production `main`. Experimental development started on
@@ -523,8 +535,8 @@ catalogue or biometric governance during exploratory work.
 
 ## Completion notes
 
-- Status: in_progress on `wi-0155`; the first work item is still a
-  feasibility/prototype decision, not production recognition acceptance.
+- Status: in_progress. See the 2026-11-22 handover for merged implementation,
+  failed real FaceEvidence attempts and the two possible closure paths.
 ## 2026-11-18 — Main-candidate V04 presence-first local acceptance
 
 **Actual maintainer test on main-based draft PR #824:** The opt-in
