@@ -13,7 +13,6 @@ Follow the [local operator guide](docs/operations/local-operator-guide.md) for t
 Use these references when you need more detail:
 
 - [Documentation index](docs/index.md)
-- [Build context](BUILD_CONTEXT.md) for the immediate development/verification handoff
 - [Architecture overview](docs/architecture/overview.md)
 - [PostgreSQL operations](docs/operations/postgresql-operations.md)
 - [Operations documentation map](docs/operations/index.md), including clearly marked historical evaluation evidence
@@ -22,7 +21,7 @@ Use these references when you need more detail:
 
 ## Development status
 
-`BUILD_CONTEXT.md` contains only the current focus and next concrete step. Formal work-item lifecycle status, dependencies and completion evidence are maintained through the canonical work-item shards under [`docs/delivery/status/work-items/`](docs/delivery/status/work-items/).
+Work items, their status and completion evidence live in GitHub Issues and their pull requests. The old repository work-item registry under `docs/delivery/` is historical and not maintained.
 
 ## Prerequisites
 
@@ -44,13 +43,6 @@ From the repository root:
 ./verify-local.ps1 -InstallModels
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ./verify-postgres.ps1
-```
-
-The living documentation gate is also expected to pass:
-
-```powershell
-dotnet run --project tools/PhotoIdentity.Docs -- validate
-dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
 ## Supported production workflow

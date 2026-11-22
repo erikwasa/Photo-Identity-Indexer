@@ -406,12 +406,6 @@ jobs:
           retention-days: 3
           if-no-files-found: warn
 
-      - name: Validate living documentation
-        run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- validate
-
-      - name: Check generated documentation
-        run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
-
       - name: Verify video survey metadata parsing
         shell: pwsh
         run: ./tools/verify-video-codec-survey.ps1
@@ -465,7 +459,6 @@ jobs:
             -Configuration Release `
             -SkipBuild `
             -SkipTests `
-            -SkipDocumentation `
             -SkipModels `
             -Image @(
               ".artifacts/ci-verification/valid.png"

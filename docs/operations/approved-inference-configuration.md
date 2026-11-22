@@ -199,8 +199,6 @@ validation, Azure ingress restrictions and separate scale controls.
 
    ```powershell
    dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj -c Release --filter "FullyQualifiedName~VideoFrameSelectedOneShotTests|FullyQualifiedName~PhotoCaptionEnrichmentContractTests"
-   dotnet run --project tools/PhotoIdentity.Docs -- validate
-   dotnet run --project tools/PhotoIdentity.Docs -- generate --check
    ```
 
 6. With caption enrichment **still disabled**, restart the API and inspect

@@ -3,13 +3,13 @@
 Runs the local Windows verification checkpoint.
 
 .DESCRIPTION
-Builds and tests the solution, validates living documentation, optionally installs
-and verifies pinned models, then checks private JPEG and PNG files without
-modifying them. Multiple image paths must be supplied as one array value.
+Builds and tests the solution, optionally installs and verifies pinned models,
+then checks private JPEG and PNG files without modifying them. Multiple image
+paths must be supplied as one array value.
 
-By default the repository build, automated tests and documentation validation all
-run. Callers that already completed those checks for the same checkout can opt out
-of repeating them with -SkipBuild, -SkipTests and -SkipDocumentation.
+By default the repository build and automated tests run. Callers that already
+completed those checks for the same checkout can opt out of repeating them with
+-SkipBuild and -SkipTests.
 
 .EXAMPLE
 ./verify-local.ps1 -InstallModels
@@ -32,7 +32,6 @@ of repeating them with -SkipBuild, -SkipTests and -SkipDocumentation.
 ./verify-local.ps1 `
   -SkipBuild `
   -SkipTests `
-  -SkipDocumentation `
   -SkipModels `
   -Image ".artifacts/ci-verification/valid.png"
 #>
@@ -44,8 +43,6 @@ param(
     [switch] $SkipBuild,
 
     [switch] $SkipTests,
-
-    [switch] $SkipDocumentation,
 
     [switch] $InstallModels,
 
@@ -88,7 +85,6 @@ $report = [ordered]@{
     configuration = $Configuration
     build = if ($SkipBuild) { "skipped" } else { "pending" }
     tests = if ($SkipTests) { "skipped" } else { "pending" }
-    documentation = if ($SkipDocumentation) { "skipped" } else { "pending" }
     modelsSkipped = [bool] $SkipModels
     models = @()
     manualImagesProvided = (($Image.Count + $UnsupportedImage.Count) -gt 0)
@@ -373,31 +369,6 @@ try {
             -FilePath (Join-Path $root "test.ps1") `
             -Parameters @{ Configuration = $Configuration } | Out-Null
         $report.tests = "passed"
-    }
-
-    if ($SkipDocumentation) {
-        Write-Host "`n== Documentation validation =="
-        Write-Host "Skipped; caller already validated living and generated documentation for this checkout."
-    }
-    else {
-        Invoke-CheckedCommand `
-            -Name "Living-document validation" `
-            -FilePath "dotnet" `
-            -ArgumentList @(
-                "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
-                "--configuration", $Configuration,
-                "--no-build", "--", "validate"
-            ) | Out-Null
-
-        Invoke-CheckedCommand `
-            -Name "Generated-document consistency" `
-            -FilePath "dotnet" `
-            -ArgumentList @(
-                "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
-                "--configuration", $Configuration,
-                "--no-build", "--", "generate", "--check"
-            ) | Out-Null
-        $report.documentation = "passed"
     }
 
     if (-not $SkipModels) {
