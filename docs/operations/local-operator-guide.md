@@ -24,7 +24,7 @@ PostgreSQL is the single supported and authoritative catalogue. WI-0102 complete
 
 The final stopped-source SQLite backup from WI-0102 may be preserved unchanged as historical migration/rollback evidence, but current Photo Identity binaries do not open it. Do not configure a catalogue provider or SQLite database path. Historical rollback instructions remain in [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) only as evidence of the accepted migration boundary.
 
-Check the short [`BUILD_CONTEXT.md`](../../BUILD_CONTEXT.md) handoff and the canonical [work-item registry](../delivery/status/work-items.yaml) before treating a planned feature as available.
+Check the project's GitHub Issues before treating a planned feature as available.
 
 ## Trust and privacy boundary
 

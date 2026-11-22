@@ -22,7 +22,6 @@ Follow CLAUDE.md. One issue, one branch, one PR. Never merge, never push to main
    - `./test.ps1 -Scope Fast`
    - If persistence changed: the relevant PostgreSQL tests against a disposable DB only
      (Testcontainers or PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING to a throwaway instance).
-   - If any `*.md` changed: `dotnet run --project tools/PhotoIdentity.Docs -- validate` (while that tool exists).
 7. Self-review `git diff main...HEAD`: each acceptance criterion met? Any personal data, private paths,
    writes to originals, or production catalogue access? Anything beyond scope? Fix or remove it.
 8. Commit, push (`git push -u origin <branch>`) and open the PR with `gh pr create`. The body has:

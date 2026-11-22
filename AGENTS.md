@@ -2,13 +2,9 @@
 
 ## Read before changing the repository
 
-1. Read `BUILD_CONTEXT.md` for the current handoff only.
+1. Read the GitHub issue for the task (`gh issue view <n>`): acceptance criteria, budget, type label and out-of-scope list.
 2. Read [the agent vertical-slice delivery approach](docs/operations/agent-vertical-slice-delivery.md) before planning feature work: prefer complete outcomes, CI-first checks and archive-value prioritization while preserving every safety gate.
-3. Use `PhotoIdentity.Docs show WI-XXXX` to locate the item's canonical status shard, then read that shard and the linked work-item document.
-4. Read only the linked ADRs and module documents needed for that item.
-5. Use `PhotoIdentity.Docs` for dependency and formal lifecycle status. Do not load archived work-item shards routinely.
-
-`BUILD_CONTEXT.md` should stay short and current. Do not turn it into a project history or repeat completion details that already live in work-item documents, ADRs, milestone documents or canonical status shards.
+3. Read only the linked ADRs and module documents needed for that issue.
 
 ## Architecture constraints
 
@@ -21,7 +17,7 @@
 - Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
-- M30's opt-in video ingestion, local processing, playable proxies, selected frame evidence and Video Search have been completed under documented bounded scopes (WI-0150/0151/0188/0189/0190/0191). **WI-0152 browser playback is merged, maintainer-accepted and archived (PR #720)**; WI-0210's merged PR #722 reports 58 current `photoidentity_main` videos with 12 isolated Rec.709 yuvj420p proxy metadata candidates, but ALL 58 source availabilities unknown; PR #724 merged and the guarded synthetic full-range proxy roundtrip PASSED on the maintainer's Windows FFmpeg; checkpoint 5 live availability verified 12/12 Rec.709 yuvj420p pixel-only candidates as local size matches (not SHA or colour proof). Checkpoint 6 merged PR #727 operator shortlist is accepted (12/12, readOnly, no source bytes opened or hydration); next add an optional exact Rec.709 yuvj420p pixel-only metadata guard to the existing explicit no-recall SHA source-proof command, preserving separate --read-local-bytes authorization and production isolation.Next develop explicit opt-in private UUID-only candidate selection without content opens, hydration or job writes. Production gate/HDR remain unchanged until approved real-source checks; local review starts on merged main and CI owns docs validation; WI-0207 independently owns online-only video hydration/release. Keep source/revision, original-file and existing photo contracts. Video face recognition is desired but starts with a bounded experimental WI-0155 prototype; mixed collections/slideshows are postponed and Live Photo pairing administratively retired. Consult M30's current section, not historical activation instructions.
+- M30's opt-in video ingestion, local processing, playable proxies, selected frame evidence and Video Search have been completed under documented bounded scopes (WI-0150/0151/0188/0189/0190/0191). **WI-0152 browser playback is merged, maintainer-accepted and archived (PR #720)**; WI-0210's merged PR #722 reports 58 current `photoidentity_main` videos with 12 isolated Rec.709 yuvj420p proxy metadata candidates, but ALL 58 source availabilities unknown; PR #724 merged and the guarded synthetic full-range proxy roundtrip PASSED on the maintainer's Windows FFmpeg; checkpoint 5 live availability verified 12/12 Rec.709 yuvj420p pixel-only candidates as local size matches (not SHA or colour proof). Checkpoint 6 merged PR #727 operator shortlist is accepted (12/12, readOnly, no source bytes opened or hydration); next add an optional exact Rec.709 yuvj420p pixel-only metadata guard to the existing explicit no-recall SHA source-proof command, preserving separate --read-local-bytes authorization and production isolation.Next develop explicit opt-in private UUID-only candidate selection without content opens, hydration or job writes. Production gate/HDR remain unchanged until approved real-source checks; local review starts on merged main; WI-0207 independently owns online-only video hydration/release. Keep source/revision, original-file and existing photo contracts. Video face recognition is desired but starts with a bounded experimental WI-0155 prototype; mixed collections/slideshows are postponed and Live Photo pairing administratively retired. Consult M30's current section, not historical activation instructions.
 
 **WI-0210 delivery handoff (2026-11-04):** PR #728's
 exact-revision local original SHA passed on the maintained
@@ -33,15 +29,14 @@ output validation + post-trial SHA + private review), then
 only after real visual acceptance implement one cohesive
 production playable-proxy integration. No new small
 prep-only PRs, production admission or unapproved original
-read. CI owns docs checks and local verification starts
-after merge on `main`.
+read. Local verification starts after merge on `main`.
 
 ## Scope discipline
 
 - Follow [the agent vertical-slice delivery guide](docs/operations/agent-vertical-slice-delivery.md): aim for a coherent user-visible outcome (often one or two reviewable PRs), put reproducible proof in CI, and prioritize archive changes by additional *usable* assets at an explicitly named stage. Record justified exceptions rather than multiplying preparatory PRs or local acceptance sessions.
-- Local operator acceptance begins only after merge into `main`; CI owns documentation validation/generation. Any original read, OneDrive hydration or production worker admission still requires its established explicit authorization and guards.
-- Work on one work item at a time.
-- Do not broaden a work item silently. Create a follow-up item for unrelated work.
+- Local operator acceptance begins only after merge into `main`. Any original read, OneDrive hydration or production worker admission still requires its established explicit authorization and guards.
+- Work on one issue at a time: one issue, one branch, one PR.
+- Do not broaden an issue silently. Create a follow-up issue for unrelated work.
 - A contract change must be explicit and documented.
 - Avoid unrelated refactoring.
 - Keep model preprocessing beside the relevant adapter.
@@ -51,37 +46,9 @@ after merge on `main`.
 
 Never commit personal photos, face crops, embeddings, biometric datasets, model binaries, credentials, tokens, private paths or large generated logs.
 
-## Repository-native work-item planning (mandatory)
+## Work items
 
-**The repository is the only planning/status authority.** Before beginning feature development, create or update a numbered `docs/delivery/work-items/WI-XXXX-*.md` and a canonical `docs/delivery/status/work-items/active/WI-XXXX.yaml`, associate that item with exactly one milestone in `docs/delivery/status/milestones.yaml` and its milestone document, and refresh the generated discovery/roadmap views via `PhotoIdentity.Docs generate`. Use the next repository work-item number, not a GitHub issue/PR number.
-
-**Do not create GitHub issues as feature work items or use issues as parallel requirement/status trackers.** GitHub pull requests are for code and documentation review; historical issue URLs can remain as traceable evidence when migrating an old issue, but must never replace the repository work-item lifecycle. When an old issue is migrated, preserve its substantive intent and evidence in the repository before retiring the issue. Do not silently reopen completed milestones for unrelated follow-on work; create a new milestone where appropriate. Continue to use the existing `PhotoIdentity.Docs` lifecycle commands and validations.
-
-## Status workflow
-
-Canonical machine/audit status is stored one work item per YAML file under `docs/delivery/status/work-items/`. Non-terminal items live in `active/WI-XXXX.yaml`; terminal items live in `archive/WI-XXXX.yaml`. `registry.yaml` contains only schema/status metadata. `PhotoIdentity.Docs` combines active and archived shards for validation, blockers, milestone status and work selection.
-
-`docs/delivery/status/work-items.yaml` and `docs/delivery/status/work-items-index.md` are deterministic generated current-work/discovery views. They are not editable sources of truth. Lifecycle commands update only the target canonical shard; completing an item moves that shard to the archive automatically.
-
-Do not load archive files during normal handoff work. Use `show` when a specific historical item is needed, and use lifecycle commands rather than hand-editing status when the required command is available.
-
-```powershell
-dotnet run --project tools/PhotoIdentity.Docs -- validate
-dotnet run --project tools/PhotoIdentity.Docs -- next
-dotnet run --project tools/PhotoIdentity.Docs -- show WI-0005
-dotnet run --project tools/PhotoIdentity.Docs -- start WI-0005 --owner ai-agent --branch agent/WI-0005
-dotnet run --project tools/PhotoIdentity.Docs -- review WI-0005
-```
-
-- `proposed` → identified but not ready
-- `ready` → scoped and unblocked
-- `in_progress` → actively implemented
-- `blocked` → cannot proceed; blockers required
-- `in_review` → implementation complete; verification pending
-- `completed` → acceptance criteria verified or an explicit administrative closeout is documented with evidence
-- `cancelled` → no longer planned when a supported lifecycle path records the reason
-
-Before work, mark the item `in_progress`. After implementation, add evidence and mark it `in_review`. Mark it `completed` only after required verification passes or an explicit retirement/supersession decision is documented without claiming unperformed acceptance work.
+Work items are GitHub Issues with acceptance criteria, a budget and a type label (`spike`, `build` or `cleanup`). Status lives in the issue and its PR, not in repository files. The old `docs/delivery/` registry (WI-XXXX documents, milestones and YAML status shards) is historical and not maintained; read it only when an issue links to a specific record.
 
 ## Testing and pull-request validation
 
@@ -102,6 +69,4 @@ Before work, mark the item `in_progress`. After implementation, add evidence and
 - Database changes include migrations.
 - Idempotency has been considered.
 - The affected documentation is updated.
-- `BUILD_CONTEXT.md` reflects only the next concrete step and essential continuation pointers.
-- Evidence is recorded through the work-item registry workflow.
-- `PhotoIdentity.Docs validate` and `generate --check` pass.
+- Evidence (commands run and their output tails) is recorded in the PR description.

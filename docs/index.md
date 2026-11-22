@@ -3,7 +3,6 @@
 ## Start here
 
 - [README and project orientation](../README.md)
-- [Build context](../BUILD_CONTEXT.md) — current development/verification handoff only
 - [Local operator guide](operations/local-operator-guide.md)
 - [PostgreSQL operations](operations/postgresql-operations.md)
 - [Operations documentation map](operations/index.md)
@@ -13,7 +12,7 @@
 
 The local operator guide is the authoritative normal operating path. Specialized operations documents are classified in the operations index so completed experiment and migration records are not mistaken for current product instructions.
 
-Formal delivery lifecycle status is kept in the canonical YAML registries. They are machine/audit records rather than the normal human current-status view; use `BUILD_CONTEXT.md` for the immediate continuation point.
+Work items and their status live in GitHub Issues. The delivery documents linked below are the historical registry and are not maintained.
 
 ## Operations
 
