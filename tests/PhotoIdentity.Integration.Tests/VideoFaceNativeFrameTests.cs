@@ -136,8 +136,13 @@ public sealed class VideoFaceNativeFrameTests
         var huge = new VideoFaceNativeFrameAnalyzer(
             new FakeDetector(Enumerable.Repeat(Face(), 33).ToArray()),
             new FakeAligner(), new FakeEmbedder());
-        await Assert.ThrowsAsync<InvalidDataException>(() =>
+        InvalidDataException overLimit = await Assert.ThrowsAsync<InvalidDataException>(() =>
             huge.AnalyzeAsync(Frame(64, 64), 0, 1000));
+        Assert.Equal("face-detection-overflow", VideoFaceFailureEvidence.Read(overLimit));
+        VideoAttemptFailureDiagnostic capacity = VideoAttemptFailureDiagnostics
+            .Sanitize(VideoAttemptFailureDiagnostics.FromException(overLimit));
+        Assert.Equal("invalid-media-evidence", capacity.FailureClass);
+        Assert.Equal("face-detection-overflow", capacity.SupervisorCheckpoint);
 
         var wrong = new VideoFaceNativeFrameAnalyzer(
             new FakeDetector([Face()]),
@@ -156,6 +161,54 @@ public sealed class VideoFaceNativeFrameTests
         Assert.Empty(await normal.AnalyzeAsync(Frame(64, 64), 0, 1000));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             normal.AnalyzeAsync(Frame(64, 64), 4, 1000));
+    }
+
+    [Theory]
+    [InlineData("native-frame-extraction")]
+    [InlineData("native-frame-validation")]
+    [InlineData("face-detector")]
+    [InlineData("face-detection-overflow")]
+    [InlineData("face-alignment")]
+    [InlineData("face-embedding")]
+    [InlineData("face-observation-validation")]
+    public void Native_face_checkpoint_survives_worker_sanitization_without_private_data(
+        string checkpoint)
+    {
+        InvalidDataException error = new(
+            @"Private face observation at C:\private\family.mov for Alice");
+        VideoFaceFailureEvidence.Mark(error, checkpoint);
+        VideoAttemptFailureDiagnostic reported =
+            VideoAttemptFailureDiagnostics.Sanitize(
+                VideoAttemptFailureDiagnostics.FromException(error));
+
+        Assert.Equal("invalid-media-evidence", reported.FailureClass);
+        Assert.Equal(checkpoint, reported.SupervisorCheckpoint);
+        Assert.DoesNotContain("private", reported.ToString(),
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Alice", reported.ToString());
+    }
+
+    [Fact]
+    public void Native_FFmpeg_exit_code_is_numeric_and_checkpoint_is_strictly_allowlisted()
+    {
+        var error = VideoFaceFailureEvidence.Mark(
+            new InvalidDataException("External FFmpeg diagnostics are never output."),
+            "native-frame-extraction", toolExitCode: 1);
+
+        VideoAttemptFailureDiagnostic reported =
+            VideoAttemptFailureDiagnostics.Sanitize(
+                VideoAttemptFailureDiagnostics.FromException(error));
+        Assert.Equal("native-frame-extraction", reported.SupervisorCheckpoint);
+        Assert.Equal(1, reported.ToolExitCode);
+        Assert.Throws<ArgumentException>(() => VideoFaceFailureEvidence.Mark(
+            new InvalidDataException("sensitive"),
+            @"C:\private\source\video.mp4"));
+        Assert.Null(VideoFaceFailureEvidence.Read(
+            new InvalidDataException("without application checkpoint")));
+
+        InvalidDataException validation = new("decoder details stay private");
+        VideoFaceFailureEvidence.Mark(validation, "native-frame-validation");
+        Assert.Null(VideoFaceFailureEvidence.ReadExitCode(validation));
     }
 
     [Fact]
