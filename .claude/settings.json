@@ -32,11 +32,9 @@
     "ask": [
       "Bash(gh api *)",
       "PowerShell(gh api *)",
-      "Bash(gh issue create *)",
       "Bash(dotnet ef *)",
       "Bash(podman *)",
       "Bash(docker *)",
-      "PowerShell(gh issue create *)",
       "PowerShell(dotnet ef *)",
       "PowerShell(podman *)",
       "PowerShell(docker *)"
@@ -60,6 +58,7 @@
       "Bash(git switch *)",
       "Bash(git push *)",
       "Bash(gh pr create *)",
+      "Bash(gh issue create *)",
       "Bash(gh pr view *)",
       "Bash(gh pr list *)",
       "Bash(gh pr diff *)",
@@ -86,6 +85,7 @@
       "PowerShell(git switch *)",
       "PowerShell(git push *)",
       "PowerShell(gh pr create *)",
+      "PowerShell(gh issue create *)",
       "PowerShell(gh pr view *)",
       "PowerShell(gh pr list *)",
       "PowerShell(gh pr diff *)",
