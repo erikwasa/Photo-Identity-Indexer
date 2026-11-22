@@ -29,7 +29,7 @@ throw @"
 Invoke-MultiModelComparison.ps1 was retired by WI-0149 when the SQLite implementation
 and migration-era batch/match/evaluation-export command surface were removed.
 
-Completed comparison evidence remains documented under docs/delivery and
+Completed comparison evidence remains documented under docs/archive/delivery and
 `docs/operations/multi-model-comparison.md`. For current supported commands run:
 
   dotnet run --project src/PhotoIdentity.Cli -- --help

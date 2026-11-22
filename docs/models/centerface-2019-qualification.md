@@ -4,7 +4,7 @@ Status date: 2026-08-07
 
 State: **exact artifact verified; corrected OpenCV runtime validated; local-evaluation governance boundary accepted; governed 100-photo candidate passed M16 and WI-0038 rollout engineering is active**
 
-This record is the completed qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
+This record is the completed qualification evidence for [WI-0037](../archive/delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
 ## Exact artifact
 
@@ -118,6 +118,6 @@ PR #92 introduced a narrow neutral candidate outcome for legitimate faces that w
 
 ## Rollout boundary
 
-CenterFace confidence `0.5` single-pass is selected for [WI-0038](../delivery/work-items/WI-0038-detector-rollout.md) engineering after the maintainer instructed that work to continue.
+CenterFace confidence `0.5` single-pass is selected for [WI-0038](../archive/delivery/work-items/WI-0038-detector-rollout.md) engineering after the maintainer instructed that work to continue.
 
 Selection is not permission to replace existing face occurrences by ordinal. The canonical catalogue currently preserves identity assignments and review history by `face_occurrence_id`, so WI-0038 must reconcile old and new detections using geometry and landmarks, create new occurrences for genuinely new faces, route ambiguous mappings through review and retain a rollback path before full-archive processing.

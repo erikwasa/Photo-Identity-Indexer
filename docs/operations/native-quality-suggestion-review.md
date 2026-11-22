@@ -12,9 +12,9 @@ or collection/slideshow selection effect was introduced.
 **WI-0206 is accepted and closed as Archive cleanup product
 work.** The archive-side technical candidate queue and keyboard UX
 are no longer blocked pending another 129-photo review. The next
-distinct curation workstream is [WI-0203](../delivery/work-items/WI-0203-creative-collection-similarity-review.md)
+distinct curation workstream is [WI-0203](../archive/delivery/work-items/WI-0203-creative-collection-similarity-review.md)
 for similar photos in collections/slideshows, and a separately calibrated
-continuous quality-rating evaluation is [WI-0205](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md).
+continuous quality-rating evaluation is [WI-0205](../archive/delivery/work-items/WI-0205-continuous-photo-quality-rating.md).
 Do not reopen M37's consumed model held-out labels.
 
 ---
@@ -203,8 +203,8 @@ but Collections/Slideshows are treated as **one distinct curation
 workflow** rather than a second use of technical-only cleanup. The
 follow-ons are:
 
-- [Creative similarity review and scoped omission planning](../delivery/milestones/M39-creative-collection-curation.md)
-- [Continuous, calibrated per-revision quality rating with provenance](../delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
+- [Creative similarity review and scoped omission planning](../archive/delivery/milestones/M39-creative-collection-curation.md)
+- [Continuous, calibrated per-revision quality rating with provenance](../archive/delivery/work-items/WI-0205-continuous-photo-quality-rating.md)
 
 Neither future work item inherits M37's rejected automatic global
 suppression as a production permission. A raw technical candidate

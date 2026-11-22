@@ -1,6 +1,6 @@
 # Face detector candidate registry
 
-This registry is planning evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). It does not activate WI-0037, approve a model, install weights or change the current YuNet pipeline.
+This registry is planning evidence for [WI-0037](../archive/delivery/work-items/WI-0037-detector-candidate.md). It does not activate WI-0037, approve a model, install weights or change the current YuNet pipeline.
 
 The screening was recorded on 2026-08-06 so that a governed alternative-detector evaluation can start without repeating the initial market and provenance review if multi-scale YuNet remains below the M16 target.
 
@@ -214,4 +214,4 @@ For the selected candidate:
 - keep detector evidence separate from canonical identity decisions; and
 - promote only through WI-0038 after human review.
 
-See [Model manifests and governance](model-governance.md), [Recognition and identity matching](../architecture/identity-matching.md) and [M16 face detection recall](../delivery/milestones/M16-detector-recall.md).
+See [Model manifests and governance](model-governance.md), [Recognition and identity matching](../architecture/identity-matching.md) and [M16 face detection recall](../archive/delivery/milestones/M16-detector-recall.md).

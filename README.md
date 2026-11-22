@@ -17,11 +17,11 @@ Use these references when you need more detail:
 - [PostgreSQL operations](docs/operations/postgresql-operations.md)
 - [Operations documentation map](docs/operations/index.md), including clearly marked historical evaluation evidence
 - [Security and privacy](docs/architecture/security-and-privacy.md)
-- [Delivery roadmap](docs/delivery/roadmap.md)
+- [Delivery roadmap](docs/archive/delivery/roadmap.md)
 
 ## Development status
 
-Work items, their status and completion evidence live in GitHub Issues and their pull requests. The old repository work-item registry under `docs/delivery/` is historical and not maintained.
+Work items, their status and completion evidence live in GitHub Issues and their pull requests. The old repository work-item registry under `docs/archive/delivery/` is historical and not maintained.
 
 ## Prerequisites
 

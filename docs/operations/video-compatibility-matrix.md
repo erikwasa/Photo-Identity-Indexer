@@ -89,8 +89,8 @@ The workitem ends once its **first deliberately selected** expansion
 is proven. Remaining formats, larger videos, HDR, rotation, audio and
 other variants are deferred candidates—not automatic acceptance gates.
 
-See [WI-0210](../delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md),
-[WI-0207](../delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
+See [WI-0210](../archive/delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md),
+[WI-0207](../archive/delivery/work-items/WI-0207-opt-in-onedrive-video-hydration-and-release.md),
 [ADR-0012](../decisions/ADR-0012-isolated-video-media-architecture.md).
 
 ## WI-0210 read-only census checkpoint (2026-11-03)

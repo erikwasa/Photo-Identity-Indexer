@@ -48,7 +48,7 @@ Never commit personal photos, face crops, embeddings, biometric datasets, model 
 
 ## Work items
 
-Work items are GitHub Issues with acceptance criteria, a budget and a type label (`spike`, `build` or `cleanup`). Status lives in the issue and its PR, not in repository files. The old `docs/delivery/` registry (WI-XXXX documents, milestones and YAML status shards) is historical and not maintained; read it only when an issue links to a specific record.
+Work items are GitHub Issues with acceptance criteria, a budget and a type label (`spike`, `build` or `cleanup`). Status lives in the issue and its PR, not in repository files. The old `docs/archive/delivery/` registry (WI-XXXX documents, milestones and YAML status shards) is historical and not maintained; read it only when an issue links to a specific record.
 
 ## Testing and pull-request validation
 

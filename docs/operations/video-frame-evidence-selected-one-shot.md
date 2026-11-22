@@ -13,7 +13,7 @@ scratch marker remained; video controls returned to disabled, paused and
 unselected; photo/video work stayed idle. The operator reported bridge
 shutdown and Azure scale-down. This verifies the checkpoint 7 happy path,
 **not** the four full WI-0190 acceptance criteria. See the
-[work-item verification record](../delivery/work-items/WI-0190-video-frame-caption-embedding.md).
+[work-item verification record](../archive/delivery/work-items/WI-0190-video-frame-caption-embedding.md).
 
 **State: Maintained-host happy path accepted; broader WI-0190 acceptance remains open.** A single operator-selected
 **already-local, already-published SDR playable proxy** can now be sampled,

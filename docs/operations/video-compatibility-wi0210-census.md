@@ -215,4 +215,4 @@ candidate counts, review of one approved already-local full-range sample,
 explicit production-stage/class approval, any real new-proxy result,
 or altered admission policy. WI-0210 remains in progress.
 
-See [WI-0210](../delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md) and [staged matrix](video-compatibility-matrix.md).
+See [WI-0210](../archive/delivery/work-items/WI-0210-archive-driven-video-compatibility-expansion.md) and [staged matrix](video-compatibility-matrix.md).

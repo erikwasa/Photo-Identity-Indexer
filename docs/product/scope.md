@@ -37,7 +37,7 @@ The accepted roadmap then improves the permanent catalogue rather than replacing
 
 ## Video support after version 1 (M30, active development)
 
-The [M30 video milestone](../delivery/milestones/M30-video-media-support.md)
+The [M30 video milestone](../archive/delivery/milestones/M30-video-media-support.md)
 has already delivered the opt-in video catalogue and technical metadata,
 durable Rec.709 still posters, bounded local playable proxies, selected
 timestamped frame caption/embedding evidence and separate Video Search.
