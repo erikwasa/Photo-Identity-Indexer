@@ -110,7 +110,9 @@ public sealed class VideoFaceSelectedOneShotTests
                 "person Alice from original file", @"C:\originals\face.jpg"));
         Assert.DoesNotContain("private", sensitive.ToString());
         Assert.DoesNotContain("Alice", sensitive.ToString());
-        Assert.DoesNotContain("originals", sensitive.ToString());
+        // "originals" is part of the legitimate originalsMayHaveBeenOpened field.
+        // Match a distinctive part of the malicious source filename instead.
+        Assert.DoesNotContain("face.jpg", sensitive.ToString());
         using JsonDocument invalid = JsonDocument.Parse(sensitive.ToString());
         Assert.Equal("unclassified",
             invalid.RootElement.GetProperty("failureStage").GetString());
