@@ -15,9 +15,11 @@ Use these references when you need more detail:
 - [Documentation index](docs/index.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [PostgreSQL operations](docs/operations/postgresql-operations.md)
-- [Operations documentation map](docs/operations/index.md), including clearly marked historical evaluation evidence
 - [Security and privacy](docs/architecture/security-and-privacy.md)
-- [Delivery roadmap](docs/archive/delivery/roadmap.md)
+
+## Runtime
+
+The production catalogue is PostgreSQL running in Podman on WSL2 on the maintainer's Windows computer; see [PostgreSQL local runtime](docs/operations/postgresql-local-runtime.md). SQLite is retired and is not a supported catalogue.
 
 ## Development status
 

@@ -177,8 +177,7 @@ Catalogue commands that require a database use a PostgreSQL connection string fr
 
 Use [PostgreSQL production operations](postgresql-operations.md) for routine logical backup, isolated restore verification, restart and upgrade procedures. The old SQLite backup is not a current recovery target for the application after WI-0149.
 
-The accepted historical migration/rollback rehearsal remains documented in [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md). [Historical SQLite persistence operations](sqlite-persistence.md) is retained only so older delivery evidence remains understandable and link-valid.
-
+The accepted historical migration/rollback rehearsal remains documented in [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md).
 ## Readiness and specialized references
 
-Do not call a planned feature available merely because an old pilot/runbook describes it. Formal lifecycle status lives in the work-item registry. Use the [operations index](index.md) to distinguish current runbooks from retained experiment/migration evidence.
+Do not call a planned feature available merely because an old pilot/runbook describes it. Work-item status lives in GitHub Issues. Use the [documentation index](../index.md) for current runbooks; completed experiment and migration evidence is under [`docs/archive/`](../archive/).
