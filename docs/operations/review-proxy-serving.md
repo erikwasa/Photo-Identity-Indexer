@@ -165,7 +165,7 @@ Source roots and filenames remain server-side. Files On-Demand command failures 
 
 ## Human acceptance remains pending
 
-Slices 1–4 now have automated implementation coverage, but WI-0042 is not complete until the maintainer performs the combined real Windows/OneDrive review. Use `bounded-archive-acceptance.md` for that gate.
+Slices 1–4 now have automated implementation coverage, but WI-0042 is not complete until the maintainer performs the combined real Windows/OneDrive review. Use `docs/archive/operations/bounded-archive-acceptance.md` for that gate.
 
 That review includes the previously deferred Slice 2 explicit-original lifecycle, Slice 3 capacity/release behavior, Slice 4 source re-verification, and the still-missing human evidence for the 100-image multi-candidate proxy visual tuning decision. Automated tests and the 556-image aggregate scale measurement do not substitute for those human checks.
 

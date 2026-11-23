@@ -161,7 +161,7 @@ immediately after production Apply to check unrelated mappings too.
 
 Only after reviewing the PR, merging, and approving each specific
 batch, follow the EXISTING operator runbook
-docs/operations/archive-case-alias-approved-pilot.md:
+docs/archive/operations/archive-case-alias-approved-pilot.md:
 
 1. Stop Photo Identity (leave PostgreSQL running). Make a NEW full
    production backup after the first successful pilot and prove it

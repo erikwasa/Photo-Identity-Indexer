@@ -2,7 +2,7 @@
 
 > Checkpoint 6 adds persisted video-lane control and advances the supported
 > PostgreSQL schema to **v35**. The status/cancel commands require the current
-> version, so complete [the v34 → v35 isolated migration gate](video-processing-control-v35.md)
+> version, so complete [the v34 → v35 isolated migration gate](../archive/operations/video-processing-control-v35.md)
 > before using them against an upgraded maintained catalogue.
 
 The maintained Windows catalogue has been verified at **PostgreSQL schema v34**
