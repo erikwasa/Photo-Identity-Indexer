@@ -151,6 +151,19 @@ Use side-by-side replacement rather than overwriting a running application folde
 
 No catalogue migration or private-data copy is part of a normal package replacement because durable state is outside both package folders. Normal database schema migration remains the application's existing startup responsibility; use the PostgreSQL backup and isolated restore-verification procedure before risky maintenance.
 
+### Unfinished archive runs across an upgrade
+
+A durable archive run can outlive the package that created it, and its configuration records absolute repository and model paths. For bounded Archive advancement those package paths are replaceable runtime state, not archive identity. When the current analysis profile matches an unfinished run whose saved `RepositoryRoot` or `ModelDirectory` differs from the current runtime paths, the application:
+
+1. requests cancellation of the stale run;
+2. keeps previously recorded exact revision/profile completions;
+3. lets normal archive advancement create a current-runtime run for only the revisions still pending; and
+4. never copies models into, reopens or otherwise depends on the previous package directory.
+
+Explicit CLI `archive resume` semantics are unchanged. Automated regression tests cover stale-path detection (different side-by-side paths are stale; identical paths stay resumable).
+
+To check it after an upgrade: start the new package against the same catalogue, confirm the running `PhotoIdentity.Api.exe` is the new one, run **Advance archive**, and confirm that no error references the previous package directory and that analyzed images stay analyzed.
+
 ## Verification
 
 Automated package verification is:

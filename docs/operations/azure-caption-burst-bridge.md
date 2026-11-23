@@ -823,7 +823,7 @@ Confirm `minReplicas=0`. A bridge or Photo Identity process stopping does not it
 - [ADR-0010: local production execution](../decisions/ADR-0010-local-production-execution.md)
 - [Local caption and narration evaluation](local-caption-narration-evaluation.md)
 - [Local operator guide](local-operator-guide.md)
-- [Azure cost controls](../azure/cost-controls.md) — historical general Azure reference; validate current Container Apps/GPU billing before each burst
+- [Azure cost controls](../azure/constraints.md#cost-controls) — historical general Azure reference; validate current Container Apps/GPU billing before each burst
 
 ## Historical issue retirement: direct-remote proposal rejected, bridge accepted
 
