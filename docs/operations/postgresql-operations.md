@@ -104,7 +104,7 @@ For an optional copy to the signed-in OneDrive sync directory, add
 This copies files to a **local** sync directory, not directly to OneDrive's cloud.
 Verify that the backup appears in the OneDrive web UI and independently download
 and SHA-256-check the remote bytes before treating it as an independent recovery
-checkpoint; see [WI-0209 retention](postgres-wi0209-backup-retention.md).
+checkpoint; see [backup-file retention](#operator-managed-backup-file-retention-wi0209).
 The `.dump` contains private data and is not encrypted by the script.
 
 The streaming wrapper checks the complete PostgreSQL custom-archive decode,
@@ -153,9 +153,83 @@ A normal logical `pg_dump` is transactionally consistent and may be taken while 
 
 ## Operator-managed backup-file retention (WI-0209)
 
-The normal backup tool continues to produce a dump and SHA-256 manifest without automatic retention or removal. A separate, explicitly invoked [WI-0209 Windows backup-retention runbook](postgres-wi0209-backup-retention.md) and backup-management script support read-only inventory, registration of short-lived pre-change precautions, acceptance-controlled exact-file cleanup, and a protected restore-verified recovery checkpoint with manually confirmed independent off-disk availability. **Do not infer remote OneDrive durability from local sync status.** This new workflow never deletes unclassified backups, the protected checkpoint, remote objects or any PostgreSQL database.
+The normal backup tool continues to produce a dump and SHA-256 manifest without automatic retention or removal. The explicitly invoked `manage-postgres-backups.ps1` supports read-only inventory, registration of short-lived pre-change precautions, acceptance-controlled exact-file cleanup, and a protected restore-verified recovery checkpoint with manually confirmed independent off-disk availability. **Do not infer remote OneDrive durability from local sync status.** This workflow never deletes unclassified backups, the protected checkpoint, remote objects or any PostgreSQL database.
 
+The procedure is explicit and local: no scheduled rotation, OneDrive API, cloud transfer, or backup deletion based on age or on an isolated restore succeeding. (Restore verification below manages temporary restored **databases**, not backup files.)
 
+### Approved local root and read-only inventory
+
+Run from PowerShell 7 at the repository root:
+
+~~~powershell
+$backupRoot = Join-Path $env:LOCALAPPDATA 'PhotoIdentity\backups\postgresql'
+.\manage-postgres-backups.ps1 | Format-Table Name, Role, MiB, ManifestPresent, RestoreReportPresent, ReparsePoint
+~~~
+
+For an **individual already-existing backup**, inspect its *actual bytes* and restore report without changing its classification or retention state:
+
+~~~powershell
+$candidate = Join-Path $backupRoot '<existing-backup>.dump'
+.\manage-postgres-backups.ps1 -InspectBackup -BackupPath $candidate | Format-List
+~~~
+
+The inspection checks the dump hash/size, original manifest and any restore report. `EligibleForCheckpointPromotion=true` establishes only **local restore evidence**; it does not establish that an independent remote copy exists. `RemoteConfirmationRecorded=true` means an operator previously registered an attestation, **not** a live check of OneDrive availability. Promotion still requires independently retrieving and hashing the off-disk copy. A mismatched manifest or restore fingerprint causes inspection to fail.
+
+The inventory does not change files. Previously existing dumps are **unclassified** until individually registered; unclassified backups are never eligible for cleanup. The tool requires direct children of the approved backup directory, rejecting nested paths, traversal, links/junctions and reparse files (including online-only placeholders). Explicit `-BackupRoot` is for intentionally approved alternate directories; review that scope before using it.
+
+The only state file is local **retention-state.json** beside the backup files; it records pre-change, protected recovery checkpoint and superseded checkpoint roles. Never publish this private file, a dump, personal identifiers or remote evidence to the repository. Do not manually edit registry roles.
+
+### A. Pre-change precaution and acceptance-controlled retirement
+
+Identify the actual production catalogue before taking a precautionary backup. Stop the app if exact count-stable restore checks are required.
+
+~~~powershell
+$backup = Join-Path $backupRoot 'prechange-maintenance.dump'
+.\backup-postgres-catalogue.ps1 -DatabaseName '<confirmed-production-database>' -OutputPath $backup
+$sha = (Get-Content -LiteralPath "$backup.json" -Raw | ConvertFrom-Json).backupSha256
+.\manage-postgres-backups.ps1 -RegisterPreChange -BackupPath $backup -ExpectedSha256 $sha -ChangeReference 'your-specific-change'
+~~~
+
+A passing backup or isolated restore **does not establish that the subsequent database/application change succeeded**. Keep the pre-change backup for failures, interruptions and unverified changes. Before removal, review a **read-only exact-file plan**; it validates the selected backup and lists only the files that would be targeted, without deleting anything:
+
+~~~powershell
+.\manage-postgres-backups.ps1 -PlanRemoval -BackupPath $backup -ExpectedSha256 $sha | Format-List
+~~~
+
+Only after the actual post-change tests have passed:
+
+~~~powershell
+.\manage-postgres-backups.ps1 -RemovePreChange -BackupPath $backup -ExpectedSha256 $sha -ConfirmChangeAccepted -ChangeAcceptanceEvidence 'passed-post-change-verification-reference' -ConfirmRemoval
+~~~
+
+This verifies the exact dump SHA-256 and manifest before deleting its dump and only its related JSON manifest and optional restore-verification sidecar. No wildcard, automatic age-based deletion or implicit acceptance. Failures report an incomplete operation and retain the classification for investigation. If a sidecar was already deleted during a failed operation, manual recovery may be needed; never use a wildcard retry.
+
+### B. One protected recovery checkpoint and replacement
+
+A candidate recovery checkpoint must have a matching SHA-256 manifest and a **passing isolated restore verification** whose temporary database cleanup succeeded. The same verified pre-change dump may be promoted rather than making another dump.
+
+Confirm that an **off-disk** copy exists and is usable, preferably through the signed-in **OneDrive web UI**. Inspect the actual remote item, retrieve it independently of the local sync folder, and calculate SHA-256 on those retrieved bytes. A OneDrive sync icon or local OneDrive-synced directory alone is **not** evidence of another physical copy. Record remote availability and hash-check details in a private operator log.
+
+~~~powershell
+$localSha = (Get-Content -LiteralPath "$backup.json" -Raw | ConvertFrom-Json).backupSha256
+$remoteSha = '<SHA-256-of-independently-retrieved-remote-file>'
+.\manage-postgres-backups.ps1 -SetRecoveryCheckpoint -BackupPath $backup -ExpectedSha256 $localSha -RemoteSha256 $remoteSha -RemoteConfirmation 'OneDrive web copy independently retrieved and checked; see private operator log' -ConfirmIndependentCopy
+~~~
+
+The tool verifies local hash, manifest, successful restore report, supplied remote SHA-256 and **explicit operator attestation**. It never accesses OneDrive APIs or claims to have verified off-device availability itself. If independent confirmation fails, do not promote or retire anything.
+
+To replace a checkpoint, create and fully verify a separately named backup, confirm its remote copy, then repeat `-SetRecoveryCheckpoint` using the new file. The former checkpoint is **marked superseded but not deleted**. Only when the replacement remains verified and protected:
+
+~~~powershell
+.\manage-postgres-backups.ps1 | Format-Table Name, Role, ManifestPresent, RestoreReportPresent
+.\manage-postgres-backups.ps1 -RemoveSuperseded -BackupPath $oldBackup -ExpectedSha256 $oldSha -ConfirmRemoval
+~~~
+
+Removal rechecks the **current** checkpoint's local hash, manifest and passing restore report. If any evidence is missing, the former checkpoint is retained. The active checkpoint can never be deleted using either cleanup mode. This tool deletes only local approved files, **not remote recovery copies**; do not manually delete the only independent cloud copy.
+
+The helper rejects unknown files, hashes, missing manifests, failed restore reports, incomplete remote confirmation, reparse-point paths, missing post-change acceptance, and attempts to remove the sole recovery checkpoint. Synthetic tests: `pwsh -NoProfile -File .\tests\PowerShell\postgres-backup-retention.tests.ps1` (CI runs it). The helper never modifies PostgreSQL production data, legacy restore databases, OneDrive objects, Podman volumes or the Windows VHDX. Accepted on the maintained host on 2026-11-01 (WI-0209), with one operator-attested recovery checkpoint registered; that attestation is not continuous cloud monitoring.
+
+## Isolated restore verification
 
 For acceptance, stop Photo Identity first. Then create a fresh backup while the catalogue is quiescent:
 
@@ -184,7 +258,61 @@ The verifier:
 
 A passing fresh run normally reports `passed=true`, `cleanupStatus=removed`, and `cleanupRequired=false`. The backup `.dump`, SHA-256 manifest and comparison JSON remain intact. Restore failures, comparison failures, interrupted runs and report-publishing failures retain the isolated database for investigation. Any cleanup failure is reported and causes the verifier to fail even when `passed=true`; do not treat `passed` alone as proof that storage was reclaimed.
 
-**Maintained Windows acceptance (WI-0208, 2026-11-01):** A verified fresh restore of the approximately 17.86 GiB production catalogue passed its comparisons and then automatically removed its exact owned temporary database. PostgreSQL autovacuum workers briefly blocked the normal cleanup window; the verifier's bounded, autovacuum-only extension allowed maintenance to finish before a non-force drop. The final report recorded `passed=true`, `cleanupStatus=removed`, `cleanupRequired=false`, independent inventory showed zero copies and the backup plus manifest remained. Client/mixed/unknown sessions, ownership mismatches and excessive maintenance still fail closed. The unmarked legacy restored database remains protected. See the [WI-0208 acceptance record](postgres-wi0208-verification.md); the final acceptance log did not include paired Podman-volume/VHDX measurements.
+**Maintained Windows acceptance (WI-0208, 2026-11-01):** A verified fresh restore of the full-size production catalogue passed its comparisons and then automatically removed its exact owned temporary database. PostgreSQL autovacuum workers briefly blocked the normal cleanup window; the verifier's bounded, autovacuum-only extension allowed maintenance to finish before a non-force drop. Client/mixed/unknown sessions, ownership mismatches and excessive maintenance still fail closed. The unmarked legacy restored database remains protected. The acceptance log did not include paired Podman-volume/VHDX measurements. See [Full restore acceptance run](#full-restore-acceptance-run) to repeat it.
+
+### Maintenance-aware automatic cleanup
+
+For a *fresh successful* verification, the ordinary short grace is 11 checks separated by 2 seconds. If the sessions at its end are **exclusively autovacuum workers**, automatic cleanup may continue for at most **60 additional checks at 10-second intervals** (plus diagnostic-query time). The verifier revalidates the exact database name, matching ownership marker and zero sessions on each check before an **ordinary non-force** `dropdb`. Other client/backend types, missing diagnostics, changed provenance and persistent maintenance beyond the bound fail safely. PostgreSQL 18 autovacuum is cluster-managed, so **do not disable autovacuum for production** or rely on `ALLOW_CONNECTIONS false` to exclude maintenance workers.
+
+The verifier records an aggregate diagnostic snapshot **for every busy cleanup attempt** in the same `*.restore-verification.json`: backend type, recognized client kind (`psql`, `pg_restore`, unnamed or other), activity state, and the number of ongoing `ANALYZE` and `VACUUM` operations. No backend PID, user, SQL statement, media, address or original application name is included. Inspect them for one run:
+
+~~~powershell
+$report = Get-Content -LiteralPath "$backupPath.restore-verification.json" -Raw | ConvertFrom-Json
+$report | Select-Object passed, cleanupStatus, cleanupRequired, verificationDatabase
+
+foreach ($sample in @($report.cleanupBusyDiagnostics)) {
+    if ($sample.diagnosticUnavailable) {
+        [pscustomobject]@{ Attempt = $sample.attempt; ObservedSessions = $sample.sessionsAtOwnershipCheck; Diagnostic = 'unavailable' }
+        continue
+    }
+    [pscustomobject]@{
+        Attempt = $sample.attempt
+        TimestampUtc = $sample.snapshot.capturedAtUtc
+        ObservedSessions = $sample.sessionsAtOwnershipCheck
+        AnalyzeRunning = $sample.snapshot.analyzeRunning
+        VacuumRunning = $sample.snapshot.vacuumRunning
+    }
+    $sample.snapshot.activity | Format-Table backendType, clientKind, state, sessions
+}
+~~~
+
+Classify the result before changing code:
+
+- **Only `autovacuum worker` plus active `ANALYZE` or `VACUUM`**: PostgreSQL maintenance, not an application-client leak, blocked cleanup. Do not terminate maintenance workers.
+- **`client backend` / `psql` or `pg_restore`**: examine verifier connection lifecycle; continued use of those clients after completion indicates a process-lifetime problem.
+- **`client backend` / `other-client` or `unnamed`**: investigate another client connecting to the generated database.
+- **An internal worker other than autovacuum**: investigate that worker class before deciding whether cleanup should wait.
+- **Differences between `sessionsAtOwnershipCheck` and activity totals**: these are separate read-only snapshots; compare timestamps, not a single count.
+
+If cleanup failed, **do not create another full restore**. The verifier also writes a last-chance `cleanupSessionSummary` on failure. Recheck live sessions read-only; after the database becomes idle and its marker is verified, use only the exact-name removal below. Do not rewrite a failed report to claim it succeeded.
+
+~~~powershell
+$restoreDb = [string]$report.verificationDatabase
+if ($restoreDb -cnotmatch '^photoidentity_restore_[0-9]{14}_[a-f0-9]{6}$') {
+    throw 'Unexpected restore database name.'
+}
+Push-Location .\deploy\postgres
+try {
+    $container = (podman compose ps -q postgres).Trim()
+    $sql = "SELECT backend_type, COALESCE(state, 'n/a') AS state, COUNT(*) AS sessions FROM pg_stat_activity WHERE datname = '$restoreDb' GROUP BY backend_type, state ORDER BY backend_type, state;"
+    podman exec -e "CHECK_SQL=$sql" $container sh -lc 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "$CHECK_SQL"'
+}
+finally {
+    Pop-Location
+}
+~~~
+
+No `--force`, process termination, bulk cleanup or online VHDX compaction is permitted.
 
 For a subsequent migration/schema rehearsal that **needs the actual restored database**, opt in to retention:
 
@@ -239,6 +367,76 @@ The command refuses missing/mismatched markers, production-name matches, active 
 ### Windows/Podman storage behavior
 
 Dropping a restored database releases PostgreSQL-managed space inside the Podman VM. **Windows free space need not increase** because the WSL/Podman VHDX may retain its allocated size. For maintenance evidence, record SQL sizes (`pg_database_size` and inventory) and separately measure Windows volume free bytes before/after. Optional VHDX compaction requires a verified recovery backup, a fully stopped Photo Identity/PostgreSQL/Podman machine, an offline/detached virtual disk and a supported Windows disk-management method; never compact a mounted live VHDX or delete the production Podman volume. This is not part of routine verification and is not automated by WI-0208.
+
+### Full restore acceptance run
+
+Use this to repeat the maintained-host restore acceptance. It does **not** delete backup files or production data. It runs one complete restore and may temporarily use about the catalogue's size inside the Podman virtual disk; confirm there is room first and never compact the VHDX to make room for a running restore.
+
+1. Identify the **actual** active production database from the launcher/connection or observed activity (see above). Never select by a familiar name alone.
+2. Stop Photo Identity and verify it has exited. Leave the PostgreSQL Compose service running. Confirm a safe recovery backup exists independently of the disk being exercised.
+3. Run the source-free tests:
+
+~~~powershell
+pwsh -NoProfile -File .\tests\PowerShell\postgres-restore-lifecycle.tests.ps1
+pwsh -NoProfile -File .\tests\PowerShell\postgres-restore-verifier.integration.ps1
+~~~
+
+Optionally, with Photo Identity stopped, run the disposable real-PostgreSQL test. It creates a **new, randomly named Compose project and volume** with a tiny synthetic database (random high localhost port, random password), exercises cleanup, retention, duplicate retry, read-only resume, confirmed disposal and a failing row-count comparison, and removes the project when done. If Podman lacks storage, skip it and report it as unverified rather than using production to simulate failure.
+
+~~~powershell
+pwsh -NoProfile -File .\tests\PowerShell\postgres-restore-disposable.integration.ps1 -ConfirmDisposableService
+~~~
+
+Record the before state without modifying any database:
+
+~~~powershell
+$before = @(.\manage-postgres-restores.ps1)
+$before | Format-Table Name, SizeGiB, Sessions, Ownership
+$windowsFreeBeforeGiB = [math]::Round((Get-PSDrive -Name C).Free / 1GB, 2)
+Push-Location .\deploy\postgres
+podman compose ps
+podman system df
+Pop-Location
+~~~
+
+Run one restore from a fresh backup taken while the application is stopped, and check the outcome:
+
+~~~powershell
+$productionDb = '<confirm-active-production-database>'
+.\backup-postgres-catalogue.ps1 -DatabaseName $productionDb
+
+# Use the actual .dump path just printed by the wrapper.
+$backupPath = '<exact-path-to-new-backup.dump>'
+.\verify-postgres-backup-restore.ps1 -BackupPath $backupPath -ApplicationStopped
+
+$report = Get-Content -LiteralPath "$backupPath.restore-verification.json" -Raw | ConvertFrom-Json
+$report | Select-Object passed, cleanupStatus, cleanupRequired, verificationDatabase, sourceDatabaseBytes, restoredDatabaseBytes
+if (-not $report.passed -or $report.cleanupStatus -ne 'removed' -or $report.cleanupRequired) {
+    throw 'Restore success/cleanup acceptance did not pass.'
+}
+$after = @(.\manage-postgres-restores.ps1)
+if (@($after | Where-Object Name -eq $report.verificationDatabase).Count -ne 0) {
+    throw 'A supposedly removed restored database is still in inventory.'
+}
+if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath "$backupPath.json" -PathType Leaf)) {
+    throw 'The source backup or hash evidence was unexpectedly removed.'
+}
+~~~
+
+Record the after state separately; Windows free space may **not** increase (see storage behavior above):
+
+~~~powershell
+$after | Format-Table Name, SizeGiB, Sessions, Ownership
+$windowsFreeAfterGiB = [math]::Round((Get-PSDrive -Name C).Free / 1GB, 2)
+Push-Location .\deploy\postgres
+podman system df
+Pop-Location
+~~~
+
+Testing explicit retention creates **another full restored database**; run it only when capacity permits. Use `-RetainRestoredDatabase`, confirm `cleanupStatus=retained` and `cleanupRequired=true`, then remove that copy with the exact-name `manage-postgres-restores.ps1 -RemoveDatabase ... -ConfirmRemoval` command above. For simulated restore, comparison, report-write and cleanup failures, rely on the synthetic CI tests; never force failures against production.
+
+Report: the synthetic test results; backup/hash/row-comparison success; `passed` and `cleanupStatus`; absence from inventory; source/restore sizes; Podman disk/volume observations; Windows free space before/after; and whether retention was tested or skipped. Do **not** share dump contents, private catalogue paths, connection strings, usernames, identities or photos.
 
 The maintainer completed this acceptance successfully on 2026-09-12 from a stopped production source. The custom-format dump was hash-recorded, restored into an isolated database, and passed schema/table/count/constraint comparison before that isolated database was explicitly removed.
 

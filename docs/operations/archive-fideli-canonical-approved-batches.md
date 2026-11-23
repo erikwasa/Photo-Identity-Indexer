@@ -229,7 +229,7 @@ batches during its validity window; do not repeat the 19 GiB restore
 for every batch.
 
 For each explicitly approved batch, use the established Apply/Restore
-commands in `docs/operations/archive-case-alias-approved-pilot.md`,
+commands in `docs/archive/operations/archive-case-alias-approved-pilot.md`,
 adding the exact canonical policy switch and that batch's separate
 manifest, metadata, hash and private receipt directory. After Apply:
 

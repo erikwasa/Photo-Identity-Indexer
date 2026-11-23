@@ -74,7 +74,7 @@ coverage; **1/12 has confirmed new production playback**
 and no inference is made about the other 11.
 No poster/frame/search, HLG or online-only support was
 added by this work item. See the
-[accepted one-step production runbook](video-fullrange-wi0210-production-acceptance.md).
+[accepted one-step production runbook](../archive/operations/video-fullrange-wi0210-production-acceptance.md).
 
 ## Choosing the first compatibility expansion
 
@@ -141,7 +141,7 @@ dry-run authorizes reading an original; the read requires
 explicit separate `--read-local-bytes` approval. Even a
 successful SHA-256 proof will not establish independent
 actual `color_range=pc` or camera colour quality.
-See [the one-revision source-proof runbook](video-fullrange-wi0210-source-proof.md).
+See [the one-revision source-proof runbook](../archive/operations/video-fullrange-wi0210-source-proof.md).
 **Checkpoint 7 real-original SHA passed** on one deliberately
 selected, already-local exact Rec.709 `yuvj420p` candidate,
 without hydration, jobs, worker changes or derivatives.
@@ -150,7 +150,7 @@ evaluation**, including actual independent input range/colour
 FFprobe, unregistered bounded conversion, limited-range
 output validation, post-trial original SHA and operator visual
 review; not further isolated preparatory commands.
-See [the real-video evaluation runbook](video-fullrange-wi0210-real-evaluation.md).
+See [the real-video evaluation runbook](../archive/operations/video-fullrange-wi0210-real-evaluation.md).
 **Real-camera source-probe update (2026-11-04):**
 a maintained-host trial returned the precise code
 `source-stream-layout-unsupported`, with no conversion or
@@ -163,7 +163,7 @@ a hypothesis about the selected source, not a verified
 stream inventory or a claim of working full-range colour;
 real input colour/geometry, conversion and visual acceptance
 are still pending. See
-[the real-video evaluation runbook](video-fullrange-wi0210-real-evaluation.md).
+[the real-video evaluation runbook](../archive/operations/video-fullrange-wi0210-real-evaluation.md).
 **Most recent live source gate (2026-11-04):**
 The third authorized real-file input probe failed safely with
 `source-ancillary-stream-unapproved`. A `data` stream is present
@@ -203,12 +203,12 @@ all metadata and data, and independent output probing
 checks limited-range Rec.709 before lease-fenced
 publication. Existing browser playback consumes the
 registered derivative. No rollout/actual-playable count
-is claimed before the [one-step operator acceptance](video-fullrange-wi0210-production-acceptance.md).
+is claimed before the [one-step operator acceptance](../archive/operations/video-fullrange-wi0210-production-acceptance.md).
 
 Historical note: the restrictions above applied before the final merged production integration. **After PR #734, this exact local-only Rec.709 full-range class is approved through its distinct opt-in profile; one published proxy has passed playback.**
-See [the synthetic verification runbook](video-fullrange-wi0210-synthetic-acceptance.md)
-and [the post-merge local availability check](video-compatibility-wi0210-local-check.md).
-See the [WI-0210 census runbook](video-compatibility-wi0210-census.md).
+See [the synthetic verification runbook](../archive/operations/video-fullrange-wi0210-synthetic-acceptance.md)
+and [the post-merge local availability check](../archive/operations/video-compatibility-wi0210-local-check.md).
+See the [WI-0210 census runbook](../archive/operations/video-compatibility-wi0210-census.md).
 
 ## WI-0207 live acceptance and first-time OneDrive discovery (2026-11-08)
 

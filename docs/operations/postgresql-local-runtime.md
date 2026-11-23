@@ -53,7 +53,7 @@ The script does not print the configured PostgreSQL password or connection strin
 
 ## Connect Photo Identity to PostgreSQL
 
-The supported production launcher keeps the PostgreSQL connection string outside source control and `launcher.json`. Persist the private connection string in a Windows environment variable and configure the launcher with only that environment-variable name; PostgreSQL is the unconditional runtime catalogue. See [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) for the accepted WI-0102 boundary.
+The supported production launcher keeps the PostgreSQL connection string outside source control and `launcher.json`. Persist the private connection string in a Windows environment variable and configure the launcher with only that environment-variable name; PostgreSQL is the unconditional runtime catalogue. See [PostgreSQL catalogue migration and cutover](../archive/operations/postgresql-catalogue-cutover.md) for the accepted WI-0102 boundary.
 
 For an ad-hoc development shell, a direct process environment variable can still be used:
 

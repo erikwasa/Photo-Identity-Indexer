@@ -5,8 +5,8 @@ on:
     paths:
       - Invoke-MultiModelComparison.ps1
       - .github/workflows/multi-model-workflow.yml
-      - docs/operations/multi-model-comparison.md
-      - docs/operations/examples/multi-model-comparison.example.json
+      - docs/archive/operations/multi-model-comparison.md
+      - docs/archive/operations/examples/multi-model-comparison.example.json
   push:
     branches:
       - main

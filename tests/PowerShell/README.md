@@ -25,7 +25,7 @@ A separate **opt-in real Podman/PostgreSQL fixture** uses a new randomly named C
 pwsh -NoProfile -File .\tests\PowerShell\postgres-restore-disposable.integration.ps1 -ConfirmDisposableService
 ~~~
 
-Real Windows/Podman acceptance is documented separately in [the WI-0208 operator procedure](../../docs/operations/postgres-wi0208-verification.md).
+Real Windows/Podman acceptance is documented separately in [the WI-0208 operator procedure](../../docs/operations/postgresql-operations.md#full-restore-acceptance-run).
 
 The Windows streaming PostgreSQL backup helper has source-free tests for
 native stdout/stdin byte handling, failure exit propagation, collision-safe

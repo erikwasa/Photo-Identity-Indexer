@@ -90,3 +90,63 @@ With the PostgreSQL-authoritative catalogue at schema version 23 and the explici
 - the 11-photo viewer sequence showed no original-open hash reads in the repeated-first-preview phase.
 
 These results do not justify a PostgreSQL query/index rewrite or immutable-verification cache as the first correction. The next evidence target is ordered distinct-image latency, followed by browser-visible request/render/prefetch timing if the direct sequence remains bounded.
+
+## Browser-side diagnostics
+
+Once direct-server serving is shown to stay bounded, measure the browser playback surface. The browser diagnostic is identity-free. It records at most the first 50 displayed slideshow images in one browser session and submits only:
+
+- a one-based sample sequence number;
+- elapsed milliseconds from insertion of the staged slideshow image until it becomes the visible presentation layer after load/decode and any crossfade (WI-0129);
+- same-origin Resource Timing duration when the browser exposes it; and
+- whether an application-owned prefetch for that resource had already completed before the staged image was inserted.
+
+It does **not** submit or persist collection names, collection identifiers, revision identifiers, filenames, image URLs, source paths, image content, credentials or embeddings. Posting a sample is best-effort and never blocks display, navigation, autoplay, fullscreen or protected-mode behavior.
+
+### Browser metrics
+
+The throughput endpoint exposes:
+
+- `slideshow-browser-image-presentation`: aggregate staged-DOM-to-visible-layer time, including load/decode readiness and any non-reduced-motion crossfade;
+- `slideshow-browser-image-resource`: aggregate browser Resource Timing duration when available;
+- `slideshow-browser-image-presentation-position-NN`: bounded per-position visible-presentation timing, used to detect growth as playback advances;
+- `slideshow-browser-prefetch-hits` / `slideshow-browser-prefetch-misses`: whether a completed application-owned prefetch existed at staging time.
+
+The prefetch classification uses the slideshow's explicit in-memory prefetch state captured at staging, not the latest Resource Timing entry. Per-element readiness timestamps (`decode()` readiness vs. final visibility) stay in browser memory for tests and debugging and are never sent to the server.
+
+### Real-phone workflow
+
+Start the application normally and verify `/health`. On the Windows host, reset diagnostics:
+
+```powershell
+.\measure-slideshow-browser-performance.ps1 -Reset
+```
+
+On the supported phone/browser:
+
+1. open the read-only slideshow library;
+2. start the representative saved Smart Collection;
+3. advance through at least 10 distinct photos, preferably the 11-photo collection used by the direct-server probe;
+4. use the navigation style being verified (autoplay, tap or swipe);
+5. include portrait and landscape photos and at least one loop boundary;
+6. leave the slideshow once enough samples are collected.
+
+Back on Windows, capture the report:
+
+```powershell
+.\measure-slideshow-browser-performance.ps1
+```
+
+The JSON goes under the current user's temporary `PhotoIdentity\slideshow-performance` directory unless `-OutputPath` is supplied. It contains the browser timing/prefetch evidence plus the server-side `collection-viewer-preview-open`, `original-verification-hash`, `api-collection-request` and `api-slideshow-request` stages and aggregate original hash-read statistics from the same diagnostics generation.
+
+Reference baseline (2026-09-11, before prefetch deduplication): 11 displayed images caused 39 `collection-viewer-preview-open` operations and 22 original hash reads. The correction keeps unchanged prefetch `Image` objects alive and retains the previous desired generation once. After it, look for a material reduction from that baseline, credible prefetch hits and no latency growth. WI-0129 redefined presentation time to final visibility, so compare Resource Timing and server stages with the baseline rather than presentation values.
+
+### Interpreting browser results
+
+Compare `browserPresentationSequence` with `browserStages`:
+
+- If visible-presentation time grows through the sequence while `slideshow-browser-image-resource` stays low, the delay is in browser decode/transition/Blazor presentation rather than server or network transfer.
+- If presentation and Resource Timing are both high, investigate phone network and content serving, and compare `collection-viewer-preview-open` and `original-verification-hash` from the same report.
+- A slow presentation recorded as a prefetch hit points at decode, transition or playback state, not server retrieval.
+- If slow transitions are mostly prefetch misses, check that the bounded prefetch is retained and scheduled early enough before considering a larger window.
+
+Do not change PostgreSQL query shape, immutable verification semantics, prefetch window size or image quality only because a stage exists. Choose a correction only when real-phone evidence makes that stage material.

@@ -126,7 +126,7 @@ timestamps 3,075 and 9,225 milliseconds within 12,300 milliseconds.
 No originals, OneDrive hydration, caption/vector return, queue write or schema
 change was reported. This is currentness/storage verification only; it is
 not CPU/GPU accounting, retrieval quality or representative clip coverage.
-See the [separate scene coverage command](video-frame-scene-coverage.md). It does
+See the [separate scene coverage command](../archive/operations/video-frame-scene-coverage.md). It does
 not grant permission to enable automatic video work, resume OneDrive
 online-only hydration or dispatch to Azure. Remaining WI-0190 acceptance:
 disturbance/cancellation/preemption tests, explicit unsupported/oversized

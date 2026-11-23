@@ -4,11 +4,11 @@ Candidate models are installed and evaluated alongside the accepted baseline. Th
 
 ## Active detector candidate: CenterFace
 
-The [face detector candidate registry](face-detector-candidate-registry.md) pre-screened alternatives for WI-0037. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order.
+The [face detector candidate registry](../archive/models/face-detector-candidate-registry.md) pre-screened alternatives for WI-0037. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order.
 
-WI-0037 became active on 2026-08-07 after governed multi-scale YuNet candidates failed the complete M16 gate. CenterFace ONNX is the first runnable detector candidate. The [CenterFace qualification record](centerface-2019-qualification.md) pins the exact upstream artifact, SHA-256, bounded dynamic input policy, decoder contract, landmark mapping and unresolved governance conditions.
+WI-0037 became active on 2026-08-07 after governed multi-scale YuNet candidates failed the complete M16 gate. CenterFace ONNX is the first runnable detector candidate. The [CenterFace qualification record](../archive/models/centerface-2019-qualification.md) pins the exact upstream artifact, SHA-256, bounded dynamic input policy, decoder contract, landmark mapping and unresolved governance conditions.
 
-The candidate implementation adds a dedicated ONNX Runtime adapter and local-batch detector selection. It is **not yet authorised for the fixed 100-photo comparison** until the Windows build/tests, exact model installation and disposable smoke procedure in the [CenterFace detector runbook](../operations/centerface-detector-runs.md) pass.
+The candidate implementation adds a dedicated ONNX Runtime adapter and local-batch detector selection. It is **not yet authorised for the fixed 100-photo comparison** until the Windows build/tests, exact model installation and disposable smoke procedure in the [CenterFace detector runbook](../archive/operations/centerface-detector-runs.md) pass.
 
 The first full candidate is predeclared as `centerface-2019-fp32`, confidence `0.5`, `single-pass`, maximum source long edge `1600` before multiple-of-32 rounding, SFace FP32 and padding `0.25`. Do not use smoke images to tune that configuration.
 
@@ -65,7 +65,7 @@ Expected success signals:
 
 ## Processing and coexistence
 
-The [historical multi-model comparison workflow](../operations/multi-model-comparison.md) records the accepted FP32/INT8 evidence, but its automation and catalogue-opening commands are retired. New comparison work must be explicitly scoped against PostgreSQL/provider-neutral contracts and must not create a separate candidate catalogue.
+The [historical multi-model comparison workflow](../archive/operations/multi-model-comparison.md) records the accepted FP32/INT8 evidence, but its automation and catalogue-opening commands are retired. New comparison work must be explicitly scoped against PostgreSQL/provider-neutral contracts and must not create a separate candidate catalogue.
 
 Baseline and candidate embeddings and suggestions therefore coexist. Installing, running or removing the candidate does not alter persisted baseline embeddings, people, assignments, rejections or append-only review history.
 
