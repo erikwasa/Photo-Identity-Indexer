@@ -1,85 +1,15 @@
 # Documentation index
 
-## Start here
-
-- [README and project orientation](../README.md)
-- [Local operator guide](operations/local-operator-guide.md)
-- [PostgreSQL operations](operations/postgresql-operations.md)
-- [Operations documentation map](operations/index.md)
+- [README](../README.md): what the project is, prerequisites and how to verify the repository
+- [Local operator guide](operations/local-operator-guide.md): the normal operating path
+- [PostgreSQL local runtime](operations/postgresql-local-runtime.md): the Podman/WSL2 PostgreSQL service
+- [PostgreSQL operations](operations/postgresql-operations.md): backup, restore and verification
 - [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Architecture overview](architecture/overview.md)
+- [Canonical data model](architecture/data-model.md)
+- [Security and privacy](architecture/security-and-privacy.md)
+- [Architecture decisions](decisions/index.md)
 - [Glossary](glossary.md)
 
-The local operator guide is the authoritative normal operating path. Specialized operations documents are classified in the operations index so completed experiment and migration records are not mistaken for current product instructions.
-
-Work items and their status live in GitHub Issues. The delivery documents linked below are the historical registry and are not maintained.
-
-## Operations
-
-- [Operations documentation map](operations/index.md)
-- [Local operator guide](operations/local-operator-guide.md)
-- [PostgreSQL operations](operations/postgresql-operations.md)
-- [Azure caption burst through a localhost bridge](operations/azure-caption-burst-bridge.md) — conditional operator procedure for temporary generated-caption GPU acceleration under ADR-0011
-- [Testing and CI strategy](operations/testing-and-ci-strategy.md)
-- [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
-- [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
-- [Historical SQLite persistence record — retired](operations/sqlite-persistence.md)
-
-## Architecture
-
-- [System overview](architecture/overview.md)
-- [Principles](architecture/principles.md)
-- [Applications](architecture/applications.md)
-- [Module boundaries](architecture/module-boundaries.md)
-- [Canonical data model](architecture/data-model.md)
-- [Recognition and matching](architecture/identity-matching.md)
-- [Portable processing bundles](architecture/portable-bundles.md)
-- [Security and privacy](architecture/security-and-privacy.md)
-
-## Product
-
-- [Vision](product/vision.md)
-- [Product scope](product/scope.md)
-- [Protected Smart Collection slideshow](product/slideshow.md)
-- [Source-copy lifecycle and privacy exclusion](product/source-copy-lifecycle.md)
-- [Non-goals](product/non-goals.md)
-- [Success criteria](product/success-criteria.md)
-
-## Sources and processing
-
-- [OneDrive synchronised source](sources/onedrive-sync.md)
-- [Hydration and staging](sources/staging-and-hydration.md)
-
-## Models
-
-- [Evaluation method](models/evaluation-method.md)
-- [Baseline models](models/baseline-models.md)
-- [Candidate models](models/candidate-models.md)
-- [Model manifests and governance](models/model-governance.md)
-
-## Azure — historical reference plus one narrow caption exception
-
-- [Tenant and identity constraints](azure/constraints.md)
-- [Identity-free execution](azure/identity-free-execution.md)
-- [Cost controls](azure/cost-controls.md)
-
-The retired Azure VM/checkpoint strategy remains historical. [ADR-0013](decisions/ADR-0013-optional-operator-controlled-remote-compute.md) keeps normal processing local while allowing deliberate inference in operator-controlled Azure apps, not unvetted third-party black-box services. [ADR-0011](decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) is the existing photo-caption bridge; video offload requires its own implementation.
-
-## Delivery (historical, not maintained)
-
-- [About this archive](archive/delivery/README.md)
-- [Local production strategy](archive/delivery/local-first-plan.md)
-- [Roadmap](archive/delivery/roadmap.md)
-- [Milestones](archive/delivery/milestones/)
-- [Work items](archive/delivery/work-items/)
-- [Historical GitHub issue retirement audit and canonical work-item map](archive/delivery/retired-github-issues-2026-10-22.md)
-- [Canonical work-item registry](archive/delivery/status/work-items.yaml)
-- [Canonical milestone registry](archive/delivery/status/milestones.yaml)
-- [Risks](archive/delivery/risks.md)
-- [Templates](archive/delivery/templates/)
-
-## Decisions
-
-- [Architecture decision index](decisions/index.md)
-
-Accepted ADRs describe current intent. Superseding decisions use a new ADR and retain the earlier record.
+Other files under `docs/` describe individual subsystems. Work items and their status live in GitHub Issues.
+[`archive/`](archive/) holds historical records (delivery registry, completed experiments and checkpoints); it is not maintained.

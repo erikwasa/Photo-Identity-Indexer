@@ -381,6 +381,12 @@ jobs:
           ./tests/PowerShell/archive-fideli-retirement-readiness.tests.ps1
           ./tests/PowerShell/archive-fideli-canonical-preview.tests.ps1
 
+      - name: Check README and docs index links
+        shell: pwsh
+        run: |
+          ./tests/PowerShell/doc-links.tests.ps1
+          ./scripts/Test-DocLinks.ps1
+
       - name: Verify WI-0209 PostgreSQL backup retention
         shell: pwsh
         run: |
