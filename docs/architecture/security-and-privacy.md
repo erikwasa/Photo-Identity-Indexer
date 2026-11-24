@@ -61,6 +61,18 @@ private-data handling or the established PostgreSQL backup/restore
 plan. Keep those controls; avoid new requirements that do not address
 a concrete failure mode.
 
+## Place names (GeoNames)
+
+Place enrichment sends photo coordinates to a third party, GeoNames.
+
+- It is off until a GeoNames username is configured. Once it is, automatic enrichment runs by default, and the operator can also start it manually.
+- The geocoder receives the photo's stored latitude and longitude. The place lookup does not round them first, so treat them as exact. It is not given images, people, paths or revision IDs.
+- The base URL must be HTTPS without embedded credentials, queries or fragments.
+- Excluded revisions are skipped before any lookup, results are cached locally, and manual places take precedence.
+- To stop automatic lookups, set `PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled` to `false`. To stop all lookups, remove the username. Restart the app afterwards.
+
+See [Windows package](../operations/windows-package.md) for the settings.
+
 ## Source-copy privacy exclusion
 
 ADR-0008 defines **Exclude from Photo Identity** as a source-copy privacy boundary rather than a normal visibility filter.

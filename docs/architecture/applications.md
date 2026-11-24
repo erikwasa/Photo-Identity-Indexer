@@ -9,7 +9,8 @@ The PowerShell-oriented command-line application for repeatable local operations
 - run PostgreSQL-backed catalogue workflows such as detector rollout, metadata enrichment and bounded evaluation experiments;
 - measure archive proxy profiles without catalogue writes;
 - decode and inspect media with the governed imaging/recognition stack;
-- process portable job bundles without database access; and
+- process portable job bundles without database access;
+- run video ingest, proxy, poster, frame and face commands; and
 - report deterministic command results and failures.
 
 SQLite-opening migration, backup, archive, batch, match, evaluation-export and bundle import/export commands were retired under WI-0149 after PostgreSQL became the sole supported catalogue. Historical migration/cutover evidence remains in delivery and operations records rather than executable compatibility paths.
@@ -18,18 +19,13 @@ The CLI orchestrates work. Long-running image decoding and inference are perform
 
 ## `PhotoIdentity.Worker`
 
-A headless .NET processing application for portable job bundles.
+A processing library, not a separate running application: its own executable is a placeholder. It contains:
 
-It:
+- archive sync and analysis, which `Api` runs in-process. This code uses the OneDrive source adapter and reaches the catalogue only through `Core` repository interfaces;
+- detector rollout processing, used by `Cli`; and
+- portable bundle processing, used by the `Cli` `bundle` command. It validates manifests, checksums and exact model revisions, detects, aligns and embeds faces, and writes a checksummed result bundle.
 
-- validates bundle manifests and checksums;
-- validates exact model revisions;
-- decodes supported media;
-- detects, aligns and embeds faces;
-- records timings, errors and checkpoints; and
-- writes a checksummed result bundle.
-
-The worker runs on maintainer-controlled local hardware. It does not connect to OneDrive, open the canonical PostgreSQL catalogue, or receive people and human review history.
+The bundle path does not connect to OneDrive, open the catalogue, or receive people and human review history.
 
 ## `PhotoIdentity.Api`
 
@@ -43,8 +39,12 @@ It provides endpoints for:
 - audit and person-maintenance views;
 - exact-model suggestion filters;
 - collection-ready photo queries;
-- bounded collection thumbnails and original-content streaming; and
-- the versioned neutral collection manifest.
+- bounded collection thumbnails and original-content streaming;
+- the versioned neutral collection manifest;
+- photo and video search, smart and creative collections, slideshows and video review; and
+- archive control, detector evaluation and detector rollout.
+
+It also runs five background services: archive advancement (sync, analysis and, when enabled, video processing after photos), identity match regeneration with provisional clustering, captions, semantic embeddings and place enrichment. The video processing code lives in `PhotoIdentity.Cli`, which the API references.
 
 The API reads local canonical and derived state from PostgreSQL-backed application services. Heavy batch inference must not run inside interactive HTTP requests.
 
@@ -58,8 +58,9 @@ It supports:
 - individual and preview-first grouped decisions;
 - exact-model ranked suggestions;
 - person creation, correction, rename, merge and audit;
-- review-state and model-revision progress filters; and
-- person-based collection browsing with any/all semantics and fixed thumbnails.
+- review-state and model-revision progress filters;
+- person-based collection browsing with any/all semantics and fixed thumbnails; and
+- photo and video search, slideshows, video review, archive control and settings.
 
 The application is unauthenticated and is intended only for localhost or a trusted private network.
 
