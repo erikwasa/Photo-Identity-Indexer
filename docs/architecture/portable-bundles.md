@@ -92,4 +92,4 @@ ADR-0013 keeps local processing as the normal default while permitting operator-
 
 Delete temporary transfer archives and remote/local copies after validated import and required diagnostics. Keep private bundles outside Git and protect them as biometric processing data.
 
-See [Architecture overview](overview.md), [Module boundaries](module-boundaries.md), [Canonical data model](data-model.md), [ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md) and the [Glossary](../glossary.md).
+See [Architecture overview](overview.md), [Canonical data model](data-model.md), [ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md) and the [Glossary](../glossary.md).

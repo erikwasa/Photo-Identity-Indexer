@@ -8,7 +8,7 @@
 - [Architecture overview](architecture/overview.md)
 - [Canonical data model](architecture/data-model.md)
 - [Security and privacy](architecture/security-and-privacy.md)
-- [Architecture decisions](decisions/index.md)
+- [Architecture decisions](decisions/README.md)
 - [Glossary](glossary.md)
 
 Other files under `docs/` describe individual subsystems. Work items and their status live in GitHub Issues.

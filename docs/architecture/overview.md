@@ -1,94 +1,91 @@
 # Architecture overview
 
-Photo Identity Indexer is a local-first modular monolith. The maintainer-controlled Windows computer is the trusted application/control environment and runs the production workflow on local hardware.
+Photo Identity Indexer finds people in a private photo and video archive. It is a .NET modular monolith on the
+maintainer's Windows computer. PostgreSQL (Podman on WSL2) is the only catalogue. Originals are read-only.
 
-It accesses Personal OneDrive through the Windows sync client, runs governed model processing, hosts the API and responsive browser application, and connects to the authoritative PostgreSQL catalogue running on the maintainer's machine. Personal source paths, people, review history and derived biometric data remain inside the local trust boundary.
+## How a photo moves through the system
 
-```text
-Personal OneDrive or local folder
-        │ Windows sync client / local filesystem
-        ▼
-Trusted Windows application/control environment
-        ├── PhotoIdentity.Cli
-        │     PostgreSQL-backed operations, diagnostics and evaluation tools
-        ├── PhotoIdentity.Api + PhotoIdentity.Web
-        │     archive advancement, review, people, collections and slideshow
-        ├── PostgreSQL authoritative catalogue
-        │     sources, revisions, people, review history and run state
-        ├── governed local artefact storage
-        │     analysis output, proxies, derivatives, reports and backups
-        └── exact model manifests and installed ONNX files
+1. **Sync:** the archive scan records each content version of a source copy as an immutable revision.
+2. **Analyse:** an API background service detects faces and stores crops, embeddings and proxies. Enabled videos follow,
+   one at a time, after photos.
+3. **Match:** embeddings from one exact model revision rank suggestions and cluster unknown faces.
+4. **Review:** the maintainer assigns, rejects or corrects people in the browser. Review history is append-only.
+5. **Browse:** collections, search and slideshows prefer derived images over originals.
+
+Captions, semantic search embeddings and place names come from other API background services.
+
+## Modules
+
+An arrow means "references"; an arrow to or from the group applies to all four projects in it. Names omit `PhotoIdentity.`.
+
+```mermaid
+flowchart TD
+  Api["Api"] --> Web["Web"]
+  Api --> Cli["Cli"]
+  Api --> Worker["Worker"]
+  Cli --> Worker
+  Api --> PG["Persistence.Postgres"]
+  Cli --> PG
+  Cli --> Bundles["Transfer.Bundles"]
+  Worker --> Bundles
+  Api --> Media
+  Cli --> Media
+  Worker --> Media
+  subgraph Media["Source and media adapters"]
+    Local["Source.Local"]
+    OneDrive["Source.OneDriveSync"]
+    Imaging["Imaging.OpenCv"]
+    Onnx["Recognition.Onnx"]
+  end
+  PG --> Core["Core"]
+  Bundles --> Core
+  Media --> Core
+  Api --> Core
+  Cli --> Core
+  Worker --> Core
 ```
 
-Production control, catalogue and normal processing remain local. [ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md) supersedes ADR-0010's blanket local-only rule and allows optional, deliberately authorized inference on maintainer-managed Azure apps. [ADR-0011](../decisions/ADR-0011-operator-authorized-caption-burst-bridge.md) documents the working photo-caption bridge; video remote inference is not automatically implemented, and the retired Azure VM/checkpoint plan remains retired.
+| Project | Responsibility |
+|---|---|
+| `Core` | Identifiers, domain records and adapter interfaces |
+| `Persistence.Postgres` | Catalogue schema, queries and writes |
+| `Source.*` | File discovery, metadata, OneDrive availability and staging |
+| `Imaging.OpenCv` | Decoding, face alignment, crops, thumbnails and proxies |
+| `Recognition.Onnx` | Face and semantic models with their preprocessing |
+| `Transfer.Bundles` | Checksummed job/result bundles without people or review history |
+| `Worker` | Sync, analysis and bundle library; its own executable is a placeholder |
+| `Cli` | Operator and evaluation commands; video processing code that `Api` reuses |
+| `Api` | Production host: HTTP endpoints, background services, Web client files |
+| `Web` | Blazor client and the HTTP contracts shared with `Api` |
 
-## Runtime applications
+## Rules
 
-- **`PhotoIdentity.Cli`** provides PostgreSQL-backed operations, local diagnostics/evaluation, media inspection and database-free portable-bundle processing.
-- **`PhotoIdentity.Worker`** contains headless processing components used by governed analysis and portable processing contracts.
-- **`PhotoIdentity.Api`** hosts archive advancement, review, people, audit, progress, photo delivery, collection and slideshow endpoints.
-- **`PhotoIdentity.Web`** is the responsive Blazor application used from Windows and supported devices on a trusted private network.
+Project references enforce the first; the rest are conventions.
 
-See [Applications](applications.md) for executable responsibilities and [Module boundaries](module-boundaries.md) for project dependencies.
+- `Core` and `Web` reference no other project. Adapters reference only `Core`.
+- OpenCV and ONNX types stay inside their adapters. Browser contracts use opaque IDs, never source paths.
+- `Worker` reaches the catalogue only through `Core` interfaces; its bundle path uses no catalogue or people data.
+- Long batch work belongs in background services, not HTTP requests. C# is the default.
 
-## Data ownership
+## Data
 
-Canonical local data includes:
+- **Canonical:** sources, revisions, people, assignments, rejections, review history and run state.
+- **Derived (replaceable but sensitive):** detections, crops, embeddings, suggestions and proxies.
+- Changed content creates a new revision, so old results are never reused for it.
+- A model revision is its ID, SHA-256 and preprocessing. Scores from different revisions are not comparable.
+- An assignment links a person to a face, not to a model. Automatic assignment is opt-in, traceable and correctable.
 
-- source, asset and immutable revision identity;
-- people and canonical assignments/rejections;
-- append-only review and person-maintenance history;
-- processing-run and job state needed for safe resume; and
-- governed provenance and operational state.
+## Trust boundary
 
-PostgreSQL is the sole supported catalogue. The former SQLite implementation and executable compatibility paths were retired under M29 after the accepted PostgreSQL migration/cutover; historical migration and rollback evidence remains in delivery and operations records only.
+Catalogue, people and biometric data stay local by default. The web app has no login: localhost or a trusted private
+network only. Data can leave through:
 
-Derived, replaceable data includes:
+- **Captions:** sent to a loopback address (normally local Ollama); an optional bridge can forward thumbnails to our own
+  Azure app ([ADR-0011](../decisions/ADR-0011-operator-authorized-caption-burst-bridge.md)).
+- **Place names:** photo coordinates go to GeoNames if a username is configured.
+- **Backups:** an optional, operator-requested copy to a OneDrive-synchronised folder.
+- **Other remote inference:** separately authorized work only
+  ([ADR-0013](../decisions/ADR-0013-optional-operator-controlled-remote-compute.md)).
 
-- detector observations;
-- aligned crops and face-review derivatives;
-- model-versioned embeddings;
-- ranked identity suggestions;
-- review proxies and collection thumbnails;
-- portable processing outputs; and
-- evaluation exports and reports.
-
-Derived artefacts remain sensitive even when replaceable. They must not be committed or exposed outside the trusted boundary.
-
-See [Canonical data model](data-model.md), [ADR-0009](../decisions/ADR-0009-postgresql-authoritative-catalogue.md) and the [Glossary](../glossary.md).
-
-## Immutable revisions and model provenance
-
-A changed photo creates a new asset revision. Detection, crops and embeddings attach to immutable revision and face-occurrence identities so old results cannot silently be reused for changed content.
-
-A model revision is identified by its model ID, exact SHA-256 hash and material preprocessing contract. Baseline and candidate embeddings can coexist in one catalogue. Suggestions and evaluation reports identify the exact revision that produced them.
-
-Scores from different revisions are not assumed to share one threshold or distribution.
-
-## Review and identity boundary
-
-People and canonical identity decisions are model-independent and auditable. Human actions remain governed history, while ADR-0006 also permits explicitly enabled automatic canonical assignment under an exact-model policy with provenance and correction semantics.
-
-Identity suggestions remain derived and regenerable. Rejected face-person evidence is preserved and matching behavior remains exact-model scoped.
-
-See [Recognition and identity matching](identity-matching.md).
-
-## Collection and slideshow boundary
-
-Collection queries and slideshow snapshots operate from the local PostgreSQL catalogue and derived media. Browser-facing contracts use opaque identifiers and HTTP resource URLs rather than exposing source roots or private local paths.
-
-Originals are hydrated only through explicit governed access/preparation paths; normal browsing remains derivative/proxy-backed where possible.
-
-## Portable compute boundary
-
-Portable job bundles contain explicitly selected neutral inputs, exact model manifests and checksums. Result bundles contain derived processing results and checkpoints. The retained worker path processes bundles without catalogue access.
-
-The portable worker contract has no access to OneDrive credentials, people, assignments, rejections or the authoritative catalogue. It is retained for isolation/offline transfer and could support a separately implemented, authorized Azure worker under ADR-0013; no general remote bundle worker is currently enabled. See [Portable processing bundles](portable-bundles.md).
-
-## Deployment and trust
-
-The browser application is unauthenticated and is intended for localhost or a trusted private network only. PostgreSQL data, backups and local derivatives stay on maintainer-controlled storage rather than a synchronised cloud folder.
-
-Original photos are read-only inputs. The system does not modify them.
-
-See [Security and privacy](security-and-privacy.md), [PostgreSQL operations](../operations/postgresql-operations.md) and the [Local operator guide](../operations/local-operator-guide.md).
+More: [applications](applications.md), [data model](data-model.md), [matching](identity-matching.md),
+[bundles](portable-bundles.md), [privacy](security-and-privacy.md), [decisions](../decisions/README.md), [glossary](../glossary.md).
