@@ -1,5 +1,10 @@
 # Stop hook. Blocks finishing (exit 2) while the solution does not build. Never runs tests.
-$null = [Console]::In.ReadToEnd()
+$ErrorActionPreference = 'Stop'
+trap { [Console]::Error.WriteLine("build-on-stop failed (malformed payload?): $_"); exit 2 }
+$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
+if ($payload -isnot [System.Management.Automation.PSCustomObject]) { throw 'not a JSON object.' }
+# Already continuing because of a Stop hook: let Claude stop and report instead of looping on a build it can't fix.
+if ($payload.stop_hook_active) { exit 0 }
 $root = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (Get-Location).Path }
 Push-Location $root
 try {

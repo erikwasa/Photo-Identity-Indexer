@@ -1,5 +1,8 @@
 # PostToolUse hook for Edit|Write. Whitespace-formats an edited .cs file.
+$ErrorActionPreference = 'Stop'
+trap { [Console]::Error.WriteLine("format-file failed (malformed payload?): $_"); exit 2 }
 $payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
+if ($payload -isnot [System.Management.Automation.PSCustomObject]) { throw 'not a JSON object.' }
 $file = [string]$payload.tool_input.file_path
 if (-not $file -or -not $file.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) { exit 0 }
 

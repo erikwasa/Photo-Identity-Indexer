@@ -387,6 +387,10 @@ jobs:
           ./tests/PowerShell/doc-links.tests.ps1
           ./scripts/Test-DocLinks.ps1
 
+      - name: Verify Claude Code guard hooks
+        shell: pwsh
+        run: ./tests/PowerShell/claude-hooks.tests.ps1
+
       - name: Verify WI-0209 PostgreSQL backup retention
         shell: pwsh
         run: |
