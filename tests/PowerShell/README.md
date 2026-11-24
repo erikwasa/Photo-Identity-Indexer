@@ -36,6 +36,14 @@ Podman, never touch production, and run in Windows CI:
 pwsh -NoProfile -File .\tests\PowerShell\postgres-streaming-backup.tests.ps1
 ~~~
 
+`claude-hooks.tests.ps1` feeds synthetic payloads to the Claude Code hooks in `.claude/hooks/`
+(push rules, guarded paths, malformed input, the Stop hook) and checks the media Read denies in
+`.claude/settings.json`. It uses temporary Git repositories, never pushes, and runs in Windows CI:
+
+~~~powershell
+pwsh -NoProfile -File .\tests\PowerShell\claude-hooks.tests.ps1
+~~~
+
 A real PostgreSQL backup, independently downloaded OneDrive copy and isolated
 restore still require the manual operator checks documented in
 [PostgreSQL production operations](../../docs/operations/postgresql-operations.md).
