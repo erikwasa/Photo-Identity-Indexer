@@ -7,7 +7,7 @@ Requirements:
 - Personal OneDrive authentication remains inside the official Windows client.
 - No OneDrive password or personal account token enters the application or Azure.
 - Azure may receive only explicitly operator-authorized, purpose-scoped input to vetted, maintainer-operated application/model endpoints (including bounded photo thumbnails or video frames). **Do not use unvetted third-party black-box AI/vision services, including Microsoft/Azure managed inference APIs.** Review runtime dependencies, model weights and platform privacy before use.
-- Original photos/videos, face data, paths, location/identity metadata or whole archives are not implicitly transferred; additional sensitive input requires a separately approved task-specific need and retention policy. Verify source exclusion and revision before export and before local publication.
+- Original photos/videos, face data, paths, location/identity metadata or whole archives are not implicitly transferred; additional sensitive input requires a separately approved task-specific need and retention policy. For photo coordinates, configuring a GeoNames username is that approval (see [Place names](#place-names-geonames)). Verify source exclusion and revision before export and before local publication.
 - Prefer crop-only bundles for embedding comparisons.
 - Protect remote inputs during authenticated encrypted transport and keep temporary storage private; restrict endpoint/network access, minimize platform/runtime logs and define remote retention, deletion and scale-to-zero controls.
 - Short-lived SAS credentials, when used, must be narrowly scoped and never logged.
@@ -65,7 +65,8 @@ a concrete failure mode.
 
 Place enrichment sends photo coordinates to a third party, GeoNames.
 
-- It is off until a GeoNames username is configured. Once it is, automatic enrichment runs by default, and the operator can also start it manually.
+- **Configuring a GeoNames username is the operator's consent** to send photo coordinates to GeoNames, including automatically. No per-photo approval is needed. The consent covers coordinates only.
+- It is off until a username is configured. Once it is, automatic enrichment runs by default, and the operator can also start it manually.
 - The geocoder receives the photo's stored latitude and longitude. The place lookup does not round them first, so treat them as exact. It is not given images, people, paths or revision IDs.
 - The base URL must be HTTPS without embedded credentials, queries or fragments.
 - Excluded revisions are skipped before any lookup, results are cached locally, and manual places take precedence.
