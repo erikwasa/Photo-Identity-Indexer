@@ -7,8 +7,8 @@ namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// PostgreSQL-backed replacement for the old file-path test catalogue. The path argument is kept
-/// only as a compatibility key so independently-created mature fixtures that used the same SQLite
-/// file continue to address the same isolated PostgreSQL database during the test process.
+/// only as a compatibility key so independently-created fixtures that use the same path
+/// address the same isolated PostgreSQL database during the test process.
 /// </summary>
 public sealed class PostgresTestCatalogueDatabase :
     ICatalogueStoreInitializer,

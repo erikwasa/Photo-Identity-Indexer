@@ -9,9 +9,6 @@
   ],
   "classWeightsSeconds": {
     "PhotoIdentity.Integration.Tests.MultiScaleBatchConfigurationTests": 0.009816,
-    "PhotoIdentity.Integration.Tests.SqliteDetectorRolloutApplicationRepositoryTests": 2.695513,
-    "PhotoIdentity.Integration.Tests.SqliteDetectorRolloutRepositoryTests": 9.540805,
-    "PhotoIdentity.Integration.Tests.SqliteDetectorRolloutReviewRepositoryTests": 20.820828,
     "PhotoIdentity_Integration_Tests.ArchiveAnalysisHydratableSelectionTests": 1.254399,
     "PhotoIdentity_Integration_Tests.ArchiveAnalysisRepositoryTests": 2.010411,
     "PhotoIdentity_Integration_Tests.ArchiveApplicationTests": 3.825324,
@@ -101,16 +98,6 @@
     "PhotoIdentity_Integration_Tests.SmartCollectionQueryRepositoryTests": 3.965787,
     "PhotoIdentity_Integration_Tests.SmartCollectionWebRouteTests": 0.00182,
     "PhotoIdentity_Integration_Tests.SmokeTests": 0.000129,
-    "PhotoIdentity_Integration_Tests.SqliteAssetCatalogueRepositoryTests": 6.169997,
-    "PhotoIdentity_Integration_Tests.SqliteCatalogueDatabaseTests": 3.642689,
-    "PhotoIdentity_Integration_Tests.SqliteFaceCatalogueRepositoryTests": 7.726681,
-    "PhotoIdentity_Integration_Tests.SqliteIdentityAutoAssignmentServiceTests": 13.723401,
-    "PhotoIdentity_Integration_Tests.SqliteIdentityCatalogueRepositoryTests": 4.258212,
-    "PhotoIdentity_Integration_Tests.SqliteIdentityMatcherMigrationTests": 2.353146,
-    "PhotoIdentity_Integration_Tests.SqliteIdentityMatcherTests": 4.273906,
-    "PhotoIdentity_Integration_Tests.SqliteIdentitySuggestionPolicyRepositoryTests": 2.72727,
-    "PhotoIdentity_Integration_Tests.SqliteProcessingMigrationTests": 1.525088,
-    "PhotoIdentity_Integration_Tests.SqliteProcessingRepositoryTests": 10.422778,
     "PhotoIdentity_Integration_Tests.SuggestionUndoRegressionTests": 3.31831,
     "PhotoIdentity_Integration_Tests.UnknownReviewStateApplicationTests": 19.737685
   }

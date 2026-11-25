@@ -59,7 +59,7 @@ The Settings page shows the effective hydration values, whether managed hydratio
 
 POSTGRESQL CATALOGUE AUTHORITY
 -----------------------------
-The packaged application always uses PostgreSQL. SQLite is not a selectable runtime catalogue.
+The packaged application always uses PostgreSQL. No other catalogue can be selected.
 
 The launcher never accepts the PostgreSQL connection string directly inside launcher.json. Store the secret connection string in a Windows environment variable and put only that variable's name in launcher.json. For example, create a private user environment variable named:
   PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
@@ -80,7 +80,7 @@ A PostgreSQL cutover preflight must report:
   catalogueProvider: postgresql
   postgresConnectionEnvironmentVariable: PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
 
-The connection string itself must not appear. `/health` must report catalogueProvider `postgresql`. Recovery uses the supported PostgreSQL backup and isolated restore-verification procedure; the retired SQLite provider cannot be selected by current packages.
+The connection string itself must not appear. `/health` must report catalogueProvider `postgresql`. Recovery uses the supported PostgreSQL backup and isolated restore-verification procedure.
 
 TRUSTED-LAN PHONE ACCESS
 ------------------------

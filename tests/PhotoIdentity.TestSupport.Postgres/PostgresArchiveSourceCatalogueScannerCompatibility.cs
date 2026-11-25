@@ -5,8 +5,7 @@ namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// PostgreSQL composition wrapper matching the historical integration-fixture scanner shape.
-/// It keeps source scanning behavior on the provider-neutral scanner while removing the SQLite
-/// adapter from active tests.
+/// It keeps source scanning behavior on the provider-neutral scanner.
 /// </summary>
 public sealed class PostgresArchiveSourceCatalogueScannerCompatibility
 {

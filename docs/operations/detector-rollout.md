@@ -28,7 +28,7 @@ The maintainer accepted the documented CenterFace model-weight/training-data unc
 
 PR #93 added versioned pipeline identity and conservative geometry/landmark reconciliation.
 
-PR #94 originally added the rollout-persistence boundary while SQLite was authoritative. The invariant remains: an existing occurrence can be reused only when the persisted plan explicitly identifies it; new candidates receive new occurrence IDs; unmatched old occurrences are retained; and ambiguous candidates cannot be applied before human resolution.
+PR #94 added the rollout-persistence boundary. Its invariant is that an existing occurrence can be reused only when the persisted plan explicitly identifies it; new candidates receive new occurrence IDs; unmatched old occurrences are retained; and ambiguous candidates cannot be applied before human resolution.
 
 PR #95 added durable candidate crop/embedding payload plus append-only human ambiguity decisions. Those decisions resolve face-occurrence identity only and never assign or change a person.
 
@@ -43,7 +43,7 @@ The ordinary `batch start` path still has its historical deterministic ordinal s
 
 ## PostgreSQL provider selection
 
-All four rollout CLI actions require `--postgres-connection-env NAME`. The named environment variable contains the PostgreSQL connection string; keep credentials out of command arguments and shell history. The command initializes PostgreSQL migrations and uses PostgreSQL processing, revision lookup, reconciliation, review and application repositories throughout the rollout worker. It does not recognize a SQLite catalogue option or perform dual writes.
+All four rollout CLI actions require `--postgres-connection-env NAME`. The named environment variable contains the PostgreSQL connection string; keep credentials out of command arguments and shell history. The command initializes PostgreSQL migrations and uses PostgreSQL processing, revision lookup, reconciliation, review and application repositories throughout the rollout worker. It does not accept a database-path option or perform dual writes.
 
 For example, after configuring the connection variable securely:
 
@@ -113,203 +113,19 @@ Detailed filenames, geometry and identity decisions remain private.
 
 This passed pilot authorizes a full rollout of the **current 560-image local catalogue** through the dedicated rollout path. It does **not** start M12 full-archive processing and does not broaden model licence or redistribution conclusions.
 
-## Full current-catalogue rollout
+## Running a rollout
 
-Use a fresh recoverable database copy. Do not mutate the untouched reviewed source database in place.
+Before starting, stop catalogue writers and take a verified logical backup as described in [PostgreSQL production operations](postgresql-operations.md). That backup is the rollback point.
 
-### 1. Update the repository and stop writers
-
-After the WI-0038 completion/status PR is merged:
+`rollout start` cannot scan a source directory. It needs explicit immutable `AssetRevisionId` values (`--revision ID` or a one-GUID-per-line `--revision-file`). Do not commit the revision list. Use a permanent `--output` directory: each processing run records its output root, and face review finds rollout crops there.
 
 ```powershell
-Set-Location "C:\Kod\codex\Photo Identity Indexer"
-git switch main
-git pull --ff-only
+dotnet run --project src/PhotoIdentity.Cli -- rollout start --postgres-connection-env PHOTOIDENTITY_ROLLOUT_CONNECTION --output OUTPUT_DIR --revision-file REVISIONS.txt
+dotnet run --project src/PhotoIdentity.Cli -- rollout status --postgres-connection-env PHOTOIDENTITY_ROLLOUT_CONNECTION --run RUN_ID
+dotnet run --project src/PhotoIdentity.Cli -- rollout resume --postgres-connection-env PHOTOIDENTITY_ROLLOUT_CONNECTION --run RUN_ID
 ```
 
-Stop the review application and every process that can write to the catalogue before making the copy.
-
-### 2. Choose permanent rollout paths
-
-Set the source database to the untouched reviewed 560-image catalogue. Use a **permanent** output root for the full rollout because each processing run records its `outputRoot`, and ordinary face review resolves rollout crops through that recorded root. Do not move or rename that output directory after adopting the migrated database.
-
-```powershell
-$sourceDb = "C:\REPLACE\WITH\YOUR\560-IMAGE\catalogue.db"
-$fullRoot = "C:\PhotoIdentity\CenterFace-current-catalogue"
-$fullDb = Join-Path $fullRoot "catalogue-centerface.db"
-$rolloutOutput = Join-Path $fullRoot "rollout-output"
-$revisionCsv = Join-Path $fullRoot "current-revisions.csv"
-$revisionFile = Join-Path $fullRoot "current-revisions.txt"
-$reviewApp = Join-Path $fullRoot "review-app"
-
-New-Item -ItemType Directory -Force -Path $fullRoot,$rolloutOutput | Out-Null
-```
-
-### 3. Copy the reviewed source database
-
-With all source-database writers stopped:
-
-```powershell
-Copy-Item -LiteralPath $sourceDb -Destination $fullDb -Force
-
-foreach ($suffix in @("-wal", "-shm")) {
-    $sidecar = "$sourceDb$suffix"
-    if (Test-Path -LiteralPath $sidecar) {
-        Copy-Item -LiteralPath $sidecar -Destination "$fullDb$suffix" -Force
-    }
-}
-```
-
-Keep `$sourceDb` untouched as the restore point.
-
-### 4. Build the explicit current-revision list
-
-`rollout start` deliberately cannot scan a source directory. It requires explicit immutable `AssetRevisionId` values.
-
-In DB Browser for SQLite, run this against the **source** catalogue:
-
-```sql
-WITH ranked AS (
-    SELECT
-        ar.id AS revision_id,
-        ROW_NUMBER() OVER (
-            PARTITION BY ar.asset_id
-            ORDER BY ar.observed_at_utc DESC, ar.id DESC
-        ) AS row_number
-    FROM asset_revisions AS ar
-    INNER JOIN assets AS a
-        ON a.id = ar.asset_id
-    WHERE a.deleted_at_utc IS NULL
-)
-SELECT revision_id
-FROM ranked
-WHERE row_number = 1
-ORDER BY revision_id;
-```
-
-Export the result with the header `revision_id` to `$revisionCsv`, then convert it to the one-GUID-per-line rollout file:
-
-```powershell
-Import-Csv -LiteralPath $revisionCsv |
-    Select-Object -ExpandProperty revision_id |
-    Set-Content -LiteralPath $revisionFile -Encoding ascii
-
-$revisionCount = @(
-    Get-Content -LiteralPath $revisionFile |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-).Count
-
-$revisionCount
-```
-
-For the currently reviewed catalogue, the expected scope is **560 current revisions**. If the count is not the number of active photos you intend to migrate, stop and inspect the query/database before starting rollout.
-
-Do not commit the revision list.
-
-### 5. Start the full current-catalogue rollout
-
-Run only against `$fullDb`:
-
-```powershell
-Set-Location "C:\Kod\codex\Photo Identity Indexer"
-
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    -- `
-    rollout start `
-    --database $fullDb `
-    --output $rolloutOutput `
-    --revision-file $revisionFile
-```
-
-Save the printed run GUID:
-
-```powershell
-$runId = "REPLACE_WITH_PRINTED_RUN_ID"
-```
-
-Do not start another run merely because processing is interrupted.
-
-### 6. Resume or inspect failures on the same run
-
-Check status:
-
-```powershell
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    -- `
-    rollout status `
-    --database $fullDb `
-    --run $runId
-```
-
-If processing was interrupted, resume the same run:
-
-```powershell
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    -- `
-    rollout resume `
-    --database $fullDb `
-    --run $runId
-```
-
-Do not proceed to adoption while `revisions-failed` is non-zero.
-
-### 7. Review every ambiguity
-
-If `awaiting-review` is greater than zero, publish the review application against `$fullDb`:
-
-```powershell
-Set-Location "C:\Kod\codex\Photo Identity Indexer"
-
-Remove-Item -LiteralPath $reviewApp -Recurse -Force -ErrorAction SilentlyContinue
-
-dotnet publish `
-    .\src\PhotoIdentity.Api `
-    --configuration Release `
-    --output $reviewApp
-
-$env:PhotoIdentity__DatabasePath = $fullDb
-Set-Location -LiteralPath $reviewApp
-
-dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
-```
-
-Open:
-
-```text
-http://127.0.0.1:5080/detector-rollout/REPLACE_WITH_RUN_ID
-```
-
-For each ambiguity choose only:
-
-- the displayed eligible old occurrence when it is the same physical face;
-- **new face occurrence** when the candidate is a real new detection; or
-- **defer** when uncertain.
-
-A deferred candidate keeps the rollout incomplete. The reconciliation UI never assigns a person.
-
-Stop the review app before applying saved decisions.
-
-### 8. Apply saved human decisions
-
-```powershell
-Set-Location "C:\Kod\codex\Photo Identity Indexer"
-
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    -- `
-    rollout apply `
-    --database $fullDb `
-    --run $runId
-```
-
-Repeat status/review/apply until all of the following are true:
+Resume the same run after an interruption; do not start another run. If `awaiting-review` is greater than zero, open `/detector-rollout/RUN_ID` in the normal application. For each ambiguity choose the eligible old occurrence when it is the same physical face, **new face occurrence** for a real new detection, or **defer** when uncertain. The reconciliation UI never assigns a person. Then run `rollout apply` for the same run. Repeat status/review/apply until:
 
 ```text
 revisions-failed: 0
@@ -319,83 +135,11 @@ deferred: 0
 rollout-complete: true
 ```
 
-`unmatched-existing` may be greater than zero. Those old occurrences must be retained; their presence is not by itself a rollout failure.
-
-### 9. Verify catalogue-history invariants before adoption
-
-Compare `$sourceDb` and `$fullDb`:
-
-```sql
-SELECT COUNT(*) AS people FROM people;
-SELECT COUNT(*) AS person_labels FROM person_labels;
-SELECT COUNT(*) AS review_actions FROM review_actions;
-SELECT COUNT(*) AS ranked_suggestions FROM identity_suggestion_rankings;
-SELECT COUNT(*) AS face_occurrences FROM face_occurrences;
-```
-
-Expected behavior:
-
-- people, person labels and review actions remain unchanged by rollout;
-- existing ranking rows are not deleted by rollout;
-- `face_occurrences` may increase because CenterFace adds genuinely new detections.
-
-For new rollout candidates, verify they have no automatic person labels or review actions. Inspect reviewed existing mappings and every ambiguous human decision closely enough to confirm they still refer to the intended physical face. Inspect unmatched existing occurrences as well.
-
-Do **not** run matcher regeneration until these migration checks are complete, because suggestion-table changes would make before/after rollout comparison noisier.
-
-### 10. Verify replay safety
-
-Record the migrated occurrence count:
-
-```sql
-SELECT COUNT(*) AS face_occurrences FROM face_occurrences;
-```
-
-Then run `rollout resume` and `rollout apply` again for the same `$runId`, followed by status. The face-occurrence count and applied occurrence IDs must remain stable. No duplicate new occurrences may appear.
-
-### 11. Adopt the migrated catalogue
-
-Only after the full current-catalogue run and replay checks pass:
-
-1. stop all catalogue writers;
-2. keep `$sourceDb` unchanged as the rollback database;
-3. keep `$rolloutOutput` at its permanent recorded path;
-4. point the local application at `$fullDb`, or copy the migrated database to the intended active database location while leaving `$rolloutOutput` unchanged; and
-5. reopen ordinary face review and spot-check existing reviewed people plus new unreviewed faces.
-
-Do not delete or rewrite old occurrences to make the migrated catalogue look cleaner.
-
-### 12. Regenerate identity suggestions only after adoption verification
-
-New CenterFace occurrences intentionally have no ranked identity suggestions until matcher regeneration is run. After migration/adoption checks are complete, regenerate suggestions for the exact SFace FP32 model if desired:
-
-```powershell
-Set-Location "C:\Kod\codex\Photo Identity Indexer"
-
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    -- `
-    match regenerate `
-    --database $fullDb `
-    --embedder-id sface-2021dec-fp32 `
-    --embedder-hash 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79
-```
-
-Matcher suggestions remain suggestions only. They do not create person assignments automatically.
+`unmatched-existing` may be greater than zero; those old occurrences are retained. Running `rollout resume` and `rollout apply` again must not change the face-occurrence count or create duplicate occurrences.
 
 ## Rollback
 
-Rollback is restore-based, never historical-data rewriting.
-
-If the full current-catalogue migration reveals a problem:
-
-1. stop the review application and all writers;
-2. preserve the failed migrated database/output privately if useful for diagnosis;
-3. point the application back to the untouched `$sourceDb` or restore it to the active catalogue location; and
-4. verify the original reviewed state opens intact.
-
-Never repair a detector migration by bulk relabelling people, deleting unmatched old occurrences, or rewriting historical review actions in place.
+Rollback restores the PostgreSQL backup taken before the rollout. Never repair a detector migration by bulk relabelling people, deleting unmatched old occurrences, or rewriting historical review actions in place.
 
 ## Scope boundary
 

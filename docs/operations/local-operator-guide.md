@@ -20,9 +20,9 @@ Azure bridge and remote compute are activated separately.
 
 ## Current catalogue authority
 
-PostgreSQL is the single supported and authoritative catalogue. WI-0102 completed the maintainer production migration/cutover and rollback acceptance, WI-0147 made PostgreSQL unconditional at runtime, and WI-0149 removed the former SQLite implementation and executable compatibility paths. `/health` must report `catalogueProvider: postgresql`.
+PostgreSQL is the single supported and authoritative catalogue. `/health` must report `catalogueProvider: postgresql`.
 
-The final stopped-source SQLite backup from WI-0102 may be preserved unchanged as historical migration/rollback evidence, but current Photo Identity binaries do not open it. Do not configure a catalogue provider or SQLite database path. Historical rollback instructions remain in [PostgreSQL catalogue migration and cutover](../archive/operations/postgresql-catalogue-cutover.md) only as evidence of the accepted migration boundary.
+The pre-cutover catalogue backup from WI-0102 may be kept as history, but current binaries do not open it. Do not configure a catalogue provider or a database path. See [PostgreSQL catalogue migration and cutover](../archive/operations/postgresql-catalogue-cutover.md) for the historical record.
 
 Check the project's GitHub Issues before treating a planned feature as available.
 
@@ -138,8 +138,7 @@ dotnet publish `
 
 ## 5. Configure and synchronize permanent archive coverage
 
-Use the **Archive** page for production archive coverage and synchronization. The application operates through PostgreSQL only; the former `archive --database ...` SQLite CLI paths were retired under WI-0149.
-
+Use the **Archive** page for production archive coverage and synchronization.
 Expanding coverage keeps one permanent archive source identity. A broader included parent can subsume previously listed children without creating another source authority.
 
 Synchronization revisits included coverage for new, changed, missing and newly available files while avoiding repeated unchanged exact-profile work. Browser-triggered long-running synchronization is server-owned and durable; see [Archive background synchronization](archive-background-sync.md).
@@ -171,11 +170,11 @@ The CLI remains available for supported PostgreSQL-backed and provider-neutral e
 dotnet run --project src/PhotoIdentity.Cli -- --help
 ```
 
-Catalogue commands that require a database use a PostgreSQL connection string from an explicitly named environment variable. `bundle process` remains database-free. Migration-era SQLite backup/migrate/archive/batch/match/evaluation-export and bundle import/export commands are no longer supported.
+Catalogue commands that require a database use a PostgreSQL connection string from an explicitly named environment variable. `bundle process` is database-free.
 
 ## 9. Back up and restore
 
-Use [PostgreSQL production operations](postgresql-operations.md) for routine logical backup, isolated restore verification, restart and upgrade procedures. The old SQLite backup is not a current recovery target for the application after WI-0149.
+Use [PostgreSQL production operations](postgresql-operations.md) for routine logical backup, isolated restore verification, restart and upgrade procedures.
 
 The accepted historical migration/rollback rehearsal remains documented in [PostgreSQL catalogue migration and cutover](../archive/operations/postgresql-catalogue-cutover.md).
 ## Readiness and specialized references

@@ -1,6 +1,6 @@
 # PostgreSQL runtime composition
 
-WI-0101 separated catalogue-provider selection from application services, WI-0102 completed the controlled maintainer production cutover on 2026-09-11, WI-0147 made PostgreSQL unconditional at runtime, and WI-0148 moved active tests/review verification to PostgreSQL. WI-0149 completes that transition by removing the SQLite implementation and active compatibility commands.
+PostgreSQL is the only catalogue provider at runtime, in tests and in review verification.
 
 ## Runtime composition
 
@@ -8,7 +8,7 @@ WI-0101 separated catalogue-provider selection from application services, WI-010
 
 The Windows launcher requires `postgresConnectionEnvironmentVariable`, resolves the private connection string from Process, User or Machine environment scope, and supplies it only to the child process. Launcher settings do not accept provider selection or a database-path setting. `/health` always reports `catalogueProvider: postgresql` for a supported runtime host.
 
-`PhotoIdentity.Api`, `PhotoIdentity.Cli`, active test projects and review-verification tooling no longer reference a SQLite persistence project or `Microsoft.Data.Sqlite`. Integration tests use isolated disposable PostgreSQL databases. The CLI retains PostgreSQL-backed catalogue operations plus provider-neutral operations such as media inspection, proxy measurement and database-free portable bundle processing; migration-era commands that opened SQLite catalogues were retired under WI-0149.
+Integration tests use isolated disposable PostgreSQL databases. The CLI has PostgreSQL-backed catalogue operations plus provider-neutral operations such as media inspection, proxy measurement and database-free portable bundle processing.
 
 `PhotoIdentity.Worker` remains catalogue-independent. It processes explicit portable bundles and has no access to the authoritative catalogue, people or human review history.
 
@@ -41,7 +41,7 @@ Normal CI additionally exercises disposable PostgreSQL integration databases, th
 
 On 2026-09-10 the maintainer ran the WI-0101 PostgreSQL verifier against the configured Podman PostgreSQL service. WI-0102 subsequently imported and verified the maintainer catalogue, completed the single-authority production switch, exercised rollback from a working copy of the preserved migration backup, and restored PostgreSQL as the accepted authority.
 
-Those SQLite-to-PostgreSQL migration and rollback records remain historical evidence. They do not constitute a current SQLite runtime/provider path. Current day-to-day backup, restore, restart and upgrade procedures are owned by [PostgreSQL production operations](../operations/postgresql-operations.md).
+Those migration and rollback records are historical evidence only. Current day-to-day backup, restore, restart and upgrade procedures are owned by [PostgreSQL production operations](../operations/postgresql-operations.md).
 
 ## Runtime connection reuse
 

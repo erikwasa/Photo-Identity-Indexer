@@ -742,10 +742,7 @@ public static class Program
                                  [--report PATH]
                                  [--review-output DIR]
 
-            PostgreSQL is the only supported catalogue. Migration-era commands that opened
-            SQLite catalogues directly were retired by WI-0149 after PostgreSQL became the
-            unconditional application catalogue and their accepted migration evidence was
-            preserved in historical work-item records.
+            PostgreSQL is the only supported catalogue.
 
             Bundle process remains database-free: it runs the portable recognition worker
             using settings stored in the job bundle and writes a checksummed result bundle.

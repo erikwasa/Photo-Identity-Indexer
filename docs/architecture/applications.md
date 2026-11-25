@@ -13,7 +13,7 @@ The PowerShell-oriented command-line application for repeatable local operations
 - run video ingest, proxy, poster, frame and face commands; and
 - report deterministic command results and failures.
 
-SQLite-opening migration, backup, archive, batch, match, evaluation-export and bundle import/export commands were retired under WI-0149 after PostgreSQL became the sole supported catalogue. Historical migration/cutover evidence remains in delivery and operations records rather than executable compatibility paths.
+Catalogue commands use PostgreSQL, the only supported catalogue.
 
 The CLI orchestrates work. Long-running image decoding and inference are performed through application and adapter services rather than embedded in documentation-only scripts.
 
@@ -68,7 +68,6 @@ The application is unauthenticated and is intended only for localhost or a trust
 
 - **`PhotoIdentity.Models`** supports pinned model installation and verification workflows.
 - **`PhotoIdentity.ReviewVerification`** exercises the published local review application with disposable PostgreSQL fixtures and privacy-boundary assertions.
-- **`Invoke-MultiModelComparison.ps1`** is retained only as a self-testable historical tombstone for completed pre-WI-0149 comparison evidence; normal execution is retired.
 - **`tools/model-lab`** remains an optional isolated Python workspace for conversion or analysis when Python is materially better. It exchanges documented neutral files and does not own canonical data.
 
 ## Shared operational rule

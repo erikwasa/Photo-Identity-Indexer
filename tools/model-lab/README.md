@@ -10,7 +10,7 @@ Do not reuse a face or source revision across splits. Personal images, crops, em
 
 ## Evaluation manifests
 
-The former catalogue-backed `evaluate export` command was retired with the SQLite migration surface under WI-0149. Existing private manifests remain valid inputs to the provider-neutral evaluator. Any new catalogue export must be introduced as a separately scoped PostgreSQL-backed workflow with the same privacy, exact-model provenance and deterministic split guarantees; do not restore the retired command or create a second catalogue.
+There is no catalogue-backed `evaluate export` command. Existing private manifests remain valid inputs to the provider-neutral evaluator. Any new catalogue export must be introduced as a separately scoped PostgreSQL-backed workflow with the same privacy, exact-model provenance and deterministic split guarantees; do not restore the retired command or create a second catalogue.
 
 ## Evaluate a manifest
 

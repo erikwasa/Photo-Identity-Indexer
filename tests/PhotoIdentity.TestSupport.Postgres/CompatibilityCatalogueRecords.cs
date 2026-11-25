@@ -5,9 +5,8 @@ using PhotoIdentity.Core.Recognition;
 namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
-/// Transitional test-fixture DTOs retained only to avoid rewriting historical integration setup
-/// code while its persistence implementation moves to PostgreSQL. These types do not use SQLite.
-/// WI-0149 removes the remaining legacy aliases at the integration-test boundary.
+/// Test-fixture DTOs kept so older integration setup code does not need rewriting.
+/// They are backed by the PostgreSQL test catalogue.
 /// </summary>
 public sealed record CatalogueSource
 {
