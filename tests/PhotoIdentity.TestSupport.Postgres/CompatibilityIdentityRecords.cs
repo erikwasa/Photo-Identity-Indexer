@@ -5,7 +5,7 @@ namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// Legacy fixture-shaped identity records backed exclusively by PostgreSQL test state.
-/// They keep mature integration assertions readable while WI-0148 removes the SQLite assembly.
+/// They keep older integration assertions readable.
 /// </summary>
 public sealed record CatalogueHumanLabel(
     long Id,

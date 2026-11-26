@@ -1,6 +1,6 @@
 # PostgreSQL local runtime
 
-PostgreSQL is the selected long-term authoritative catalogue under ADR-0009. WI-0102 completed the maintainer production cutover on 2026-09-11, including rollback acceptance; the preserved SQLite backup is now a rollback/migration artifact rather than a second writable authority.
+PostgreSQL is the authoritative catalogue under ADR-0009.
 
 This runbook establishes the local PostgreSQL service used for migration development, verification and the accepted Windows-hosted PostgreSQL catalogue. Full day-to-day PostgreSQL backup/recovery and sustained archive-catch-up operations are completed under WI-0106.
 
@@ -111,7 +111,7 @@ This removes the named PostgreSQL data volume.
 
 ## Current authority boundary
 
-WI-0102 completed the real SQLite-to-PostgreSQL migration and controlled authority transfer. The maintainer runtime now requires PostgreSQL; WI-0149 removed the remaining executable SQLite migration/import and active test compatibility surface.
+The maintainer runtime requires PostgreSQL. There is no other catalogue provider.
 
 Longer-term PostgreSQL backup/recovery, stabilization and sustained real-archive catch-up are owned by WI-0106.
 

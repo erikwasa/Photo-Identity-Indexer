@@ -55,7 +55,7 @@ WI-0111 adds bounded automatic follow-up around the same controller. Evidence-ve
 
 The web `Regenerate matches` workspace selects an exact model revision, presents current/stale/queued/running/completed state and durable progress, and links back to confidence-group review after completion. Review reads remain available while scoring proceeds because work is split into short transactions.
 
-The old SQLite-opening `match regenerate` CLI path was retired under WI-0149. New matcher tooling must use PostgreSQL/provider-neutral application contracts rather than restoring a provider-specific command path.
+There is no `match regenerate` CLI command. New matcher tooling must use the PostgreSQL/provider-neutral application contracts.
 
 ## Review states
 

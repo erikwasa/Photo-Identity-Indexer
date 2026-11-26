@@ -10,8 +10,7 @@ namespace PhotoIdentity.Testing.Postgres;
 /// <summary>
 /// PostgreSQL-backed compatibility facade for mature integration fixtures that predate the
 /// provider-neutral catalogue source and asset-revision lookup contracts. The public shape is kept
-/// temporarily so WI-0148 can remove the SQLite adapter dependency without rewriting unrelated
-/// behavior tests; WI-0149 can then clean up the historical names.
+/// so unrelated behavior tests do not need rewriting.
 /// </summary>
 public sealed class PostgresLocalBatchCompatibilityRepository :
     IAssetRevisionLookupRepository,

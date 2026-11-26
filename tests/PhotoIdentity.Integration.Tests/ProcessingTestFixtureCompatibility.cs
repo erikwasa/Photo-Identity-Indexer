@@ -5,9 +5,7 @@ using PhotoIdentity.Core.Recognition;
 namespace PhotoIdentity_Integration_Tests;
 
 /// <summary>
-/// Shared processing fixture helpers retained after the SQLite-only processing repository tests
-/// were retired by WI-0148. The historical class name is intentionally temporary so existing
-/// higher-level batch and resumability tests can keep their fixture calls while running on the
+/// Shared processing fixture helpers for the batch and resumability tests, which run on the
 /// PostgreSQL test catalogue.
 /// </summary>
 internal static class PostgresProcessingRepositoryTests

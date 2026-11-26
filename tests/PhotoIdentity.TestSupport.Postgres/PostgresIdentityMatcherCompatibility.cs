@@ -9,8 +9,8 @@ namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// PostgreSQL-backed compatibility matcher for mature application tests that predate the durable
-/// regeneration worker. It preserves the legacy synchronous fixture semantics without referencing
-/// the SQLite persistence assembly. Production continues to use the durable regeneration contracts.
+/// regeneration worker. It preserves the legacy synchronous fixture semantics. Production uses the
+/// durable regeneration contracts.
 /// </summary>
 public sealed class PostgresIdentityMatcherCompatibility
 {

@@ -1,8 +1,6 @@
 # PostgreSQL production operations
 
-PostgreSQL is the accepted single writable production catalogue for the maintainer installation. This runbook owns the WI-0106 day-to-day service, backup/restore, restart and upgrade boundary after the SQLite-to-PostgreSQL cutover.
-
-The final pre-cutover SQLite backup remains a rollback/migration artifact during M24 stabilization. It is not a second writable production catalogue.
+PostgreSQL is the accepted single writable production catalogue for the maintainer installation. This runbook owns the WI-0106 day-to-day service, backup/restore, restart and upgrade boundary.
 
 ## Normal startup order
 
@@ -440,7 +438,7 @@ Report: the synthetic test results; backup/hash/row-comparison success; `passed`
 
 The maintainer completed this acceptance successfully on 2026-09-12 from a stopped production source. The custom-format dump was hash-recorded, restored into an isolated database, and passed schema/table/count/constraint comparison before that isolated database was explicitly removed.
 
-M24/WI-0106 stabilization is complete. The pre-cutover SQLite snapshot may remain as protected historical migration evidence, but it is not a current recovery target; current recovery always uses a verified PostgreSQL logical backup.
+M24/WI-0106 stabilization is complete. Recovery always uses a verified PostgreSQL logical backup.
 
 ## PostgreSQL 18 service upgrades
 
@@ -514,6 +512,6 @@ Invoke-RestMethod "$Api/api/archive/storage"
 Invoke-RestMethod "$Api/api/archive/diagnostics/throughput"
 ```
 
-The acceptance question is operational stability, not comparison with SQLite. Watch that backlog/progress continues to move, managed hydration is released normally, PostgreSQL health remains ready, and diagnostics expose enough aggregate stage/counter evidence to investigate a stall without enabling per-photo tracing.
+The acceptance question is operational stability. Watch that backlog/progress continues to move, managed hydration is released normally, PostgreSQL health remains ready, and diagnostics expose enough aggregate stage/counter evidence to investigate a stall without enabling per-photo tracing.
 
 After sustained catch-up is accepted, add a small real source increment and run the normal synchronization/advance path without full regeneration. Verify that the new photos synchronize, analyze, enrich and appear for review while unchanged existing work is not unnecessarily repeated. Record that as the final daily-style increment evidence for WI-0106.
